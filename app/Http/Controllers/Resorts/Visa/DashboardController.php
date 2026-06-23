@@ -251,9 +251,9 @@ class DashboardController extends Controller
         }
 
         $id = base64_decode($request->id);
-        // The modal input is shown/entered in the resort's display currency.
-        // Xpact_Amt is stored in MVR, so convert display → MVR before saving.
-        $WalletAmt = Common::convertToStorageCurrency($request->Xpact_WalletAmt, 'MVR');
+        // The visa module is MVR end-to-end: the modal input is entered in MVR
+        // and Xpact_Amt is stored in MVR, so save the raw value (no conversion).
+        $WalletAmt = (float) $request->Xpact_WalletAmt;
         $VisaXpactAmounts = VisaXpactAmounts::where('resort_id', $this->resort->resort_id)->find($id);
 
         if (!$VisaXpactAmounts) {
@@ -281,14 +281,14 @@ class DashboardController extends Controller
                                             <div class="d-flex align-items-center">
                                                 <a href="javascript:void(0)"
                                                 class="edit-visa-wallet me-2"
-                                                data-amt="' . base64_encode(Common::convertToDisplayCurrency($VisaWallet->Xpact_Amt, 'MVR')) . '"
+                                                data-amt="' . base64_encode($VisaWallet->Xpact_Amt) . '"
                                                 data-name="' . base64_encode($VisaWallet->Xpact_WalletName) . '"
                                                 data-id="' . base64_encode($VisaWallet->id) . '">
                                                     <img src="' . URL::asset('resorts_assets/images/edit.svg') . '" alt="icon">
                                                 </a>
                                             </div>
                                             <h6>' . e($VisaWallet->Xpact_WalletName) . '</h6>
-                                            <strong>' . Common::formatCurrency($VisaWallet->Xpact_Amt, 'MVR') . '</strong>
+                                            <strong>' . Common::formatMvr($VisaWallet->Xpact_Amt) . '</strong>
                                         </div>
                                     </div>
                                 </div>';
@@ -355,7 +355,7 @@ class DashboardController extends Controller
                 $results[] = [
                     'wallet_name' => $xpact->Xpact_WalletName,
                     'status'      => 'Not Reconciled - Difference: '
-                        . Common::formatCurrency(round(abs($walletAmt - $xpactAmt), 2), 'MVR'),
+                        . Common::formatMvr(round(abs($walletAmt - $xpactAmt), 2)),
                 ];
             }
         }
@@ -421,7 +421,7 @@ class DashboardController extends Controller
                     // Previously rendered the per-person rate which made
                     // "5 employees × MVR 18,000" look identical to "1 employee".
                     $total = (float) $row->deposit_amount * (int) $row->employee_count;
-                    return Common::formatCurrency($total, 'MVR');
+                    return Common::formatMvr($total);
                 })
                 ->editColumn('Employeee', function ($row) {
                     return $row->employee_count;
@@ -482,7 +482,7 @@ class DashboardController extends Controller
                     // Previously rendered the per-person rate which made
                     // "5 employees × MVR 18,000" look identical to "1 employee".
                     $total = (float) $row->deposit_amount * (int) $row->employee_count;
-                    return Common::formatCurrency($total, 'MVR');
+                    return Common::formatMvr($total);
                 })
                 ->editColumn('Employeee', function ($row) {
                     return $row->employee_count;
@@ -763,12 +763,12 @@ class DashboardController extends Controller
                     return $w;
             });
             
-            $TotalPaidAmt         =    Common::formatCurrency($WorkPermit->where('Status', 'Paid')->sum('Amt'), 'MVR');
-            $TotalUnpaidAmt       =    Common::formatCurrency($WorkPermit->where('Status', 'Unpaid')->sum('Amt'), 'MVR');
+            $TotalPaidAmt         =    Common::formatMvr($WorkPermit->where('Status', 'Paid')->sum('Amt'));
+            $TotalUnpaidAmt       =    Common::formatMvr($WorkPermit->where('Status', 'Unpaid')->sum('Amt'));
             $Totalemployees       =    $WorkPermit->groupBy('employee_id')->count('employee_id');
-            $MonthlyduePayment    =    Common::formatCurrency(WorkPermit::where('resort_id', $resort_id)->whereBetween("Due_Date",[$startOfMonth,$endOfMonth])->where('Status', 'Unpaid')->sum('Amt'), 'MVR');
-            $WeekduePayment       =    Common::formatCurrency(WorkPermit::where('resort_id', $resort_id)->whereBetween("Due_Date",[$ThisWeekStartDate,$ThisWeekEndDate])->where('Status', 'Unpaid')->sum('Amt'), 'MVR');
-            $TodayduePayment      =    Common::formatCurrency(WorkPermit::where('resort_id', $resort_id)->whereDate("Due_Date",$Today->toDateString())->where('Status', 'Unpaid')->sum('Amt'), 'MVR');
+            $MonthlyduePayment    =    Common::formatMvr(WorkPermit::where('resort_id', $resort_id)->whereBetween("Due_Date",[$startOfMonth,$endOfMonth])->where('Status', 'Unpaid')->sum('Amt'));
+            $WeekduePayment       =    Common::formatMvr(WorkPermit::where('resort_id', $resort_id)->whereBetween("Due_Date",[$ThisWeekStartDate,$ThisWeekEndDate])->where('Status', 'Unpaid')->sum('Amt'));
+            $TodayduePayment      =    Common::formatMvr(WorkPermit::where('resort_id', $resort_id)->whereDate("Due_Date",$Today->toDateString())->where('Status', 'Unpaid')->sum('Amt'));
 
 
         
@@ -807,13 +807,13 @@ class DashboardController extends Controller
 
                     return $w;
                 });
-            $TotalPaidAmt         =    Common::formatCurrency($QuotaSlotRenewal->where('Status', 'Paid')->sum('Amt'), 'MVR');
+            $TotalPaidAmt         =    Common::formatMvr($QuotaSlotRenewal->where('Status', 'Paid')->sum('Amt'));
 
-            $TotalUnpaidAmt       =    Common::formatCurrency($QuotaSlotRenewal->where('Status', 'Unpaid')->sum('Amt'), 'MVR');
+            $TotalUnpaidAmt       =    Common::formatMvr($QuotaSlotRenewal->where('Status', 'Unpaid')->sum('Amt'));
             $Totalemployees       =    $QuotaSlotRenewal->groupBy('employee_id')->count('employee_id');
-            $MonthlyduePayment    =    Common::formatCurrency(QuotaSlotRenewal::where('resort_id', $resort_id)->whereBetween("Due_Date",[$startOfMonth,$endOfMonth])->where('Status', 'Unpaid')->sum('Amt'), 'MVR');
-            $WeekduePayment       =    Common::formatCurrency(QuotaSlotRenewal::where('resort_id', $resort_id)->whereBetween("Due_Date",[$ThisWeekStartDate,$ThisWeekEndDate])->where('Status', 'Unpaid')->sum('Amt'), 'MVR');
-            $TodayduePayment      =    Common::formatCurrency(QuotaSlotRenewal::where('resort_id', $resort_id)->whereDate("Due_Date",$Today->toDateString())->where('Status', 'Unpaid')->sum('Amt'), 'MVR');
+            $MonthlyduePayment    =    Common::formatMvr(QuotaSlotRenewal::where('resort_id', $resort_id)->whereBetween("Due_Date",[$startOfMonth,$endOfMonth])->where('Status', 'Unpaid')->sum('Amt'));
+            $WeekduePayment       =    Common::formatMvr(QuotaSlotRenewal::where('resort_id', $resort_id)->whereBetween("Due_Date",[$ThisWeekStartDate,$ThisWeekEndDate])->where('Status', 'Unpaid')->sum('Amt'));
+            $TodayduePayment      =    Common::formatMvr(QuotaSlotRenewal::where('resort_id', $resort_id)->whereDate("Due_Date",$Today->toDateString())->where('Status', 'Unpaid')->sum('Amt'));
 
         }
         elseif($flag == "Insurance")
@@ -851,15 +851,15 @@ class DashboardController extends Controller
             // Total Paid = sum of Premium for policies whose start falls in the
             // selected window AND are marked Status='Paid' (column added in
             // 2026_05_14 migration). Existing rows backfilled to Paid.
-            $TotalPaidAmt         =    Common::formatCurrency(EmployeeInsurance::where('resort_id', $resort_id)->where('Status', 'Paid')->whereBetween("insurance_start_date",[$StartDate,$EndDate])->sum('Premium'), 'MVR');
-            $TotalUnpaidAmt       =    Common::formatCurrency($EmployeeInsurance->where('Status', 'Pending')->sum('Premium'), 'MVR');
+            $TotalPaidAmt         =    Common::formatMvr(EmployeeInsurance::where('resort_id', $resort_id)->where('Status', 'Paid')->whereBetween("insurance_start_date",[$StartDate,$EndDate])->sum('Premium'));
+            $TotalUnpaidAmt       =    Common::formatMvr($EmployeeInsurance->where('Status', 'Pending')->sum('Premium'));
             $Totalemployees       =    $EmployeeInsurance->groupBy('employee_id')->count('employee_id');
             // Coming-due totals: only count policies that haven't been paid
             // yet (Status='Pending'). Mirrors the Status='Unpaid' filter the
             // Work Permit / Quota Slot branches already use for parity.
-            $MonthlyduePayment    =    Common::formatCurrency(EmployeeInsurance::where('resort_id', $resort_id)->where('Status', 'Pending')->whereBetween("insurance_end_date",[$startOfMonth,$endOfMonth])->sum('Premium'), 'MVR');
-            $WeekduePayment       =    Common::formatCurrency(EmployeeInsurance::where('resort_id', $resort_id)->where('Status', 'Pending')->whereBetween("insurance_end_date",[$ThisWeekStartDate,$ThisWeekEndDate])->sum('Premium'), 'MVR');
-            $TodayduePayment      =    Common::formatCurrency(EmployeeInsurance::where('resort_id', $resort_id)->where('Status', 'Pending')->whereDate("insurance_end_date",$Today->toDateString())->sum('Premium'), 'MVR');
+            $MonthlyduePayment    =    Common::formatMvr(EmployeeInsurance::where('resort_id', $resort_id)->where('Status', 'Pending')->whereBetween("insurance_end_date",[$startOfMonth,$endOfMonth])->sum('Premium'));
+            $WeekduePayment       =    Common::formatMvr(EmployeeInsurance::where('resort_id', $resort_id)->where('Status', 'Pending')->whereBetween("insurance_end_date",[$ThisWeekStartDate,$ThisWeekEndDate])->sum('Premium'));
+            $TodayduePayment      =    Common::formatMvr(EmployeeInsurance::where('resort_id', $resort_id)->where('Status', 'Pending')->whereDate("insurance_end_date",$Today->toDateString())->sum('Premium'));
         }
         elseif($flag == "PermitMedicalFee")
         {
@@ -894,13 +894,13 @@ class DashboardController extends Controller
             // Total Paid = sum Amt for renewals whose start falls in the selected
             // window AND are marked Status='Paid' (column added in 2026_05_14
             // migration). Was using current month + no Status filter.
-            $TotalPaidAmt                =    Common::formatCurrency(WorkPermitMedicalRenewal::where('resort_id', $resort_id)->where('Status', 'Paid')->whereBetween("start_date",[$StartDate,$EndDate])->sum('Amt'), 'MVR');
-            $TotalUnpaidAmt              =    Common::formatCurrency($WorkPermitMedicalRenewal->where('Status', 'Pending')->sum('Amt'), 'MVR');
+            $TotalPaidAmt                =    Common::formatMvr(WorkPermitMedicalRenewal::where('resort_id', $resort_id)->where('Status', 'Paid')->whereBetween("start_date",[$StartDate,$EndDate])->sum('Amt'));
+            $TotalUnpaidAmt              =    Common::formatMvr($WorkPermitMedicalRenewal->where('Status', 'Pending')->sum('Amt'));
             $Totalemployees              =    $WorkPermitMedicalRenewal->groupBy('employee_id')->count('employee_id');
             // Coming-due totals filtered to Status='Pending' for parity with WorkPermit/QuotaSlot.
-            $MonthlyduePayment           =    Common::formatCurrency(WorkPermitMedicalRenewal::where('resort_id', $resort_id)->where('Status', 'Pending')->whereBetween("end_date",[$startOfMonth,$endOfMonth])->sum('Amt'), 'MVR');
-            $WeekduePayment              =    Common::formatCurrency(WorkPermitMedicalRenewal::where('resort_id', $resort_id)->where('Status', 'Pending')->whereBetween("end_date",[$ThisWeekStartDate,$ThisWeekEndDate])->sum('Amt'), 'MVR');
-            $TodayduePayment             =    Common::formatCurrency(WorkPermitMedicalRenewal::where('resort_id', $resort_id)->where('Status', 'Pending')->whereDate("end_date",$Today->toDateString())->sum('Amt'), 'MVR');
+            $MonthlyduePayment           =    Common::formatMvr(WorkPermitMedicalRenewal::where('resort_id', $resort_id)->where('Status', 'Pending')->whereBetween("end_date",[$startOfMonth,$endOfMonth])->sum('Amt'));
+            $WeekduePayment              =    Common::formatMvr(WorkPermitMedicalRenewal::where('resort_id', $resort_id)->where('Status', 'Pending')->whereBetween("end_date",[$ThisWeekStartDate,$ThisWeekEndDate])->sum('Amt'));
+            $TodayduePayment             =    Common::formatMvr(WorkPermitMedicalRenewal::where('resort_id', $resort_id)->where('Status', 'Pending')->whereDate("end_date",$Today->toDateString())->sum('Amt'));
         }
         elseif($flag == "WorkVisa")
         {
@@ -937,13 +937,13 @@ class DashboardController extends Controller
             // Total Paid = sum Amt for visas whose start falls in the selected
             // window AND are marked Status='Paid' (column added in 2026_05_14
             // migration).
-            $TotalPaidAmt                =    Common::formatCurrency(VisaRenewal::where('resort_id', $resort_id)->where('Status', 'Paid')->whereBetween("start_date",[$StartDate,$EndDate])->sum('Amt'), 'MVR');
-            $TotalUnpaidAmt              =    Common::formatCurrency($VisaRenewal->where('Status', 'Pending')->sum('Amt'), 'MVR');
+            $TotalPaidAmt                =    Common::formatMvr(VisaRenewal::where('resort_id', $resort_id)->where('Status', 'Paid')->whereBetween("start_date",[$StartDate,$EndDate])->sum('Amt'));
+            $TotalUnpaidAmt              =    Common::formatMvr($VisaRenewal->where('Status', 'Pending')->sum('Amt'));
             $Totalemployees              =    $VisaRenewal->groupBy('employee_id')->count('employee_id');
             // Coming-due totals filtered to Status='Pending' for parity with WorkPermit/QuotaSlot.
-            $MonthlyduePayment           =    Common::formatCurrency(VisaRenewal::where('resort_id', $resort_id)->where('Status', 'Pending')->whereBetween("end_date",[$startOfMonth,$endOfMonth])->sum('Amt'), 'MVR');
-            $WeekduePayment              =    Common::formatCurrency(VisaRenewal::where('resort_id', $resort_id)->where('Status', 'Pending')->whereBetween("end_date",[$ThisWeekStartDate,$ThisWeekEndDate])->sum('Amt'), 'MVR');
-            $TodayduePayment             =    Common::formatCurrency(VisaRenewal::where('resort_id', $resort_id)->where('Status', 'Pending')->whereDate("end_date",$Today->toDateString())->sum('Amt'), 'MVR');
+            $MonthlyduePayment           =    Common::formatMvr(VisaRenewal::where('resort_id', $resort_id)->where('Status', 'Pending')->whereBetween("end_date",[$startOfMonth,$endOfMonth])->sum('Amt'));
+            $WeekduePayment              =    Common::formatMvr(VisaRenewal::where('resort_id', $resort_id)->where('Status', 'Pending')->whereBetween("end_date",[$ThisWeekStartDate,$ThisWeekEndDate])->sum('Amt'));
+            $TodayduePayment             =    Common::formatMvr(VisaRenewal::where('resort_id', $resort_id)->where('Status', 'Pending')->whereDate("end_date",$Today->toDateString())->sum('Amt'));
         }
 
         $row1='';

@@ -38,10 +38,10 @@ class FundTransferController extends Controller
     {
         $from_wallet = base64_decode($request->from_wallet);
         $to_wallet = base64_decode($request->to_wallet);
-        // The AMOUNT field is entered in the resort's display currency; wallet
-        // balances are stored in MVR — convert display → MVR before any math
-        // (balance check, debit, credit, transaction record).
-        $Amt      =  Common::convertToStorageCurrency($request->Amt, 'MVR');
+        // The visa module is MVR end-to-end: the AMOUNT field is entered in MVR
+        // and wallet balances are stored in MVR, so use the raw value for all
+        // math (balance check, debit, credit, transaction record).
+        $Amt      =  (float) $request->Amt;
         $comments = $request->comments;
     
         
@@ -241,7 +241,7 @@ class FundTransferController extends Controller
                 ->editColumn('Date', fn ($row) => $row->Date)
                 ->editColumn('FromWallet', fn ($row) => $row->FromWallet)
                 ->editColumn('ToWallet', fn ($row) => $row->ToWallet)
-                ->editColumn('Amount', fn ($row) => number_format(Common::convertToDisplayCurrency($row->Amount, 'MVR'), 2))
+                ->editColumn('Amount', fn ($row) => 'MVR ' . number_format($row->Amount, 2))
                 ->editColumn('Comment', fn ($row) => $row->Comment)
                 ->editColumn('Attachment', fn ($row) => $row->Attachment)
                 ->rawColumns(['Date', 'FromWallet', 'ToWallet', 'Amount', 'Comment', 'Attachment'])
