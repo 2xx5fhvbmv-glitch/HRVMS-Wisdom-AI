@@ -188,16 +188,21 @@ class PaymentRequestController extends Controller
                 $flags = ['insurance', 'work_permit', 'MedicalReport', 'slot_payment'];
             }
 
+            // By default we show the next OUTSTANDING (unpaid) due per fee type,
+            // regardless of when it falls — the date window only narrows results
+            // when the user explicitly picks a range.
+            $hasDateFilter = false;
             $filterStart = Carbon::now()->startOfMonth();
             $filterEnd = Carbon::now()->endOfMonth();
 
             if ($date && strpos($date, '-') !== false) {
-                try 
+                try
                 {
                     $parts = explode(' - ', $date);
                     $filterStart = Carbon::createFromFormat('d-m-Y', trim($parts[0]))->startOfDay();
                     $filterEnd = Carbon::createFromFormat('d-m-Y', trim($parts[1]))->endOfDay();
-                } catch (\Exception $e) 
+                    $hasDateFilter = true;
+                } catch (\Exception $e)
                 {
                     // fallback
                 }
@@ -217,7 +222,7 @@ class PaymentRequestController extends Controller
                 ->where("nationality", '!=', "Maldivian")
                 ->where('resort_id', $this->resort->resort_id)
                 ->get()
-                ->map(function ($employee) use (&$totalChecked, $isChecked, $flags, $showAll, $filterStart, $filterEnd, &$totalVisa, &$totalInsurance, &$totalPermit, &$totalMedical, &$totalQuota) {
+                ->map(function ($employee) use (&$totalChecked, $isChecked, $flags, $showAll, $hasDateFilter, $filterStart, $filterEnd, &$totalVisa, &$totalInsurance, &$totalPermit, &$totalMedical, &$totalQuota) {
                     $employee->isChecked = $isChecked;
                     $employee->Emp_name = $employee->resortAdmin->first_name . ' ' . $employee->resortAdmin->last_name;
                     $employee->Emp_id = $employee->Emp_id;
@@ -254,7 +259,11 @@ class PaymentRequestController extends Controller
 
                     if (in_array('insurance', $flags)) {
                         $insurance = $employee->EmployeeInsurance()->where('employee_id', $employee->id)->where('resort_id', $this->resort->resort_id)->orderBy('insurance_end_date', 'desc')->orderBy('id', 'desc')->first();
-                        if ($insurance && Carbon::parse($insurance->insurance_end_date)->between($filterStart, $filterEnd)) {
+                        // Outstanding = current policy not yet paid. Shown regardless of
+                        // the window; the window only narrows when explicitly picked.
+                        $insOutstanding = $insurance && strtolower((string) $insurance->Status) !== 'paid';
+                        $insInWindow = $insurance && (!$hasDateFilter || Carbon::parse($insurance->insurance_end_date)->between($filterStart, $filterEnd));
+                        if ($insOutstanding && $insInWindow) {
                             $employee->InsuranceExpiryDate = '<b>MVR ' . number_format($insurance->Premium, 2) . '</b> ' . $this->getFormattedExpiryStatus($insurance->insurance_end_date);
                             $totalInsurance += $insurance->Premium;
                             $hasAnyFlagData = true;
@@ -267,10 +276,18 @@ class PaymentRequestController extends Controller
                         }
                     }
 
-                    if (in_array('work_permit', $flags)) 
+                    if (in_array('work_permit', $flags))
                     {
-                        $wpEntries = $employee->WorkPermit->sortByDesc('id'); // all records sorted by id DESC
-                        $currentWP = $wpEntries->filter(fn($item) => Carbon::parse($item->Due_Date)->between($filterStart, $filterEnd))->first();
+                        // Next OUTSTANDING work-permit due: earliest Unpaid month with a
+                        // real fee, regardless of the date window (window only narrows).
+                        $wpEntries = $employee->WorkPermit->sortBy('Due_Date');
+                        $unpaidWP = $wpEntries->filter(fn($item) => $item->Due_Date
+                            && strtolower((string) $item->Status) !== 'paid'
+                            && (float) $item->Amt > 0);
+                        if ($hasDateFilter) {
+                            $unpaidWP = $unpaidWP->filter(fn($item) => Carbon::parse($item->Due_Date)->between($filterStart, $filterEnd));
+                        }
+                        $currentWP = $unpaidWP->first();
                         $encodedId = base64_encode($employee->id);
                         if ($currentWP)
                         {
@@ -280,25 +297,17 @@ class PaymentRequestController extends Controller
                             $employeeData[$encodedId]['WorkPermitAmt'] = $currentWP->Amt;
                             $employeeData[$encodedId]['WorkPermitExpiry'] = $currentWP->Due_Date;
 
-                            $previousWP = $wpEntries->first(function ($item) use ($currentWP) {
-                                return Carbon::parse($item->Due_Date)->lt(Carbon::parse($currentWP->Due_Date));
-                            });
-
-                            if ($previousWP) 
-                            {
-                                $employeeData[$encodedId]['LastWorkPermitExpiry'] = $previousWP->Due_Date;
-                            } 
-                            else
-                            {
-                                $employeeData[$encodedId]['LastWorkPermitExpiry'] = 'N/A';
-                            }
+                            $previousWP = $wpEntries->filter(fn($item) => Carbon::parse($item->Due_Date)->lt(Carbon::parse($currentWP->Due_Date)))->last();
+                            $employeeData[$encodedId]['LastWorkPermitExpiry'] = $previousWP ? $previousWP->Due_Date : 'N/A';
                         }
                     }
 
-                    if (in_array('MedicalReport', $flags)) 
+                    if (in_array('MedicalReport', $flags))
                     {
                         $med = $employee->WorkPermitMedicalRenewal;
-                        if ($med && Carbon::parse($med->end_date)->between($filterStart, $filterEnd)) 
+                        $medOutstanding = $med && strtolower((string) $med->Status) !== 'paid';
+                        $medInWindow = $med && (!$hasDateFilter || Carbon::parse($med->end_date)->between($filterStart, $filterEnd));
+                        if ($medOutstanding && $medInWindow)
                         {
                             $employee->WorkPermitMedicalPermitExpiryDate = '<b>MVR ' . number_format($med->Amt, 2) . '</b> ' . $this->getFormattedExpiryStatus($med->end_date);
                             $totalMedical += $med->Amt;
@@ -306,7 +315,6 @@ class PaymentRequestController extends Controller
                             $employeeData[base64_encode($employee->id)]['MedicalAmt'] = $med->Amt;
                             $employeeData[base64_encode($employee->id)]['MedicalExpiry'] = $med->end_date;
 
-                   
                             $LastWorkPermitMedicalExpiry  = $employee->WorkPermitMedicalRenewal->WorkPermitMedicalRenewalChild()->orderBy("id","desc")->first();
                             $LastWorkPermitMedicalExpiry = $LastWorkPermitMedicalExpiry->end_date ?? 'N/A';
                             $employeeData[base64_encode($employee->id)]['LastWorkPermitMedicalExpiry'] = $LastWorkPermitMedicalExpiry;
@@ -314,24 +322,18 @@ class PaymentRequestController extends Controller
                     }
 
                     if (in_array('slot_payment', $flags)) {
-                        // $quota = $employee->QuotaSlotRenewal->filter(fn($item) => Carbon::parse($item->Expiry_Date)->between($filterStart, $filterEnd))->sortByDesc('id')->first();
-                        // if ($quota) {
-                        //     $employee->QuotaSlotAmtForThisMonth = '<b> MVR ' . number_format($quota->Amt, 2) . '</b> ' . $this->getFormattedExpiryStatus($quota->Due_Date);
-                        //     $totalQuota += $quota->Amt;
-                        //     $hasAnyFlagData = true;
-                        //     $employeeData[base64_encode($employee->id)]['QuotaAmt'] = $quota->Amt;
-                        //     $employeeData[base64_encode($employee->id)]['QuotaExpiry'] = $quota->Due_Date;
-                        // }
-
-                        $quotaEntries = $employee->QuotaSlotRenewal->sortByDesc('id'); // All entries sorted descending by ID
-                        // quota_slot_renewals has NO Expiry_Date column — the old
-                        // $item->Expiry_Date was null, so Carbon::parse(null)=today and
-                        // the duration window never matched correctly. Use Due_Date.
-                        $currentQuota = $quotaEntries
-                            ->filter(fn($item) => $item->Due_Date && Carbon::parse($item->Due_Date)->between($filterStart, $filterEnd))
-                            ->first();
+                        // Next OUTSTANDING quota-slot due: earliest Unpaid month with a
+                        // real fee, regardless of the date window (window only narrows).
+                        $quotaEntries = $employee->QuotaSlotRenewal->sortBy('Due_Date');
+                        $unpaidQuota = $quotaEntries->filter(fn($item) => $item->Due_Date
+                            && strtolower((string) $item->Status) !== 'paid'
+                            && (float) $item->Amt > 0);
+                        if ($hasDateFilter) {
+                            $unpaidQuota = $unpaidQuota->filter(fn($item) => Carbon::parse($item->Due_Date)->between($filterStart, $filterEnd));
+                        }
+                        $currentQuota = $unpaidQuota->first();
                         $encodedId = base64_encode($employee->id);
-                        if ($currentQuota) 
+                        if ($currentQuota)
                         {
                             $employee->QuotaSlotAmtForThisMonth = '<b>MVR ' . number_format($currentQuota->Amt, 2) . '</b> ' . $this->getFormattedExpiryStatus($currentQuota->Due_Date);
                             $totalQuota += $currentQuota->Amt;
@@ -340,19 +342,8 @@ class PaymentRequestController extends Controller
                             $employeeData[$encodedId]['QuotaAmt'] = $currentQuota->Amt;
                             $employeeData[$encodedId]['QuotaExpiry'] = $currentQuota->Due_Date;
 
-                            // Get previous quota entry (before current one)
-                            $previousQuota = $quotaEntries->first(function ($item) use ($currentQuota) {
-                                return Carbon::parse($item->Due_Date)->lt(Carbon::parse($currentQuota->Due_Date));
-                            });
-
-                            if ($previousQuota) 
-                            {
-                                $employeeData[$encodedId]['LastQuotaExpiry'] = $previousQuota->Due_Date;
-                            } 
-                            else 
-                            {
-                                $employeeData[$encodedId]['LastQuotaExpiry'] = 'N/A';
-                            }
+                            $previousQuota = $quotaEntries->filter(fn($item) => Carbon::parse($item->Due_Date)->lt(Carbon::parse($currentQuota->Due_Date)))->last();
+                            $employeeData[$encodedId]['LastQuotaExpiry'] = $previousQuota ? $previousQuota->Due_Date : 'N/A';
                         }
                     }
 
