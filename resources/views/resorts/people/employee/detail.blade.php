@@ -1660,6 +1660,37 @@
                                                 </div>
                                             @endif
                                         </div>
+
+                                        {{-- Visa / Work-Permit expiries synced from the Xpat module (read-only) --}}
+                                        @if(!empty($xpatExpiries) && collect($xpatExpiries)->contains(fn($x) => !empty($x['date'])))
+                                        <div class="row g-xxl-4 g-md-3 g-2 mt-1">
+                                            <div class="col-12"><h6 class="mb-2">Visa &amp; Work Permit Expiry</h6></div>
+                                            @php $xpChunks = array_chunk($xpatExpiries, (int) ceil(count($xpatExpiries) / 2)); @endphp
+                                            @foreach($xpChunks as $xpChunk)
+                                            <div class="col-lg-6">
+                                                <div class="table-responsive">
+                                                    <table class="table table-lable mb-1">
+                                                        <tbody>
+                                                            @foreach($xpChunk as $xp)
+                                                            <tr>
+                                                                <th>{{ $xp['label'] }}</th>
+                                                                <td>
+                                                                    @if(!empty($xp['date']))
+                                                                        {{ $xp['date'] }}
+                                                                        @if(!empty($xp['status']))<span class="text-danger d-block" style="font-size:12px;">{{ $xp['status'] }}</span>@endif
+                                                                    @else
+                                                                        -
+                                                                    @endif
+                                                                </td>
+                                                            </tr>
+                                                            @endforeach
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                            @endforeach
+                                        </div>
+                                        @endif
                                     </div>
 
                                     <div class="card-title mb-lg-3">

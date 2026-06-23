@@ -1283,7 +1283,76 @@ class EmployeeController extends Controller
             ->take(3)
             ->values();
 
-        return view('resorts.people.employee.detail',compact('page_title','conversionRate','teams','roles','resort_id','resort_divisions','employee','departments','positions','remianing_leaves','nationality','benefitGrids','sections','costs','emp_benigit_grid','resort_allowances','airports','recentActivities'));
+        // Visa / Work-Permit expiries synced from the Xpat module, so the
+        // Expiry tab surfaces the same data the Visa module already holds
+        // instead of only the manually-uploaded employees_documents rows.
+        $xpatExpiries = $this->getXpatExpiries($employee->id, $resort_id);
+
+        return view('resorts.people.employee.detail',compact('page_title','conversionRate','teams','roles','resort_id','resort_divisions','employee','departments','positions','remianing_leaves','nationality','benefitGrids','sections','costs','emp_benigit_grid','resort_allowances','airports','recentActivities','xpatExpiries'));
+    }
+
+    /**
+     * Collect the visa/work-permit expiry dates for an employee from the Xpat
+     * module's tables (same sources as the Expiry Tracker / Xpat details page).
+     * Returns a list of ['label','date','status'] — date is 'd M Y' or null.
+     */
+    private function getXpatExpiries($employeeId, $resortId): array
+    {
+        $fmt = function ($date) {
+            if (empty($date)) {
+                return [null, null];
+            }
+            try {
+                $end = Carbon::parse($date);
+            } catch (\Exception $e) {
+                return [null, null];
+            }
+            $days = Carbon::today()->diffInDays($end, false);
+            $status = $days < 0
+                ? 'Expired ' . abs($days) . ' days ago'
+                : 'Expires in ' . $days . ' days';
+            return [$end->format('d M Y'), $status];
+        };
+
+        // OCR blob ("Other" doc) — work permit expiry, same field the Xpat
+        // details page reads.
+        $ocrWpExpiry = null;
+        $ocrRow = \App\Models\VisaEmployeeExpiryData::where('resort_id', $resortId)
+            ->where('employee_id', $employeeId)->where('DocumentName', 'Other')->latest('id')->first();
+        if ($ocrRow) {
+            $blob = is_array($ocrRow->Ai_extracted_data) ? $ocrRow->Ai_extracted_data : json_decode($ocrRow->Ai_extracted_data, true);
+            $ocrWpExpiry = $blob['extracted_fields']['Work Permit Expiry Date (Expiry On)'] ?? null;
+        }
+
+        // Passport expiry from the OCR Passport_Copy doc.
+        $passportExpiry = null;
+        $passRow = \App\Models\VisaEmployeeExpiryData::where('resort_id', $resortId)
+            ->where('employee_id', $employeeId)->where('DocumentName', 'Passport_Copy')->latest('id')->first();
+        if ($passRow) {
+            $blob = is_array($passRow->Ai_extracted_data) ? $passRow->Ai_extracted_data : json_decode($passRow->Ai_extracted_data, true);
+            $passportExpiry = $blob['extracted_fields']['Date of Expiry'] ?? ($blob['extracted_fields']['Passport Expiry Date'] ?? null);
+        }
+
+        $visa      = \App\Models\VisaRenewal::where('resort_id', $resortId)->where('employee_id', $employeeId)->latest('id')->first();
+        $insurance = \App\Models\EmployeeInsurance::where('resort_id', $resortId)->where('employee_id', $employeeId)->latest('id')->first();
+        $slot      = \App\Models\QuotaSlotRenewal::where('resort_id', $resortId)->where('employee_id', $employeeId)->latest('id')->first();
+        $medical   = \App\Models\WorkPermitMedicalRenewal::where('resort_id', $resortId)->where('employee_id', $employeeId)->latest('id')->first();
+
+        $rows = [
+            ['Passport', $passportExpiry],
+            ['Visa', $visa->end_date ?? null],
+            ['Work Permit', $ocrWpExpiry],
+            ['Slot Payment', $slot->Due_Date ?? null],
+            ['Insurance', $insurance->insurance_end_date ?? null],
+            ['Work Permit Medical', $medical->end_date ?? null],
+        ];
+
+        $out = [];
+        foreach ($rows as [$label, $date]) {
+            [$formatted, $status] = $fmt($date);
+            $out[] = ['label' => $label, 'date' => $formatted, 'status' => $status];
+        }
+        return $out;
     }
 
     public function assignToTeam(Request $request)
