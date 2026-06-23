@@ -109,17 +109,11 @@ class XpactEmployeeController extends Controller
                                     $i->MedicalExpiryDate = $this->getFormattedExpiryStatus($WorkPermitMedicalRenewal->end_date);
                                 }
 
-                                // Work Permit FEE due — next unpaid work permit row for this
-                                // employee, soonest Due_Date first.
-                                $workPermitFee = WorkPermit::where('employee_id', $i->id)
-                                    ->where('resort_id', $this->resort->resort_id)
-                                    ->where('Status', 'Unpaid')
-                                    ->whereNotNull('Due_Date')
-                                    ->orderBy('Due_Date', 'asc')
-                                    ->first(['employee_id', 'Due_Date', 'Status']);
-                                $i->WorkPermitDueDate = $workPermitFee
-                                    ? $this->getFormattedExpiryStatus($workPermitFee->Due_Date)
-                                    : null;
+                                // Work Permit Expiry — MUST match the Details page's
+                                // "Work Permit Fee Expiry" card, which reads the AI-extracted
+                                // 'Work Permit Expiry Date (Expiry On)' field. Set below once
+                                // the statistic header blob ($statisctic_emp_header) is loaded.
+                                $i->WorkPermitDueDate = null;
    
                                 $QuotaSlotRenewal = QuotaSlotRenewal::where('employee_id', $i->id)
                                         ->where('resort_id', $this->resort->resort_id)
@@ -140,11 +134,17 @@ class XpactEmployeeController extends Controller
                                     if ($statisctic_emp_header) {
                                         $insuranceExpiryRaw = $statisctic_emp_header['Ai_extracted_data']['extracted_fields']['Insurance Expiry Date'] ?? null;
 
-                                        if ($insuranceExpiryRaw) 
+                                        if ($insuranceExpiryRaw)
                                         {
-                                            
+
                                             $i->InsuranceRenewalDate = $this->getFormattedExpiryStatus($insuranceExpiryRaw);
-                                        
+
+                                        }
+
+                                        // Same field the Details "Work Permit Fee Expiry" card uses.
+                                        $wpExpiryRaw = $statisctic_emp_header['Ai_extracted_data']['extracted_fields']['Work Permit Expiry Date (Expiry On)'] ?? null;
+                                        if ($wpExpiryRaw) {
+                                            $i->WorkPermitDueDate = $this->getFormattedExpiryStatus($wpExpiryRaw);
                                         }
                                     } else {
                                         $i->InsuranceRenewalDate = null;
