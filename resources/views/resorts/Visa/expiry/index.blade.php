@@ -59,8 +59,8 @@
                             </div>
                         </div>
 
-                        <div class="col-xl-2 col-md-4 col-sm-4 col-4">
-                            <input type="text" class="form-control datepicker" id="datepickerXpact" placeholder="Select Date" />
+                        <div class="col-xl-3 col-md-4 col-sm-4 col-4">
+                            <input type="text" class="form-control" id="datepickerXpact" placeholder="Select date range" autocomplete="off" />
                         </div>
 
 
@@ -93,11 +93,32 @@
 $(document).ready(function() 
 {
     FetchIndexDate();
-    $("#datepickerXpact").datepicker({
-        format: 'yyyy-mm-dd',
-        autoclose: true,
-        todayHighlight: true
+
+    // Date-range filter: pick a start and end date; employees whose expiry
+    // falls anywhere inside that range are listed. Empty = current month
+    // (handled server-side). ISO format so Carbon parses it cleanly.
+    $("#datepickerXpact").daterangepicker({
+        autoUpdateInput: false,
+        autoApply: true,
+        alwaysShowCalendars: true,
+        linkedCalendars: false,
+        opens: 'left',
+        locale: {
+            format: 'YYYY-MM-DD',
+            cancelLabel: 'Clear'
+        }
     });
+    $("#datepickerXpact").on('apply.daterangepicker', function(ev, picker) {
+        $(this).val(picker.startDate.format('YYYY-MM-DD') + ' - ' + picker.endDate.format('YYYY-MM-DD'));
+        var flag = $('.ExpDa-fillterbox .Categories.active').data('flag');
+        FetchIndexDate(flag);
+    });
+    $("#datepickerXpact").on('cancel.daterangepicker', function() {
+        $(this).val('');
+        var flag = $('.ExpDa-fillterbox .Categories.active').data('flag');
+        FetchIndexDate(flag);
+    });
+
     $(document).on('click', '.Categories', function(e) {
         // Remove 'active' from all
 
@@ -110,13 +131,9 @@ $(document).ready(function()
         var flag = $(this).data('flag');
         FetchIndexDate(flag);
     });
-    $(document).on('keyup', '.Search', function() 
+    $(document).on('keyup', '.Search', function()
     {
         var flag = $('.ExpDa-fillterbox .Categories.active').data('flag');
-        FetchIndexDate(flag);
-    });
-    $(document).on('change', '#datepickerXpact', function() {
-       var flag = $('.ExpDa-fillterbox .Categories.active').data('flag');
         FetchIndexDate(flag);
     });
 

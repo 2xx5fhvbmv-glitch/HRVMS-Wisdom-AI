@@ -36,11 +36,16 @@ class ExpiryController extends Controller
             $search = $request->search;
             $date   =  $request->date;
         
-            if ($date) 
+            if ($date)
             {
-                    $parts = explode(' - ', $date);
+                    // Honour the full selected range "start - end". Previously this
+                    // ignored the end date and forced endOfMonth() of the start,
+                    // so a multi-month range only ever matched the start month.
+                    $parts = array_map('trim', explode(' - ', $date));
                     $filterStart = Carbon::parse($parts[0])->startOfDay();
-                    $filterEnd   = Carbon::parse($parts[0])->endOfMonth();
+                    $filterEnd   = (!empty($parts[1]))
+                        ? Carbon::parse($parts[1])->endOfDay()
+                        : Carbon::parse($parts[0])->endOfDay();
             }
             else
             {
@@ -97,15 +102,22 @@ class ExpiryController extends Controller
                     
                             }
                     
-                            $wpEntries = $employee->WorkPermit->where('Status','Unpaid')->sortByDesc('id');
-                            $currentWP = $wpEntries->filter(fn($item) => Carbon::parse($item->Due_Date)->between($filterStart, $filterEnd))->first();
-                            
-                            if ($currentWP)
+                            // Work Permit expiry comes from the synced OCR data
+                            // (the same "Work Permit Expiry Date (Expiry On)" field
+                            // the Xpat employee details page reads), not the fee
+                            // schedule's due date. Falls back to the soonest unpaid
+                            // fee due date if the OCR field isn't present.
+                            $wpExpiryDate = $this->getWorkPermitExpiryDate($employee->id);
+                            if (!$wpExpiryDate) {
+                                $fallbackWP = $employee->WorkPermit->where('Status','Unpaid')->sortByDesc('id')->first();
+                                $wpExpiryDate = $fallbackWP->Due_Date ?? null;
+                            }
+                            if ($wpExpiryDate && Carbon::parse($wpExpiryDate)->between($filterStart, $filterEnd))
                             {
-                                $employee->WorkPermitExpiryDate =  $this->getFormattedExpiryStatus($currentWP->Due_Date);
-                                $employee->WorkPermitAmt = number_format($currentWP->Amt,2);
+                                $employee->WorkPermitExpiryDate = $this->getFormattedExpiryStatus($wpExpiryDate);
+                                $currentWP = $employee->WorkPermit->where('Status','Unpaid')->sortByDesc('id')->first();
+                                $employee->WorkPermitAmt = $currentWP ? number_format($currentWP->Amt,2) : null;
                                 $hasWorkPermitExpiry = true;
-                            
                             }
 
                             $med = $employee->WorkPermitMedicalRenewal;
@@ -193,7 +205,7 @@ class ExpiryController extends Controller
                 ->make(true);
         }
 
-        $page_title = 'Visa Expiry';
+        $page_title = 'Expiry Tracker';
         return view('resorts.Visa.expiry.index', compact('page_title'));
     }
 
@@ -214,6 +226,35 @@ class ExpiryController extends Controller
         }
 
 
+    }
+
+    /**
+     * Work Permit expiry date for an employee, read from the synced OCR blob
+     * (VisaEmployeeExpiryData 'Other' document, field "Work Permit Expiry Date
+     * (Expiry On)") — the same source the Xpat employee details page uses.
+     * Returns a Y-m-d string or null.
+     */
+    private function getWorkPermitExpiryDate($employeeId)
+    {
+        $row = VisaEmployeeExpiryData::where('resort_id', $this->resort->resort_id)
+            ->where('employee_id', $employeeId)
+            ->where('DocumentName', 'Other')
+            ->latest('id')
+            ->first();
+        if (!$row) {
+            return null;
+        }
+        $data = is_array($row->Ai_extracted_data) ? $row->Ai_extracted_data : json_decode($row->Ai_extracted_data, true);
+        $fields = is_array($data) ? ($data['extracted_fields'] ?? []) : [];
+        $raw = $fields['Work Permit Expiry Date (Expiry On)'] ?? null;
+        if (empty($raw)) {
+            return null;
+        }
+        try {
+            return Carbon::parse($raw)->toDateString();
+        } catch (\Exception $e) {
+            return null;
+        }
     }
 
     private function GetemployeeDocument($id)

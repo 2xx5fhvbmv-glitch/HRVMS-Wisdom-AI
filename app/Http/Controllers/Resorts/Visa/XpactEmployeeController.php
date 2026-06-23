@@ -1044,29 +1044,33 @@ class XpactEmployeeController extends Controller
    {
         $rid = $this->resort->resort_id;
 
-        // Normalise a stored amount (in its own currency) to USD — the cards
-        // render every figure via formatCurrency(..,'USD').
-        $toUsd = function ($amount, $currency = 'MVR') use ($rid) {
+        // These are Maldives government fees, always denominated in MVR. Normalise
+        // each stored amount to MVR (convert any USD-stored row up to MVR) so the
+        // cards can render a plain "MVR x" regardless of the resort's display
+        // currency. Previously the figures were converted to USD and shown with
+        // the resort's '$' symbol, which mislabeled MVR govt fees.
+        $toMvr = function ($amount, $currency = 'MVR') use ($rid) {
             $cur = strtoupper(trim((string) $currency));
-            if (in_array($cur, ['USD', '$'], true)) {
+            if ($cur === 'MVR') {
                 return (float) $amount;
             }
-            return (float) Common::RateConversion('MVRToDoller', (float) $amount, $rid);
+            // USD / $ stored row -> MVR
+            return (float) Common::RateConversion('DollerToMVR', (float) $amount, $rid);
         };
-        $sumPaidUsd = function ($rows, string $amountCol) use ($toUsd) {
-            return (float) $rows->sum(fn ($r) => $toUsd($r->{$amountCol}, $r->Currency ?? 'MVR'));
+        $sumPaidMvr = function ($rows, string $amountCol) use ($toMvr) {
+            return (float) $rows->sum(fn ($r) => $toMvr($r->{$amountCol}, $r->Currency ?? 'MVR'));
         };
 
-        // Actual expenses = the PAID records, summed live and converted to USD.
+        // Actual expenses = the PAID records, summed live in MVR.
         // The old total_expensess_since_joings snapshot was written once at sync
         // time from the cost config, so it never reflected later edits and showed
         // 0 wherever the config lookup missed — no longer used for the fee totals.
         $data = [];
-        $data['totalWorkPermitAmount']            = $sumPaidUsd(\App\Models\WorkPermit::where('resort_id',$rid)->where('employee_id',$id)->where('Status','Paid')->get(), 'Amt');
-        $data['totalQuotaSlotPayment']            = $sumPaidUsd(\App\Models\QuotaSlotRenewal::where('resort_id',$rid)->where('employee_id',$id)->where('Status','Paid')->get(), 'Amt');
-        $data['totalInsurancePayment']            = $sumPaidUsd(\App\Models\EmployeeInsurance::where('resort_id',$rid)->where('employee_id',$id)->where('Status','Paid')->get(), 'Premium');
-        $data['totalWorkPermitMedicalFeePayment'] = $sumPaidUsd(\App\Models\WorkPermitMedicalRenewal::where('resort_id',$rid)->where('employee_id',$id)->where('Status','Paid')->get(), 'Amt');
-        $data['totalVisa']                        = $sumPaidUsd(\App\Models\VisaRenewal::where('resort_id',$rid)->where('employee_id',$id)->where('Status','Paid')->get(), 'Amt');
+        $data['totalWorkPermitAmount']            = $sumPaidMvr(\App\Models\WorkPermit::where('resort_id',$rid)->where('employee_id',$id)->where('Status','Paid')->get(), 'Amt');
+        $data['totalQuotaSlotPayment']            = $sumPaidMvr(\App\Models\QuotaSlotRenewal::where('resort_id',$rid)->where('employee_id',$id)->where('Status','Paid')->get(), 'Amt');
+        $data['totalInsurancePayment']            = $sumPaidMvr(\App\Models\EmployeeInsurance::where('resort_id',$rid)->where('employee_id',$id)->where('Status','Paid')->get(), 'Premium');
+        $data['totalWorkPermitMedicalFeePayment'] = $sumPaidMvr(\App\Models\WorkPermitMedicalRenewal::where('resort_id',$rid)->where('employee_id',$id)->where('Status','Paid')->get(), 'Amt');
+        $data['totalVisa']                        = $sumPaidMvr(\App\Models\VisaRenewal::where('resort_id',$rid)->where('employee_id',$id)->where('Status','Paid')->get(), 'Amt');
 
         // Deposit is a one-time amount with no per-payment record — keep it from
         // the snapshot row written at sync time.
