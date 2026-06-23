@@ -193,23 +193,9 @@ class FundTransferController extends Controller
                 ]);
             });
 
-        // ── 4. Insurance — Status was backfilled to 'Paid' by the 2026_05_14 migration ──
-        EmployeeInsurance::with(['employee.resortAdmin'])
-            ->where('resort_id', $resort_id)
-            ->where('Status', 'Paid')
-            ->get()
-            ->each(function ($r) use (&$unified, $feeRecipientLabel) {
-                $date = $r->paid_date ?: $r->insurance_start_date;
-                $unified->push((object) [
-                    'Date'       => $date ? Carbon::parse($date)->format('d M Y') : '',
-                    'FromWallet' => '—',
-                    'ToWallet'   => $feeRecipientLabel($r->employee, 'Insurance Premium'),
-                    'Amount'     => (float) $r->Premium,
-                    'Comment'    => '—',
-                    'Attachment' => '—',
-                    'sort_ts'    => $date ? Carbon::parse($date)->timestamp : 0,
-                ]);
-            });
+        // ── 4. Insurance — intentionally NOT listed: insurance premiums are paid to
+        // the insurer, not from a visa wallet, so they don't belong in the wallet
+        // transaction history (they were also showing as 0.00 noise rows).
 
         // ── 5. Work Permit Medical — Status='Paid' (migration-backfilled) ──
         WorkPermitMedicalRenewal::with(['employee.resortAdmin'])

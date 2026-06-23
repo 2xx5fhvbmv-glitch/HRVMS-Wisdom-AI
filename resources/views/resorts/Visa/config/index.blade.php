@@ -275,7 +275,7 @@
                                                     <input type="hidden" class="form-control" name="id[]" value="{{$c->id}}" placeholder="1000">
 
                                                         <input type="number" step="0.01" min="0" class="form-control" value="{{$c->New_Amount}}" name="amount[]" required data-parsley-required-message="Amount is required" data-parsley-type="number" data-parsley-type-message="Please enter a valid number" placeholder="0.00">
-                                                        <span>{{ Common::GetResortCurrencySymbol() }}</span>
+                                                        <span>MVR</span>
                                                     </div>
 
                                                 </div>

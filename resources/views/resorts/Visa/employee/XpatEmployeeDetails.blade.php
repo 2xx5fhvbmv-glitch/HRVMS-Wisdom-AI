@@ -176,7 +176,10 @@
                     <div class="row  AppendEmployeeDcoument gx-2">
                         @if($VisaEmployeeExpiryData->isNotEmpty())
                             @foreach($VisaEmployeeExpiryData as $VisaEmployeeExpiry)
-                                @if($VisaEmployeeExpiry->DocName !="Other")
+                                {{-- Only rows backed by an actual uploaded FILE are real documents.
+                                     Edit-Expiry writes date-only blobs (Passport_Copy / Work_Permit_Entry_Pass
+                                     with no File_child_id) — those must NOT appear as documents. --}}
+                                @if($VisaEmployeeExpiry->DocName !="Other" && !empty($VisaEmployeeExpiry->File_child_id))
                                     <div class="col-xxl-cust5 col-xl-3 col-lg-4 col-sm-6">
                                         <div class="d-flex align-items-top justify-content-between XpatDetail-Documents-block">
                                             <div>
@@ -620,7 +623,7 @@ $(document).ready(function(){
                                 let strings='';
                                 $.each(response.data, function(index, value) 
                                 {
-                                    if(value.DocName != "Other")
+                                    if(value.DocName != "Other" && value.child_id)
                                     {
                                         strings += `<div class="col-xxl-cust5 col-xl-3 col-lg-4 col-sm-6">
                                                         <div class="d-flex align-items-top justify-content-between XpatDetail-Documents-block">
