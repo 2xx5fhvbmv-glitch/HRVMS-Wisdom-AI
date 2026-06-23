@@ -121,7 +121,17 @@ class OpenRouterDocExtractor
             . '"Visa Expiry Date": "", '
             . '"Quota Slot Number": "", '
             . '"Insurance Expiry Date": ""'
-            . '}. Output ONLY the JSON object.';
+            . '}. '
+            // The Work Permit Expiry is the field that is most often misread, so
+            // anchor it explicitly: it is the WORK PERMIT\'s own expiry, a distinct
+            // value from the visa expiry / issue / last-entry dates.
+            . 'IMPORTANT for "Work Permit Expiry Date (Expiry On)": read the value printed against the '
+            . 'work permit\'s own expiry label — commonly "Expiry", "Expiry On", "Expiry Date", '
+            . '"Date of Expiry", "Valid Until" or "Valid Till" in the WORK PERMIT section. '
+            . 'It is NOT the Visa Expiry Date, NOT the visa/work-permit issued date, and NOT the '
+            . '"Last Entry Allowed" date. If the work permit section shows both an issue date and an '
+            . 'expiry date, pick the later (expiry) one. '
+            . 'Return every date exactly as printed on the document. Output ONLY the JSON object.';
     }
 
     /** Extract a JSON value from the model reply (tolerates code fences / stray prose). */
