@@ -95,7 +95,7 @@
                             </div>
                         </div>
                         <div class="col text-end order-md-2 order-1 order-xxl-last">
-                            <span class=" Overall-tot-amount text-nowrap">Total amount: {{ Common::GetResortCurrencySymbol() }} 0.00</span>
+                            <span class=" Overall-tot-amount text-nowrap">Total amount: MVR 0.00</span>
                         </div>
 
                     </div>
@@ -138,10 +138,10 @@
                                 <th></th>
                                 {{-- Visa Expiry total cell commented out per request --}}
                                 {{-- <th class="d-none">MVR 0.00</th> --}}
-                                <th>{{ Common::GetResortCurrencySymbol() }} 0.00</th>
-                                <th>{{ Common::GetResortCurrencySymbol() }} 0.00</th>
-                                <th>{{ Common::GetResortCurrencySymbol() }} 0.00</th>
-                                <th>{{ Common::GetResortCurrencySymbol() }} 0.00</th>
+                                <th>MVR 0.00</th>
+                                <th>MVR 0.00</th>
+                                <th>MVR 0.00</th>
+                                <th>MVR 0.00</th>
                             </tr>
                         </tfoot>
                     </table>
@@ -301,7 +301,7 @@ function updateTopTotal() {
     $('#payment-request-table tbody input.ChildCheck:checked').each(function () {
         total += parseFloat($(this).data('total')) || 0;
     });
-    $('.Overall-tot-amount').html('<b>{{ Common::GetResortCurrencySymbol() }} ' + total.toFixed(2) + '</b>');
+    $('.Overall-tot-amount').html('<b>MVR ' + total.toFixed(2) + '</b>');
 }
 
 function PaymentRequestTable() {
@@ -372,7 +372,7 @@ function PaymentRequestTable() {
                     $(api.column(6).footer()).html('<b>0</b>');
                     $(api.column(7).footer()).html('<b>0</b>');
                     $(api.column(8).footer()).html('<b>0</b>');
-                    $('.Overall-tot-amount').html('<b>Total Amount: {{ Common::GetResortCurrencySymbol() }} 0</b>');
+                    $('.Overall-tot-amount').html('<b>Total Amount: MVR 0</b>');
                 }
             }
         }); 
