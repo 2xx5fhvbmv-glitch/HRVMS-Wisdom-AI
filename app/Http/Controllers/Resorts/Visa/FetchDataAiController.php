@@ -287,8 +287,19 @@ class FetchDataAiController extends Controller
         $employee = Employee::with(['resortAdmin'])->where('resort_id', $resortId)->where('passport_number', $passport_number)->first();
         if (!$employee) return $fail('Employee not found');
 
-        $VisaNationality = VisaNationality::where('resort_id', $resortId)->where('nationality', $employee->nationality)->first();
-        if (!$VisaNationality) return $fail('Please Add  Deposit Rate for the' . $employee->nationality);
+        // Match the deposit rate flexibly: employees store a demonym ("Indian")
+        // while the rate list usually has the country name ("India"). Compare
+        // case-insensitively, allowing either side to be a prefix of the other
+        // so Indian<->India, Russian<->Russia, Syrian<->Syria all match.
+        $natRaw = strtolower(trim((string) $employee->nationality));
+        $VisaNationality = VisaNationality::where('resort_id', $resortId)
+            ->where(function ($q) use ($natRaw) {
+                $q->whereRaw('LOWER(TRIM(nationality)) = ?', [$natRaw])
+                  ->orWhereRaw("? LIKE CONCAT(LOWER(TRIM(nationality)), '%')", [$natRaw])
+                  ->orWhereRaw("LOWER(TRIM(nationality)) LIKE CONCAT(?, '%')", [$natRaw]);
+            })
+            ->first();
+        if (!$VisaNationality) return $fail('Please add a Deposit Rate for ' . $employee->nationality);
 
         if (QuotaSlotRenewal::where('employee_id', $employee->id)->first()) {
             $name = $employee->resortAdmin->first_name . ' ' . $employee->resortAdmin->last_name;
