@@ -36,7 +36,11 @@ class ExpiryController extends Controller
             $search = $request->search;
             $date   =  $request->date;
         
-            if ($date)
+            // By default the tracker shows EVERY expiry date (so the page is never
+            // empty just because nothing expires this month). A date range only
+            // narrows the list when the user explicitly picks one.
+            $hasDateFilter = !empty($date);
+            if ($hasDateFilter)
             {
                     // Honour the full selected range "start - end". Previously this
                     // ignored the end date and forced endOfMonth() of the start,
@@ -64,7 +68,13 @@ class ExpiryController extends Controller
                 ->whereRaw('LOWER(TRIM(nationality)) != ?', ['maldivian'])
                 ->where('resort_id', $this->resort->resort_id)
                 ->get()
-                ->map(function ($employee) use ($flag, $filterStart, $filterEnd) {
+                ->map(function ($employee) use ($flag, $hasDateFilter, $filterStart, $filterEnd) {
+                    // True when the date is missing/unreadable OR falls in the picked range.
+                    $inWindow = function ($d) use ($hasDateFilter, $filterStart, $filterEnd) {
+                        if (empty($d)) return false;
+                        if (!$hasDateFilter) return true;
+                        return Carbon::parse($d)->between($filterStart, $filterEnd);
+                    };
                     $employee->Emp_name        = $employee->resortAdmin->first_name .' '.$employee->resortAdmin->last_name;
                     $employee->Emp_id          = $employee->Emp_id;
                     $employee->Department_name = $employee->department->name;
@@ -85,7 +95,7 @@ class ExpiryController extends Controller
                             $visa = $employee->VisaRenewal;
 
                 
-                            if ($visa && Carbon::parse($visa->end_date)->between($filterStart, $filterEnd)) 
+                            if ($visa && $inWindow($visa->end_date))
                             {
                                 $employee->VisaExpiryDate = $this->getFormattedExpiryStatus($visa->end_date);
                                 $employee->VisaExpiryExpiryAmt = $visa->Amt;
@@ -95,7 +105,7 @@ class ExpiryController extends Controller
 
             
                             $insurance = $employee->EmployeeInsurance()->where('employee_id', $employee->id)->where('resort_id', $this->resort->resort_id)->orderBy('id', 'desc')->first();
-                            if ($insurance && Carbon::parse($insurance->insurance_end_date)->between($filterStart, $filterEnd)) {
+                            if ($insurance && $inWindow($insurance->insurance_end_date)) {
                                 $employee->InsuranceExpiryDate = $this->getFormattedExpiryStatus($insurance->insurance_end_date);
                                 $employee->Premium = $insurance->Premium;
                                 $hasInsuranceExpiry = true;
@@ -112,7 +122,7 @@ class ExpiryController extends Controller
                                 $fallbackWP = $employee->WorkPermit->where('Status','Unpaid')->sortByDesc('id')->first();
                                 $wpExpiryDate = $fallbackWP->Due_Date ?? null;
                             }
-                            if ($wpExpiryDate && Carbon::parse($wpExpiryDate)->between($filterStart, $filterEnd))
+                            if ($wpExpiryDate && $inWindow($wpExpiryDate))
                             {
                                 $employee->WorkPermitExpiryDate = $this->getFormattedExpiryStatus($wpExpiryDate);
                                 $currentWP = $employee->WorkPermit->where('Status','Unpaid')->sortByDesc('id')->first();
@@ -121,7 +131,7 @@ class ExpiryController extends Controller
                             }
 
                             $med = $employee->WorkPermitMedicalRenewal;
-                            if ($med && Carbon::parse($med->end_date)->between($filterStart, $filterEnd)) 
+                            if ($med && $inWindow($med->end_date))
                             {
                                 $employee->WorkPermitMedicalPermitExpiryDate = $this->getFormattedExpiryStatus($med->end_date);
                                 $employee->WorkPermitMedicalPermitAmt        =  number_format($med->Amt,2);
@@ -132,7 +142,7 @@ class ExpiryController extends Controller
                         
                             // Filter & display both based on Due_Date so the value shown to
                             // the user matches the window being filtered.
-                            $currentQuota = $employee->QuotaSlotRenewal->where('Status', 'Unpaid')->filter(fn($item) => Carbon::parse($item->Due_Date)->between($filterStart, $filterEnd))->first();
+                            $currentQuota = $employee->QuotaSlotRenewal->where('Status', 'Unpaid')->filter(fn($item) => $inWindow($item->Due_Date))->first();
                             if ($currentQuota)
                             {
                                 $employee->QuotaSlotAmtForThisMonth = $this->getFormattedExpiryStatus($currentQuota->Due_Date);
