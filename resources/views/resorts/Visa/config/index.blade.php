@@ -61,7 +61,7 @@
                                         </div>
 
                                         <div class="col-sm-6">
-                                            <label for="txt-amount" class="form-label">AMOUNT ({{ Common::GetResortCurrencySymbol() }}) <span class="red-mark">*</span></label>
+                                            <label for="txt-amount" class="form-label">AMOUNT (MVR) <span class="red-mark">*</span></label>
                                             <input type="number" min="0" name="amt[]"   id="txt-amount_1" class="form-control" placeholder="Amount" required data-parsley-type="number" data-parsley-required-message="Please enter an amount">
                                         </div>
                                         <input type="hidden" name="id" id="NationalityCount" value="1">
@@ -306,7 +306,7 @@
                                                         data-parsley-required-message="Amount before expiry is required"
                                                         data-parsley-type="number"
                                                         data-parsley-type-message="Enter a valid amount" name="AmountbeforExp"  class="form-control" placeholder="1000">
-                                                <span>{{ Common::GetResortCurrencySymbol() }}</span>
+                                                <span>MVR</span>
                                             </div>
                                         </div>
                                         <div class="col-sm-6">
@@ -318,7 +318,7 @@
                                                     data-parsley-type="number"
                                                     data-parsley-type-message="Enter a valid amount"
                                                     name="AmountafterExp"  class="form-control" placeholder="1000">
-                                                <span>{{ Common::GetResortCurrencySymbol() }}</span>
+                                                <span>MVR</span>
                                             </div>
                                         </div> 
                                     </div> -->
@@ -596,7 +596,7 @@ $(document).on("click",".blockAdd-Nationality",function(){
                                               <div id="nationality_error_${count}" class="text-danger mt-1"></div>
                                         </div>
                                         <div class="col-sm-4">
-                                            <label for="txt-amount" class="form-label">AMOUNT ({{ Common::GetResortCurrencySymbol() }}) <span class="red-mark">*</span></label>
+                                            <label for="txt-amount" class="form-label">AMOUNT (MVR) <span class="red-mark">*</span></label>
                                             <input type="number" min="0" name="amt[]" id="txt-amount_${count}" class="form-control" placeholder="Amount" required data-parsley-type="number" data-parsley-required-message="Please enter an amount">
                                         </div>
                                         

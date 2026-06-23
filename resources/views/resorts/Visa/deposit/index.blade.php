@@ -84,7 +84,7 @@
                                                         <div class="DepRefReq-checkbox d-flex align-items-center justify-content-between">
                                                             <div>
                                                                 <p>{{ $wallet->WalletName }}</p>
-                                                                <span>Current Balance: {!! Common::formatCurrency($wallet->Amt, 'USD') !!}</span>
+                                                                <span>Current Balance: {!! Common::formatMvr($wallet->Amt) !!}</span>
                                                             </div>
                                                             <div class="form-check form-check-inline p-0 me-0">
                                                                 <input

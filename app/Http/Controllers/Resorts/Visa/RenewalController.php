@@ -142,7 +142,7 @@ class RenewalController extends Controller
                 {
                     $WorkPermitMedicalRenewal->MedicalRenewalTime = "$medical_months_diff month(s) remaining";
                 } 
-                $WorkPermitMedicalRenewal->workpermitcost =  Common::formatCurrency($WorkPermitMedicalRenewal->Amt, 'MVR');
+                $WorkPermitMedicalRenewal->workpermitcost =  Common::formatMvr($WorkPermitMedicalRenewal->Amt);
                 $WorkPermitMedicalRenewal->employee_id =base64_encode($WorkPermitMedicalRenewal->employee_id);
                 $WorkPermitMedicalRenewal->medical_end_date = Carbon::parse($WorkPermitMedicalRenewal->medical_end_date)->format('d M Y');
             }
@@ -967,12 +967,11 @@ class RenewalController extends Controller
                                         . ' data-amount="" data-date="' . htmlspecialchars((string) $date, ENT_QUOTES) . '" data-status="">'
                                         . '<i class="fa-regular fa-circle-plus"></i></a>';
                                 }
-                                // Records are stored in MVR; the edit modal shows/accepts the
-                                // resort's currently displayed currency (menu MVR/$ toggle), so
-                                // pre-fill the amount converted into that display currency.
+                                // Records are stored in MVR and the edit modal is MVR-only, so
+                                // pre-fill the raw stored amount (no conversion).
                                 $displayAmount = ($amount === null || $amount === '')
                                     ? ''
-                                    : Common::convertToDisplayCurrency($amount, 'MVR');
+                                    : $amount;
                                 return ' <a href="javascript:void(0)" class="EditExpiry" title="Edit"'
                                     . ' data-type="' . $type . '"'
                                     . ' data-id="' . $id . '"'
@@ -984,20 +983,20 @@ class RenewalController extends Controller
                             };
 
                                 $expiryBoxes .= '<div>
-                                    <label>Work Permit: '.Common::formatCurrency($row->WorkPermitAmt, 'MVR').$editIcon('work_permit', $row->WorkPermitRecordId, $row->WorkPermitAmtRaw, $row->WorkPermitDateRaw, $row->WorkPermitStatusRaw, $row->id).'</label>
+                                    <label>Work Permit: '.Common::formatMvr($row->WorkPermitAmt).$editIcon('work_permit', $row->WorkPermitRecordId, $row->WorkPermitAmtRaw, $row->WorkPermitDateRaw, $row->WorkPermitStatusRaw, $row->id).'</label>
                                     <p>Expires: ' . ($row->WorkPermitExpiryDate ?? '-') . '</p>
                                 </div>';
 
                                 $expiryBoxes .= '<div>
-                                    <label>Slot Payment: '.Common::formatCurrency($row->QuotaSlotAmtForThisMonthAmt, 'MVR').$editIcon('slot', $row->SlotRecordId, $row->SlotAmtRaw, $row->SlotDateRaw, $row->SlotStatusRaw).'</label>
+                                    <label>Slot Payment: '.Common::formatMvr($row->QuotaSlotAmtForThisMonthAmt).$editIcon('slot', $row->SlotRecordId, $row->SlotAmtRaw, $row->SlotDateRaw, $row->SlotStatusRaw).'</label>
                                     <p>Expires: ' . ($row->QuotaSlotAmtForThisMonth ?? '-') . '</p>
                                 </div>';
                                $expiryBoxes .= '<div>
-                                    <label>Visa: ' . ($row->VisaExpiryExpiryAmt !== null ? Common::formatCurrency($row->VisaExpiryExpiryAmt, 'MVR') : '-') . $editIcon('visa', $row->VisaRecordId, $row->VisaAmtRaw, $row->VisaDateRaw, $row->VisaStatusRaw) . '</label>
+                                    <label>Visa: ' . ($row->VisaExpiryExpiryAmt !== null ? Common::formatMvr($row->VisaExpiryExpiryAmt) : '-') . $editIcon('visa', $row->VisaRecordId, $row->VisaAmtRaw, $row->VisaDateRaw, $row->VisaStatusRaw) . '</label>
                                     <p>Expires: ' . ($row->VisaExpiryDate ?? '-') . '</p>
                                 </div>';
                                $expiryBoxes .= '<div>
-                                    <label>Insurance: ' . ($row->Premium !== null ? Common::formatCurrency($row->Premium, 'MVR') : '-') . $editIcon('insurance', $row->InsuranceRecordId, $row->InsuranceAmtRaw, $row->InsuranceDateRaw, '') . '</label>
+                                    <label>Insurance: ' . ($row->Premium !== null ? Common::formatMvr($row->Premium) : '-') . $editIcon('insurance', $row->InsuranceRecordId, $row->InsuranceAmtRaw, $row->InsuranceDateRaw, '') . '</label>
                                     <p>Expires: ' . ($row->InsuranceExpiryDate ?? '-') . '</p>
                                 </div>';
                            
@@ -1190,19 +1189,9 @@ class RenewalController extends Controller
         }
 
         if ($request->filled('amount')) {
-            // The amount is typed in the resort's currently displayed currency
-            // (the menu MVR/$ toggle). These records are stored in MVR, so when
-            // the resort is viewing in Dollars, convert USD -> MVR (multiply by
-            // the canonical DollertoMVR rate) before saving. In MVR mode it is
-            // stored as-is.
-            $amountToStore = (float) $request->amount;
-            if (Common::GetResortCurrentCurrency() === 'Dollar') {
-                $settings = \App\Models\ResortSiteSettings::where('resort_id', $this->resort->resort_id)->first();
-                $rate = (float) (optional($settings)->DollertoMVR ?: 15.42);
-                if ($rate <= 0) $rate = 15.42;
-                $amountToStore = round($amountToStore * $rate, 2);
-            }
-            $record->{$amountCol} = $amountToStore;
+            // The visa module is MVR end-to-end — the edit modal accepts MVR and
+            // these records are stored in MVR, so save the raw value as typed.
+            $record->{$amountCol} = (float) $request->amount;
         }
         if ($request->filled('expiry_date')) {
             $record->{$dateCol} = Carbon::parse($request->expiry_date)->format('Y-m-d');
@@ -1374,7 +1363,7 @@ class RenewalController extends Controller
                                     <p>' . $employee['Department_name'] . ' - ' . $employee['Position_name'] . '</p>
                                 </div>
                                 <div class="overdue-text">
-                                    ' . $flag . ': ' . Common::formatCurrency($employee['Amount'], 'MVR') . '<br/>
+                                    ' . $flag . ': ' . Common::formatMvr($employee['Amount']) . '<br/>
                                     Expires: ' . $employee['ExpiryDate'] . '
                                 </div>
                             </div>

@@ -4600,6 +4600,21 @@ class Common
     }
 
     /**
+     * Format a stored-MVR amount as raw MVR with NO conversion and NO resort
+     * currency symbol. The visa module deals in Maldivian rufiyaa (deposits and
+     * government fees are paid in MVR), so its figures must always read "MVR …"
+     * regardless of the resort's display currency. Use this instead of
+     * formatCurrency($x,'MVR') anywhere in the visa module.
+     */
+    public static function formatMvr($amount, $decimals = 2)
+    {
+        if ($amount === null || $amount === '' || $amount === false) {
+            return '-';
+        }
+        return 'MVR ' . number_format((float) $amount, $decimals);
+    }
+
+    /**
      * Live fallback for a single resort_budget_cost row for one month —
      * mirrors BudgetController::computeBudgetCostMonthlyValue so the
      * Liability page can replicate the view-budget "no saved override

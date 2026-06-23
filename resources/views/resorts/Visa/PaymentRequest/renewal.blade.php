@@ -74,7 +74,7 @@
                                             <div class="col-sm-6">
                                                     <div class="renewal-innerbox">
                                                         <label>Premium</label>
-                                                        <p>{!! Common::formatCurrency($EmployeeInsurance->cost ?? 0, 'USD') !!}</p>
+                                                        <p>{!! Common::formatMvr($EmployeeInsurance->cost ?? 0) !!}</p>
                                                     </div>
                                                 </div>
 
@@ -223,7 +223,7 @@
                                         @if($QuotaSlotVariable)
                                             <tr>
                                                 <th>{{$QuotaSlotVariable->Month}}</th>
-                                                <td>{!! Common::formatCurrency($QuotaSlotVariable->Amt, 'USD') !!}</td>    
+                                                <td>{!! Common::formatMvr($QuotaSlotVariable->Amt) !!}</td>    
                                                 <td>{{$QuotaSlotVariable->Due_Date}}</td>
                                                 <td>
                                                     <span class="badge badge-themeDanger">Pending</span>
@@ -243,8 +243,8 @@
                             </div>
                             <div class="listing-box badge-themeNew1 border-0">
                                 <ul class="nav ">
-                                    <li>Total Amount (Payable): {!! Common::formatCurrency($QuotaSlotPayableAmt, 'USD') !!}</li>
-                                    <li>Amount Paid: {!! Common::formatCurrency($QuotaSlotPaidAmt, 'USD') !!}</li>
+                                    <li>Total Amount (Payable): {!! Common::formatMvr($QuotaSlotPayableAmt) !!}</li>
+                                    <li>Amount Paid: {!! Common::formatMvr($QuotaSlotPaidAmt) !!}</li>
                                     <li>Balance Amount: {{ number_format($QuotaSlotUnPaidAmt,2)}}</li>
                                 </ul>
                             </div>
@@ -280,7 +280,7 @@
                                     <tbody>
                                         <tr>
                                             <th>{{$WorkPermitCommonVariable->Month}}</th>
-                                            <td>{!! Common::formatCurrency($WorkPermitCommonVariable->Amt, 'USD') !!}</td>    
+                                            <td>{!! Common::formatMvr($WorkPermitCommonVariable->Amt) !!}</td>    
                                             <td>{{$WorkPermitCommonVariable->Due_Date}}</td>
                                             <td>
                                                     <span class="badge badge-themeDanger">Pending</span>
@@ -298,8 +298,8 @@
                             </div>
                             <div class="listing-box badge-themeNew1 border-0">
                                 <ul class="nav ">
-                                    <li>Total Amount (Payable): {!! Common::formatCurrency($WorkPermitPayableAmt, 'USD') !!}</li>
-                                    <li>Amount Paid: {!! Common::formatCurrency($WorkPermitPaidAmt, 'USD') !!}</li>
+                                    <li>Total Amount (Payable): {!! Common::formatMvr($WorkPermitPayableAmt) !!}</li>
+                                    <li>Amount Paid: {!! Common::formatMvr($WorkPermitPaidAmt) !!}</li>
                                     <li>Balance Amount: {{ number_format($WorkPermitUnPaidAmt,2)}}</li>
                                 </ul>
                             </div>

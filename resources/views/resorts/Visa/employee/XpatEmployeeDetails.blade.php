@@ -375,7 +375,7 @@
                                 <div>
                                     <h6>Visa Payment</h6>
                                     <div class="d-flex justify-content-between align-items-center">
-                                        <strong>{!! Common::formatCurrency($TotalExpensessSinceJoing['totalWorkPermitMedicalFeePayment'], 'USD') !!}</strong>
+                                        <strong>{!! Common::formatMvr($TotalExpensessSinceJoing['totalWorkPermitMedicalFeePayment']) !!}</strong>
                                     </div>
                                 </div>
                             </div>

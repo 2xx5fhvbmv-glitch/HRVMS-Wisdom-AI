@@ -38,7 +38,7 @@
                                 <div class="d-flex align-items-center justify-content-between">
                                     <div>
                                         <p class="mb-0  fw-500">{{$VisaWallet->WalletName}}</p>
-                                        <strong>{!! Common::formatCurrency($VisaWallet->Amt, 'USD') !!}</strong>
+                                        <strong>{!! Common::formatMvr($VisaWallet->Amt) !!}</strong>
                                     </div>
                                     <a href="#">
                                         <img src="assets/images/arrow-right-circle.svg" alt="" class="img-fluid">
@@ -354,7 +354,7 @@
                                     </div>
 
                                     <div class="col-12">
-                                        <label for="amount" class="form-label">AMOUNT ({{ Common::GetResortCurrencySymbol() }})</label>
+                                        <label for="amount" class="form-label">AMOUNT (MVR)</label>
                                         <input type="text" class="form-control" name="Amt" id="amount" placeholder="Amount" required data-parsley-type="number" data-parsley-min="1" />
                                     </div>
 
@@ -400,7 +400,7 @@
                                                         <div class="reconciliation-block">
                                                             <div>
                                                                 <h6>{{$VisaWallet->WalletName}}</h6>
-                                                                <strong>{!! Common::formatCurrency($VisaWallet->Amt, 'USD') !!}</strong>
+                                                                <strong>{!! Common::formatMvr($VisaWallet->Amt) !!}</strong>
                                                             </div>
                                                         </div>
                                                     </div>
@@ -422,12 +422,12 @@
                                                         <div class="reconciliation-block">
                                                             <div>
                                                                 <div class="d-flex align-items-center">
-                                                                       <h6>{{$VisaWallet->Xpact_WalletName}}   <a href="javascript:void(0)" class="edit-visa-wallet"  data-amt="{{base64_encode(Common::convertToDisplayCurrency($VisaWallet->Xpact_Amt, 'USD'))}}" data-name="{{base64_encode($VisaWallet->Xpact_WalletName)}}" data-id="{{ base64_encode($VisaWallet->id) }}" class="me-2">
+                                                                       <h6>{{$VisaWallet->Xpact_WalletName}}   <a href="javascript:void(0)" class="edit-visa-wallet"  data-amt="{{base64_encode($VisaWallet->Xpact_Amt)}}" data-name="{{base64_encode($VisaWallet->Xpact_WalletName)}}" data-id="{{ base64_encode($VisaWallet->id) }}" class="me-2">
                                                                         <img src="{{URL::asset('resorts_assets/images/edit.svg')}}" alt="icon">
                                                                     </a> </h6>
                                                                 </div>
                                                             
-                                                                <strong>{!! Common::formatCurrency($VisaWallet->Xpact_Amt, 'USD') !!}</strong>
+                                                                <strong>{!! Common::formatMvr($VisaWallet->Xpact_Amt) !!}</strong>
                                                             </div>
                                                             
                                                         </div>
@@ -545,7 +545,7 @@
                         </div>
 
                         <div class="mt-3 mb-3">
-                            <label class="form-label">Xpat Wallet Amount ({{ Common::GetResortCurrencySymbol() }}) <span class="red-mark">*</span></label>
+                            <label class="form-label">Xpat Wallet Amount (MVR) <span class="red-mark">*</span></label>
                             <input type="number" min="0" step="0.01" class="form-control" id="Xpact_WalletAmt" name="Xpact_WalletAmt"
                                 placeholder="Wallet Amount"
                                 required
@@ -1283,9 +1283,10 @@ $(document).ready(function ()
 
                             
                             
-                            // Inject the active resort currency symbol so the legend matches the
-                            // nav-bar currency switch. Picked up server-side via Blade.
-                            var __resortCurrency = "{{ Common::GetResortCurrencySymbol() }}";
+                            // Visa figures are always MVR (deposits/fees are paid in rufiyaa),
+                            // so the chart legend reads MVR regardless of the resort's display
+                            // currency switch.
+                            var __resortCurrency = "MVR";
                             let row=  `<div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
                                     <div class="doughnut-label">
                                         <span class="bg-theme"></span>Workpermit - ${__resortCurrency} ${workpermit.toLocaleString('en-IN')}

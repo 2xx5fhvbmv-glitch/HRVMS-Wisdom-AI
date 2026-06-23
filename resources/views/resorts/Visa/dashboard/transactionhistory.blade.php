@@ -43,7 +43,7 @@
                                     <th class="text-nowrap">Date</th>
                                     <th class="text-nowrap">From Wallet</th>
                                     <th class="text-nowrap">To Wallet</th>
-                                    <th class="text-nowrap">Amount ({{ Common::GetResortCurrencySymbol() }})</th>
+                                    <th class="text-nowrap">Amount (MVR)</th>
                                     <th class="text-nowrap">Comment</th>
                                     <th class="text-nowrap">Attachment</th>
                                 </tr>
