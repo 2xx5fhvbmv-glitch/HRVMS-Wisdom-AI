@@ -28,6 +28,8 @@ use App\Models\WorkPermitMedicalRenewal;
 use App\Models\VisaRenewal;
 use App\Models\PaymentRequest;
 use App\Models\VisaWallets;
+use App\Models\disciplinarySubmit;
+use App\Models\GrivanceSubmissionModel;
 use App\Services\Wisdom\ReadQueryGuard;
 use Carbon\Carbon;
 
@@ -203,6 +205,29 @@ class WisdomTools
                 [
                     'name' => ['type' => 'string', 'description' => 'Employee full or partial name, or employee ID.'],
                 ], ['name']),
+
+            // ---- Grievance & Disciplinary (Employee Relations) ----
+            self::fn('get_employee_relations_summary',
+                'Employee Relations dashboard: open / pending / under-review / resolved counts for both grievance and disciplinary cases, plus cases filed this month, confidential grievances and pending GM approvals. Use for "employee relations summary", "how many open cases", "how many grievance/disciplinary cases are open".', []),
+            self::fn('get_disciplinary_cases',
+                'Disciplinary cases: count and list (employee, department, category, action taken, priority, status, date), with by-department and by-category breakdowns. Use for "show disciplinary cases", "open disciplinary cases", "which department has the most disciplinary cases".',
+                [
+                    'status'     => ['type' => 'string', 'description' => 'open (default), pending, review, resolved, rejected, or all.'],
+                    'department' => ['type' => 'string', 'description' => 'Optional department name filter.'],
+                ]),
+            self::fn('get_grievance_cases',
+                'Grievance cases: count and list (employee, department, category, priority, status, confidential flag, date), with by-department and by-category breakdowns. Use for "show grievance cases", "open grievances", "which departments generate the most grievances".',
+                [
+                    'status'     => ['type' => 'string', 'description' => 'open (default), pending, review, resolved, rejected, or all.'],
+                    'department' => ['type' => 'string', 'description' => 'Optional department name filter.'],
+                ]),
+            self::fn('get_disciplinary_outcomes',
+                'Disciplinary outcomes: counts of cases grouped by the action taken (e.g. Verbal Warning, Written Warning, Suspension, Termination). Use for "how many written warnings were issued", "how many terminations", "show disciplinary outcomes".', []),
+            self::fn('get_employee_relations_history',
+                'Grievance and disciplinary history for one employee by name: their disciplinary cases (category, action, status) and grievances filed (category, status). Use for "has Ahmed received disciplinary action", "has Ahmed filed any grievances", "show Ahmed\'s case history".',
+                [
+                    'name' => ['type' => 'string', 'description' => 'Employee full or partial name, or employee ID.'],
+                ], ['name']),
         ];
 
         // Payroll tools — HR / FULL tier only.
@@ -318,6 +343,11 @@ class WisdomTools
                 case 'get_visa_wallet':          return self::getVisaWallet($rid);
                 case 'get_visa_payment_requests':return self::getVisaPaymentRequests($rid, $args);
                 case 'get_employee_immigration': return self::getEmployeeImmigration($rid, $args);
+                case 'get_employee_relations_summary': return self::getEmployeeRelationsSummary($rid);
+                case 'get_disciplinary_cases':   return self::getDisciplinaryCases($rid, $args);
+                case 'get_grievance_cases':      return self::getGrievanceCases($rid, $args);
+                case 'get_disciplinary_outcomes':return self::getDisciplinaryOutcomes($rid);
+                case 'get_employee_relations_history': return self::getEmployeeRelationsHistory($rid, $args);
                 case 'get_workforce_budget':     return self::getWorkforceBudget($rid, $args);
                 case 'get_employee_cost':        return self::getEmployeeCost($rid, $args);
                 case 'get_payroll_summary':      return self::getPayrollSummary($rid);
