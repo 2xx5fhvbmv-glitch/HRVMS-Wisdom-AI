@@ -3760,6 +3760,33 @@ class Common
     }
 
     /**
+     * Active employees in the resort's Finance / Accounting department(s).
+     * Used to notify Finance of visa payment requests (they handle the actual
+     * payments). Department matching reuses the same aliases as
+     * isFinanceDepartment (Finance, Accounting, Accounts, Acc, Fin).
+     */
+    public static function getResortFinanceEmployeeIds($resortId)
+    {
+        $finDeptIds = \App\Models\ResortDepartment::where('resort_id', $resortId)
+            ->pluck('id')
+            ->filter(fn($id) => self::isFinanceDepartment($id))
+            ->all();
+
+        if (empty($finDeptIds)) {
+            return [];
+        }
+
+        return \App\Models\Employee::where('resort_id', $resortId)
+            ->whereIn('Dept_id', $finDeptIds)
+            ->where(function ($q) {
+                $q->whereNull('status')->orWhere('status', 'Active')->orWhere('status', 'Probationary');
+            })
+            ->pluck('id')
+            ->map(fn($v) => (int) $v)
+            ->all();
+    }
+
+    /**
      * Position titles that grant full resort-wide visibility for Learning / Performance
      * modules. Treated equivalently to GM (rank 8) and super/master admin.
      * Update this list when product confirms additional leadership roles need
