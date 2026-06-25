@@ -30,6 +30,21 @@ use App\Models\PaymentRequest;
 use App\Models\VisaWallets;
 use App\Models\disciplinarySubmit;
 use App\Models\GrivanceSubmissionModel;
+use App\Models\LearningProgram;
+use App\Models\TrainingSchedule;
+use App\Models\TrainingParticipant;
+use App\Models\TrainingAttendance;
+use App\Models\MandatoryLearningProgram;
+use App\Models\Incidents;
+use App\Models\ParentSurvey;
+use App\Models\SurveyEmployee;
+use App\Models\EmployeesDocument;
+use App\Models\EmployeePromotion;
+use App\Models\EmployeeTransfer;
+use App\Models\EmployeeResignation;
+use App\Models\PeopleSalaryIncrement;
+use App\Models\PayrollAdvance;
+use App\Models\PayrollRecoverySchedule;
 use App\Services\Wisdom\ReadQueryGuard;
 use Carbon\Carbon;
 
@@ -228,6 +243,106 @@ class WisdomTools
                 [
                     'name' => ['type' => 'string', 'description' => 'Employee full or partial name, or employee ID.'],
                 ], ['name']),
+
+            // ---- Learning & Development ----
+            self::fn('get_learning_summary',
+                'Learning & Development dashboard: total training programs, mandatory programs, scheduled sessions (ongoing / upcoming / completed by date) and overall attendance rate. Use for "give me a learning summary", "how many training programs are active", "training completion rate".', []),
+            self::fn('get_training_programs',
+                'Training program library: list (name, category, delivery mode, frequency, hours) with by-category and by-delivery-mode breakdowns. Use for "what training programs are available", "show the program library", "show online/classroom programs".',
+                [
+                    'category'      => ['type' => 'string', 'description' => 'Optional category name filter.'],
+                    'delivery_mode' => ['type' => 'string', 'description' => 'Optional delivery mode filter (classroom, online, workshop).'],
+                ]),
+            self::fn('get_training_schedule',
+                'Scheduled / upcoming training sessions from a date (defaults to today): program, dates, venue, date-derived status (Scheduled/Ongoing/Completed) and participant count. Use for "what training is scheduled this week", "upcoming learning programs", "training calendar".',
+                [
+                    'date' => ['type' => 'string', 'description' => 'Start date YYYY-MM-DD. Defaults to today.'],
+                ]),
+            self::fn('get_training_attendance',
+                'Training attendance summary across the resort: counts by status (Present/Absent/Late/Pending) and the overall attendance rate. Use for "training attendance this month", "how many employees attended training", "attendance statistics".', []),
+            self::fn('get_mandatory_training',
+                'Mandatory / compulsory training programs configured for the resort: count and the program names. Use for "which trainings are mandatory", "show compulsory training", "mandatory training programs".', []),
+            self::fn('get_employee_training',
+                'Training history for one employee by name: the programs they were enrolled in with attendance status and date. Use for "what training has Ahmed attended", "show Ahmed\'s training history", "did Ahmed complete his training".',
+                [
+                    'name' => ['type' => 'string', 'description' => 'Employee full or partial name, or employee ID.'],
+                ], ['name']),
+
+            // ---- Incident Management ----
+            self::fn('get_incident_summary',
+                'Incident dashboard: total / open / resolved counts, breakdowns by status, severity, category and location, plus incidents this month and average resolution time. Use for "give me an incident summary", "how many incidents are open", "incidents by severity", "which locations have the most incidents".', []),
+            self::fn('get_incidents',
+                'Incident cases: count and list (name, category, severity, priority, status, location, date, reporter) with by-status / by-severity / by-category / by-location breakdowns. Use for "show open incidents", "incidents by department/location", "high severity incidents".',
+                [
+                    'status'   => ['type' => 'string', 'description' => 'open (default = not Resolved), resolved, or all. You may also pass an exact status string.'],
+                    'severity' => ['type' => 'string', 'description' => 'Optional severity filter (Minor, Moderate, Severe).'],
+                    'category' => ['type' => 'string', 'description' => 'Optional incident category name filter.'],
+                ]),
+            self::fn('get_incident_investigations',
+                'Incidents currently under investigation, with investigation start date, expected resolution date and findings. Use for "which incidents are under investigation", "show active investigations", "investigation status".', []),
+            self::fn('get_employee_incidents',
+                'Incidents involving one employee by name (as reporter, victim or involved party): name, category, severity, status, date and their role. Use for "has Ahmed been involved in any incidents", "show employee incident history".',
+                [
+                    'name' => ['type' => 'string', 'description' => 'Employee full or partial name, or employee ID.'],
+                ], ['name']),
+
+            // ---- Survey Management ----
+            self::fn('get_survey_summary',
+                'Survey dashboard: total, draft, active (published/ongoing), completed and expired survey counts, plus total recipients, responses and overall participation rate. Use for "give me a survey summary", "how many surveys are active/draft/completed", "what is the participation rate".', []),
+            self::fn('get_surveys',
+                'List surveys with status (Draft/Active/Complete/Expired derived from dates), start/end dates, recipients, responses and per-survey participation rate. Use for "show active surveys", "which surveys are closing soon", "draft surveys", "completed surveys".',
+                [
+                    'status' => ['type' => 'string', 'description' => 'all (default), draft, active, complete, or expired.'],
+                ]),
+            self::fn('get_survey_participation',
+                'Participation detail. With a survey name: that survey\'s recipients, responses, pending count and the names of non-respondents. Without a name: overall participation and the lowest-participation surveys. Use for "what is the participation rate for X", "who has not completed the survey", "which surveys need more responses".',
+                [
+                    'survey' => ['type' => 'string', 'description' => 'Optional survey title (full or partial) to drill into.'],
+                ]),
+
+            // ---- File / Document Management ----
+            self::fn('get_employee_documents',
+                'List the documents on file for one employee by name: document title, category, expiry date and whether a file is attached. (Returns metadata only — the actual files are opened in the File Management module.) Use for "what documents are available for Ahmed", "show Ahmed\'s files", "does Ahmed have a passport on file".',
+                [
+                    'name' => ['type' => 'string', 'description' => 'Employee full or partial name, or employee ID.'],
+                ], ['name']),
+            self::fn('search_documents',
+                'Search employee documents across the resort by keyword in the title or category (e.g. passport, contract, certificate, "Chef"). Returns matching documents with the owning employee, title, category and expiry. Use for "find documents containing X", "search qualification certificates", "search employment contracts".',
+                [
+                    'keyword' => ['type' => 'string', 'description' => 'Keyword to match in document title or category.'],
+                ], ['keyword']),
+
+            // ---- People Management (probation / promotion / transfer / resignation / increment / loans) ----
+            self::fn('get_probation_overview',
+                'Probation overview: how many employees are currently on probation, by probation status (Active/Extended/Confirmed/Failed), and how many probation periods end this month. Use for "how many employees are on probation", "whose probation ends this week/month", "confirmed/failed probation".', []),
+            self::fn('get_promotions',
+                'Employee promotions: count and list (employee, from → to position, effective date, status) plus total monthly payroll impact of approved promotions. Use for "how many promotions are pending/approved", "upcoming promotions", "salary impact of promotions".',
+                [
+                    'status' => ['type' => 'string', 'description' => 'pending (default), approved, rejected, on_hold, or all.'],
+                ]),
+            self::fn('get_transfers',
+                'Employee transfers: count and list (employee, from → to department, type Permanent/Temporary, effective date, status). Use for "how many transfers are pending", "show temporary/permanent transfers".',
+                [
+                    'status' => ['type' => 'string', 'description' => 'pending (default), approved, rejected, on_hold, or all.'],
+                    'type'   => ['type' => 'string', 'description' => 'Optional: Permanent or Temporary.'],
+                ]),
+            self::fn('get_resignations',
+                'Employee resignations: count and list (employee, reason, resignation date, last working day, status), plus resignations this month and by-department breakdown. Use for "how many resigned this month", "upcoming exits", "resignations by department".',
+                [
+                    'status' => ['type' => 'string', 'description' => 'pending, approved, completed, rejected, or all (default all).'],
+                ]),
+            self::fn('get_salary_increments',
+                'Salary increments (people module workflow): count and list (employee, previous → new salary, increment amount, status, effective date) plus total monthly payroll impact of approved increments. Use for "how many salary increments are pending", "payroll impact of increments".',
+                [
+                    'status' => ['type' => 'string', 'description' => 'pending (default = Pending/Hold/Change-Request), approved, rejected, or all.'],
+                ]),
+            self::fn('get_employee_loans',
+                'Salary advances / employee loans: list (employee, type, amount, approval status, outstanding balance). With a name, returns that employee\'s loans and outstanding balance. Use for "how many active loans", "how much loan does Ahmed have", "outstanding balances".',
+                [
+                    'name' => ['type' => 'string', 'description' => 'Optional employee name to look up a specific person\'s loans.'],
+                ]),
+            self::fn('get_pending_approvals',
+                'Centralized pending-approvals summary: counts of pending promotions, transfers, resignations, salary increments and salary advances awaiting action. Use for "what approvals are pending", "show approval bottlenecks", "pending HR approvals".', []),
         ];
 
         // Payroll tools — HR / FULL tier only.
@@ -348,6 +463,28 @@ class WisdomTools
                 case 'get_grievance_cases':      return self::getGrievanceCases($rid, $args);
                 case 'get_disciplinary_outcomes':return self::getDisciplinaryOutcomes($rid);
                 case 'get_employee_relations_history': return self::getEmployeeRelationsHistory($rid, $args);
+                case 'get_learning_summary':     return self::getLearningSummary($rid);
+                case 'get_training_programs':    return self::getTrainingPrograms($rid, $args);
+                case 'get_training_schedule':    return self::getTrainingSchedule($rid, $args);
+                case 'get_training_attendance':  return self::getTrainingAttendance($rid);
+                case 'get_mandatory_training':   return self::getMandatoryTraining($rid);
+                case 'get_employee_training':    return self::getEmployeeTraining($rid, $args);
+                case 'get_incident_summary':     return self::getIncidentSummary($rid);
+                case 'get_incidents':            return self::getIncidents($rid, $args);
+                case 'get_incident_investigations': return self::getIncidentInvestigations($rid);
+                case 'get_employee_incidents':   return self::getEmployeeIncidents($rid, $args);
+                case 'get_survey_summary':       return self::getSurveySummary($rid);
+                case 'get_surveys':              return self::getSurveys($rid, $args);
+                case 'get_survey_participation': return self::getSurveyParticipation($rid, $args);
+                case 'get_employee_documents':   return self::getEmployeeDocuments($rid, $args);
+                case 'search_documents':         return self::searchDocuments($rid, $args);
+                case 'get_probation_overview':   return self::getProbationOverview($rid);
+                case 'get_promotions':           return self::getPromotions($rid, $args);
+                case 'get_transfers':            return self::getTransfers($rid, $args);
+                case 'get_resignations':         return self::getResignations($rid, $args);
+                case 'get_salary_increments':    return self::getSalaryIncrements($rid, $args);
+                case 'get_employee_loans':       return self::getEmployeeLoans($rid, $args);
+                case 'get_pending_approvals':    return self::getPendingApprovals($rid);
                 case 'get_workforce_budget':     return self::getWorkforceBudget($rid, $args);
                 case 'get_employee_cost':        return self::getEmployeeCost($rid, $args);
                 case 'get_payroll_summary':      return self::getPayrollSummary($rid);
@@ -1927,6 +2064,741 @@ class WisdomTools
                 'status'   => $c->status,
                 'date'     => $c->getRawOriginal('Grivance_date_time') ? Carbon::parse($c->getRawOriginal('Grivance_date_time'))->format('Y-m-d') : null,
             ])->values(),
+        ];
+    }
+
+    // ---------------------------------------------------------------------
+    // Learning & Development
+    // ---------------------------------------------------------------------
+
+    private static function getLearningSummary(int $rid): array
+    {
+        $today = Carbon::today()->toDateString();
+        $sched = fn () => TrainingSchedule::where('resort_id', $rid);
+
+        $schedIds = TrainingSchedule::where('resort_id', $rid)->pluck('id');
+        $att = TrainingAttendance::whereIn('training_schedule_id', $schedIds);
+        $attTotal = (clone $att)->count();
+        $present = (clone $att)->where('status', 'Present')->count();
+
+        return [
+            'total_programs'    => LearningProgram::where('resort_id', $rid)->count(),
+            'mandatory_programs'=> MandatoryLearningProgram::where('resort_id', $rid)->distinct('program_id')->count('program_id'),
+            'sessions_ongoing'  => $sched()->whereDate('start_date', '<=', $today)->whereDate('end_date', '>=', $today)->count(),
+            'sessions_upcoming' => $sched()->whereDate('start_date', '>', $today)->count(),
+            'sessions_completed'=> $sched()->whereDate('end_date', '<', $today)->count(),
+            'attendance_records'=> $attTotal,
+            'attendance_rate_pct' => $attTotal > 0 ? round($present / $attTotal * 100, 1) : 0,
+        ];
+    }
+
+    private static function getTrainingPrograms(int $rid, array $args): array
+    {
+        $q = LearningProgram::where('resort_id', $rid)->with('category:id,category');
+
+        $cat = trim($args['category'] ?? '');
+        if ($cat !== '') {
+            $q->whereHas('category', fn ($c) => $c->where('category', 'like', "%{$cat}%"));
+        }
+        $mode = trim($args['delivery_mode'] ?? '');
+        if ($mode !== '') {
+            $q->where('delivery_mode', 'like', "%{$mode}%");
+        }
+
+        $rows = $q->orderBy('name')->limit(100)->get();
+        $list = $rows->map(fn ($p) => [
+            'name'          => $p->name,
+            'category'      => optional($p->category)->category,
+            'delivery_mode' => $p->delivery_mode,
+            'frequency'     => $p->frequency,
+            'hours'         => $p->hours,
+        ])->values();
+
+        return [
+            'count'           => $list->count(),
+            'by_category'     => $list->groupBy(fn ($r) => $r['category'] ?: 'Uncategorised')->map->count(),
+            'by_delivery_mode'=> $list->groupBy(fn ($r) => $r['delivery_mode'] ?: 'Unspecified')->map->count(),
+            'programs'        => $list,
+        ];
+    }
+
+    private static function getTrainingSchedule(int $rid, array $args): array
+    {
+        $date = self::cleanDate($args['date'] ?? null);
+        $today = Carbon::today();
+
+        $rows = TrainingSchedule::where('resort_id', $rid)
+            ->whereNotNull('end_date')->whereDate('end_date', '>=', $date)
+            ->with('learningProgram:id,name')
+            ->withCount('participants')
+            ->orderBy('start_date')->limit(50)->get();
+
+        $list = $rows->map(function ($s) use ($today) {
+            $start = $s->getRawOriginal('start_date');
+            $end   = $s->getRawOriginal('end_date');
+            $status = 'Scheduled';
+            if ($start && $end) {
+                $sd = Carbon::parse($start);
+                $ed = Carbon::parse($end);
+                if ($today->betweenIncluded($sd, $ed)) {
+                    $status = 'Ongoing';
+                } elseif ($today->gt($ed)) {
+                    $status = 'Completed';
+                }
+            }
+            return [
+                'program'      => optional($s->learningProgram)->name,
+                'start_date'   => $start,
+                'end_date'     => $end,
+                'venue'        => $s->venue,
+                'status'       => $status,
+                'participants' => $s->participants_count,
+            ];
+        })->values();
+
+        return ['from_date' => $date, 'count' => $list->count(), 'sessions' => $list];
+    }
+
+    private static function getTrainingAttendance(int $rid): array
+    {
+        $schedIds = TrainingSchedule::where('resort_id', $rid)->pluck('id');
+        $byStatus = TrainingAttendance::whereIn('training_schedule_id', $schedIds)
+            ->select('status', DB::raw('COUNT(*) as c'))->groupBy('status')->pluck('c', 'status');
+
+        $total = array_sum($byStatus->toArray());
+        $present = (int) ($byStatus['Present'] ?? 0);
+
+        return [
+            'total_records'       => $total,
+            'by_status'           => $byStatus->toArray(),
+            'attendance_rate_pct' => $total > 0 ? round($present / $total * 100, 1) : 0,
+        ];
+    }
+
+    private static function getMandatoryTraining(int $rid): array
+    {
+        $rows = MandatoryLearningProgram::where('resort_id', $rid)
+            ->with('program:id,name')->get();
+        $programs = $rows->map(fn ($m) => optional($m->program)->name)->filter()->unique()->values();
+
+        return [
+            'count'    => $programs->count(),
+            'programs' => $programs,
+        ];
+    }
+
+    private static function getEmployeeTraining(int $rid, array $args): array
+    {
+        $term = trim($args['name'] ?? '');
+        if ($term === '') {
+            return ['error' => 'Please provide an employee name.'];
+        }
+
+        $emp = Employee::where('resort_id', $rid)
+            ->where(function ($q) use ($term) {
+                $q->whereHas('resortAdmin', function ($r) use ($term) {
+                      $r->where('first_name', 'like', "%{$term}%")
+                        ->orWhere('last_name', 'like', "%{$term}%")
+                        ->orWhereRaw("CONCAT(first_name,' ',last_name) LIKE ?", ["%{$term}%"]);
+                  })->orWhere('Emp_id', 'like', "%{$term}%");
+            })
+            ->with('resortAdmin:id,first_name,last_name')
+            ->first(['id', 'Emp_id', 'Admin_Parent_id']);
+
+        if (!$emp) {
+            return ['query' => $term, 'found' => false, 'message' => 'No matching employee found.'];
+        }
+
+        $schedIds = TrainingSchedule::where('resort_id', $rid)->pluck('id');
+        $parts = TrainingParticipant::where('employee_id', $emp->id)
+            ->whereIn('training_schedule_id', $schedIds)
+            ->with('schedule.learningProgram:id,name')
+            ->orderByDesc('id')->limit(50)->get();
+
+        $list = $parts->map(fn ($p) => [
+            'program'         => optional(optional($p->schedule)->learningProgram)->name,
+            'status'          => $p->status,
+            'attendance_date' => $p->getRawOriginal('attendance_date'),
+        ])->values();
+
+        return [
+            'employee'      => self::empName($emp),
+            'training_count'=> $list->count(),
+            'trainings'     => $list,
+        ];
+    }
+
+    // ---------------------------------------------------------------------
+    // Incident Management
+    // ---------------------------------------------------------------------
+
+    private static function getIncidentSummary(int $rid): array
+    {
+        $inc = fn () => Incidents::where('resort_id', $rid);
+        $monthStart = Carbon::now()->startOfMonth()->toDateString();
+
+        // Average resolution time (days) for resolved incidents.
+        $resolved = $inc()->where('status', 'Resolved')->whereNotNull('resolved_at')
+            ->get(['created_at', 'resolved_at']);
+        $avgDays = null;
+        if ($resolved->isNotEmpty()) {
+            $sum = 0; $n = 0;
+            foreach ($resolved as $r) {
+                $c = $r->getRawOriginal('created_at');
+                $rs = $r->getRawOriginal('resolved_at');
+                if ($c && $rs) { $sum += Carbon::parse($c)->diffInDays(Carbon::parse($rs)); $n++; }
+            }
+            $avgDays = $n > 0 ? round($sum / $n, 1) : null;
+        }
+
+        return [
+            'total_incidents'      => $inc()->count(),
+            'open'                 => $inc()->where('status', '!=', 'Resolved')->count(),
+            'resolved'             => $inc()->where('status', 'Resolved')->count(),
+            'this_month'           => $inc()->whereDate('incident_date', '>=', $monthStart)->count(),
+            'by_status'            => $inc()->select('status', DB::raw('COUNT(*) as c'))->groupBy('status')->pluck('c', 'status')->toArray(),
+            'by_severity'          => $inc()->selectRaw("COALESCE(NULLIF(severity,''),'Unspecified') as s, COUNT(*) as c")->groupBy('s')->pluck('c', 's')->toArray(),
+            'by_location'          => $inc()->selectRaw("COALESCE(NULLIF(location,''),'Unspecified') as l, COUNT(*) as c")->groupBy('l')->orderByDesc('c')->limit(15)->pluck('c', 'l')->toArray(),
+            'avg_resolution_days'  => $avgDays,
+        ];
+    }
+
+    private static function getIncidents(int $rid, array $args): array
+    {
+        $status = trim($args['status'] ?? 'open');
+        $q = Incidents::where('resort_id', $rid)
+            ->with(['categoryName:id,category_name', 'reporter:id,Emp_id,Admin_Parent_id', 'reporter.resortAdmin:id,first_name,last_name']);
+
+        $sl = strtolower($status);
+        if ($sl === 'open') {
+            $q->where('status', '!=', 'Resolved');
+        } elseif ($sl === 'resolved' || $sl === 'closed') {
+            $q->where('status', 'Resolved');
+        } elseif ($sl !== 'all' && $status !== '') {
+            $q->where('status', $status); // exact status passthrough
+        }
+
+        $sev = trim($args['severity'] ?? '');
+        if ($sev !== '') {
+            $q->where('severity', 'like', "%{$sev}%");
+        }
+        $cat = trim($args['category'] ?? '');
+        if ($cat !== '') {
+            $q->whereHas('categoryName', fn ($c) => $c->where('category_name', 'like', "%{$cat}%"));
+        }
+
+        $rows = $q->orderByDesc('id')->limit(100)->get();
+        $list = $rows->map(fn ($i) => [
+            'incident'  => $i->incident_name,
+            'category'  => optional($i->categoryName)->category_name,
+            'severity'  => $i->severity ?: 'Unspecified',
+            'priority'  => $i->priority,
+            'status'    => $i->status,
+            'location'  => $i->location,
+            'date'      => $i->getRawOriginal('incident_date'),
+            'reporter'  => $i->reporter ? self::empName($i->reporter) : null,
+        ])->values();
+
+        return [
+            'status_filter' => $status,
+            'count'         => $list->count(),
+            'by_status'     => $list->groupBy(fn ($r) => $r['status'] ?: 'Unknown')->map->count(),
+            'by_severity'   => $list->groupBy(fn ($r) => $r['severity'])->map->count(),
+            'by_category'   => $list->groupBy(fn ($r) => $r['category'] ?: 'Uncategorised')->map->count(),
+            'by_location'   => $list->groupBy(fn ($r) => $r['location'] ?: 'Unspecified')->map->count(),
+            'incidents'     => $list,
+        ];
+    }
+
+    private static function getIncidentInvestigations(int $rid): array
+    {
+        $incs = Incidents::where('resort_id', $rid)
+            ->where('status', 'Investigation In Progress')
+            ->with(['categoryName:id,category_name', 'Investigation:id,incident_id,start_date,expected_resolution_date,investigation_findings'])
+            ->orderByDesc('id')->limit(50)->get();
+
+        $list = $incs->map(function ($i) {
+            $inv = $i->Investigation->first();
+            return [
+                'incident'            => $i->incident_name,
+                'category'            => optional($i->categoryName)->category_name,
+                'severity'            => $i->severity ?: 'Unspecified',
+                'started'             => $inv ? $inv->getRawOriginal('start_date') : null,
+                'expected_resolution' => $inv ? $inv->getRawOriginal('expected_resolution_date') : null,
+                'has_findings'        => $inv ? ($inv->investigation_findings ? true : false) : false,
+            ];
+        })->values();
+
+        return ['count' => $list->count(), 'investigations' => $list];
+    }
+
+    private static function getEmployeeIncidents(int $rid, array $args): array
+    {
+        $term = trim($args['name'] ?? '');
+        if ($term === '') {
+            return ['error' => 'Please provide an employee name.'];
+        }
+
+        $emp = Employee::where('resort_id', $rid)
+            ->where(function ($q) use ($term) {
+                $q->whereHas('resortAdmin', function ($r) use ($term) {
+                      $r->where('first_name', 'like', "%{$term}%")
+                        ->orWhere('last_name', 'like', "%{$term}%")
+                        ->orWhereRaw("CONCAT(first_name,' ',last_name) LIKE ?", ["%{$term}%"]);
+                  })->orWhere('Emp_id', 'like', "%{$term}%");
+            })
+            ->with('resortAdmin:id,first_name,last_name')
+            ->first(['id', 'Emp_id', 'Admin_Parent_id']);
+
+        if (!$emp) {
+            return ['query' => $term, 'found' => false, 'message' => 'No matching employee found.'];
+        }
+
+        $incs = Incidents::where('resort_id', $rid)
+            ->where(function ($q) use ($emp) {
+                $q->where('reporter_id', $emp->id)
+                  ->orWhereRaw('FIND_IN_SET(?, involved_employees)', [$emp->id])
+                  ->orWhereRaw('FIND_IN_SET(?, victims)', [$emp->id]);
+            })
+            ->with('categoryName:id,category_name')
+            ->orderByDesc('id')->limit(50)->get();
+
+        $list = $incs->map(fn ($i) => [
+            'incident' => $i->incident_name,
+            'category' => optional($i->categoryName)->category_name,
+            'severity' => $i->severity ?: 'Unspecified',
+            'status'   => $i->status,
+            'date'     => $i->getRawOriginal('incident_date'),
+            'role'     => (int) $i->reporter_id === (int) $emp->id ? 'Reporter' : 'Involved',
+        ])->values();
+
+        return [
+            'employee'       => self::empName($emp),
+            'incident_count' => $list->count(),
+            'incidents'      => $list,
+        ];
+    }
+
+    // ---------------------------------------------------------------------
+    // Survey Management
+    // ---------------------------------------------------------------------
+
+    private static function getSurveySummary(int $rid): array
+    {
+        $today = Carbon::today()->toDateString();
+        $sv = fn () => ParentSurvey::where('resort_id', $rid);
+
+        $ids = ParentSurvey::where('resort_id', $rid)->pluck('id');
+        $totalRecip = SurveyEmployee::whereIn('Parent_survey_id', $ids)->count();
+        $completed  = SurveyEmployee::whereIn('Parent_survey_id', $ids)->where('emp_status', 'yes')->count();
+
+        return [
+            'total_surveys' => $sv()->count(),
+            'draft'         => $sv()->where('Status', 'SaveAsDraft')->count(),
+            'active'        => $sv()->whereIn('Status', ['Publish', 'OnGoing'])->count(),
+            'completed'     => $sv()->where('Status', 'Complete')->count(),
+            'expired'       => $sv()->whereNotNull('End_date')->whereDate('End_date', '<', $today)
+                                    ->whereNotIn('Status', ['Complete', 'SaveAsDraft'])->count(),
+            'total_recipients'      => $totalRecip,
+            'responses'             => $completed,
+            'participation_rate_pct'=> $totalRecip > 0 ? round($completed / $totalRecip * 100, 1) : 0,
+        ];
+    }
+
+    private static function getSurveys(int $rid, array $args): array
+    {
+        $status = strtolower(trim($args['status'] ?? 'all'));
+        $today  = Carbon::today();
+        $q = ParentSurvey::where('resort_id', $rid);
+
+        switch ($status) {
+            case 'draft':    $q->where('Status', 'SaveAsDraft'); break;
+            case 'active':
+            case 'ongoing':
+            case 'published': $q->whereIn('Status', ['Publish', 'OnGoing']); break;
+            case 'complete':
+            case 'completed': $q->where('Status', 'Complete'); break;
+            case 'expired':   $q->whereNotNull('End_date')->whereDate('End_date', '<', $today->toDateString())
+                                ->whereNotIn('Status', ['Complete', 'SaveAsDraft']); break;
+        }
+
+        $surveys = $q->orderByDesc('id')->limit(50)->get(['id', 'Surevey_title', 'Start_date', 'End_date', 'Status']);
+        $ids = $surveys->pluck('id');
+        $recip = SurveyEmployee::whereIn('Parent_survey_id', $ids)
+            ->select('Parent_survey_id', DB::raw('COUNT(*) as total'), DB::raw("SUM(emp_status='yes') as completed"))
+            ->groupBy('Parent_survey_id')->get()->keyBy('Parent_survey_id');
+
+        $list = $surveys->map(function ($s) use ($recip, $today) {
+            $r = $recip[$s->id] ?? null;
+            $total = $r ? (int) $r->total : 0;
+            $done  = $r ? (int) $r->completed : 0;
+            $end   = $s->getRawOriginal('End_date');
+
+            $disp = $s->Status;
+            if ($disp === 'SaveAsDraft') {
+                $disp = 'Draft';
+            } elseif ($disp !== 'Complete' && $end && Carbon::parse($end)->lt($today)) {
+                $disp = 'Expired';
+            } elseif (in_array($disp, ['Publish', 'OnGoing'], true)) {
+                $disp = 'Active';
+            }
+
+            return [
+                'title'                 => $s->Surevey_title,
+                'status'                => $disp,
+                'start'                 => $s->getRawOriginal('Start_date'),
+                'end'                   => $end,
+                'recipients'            => $total,
+                'responses'             => $done,
+                'participation_rate_pct'=> $total > 0 ? round($done / $total * 100, 1) : 0,
+            ];
+        })->values();
+
+        return ['status_filter' => $status, 'count' => $list->count(), 'surveys' => $list];
+    }
+
+    private static function getSurveyParticipation(int $rid, array $args): array
+    {
+        $name = trim($args['survey'] ?? '');
+
+        // Drill into a specific survey.
+        if ($name !== '') {
+            $survey = ParentSurvey::where('resort_id', $rid)
+                ->where('Surevey_title', 'like', "%{$name}%")->orderByDesc('id')->first(['id', 'Surevey_title']);
+            if (!$survey) {
+                return ['query' => $name, 'found' => false, 'message' => 'No matching survey found.'];
+            }
+            $recips = SurveyEmployee::where('Parent_survey_id', $survey->id)->get(['Emp_id', 'emp_status']);
+            $total = $recips->count();
+            $done  = $recips->where('emp_status', 'yes')->count();
+            $pendingIds = $recips->where('emp_status', 'no')->pluck('Emp_id')->all();
+            $names = self::resolveEmpNames($rid, $pendingIds);
+
+            return [
+                'survey'                 => $survey->Surevey_title,
+                'recipients'             => $total,
+                'responses'              => $done,
+                'pending'                => $total - $done,
+                'participation_rate_pct' => $total > 0 ? round($done / $total * 100, 1) : 0,
+                'non_respondents'        => array_values(array_slice($names, 0, 50)),
+            ];
+        }
+
+        // Overall + lowest-participation surveys.
+        $surveys = ParentSurvey::where('resort_id', $rid)->get(['id', 'Surevey_title']);
+        $ids = $surveys->pluck('id');
+        $recip = SurveyEmployee::whereIn('Parent_survey_id', $ids)
+            ->select('Parent_survey_id', DB::raw('COUNT(*) as total'), DB::raw("SUM(emp_status='yes') as completed"))
+            ->groupBy('Parent_survey_id')->get()->keyBy('Parent_survey_id');
+
+        $perSurvey = $surveys->map(function ($s) use ($recip) {
+            $r = $recip[$s->id] ?? null;
+            $total = $r ? (int) $r->total : 0;
+            $done  = $r ? (int) $r->completed : 0;
+            return [
+                'title' => $s->Surevey_title,
+                'rate'  => $total > 0 ? round($done / $total * 100, 1) : 0,
+                'recipients' => $total,
+                'responses'  => $done,
+            ];
+        })->sortBy('rate')->values();
+
+        $totalRecip = SurveyEmployee::whereIn('Parent_survey_id', $ids)->count();
+        $totalDone  = SurveyEmployee::whereIn('Parent_survey_id', $ids)->where('emp_status', 'yes')->count();
+
+        return [
+            'overall_participation_rate_pct' => $totalRecip > 0 ? round($totalDone / $totalRecip * 100, 1) : 0,
+            'total_recipients' => $totalRecip,
+            'total_responses'  => $totalDone,
+            'lowest_participation' => $perSurvey->take(10),
+        ];
+    }
+
+    // ---------------------------------------------------------------------
+    // File / Document Management
+    // ---------------------------------------------------------------------
+
+    private static function getEmployeeDocuments(int $rid, array $args): array
+    {
+        $term = trim($args['name'] ?? '');
+        if ($term === '') {
+            return ['error' => 'Please provide an employee name.'];
+        }
+
+        $emp = Employee::where('resort_id', $rid)
+            ->where(function ($q) use ($term) {
+                $q->whereHas('resortAdmin', function ($r) use ($term) {
+                      $r->where('first_name', 'like', "%{$term}%")
+                        ->orWhere('last_name', 'like', "%{$term}%")
+                        ->orWhereRaw("CONCAT(first_name,' ',last_name) LIKE ?", ["%{$term}%"]);
+                  })->orWhere('Emp_id', 'like', "%{$term}%");
+            })
+            ->with('resortAdmin:id,first_name,last_name')
+            ->first(['id', 'Emp_id', 'Admin_Parent_id']);
+
+        if (!$emp) {
+            return ['query' => $term, 'found' => false, 'message' => 'No matching employee found.'];
+        }
+
+        $docs = EmployeesDocument::where('resort_id', $rid)->where('employee_id', $emp->id)
+            ->orderByDesc('id')->limit(100)->get(['document_title', 'document_category', 'document_path', 'expiry_date']);
+
+        $list = $docs->map(fn ($d) => [
+            'title'       => $d->document_title,
+            'category'    => $d->document_category,
+            'expiry_date' => $d->getRawOriginal('expiry_date'),
+            'has_file'    => !empty($d->document_path),
+        ])->values();
+
+        return [
+            'employee'       => self::empName($emp),
+            'document_count' => $list->count(),
+            'documents'      => $list,
+            'note'           => 'Open the actual files in the File Management module.',
+        ];
+    }
+
+    private static function searchDocuments(int $rid, array $args): array
+    {
+        $kw = trim($args['keyword'] ?? '');
+        if ($kw === '') {
+            return ['error' => 'Please provide a keyword to search for.'];
+        }
+
+        $docs = EmployeesDocument::where('resort_id', $rid)
+            ->where(function ($q) use ($kw) {
+                $q->where('document_title', 'like', "%{$kw}%")
+                  ->orWhere('document_category', 'like', "%{$kw}%");
+            })
+            ->orderByDesc('id')->limit(100)
+            ->get(['employee_id', 'document_title', 'document_category', 'document_path', 'expiry_date']);
+
+        $names = self::resolveEmpNames($rid, $docs->pluck('employee_id')->all());
+        $list = $docs->map(fn ($d) => [
+            'employee'    => $names[$d->employee_id] ?? ('Employee #' . $d->employee_id),
+            'title'       => $d->document_title,
+            'category'    => $d->document_category,
+            'expiry_date' => $d->getRawOriginal('expiry_date'),
+            'has_file'    => !empty($d->document_path),
+        ])->values();
+
+        return ['keyword' => $kw, 'count' => $list->count(), 'documents' => $list];
+    }
+
+    // ---------------------------------------------------------------------
+    // People Management — deeper sub-modules
+    // ---------------------------------------------------------------------
+
+    /** Standard approval-status filter ('Pending'/'Approved'/'Rejected'/'On Hold'). */
+    private static function applyApprovalStatus($q, string $status, string $default = 'pending'): void
+    {
+        $s = strtolower(trim($status)) ?: $default;
+        switch ($s) {
+            case 'all':      break;
+            case 'approved': $q->where('status', 'Approved'); break;
+            case 'rejected': $q->where('status', 'Rejected'); break;
+            case 'completed':$q->where('status', 'Completed'); break;
+            case 'on_hold':
+            case 'onhold':
+            case 'hold':     $q->where('status', 'On Hold'); break;
+            case 'pending':
+            default:         $q->where('status', 'Pending');
+        }
+    }
+
+    private static function empEager(): array
+    {
+        return ['employee:id,Emp_id,Admin_Parent_id,Dept_id', 'employee.resortAdmin:id,first_name,last_name'];
+    }
+
+    private static function getProbationOverview(int $rid): array
+    {
+        $today    = Carbon::today()->toDateString();
+        $monthEnd = Carbon::now()->endOfMonth()->toDateString();
+        $base = fn () => Employee::where('resort_id', $rid);
+
+        $onProbation = $base()->whereIn('probation_status', ['Active', 'Extended'])
+            ->whereRaw("COALESCE(probation_end_date, DATE_ADD(joining_date, INTERVAL 3 MONTH)) >= ?", [$today])
+            ->count();
+        $endingThisMonth = $base()->whereIn('probation_status', ['Active', 'Extended'])
+            ->whereRaw("COALESCE(probation_end_date, DATE_ADD(joining_date, INTERVAL 3 MONTH)) BETWEEN ? AND ?", [$today, $monthEnd])
+            ->count();
+
+        return [
+            'on_probation'      => $onProbation,
+            'ending_this_month' => $endingThisMonth,
+            'confirmed'         => $base()->where('probation_status', 'Confirmed')->count(),
+            'failed'            => $base()->where('probation_status', 'Failed')->count(),
+            'by_status'         => $base()->selectRaw("COALESCE(NULLIF(probation_status,''),'Unspecified') as s, COUNT(*) as c")
+                                          ->groupBy('s')->pluck('c', 's')->toArray(),
+        ];
+    }
+
+    private static function getPromotions(int $rid, array $args): array
+    {
+        $status = trim($args['status'] ?? 'pending');
+        $q = EmployeePromotion::where('resort_id', $rid)
+            ->with(array_merge(self::empEager(), ['currentPosition:id,position_title', 'newPosition:id,position_title']));
+        self::applyApprovalStatus($q, $status, 'pending');
+
+        $rows = $q->orderByDesc('id')->limit(100)->get();
+        $list = $rows->map(fn ($p) => [
+            'employee'      => $p->employee ? self::empName($p->employee) : 'Unknown',
+            'from'          => optional($p->currentPosition)->position_title,
+            'to'            => optional($p->newPosition)->position_title,
+            'effective_date'=> $p->getRawOriginal('effective_date'),
+            'status'        => $p->status,
+            'salary_increase'=> $p->salary_increment_amount !== null ? Common::formatCurrency((float) $p->salary_increment_amount, 'USD') : null,
+        ])->values();
+
+        $approvedImpact = EmployeePromotion::where('resort_id', $rid)->where('status', 'Approved')->sum('salary_increment_amount');
+
+        return [
+            'status_filter'      => $status,
+            'count'              => $list->count(),
+            'approved_payroll_impact' => Common::formatCurrency((float) $approvedImpact, 'USD'),
+            'promotions'         => $list,
+        ];
+    }
+
+    private static function getTransfers(int $rid, array $args): array
+    {
+        $status = trim($args['status'] ?? 'pending');
+        $q = EmployeeTransfer::where('resort_id', $rid)
+            ->with(array_merge(self::empEager(), ['currentDepartment:id,name', 'targetDepartment:id,name']));
+        self::applyApprovalStatus($q, $status, 'pending');
+
+        $type = trim($args['type'] ?? '');
+        if ($type !== '') {
+            $q->where('transfer_status', 'like', "%{$type}%");
+        }
+
+        $rows = $q->orderByDesc('id')->limit(100)->get();
+        $list = $rows->map(fn ($t) => [
+            'employee'      => $t->employee ? self::empName($t->employee) : 'Unknown',
+            'from_dept'     => optional($t->currentDepartment)->name,
+            'to_dept'       => optional($t->targetDepartment)->name,
+            'type'          => $t->transfer_status,
+            'effective_date'=> $t->getRawOriginal('effective_date'),
+            'status'        => $t->status,
+        ])->values();
+
+        return ['status_filter' => $status, 'count' => $list->count(), 'transfers' => $list];
+    }
+
+    private static function getResignations(int $rid, array $args): array
+    {
+        $status = trim($args['status'] ?? 'all');
+        $q = EmployeeResignation::where('resort_id', $rid)
+            ->with(array_merge(self::empEager(), ['employee.department:id,name', 'reason_title:id,reason']));
+        self::applyApprovalStatus($q, $status, 'all');
+
+        $rows = $q->orderByDesc('id')->limit(100)->get();
+        $list = $rows->map(fn ($r) => [
+            'employee'        => $r->employee ? self::empName($r->employee) : 'Unknown',
+            'department'      => optional(optional($r->employee)->department)->name,
+            'reason'          => optional($r->reason_title)->reason,
+            'resignation_date'=> $r->getRawOriginal('resignation_date'),
+            'last_working_day'=> $r->getRawOriginal('last_working_day'),
+            'status'          => $r->status,
+        ])->values();
+
+        $monthStart = Carbon::now()->startOfMonth()->toDateString();
+        $thisMonth = EmployeeResignation::where('resort_id', $rid)->whereDate('resignation_date', '>=', $monthStart)->count();
+
+        return [
+            'status_filter' => $status,
+            'count'         => $list->count(),
+            'this_month'    => $thisMonth,
+            'by_department' => $list->groupBy(fn ($r) => $r['department'] ?: 'Unassigned')->map->count(),
+            'resignations'  => $list,
+        ];
+    }
+
+    private static function getSalaryIncrements(int $rid, array $args): array
+    {
+        $status = strtolower(trim($args['status'] ?? 'pending'));
+        $q = PeopleSalaryIncrement::where('resort_id', $rid)->with(self::empEager());
+
+        switch ($status) {
+            case 'all':      break;
+            case 'approved': $q->where('status', 'Approved'); break;
+            case 'rejected': $q->where('status', 'Rejected'); break;
+            case 'pending':
+            default:         $q->whereIn('status', ['Pending', 'Hold', 'Change-Request']);
+        }
+
+        $rows = $q->orderByDesc('id')->limit(100)->get();
+        $list = $rows->map(fn ($i) => [
+            'employee'        => $i->employee ? self::empName($i->employee) : 'Unknown',
+            'previous_salary' => Common::formatCurrency((float) $i->previous_salary, 'USD'),
+            'new_salary'      => Common::formatCurrency((float) $i->new_salary, 'USD'),
+            'increment'       => Common::formatCurrency((float) $i->increment_amount, 'USD'),
+            'status'          => $i->status,
+            'effective_date'  => $i->getRawOriginal('effective_date'),
+        ])->values();
+
+        $approvedImpact = PeopleSalaryIncrement::where('resort_id', $rid)->where('status', 'Approved')->sum('increment_amount');
+
+        return [
+            'status_filter'           => $status,
+            'count'                   => $list->count(),
+            'approved_payroll_impact' => Common::formatCurrency((float) $approvedImpact, 'USD'),
+            'increments'              => $list,
+        ];
+    }
+
+    private static function getEmployeeLoans(int $rid, array $args): array
+    {
+        $name = trim($args['name'] ?? '');
+        $q = PayrollAdvance::where('resort_id', $rid)->with(self::empEager());
+        if ($name !== '') {
+            $q->whereHas('employee.resortAdmin', function ($r) use ($name) {
+                $r->whereRaw("CONCAT(first_name,' ',last_name) LIKE ?", ["%{$name}%"])
+                  ->orWhere('first_name', 'like', "%{$name}%")
+                  ->orWhere('last_name', 'like', "%{$name}%");
+            });
+        }
+
+        $rows = $q->orderByDesc('id')->limit(100)->get();
+        $advIds = $rows->pluck('id');
+        $outstanding = PayrollRecoverySchedule::whereIn('payroll_advance_id', $advIds)->where('status', 'Pending')
+            ->select('payroll_advance_id', DB::raw('SUM(amount) as bal'))->groupBy('payroll_advance_id')
+            ->pluck('bal', 'payroll_advance_id');
+
+        $list = $rows->map(function ($a) use ($outstanding) {
+            $stages = [$a->hr_status, $a->finance_status, $a->gm_status];
+            if (in_array('Rejected', $stages, true)) {
+                $st = 'Rejected';
+            } elseif ($a->hr_status === 'Approved' && $a->finance_status === 'Approved' && $a->gm_status === 'Approved') {
+                $st = 'Approved';
+            } elseif (in_array('Hold', $stages, true)) {
+                $st = 'On Hold';
+            } else {
+                $st = 'Pending';
+            }
+            return [
+                'employee'    => $a->employee ? self::empName($a->employee) : 'Unknown',
+                'type'        => $a->request_type,
+                'amount'      => Common::formatCurrency((float) $a->request_amount, 'USD'),
+                'status'      => $st,
+                'outstanding' => Common::formatCurrency((float) ($outstanding[$a->id] ?? 0), 'USD'),
+            ];
+        })->values();
+
+        return ['count' => $list->count(), 'loans' => $list];
+    }
+
+    private static function getPendingApprovals(int $rid): array
+    {
+        return [
+            'promotions_pending'        => EmployeePromotion::where('resort_id', $rid)->where('status', 'Pending')->count(),
+            'transfers_pending'         => EmployeeTransfer::where('resort_id', $rid)->where('status', 'Pending')->count(),
+            'resignations_pending'      => EmployeeResignation::where('resort_id', $rid)->where('status', 'Pending')->count(),
+            'salary_increments_pending' => PeopleSalaryIncrement::where('resort_id', $rid)->whereIn('status', ['Pending', 'Hold', 'Change-Request'])->count(),
+            'salary_advances_pending'   => PayrollAdvance::where('resort_id', $rid)
+                ->where(fn ($q) => $q->where('hr_status', 'Pending')->orWhere('finance_status', 'Pending')->orWhere('gm_status', 'Pending'))
+                ->count(),
         ];
     }
 
