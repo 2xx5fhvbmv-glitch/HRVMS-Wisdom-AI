@@ -18,6 +18,7 @@ use App\Models\EmployeeResignation;
 use App\Models\VisaWallets;
 use App\Models\TotalExpensessSinceJoing;
 use App\Models\VisaTransectionHistory;
+use App\Models\DepositRefound;
 class PaymentDepositRequestController extends Controller
 {
     protected $resort;
@@ -47,11 +48,16 @@ class PaymentDepositRequestController extends Controller
     {
 
         $wallet_option = $request->input('wallet_option', []);
+        // Employees HR marked "No": defer (snooze) the deposit refund instead of
+        // paying it out now. Carries the employee ids.
+        $no_refund = array_values(array_filter(array_map('intval', (array) $request->input('no_refund', []))));
 
 
         $validator = Validator::make($request->all(), [
-            'wallet_option' => 'required|array',
+            'wallet_option' => 'nullable|array',
             'wallet_option.*' => 'required|integer|min:1',
+            'no_refund' => 'nullable|array',
+            'no_refund.*' => 'integer|min:1',
         ]);
 
             if ($validator->fails())
@@ -61,6 +67,14 @@ class PaymentDepositRequestController extends Controller
                     'success' => false,
                     'msg' => 'Validation failed',
                     'errors' => $validator->errors()->first()
+                ], 422);
+            }
+
+            if (empty($wallet_option) && empty($no_refund)) {
+                return response()->json([
+                    'success' => false,
+                    'msg' => 'Validation failed',
+                    'errors' => 'Please tick an employee and choose Yes (with a wallet) or No.'
                 ], 422);
             }
 
@@ -152,8 +166,20 @@ class PaymentDepositRequestController extends Controller
                     ]);
                 }
 
+                // "No" decisions: snooze these employees off the deposit-request
+                // list until the follow-up reminder window passes; the row then
+                // reappears so HR is reminded again.
+                if (!empty($no_refund)) {
+                    $cfg = DepositRefound::where('resort_id', $this->resort->resort_id)->first();
+                    $followupDays = (int) (optional($cfg)->followup_reminder ?: 2);
+                    if ($followupDays < 1) {
+                        $followupDays = 2;
+                    }
+                    EmployeeResignation::where('resort_id', $this->resort->resort_id)
+                        ->whereIn('employee_id', $no_refund)
+                        ->update(['deposit_refund_snooze_until' => Carbon::today()->addDays($followupDays)->toDateString()]);
+                }
 
-               
                 DB::commit();
                 $EmployeeResignation = $this->GetIndex();
                 $VisaWallets  = VisaWallets::orderBy("id","DESC")->where('resort_id', $this->resort->resort_id)->get();
@@ -182,6 +208,11 @@ class PaymentDepositRequestController extends Controller
     public function GetIndex()
     {
         return $EmployeeResignation = EmployeeResignation::with(['employee.department','employee.position','employee.resortAdmin'])->where('hr_status','Approved')->where('resort_id', $this->resort->resort_id)
+                            // Hide rows HR snoozed via "No" until the snooze window passes.
+                            ->where(function($q) {
+                                $q->whereNull('deposit_refund_snooze_until')
+                                  ->orWhereDate('deposit_refund_snooze_until', '<=', Carbon::today());
+                            })
                             ->get()
                             ->filter(function($resignation) {
                                 // Filter out resignations that have already been processed for deposit refund
@@ -217,6 +248,10 @@ class PaymentDepositRequestController extends Controller
         $EmployeeResignation = EmployeeResignation::with(['employee.department','employee.position','employee.resortAdmin'])
             ->where('hr_status', 'Approved')
             ->where('resort_id', $this->resort->resort_id)
+            ->where(function($q) {
+                $q->whereNull('deposit_refund_snooze_until')
+                  ->orWhereDate('deposit_refund_snooze_until', '<=', Carbon::today());
+            })
             ->where(function($query) use ($search) {
                 $query->whereHas('employee.resortAdmin', function($q) use ($search) {
                     $q->where('first_name', 'like', "%{$search}%")

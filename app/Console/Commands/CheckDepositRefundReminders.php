@@ -46,18 +46,32 @@ class CheckDepositRefundReminders extends Command
                     $q->whereNull('Deposit_withdraw')
                       ->orWhere('Deposit_withdraw', '!=', 'Yes');
                 })
-                ->whereNotNull('resignation_date')
+                // Skip rows HR snoozed via "No" until the snooze window passes.
+                ->where(function ($q) use ($today) {
+                    $q->whereNull('deposit_refund_snooze_until')
+                      ->orWhereDate('deposit_refund_snooze_until', '<=', $today);
+                })
                 ->get();
 
             foreach ($candidates as $resignation) {
-                $resignationDate = Carbon::parse($resignation->resignation_date)->startOfDay();
-                $daysSince       = $resignationDate->diffInDays($today, false);
+                // "Days after departure" = the employee's last working day; fall
+                // back to the resignation date when no last working day is set.
+                $departureRaw = $resignation->last_working_day ?: $resignation->resignation_date;
+                if (empty($departureRaw)) {
+                    continue;
+                }
+                $departureDate = Carbon::parse($departureRaw)->startOfDay();
+                $daysSince     = $departureDate->diffInDays($today, false);
                 if ($daysSince < 0) {
-                    continue; // future-dated resignation, skip
+                    continue; // future-dated departure, skip
                 }
 
+                // Initial reminder on day == initialDays; then a follow-up every
+                // followupDays after that, for as long as it stays unapplied.
                 $isInitial  = ($daysSince === $initialDays);
-                $isFollowup = ($followupDays > 0) && ($daysSince === ($initialDays + $followupDays));
+                $isFollowup = ($followupDays > 0)
+                    && ($daysSince > $initialDays)
+                    && ((($daysSince - $initialDays) % $followupDays) === 0);
 
                 if (!$isInitial && !$isFollowup) {
                     continue;

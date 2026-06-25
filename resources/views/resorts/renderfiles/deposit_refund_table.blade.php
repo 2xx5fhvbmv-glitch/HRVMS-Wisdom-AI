@@ -21,7 +21,7 @@
                     </div>
                     <div class="form-check">
                         <input class="form-check-input toggle-checkbox PaymentcheckCancle" type="checkbox" data-id="{{$resignation['id']}}"  id="no-check-{{$resignation['id']}}"
-                            value="Status1">
+                            name="no_refund[]" value="{{$resignation['employee_id']}}">
                         <label class="form-check-label text-nowrap" for="check">No</label>
                     </div>
                     @endif
@@ -37,7 +37,7 @@
                             <div class="DepRefReq-checkbox d-flex align-items-center justify-content-between">
                                 <div>
                                     <p>{{ $wallet->WalletName }}</p>
-                                    <span>Current Balance: {!! Common::formatCurrency($wallet->Amt, 'USD') !!}</span>
+                                    <span>Current Balance: {!! Common::formatMvr($wallet->Amt) !!}</span>
                                 </div>
                                 <div class="form-check form-check-inline p-0 me-0">
                                     <input
