@@ -58,24 +58,29 @@ class ReportController extends Controller
             return abort(403, 'Unauthorized access');
          }
          $page_title = 'Create Report';
-        // HR picks by Module -> Entity (friendly names), never raw table names.
-        // The catalog below is the curated, module-based vocabulary.
-        $catalog = $this->reportCatalog();
+        // HR picks by Module -> Entity -> curated business Fields. They never see
+        // raw table or column names; the catalog below is the only vocabulary.
+        $catalog = $this->reportFieldCatalog();
         return view('resorts.reports.create', compact('catalog', 'page_title'));
     }
 
     /**
-     * The module-based report catalog, filtered to entities whose table
-     * actually exists in this database. Shape: [ Module => [ Entity => table ] ].
-     * This doubles as the security allow-list of report-able tables.
+     * The curated semantic catalog the UI renders, filtered to entities whose
+     * base table actually exists. Shape for the front end:
+     *   [ Module => [ Entity => [ 'table' => t, 'fields' => [ 'Label', ... ] ] ] ]
+     * Only field labels are exposed — never columns, joins or related tables.
      */
-    private function reportCatalog(): array
+    private function reportFieldCatalog(): array
     {
         $catalog = [];
-        foreach ((array) config('report_catalog', []) as $module => $entities) {
-            foreach ((array) $entities as $label => $table) {
-                if (Schema::hasTable($table)) {
-                    $catalog[$module][$label] = $table;
+        foreach ((array) config('report_fields', []) as $module => $entities) {
+            foreach ((array) $entities as $entity => $def) {
+                $table = $def['table'] ?? null;
+                if ($table && Schema::hasTable($table)) {
+                    $catalog[$module][$entity] = [
+                        'table'  => $table,
+                        'fields' => array_keys($def['fields'] ?? []),
+                    ];
                 }
             }
         }
@@ -83,18 +88,16 @@ class ReportController extends Controller
     }
 
     /**
-     * Flat list of every table the report builder is allowed to touch.
-     * Anything not in here is rejected by getTableColumns()/store().
+     * Resolve a single Module/Entity to its raw definition from config, or null.
+     * This is the gatekeeper: anything the builder runs must come from here.
      */
-    private function allowedReportTables(): array
+    private function findEntityDef(?string $module, ?string $entity): ?array
     {
-        $tables = [];
-        foreach ($this->reportCatalog() as $entities) {
-            foreach ($entities as $table) {
-                $tables[$table] = true;
-            }
+        $def = config("report_fields.$module.$entity");
+        if (!is_array($def) || empty($def['table']) || !Schema::hasTable($def['table'])) {
+            return null;
         }
-        return array_keys($tables);
+        return $def;
     }
     public function store(Request $request)
     {
@@ -102,34 +105,47 @@ class ReportController extends Controller
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
-            'table_name' => 'required|string',
-            'columns' => 'required|array',
-            'related_columns' => 'nullable|array', 
+            'module' => 'required|string',
+            'entity' => 'required|string',
+            'fields' => 'required|array|min:1',
             'filters' => 'nullable|array',
             'from_date' => 'nullable|date_format:Y-m-d',
             'to_date' => 'nullable|date_format:Y-m-d',
         ]);
 
-        // Reject any table not exposed through the module catalog.
-        if (!in_array($validated['table_name'], $this->allowedReportTables(), true)) {
+        // Reject anything not exposed through the curated semantic catalog.
+        $def = $this->findEntityDef($validated['module'], $validated['entity']);
+        if (!$def) {
             return response()->json(['success' => false, 'message' => 'That data source is not available for reporting.'], 422);
         }
 
-        $relationTables = [];
-        if (!empty($validated['related_columns'])) 
-        {
-            foreach ($validated['related_columns'] as $table => $columns) 
-            {
-                if (!empty($columns)) {
-                    $relationTables[$table] = ['columns' => $columns];
-                }
+        // Keep only fields that exist in this entity, preserving the catalog order
+        // so report columns are always laid out consistently.
+        $allowedFields = array_keys($def['fields']);
+        $selectedFields = array_values(array_intersect($allowedFields, $validated['fields']));
+        if (empty($selectedFields)) {
+            return response()->json(['success' => false, 'message' => 'Please choose at least one valid field.'], 422);
+        }
+
+        // Filters may only reference fields the report actually includes.
+        $filters = [];
+        foreach ($validated['filters'] ?? [] as $filter) {
+            if (!empty($filter['field']) && in_array($filter['field'], $selectedFields, true)
+                && isset($filter['operator'], $filter['value']) && $filter['value'] !== '') {
+                $filters[] = [
+                    'field'    => $filter['field'],
+                    'operator' => $filter['operator'],
+                    'value'    => $filter['value'],
+                ];
             }
         }
+
         $query_params = [
-            'table' => $validated['table_name'],
-            'columns' => $validated['columns'],
-            'relation_tables' => $relationTables, 
-            'filters' => $validated['filters'] ?? [],
+            'module'  => $validated['module'],
+            'entity'  => $validated['entity'],
+            'table'   => $def['table'],
+            'fields'  => $selectedFields,
+            'filters' => $filters,
         ];
         $report               =  new ResortReports();
         $report->name         = $validated['name'];
@@ -158,60 +174,76 @@ class ReportController extends Controller
         return view('resorts.reports.show',compact('report','form_date','to_date','page_title'));
     }
     public function FetchReportData(Request $request)
-    {   
+    {
 
         $report = ResortReports::findOrFail($request->report_id);
-        $columns = $report->query_params['columns'] ?? [];
-        $relation_tables = $report->query_params['relation_tables'] ?? [];
-        $data = $this->runReport($request->report_id,$request->todate,$request->formdate);
-        
-        $html =  view('resorts.renderfiles.ReportFilterData', compact('report', 'columns', 'data', 'relation_tables'))->render();
-        
+        $result  = $this->runReport($request->report_id, $request->todate, $request->formdate);
+        $columns = $result['columns'];
+        $data    = $result['rows'];
+
+        $html =  view('resorts.renderfiles.ReportFilterData', compact('report', 'columns', 'data'))->render();
+
         return response()->json([
             'html' => $html,
             "columns" => count($data),
         ]);
     }
-    private function runReport($id,$fromDate,$toDate)
+    /**
+     * Run a saved report and return resolved, display-ready data.
+     * Shape: [ 'columns' => [ 'Field Label', ... ], 'rows' => [ [ 'Field Label' => value ], ... ] ].
+     *
+     * Everything is driven by the curated config/report_fields definition, so a
+     * report can only ever read tables/columns that were deliberately exposed.
+     * Business labels are resolved here (names from related tables, rank/grade
+     * mappings, date formatting) — the views just print label => value.
+     */
+    private function runReport($id, $fromDate, $toDate): array
     {
-
         $report = ResortReports::where('id', $id)->first();
-        $queryParams = $report->query_params;
-        $tableName = $queryParams['table'];
-        $columns = $queryParams['columns'] ?? [];
-        $relationTables = $queryParams['relation_tables'] ?? [];
-        $filters = $queryParams['filters'] ?? [];
-        $query = DB::table($tableName);
-        // Only scope by resort if the target table actually has a resort_id column
-        if (Schema::hasColumn($tableName, 'resort_id')) {
-            $query->where("$tableName.resort_id", $this->resort->resort_id);
+        $params = $report->query_params ?? [];
+
+        $def = $this->findEntityDef($params['module'] ?? null, $params['entity'] ?? null);
+        // Legacy reports (old column-based query_params) have no entity definition.
+        if (!$def) {
+            return ['columns' => [], 'rows' => []];
         }
 
-        // Department-based visibility: restrict reports to the user's department scope
-        // unless they have full access (Super admin / GM / HR dept members).
+        $table       = $def['table'];
+        $employeeFk  = $def['employee_fk'] ?? null;
+        $fieldDefs   = $def['fields'];
+        // Honour the saved field order, but only for fields still in the catalog.
+        $labels = array_values(array_filter(
+            $params['fields'] ?? [],
+            fn ($label) => isset($fieldDefs[$label])
+        ));
+        $filters = $params['filters'] ?? [];
+
+        // ---- Base query: resort + department scoping + created_at date range ----
+        $query = DB::table($table);
+        if (Schema::hasColumn($table, 'resort_id')) {
+            $query->where("$table.resort_id", $this->resort->resort_id);
+        }
+
         $scopedDeptIds = Common::getScopedDepartmentIds();
         $scopedEmpIds  = Common::getPerformanceScopedEmpIds();
         if (is_array($scopedDeptIds)) {
-            if (Schema::hasColumn($tableName, 'Dept_id')) {
-                $query->whereIn("$tableName.Dept_id", $scopedDeptIds);
-            } elseif (Schema::hasColumn($tableName, 'department_id')) {
-                $query->whereIn("$tableName.department_id", $scopedDeptIds);
+            if (Schema::hasColumn($table, 'Dept_id')) {
+                $query->whereIn("$table.Dept_id", $scopedDeptIds);
+            } elseif (Schema::hasColumn($table, 'department_id')) {
+                $query->whereIn("$table.department_id", $scopedDeptIds);
             } elseif (is_array($scopedEmpIds)) {
-                // Fall back to employee-level scoping for tables keyed by employee.
-                if (Schema::hasColumn($tableName, 'Emp_main_id')) {
-                    $query->whereIn("$tableName.Emp_main_id", $scopedEmpIds);
-                } elseif (Schema::hasColumn($tableName, 'emp_id')) {
-                    $query->whereIn("$tableName.emp_id", $scopedEmpIds);
-                } elseif (Schema::hasColumn($tableName, 'employee_id')) {
-                    $query->whereIn("$tableName.employee_id", $scopedEmpIds);
-                } elseif ($tableName === 'employees' && Schema::hasColumn($tableName, 'id')) {
-                    $query->whereIn("$tableName.id", $scopedEmpIds);
+                if (Schema::hasColumn($table, 'Emp_main_id')) {
+                    $query->whereIn("$table.Emp_main_id", $scopedEmpIds);
+                } elseif (Schema::hasColumn($table, 'emp_id')) {
+                    $query->whereIn("$table.emp_id", $scopedEmpIds);
+                } elseif (Schema::hasColumn($table, 'employee_id')) {
+                    $query->whereIn("$table.employee_id", $scopedEmpIds);
+                } elseif ($table === 'employees' && Schema::hasColumn($table, 'id')) {
+                    $query->whereIn("$table.id", $scopedEmpIds);
                 }
             }
         }
 
-        $query->select("$tableName.*");
-        
         // Be resilient about both formats (d/m/Y and already-normalised Y-m-d)
         $parseFlexible = function ($value, $endOfDay = false) {
             if (empty($value)) return null;
@@ -229,85 +261,148 @@ class ReportController extends Controller
         };
         $from = $parseFlexible($fromDate, false);
         $to   = $parseFlexible($toDate, true);
-
-        if ($from && $to) {
-            // Ensure correct order regardless of user input
+        if ($from && $to && Schema::hasColumn($table, 'created_at')) {
             if ($from->greaterThan($to)) { [$from, $to] = [$to, $from]; }
-            $query->whereBetween("$tableName.created_at", [$from->format('Y-m-d H:i:s'), $to->format('Y-m-d H:i:s')]);
+            $query->whereBetween("$table.created_at", [$from->format('Y-m-d H:i:s'), $to->format('Y-m-d H:i:s')]);
         }
-        $mainRecords = $query->get();
+
+        $baseRows = $query->get()->map(fn ($r) => (array) $r)->all();
+        if (empty($baseRows)) {
+            return ['columns' => $labels, 'rows' => []];
+        }
+
+        // ---- Batch-load everything the selected fields need (no N+1) ----
+        $selectedDefs = array_intersect_key($fieldDefs, array_flip($labels));
+
+        $needsEmployee = false;
+        foreach ($selectedDefs as $fd) {
+            if (isset($fd['employee_col']) || isset($fd['employee_name']) || isset($fd['employee_lookup'])) {
+                $needsEmployee = true;
+                break;
+            }
+        }
+
+        // Map of employees keyed by employees.id. For the Employees entity the
+        // base row IS the employee, so no extra fetch is needed.
+        $employees = [];
+        if ($needsEmployee && $employeeFk) {
+            $empIds = array_filter(array_unique(array_column($baseRows, $employeeFk)));
+            if (!empty($empIds)) {
+                $employees = DB::table('employees')->whereIn('id', $empIds)
+                    ->get()->keyBy('id')->map(fn ($r) => (array) $r)->all();
+            }
+        }
+        $employeeFor = function (array $baseRow) use ($employeeFk, $employees) {
+            if (!$employeeFk) return $baseRow;           // base row is the employee
+            $fk = $baseRow[$employeeFk] ?? null;
+            return $fk !== null ? ($employees[$fk] ?? null) : null;
+        };
+
+        // Lookup tables keyed by id. We union every id needed for a given table.
+        $lookupMaps = [];
+        $collectLookup = function ($table, $id) use (&$lookupMaps) {
+            if ($table && $id !== null && $id !== '') {
+                $lookupMaps[$table][$id] = true;
+            }
+        };
+        $needAdmin = false;
+        foreach ($baseRows as $baseRow) {
+            $emp = $employeeFor($baseRow);
+            foreach ($selectedDefs as $fd) {
+                if (isset($fd['lookup'])) {
+                    $collectLookup($fd['lookup'], $baseRow[$fd['fk']] ?? null);
+                } elseif (isset($fd['employee_lookup']) && $emp) {
+                    $collectLookup($fd['employee_lookup'], $emp[$fd['fk']] ?? null);
+                } elseif (isset($fd['employee_name'])) {
+                    $needAdmin = true;
+                    if ($emp) { $collectLookup('resort_admins', $emp['Admin_Parent_id'] ?? null); }
+                }
+            }
+        }
+        foreach ($lookupMaps as $lt => $idSet) {
+            $rows = DB::table($lt)->whereIn('id', array_keys($idSet))
+                ->get()->keyBy('id')->map(fn ($r) => (array) $r)->all();
+            $lookupMaps[$lt] = $rows;
+        }
+
+        // ---- Resolve each base row into a label => display-value array ----
+        $eligibility = config('settings.eligibilty', []);
+        $format = function ($fd, array $baseRow) use ($employeeFor, $lookupMaps, $eligibility) {
+            if (isset($fd['employee_name'])) {
+                $emp = $employeeFor($baseRow);
+                $admin = $emp ? ($lookupMaps['resort_admins'][$emp['Admin_Parent_id'] ?? null] ?? null) : null;
+                if (!$admin) return 'N/A';
+                $name = trim(($admin['first_name'] ?? '') . ' ' . ($admin['last_name'] ?? ''));
+                return $name !== '' ? $name : 'N/A';
+            }
+            if (isset($fd['lookup'])) {
+                $rec = $lookupMaps[$fd['lookup']][$baseRow[$fd['fk']] ?? null] ?? null;
+                $v = $rec[$fd['name']] ?? null;
+                return ($v === null || $v === '') ? 'N/A' : $v;
+            }
+            if (isset($fd['employee_lookup'])) {
+                $emp = $employeeFor($baseRow);
+                $rec = $emp ? ($lookupMaps[$fd['employee_lookup']][$emp[$fd['fk']] ?? null] ?? null) : null;
+                $v = $rec[$fd['name']] ?? null;
+                return ($v === null || $v === '') ? 'N/A' : $v;
+            }
+
+            // Plain / employee column with optional cast.
+            if (isset($fd['employee_col'])) {
+                $emp = $employeeFor($baseRow);
+                $v = $emp[$fd['employee_col']] ?? null;
+            } else {
+                $v = $baseRow[$fd['col']] ?? null;
+            }
+            if ($v === null || $v === '') return 'N/A';
+
+            $cast = $fd['cast'] ?? null;
+            if ($cast === 'eligibility') {
+                return $eligibility[$v] ?? $v;
+            }
+            if ($cast === 'date') {
+                try { return Carbon::parse($v)->format('d/m/Y'); } catch (\Exception) { return $v; }
+            }
+            return $v;
+        };
+
+        $rows = [];
+        foreach ($baseRows as $baseRow) {
+            $out = [];
+            foreach ($labels as $label) {
+                $out[$label] = $format($selectedDefs[$label], $baseRow);
+            }
+            $rows[] = $out;
+        }
+
+        // ---- Apply filters on the resolved display values ----
         if (!empty($filters)) {
-            foreach ($filters as $filter) {
-                if (!empty($filter) && isset($filter['field'], $filter['operator'], $filter['value'])) {
-                    $field = $filter['field'];
-                    $operator = $filter['operator'];
-                    $value = $filter['value'];
-                    
-                    switch ($operator) {
+            $rows = array_values(array_filter($rows, function ($row) use ($filters) {
+                foreach ($filters as $filter) {
+                    $field = $filter['field'] ?? null;
+                    if ($field === null || !array_key_exists($field, $row)) { return false; }
+                    $cell  = (string) $row[$field];
+                    $value = (string) $filter['value'];
+                    switch ($filter['operator'] ?? '') {
                         case 'equals':
-                            $query->where($field, '=', $value);
+                            if (strcasecmp($cell, $value) !== 0) return false;
                             break;
                         case 'contains':
-                            $query->where($field, 'LIKE', "%{$value}%");
+                            if (stripos($cell, $value) === false) return false;
                             break;
                         case 'greater_than':
-                            $query->where($field, '>', $value);
+                            if (!(floatval($cell) > floatval($value))) return false;
                             break;
                         case 'less_than':
-                            $query->where($field, '<', $value);
+                            if (!(floatval($cell) < floatval($value))) return false;
                             break;
-                        
                     }
                 }
-            }
+                return true;
+            }));
         }
-        $mainRecords = $query->get();
-        $results = [];
-        
-        foreach ($mainRecords as $record) {
-            $recordArray = (array)$record;
-            
 
-            foreach ($relationTables as $relationTable => $relationDetails) {
-                $relationColumns = $relationDetails['columns'] ?? [];
-                $foreignKey = $this->findForeignKeyForTable($tableName, $relationTable);
-                if ($foreignKey && isset($record->$foreignKey)) {
-                    $relatedRecord = DB::table($relationTable)
-                        ->where('id', $record->$foreignKey)
-                        ->where('resort_id', $this->resort->resort_id)
-                        ->first();
-                    
-                    if ($relatedRecord) {
-                        $relatedArray = [];
-                        foreach ($relationColumns as $column) {
-                            if (isset($relatedRecord->$column)) 
-                            {
-                                $relatedArray[$column] = $relatedRecord->$column;
-                            }
-                        }
-                        $recordArray[$relationTable] = $relatedArray;
-                    }
-                }
-            }
-            
-            $results[] = $recordArray;
-        }
-        
-        return $results;
-    }
-    
-    private function findForeignKeyForTable($mainTable, $relationTable)
-    {
-        $foreignKeys = $this->getTableForeignKeys($mainTable);
-
-        foreach ($foreignKeys as $column => $referencedTable) 
-        {
-            if ($referencedTable === $relationTable) 
-            {
-                return $column;
-            }
-        }
-        return null;
+        return ['columns' => $labels, 'rows' => $rows];
     }
     public function getTableColumns(Request $request)
     {
@@ -406,78 +501,47 @@ class ReportController extends Controller
     {
         
         $report = ResortReports::findOrFail(base64_decode($request->report_id));
-        $data = $this->runReport(base64_decode($request->report_id),$request->Form_todate,$request->Form_formdate);
-        return $this->exportReport($data, $report, $request->format);
+        $result = $this->runReport(base64_decode($request->report_id),$request->Form_todate,$request->Form_formdate);
+        return $this->exportReport($result, $report, $request->format);
     }
-    private function exportReport($data, $report, $format)
+    private function exportReport($result, $report, $format)
     {
-        $data = $this->preprocessDataForExport($data);
-        
-        switch ($format) 
+        $columns = $result['columns'];
+        $data    = $result['rows'];
+
+        switch ($format)
         {
             case 'pdf':
                 $pdf = PDF::loadView('resorts.reports.pdf', [
-                    'report' => $report,
-                    'data' => $data,
-                    'columns' => $report->query_params['columns'],
-                    'relation_tables' => $report->query_params['relation_tables'] ?? [],
+                    'report'  => $report,
+                    'data'    => $data,
+                    'columns' => $columns,
                 ]);
                 return $pdf->download($report->name.'.pdf');
-                
+
             case 'excel':
-                return Excel::download(
-                    new ReportExport(
-                        $data, 
-                        $report->query_params['columns'],
-                        $report->query_params['relation_tables'] ?? []
-                    ), 
-                    $report->name.'.xlsx'
-                );
-                
+                return Excel::download(new ReportExport($data, $columns), $report->name.'.xlsx');
+
             case 'csv':
-                return Excel::download(
-                    new ReportExport(
-                        $data, 
-                        $report->query_params['columns'], 
-                        $report->query_params['relation_tables'] ?? []
-                    ), 
-                    $report->name.'.csv'
-                );
-                
+                return Excel::download(new ReportExport($data, $columns), $report->name.'.csv');
+
             default:
                 abort(400, 'Unsupported export format');
         }
     }
-    private function preprocessDataForExport($data)
-    {
-        $processedData = [];
-        
-        foreach ($data as $row) {
-            $processedRow = is_array($row) ? $row : (array)$row;
-            
-            foreach ($processedRow as $key => $value) {
-                if (is_string($value) && strpos($value, '{') === 0 && substr($value, -1) === '}') {
-                    $jsonData = json_decode($value, true);
-                    
-                    if (json_last_error() === JSON_ERROR_NONE) {
-                        $processedRow[$key] = json_encode($jsonData, JSON_PRETTY_PRINT);
-                    }
-                }
-            }
-            
-            $processedData[] = $processedRow;
-        }
-        
-        return $processedData;
-    }
     public function edit($id)
     {
+        $page_title = 'Edit Report';
         $report = ResortReports::findOrFail(base64_decode($id));
-        $tables = DB::select('SHOW TABLES');
-        $queryParams = $report->query_params;
-        $columns = $queryParams['columns'] ?? [];
-        $relationTables = $queryParams['relation_tables'] ?? [];
-        return view('resorts.reports.edit', compact('report', 'tables', 'columns', 'relationTables'));
+        // Same curated vocabulary as create — never expose raw tables/columns.
+        $catalog = $this->reportFieldCatalog();
+        $params  = $report->query_params ?? [];
+        $selected = [
+            'module' => $params['module'] ?? '',
+            'entity' => $params['entity'] ?? '',
+            'fields' => $params['fields'] ?? [],
+        ];
+        return view('resorts.reports.edit', compact('report', 'catalog', 'selected', 'page_title'));
     }
 
     public function destroy($id)
@@ -498,11 +562,9 @@ class ReportController extends Controller
         $formdate   = $request->formdate;
         $report = ResortReports::findOrFail($report_id);
 
-        $columns = $report->query_params['columns'] ?? [];
-        $relation_tables = $report->query_params['relation_tables'] ?? [];
-
-        // Get report data (assumed array of arrays or collection of arrays)
-        $reportData = $this->runReport($report_id, $todate, $formdate);
+        // Data is already resolved to business labels -> display values.
+        $result  = $this->runReport($report_id, $todate, $formdate);
+        $columns = $result['columns'];
 
         // Prepare report info to embed in each row
         $reportInfo = [
@@ -513,52 +575,10 @@ class ReportController extends Controller
         ];
 
         $formattedData = [];
-
-        foreach ($reportData as $row) 
+        foreach ($result['rows'] as $row)
         {
-            $formattedRow = [];
-
-            foreach ($columns as $column) 
-            {
-                if (isset($relation_tables[$column])) 
-                {
-                    // Related table column
-                    $relatedData = $row[$column] ?? null;
-
-                    if ($relatedData) {
-                        $relColumns = $relation_tables[$column]['columns'] ?? [];
-                        $relationInfo = [];
-
-                        foreach ($relColumns as $relColumn) {
-                            if (in_array(strtolower($relColumn), ['rank', 'benefit_grid_level'])) {
-                                $eligibility = config('settings.eligibilty');
-                                $relationInfo[$relColumn] = $eligibility[$relatedData[$relColumn]] ?? $relatedData[$relColumn] ?? "N/A";
-                            } else {
-                                $relationInfo[$relColumn] = $relatedData[$relColumn] ?? "N/A";
-                            }
-                        }
-                        $formattedRow[$column] = $relationInfo;
-                    } else {
-                        $formattedRow[$column] = "N/A";
-                    }
-                } 
-                else 
-                {
-                    // Regular column
-                    if (isset($row[$column])) {
-                        if (in_array(strtolower($column), ['rank', 'benefit_grid_level'])) {
-                            $eligibility = config('settings.eligibilty');
-                            $formattedRow[$column] = $eligibility[$row[$column]] ?? $row[$column];
-                        } else {
-                            $formattedRow[$column] = $row[$column];
-                        }
-                    } else {
-                        $formattedRow[$column] = "N/A";
-                    }
-                }
-            }
-            $formattedRow['report'] = $reportInfo;
-            $formattedData[] = $formattedRow;
+            $row['report'] = $reportInfo;
+            $formattedData[] = $row;
         }
 
         $requestData = [

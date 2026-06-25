@@ -87,8 +87,10 @@
                     data-parsley-errors-container="#error-msg">
                     <option value="">Select a module first</option>
                 </select>
-                {{-- The resolved real table name is carried here for the controller. --}}
-                <input type="hidden" id="table_name" name="table_name" value="">
+                {{-- Module/Entity are the only identifiers sent to the server; the
+                     real table is resolved server-side from the curated catalog. --}}
+                <input type="hidden" id="module_field" name="module" value="">
+                <input type="hidden" id="entity_field" name="entity" value="">
                 <div id="error-msg" class="text-danger mt-1"></div>
             </div>
 
@@ -114,19 +116,11 @@
                     data-parsley-afterdate-message="To date must be after from date">
             </div>
 
-            <!-- Columns Container -->
-            <div class="col-md-6 form-group mb-3">
-                <label>Select Columns</label>
-                <div id="columns-container">
-                    <p>Please select a table first</p>
-                </div>
-            </div>
-
-            <!-- Foreign Key Columns -->
-            <div class="col-md-6 form-group mb-3">
-                <label>Select Foreign Keys Columns</label>
-                <div id="columns-ForeignKeyscontainer">
-                    <p>Please select a table first</p>
+            <!-- Predefined Fields -->
+            <div class="col-md-12 form-group mb-3">
+                <label>Select Fields <span class="req_span">*</span></label>
+                <div id="fields-container" class="border rounded p-3">
+                    <p class="text-muted mb-0">Please select what to report on first</p>
                 </div>
             </div>
 
@@ -177,139 +171,76 @@
      
         $('#report-create-form').parsley();
 
-        // Module -> Entity catalog (friendly names -> real table). HR never
-        // sees a table name; selecting an Entity resolves to its table.
+        // Curated catalog: Module -> Entity -> { table, fields[] }. Only
+        // business field labels are ever shown; no DB tables/columns leak.
         const reportCatalog = @json($catalog);
 
         $("#module_name, #entity_name").select2({ placeholder: "Select..." });
 
+        const fieldsPlaceholder = '<p class="text-muted mb-0">Please select what to report on first</p>';
+
+        function resetFields() {
+            $('#fields-container').html(fieldsPlaceholder);
+            $('#add-filter').hide();
+            clearFilters();
+        }
+
         // Populate the Entity dropdown when a Module is chosen.
         $(document).on('change', '#module_name', function(){
-            const entities = reportCatalog[$(this).val()] || {};
+            const module = $(this).val();
+            const entities = reportCatalog[module] || {};
             let opts = '<option value="">Select data</option>';
-            $.each(entities, function(label, table){
-                opts += `<option value="${table}">${label}</option>`;
+            $.each(entities, function(entityLabel){
+                opts += `<option value="${entityLabel}">${entityLabel}</option>`;
             });
             $('#entity_name').html(opts).val('').trigger('change.select2');
-            $('#table_name').val('');
-            $('#columns-container').html('<p>Please select data first</p>');
-            $('#columns-ForeignKeyscontainer').html('');
-            $('#add-filter').hide();
+            $('#module_field').val(module);
+            $('#entity_field').val('');
+            resetFields();
         });
 
-        // Selecting an Entity sets the resolved table and loads its columns.
+        // Selecting an Entity renders its predefined fields as checkboxes.
         $(document).on('change', '#entity_name', function(){
-            const tableName = $(this).val();
-            $('#table_name').val(tableName);
-            if (tableName) {
-                loadColumns(tableName);
-            } else {
-                $('#columns-container').html('<p>Please select data first</p>');
-                $('#columns-ForeignKeyscontainer').html('');
-                $('#add-filter').hide();
+            const module = $('#module_name').val();
+            const entity = $(this).val();
+            $('#entity_field').val(entity);
+
+            const def = (reportCatalog[module] || {})[entity];
+            if (!def || !Array.isArray(def.fields) || def.fields.length === 0) {
+                resetFields();
+                return;
             }
+            renderFields(def.fields);
         });
 
-        function loadColumns(tableName) {
-                $.ajax({
-                    url: '{{ route("resort.reports.get-columns") }}',
-                    method: 'GET',
-                    data: { table: tableName },
-                    success: function(response) {
-                        // For parent table columns
-                        let html = '<div class="form-check">';
-                        
-                        // Check if parent_columns exists and is an array
-                        if (response.data && response.data.parent_columns && Array.isArray(response.data.parent_columns)) {
-                            response.data.parent_columns.forEach(function(column) {
-                                html += `
-                                    <div class="mb-2">
-                                        <input class="form-check-input column-checkbox" type="checkbox" name="columns[]" value="${column.original}" id="column-${column.original}">
-                                        <label class="form-check-label" for="column-${column.original}">${column.formatted}</label>
-                                    </div>
-                                `;
-                            });
-                        } else {
-                            html += '<p>No varchar or enum columns found in this table</p>';
-                        }
-                        
-                        html += '</div>';
-                        $('#columns-container').html(html);
-                        
-                        // For foreign keys and related tables
-                        let html1 = '';
-                        
-                        // Check if related_tables exists and is an array
-                        if (response.data && response.data.related_tables && Array.isArray(response.data.related_tables)) {
-                            response.data.related_tables.forEach(function(relation) {
-                                // Add the foreign key as a checkbox
-                                html1 += `<div class="mb-3">
-                                    <div class="foreign-key-container">
-                                        <input class="form-check-input column-checkbox"  data-bs-toggle="collapse" 
-                                                data-bs-target="#collapse-${relation.referenced_table}" 
-                                                aria-expanded="false" type="checkbox" 
-                                            name="columns[]" value="${relation.referenced_table}" 
-                                            id="table-${relation.referenced_table}">
-                                        <label class="form-check-label fw-bold" for="table-${relation.referenced_table}">
-                                            ${relation.formatted_table_name} (Related Table)
-                                        </label>
-                                    </div>
-                                    
-                                    <!-- Collapsible section for related table columns -->
-                                    <div class="ms-4 mt-2">
-                                     
-                                        
-                                        <div class="collapse" id="collapse-${relation.referenced_table}">
-                                            <div class="card card-body">`;
-                                
-                                // Add checkboxes for each column in the related table
-                                if (relation.columns && Array.isArray(relation.columns)) {
-                                    relation.columns.forEach(function(column) {
-                                        html1 += `
-                                            <div class="mb-2">
-                                                <input class="form-check-input related-column-checkbox" 
-                                                    type="checkbox" 
-                                                    name="related_columns[${relation.referenced_table}][]" 
-                                                    value="${column.original}" 
-                                                    id="column-${relation.referenced_table}-${column.original}">
-                                                <label class="form-check-label" 
-                                                    for="column-${relation.referenced_table}-${column.original}">
-                                                    ${column.formatted}
-                                                </label>
-                                            </div>
-                                        `;
-                                    });
-                                } else {
-                                    html1 += '<p>No varchar or enum columns found in this related table</p>';
-                                }
-                                
-                                html1 += `
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>`;
-                            });
-                        } else {
-                            html1 += '<p>No related tables found</p>';
-                        }
-                        
-                        $('#columns-ForeignKeyscontainer').html(html1);
-                        
-                        // Enable adding filters after columns are loaded
-                        $('.column-checkbox, .related-column-checkbox').change(function() {
-                            if ($('.column-checkbox:checked, .related-column-checkbox:checked').length > 0) {
-                                $('#add-filter').show();
-                            } else {
-                                $('#add-filter').hide();
-                            }
-                        });
-                    },
-                    error: function(xhr, status, error) {
-                        console.error("Error fetching columns:", error);
-                        $('#columns-container').html('<p class="text-danger">Error loading columns. Please try again.</p>');
-                        $('#columns-ForeignKeyscontainer').html('');
-                    }
-                });
+        function renderFields(fields) {
+            let html = '<div class="row">';
+            fields.forEach(function(label, i){
+                const id = 'field-' + i;
+                html += `
+                    <div class="col-md-4 col-sm-6 mb-2">
+                        <div class="form-check">
+                            <input class="form-check-input field-checkbox" type="checkbox"
+                                   name="fields[]" value="${label}" id="${id}">
+                            <label class="form-check-label" for="${id}">${label}</label>
+                        </div>
+                    </div>`;
+            });
+            html += '</div>';
+            $('#fields-container').html(html);
+            clearFilters();
+
+            $('.field-checkbox').on('change', function(){
+                if ($('.field-checkbox:checked').length > 0) {
+                    $('#add-filter').show();
+                } else {
+                    $('#add-filter').hide();
+                }
+            });
+        }
+
+        function clearFilters() {
+            $('#filters-container').html('<div class="alert alert-info">You can add filters after selecting fields</div>');
         }
 
         let filterCount = 0;
@@ -321,7 +252,7 @@
                             <div class="col-md-3">
                                 <select name="filters[${filterCount}][field]" class="form-control filter-field" required>
                                     <option value="">Select Field</option>
-                                    ${$('.column-checkbox:checked').map(function() {
+                                    ${$('.field-checkbox:checked').map(function() {
                                         return `<option value="${$(this).val()}">${$(this).val()}</option>`;
                                     }).get().join('')}
                                 </select>
@@ -358,9 +289,14 @@
         $('#report-create-form').on('submit', function(e) {
             e.preventDefault();
             var $form = $(this);
-            if (!$form.parsley().isValid()) 
+            if (!$form.parsley().isValid())
             {
                 $form.parsley().validate();
+                return false;
+            }
+            else if ($('.field-checkbox:checked').length === 0)
+            {
+                toastr.error('Please select at least one field for the report.', 'Error', { positionClass: 'toast-bottom-right' });
                 return false;
             }
             else
