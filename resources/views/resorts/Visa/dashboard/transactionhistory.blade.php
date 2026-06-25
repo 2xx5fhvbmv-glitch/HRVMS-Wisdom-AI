@@ -41,8 +41,7 @@
                             <thead>
                                 <tr>
                                     <th class="text-nowrap">Date</th>
-                                    <th class="text-nowrap">From Wallet</th>
-                                    <th class="text-nowrap">To Wallet</th>
+                                    <th class="text-nowrap">Description</th>
                                     <th class="text-nowrap">Amount (MVR)</th>
                                     <th class="text-nowrap">Comment</th>
                                     <th class="text-nowrap">Attachment</th>
@@ -86,7 +85,6 @@ $(document).ready(function () {
         },
         columns: [
             { data: 'Date', name: 'Date', className: 'text-nowrap' },
-            { data: 'FromWallet', name: 'FromWallet', className: 'text-nowrap' },
             { data: 'ToWallet', name: 'ToWallet', className: 'text-nowrap' },
             { data: 'Amount', name: 'Amount', className: 'text-nowrap' },
             { data: 'Comment', name: 'Comment' },
