@@ -264,7 +264,7 @@ class PaymentRequestController extends Controller
                         $insOutstanding = $insurance && strtolower((string) $insurance->Status) !== 'paid';
                         $insInWindow = $insurance && (!$hasDateFilter || Carbon::parse($insurance->insurance_end_date)->between($filterStart, $filterEnd));
                         if ($insOutstanding && $insInWindow) {
-                            $employee->InsuranceExpiryDate = '<b>MVR ' . number_format($insurance->Premium, 2) . '</b> ' . $this->getFormattedExpiryStatus($insurance->insurance_end_date);
+                            $employee->InsuranceExpiryDate = '<b class="fee-amt">MVR ' . number_format($insurance->Premium, 2) . '</b> ' . $this->getFormattedExpiryStatus($insurance->insurance_end_date);
                             $totalInsurance += $insurance->Premium;
                             $hasAnyFlagData = true;
                             $employeeData[base64_encode($employee->id)]['InsuranceAmt'] = $insurance->Premium;
@@ -278,8 +278,8 @@ class PaymentRequestController extends Controller
 
                     if (in_array('work_permit', $flags))
                     {
-                        // Next OUTSTANDING work-permit due: earliest Unpaid month with a
-                        // real fee, regardless of the date window (window only narrows).
+                        // Outstanding work-permit dues: every Unpaid month with a real
+                        // fee, earliest first. HR can pay the next N of them at once.
                         $wpEntries = $employee->WorkPermit->sortBy('Due_Date');
                         $unpaidWP = $wpEntries->filter(fn($item) => $item->Due_Date
                             && strtolower((string) $item->Status) !== 'paid'
@@ -287,11 +287,16 @@ class PaymentRequestController extends Controller
                         if ($hasDateFilter) {
                             $unpaidWP = $unpaidWP->filter(fn($item) => Carbon::parse($item->Due_Date)->between($filterStart, $filterEnd));
                         }
+                        $wpDues = $unpaidWP->take(12)->map(fn($i) => [
+                            'id'   => $i->id,
+                            'amt'  => (float) $i->Amt,
+                            'date' => Carbon::parse($i->Due_Date)->format('Y-m-d'),
+                        ])->values()->all();
                         $currentWP = $unpaidWP->first();
                         $encodedId = base64_encode($employee->id);
                         if ($currentWP)
                         {
-                            $employee->WorkPermitExpiryDate = '<b>MVR ' . number_format($currentWP->Amt, 2) . '</b> ' . $this->getFormattedExpiryStatus($currentWP->Due_Date);
+                            $employee->WorkPermitExpiryDate = $this->buildMultiMonthFeeCell($wpDues, 'wp');
                             $totalPermit += $currentWP->Amt;
                             $hasAnyFlagData = true;
                             $employeeData[$encodedId]['WorkPermitAmt'] = $currentWP->Amt;
@@ -309,7 +314,7 @@ class PaymentRequestController extends Controller
                         $medInWindow = $med && (!$hasDateFilter || Carbon::parse($med->end_date)->between($filterStart, $filterEnd));
                         if ($medOutstanding && $medInWindow)
                         {
-                            $employee->WorkPermitMedicalPermitExpiryDate = '<b>MVR ' . number_format($med->Amt, 2) . '</b> ' . $this->getFormattedExpiryStatus($med->end_date);
+                            $employee->WorkPermitMedicalPermitExpiryDate = '<b class="fee-amt">MVR ' . number_format($med->Amt, 2) . '</b> ' . $this->getFormattedExpiryStatus($med->end_date);
                             $totalMedical += $med->Amt;
                             $hasAnyFlagData = true;
                             $employeeData[base64_encode($employee->id)]['MedicalAmt'] = $med->Amt;
@@ -322,8 +327,8 @@ class PaymentRequestController extends Controller
                     }
 
                     if (in_array('slot_payment', $flags)) {
-                        // Next OUTSTANDING quota-slot due: earliest Unpaid month with a
-                        // real fee, regardless of the date window (window only narrows).
+                        // Outstanding quota-slot dues: every Unpaid month with a real
+                        // fee, earliest first. HR can pay the next N of them at once.
                         $quotaEntries = $employee->QuotaSlotRenewal->sortBy('Due_Date');
                         $unpaidQuota = $quotaEntries->filter(fn($item) => $item->Due_Date
                             && strtolower((string) $item->Status) !== 'paid'
@@ -331,11 +336,16 @@ class PaymentRequestController extends Controller
                         if ($hasDateFilter) {
                             $unpaidQuota = $unpaidQuota->filter(fn($item) => Carbon::parse($item->Due_Date)->between($filterStart, $filterEnd));
                         }
+                        $quotaDues = $unpaidQuota->take(12)->map(fn($i) => [
+                            'id'   => $i->id,
+                            'amt'  => (float) $i->Amt,
+                            'date' => Carbon::parse($i->Due_Date)->format('Y-m-d'),
+                        ])->values()->all();
                         $currentQuota = $unpaidQuota->first();
                         $encodedId = base64_encode($employee->id);
                         if ($currentQuota)
                         {
-                            $employee->QuotaSlotAmtForThisMonth = '<b>MVR ' . number_format($currentQuota->Amt, 2) . '</b> ' . $this->getFormattedExpiryStatus($currentQuota->Due_Date);
+                            $employee->QuotaSlotAmtForThisMonth = $this->buildMultiMonthFeeCell($quotaDues, 'slot');
                             $totalQuota += $currentQuota->Amt;
                             $hasAnyFlagData = true;
 
@@ -392,7 +402,7 @@ class PaymentRequestController extends Controller
                   
                     return "<div class=\"form-check no-label\">" .
                      
-                        "<input class=\"form-check-input ChildCheck\" data-total=\"".($row->RowTotalDisplay ?? 0)."\" name=\"employee_ids[".$id."]\" type=\"checkbox\"  value=".$row->extra." ".$isChecked.">" .
+                        "<input class=\"form-check-input ChildCheck\" data-total=\"".($row->RowTotalDisplay ?? 0)."\" data-emp=\"".$id."\" name=\"employee_ids[".$id."]\" type=\"checkbox\"  value=".$row->extra." ".$isChecked.">" .
                         "</div>";
                 })
                 ->rawColumns(['EmployeeID','CheckBox','SlotFees','VisaExpiry','Medical','Insurance','WorkPermit','Department','Position','EmployeeName'])
@@ -415,6 +425,31 @@ class PaymentRequestController extends Controller
         return view('resorts.Visa.PaymentRequest.create',compact('page_title'));
        
     }
+    /**
+     * Build a Work Permit / Slot fee cell that lets HR choose how many upcoming
+     * months to pay. $dues is the ordered list of unpaid dues
+     * ([{id,amt,date}, ...]); the cell shows the 1-month amount by default plus a
+     * "Months" input carrying the full list so the page can re-total client-side
+     * (and the server re-derives the exact rows on submit).
+     */
+    private function buildMultiMonthFeeCell(array $dues, string $fee)
+    {
+        if (empty($dues)) {
+            return 'N/A';
+        }
+        $first    = $dues[0];
+        $count    = count($dues);
+        $duesJson = htmlspecialchars(json_encode($dues), ENT_QUOTES);
+        $html  = '<div class="fee-cell" data-fee="' . $fee . '">';
+        $html .= '<b class="fee-amt">MVR ' . number_format($first['amt'], 2) . '</b> ';
+        $html .= '<span class="fee-status">' . $this->getFormattedExpiryStatus($first['date']) . '</span>';
+        $html .= '<div class="fee-months-wrap mt-1"><label class="me-1 mb-0">Months:</label>';
+        $html .= '<input type="number" class="form-control form-control-sm fee-months d-inline-block" style="width:72px" min="1" max="' . $count . '" value="1" data-fee="' . $fee . '" data-dues="' . $duesJson . '">';
+        $html .= '<small class="text-muted ms-1 fee-months-note"></small></div>';
+        $html .= '</div>';
+        return $html;
+    }
+
     function getFormattedExpiryStatus($endDate)
     {
         $start = Carbon::today();
@@ -495,7 +530,42 @@ class PaymentRequestController extends Controller
                         $quotaExpiry                   = isset($value['QuotaExpiry']) ? $value['QuotaExpiry'] : null;
                         $employee_id                   = base64_decode($key);
 
-                     
+                        // ── Multi-month WP / Slot ──────────────────────────────
+                        // HR may opt to pay several upcoming months at once. Re-derive
+                        // the next N unpaid dues from the live schedule (authoritative),
+                        // sum them, and record the exact row ids so fulfillment can
+                        // mark all of them Paid in one action.
+                        $monthsMap     = (array) $request->input('months', []);
+                        $wpMonths      = max(1, (int) ($monthsMap[$key]['wp']   ?? 1));
+                        $slotMonths    = max(1, (int) ($monthsMap[$key]['slot'] ?? 1));
+                        $workPermitIds = null;
+                        $quotaIds      = null;
+
+                        if (isset($value['WorkPermitAmt'])) {
+                            $wpRows = WorkPermit::where('employee_id', $employee_id)
+                                ->where('resort_id', $this->resort->resort_id)
+                                ->whereNotNull('Due_Date')->where('Status', '!=', 'Paid')->where('Amt', '>', 0)
+                                ->orderBy('Due_Date', 'asc')->take($wpMonths)->get();
+                            if ($wpRows->isNotEmpty()) {
+                                $WorkpermitAmt    = round($wpRows->sum('Amt'), 2);
+                                $WorkpermitExpiry = Carbon::parse($wpRows->last()->Due_Date)->format('Y-m-d');
+                                $workPermitIds    = $wpRows->pluck('id')->implode(',');
+                                $wpMonths         = $wpRows->count();
+                            }
+                        }
+                        if (isset($value['QuotaAmt'])) {
+                            $qRows = QuotaSlotRenewal::where('employee_id', $employee_id)
+                                ->where('resort_id', $this->resort->resort_id)
+                                ->whereNotNull('Due_Date')->where('Status', '!=', 'Paid')->where('Amt', '>', 0)
+                                ->orderBy('Due_Date', 'asc')->take($slotMonths)->get();
+                            if ($qRows->isNotEmpty()) {
+                                $quotaAmt    = round($qRows->sum('Amt'), 2);
+                                $quotaExpiry = Carbon::parse($qRows->last()->Due_Date)->format('Y-m-d');
+                                $quotaIds    = $qRows->pluck('id')->implode(',');
+                                $slotMonths  = $qRows->count();
+                            }
+                        }
+
                         $countrequest = [ $WorkpermitAmt > 0 ? 'yes' : 'no',
                                           $quotaExpiry > 0 ? 'yes' : 'no',
                                           $insuranceExpiry > 0 ? 'yes' : 'no',
@@ -512,8 +582,12 @@ class PaymentRequestController extends Controller
                                                     'Employee_id' => $employee_id,
                                                     'WorkPermitDate'=> $WorkpermitExpiry,
                                                     'WorkPermitAmt' => $WorkpermitAmt,
+                                                    'WorkPermitMonths' => $wpMonths,
+                                                    'WorkPermitIds' => $workPermitIds,
                                                     'QuotaslotDate' => $quotaExpiry,
                                                     'QuotaslotAmt' => $quotaAmt,
+                                                    'QuotaslotMonths' => $slotMonths,
+                                                    'QuotaslotIds' => $quotaIds,
                                                     'InsuranceDate' => $insuranceExpiry,
                                                     'InsurancePrimume' => $insuranceAmt,
                                                     'MedicalReportDate' => $medicalExpiry, 
@@ -793,7 +867,12 @@ class PaymentRequestController extends Controller
                     $QuotaSlotPaidAmt = $QuotaSlotRenewalPaid->where("Status","Paid")->sum('Amt');
                     $QuotaSlotUnPaidAmt = $QuotaSlotRenewalPaid->where("Status","Unpaid")->sum('Amt');
                     $QuotaSlotVariable = QuotaSlotRenewal::where('Status','Unpaid')->whereDate('Due_date',$child->QuotaslotDate)->where('employee_id', $child->Employee_id)->where("Status","Unpaid")->where('resort_id', $this->resort->resort_id)->orderBy('Month', 'ASC')->first();
-            
+                    // Multi-month: show the full amount + month count for this request.
+                    if ($QuotaSlotVariable) {
+                        $QuotaSlotVariable->Months = (int) ($child->QuotaslotMonths ?? 1);
+                        $QuotaSlotVariable->Amt    = $child->QuotaslotAmt;
+                    }
+
                     $QuotaSlotPayableAmt = $QuotaSlotPaidAmt + $QuotaSlotUnPaidAmt;
                 }
                 else
@@ -816,8 +895,12 @@ class PaymentRequestController extends Controller
                     $WorkPermitUnPaidAmt = $WorkPermit->where("Status","Unpaid")->sum('Amt');
 
                     $WorkPermitCommonVariable = WorkPermit::where('employee_id', $child->Employee_id)->whereDate('Due_date',$child->WorkPermitDate)->where("Status","Unpaid")->where('resort_id', $this->resort->resort_id)->orderBy('Month', 'ASC')->first();
-               
-                                     
+                    // Multi-month: show the full amount + month count for this request.
+                    if ($WorkPermitCommonVariable) {
+                        $WorkPermitCommonVariable->Months = (int) ($child->WorkPermitMonths ?? 1);
+                        $WorkPermitCommonVariable->Amt    = $child->WorkPermitAmt;
+                    }
+
                     $WorkPermitPayableAmt = $WorkPermitPaidAmt + $WorkPermitUnPaidAmt;
             }
             else
