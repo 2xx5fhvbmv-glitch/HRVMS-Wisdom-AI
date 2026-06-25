@@ -865,17 +865,26 @@ class RenewalController extends Controller
                             }
                         }
                   
-                        // Work permit: prefer an actual work_permits row (latest unpaid by due
-                        // date) so it can be edited inline; show it regardless of month and only
-                        // flag the current-month list when it's actually due this month. When no
-                        // row exists, fall back to the OCR-extracted Work Permit expiry from the
-                        // employee's documents (the 'Other' blob, same source employee-details
-                        // uses). HR can always create an editable record via the Add (+) control.
+                        // Work permit EXPIRY shown here is the document's "Expiry On" from the
+                        // OCR 'Other' blob (the same source the employee-details page uses) — NOT
+                        // the monthly fee-schedule due date, which would otherwise show the last
+                        // scheduled fee month instead of the permit's real expiry. The fee row is
+                        // only used to attach the inline Edit (or Add +) control and its amount.
+                        $ocrWp = \App\Models\VisaEmployeeExpiryData::where('employee_id', $employee->id)
+                            ->where('resort_id', $this->resort->resort_id)
+                            ->where('DocumentName', 'Other')
+                            ->orderBy('id', 'desc')
+                            ->first();
+                        $wpOcrExpiry = null;
+                        if ($ocrWp) {
+                            $fields = json_decode($ocrWp->Ai_extracted_data, true)['extracted_fields'] ?? [];
+                            $wpOcrExpiry = \App\Helpers\Common::safeAiDate($fields['Work Permit Expiry Date (Expiry On)'] ?? null);
+                        }
+
                         $currentWP = $employee->WorkPermit->where('Status','Unpaid')->sortByDesc('Due_Date')->first();
                         if ($currentWP)
                         {
-                            $employee->WorkPermitExpiryDate =  $this->getFormattedExpiryStatus($currentWP->Due_Date);
-                             $employee->WorkPermitAmt = number_format($currentWP->Amt,2);
+                            $employee->WorkPermitAmt       = number_format($currentWP->Amt,2);
                             $employee->WorkPermitRecordId  = $currentWP->id;
                             $employee->WorkPermitAmtRaw    = $currentWP->Amt;
                             $employee->WorkPermitDateRaw   = Carbon::parse($currentWP->Due_Date)->format('Y-m-d');
@@ -884,21 +893,15 @@ class RenewalController extends Controller
                                 $hasAnyFlagData = true;
                             }
                         }
-                        else
-                        {
-                            $ocr = \App\Models\VisaEmployeeExpiryData::where('employee_id', $employee->id)
-                                ->where('resort_id', $this->resort->resort_id)
-                                ->where('DocumentName', 'Other')
-                                ->orderBy('id', 'desc')
-                                ->first();
-                            if ($ocr) {
-                                $fields = json_decode($ocr->Ai_extracted_data, true)['extracted_fields'] ?? [];
-                                $wpDate = \App\Helpers\Common::safeAiDate($fields['Work Permit Expiry Date (Expiry On)'] ?? null);
-                                if ($wpDate) {
-                                    $employee->WorkPermitExpiryDate = $this->getFormattedExpiryStatus($wpDate->format('Y-m-d'));
-                                    $employee->WorkPermitDateRaw     = $wpDate->format('Y-m-d');
-                                }
+
+                        // Displayed expiry: OCR "Expiry On" first, fee due date only as fallback.
+                        if ($wpOcrExpiry) {
+                            $employee->WorkPermitExpiryDate = $this->getFormattedExpiryStatus($wpOcrExpiry->format('Y-m-d'));
+                            if (!$employee->WorkPermitDateRaw) {
+                                $employee->WorkPermitDateRaw = $wpOcrExpiry->format('Y-m-d');
                             }
+                        } elseif ($currentWP) {
+                            $employee->WorkPermitExpiryDate = $this->getFormattedExpiryStatus($currentWP->Due_Date);
                         }
 
                         $med = $employee->WorkPermitMedicalRenewal;
