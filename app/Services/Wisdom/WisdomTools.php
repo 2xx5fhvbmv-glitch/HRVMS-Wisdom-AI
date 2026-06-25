@@ -21,6 +21,13 @@ use App\Models\EmployeePdpPlan;
 use App\Models\PerformanceKpiParent;
 use App\Models\MonthlyCheckingModel;
 use App\Models\PeformanceMeeting;
+use App\Models\WorkPermit;
+use App\Models\QuotaSlotRenewal;
+use App\Models\EmployeeInsurance;
+use App\Models\WorkPermitMedicalRenewal;
+use App\Models\VisaRenewal;
+use App\Models\PaymentRequest;
+use App\Models\VisaWallets;
 use App\Services\Wisdom\ReadQueryGuard;
 use Carbon\Carbon;
 
@@ -169,6 +176,33 @@ class WisdomTools
                 [
                     'name' => ['type' => 'string', 'description' => 'Employee full or partial name, or employee ID.'],
                 ], ['name']),
+
+            // ---- Visa / Immigration Management ----
+            self::fn('get_visa_summary',
+                'Immigration/visa dashboard summary: expat employee count, employees with work permits, documents expiring in 30 days, unpaid work-permit & slot fees, and pending payment requests. Use for "give me a visa summary", "current immigration status", "what compliance items need attention".', []),
+            self::fn('get_visa_expiries',
+                'Documents expiring within N days (default 30): visa, work permit, insurance, medical, slot fee. Each item has employee, document type, expiry date, days left and amount. Use for "which documents expire this week/month", "upcoming expiries", "urgent renewals", "expired documents" (pass negative days span via within_days for overdue is not supported — use period words in your question).',
+                [
+                    'doc_type'    => ['type' => 'string', 'description' => 'One of: all (default), visa, work_permit, insurance, medical, slot.'],
+                    'within_days' => ['type' => 'integer', 'description' => 'Look-ahead window in days (default 30, e.g. 7 for this week).'],
+                ]),
+            self::fn('get_visa_liability',
+                'Immigration liability (money due) including overdue, up to the end of a period. Breaks down by work permit, slot fee, insurance, medical and visa, plus total. Use for "total immigration liability", "slot/work-permit fee liability", "what is due this month/week".',
+                [
+                    'period' => ['type' => 'string', 'description' => 'One of: today, week, month (default month).'],
+                ]),
+            self::fn('get_visa_wallet',
+                'Immigration wallet status for the resort: Available, Reserved, Deposited and Withdrawn amounts. Use for "wallet balance", "how much is reserved/blocked", "wallet status".', []),
+            self::fn('get_visa_payment_requests',
+                'Visa payment requests with their status (default Pending). Use for "what payment requests are pending", "show pending payment approvals".',
+                [
+                    'status' => ['type' => 'string', 'description' => 'Pending (default), Approved, Rejected, or all.'],
+                ]),
+            self::fn('get_employee_immigration',
+                'Full immigration profile for one employee by name: visa, work permit, insurance, medical and slot-payment expiry dates with days-left and an EXPIRED/valid flag. Use for "when does Rani\'s visa expire", "show Rani\'s immigration profile", "is this employee compliant".',
+                [
+                    'name' => ['type' => 'string', 'description' => 'Employee full or partial name, or employee ID.'],
+                ], ['name']),
         ];
 
         // Payroll tools — HR / FULL tier only.
@@ -278,6 +312,12 @@ class WisdomTools
                 case 'get_monthly_checkins':     return self::getMonthlyCheckins($rid);
                 case 'get_performance_meetings': return self::getPerformanceMeetings($rid, $args);
                 case 'get_employee_performance': return self::getEmployeePerformance($rid, $args);
+                case 'get_visa_summary':         return self::getVisaSummary($rid);
+                case 'get_visa_expiries':        return self::getVisaExpiries($rid, $args);
+                case 'get_visa_liability':       return self::getVisaLiability($rid, $args);
+                case 'get_visa_wallet':          return self::getVisaWallet($rid);
+                case 'get_visa_payment_requests':return self::getVisaPaymentRequests($rid, $args);
+                case 'get_employee_immigration': return self::getEmployeeImmigration($rid, $args);
                 case 'get_workforce_budget':     return self::getWorkforceBudget($rid, $args);
                 case 'get_employee_cost':        return self::getEmployeeCost($rid, $args);
                 case 'get_payroll_summary':      return self::getPayrollSummary($rid);
@@ -1452,6 +1492,212 @@ class WisdomTools
             'pdp'              => $pdp ? ['status' => $pdp->status, 'duration' => $pdp->duration] : 'No PDP record',
             'latest_appraisal' => $child ? ['self_review' => $child->self_review_status, 'manager_review' => $child->manager_review_status] : 'No appraisal record',
             'latest_checkin'   => $checkin ? ['status' => $checkin->status, 'approval' => $checkin->approval_status, 'date' => $checkin->date_discussion] : 'No check-in record',
+        ];
+    }
+
+    // ---------------------------------------------------------------------
+    // Visa / Immigration Management
+    // ---------------------------------------------------------------------
+
+    /**
+     * Collect unpaid visa documents (work permit / slot / insurance / medical /
+     * visa) whose due/expiry date falls within [$from, $to]. Returns a plain
+     * collection of ['employee_id','type','expiry','amount'].
+     */
+    private static function visaDocs(int $rid, string $type, Carbon $from, Carbon $to): \Illuminate\Support\Collection
+    {
+        $type = strtolower($type ?: 'all');
+        $want = fn ($t) => $type === 'all' || $type === $t;
+        $out = collect();
+        [$f, $t] = [$from->toDateString(), $to->toDateString()];
+
+        if ($want('work_permit')) {
+            WorkPermit::where('resort_id', $rid)->where('Status', 'Unpaid')->whereNotNull('Due_Date')
+                ->whereBetween('Due_Date', [$f, $t])->get(['employee_id', 'Due_Date', 'Amt'])
+                ->each(fn ($r) => $out->push(['employee_id' => $r->employee_id, 'type' => 'Work Permit', 'expiry' => $r->getRawOriginal('Due_Date'), 'amount' => (float) $r->Amt]));
+        }
+        if ($want('slot')) {
+            QuotaSlotRenewal::where('resort_id', $rid)->where('Status', 'Unpaid')->whereNotNull('Due_Date')
+                ->whereBetween('Due_Date', [$f, $t])->get(['employee_id', 'Due_Date', 'Amt'])
+                ->each(fn ($r) => $out->push(['employee_id' => $r->employee_id, 'type' => 'Slot Fee', 'expiry' => $r->getRawOriginal('Due_Date'), 'amount' => (float) $r->Amt]));
+        }
+        if ($want('insurance')) {
+            EmployeeInsurance::where('resort_id', $rid)->where('Status', '!=', 'Paid')->whereNotNull('insurance_end_date')
+                ->whereBetween('insurance_end_date', [$f, $t])->get(['employee_id', 'insurance_end_date', 'Premium'])
+                ->each(fn ($r) => $out->push(['employee_id' => $r->employee_id, 'type' => 'Insurance', 'expiry' => $r->getRawOriginal('insurance_end_date'), 'amount' => (float) $r->Premium]));
+        }
+        if ($want('medical')) {
+            WorkPermitMedicalRenewal::where('resort_id', $rid)->where('Status', '!=', 'Paid')->whereNotNull('end_date')
+                ->whereBetween('end_date', [$f, $t])->get(['employee_id', 'end_date', 'Amt'])
+                ->each(fn ($r) => $out->push(['employee_id' => $r->employee_id, 'type' => 'Medical', 'expiry' => $r->getRawOriginal('end_date'), 'amount' => (float) $r->Amt]));
+        }
+        if ($want('visa')) {
+            VisaRenewal::where('resort_id', $rid)->where('Status', '!=', 'Paid')->whereNotNull('end_date')
+                ->whereBetween('end_date', [$f, $t])->get(['employee_id', 'end_date', 'Amt'])
+                ->each(fn ($r) => $out->push(['employee_id' => $r->employee_id, 'type' => 'Visa', 'expiry' => $r->getRawOriginal('end_date'), 'amount' => (float) $r->Amt]));
+        }
+        return $out;
+    }
+
+    /** Resolve employee ids to display names in one query. */
+    private static function resolveEmpNames(int $rid, array $ids): array
+    {
+        $ids = array_values(array_unique(array_filter($ids)));
+        if (empty($ids)) {
+            return [];
+        }
+        return Employee::where('resort_id', $rid)->whereIn('id', $ids)
+            ->with('resortAdmin:id,first_name,last_name')
+            ->get(['id', 'Emp_id', 'Admin_Parent_id'])
+            ->mapWithKeys(fn ($e) => [$e->id => self::empName($e)])
+            ->toArray();
+    }
+
+    private static function getVisaSummary(int $rid): array
+    {
+        $today = Carbon::today();
+        $in30  = (clone $today)->addDays(30);
+
+        $expat = Employee::where('resort_id', $rid)->where('status', 'Active')
+            ->where('nationality', '!=', 'Maldivian')->count();
+
+        return [
+            'expat_employees'             => $expat,
+            'employees_with_work_permits' => WorkPermit::where('resort_id', $rid)->distinct('employee_id')->count('employee_id'),
+            'documents_expiring_30d'      => self::visaDocs($rid, 'all', $today, $in30)->count(),
+            'unpaid_work_permit_fees'     => WorkPermit::where('resort_id', $rid)->where('Status', 'Unpaid')->count(),
+            'unpaid_slot_fees'            => QuotaSlotRenewal::where('resort_id', $rid)->where('Status', 'Unpaid')->count(),
+            'pending_payment_requests'    => PaymentRequest::where('resort_id', $rid)->where('Status', 'Pending')->count(),
+        ];
+    }
+
+    private static function getVisaExpiries(int $rid, array $args): array
+    {
+        $type = strtolower(trim($args['doc_type'] ?? 'all'));
+        $days = (int) ($args['within_days'] ?? 30);
+        if ($days < 1)   $days = 30;
+        if ($days > 365) $days = 365;
+
+        $from = Carbon::today();
+        $to   = (clone $from)->addDays($days);
+        $docs = self::visaDocs($rid, $type, $from, $to);
+        $names = self::resolveEmpNames($rid, $docs->pluck('employee_id')->all());
+
+        $list = $docs->sortBy('expiry')->map(fn ($d) => [
+            'employee'  => $names[$d['employee_id']] ?? ('Employee #' . $d['employee_id']),
+            'document'  => $d['type'],
+            'expiry'    => $d['expiry'],
+            'days_left' => (int) Carbon::today()->diffInDays(Carbon::parse($d['expiry']), false),
+            'amount'    => Common::formatCurrency($d['amount'], 'MVR'),
+        ])->values();
+
+        return ['doc_type' => $type, 'within_days' => $days, 'count' => $list->count(), 'documents' => $list];
+    }
+
+    private static function getVisaLiability(int $rid, array $args): array
+    {
+        $period = strtolower(trim($args['period'] ?? 'month'));
+        if ($period === 'today') {
+            $end = Carbon::today();
+        } elseif ($period === 'week') {
+            $end = Carbon::today()->addDays(7);
+        } else {
+            $period = 'month';
+            $end = Carbon::today()->endOfMonth();
+        }
+
+        // Include overdue: scan from far past up to the period end.
+        $docs   = self::visaDocs($rid, 'all', Carbon::today()->subYears(5), $end);
+        $byType = $docs->groupBy('type')->map(fn ($g) => $g->sum('amount'));
+        $fmt    = fn ($v) => Common::formatCurrency((float) $v, 'MVR');
+
+        return [
+            'period'      => $period,
+            'work_permit' => $fmt($byType['Work Permit'] ?? 0),
+            'slot_fee'    => $fmt($byType['Slot Fee'] ?? 0),
+            'insurance'   => $fmt($byType['Insurance'] ?? 0),
+            'medical'     => $fmt($byType['Medical'] ?? 0),
+            'visa'        => $fmt($byType['Visa'] ?? 0),
+            'total'       => $fmt($docs->sum('amount')),
+            'note'        => 'Includes overdue items up to the end of the period.',
+        ];
+    }
+
+    private static function getVisaWallet(int $rid): array
+    {
+        $rows = VisaWallets::where('resort_id', $rid)->get(['WalletName', 'Amt']);
+        if ($rows->isEmpty()) {
+            return ['message' => 'No immigration wallet configured for this resort.'];
+        }
+        $wallet = [];
+        foreach ($rows as $r) {
+            $wallet[$r->WalletName] = Common::formatCurrency((float) $r->Amt, 'MVR');
+        }
+        return ['wallet' => $wallet];
+    }
+
+    private static function getVisaPaymentRequests(int $rid, array $args): array
+    {
+        $status = trim($args['status'] ?? 'Pending');
+        $q = PaymentRequest::where('resort_id', $rid);
+        if (strtolower($status) !== 'all') {
+            $q->where('Status', $status);
+        }
+        $rows = $q->orderByDesc('id')->limit(50)->get(['Requestd_id', 'Request_date', 'Status']);
+        $list = $rows->map(fn ($p) => [
+            'request_id' => $p->Requestd_id,
+            'date'       => $p->Request_date ? Carbon::parse($p->Request_date)->format('Y-m-d') : null,
+            'status'     => $p->Status,
+        ])->values();
+
+        return ['status_filter' => $status, 'count' => $list->count(), 'requests' => $list];
+    }
+
+    private static function getEmployeeImmigration(int $rid, array $args): array
+    {
+        $term = trim($args['name'] ?? '');
+        if ($term === '') {
+            return ['error' => 'Please provide an employee name.'];
+        }
+
+        $emp = Employee::where('resort_id', $rid)
+            ->where(function ($q) use ($term) {
+                $q->whereHas('resortAdmin', function ($r) use ($term) {
+                      $r->where('first_name', 'like', "%{$term}%")
+                        ->orWhere('last_name', 'like', "%{$term}%")
+                        ->orWhereRaw("CONCAT(first_name,' ',last_name) LIKE ?", ["%{$term}%"]);
+                  })->orWhere('Emp_id', 'like', "%{$term}%");
+            })
+            ->with('resortAdmin:id,first_name,last_name')
+            ->first(['id', 'Emp_id', 'Admin_Parent_id', 'nationality']);
+
+        if (!$emp) {
+            return ['query' => $term, 'found' => false, 'message' => 'No matching employee found.'];
+        }
+
+        $exp = function ($date) {
+            if (!$date) {
+                return 'No record';
+            }
+            $d = Carbon::parse($date);
+            $days = (int) Carbon::today()->diffInDays($d, false);
+            return ['expiry' => $d->toDateString(), 'days_left' => $days, 'status' => $days < 0 ? 'EXPIRED' : 'valid'];
+        };
+
+        $wp   = WorkPermit::where('resort_id', $rid)->where('employee_id', $emp->id)->whereNotNull('Due_Date')->orderByDesc('Due_Date')->first();
+        $slot = QuotaSlotRenewal::where('resort_id', $rid)->where('employee_id', $emp->id)->whereNotNull('Due_Date')->orderByDesc('Due_Date')->first();
+        $ins  = EmployeeInsurance::where('resort_id', $rid)->where('employee_id', $emp->id)->orderByDesc('id')->first();
+        $med  = WorkPermitMedicalRenewal::where('resort_id', $rid)->where('employee_id', $emp->id)->orderByDesc('id')->first();
+        $visa = VisaRenewal::where('resort_id', $rid)->where('employee_id', $emp->id)->orderByDesc('id')->first();
+
+        return [
+            'employee'         => self::empName($emp),
+            'nationality'      => $emp->nationality,
+            'visa'             => $visa ? $exp($visa->end_date) : 'No record',
+            'work_permit'      => $wp ? $exp($wp->Due_Date) : 'No record',
+            'insurance'        => $ins ? $exp($ins->insurance_end_date) : 'No record',
+            'medical'          => $med ? $exp($med->end_date) : 'No record',
+            'slot_payment_due' => $slot ? $exp($slot->Due_Date) : 'No record',
         ];
     }
 

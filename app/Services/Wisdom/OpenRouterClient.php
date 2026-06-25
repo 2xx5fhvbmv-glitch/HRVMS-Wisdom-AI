@@ -83,6 +83,17 @@ class OpenRouterClient
                         $resp = $send($payload);
                     }
                 }
+
+                // Free models are rate-limited (429) and providers occasionally
+                // return 5xx. Retry a couple of times with short backoff before
+                // surfacing an error — interactive use sends one message at a
+                // time, so a brief retry almost always succeeds.
+                $retries = 0;
+                while (($resp->status() === 429 || $resp->status() >= 500) && $retries < 2) {
+                    usleep(1300000); // 1.3s
+                    $resp = $send($payload);
+                    $retries++;
+                }
             } catch (\Throwable $e) {
                 Log::error('Wisdom AI request failed', ['error' => $e->getMessage()]);
                 return ['ok' => false, 'reply' => '', 'error' => 'Could not reach the AI service. Please try again.'];
