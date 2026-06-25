@@ -151,10 +151,12 @@
 
     $("#DepositRefundForm").on("submit", function (e) {
         e.preventDefault();
-        // Nothing to refund unless at least one employee's wallet is selected —
-        // show a clear prompt instead of the server "wallet option is required".
-        if ($("input[name^='wallet_option']:checked").length === 0) {
-            toastr.error("Please tick an employee and select a wallet to refund the deposit from.", "Error", { positionClass: 'toast-bottom-right' });
+        // Allow submit when at least one employee is actioned: either a "Yes"
+        // with a wallet chosen (wallet_option) OR a "No" deferral (no_refund).
+        var hasWallet = $("input[name^='wallet_option']:checked").length > 0;
+        var hasNo     = $("input[name='no_refund[]']:checked").length > 0;
+        if (!hasWallet && !hasNo) {
+            toastr.error("Please tick an employee and choose Yes (with a wallet) or No.", "Error", { positionClass: 'toast-bottom-right' });
             return;
         }
         if ($(this).parsley().isValid()) {

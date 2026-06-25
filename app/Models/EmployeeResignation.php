@@ -40,7 +40,8 @@ class EmployeeResignation extends Model
         'created_at',
         'updated_at',
         'Deposit_withdraw',
-        'Deposit_Amt'
+        'Deposit_Amt',
+        'deposit_refund_snooze_until'
     ];
 
     
