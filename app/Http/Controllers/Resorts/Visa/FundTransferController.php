@@ -157,10 +157,14 @@ class FundTransferController extends Controller
             return $feeLabel;
         };
 
-        // ── 2. Work Permit fees marked Paid ──
+        // ── 2. Work Permit fees actually paid through the system ──
+        // Only rows with a real Payment_Date count as transactions; sync-backfilled
+        // 'Paid' rows (no Payment_Date) are historical state, not wallet payments,
+        // and were flooding this list with identical-looking entries.
         WorkPermit::with(['employee.resortAdmin'])
             ->where('resort_id', $resort_id)
             ->where('Status', 'Paid')
+            ->whereNotNull('Payment_Date')
             ->get()
             ->each(function ($r) use (&$unified, $feeRecipientLabel) {
                 $date = $r->Payment_Date ?: $r->updated_at;
@@ -175,10 +179,11 @@ class FundTransferController extends Controller
                 ]);
             });
 
-        // ── 3. Quota Slot fees marked Paid ──
+        // ── 3. Quota Slot fees actually paid through the system (real Payment_Date) ──
         QuotaSlotRenewal::with(['employee.resortAdmin'])
             ->where('resort_id', $resort_id)
             ->where('Status', 'Paid')
+            ->whereNotNull('Payment_Date')
             ->get()
             ->each(function ($r) use (&$unified, $feeRecipientLabel) {
                 $date = $r->Payment_Date ?: $r->updated_at;
@@ -197,10 +202,11 @@ class FundTransferController extends Controller
         // the insurer, not from a visa wallet, so they don't belong in the wallet
         // transaction history (they were also showing as 0.00 noise rows).
 
-        // ── 5. Work Permit Medical — Status='Paid' (migration-backfilled) ──
+        // ── 5. Work Permit Medical actually paid through the system (real paid_date) ──
         WorkPermitMedicalRenewal::with(['employee.resortAdmin'])
             ->where('resort_id', $resort_id)
             ->where('Status', 'Paid')
+            ->whereNotNull('paid_date')
             ->get()
             ->each(function ($r) use (&$unified, $feeRecipientLabel) {
                 $date = $r->paid_date ?: $r->start_date;
@@ -215,10 +221,11 @@ class FundTransferController extends Controller
                 ]);
             });
 
-        // ── 6. Visa Renewal — Status='Paid' (migration-backfilled) ──
+        // ── 6. Visa Renewal actually paid through the system (real paid_date) ──
         VisaRenewal::with(['employee.resortAdmin'])
             ->where('resort_id', $resort_id)
             ->where('Status', 'Paid')
+            ->whereNotNull('paid_date')
             ->get()
             ->each(function ($r) use (&$unified, $feeRecipientLabel) {
                 $date = $r->paid_date ?: $r->start_date;

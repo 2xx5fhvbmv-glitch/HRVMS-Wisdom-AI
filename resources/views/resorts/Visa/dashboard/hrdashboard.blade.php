@@ -506,8 +506,7 @@
                                         <thead>
                                             <tr>
                                                 <th>Date</th>
-                                                <th>From Wallet</th>
-                                                <th>To Wallet</th>
+                                                <th>Description</th>
                                                 <th>Amount</th>
                                             </tr>
                                         </thead>
@@ -1237,7 +1236,6 @@ $(document).ready(function ()
                 },
                 columns: [
                     { data: 'Date', name: 'Date', className: 'text-nowrap' },
-                    { data: 'FromWallet', name: 'FromWallet', className: 'text-nowrap' },
                     { data: 'ToWallet', name: 'ToWallet', className: 'text-nowrap' },
                     { data: 'Amount', name: 'Amount', className: 'text-nowrap' },
                 ]
