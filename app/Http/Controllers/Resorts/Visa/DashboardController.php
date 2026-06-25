@@ -951,12 +951,21 @@ class DashboardController extends Controller
         }
 
         $row1='';
+        $seenOverdue = [];
         if(!empty($employee))
         {
             foreach($employee as $emp)
             {
                 if($emp['overDue_status'] != null)
                 {
+                    // De-duplicate: an employee with several overdue installments
+                    // (e.g. multiple unpaid monthly quota / work-permit rows) must
+                    // appear only ONCE here — keep the first card, which is the most
+                    // overdue (records come oldest-due first).
+                    $dupKey = (string) ($emp['Emp_id'] ?? ($emp['Emp_name'] ?? ''));
+                    if ($dupKey !== '' && isset($seenOverdue[$dupKey])) { continue; }
+                    $seenOverdue[$dupKey] = true;
+
                     $row1.='<div class="user-block block-danger  mb-1 d-flex align-items-center">
                         <div class="img-circle">
                             <img src='.$emp['ProfilePic'].' alt="image">
@@ -971,16 +980,16 @@ class DashboardController extends Controller
                         </div>
                     </div>';
                 }
-                else
-                {
-                     $row1 = '<div class="user-block block-danger  mb-1 d-flex align-items-center">
-                    <h6 class="text-center">No Overdue found.</h6>
-                    </div>';
-                }
-                 
             }
         }
-        else
+
+        // Show the "No Overdue found." placeholder ONLY when nothing overdue was
+        // collected. Previously the loop's else-branch RE-ASSIGNED $row1 to the
+        // placeholder on every non-overdue row, which wiped already-collected
+        // overdue cards whenever a not-yet-due installment came later in the list
+        // (Work Permit / Quota Slot carry future monthly rows after the overdue
+        // one) — so their overdue alerts silently vanished.
+        if ($row1 === '')
         {
             $row1 = '<div class="user-block block-danger  mb-1 d-flex align-items-center">
                     <h6 class="text-center">No Overdue found.</h6>
