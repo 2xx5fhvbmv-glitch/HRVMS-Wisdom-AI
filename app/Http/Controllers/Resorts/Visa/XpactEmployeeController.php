@@ -358,9 +358,20 @@ class XpactEmployeeController extends Controller
             }
         }
 
+        // Medical Expiry — from the employee's Work Permit Medical Renewal record
+        // (same source as the Medical Expiry column on the xpat-employee list).
+        $medicalExpiryDate = null;
+        $medicalExpiryStatus = null;
+        $wpMedical = WorkPermitMedicalRenewal::where('resort_id', $this->resort->resort_id)
+            ->where('employee_id', $id)->orderBy('id', 'desc')->first(['end_date']);
+        if ($wpMedical && $wpMedical->end_date) {
+            $medicalExpiryDate   = Carbon::parse($wpMedical->end_date)->format('d M Y');
+            $medicalExpiryStatus = $this->getFormattedExpiryStatus($wpMedical->end_date);
+        }
+
         $TotalExpensessSinceJoing = $this->TotalExpensessSinceJoing($id);
 
-        return view('resorts.Visa.employee.XpatEmployeeDetails', compact('page_title','Employee','statisctic_emp_header','QuotaSlotRenewal','VisaEmployeeExpiryData','TotalExpensessSinceJoing','passportExpiryDate','passportExpiryStatus'));
+        return view('resorts.Visa.employee.XpatEmployeeDetails', compact('page_title','Employee','statisctic_emp_header','QuotaSlotRenewal','VisaEmployeeExpiryData','TotalExpensessSinceJoing','passportExpiryDate','passportExpiryStatus','medicalExpiryDate','medicalExpiryStatus'));
     }
 
     /**
