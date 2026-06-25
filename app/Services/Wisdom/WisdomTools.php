@@ -1731,6 +1731,205 @@ class WisdomTools
         ];
     }
 
+    // ---------------------------------------------------------------------
+    // Grievance & Disciplinary (Employee Relations)
+    // ---------------------------------------------------------------------
+
+    private static function getEmployeeRelationsSummary(int $rid): array
+    {
+        $monthStart = Carbon::now()->startOfMonth();
+        $disc  = fn () => disciplinarySubmit::where('resort_id', $rid);
+        $griev = fn () => GrivanceSubmissionModel::where('resort_id', $rid);
+
+        return [
+            'disciplinary' => [
+                'open'             => $disc()->whereNotIn('status', ['resolved', 'rejected'])->count(),
+                'pending'          => $disc()->where('status', 'pending')->count(),
+                'under_review'     => $disc()->where('status', 'In_Review')->count(),
+                'resolved'         => $disc()->where('status', 'resolved')->count(),
+                'filed_this_month' => $disc()->where('created_at', '>=', $monthStart)->count(),
+            ],
+            'grievance' => [
+                'open'                => $griev()->whereNotIn('status', ['resolved', 'rejected'])->count(),
+                'pending'             => $griev()->where('status', 'pending')->count(),
+                'under_review'        => $griev()->where('status', 'in_review')->count(),
+                'resolved'            => $griev()->where('status', 'resolved')->count(),
+                'confidential'        => $griev()->where('Request_Identity_Disclosure', 'No')->count(),
+                'pending_gm_approval' => $griev()->where('SentToGM', 'Yes')->where('Gm_Decision', 'Pending')->count(),
+            ],
+        ];
+    }
+
+    /** Apply a friendly status filter to a grievance/disciplinary query. */
+    private static function applyCaseStatus($q, string $status, string $type): void
+    {
+        $review = $type === 'disciplinary' ? 'In_Review' : 'in_review';
+        switch ($status) {
+            case 'all':
+                break;
+            case 'pending':
+                $q->where('status', 'pending');
+                break;
+            case 'review':
+            case 'in_review':
+            case 'under_review':
+            case 'investigation':
+            case 'under_investigation':
+                $q->where('status', $review);
+                break;
+            case 'closed':
+            case 'resolved':
+                $q->where('status', 'resolved');
+                break;
+            case 'rejected':
+            case 'dismissed':
+                $q->where('status', 'rejected');
+                break;
+            case 'open':
+            default:
+                $q->whereNotIn('status', ['resolved', 'rejected']);
+        }
+    }
+
+    private static function getDisciplinaryCases(int $rid, array $args): array
+    {
+        $status = strtolower(trim($args['status'] ?? 'open'));
+        $q = disciplinarySubmit::where('resort_id', $rid)
+            ->with([
+                'GetEmployee:id,Emp_id,Admin_Parent_id,Dept_id',
+                'GetEmployee.resortAdmin:id,first_name,last_name',
+                'GetEmployee.department:id,name',
+                'category:id,DisciplinaryCategoryName',
+                'action:id,ActionName',
+            ]);
+        self::applyCaseStatus($q, $status, 'disciplinary');
+
+        $dept = trim($args['department'] ?? '');
+        if ($dept !== '') {
+            $q->whereHas('GetEmployee.department', fn ($d) => $d->where('name', 'like', "%{$dept}%"));
+        }
+
+        $rows = $q->orderByDesc('id')->limit(100)->get();
+        $list = $rows->map(fn ($c) => [
+            'employee'   => $c->GetEmployee ? self::empName($c->GetEmployee) : 'Unknown',
+            'department' => optional(optional($c->GetEmployee)->department)->name,
+            'category'   => optional($c->category)->DisciplinaryCategoryName,
+            'action'     => optional($c->action)->ActionName,
+            'priority'   => $c->Priority,
+            'status'     => $c->status,
+            'date'       => $c->getRawOriginal('created_at') ? Carbon::parse($c->getRawOriginal('created_at'))->format('Y-m-d') : null,
+        ])->values();
+
+        return [
+            'type'          => 'disciplinary',
+            'status_filter' => $status,
+            'count'         => $list->count(),
+            'by_department' => $list->groupBy(fn ($r) => $r['department'] ?: 'Unassigned')->map->count(),
+            'by_category'   => $list->groupBy(fn ($r) => $r['category'] ?: 'Uncategorised')->map->count(),
+            'cases'         => $list,
+        ];
+    }
+
+    private static function getGrievanceCases(int $rid, array $args): array
+    {
+        $status = strtolower(trim($args['status'] ?? 'open'));
+        $q = GrivanceSubmissionModel::where('resort_id', $rid)
+            ->with([
+                'GetEmployee:id,Emp_id,Admin_Parent_id,Dept_id',
+                'GetEmployee.resortAdmin:id,first_name,last_name',
+                'GetEmployee.department:id,name',
+                'category:id,Category_Name',
+            ]);
+        self::applyCaseStatus($q, $status, 'grievance');
+
+        $dept = trim($args['department'] ?? '');
+        if ($dept !== '') {
+            $q->whereHas('GetEmployee.department', fn ($d) => $d->where('name', 'like', "%{$dept}%"));
+        }
+
+        $rows = $q->orderByDesc('id')->limit(100)->get();
+        $list = $rows->map(fn ($c) => [
+            'employee'     => $c->GetEmployee ? self::empName($c->GetEmployee) : 'Confidential/Unknown',
+            'department'   => optional(optional($c->GetEmployee)->department)->name,
+            'category'     => optional($c->category)->Category_Name,
+            'priority'     => $c->Priority,
+            'status'       => $c->status,
+            'confidential' => $c->Request_Identity_Disclosure === 'No',
+            'date'         => $c->getRawOriginal('Grivance_date_time') ? Carbon::parse($c->getRawOriginal('Grivance_date_time'))->format('Y-m-d') : null,
+        ])->values();
+
+        return [
+            'type'          => 'grievance',
+            'status_filter' => $status,
+            'count'         => $list->count(),
+            'by_department' => $list->groupBy(fn ($r) => $r['department'] ?: 'Unassigned')->map->count(),
+            'by_category'   => $list->groupBy(fn ($r) => $r['category'] ?: 'Uncategorised')->map->count(),
+            'cases'         => $list,
+        ];
+    }
+
+    private static function getDisciplinaryOutcomes(int $rid): array
+    {
+        $rows = disciplinarySubmit::where('resort_id', $rid)
+            ->whereNotNull('Action_id')
+            ->with('action:id,ActionName')
+            ->get(['id', 'Action_id', 'status']);
+
+        $byAction = $rows->groupBy(fn ($c) => optional($c->action)->ActionName ?: 'Unspecified')->map->count();
+
+        return [
+            'total_cases_with_action' => $rows->count(),
+            'by_action'               => $byAction,
+        ];
+    }
+
+    private static function getEmployeeRelationsHistory(int $rid, array $args): array
+    {
+        $term = trim($args['name'] ?? '');
+        if ($term === '') {
+            return ['error' => 'Please provide an employee name.'];
+        }
+
+        $emp = Employee::where('resort_id', $rid)
+            ->where(function ($q) use ($term) {
+                $q->whereHas('resortAdmin', function ($r) use ($term) {
+                      $r->where('first_name', 'like', "%{$term}%")
+                        ->orWhere('last_name', 'like', "%{$term}%")
+                        ->orWhereRaw("CONCAT(first_name,' ',last_name) LIKE ?", ["%{$term}%"]);
+                  })->orWhere('Emp_id', 'like', "%{$term}%");
+            })
+            ->with('resortAdmin:id,first_name,last_name')
+            ->first(['id', 'Emp_id', 'Admin_Parent_id']);
+
+        if (!$emp) {
+            return ['query' => $term, 'found' => false, 'message' => 'No matching employee found.'];
+        }
+
+        $disc = disciplinarySubmit::where('resort_id', $rid)->where('Employee_id', $emp->id)
+            ->with(['category:id,DisciplinaryCategoryName', 'action:id,ActionName'])
+            ->orderByDesc('id')->limit(50)->get();
+        $griev = GrivanceSubmissionModel::where('resort_id', $rid)->where('Employee_id', $emp->id)
+            ->with('category:id,Category_Name')
+            ->orderByDesc('id')->limit(50)->get();
+
+        return [
+            'employee'           => self::empName($emp),
+            'disciplinary_count' => $disc->count(),
+            'disciplinary'       => $disc->map(fn ($c) => [
+                'category' => optional($c->category)->DisciplinaryCategoryName,
+                'action'   => optional($c->action)->ActionName,
+                'status'   => $c->status,
+                'date'     => $c->getRawOriginal('created_at') ? Carbon::parse($c->getRawOriginal('created_at'))->format('Y-m-d') : null,
+            ])->values(),
+            'grievance_count'    => $griev->count(),
+            'grievance'          => $griev->map(fn ($c) => [
+                'category' => optional($c->category)->Category_Name,
+                'status'   => $c->status,
+                'date'     => $c->getRawOriginal('Grivance_date_time') ? Carbon::parse($c->getRawOriginal('Grivance_date_time'))->format('Y-m-d') : null,
+            ])->values(),
+        ];
+    }
+
     private static function empName(Employee $e): string
     {
         $ra = $e->resortAdmin;
