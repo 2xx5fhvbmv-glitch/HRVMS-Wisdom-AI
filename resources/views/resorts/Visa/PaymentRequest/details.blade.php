@@ -136,50 +136,6 @@
 @section('import-scripts')
 <script>
 $(document).ready(function(){
-$("#PaymentRequestRejectedForm").parsley();
-    $("#date").datepicker({
-        format: 'yyyy-mm-dd',
-        autoclose: true,
-        todayHighlight: true,
-        orientation: "bottom auto",
-    });
-
-    $(document).on("click",".PaymentRequestRejected",function(){
-
-        var Payment_id = $(this).data('id');
-        $("#Payment_id").val(Payment_id);
-        $("#PaymentRequestRejected-modal").modal('show');
-    });
-   PaymentRequestTableIndex();
-
-    
-
-    $("#PaymentRequestRejectedForm").on('submit', function(e) {
-        e.preventDefault();
-        if ($("#PaymentRequestRejectedForm").parsley().isValid()) {
-            $.ajax({
-                type: "POST",
-                url: "{{ route('resort.visa.PaymentRequestRejected') }}",
-                data: $(this).serialize(),
-                success: function(response) {
-                    if (response.status == 'success') {
-                        toastr.success(response.msg, "success", {
-                            positionClass: 'toast-bottom-right'
-                        });
-                        $('#PaymentRequestRejected-modal').modal('hide');
-                        PaymentRequestTableIndex();
-                    } else {
-                        toastr.error(response.msg, "Error", {
-                            positionClass: 'toast-bottom-right'
-                        });
-                    }
-                },
-                error: function(xhr, status, error) {
-                    toastr.error("An error occurred while processing your request.");
-                }
-            });
-        }
-    });
 
     $(document).on("click",".PrintPaymentRequest",function(){
             var printContents = $('<div>');
@@ -217,53 +173,5 @@ $("#PaymentRequestRejectedForm").parsley();
     });
 
 });
-
-
-function PaymentRequestTableIndex() {
-
-
-  
-     if($.fn.DataTable.isDataTable('#payment-request-tableIndex'))
-        {
-            $('#payment-request-tableIndex').DataTable().destroy();
-        }
-       var productTable = $('#payment-request-tableIndex').DataTable({
-            searching: false,
-            bLengthChange: false,
-            bInfo: true,
-            bAutoWidth: false,
-            scrollX: false,
-            iDisplayLength: 15,
-            processing: true,
-            serverSide: true,
-            order: [[4, 'desc']],
-            ajax: {
-                url: "{{ route('resort.visa.PaymentRequestIndex') }}",
-                type: 'GET',
-                data: function (d) {
-
-       
-               
-                    d.date = $('#date').val();
-           
-                }
-            },
-            columns: [
-                { data: 'PaymentRequestID', name: 'PaymentRequestID' },
-                { data: 'PaymentRequestedDate', name: 'PaymentRequestedDate' },
-                { data: 'Status', name: 'Status' },
-                { data: 'Action', name: 'Action' },
-                {data:'created_at', visible:false,searchable:false},
-            ],
-           
-        }); 
-
-
-   
-
-    
-}
-
-
 </script>
 @endsection
