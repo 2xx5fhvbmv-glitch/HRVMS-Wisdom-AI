@@ -147,11 +147,10 @@
                     <div class="col-xxl-2 col-xl-3 col-lg-4 col-sm-6">
                         <div class="empDetail-block XpatDetail-box">
                             <div>
-                                <h6>Last Entry Date</h6>
-                                @if(isset($statisctic_emp_header) && $statisctic_emp_header->LastEntryDate)
-
-                                    <strong>{{$statisctic_emp_header->LastEntryDate}}</strong>
-                                    <span class="text-danger">{{$statisctic_emp_header->WorkPermitPassRemingDays}} </span>
+                                <h6>Medical Expiry</h6>
+                                @if(!empty($medicalExpiryDate))
+                                    <strong>{{ $medicalExpiryDate }}</strong>
+                                    <span class="text-danger">{{ $medicalExpiryStatus }}</span>
                                 @else
                                     <strong>N/A</strong>
                                     <span class="text-danger">N/A</span>
