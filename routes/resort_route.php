@@ -1435,6 +1435,8 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
       // Payment Request
       Route::get('visa/payment-request','Visa\PaymentRequestController@Create')->name('resort.visa.PaymentRequest');
       Route::post('visa/payment-request/submit', 'Visa\PaymentRequestController@PaymentRequestSubmit')->name('resort.visa.PaymentRequestSubmit');
+      Route::get('visa/bulk-renewal', 'Visa\PaymentRequestController@BulkRenewal')->name('resort.visa.BulkRenewal');
+      Route::post('visa/bulk-renewal/pay', 'Visa\PaymentRequestController@BulkRenewalPay')->name('resort.visa.BulkRenewalPay');
       Route::get('visa/payment-request/index','Visa\PaymentRequestController@index')->name('resort.visa.PaymentRequestIndex');
       Route::get('visa/payment-request/renewal/{id}','Visa\PaymentRequestController@UsingPaymentRequestRenewal')->name('resort.visa.UsingPaymentRequestRenewal');
       Route::get('visa/payment-request/details/{id}','Visa\PaymentRequestController@PaymentRequestDetails')->name('resort.visa.PaymentRequestDetails');

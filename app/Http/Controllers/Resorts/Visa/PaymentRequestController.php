@@ -1016,6 +1016,147 @@ class PaymentRequestController extends Controller
            
         return view('resorts.Visa.PaymentRequest.renewal', compact('page_title','VisaRenewal','WorkPermitCommonVariable','WorkPermitPayableAmt','WorkPermitPaidAmt','WorkPermitUnPaidAmt','QuotaSlotVariable','QuotaSlotPayableAmt','QuotaSlotPaidAmt','QuotaSlotUnPaidAmt','WorkPermitMedicalRenewal','EmployeeInsurance','child', 'Employees', 'PaymentRequest_id'));
     }
+
+    /**
+     * Finance bulk-payment page: lists EVERY unpaid Work Permit / Slot fee for
+     * the resort's active expat employees so Finance can tick many and settle
+     * them in one action (one shared receipt).
+     */
+    public function BulkRenewal(Request $request)
+    {
+        if ($request->ajax()) {
+            $resortId = $this->resort->resort_id;
+            $unified  = collect();
+
+            $pushRow = function ($r, $type, $label) use (&$unified) {
+                $emp = $r->employee;
+                if (!$emp) return;
+                if (strtolower(trim((string) $emp->nationality)) === 'maldivian') return;
+                if (!empty($emp->status) && !in_array($emp->status, ['Active', 'Probationary'], true)) return;
+
+                $name = $emp->resortAdmin
+                    ? trim($emp->resortAdmin->first_name . ' ' . $emp->resortAdmin->last_name)
+                    : ('Employee #' . $emp->id);
+
+                $unified->push((object) [
+                    'key'      => $type . ':' . $r->id,
+                    'emp_name' => $name,
+                    'emp_id'   => $emp->Emp_id,
+                    'fee_type' => $label,
+                    'month'    => $r->Month,
+                    'due_date' => $r->Due_Date ? Carbon::parse($r->Due_Date)->format('d M Y') : '-',
+                    'due_ts'   => $r->Due_Date ? Carbon::parse($r->Due_Date)->timestamp : 0,
+                    'amount'   => (float) $r->Amt,
+                ]);
+            };
+
+            WorkPermit::with('employee.resortAdmin')->where('resort_id', $resortId)
+                ->where('Status', '!=', 'Paid')->where('Amt', '>', 0)->whereNotNull('Due_Date')
+                ->get()->each(fn($r) => $pushRow($r, 'WP', 'Work Permit'));
+
+            QuotaSlotRenewal::with('employee.resortAdmin')->where('resort_id', $resortId)
+                ->where('Status', '!=', 'Paid')->where('Amt', '>', 0)->whereNotNull('Due_Date')
+                ->get()->each(fn($r) => $pushRow($r, 'SLOT', 'Slot Fee'));
+
+            $unified = $unified->sortBy('due_ts')->values();
+
+            return datatables()->of($unified)
+                ->addColumn('CheckBox', fn($row) => '<input type="checkbox" class="form-check-input BulkCheck" data-amt="' . $row->amount . '" value="' . e($row->key) . '">')
+                ->addColumn('EmployeeName', fn($row) => e($row->emp_name) . ' <span class="badge badge-themeNew">' . e($row->emp_id) . '</span>')
+                ->addColumn('FeeType', fn($row) => e($row->fee_type))
+                ->addColumn('Month', fn($row) => e($row->month))
+                ->addColumn('DueDate', fn($row) => e($row->due_date))
+                ->addColumn('Amount', fn($row) => Common::formatMvr($row->amount))
+                ->rawColumns(['CheckBox', 'EmployeeName'])
+                ->make(true);
+        }
+
+        $page_title = 'Bulk Visa Fee Payment';
+        return view('resorts.Visa.PaymentRequest.bulk_renewal', compact('page_title'));
+    }
+
+    /**
+     * Settle a batch of Work Permit / Slot fees Finance ticked on the bulk page,
+     * all under one receipt. Mirrors the single mark-as-paid: records who paid,
+     * rolls totals into TotalExpensessSinceJoing, and notifies HR once.
+     */
+    public function BulkRenewalPay(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'items'   => 'required|array|min:1',
+            'receipt' => 'required|string|max:191',
+        ], [
+            'items.required'   => 'Please select at least one fee to mark as paid.',
+            'receipt.required' => 'Receipt number is required.',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'msg' => $validator->errors()->first()], 422);
+        }
+
+        $resortId  = $this->resort->resort_id;
+        $receipt   = $request->receipt;
+        $payer     = $this->resort;
+        $payerName = trim(($payer->first_name ?? '') . ' ' . ($payer->last_name ?? ''));
+        if ($payerName === '') {
+            $payerName = optional($payer)->email ?: 'Finance';
+        }
+
+        $wpIds = []; $slotIds = [];
+        foreach ((array) $request->items as $key) {
+            [$t, $id] = array_pad(explode(':', (string) $key, 2), 2, null);
+            if ($t === 'WP' && ctype_digit((string) $id))   $wpIds[]   = (int) $id;
+            if ($t === 'SLOT' && ctype_digit((string) $id)) $slotIds[] = (int) $id;
+        }
+
+        DB::beginTransaction();
+        try {
+            $paidCount = 0; $paidTotal = 0.0; $byEmpWp = []; $byEmpSlot = [];
+            $today = Carbon::now()->format('Y-m-d');
+
+            foreach (WorkPermit::whereIn('id', $wpIds)->where('resort_id', $resortId)->get() as $r) {
+                if (strtolower((string) $r->Status) === 'paid') continue;
+                $r->Status = 'Paid'; $r->ReceiptNumber = $receipt; $r->Payment_Date = $today; $r->paid_by = $payerName; $r->save();
+                $byEmpWp[$r->employee_id] = ($byEmpWp[$r->employee_id] ?? 0) + (float) $r->Amt;
+                $paidCount++; $paidTotal += (float) $r->Amt;
+            }
+            foreach (QuotaSlotRenewal::whereIn('id', $slotIds)->where('resort_id', $resortId)->get() as $r) {
+                if (strtolower((string) $r->Status) === 'paid') continue;
+                $r->Status = 'Paid'; $r->ReceiptNumber = $receipt; $r->Payment_Date = $today; $r->paid_by = $payerName; $r->save();
+                $byEmpSlot[$r->employee_id] = ($byEmpSlot[$r->employee_id] ?? 0) + (float) $r->Amt;
+                $paidCount++; $paidTotal += (float) $r->Amt;
+            }
+
+            foreach ($byEmpWp as $empId => $sum) {
+                $t = \App\Models\TotalExpensessSinceJoing::where('resort_id', $resortId)->where('employees_id', $empId)->first();
+                if ($t) { $t->Total_work_permit = $t->Total_work_permit + $sum; $t->save(); }
+            }
+            foreach ($byEmpSlot as $empId => $sum) {
+                $t = \App\Models\TotalExpensessSinceJoing::where('resort_id', $resortId)->where('employees_id', $empId)->first();
+                if ($t) { $t->Total_slot_Payment = $t->Total_slot_Payment + $sum; $t->save(); }
+            }
+
+            DB::commit();
+
+            // Notify HR once for the whole batch.
+            $hrIds = Common::getResortHrEmployeeIds($resortId);
+            if (!empty($hrIds) && $paidCount > 0) {
+                $title   = 'Visa Payments Completed';
+                $message = $paidCount . ' visa fee(s) totalling MVR ' . number_format($paidTotal, 2) . ' marked Paid by ' . $payerName . ' (receipt ' . $receipt . ').';
+                foreach ($hrIds as $hrId) {
+                    try {
+                        event(new \App\Events\ResortNotificationEvent(Common::nofitication($resortId, 10, $title, $message, 0, (int) $hrId, 'Visa')));
+                    } catch (\Throwable $e) {
+                        \Log::warning('Bulk-pay HR notify failed (resort ' . $resortId . ', hr ' . $hrId . '): ' . $e->getMessage());
+                    }
+                }
+            }
+
+            return response()->json(['success' => true, 'msg' => $paidCount . ' fee(s) marked as paid under receipt ' . $receipt . '.']);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['success' => false, 'msg' => 'Failed to process payment: ' . $e->getMessage()], 500);
+        }
+    }
  
 
 
