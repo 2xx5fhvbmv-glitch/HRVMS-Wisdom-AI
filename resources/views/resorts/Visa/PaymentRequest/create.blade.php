@@ -240,18 +240,29 @@ $(document).ready(function(){
     $(".SubmitEmployee").on("click", function(){
 
         var selectedEmployees = [];
-        $('#payment-request-table tbody input[type="checkbox"]:checked').each(function() {
+        // months[encodedEmployeeId] = { wp: N, slot: M } — how many upcoming
+        // months of Work Permit / Slot fees HR chose to pay for that employee.
+        var months = {};
+        $('#payment-request-table tbody input.ChildCheck:checked').each(function() {
 
-         
             selectedEmployees.push($(this).val());
+
+            var emp = $(this).data('emp');
+            if (emp) {
+                var $row = $(this).closest('tr');
+                months[emp] = {
+                    wp:   parseInt($row.find('.fee-months[data-fee="wp"]').val(), 10)   || 1,
+                    slot: parseInt($row.find('.fee-months[data-fee="slot"]').val(), 10) || 1
+                };
+            }
         });
 
-        if (selectedEmployees.length === 0) 
+        if (selectedEmployees.length === 0)
         {
             toastr.error("Please select at least one employee", "Error", {
                             positionClass: 'toast-bottom-right'
                         });
-                        
+
         }
 
         $.ajax({
@@ -259,6 +270,7 @@ $(document).ready(function(){
             type: 'POST',
             data: {
                 employee_ids: selectedEmployees,
+                months: months,
                 _token: '{{ csrf_token() }}'
             },
             success: function(response) {
@@ -291,7 +303,35 @@ $(document).ready(function(){
         $("#selectedCount").html(selectedEmployees.length + ' Employees Selected');
         updateTopTotal();
     });
+
+    // Multi-month Work Permit / Slot fee: when HR changes the "Months" count, the
+    // fee cell shows the sum of the next N upcoming unpaid dues, and the row +
+    // top totals update to match.
+    $(document).on("input change", ".fee-months", function () {
+        var $input = $(this);
+        var dues = $input.data('dues') || [];
+        var n = parseInt($input.val(), 10) || 1;
+        if (n < 1) { n = 1; $input.val(1); }
+        if (n > dues.length) { n = dues.length; $input.val(dues.length); }
+        var sum = 0;
+        for (var i = 0; i < n && i < dues.length; i++) { sum += parseFloat(dues[i].amt) || 0; }
+        var $cell = $input.closest('.fee-cell');
+        $cell.find('.fee-amt').first().text('MVR ' + sum.toFixed(2));
+        $cell.find('.fee-months-note').text(n > 1 ? '(' + n + ' months)' : '');
+        recomputeRowTotal($input.closest('tr'));
+        updateTopTotal();
+    });
 });
+
+// Row data-total = sum of every fee amount shown in the row, so the live top
+// total reflects multi-month selections.
+function recomputeRowTotal($row) {
+    var total = 0;
+    $row.find('.fee-amt').each(function () {
+        total += parseFloat(($(this).text() || '').replace(/[^0-9.]/g, '')) || 0;
+    });
+    $row.find('input.ChildCheck').attr('data-total', total.toFixed(2)).data('total', total);
+}
 
 
 // Live total on top = sum of the SELECTED employees' fees (data-total is the

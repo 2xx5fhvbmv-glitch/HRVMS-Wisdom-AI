@@ -547,88 +547,91 @@ class XpactEmployeeController extends Controller
     public function QuotaSlotMakrasPaid(Request $request)
     {
         $child_id = base64_decode($request->child_id);
+        $child    = $child_id ? PaymentRequestChild::find($child_id) : null;
+
+        // Advance the payment-request child one step (a fee type is one step,
+        // regardless of how many months it covered) and complete it when done.
+        $advanceChild = function ($child, string $showField, string $stepField) {
+            if (!$child) {
+                return;
+            }
+            $child->OngoingSteps = $child->OngoingSteps + 1;
+            if ($child->OverallSteps == $child->OngoingSteps) {
+                $child->ChildStatus = 'Complete';
+                PaymentRequest::where('id', $child->Requested_Id)->update(['Status' => 'Approved']);
+            }
+            $child->{$showField} = 'No';
+            $child->{$stepField} = 'Yes';
+            $child->save();
+        };
+
         if($request->TypeofModel =="WorkPermit")
         {
-            $WorkPermit = WorkPermit::find(base64_decode($request->Mark_id));
+            // Settle every month included in this request at once: the stored
+            // multi-month ids, else the single Mark_id for legacy requests.
+            $ids = ($child && !empty($child->WorkPermitIds))
+                ? array_filter(array_map('intval', explode(',', $child->WorkPermitIds)))
+                : [ (int) base64_decode($request->Mark_id) ];
 
-            $TotalExpensessSinceJoing =  TotalExpensessSinceJoing::where('resort_id', $this->resort->resort_id)->where('employees_id', $WorkPermit->employee_id)->first();
-            if($WorkPermit)
-            {
-                if($TotalExpensessSinceJoing)
-                {
-                    $TotalExpensessSinceJoing->Total_work_permit = $TotalExpensessSinceJoing->Total_work_permit + $WorkPermit->Amt;
-                    $TotalExpensessSinceJoing->save();
-                }
-                $PaymentRequestChild = PaymentRequestChild::where('employee_id', $WorkPermit->employee_id)->where('id', $child_id)->first();
-                $WorkPermit->Status = "Paid";
-                $WorkPermit->ReceiptNumber = $request->Receipt_number;
-                $WorkPermit->Payment_Date = Carbon::now()->format('Y-m-d');
-
-                $WorkPermit->save();
-                if( $child_id)
-                {
-                    $PaymentRequestChild = PaymentRequestChild::where('employee_id', $WorkPermit->employee_id)->where('id', $child_id)->first();
-                    $PaymentRequestChild->OngoingSteps = $PaymentRequestChild->OngoingSteps + 1;
-                    
-                    if($PaymentRequestChild->OverallSteps == $PaymentRequestChild->OngoingSteps )
-                    {
-                        $PaymentRequestChild->ChildStatus = 'Complete';
-                        PaymentRequest::where('id', $PaymentRequestChild->Requested_Id)->update(['Status' => 'Approved']);
-                    }
-                     $PaymentRequestChild->WorkPermitShow = 'No';
-                    $PaymentRequestChild->WorkPermitStep = 'Yes';
-                    $PaymentRequestChild->save();
-    
-
-                }
-                return response()->json(['status' =>true, 'message' => 'Marked as Paid successfully']);
-            }
-            else
-            {
+            $rows = WorkPermit::whereIn('id', $ids)->where('resort_id', $this->resort->resort_id)->get();
+            if ($rows->isEmpty()) {
                 return response()->json(['status' => false, 'message' => 'Work Permit Slot Renewal not found']);
             }
+
+            $paidSum = 0.0;
+            foreach ($rows as $WorkPermit) {
+                if (strtolower((string) $WorkPermit->Status) === 'paid') {
+                    continue;
+                }
+                $WorkPermit->Status        = "Paid";
+                $WorkPermit->ReceiptNumber = $request->Receipt_number;
+                $WorkPermit->Payment_Date  = Carbon::now()->format('Y-m-d');
+                $WorkPermit->save();
+                $paidSum += (float) $WorkPermit->Amt;
+            }
+
+            $TotalExpensessSinceJoing = TotalExpensessSinceJoing::where('resort_id', $this->resort->resort_id)->where('employees_id', $rows->first()->employee_id)->first();
+            if ($TotalExpensessSinceJoing) {
+                $TotalExpensessSinceJoing->Total_work_permit = $TotalExpensessSinceJoing->Total_work_permit + $paidSum;
+                $TotalExpensessSinceJoing->save();
+            }
+
+            $advanceChild($child, 'WorkPermitShow', 'WorkPermitStep');
+            return response()->json(['status' => true, 'message' => 'Marked as Paid successfully']);
         }
         else
         {
-            $QuotaSlotRenewal = QuotaSlotRenewal::find(base64_decode($request->Mark_id));
-            $TotalExpensessSinceJoing =  TotalExpensessSinceJoing::where('resort_id', $this->resort->resort_id)
-                                                ->where('employees_id', $QuotaSlotRenewal->employee_id)
-                                                ->first();
+            $ids = ($child && !empty($child->QuotaslotIds))
+                ? array_filter(array_map('intval', explode(',', $child->QuotaslotIds)))
+                : [ (int) base64_decode($request->Mark_id) ];
 
-            if($TotalExpensessSinceJoing)
-            {
-                $TotalExpensessSinceJoing->Total_slot_Payment = $TotalExpensessSinceJoing->Total_slot_Payment + $QuotaSlotRenewal->Amt;
-                $TotalExpensessSinceJoing->save();
-            }
-           
-            if($QuotaSlotRenewal)
-            {
-                $QuotaSlotRenewal->Status = "Paid";
-                $QuotaSlotRenewal->ReceiptNumber = $request->Receipt_number;
-                $QuotaSlotRenewal->Payment_Date = Carbon::now()->format('Y-m-d');
-                $QuotaSlotRenewal->save();
-                if($child_id)
-                {
-                    $PaymentRequestChild = PaymentRequestChild::where('employee_id', $QuotaSlotRenewal->employee_id)->where('id', $child_id)->first();
-                    $PaymentRequestChild->OngoingSteps = $PaymentRequestChild->OngoingSteps + 1;
-                    if($PaymentRequestChild->OverallSteps == $PaymentRequestChild->OngoingSteps )
-                    {
-                        $PaymentRequestChild->ChildStatus = 'Complete';
-                        PaymentRequest::where('id', $PaymentRequestChild->Requested_Id)->update(['Status' => 'Approved']);
-                    }
-                     $PaymentRequestChild->QuotaslotShow = 'No';
-                    $PaymentRequestChild->QuotaslotStep = 'Yes';
-                    $PaymentRequestChild->save();
-    
-                }
-                return response()->json(['status' =>true, 'message' => 'Marked as Paid successfully']);
-            }
-            else
-            {
+            $rows = QuotaSlotRenewal::whereIn('id', $ids)->where('resort_id', $this->resort->resort_id)->get();
+            if ($rows->isEmpty()) {
                 return response()->json(['status' => false, 'message' => 'Quota Slot Renewal not found']);
             }
+
+            $paidSum = 0.0;
+            foreach ($rows as $QuotaSlotRenewal) {
+                if (strtolower((string) $QuotaSlotRenewal->Status) === 'paid') {
+                    continue;
+                }
+                $QuotaSlotRenewal->Status        = "Paid";
+                $QuotaSlotRenewal->ReceiptNumber = $request->Receipt_number;
+                $QuotaSlotRenewal->Payment_Date  = Carbon::now()->format('Y-m-d');
+                $QuotaSlotRenewal->save();
+                $paidSum += (float) $QuotaSlotRenewal->Amt;
+            }
+
+            $TotalExpensessSinceJoing = TotalExpensessSinceJoing::where('resort_id', $this->resort->resort_id)->where('employees_id', $rows->first()->employee_id)->first();
+            if ($TotalExpensessSinceJoing) {
+                $TotalExpensessSinceJoing->Total_slot_Payment = $TotalExpensessSinceJoing->Total_slot_Payment + $paidSum;
+                $TotalExpensessSinceJoing->save();
+            }
+
+            $advanceChild($child, 'QuotaslotShow', 'QuotaslotStep');
+            return response()->json(['status' => true, 'message' => 'Marked as Paid successfully']);
         }
-        
+
     }
     public function PastTransectionHistory(Request $request)
     {

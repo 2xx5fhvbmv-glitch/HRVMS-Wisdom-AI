@@ -223,7 +223,9 @@
                                         @if($QuotaSlotVariable)
                                             <tr>
                                                 <th>{{$QuotaSlotVariable->Month}}</th>
-                                                <td>{!! Common::formatMvr($QuotaSlotVariable->Amt) !!}</td>    
+                                                <td>{!! Common::formatMvr($QuotaSlotVariable->Amt) !!}
+                                                    @if(($QuotaSlotVariable->Months ?? 1) > 1)<span class="badge badge-themeNew ms-1">{{ $QuotaSlotVariable->Months }} months</span>@endif
+                                                </td>
                                                 <td>{{$QuotaSlotVariable->Due_Date}}</td>
                                                 <td>
                                                     <span class="badge badge-themeDanger">Pending</span>
@@ -280,7 +282,9 @@
                                     <tbody>
                                         <tr>
                                             <th>{{$WorkPermitCommonVariable->Month}}</th>
-                                            <td>{!! Common::formatMvr($WorkPermitCommonVariable->Amt) !!}</td>    
+                                            <td>{!! Common::formatMvr($WorkPermitCommonVariable->Amt) !!}
+                                                @if(($WorkPermitCommonVariable->Months ?? 1) > 1)<span class="badge badge-themeNew ms-1">{{ $WorkPermitCommonVariable->Months }} months</span>@endif
+                                            </td>
                                             <td>{{$WorkPermitCommonVariable->Due_Date}}</td>
                                             <td>
                                                     <span class="badge badge-themeDanger">Pending</span>
