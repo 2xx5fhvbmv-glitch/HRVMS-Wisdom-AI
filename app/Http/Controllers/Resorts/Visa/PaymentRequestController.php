@@ -653,9 +653,11 @@ class PaymentRequestController extends Controller
         if($request->ajax())
         {
                 $date = $request->date;
+                // Keep paid (Approved) requests on the list too — they're no longer
+                // removed once settled, just shown as Paid. Rejected ones drop off.
                 $PaymentRequest = PaymentRequest::where('resort_id', $this->resort->resort_id)
-                    ->where('Status', 'Pending')
-                    ->when($date, function ($query) use ($date) 
+                    ->whereIn('Status', ['Pending', 'Approved'])
+                    ->when($date, function ($query) use ($date)
                     {
                         $query->whereDate('Request_date', carbon::parse($date)->format('Y-m-d'));
                     })
@@ -677,17 +679,24 @@ class PaymentRequestController extends Controller
                                 {
                                     return $row->Request_date ? Carbon::parse($row->Request_date)->format('d M Y') : 'N/A';
                                 })
-                                ->editColumn('Status', function ($row) 
+                                ->editColumn('Status', function ($row)
                                 {
-                                    $badgeClass = 'badge-warning'; 
-                                    return '<span class="badge ' . $badgeClass . '">' . htmlspecialchars($row->Status) . '</span>';
+                                    // Approved = fully settled by Finance -> show as Paid.
+                                    if ($row->Status === 'Approved') {
+                                        return '<span class="badge badge-themeNeon">Paid</span>';
+                                    }
+                                    return '<span class="badge badge-warning">' . htmlspecialchars($row->Status) . '</span>';
                                 })
-                                ->addColumn('Action', function ($row) use ($edit_class) 
+                                ->addColumn('Action', function ($row) use ($edit_class)
                                 {
-                                    // <a target="_blank" href="' . $viewUrl1 . '" class="btn-tableIcon btnIcon-blue   btn-sm"><i class="fa-solid fa-check"></i></a>
                                     $encodedId = base64_encode($row->id);
                                     $viewUrl2 = route('resort.visa.PaymentRequestDetails', ['id' => $encodedId]);
-                                                return '<a target="_blank" href="' . $viewUrl2 . '" class="btn-tableIcon btnIcon-blue   btn-sm"><i class="fa-regular fa-eye"></i></a>
+                                    $view = '<a target="_blank" href="' . $viewUrl2 . '" class="btn-tableIcon btnIcon-blue   btn-sm"><i class="fa-regular fa-eye"></i></a>';
+                                    // Once paid (Approved) only View remains — no reject action.
+                                    if ($row->Status === 'Approved') {
+                                        return $view;
+                                    }
+                                    return $view . '
                                                         <a  href="javascript:void(0)" class="btn-tableIcon btnIcon-danger PaymentRequestRejected   btn-sm '.$edit_class.'" data-id="'.$encodedId.'"><i class="fa-solid fa-xmark"></i></a>';
                                 })
                                 ->rawColumns(['Status', 'Action']) 
