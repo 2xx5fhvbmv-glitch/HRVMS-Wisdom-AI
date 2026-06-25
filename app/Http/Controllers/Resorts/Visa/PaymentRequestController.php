@@ -296,7 +296,7 @@ class PaymentRequestController extends Controller
                         $encodedId = base64_encode($employee->id);
                         if ($currentWP)
                         {
-                            $employee->WorkPermitExpiryDate = $this->buildMultiMonthFeeCell($wpDues, 'wp');
+                            $employee->WorkPermitExpiryDate = $this->buildMultiMonthFeeCell($this->buildPayableSchedule($wpDues), 'wp');
                             $totalPermit += $currentWP->Amt;
                             $hasAnyFlagData = true;
                             $employeeData[$encodedId]['WorkPermitAmt'] = $currentWP->Amt;
@@ -345,7 +345,7 @@ class PaymentRequestController extends Controller
                         $encodedId = base64_encode($employee->id);
                         if ($currentQuota)
                         {
-                            $employee->QuotaSlotAmtForThisMonth = $this->buildMultiMonthFeeCell($quotaDues, 'slot');
+                            $employee->QuotaSlotAmtForThisMonth = $this->buildMultiMonthFeeCell($this->buildPayableSchedule($quotaDues), 'slot');
                             $totalQuota += $currentQuota->Amt;
                             $hasAnyFlagData = true;
 
@@ -432,6 +432,96 @@ class PaymentRequestController extends Controller
      * "Months" input carrying the full list so the page can re-total client-side
      * (and the server re-derives the exact rows on submit).
      */
+    /**
+     * Extend the existing unpaid dues into a full payable schedule of up to 12
+     * upcoming months (current + 11 ahead), synthesising months that don't have
+     * a fee row yet using the monthly fee + due-day of the first due. Synthesised
+     * entries carry id=null; the matching rows are created on submit. This is
+     * what lets HR pay months in advance even when only the current month exists.
+     */
+    private function buildPayableSchedule(array $dues): array
+    {
+        if (empty($dues)) {
+            return [];
+        }
+        $start   = Carbon::parse($dues[0]['date']);
+        $dueDay  = (int) $start->format('d');
+        $monthly = (float) $dues[0]['amt'];
+
+        $existingByYm = [];
+        foreach ($dues as $d) {
+            $existingByYm[Carbon::parse($d['date'])->format('Y-m')] = $d;
+        }
+
+        $schedule  = [];
+        $cursor    = $start->copy()->startOfMonth();
+        $endCursor = $start->copy()->addMonths(11)->startOfMonth();
+        while ($cursor->lte($endCursor)) {
+            $ym = $cursor->format('Y-m');
+            if (isset($existingByYm[$ym])) {
+                $schedule[] = $existingByYm[$ym];
+            } else {
+                $day = min($dueDay, (int) $cursor->copy()->endOfMonth()->format('d'));
+                $schedule[] = ['id' => null, 'amt' => $monthly, 'date' => $cursor->copy()->day($day)->format('Y-m-d')];
+            }
+            $cursor->addMonth();
+        }
+        return $schedule;
+    }
+
+    /**
+     * Resolve the next $months fee rows for an employee, creating the upcoming
+     * (advance) month rows that don't exist yet. Returns [ids[], totalAmount].
+     */
+    private function resolveAdvanceFeeRows(string $type, int $employeeId, int $months): array
+    {
+        $resortId = $this->resort->resort_id;
+        $model    = $type === 'wp' ? WorkPermit::class : QuotaSlotRenewal::class;
+
+        $existing = $model::where('employee_id', $employeeId)->where('resort_id', $resortId)
+            ->whereNotNull('Due_Date')->where('Status', '!=', 'Paid')->where('Amt', '>', 0)
+            ->orderBy('Due_Date', 'asc')->get();
+        if ($existing->isEmpty()) {
+            return [[], 0.0];
+        }
+
+        $first   = $existing->first();
+        $monthly = (float) $first->Amt;
+        $start   = Carbon::parse($first->Due_Date);
+        $dueDay  = (int) $start->format('d');
+
+        $existingByYm = [];
+        foreach ($existing as $r) {
+            $existingByYm[Carbon::parse($r->Due_Date)->format('Y-m')] = $r;
+        }
+
+        $ids = []; $sum = 0.0; $taken = 0;
+        $cursor    = $start->copy()->startOfMonth();
+        $endCursor = $start->copy()->addMonths(11)->startOfMonth();
+        while ($cursor->lte($endCursor) && $taken < $months) {
+            $ym = $cursor->format('Y-m');
+            if (isset($existingByYm[$ym])) {
+                $row = $existingByYm[$ym];
+            } else {
+                $day = min($dueDay, (int) $cursor->copy()->endOfMonth()->format('d'));
+                $row = new $model();
+                $row->resort_id   = $resortId;
+                $row->employee_id = $employeeId;
+                $row->Month       = $cursor->format('F Y');
+                $row->Currency    = 'MVR';
+                $row->Amt         = $monthly;
+                $row->Due_Date    = $cursor->copy()->day($day)->format('Y-m-d');
+                $row->Status      = 'Unpaid';
+                $row->save();
+            }
+            $ids[] = (int) $row->id;
+            $sum  += (float) $row->Amt;
+            $taken++;
+            $cursor->addMonth();
+        }
+        return [$ids, round($sum, 2)];
+    }
+
     private function buildMultiMonthFeeCell(array $dues, string $fee)
     {
         if (empty($dues)) {
@@ -545,27 +635,23 @@ class PaymentRequestController extends Controller
                         $quotaIds      = null;
 
                         if (isset($value['WorkPermitAmt'])) {
-                            $wpRows = WorkPermit::where('employee_id', $employee_id)
-                                ->where('resort_id', $this->resort->resort_id)
-                                ->whereNotNull('Due_Date')->where('Status', '!=', 'Paid')->where('Amt', '>', 0)
-                                ->orderBy('Due_Date', 'asc')->take($wpMonths)->get();
-                            if ($wpRows->isNotEmpty()) {
-                                $WorkpermitAmt    = round($wpRows->sum('Amt'), 2);
-                                $WorkpermitExpiry = Carbon::parse($wpRows->last()->Due_Date)->format('Y-m-d');
-                                $workPermitIds    = $wpRows->pluck('id')->implode(',');
-                                $wpMonths         = $wpRows->count();
+                            [$wpIdsArr, $wpSum] = $this->resolveAdvanceFeeRows('wp', (int) $employee_id, $wpMonths);
+                            if (!empty($wpIdsArr)) {
+                                $WorkpermitAmt    = $wpSum;
+                                $workPermitIds    = implode(',', $wpIdsArr);
+                                $wpMonths         = count($wpIdsArr);
+                                $lastWp           = WorkPermit::find(end($wpIdsArr));
+                                $WorkpermitExpiry = $lastWp ? Carbon::parse($lastWp->Due_Date)->format('Y-m-d') : $WorkpermitExpiry;
                             }
                         }
                         if (isset($value['QuotaAmt'])) {
-                            $qRows = QuotaSlotRenewal::where('employee_id', $employee_id)
-                                ->where('resort_id', $this->resort->resort_id)
-                                ->whereNotNull('Due_Date')->where('Status', '!=', 'Paid')->where('Amt', '>', 0)
-                                ->orderBy('Due_Date', 'asc')->take($slotMonths)->get();
-                            if ($qRows->isNotEmpty()) {
-                                $quotaAmt    = round($qRows->sum('Amt'), 2);
-                                $quotaExpiry = Carbon::parse($qRows->last()->Due_Date)->format('Y-m-d');
-                                $quotaIds    = $qRows->pluck('id')->implode(',');
-                                $slotMonths  = $qRows->count();
+                            [$qIdsArr, $qSum] = $this->resolveAdvanceFeeRows('slot', (int) $employee_id, $slotMonths);
+                            if (!empty($qIdsArr)) {
+                                $quotaAmt    = $qSum;
+                                $quotaIds    = implode(',', $qIdsArr);
+                                $slotMonths  = count($qIdsArr);
+                                $lastQ       = QuotaSlotRenewal::find(end($qIdsArr));
+                                $quotaExpiry = $lastQ ? Carbon::parse($lastQ->Due_Date)->format('Y-m-d') : $quotaExpiry;
                             }
                         }
 
