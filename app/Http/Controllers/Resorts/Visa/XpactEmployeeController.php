@@ -338,7 +338,14 @@ class XpactEmployeeController extends Controller
             ->latest('id')
             ->first();
         if ($passportRow) {
-            $extracted = $passportRow->Ai_extracted_data['extracted_fields'] ?? [];
+            // Ai_extracted_data is stored as a JSON STRING (the model has no array
+            // cast), so decode before reading — array-indexing the raw string just
+            // yields a character and the passport date showed as N/A even after a
+            // manual update wrote the correct value.
+            $decodedPassport = is_array($passportRow->Ai_extracted_data)
+                ? $passportRow->Ai_extracted_data
+                : (json_decode($passportRow->Ai_extracted_data, true) ?: []);
+            $extracted = $decodedPassport['extracted_fields'] ?? [];
             $rawPassportExpiry = $extracted['Date of Expiry'] ?? ($extracted['Passport Expiry Date'] ?? null);
             if (!empty($rawPassportExpiry)) {
                 try {
