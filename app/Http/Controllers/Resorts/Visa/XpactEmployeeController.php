@@ -557,6 +557,30 @@ class XpactEmployeeController extends Controller
             $payerName = optional($payer)->email ?: 'Finance';
         }
 
+        // Notify HR when Finance completes a payment (HR raises the request, so
+        // they should know it's been settled).
+        $notifyHr = function ($employeeId, string $feeLabel, $amount) use ($payerName) {
+            $hrIds = Common::getResortHrEmployeeIds($this->resort->resort_id);
+            if (empty($hrIds)) {
+                return;
+            }
+            $emp = Employee::with('resortAdmin')->find($employeeId);
+            $empName = ($emp && $emp->resortAdmin)
+                ? trim($emp->resortAdmin->first_name . ' ' . $emp->resortAdmin->last_name)
+                : ('Employee #' . $employeeId);
+            $title   = 'Visa Payment Completed';
+            $message = $feeLabel . ' for ' . $empName . ' (MVR ' . number_format((float) $amount, 2) . ') has been marked Paid by ' . $payerName . '.';
+            foreach ($hrIds as $hrId) {
+                try {
+                    event(new \App\Events\ResortNotificationEvent(Common::nofitication(
+                        $this->resort->resort_id, 10, $title, $message, 0, (int) $hrId, 'Visa'
+                    )));
+                } catch (\Throwable $e) {
+                    \Log::warning('Mark-paid HR notify failed (resort ' . $this->resort->resort_id . ', hr ' . $hrId . '): ' . $e->getMessage());
+                }
+            }
+        };
+
         // Advance the payment-request child one step (a fee type is one step,
         // regardless of how many months it covered) and complete it when done.
         $advanceChild = function ($child, string $showField, string $stepField) {
@@ -605,6 +629,7 @@ class XpactEmployeeController extends Controller
                 $TotalExpensessSinceJoing->save();
             }
 
+            $notifyHr($rows->first()->employee_id, 'Work Permit fee', $paidSum);
             $advanceChild($child, 'WorkPermitShow', 'WorkPermitStep');
             return response()->json(['status' => true, 'message' => 'Marked as Paid successfully']);
         }
@@ -638,6 +663,7 @@ class XpactEmployeeController extends Controller
                 $TotalExpensessSinceJoing->save();
             }
 
+            $notifyHr($rows->first()->employee_id, 'Slot fee', $paidSum);
             $advanceChild($child, 'QuotaslotShow', 'QuotaslotStep');
             return response()->json(['status' => true, 'message' => 'Marked as Paid successfully']);
         }
