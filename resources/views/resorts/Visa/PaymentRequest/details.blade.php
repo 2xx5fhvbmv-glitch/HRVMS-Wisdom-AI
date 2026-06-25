@@ -67,7 +67,9 @@
                                     <div class="border-top">
                                         <div class="insurance-Ibox">
                                             <label class="d-block">Work Permit</label>
-                                            <span>Last Paid: 2024-01-01 | Due Date: {{$PaymentRequestChild->LastWorkPermitDate}} | Amount: {!! Common::formatMvr($PaymentRequestChild->WorkPermitAmt) !!}</span>
+                                            <span>Last Paid: {{$PaymentRequestChild->LastWorkPermitDate ?? 'N/A'}} | Due Date: {{$PaymentRequestChild->WorkPermitDate ?? 'N/A'}} | Amount: {!! Common::formatMvr($PaymentRequestChild->WorkPermitAmt) !!}
+                                                @if(($PaymentRequestChild->WorkPermitMonths ?? 1) > 1)<span class="badge badge-themeNew ms-1">{{ $PaymentRequestChild->WorkPermitMonths }} months</span>@endif
+                                            </span>
                                         </div>
                                     </div>
                                 @endif
@@ -92,7 +94,9 @@
                                     <div class="border-top">
                                         <div class="insurance-Ibox">
                                             <label class="d-block">Quota Slot</label>
-                                            <span>Last Paid: {{$PaymentRequestChild->LastQuotaslotDate?? 'N/A'}} | Due Date: {{$PaymentRequestChild->QuotaslotDate?? 'N/A'}} | Amount: {!! Common::formatMvr($PaymentRequestChild->QuotaslotAmt) !!}</span>
+                                            <span>Last Paid: {{$PaymentRequestChild->LastQuotaslotDate?? 'N/A'}} | Due Date: {{$PaymentRequestChild->QuotaslotDate?? 'N/A'}} | Amount: {!! Common::formatMvr($PaymentRequestChild->QuotaslotAmt) !!}
+                                                @if(($PaymentRequestChild->QuotaslotMonths ?? 1) > 1)<span class="badge badge-themeNew ms-1">{{ $PaymentRequestChild->QuotaslotMonths }} months</span>@endif
+                                            </span>
                                         </div>
                                     </div>
                                 @endif
