@@ -25,19 +25,6 @@
             <div class="card">
                 <div class="card-header border-0 m-0">
                     <div class="row g-md-3 g-2 ">
-                        <div class="col-xl-3 col-lg-5 col-md-7 col-sm-12 order-md-1 order-2 ">
-                            <label class="form-label">DURATION</label>
-                                <div class="dateRangeAb"  id="datapicker">
-                                                <div>
-                                                    <!-- Hidden input field to attach the calendar to -->
-                                                    <input type="text" class="form-control" name="hiddenInput" id="hiddenInput">
-                                                </div>
-                                                <p id="startDate" class="d-none">Start Date:</p>
-                                                <p id="endDate" class="d-none">End Date:</p>
-                                            </div>
-
-                        </div>
-
                         <div class="col-lg-auto  order-last order-xxl-2">
                             <label class="form-label">PAYMENT TYPE</label>
                             <div class="row mt-2">
@@ -176,32 +163,6 @@
 <script>
 $(document).ready(function(){
 
-    $("#hiddenInput").daterangepicker({
-        autoApply: true,
-        startDate: moment(),
-        endDate: moment().add(7, 'days'),
-        opens: 'right',
-        parentEl: '#datapicker',
-        alwaysShowCalendars: true,
-        linkedCalendars: false,
-        locale: {
-            format: "DD-MM-YYYY", // Ensure the format matches your date parsing logic
-        }
-    });
-
-    $("#hiddenInput").on('apply.daterangepicker', function (ev, picker) {
-        $("#startDate").text("Start Date: " + picker.startDate.format("DD-MM-YYYY"));
-        $("#endDate").text("End Date: " + picker.endDate.format("DD-MM-YYYY"));
-        // Reload the list for the chosen duration (the input's 'change' event is
-        // not reliably fired when daterangepicker sets the value programmatically).
-        PaymentRequestTable();
-    });
-
-    $("#hiddenInput").on("change", function() {
-        var date = $(this).val();
-        PaymentRequestTable();
-    });
-    
     $('.PaymentType').on('change', function() {
     
         var flag = $(this).data('flag');
@@ -377,7 +338,6 @@ function PaymentRequestTable() {
                             }).get();
                     d.flag = flags.length ? flags : [];
                     d.search = $('.search').val();
-                    d.date = $('#hiddenInput').val();
                    d.isChecked = isChecked;
                 }
             },
