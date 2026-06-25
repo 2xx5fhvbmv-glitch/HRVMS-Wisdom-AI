@@ -123,14 +123,13 @@ class OpenRouterDocExtractor
             . '"Insurance Expiry Date": ""'
             . '}. '
             // The Work Permit Expiry is the field that is most often misread, so
-            // anchor it explicitly: it is the WORK PERMIT\'s own expiry, a distinct
-            // value from the visa expiry / issue / last-entry dates.
-            . 'IMPORTANT for "Work Permit Expiry Date (Expiry On)": read the value printed against the '
-            . 'work permit\'s own expiry label — commonly "Expiry", "Expiry On", "Expiry Date", '
-            . '"Date of Expiry", "Valid Until" or "Valid Till" in the WORK PERMIT section. '
-            . 'It is NOT the Visa Expiry Date, NOT the visa/work-permit issued date, and NOT the '
-            . '"Last Entry Allowed" date. If the work permit section shows both an issue date and an '
-            . 'expiry date, pick the later (expiry) one. '
+            // anchor it explicitly to the single field labelled "Expiry On".
+            . 'IMPORTANT for "Work Permit Expiry Date (Expiry On)": use ONLY the date printed against '
+            . 'the work permit\'s "Expiry On" (or "Expiry" / "Expiry Date") label — the WORK PERMIT\'s '
+            . 'own expiry. Do NOT use "Contract Exp"/"Contract Expiry On", "Insurance Exp", '
+            . '"Visa Expiry On", "Visa Issued On", "Issued On" or "Arrived On"; those are separate '
+            . 'fields that are commonly confused with it. Read the value next to the literal "Expiry '
+            . 'On" label only — do NOT just pick the latest date on the page. '
             . 'Return every date exactly as printed on the document. Output ONLY the JSON object.';
     }
 
