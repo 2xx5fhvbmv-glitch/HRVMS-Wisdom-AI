@@ -23,21 +23,6 @@
             </div>
 
             <div class="card">
-                <div class="card-header border-0 m-0">
-                    <div class="row g-md-3 g-2 ">
-                        <div class="col-xl-3 col-lg-5 col-md-7 col-sm-12 order-md-1 order-2 ">
-                            <label class="form-label">DURATION</label>
-                             
-                            <input type="text" class="form-control datepicker" name="date" id="date">
-                                          
-                                             
-
-                        </div>
-
-
-                    </div>
-                </div>
-         
                 <div class="table-responsive mb-md-4 mb-3">
                     <table class="table-lableNew  table-fileuncateDocView w-100" id="payment-request-tableIndex">
                         <thead>
@@ -104,17 +89,6 @@
 <script>
 $(document).ready(function(){
 $("#PaymentRequestRejectedForm").parsley();
-    $("#date").datepicker({
-        format: 'dd-mm-yyyy',
-        autoclose: true,
-        todayHighlight: true,
-        orientation: "bottom auto",
-    });
-
-    $("#date").on("change",function()
-    {
-        PaymentRequestTableIndex();
-    });
     $(document).on("click",".PaymentRequestRejected",function(){
 
         var Payment_id = $(this).data('id');
@@ -176,11 +150,6 @@ function PaymentRequestTableIndex() {
             ajax: {
                 url: "{{ route('resort.visa.PaymentRequestIndex') }}",
                 type: 'GET',
-                data: function (d) {
-
-                    d.date = $('#date').val();
-           
-                }
             },
             columns: [
                 { data: 'PaymentRequestID', name: 'PaymentRequestID' },
