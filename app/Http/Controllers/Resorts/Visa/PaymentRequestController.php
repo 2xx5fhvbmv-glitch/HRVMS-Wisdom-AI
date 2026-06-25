@@ -744,7 +744,38 @@ class PaymentRequestController extends Controller
                                     $employee->Position_name = $employee->RequestedEmployees->position->position_title ?? 'N/A';
                                     $employee->ProfilePic = Common::getResortUserPicture( $employee->RequestedEmployees->resortAdmin->id);
                                     $GrandTotal += $sum;
-                                    
+
+                                    // Renewal status + who settled it (Finance), per fee type.
+                                    // Derived from the linked fee rows; falls back to the
+                                    // child's Step flag for legacy single-month requests.
+                                    $employee->WorkPermitPaid = false; $employee->WorkPermitPaidBy = null; $employee->WorkPermitPaidAt = null;
+                                    $wpIds = array_filter(array_map('intval', explode(',', (string) $employee->WorkPermitIds)));
+                                    if (!empty($wpIds)) {
+                                        $wpRows = WorkPermit::whereIn('id', $wpIds)->get(['Status','paid_by','Payment_Date']);
+                                        if ($wpRows->count() && $wpRows->every(fn($r) => strtolower((string) $r->Status) === 'paid')) {
+                                            $employee->WorkPermitPaid   = true;
+                                            $paid = $wpRows->firstWhere('paid_by', '!=', null) ?: $wpRows->first();
+                                            $employee->WorkPermitPaidBy = $paid->paid_by;
+                                            $employee->WorkPermitPaidAt = $paid->Payment_Date;
+                                        }
+                                    } elseif (($employee->WorkPermitStep ?? '') === 'Yes') {
+                                        $employee->WorkPermitPaid = true;
+                                    }
+
+                                    $employee->QuotaslotPaid = false; $employee->QuotaslotPaidBy = null; $employee->QuotaslotPaidAt = null;
+                                    $qIds = array_filter(array_map('intval', explode(',', (string) $employee->QuotaslotIds)));
+                                    if (!empty($qIds)) {
+                                        $qRows = QuotaSlotRenewal::whereIn('id', $qIds)->get(['Status','paid_by','Payment_Date']);
+                                        if ($qRows->count() && $qRows->every(fn($r) => strtolower((string) $r->Status) === 'paid')) {
+                                            $employee->QuotaslotPaid   = true;
+                                            $paid = $qRows->firstWhere('paid_by', '!=', null) ?: $qRows->first();
+                                            $employee->QuotaslotPaidBy = $paid->paid_by;
+                                            $employee->QuotaslotPaidAt = $paid->Payment_Date;
+                                        }
+                                    } elseif (($employee->QuotaslotStep ?? '') === 'Yes') {
+                                        $employee->QuotaslotPaid = true;
+                                    }
+
                                 return $employee;
                             });
                          

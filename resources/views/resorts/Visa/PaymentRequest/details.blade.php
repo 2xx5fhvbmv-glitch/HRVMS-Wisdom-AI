@@ -66,7 +66,13 @@
                                 @if($PaymentRequestChild->WorkPermitDate)
                                     <div class="border-top">
                                         <div class="insurance-Ibox">
-                                            <label class="d-block">Work Permit</label>
+                                            <label class="d-block">Work Permit
+                                                @if($PaymentRequestChild->WorkPermitPaid ?? false)
+                                                    <span class="badge badge-themeNeon ms-1">Renewed@if($PaymentRequestChild->WorkPermitPaidBy) by {{ $PaymentRequestChild->WorkPermitPaidBy }}@endif@if($PaymentRequestChild->WorkPermitPaidAt) on {{ \Carbon\Carbon::parse($PaymentRequestChild->WorkPermitPaidAt)->format('d M Y') }}@endif</span>
+                                                @else
+                                                    <span class="badge badge-themeDanger ms-1">Pending</span>
+                                                @endif
+                                            </label>
                                             <span>Last Paid: {{$PaymentRequestChild->LastWorkPermitDate ?? 'N/A'}} | Due Date: {{$PaymentRequestChild->WorkPermitDate ?? 'N/A'}} | Amount: {!! Common::formatMvr($PaymentRequestChild->WorkPermitAmt) !!}
                                                 @if(($PaymentRequestChild->WorkPermitMonths ?? 1) > 1)<span class="badge badge-themeNew ms-1">{{ $PaymentRequestChild->WorkPermitMonths }} months</span>@endif
                                             </span>
@@ -93,7 +99,13 @@
                                 @if($PaymentRequestChild->QuotaslotDate)
                                     <div class="border-top">
                                         <div class="insurance-Ibox">
-                                            <label class="d-block">Quota Slot</label>
+                                            <label class="d-block">Quota Slot
+                                                @if($PaymentRequestChild->QuotaslotPaid ?? false)
+                                                    <span class="badge badge-themeNeon ms-1">Renewed@if($PaymentRequestChild->QuotaslotPaidBy) by {{ $PaymentRequestChild->QuotaslotPaidBy }}@endif@if($PaymentRequestChild->QuotaslotPaidAt) on {{ \Carbon\Carbon::parse($PaymentRequestChild->QuotaslotPaidAt)->format('d M Y') }}@endif</span>
+                                                @else
+                                                    <span class="badge badge-themeDanger ms-1">Pending</span>
+                                                @endif
+                                            </label>
                                             <span>Last Paid: {{$PaymentRequestChild->LastQuotaslotDate?? 'N/A'}} | Due Date: {{$PaymentRequestChild->QuotaslotDate?? 'N/A'}} | Amount: {!! Common::formatMvr($PaymentRequestChild->QuotaslotAmt) !!}
                                                 @if(($PaymentRequestChild->QuotaslotMonths ?? 1) > 1)<span class="badge badge-themeNew ms-1">{{ $PaymentRequestChild->QuotaslotMonths }} months</span>@endif
                                             </span>
