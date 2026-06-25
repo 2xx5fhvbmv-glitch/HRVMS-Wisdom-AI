@@ -167,7 +167,8 @@ class ConfigurationController extends Controller
                     return $row->nationality;
                 })
                 ->editColumn('Amount', function ($row) {
-                    return $row->amt;
+                    // Nationality deposit rates are held in MVR — label them so.
+                    return Common::formatMvr($row->amt);
                 })
                 ->editColumn('Action', function ($row) 
                 {

@@ -168,8 +168,10 @@ class DashboardController extends Controller
             $nats = VisaNationality::where('resort_id', $resortId)->get(['nationality', 'amt']);
             $rows = []; $totalLiability = 0; $totalHeads = 0;
             foreach ($nats as $n) {
-                $count = Employee::where('resort_id', $resortId)->where('status', 'Active')
-                    ->where('nationality', $n->nationality)->count();
+                $count = Common::applyNationalityMatch(
+                        Employee::where('resort_id', $resortId)->where('status', 'Active'),
+                        $n->nationality
+                    )->count();
                 if ($count === 0) continue;
                 $rate = $num($n->amt);
                 $liab = $rate * $count;
@@ -384,10 +386,10 @@ class DashboardController extends Controller
             VisaNationality::where('resort_id', $this->resort->resort_id)
             ->get()
             ->map(function($ak) use (&$natioanlity){
-                $natioanlityWiseEmp_count = Employee::where('resort_id', $this->resort->resort_id)
-                                                    ->where('status', 'Active')
-                                                    ->where('nationality', $ak->nationality)
-                                                    ->get()->count();
+                $natioanlityWiseEmp_count = Common::applyNationalityMatch(
+                        Employee::where('resort_id', $this->resort->resort_id)->where('status', 'Active'),
+                        $ak->nationality
+                    )->count();
                 $natioanlity[$ak->nationality] = ['id'=>$ak->id,'DepositAmt'=>$ak->amt,'natioanlity'=>$ak->nationality,'Count'=>$natioanlityWiseEmp_count];
             return $ak;
             });
@@ -445,16 +447,16 @@ class DashboardController extends Controller
             VisaNationality::where('resort_id', $this->resort->resort_id)
             ->get()
             ->map(function($ak) use (&$natioanlity){
-                $natioanlityWiseEmp_count = Employee::where('resort_id', $this->resort->resort_id)
-                                                    ->where('status', 'Active')
-                                                    ->where('nationality', $ak->nationality)
-                                                    ->get()->count();
+                $natioanlityWiseEmp_count = Common::applyNationalityMatch(
+                        Employee::where('resort_id', $this->resort->resort_id)->where('status', 'Active'),
+                        $ak->nationality
+                    )->count();
                 $natioanlity[$ak->nationality] = ['id'=>$ak->id,'DepositAmt'=>$ak->amt,'natioanlity'=>$ak->nationality,'Count'=>$natioanlityWiseEmp_count];
             return $ak;
             });
 
-        
-           
+
+
             $nationalityData = collect();
              foreach ($natioanlity as $key => $value) {
                 // Same rule as the dashboard widget: drop configured
@@ -505,10 +507,12 @@ class DashboardController extends Controller
     
         $id = base64_decode($request->id);
         $VisaNationality = VisaNationality::where('resort_id', $this->resort->resort_id)->where('id', $id)->first();
-        $natioanlityWiseEmp_count = Employee::with(['resortAdmin', 'position', 'department',])
-                                                    ->where('resort_id', $this->resort->resort_id)
-                                                    ->where('status', 'Active')
-                                                    ->where('nationality', $VisaNationality->nationality)
+        $natioanlityWiseEmp_count = Common::applyNationalityMatch(
+                                                    Employee::with(['resortAdmin', 'position', 'department',])
+                                                        ->where('resort_id', $this->resort->resort_id)
+                                                        ->where('status', 'Active'),
+                                                    $VisaNationality->nationality
+                                                )
                                                     ->get()
                                                     ->map(function($employee) {
                                                         $employee->Emp_name = $employee->resortAdmin->first_name . ' ' . $employee->resortAdmin->last_name;
