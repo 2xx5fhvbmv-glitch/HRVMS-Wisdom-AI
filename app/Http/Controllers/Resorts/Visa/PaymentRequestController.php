@@ -612,7 +612,24 @@ class PaymentRequestController extends Controller
                     }
 
                 }
-  
+
+                // Notify the Finance department — they handle the actual payments
+                // for visa payment requests.
+                $financeIds = Common::getResortFinanceEmployeeIds($this->resort->resort_id);
+                if (!empty($financeIds)) {
+                    $title   = 'New Visa Payment Request';
+                    $message = 'Payment request ' . $PaymentRequest->Requestd_id . ' has been created and needs Finance action.';
+                    foreach ($financeIds as $financeId) {
+                        try {
+                            event(new \App\Events\ResortNotificationEvent(Common::nofitication(
+                                $this->resort->resort_id, 10, $title, $message, $PaymentRequest->id, $financeId, 'Visa'
+                            )));
+                        } catch (\Throwable $e) {
+                            \Log::warning('Finance payment-request notify failed (resort ' . $this->resort->resort_id . ', emp ' . $financeId . '): ' . $e->getMessage());
+                        }
+                    }
+                }
+
                 DB::commit();
                 $route = route('resort.visa.PaymentRequestIndex');
                     return response()->json([
