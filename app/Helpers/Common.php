@@ -4615,6 +4615,24 @@ class Common
     }
 
     /**
+     * Constrain a query so a nationality column matches a given nationality
+     * value even when one side is a demonym and the other a country name —
+     * employees store "Indian"/"Russian" while the visa deposit-rate config
+     * often holds "India"/"Russia". Matches case-insensitively and allows
+     * either side to be a prefix of the other (Indian<->India, Oman<->Omani).
+     * $column is supplied by trusted callers only (never user input).
+     */
+    public static function applyNationalityMatch($query, $nationality, string $column = 'nationality')
+    {
+        $n = strtolower(trim((string) $nationality));
+        return $query->where(function ($w) use ($n, $column) {
+            $w->whereRaw("LOWER(TRIM($column)) = ?", [$n])
+              ->orWhereRaw("LOWER(TRIM($column)) LIKE CONCAT(?, '%')", [$n])
+              ->orWhereRaw("? LIKE CONCAT(LOWER(TRIM($column)), '%')", [$n]);
+        });
+    }
+
+    /**
      * Live fallback for a single resort_budget_cost row for one month —
      * mirrors BudgetController::computeBudgetCostMonthlyValue so the
      * Liability page can replicate the view-budget "no saved override
