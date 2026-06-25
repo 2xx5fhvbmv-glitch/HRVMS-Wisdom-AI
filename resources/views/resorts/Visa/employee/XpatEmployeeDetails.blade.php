@@ -491,9 +491,16 @@
                         <div class="row g-3">
                             <div class="col-md-6"><label class="form-label">Passport Expiry</label><input type="date" name="passport_expiry" class="form-control"></div>
                             <div class="col-md-6"><label class="form-label">Visa Expiry</label><input type="date" name="visa_expiry" class="form-control"></div>
-                            <div class="col-md-6"><label class="form-label">Work Permit Fee Expiry</label><input type="date" name="work_permit_expiry" class="form-control"></div>
                             <div class="col-md-6"><label class="form-label">Insurance Expiry</label><input type="date" name="insurance_expiry" class="form-control"></div>
-                            <div class="col-md-6"><label class="form-label">Last Entry Date</label><input type="date" name="last_entry" class="form-control"></div>
+                            <div class="col-md-6"><label class="form-label">Medical Expiry</label><input type="date" name="medical_expiry" class="form-control"></div>
+                            <div class="col-12"><hr class="my-1"></div>
+                            <div class="col-12"><small class="text-muted">Work Permit Fee — set a start and end date to generate the monthly work-permit-fee schedule (one installment per month, using the configured Work Permit fee).</small></div>
+                            <div class="col-md-6"><label class="form-label">Work Permit Start</label><input type="date" name="work_permit_start" class="form-control"></div>
+                            <div class="col-md-6"><label class="form-label">Work Permit End</label><input type="date" name="work_permit_end" class="form-control"></div>
+                            <div class="col-12"><hr class="my-1"></div>
+                            <div class="col-12"><small class="text-muted">Slot Payment — set a start and end date to generate the monthly slot-fee schedule (one installment per month, using the configured Quota Slot fee).</small></div>
+                            <div class="col-md-6"><label class="form-label">Slot Start</label><input type="date" name="slot_start" class="form-control"></div>
+                            <div class="col-md-6"><label class="form-label">Slot End</label><input type="date" name="slot_end" class="form-control"></div>
                         </div>
                     </div>
                     <div class="modal-footer">

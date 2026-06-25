@@ -385,10 +385,13 @@ class XpactEmployeeController extends Controller
         $request->validate([
             'employee_id'        => 'required',
             'visa_expiry'        => 'nullable|date',
-            'work_permit_expiry' => 'nullable|date',
             'insurance_expiry'   => 'nullable|date',
             'passport_expiry'    => 'nullable|date',
-            'last_entry'         => 'nullable|date',
+            'medical_expiry'     => 'nullable|date',
+            'work_permit_start'  => 'nullable|date',
+            'work_permit_end'    => 'nullable|date|after_or_equal:work_permit_start',
+            'slot_start'         => 'nullable|date',
+            'slot_end'           => 'nullable|date|after_or_equal:slot_start',
         ]);
 
         $eid = (int) base64_decode($request->employee_id);
@@ -422,10 +425,124 @@ class XpactEmployeeController extends Controller
         };
 
         $upsert('Other', 'Visa Expiry Date', $request->visa_expiry);
-        $upsert('Other', 'Work Permit Expiry Date (Expiry On)', $request->work_permit_expiry);
         $upsert('Other', 'Insurance Expiry Date', $request->insurance_expiry);
         $upsert('Passport_Copy', 'Date of Expiry', $request->passport_expiry);
-        $upsert('Work_Permit_Entry_Pass', 'Last Entry Allowed', $request->last_entry);
+        // Work Permit card still reads the OCR display date — keep it in sync with
+        // the schedule's end month.
+        $upsert('Other', 'Work Permit Expiry Date (Expiry On)', $request->work_permit_end);
+
+        // Medical Expiry — write to the real Work Permit Medical Renewal record
+        // (the Medical card reads end_date from this table). Update the latest row
+        // or create one so the card reflects the manual entry.
+        if (!empty($request->medical_expiry)) {
+            $medEnd = \Carbon\Carbon::parse($request->medical_expiry)->format('Y-m-d');
+            $med = WorkPermitMedicalRenewal::where('employee_id', $eid)->where('resort_id', $rid)
+                ->orderBy('id', 'desc')->first();
+            if ($med) {
+                $med->end_date = $medEnd;
+                $med->save();
+            } else {
+                WorkPermitMedicalRenewal::create([
+                    'resort_id' => $rid, 'employee_id' => $eid,
+                    'end_date'  => $medEnd, 'Currency' => 'MVR', 'Status' => 'Unpaid',
+                ]);
+            }
+        }
+
+        // Resolve a per-month fee in MVR, respecting the budget row's amount_unit:
+        // a row stored in $/USD is converted up to MVR; a row already in MVR is used
+        // as-is (converting it again would multiply an MVR amount by the FX rate).
+        $feeFor = function (array $particulars) use ($rid) {
+            $b = ResortBudgetCost::whereIn('particulars', $particulars)
+                ->where('details', 'Xpat Only')->where('status', 'active')->where('resort_id', $rid)
+                ->orderBy('updated_at', 'DESC')->first(['amount', 'amount_unit']);
+            if (!$b) {
+                return 0.0;
+            }
+            $amt  = (float) $b->amount;
+            $unit = strtoupper(trim((string) $b->amount_unit));
+            if ($unit === '$' || $unit === 'USD' || $unit === 'DOLLAR') {
+                return round((float) Common::RateConversion('DollerToMVR', $amt, $rid), 2);
+            }
+            return round($amt, 2); // already MVR
+        };
+
+        // Visa Expiry — create/update the VisaRenewal record so the Visa expiry shows
+        // in the dashboard / expiry overview (which read records, not the OCR blob),
+        // mirroring what the Xpat sync writes.
+        if (!empty($request->visa_expiry)) {
+            $visaEnd = \Carbon\Carbon::parse($request->visa_expiry)->format('Y-m-d');
+            $visaFee = $feeFor(['VISA FEE', 'Visa Fee', 'visa fee']);
+            $visa = VisaRenewal::where('employee_id', $eid)->where('resort_id', $rid)->orderBy('id', 'desc')->first();
+            if ($visa) {
+                $visa->end_date = $visaEnd;
+                if ((float) $visa->Amt <= 0) { $visa->Amt = $visaFee; }
+                $visa->save();
+            } else {
+                VisaRenewal::create([
+                    'resort_id' => $rid, 'employee_id' => $eid,
+                    'end_date'  => $visaEnd, 'Amt' => $visaFee, 'Currency' => 'MVR', 'Status' => 'Pending',
+                ]);
+            }
+        }
+
+        // Insurance Expiry — create/update the EmployeeInsurance record.
+        if (!empty($request->insurance_expiry)) {
+            $insEnd = \Carbon\Carbon::parse($request->insurance_expiry)->format('Y-m-d');
+            $insFee = $feeFor(['MEDICAL INSURANCE - INTERNATIONAL', 'Medical Insurance - International', 'medical insurance - international']);
+            $ins = EmployeeInsurance::where('employee_id', $eid)->where('resort_id', $rid)->orderBy('id', 'desc')->first();
+            if ($ins) {
+                $ins->insurance_end_date = $insEnd;
+                if ((float) $ins->Premium <= 0) { $ins->Premium = $insFee; }
+                $ins->save();
+            } else {
+                EmployeeInsurance::create([
+                    'resort_id' => $rid, 'employee_id' => $eid,
+                    'insurance_end_date' => $insEnd, 'Premium' => $insFee, 'Currency' => 'MVR', 'Status' => 'Unpaid',
+                ]);
+            }
+        }
+
+        // Generate one monthly fee installment per month from $start to $end
+        // (inclusive) for the given model. Idempotent — a month that already has an
+        // installment (same Due_Date) is skipped, so re-saving the same range won't
+        // duplicate rows. This is what fills the (otherwise empty) Work Permit / Quota
+        // Slot payment schedules for employees not created via the Xpact sync.
+        $generateMonthly = function (string $modelClass, $start, $end, float $fee) use ($eid, $rid) {
+            $cursor = \Carbon\Carbon::parse($start)->startOfDay();
+            $stop   = \Carbon\Carbon::parse($end)->startOfDay();
+            $guard  = 0; // hard cap to avoid runaway loops on bad input
+            while ($cursor->lte($stop) && $guard < 120) {
+                $due = $cursor->toDateString();
+                $exists = $modelClass::where('employee_id', $eid)->where('resort_id', $rid)
+                    ->whereDate('Due_Date', $due)->exists();
+                if (!$exists) {
+                    $modelClass::create([
+                        'resort_id'   => $rid,
+                        'employee_id' => $eid,
+                        'Month'       => $cursor->month,
+                        'Amt'         => $fee,
+                        'Currency'    => 'MVR',
+                        'Due_Date'    => $due,
+                        'Status'      => 'Unpaid',
+                    ]);
+                }
+                $cursor->addMonthNoOverflow();
+                $guard++;
+            }
+        };
+
+        // Work Permit Fee schedule (monthly, configured Work Permit fee).
+        if (!empty($request->work_permit_start) && !empty($request->work_permit_end)) {
+            $generateMonthly(WorkPermit::class, $request->work_permit_start, $request->work_permit_end,
+                $feeFor(['Work Permit fee', 'work permit fee', 'WORK PERMIT FEE']));
+        }
+
+        // Quota Slot Fee schedule (monthly, configured Quota Slot fee).
+        if (!empty($request->slot_start) && !empty($request->slot_end)) {
+            $generateMonthly(QuotaSlotRenewal::class, $request->slot_start, $request->slot_end,
+                $feeFor(['QUOTA SLOT DEPOSIT', 'Quota Slot Deposit', 'quota slot deposit']));
+        }
 
         return response()->json(['status' => true, 'message' => 'Details updated successfully.']);
     }
@@ -1129,10 +1246,33 @@ class XpactEmployeeController extends Controller
         $data['totalWorkPermitMedicalFeePayment'] = $sumPaidMvr(\App\Models\WorkPermitMedicalRenewal::where('resort_id',$rid)->where('employee_id',$id)->where('Status','Paid')->get(), 'Amt');
         $data['totalVisa']                        = $sumPaidMvr(\App\Models\VisaRenewal::where('resort_id',$rid)->where('employee_id',$id)->where('Status','Paid')->get(), 'Amt');
 
-        // Deposit is a one-time amount with no per-payment record — keep it from
-        // the snapshot row written at sync time.
+        // Deposit is a one-time amount with no per-payment record — taken from the
+        // snapshot row written at sync time.
         $snapshot = TotalExpensessSinceJoing::where('resort_id',$rid)->where('employees_id',$id)->get();
-        $data['totalDepositAmount'] = (float) ($snapshot->sum('Deposit_Amt') ?? 0.00);
+        $depositAmount = (float) ($snapshot->sum('Deposit_Amt') ?? 0.00);
+
+        // Live fallback: manually-managed employees that were never run through the
+        // Xpact sync have no snapshot row, so the deposit came out MVR 0 even though
+        // a nationality deposit rate exists. Look the rate up directly from
+        // visa_nationalities using the SAME flexible matcher the sync uses
+        // (case-insensitive, tolerant of demonym<->country e.g. Indian<->India).
+        if ($depositAmount <= 0) {
+            $emp    = Employee::where('id', $id)->where('resort_id', $rid)->first(['nationality']);
+            $natRaw = $emp ? strtolower(trim((string) $emp->nationality)) : '';
+            if ($natRaw !== '') {
+                $rate = \App\Models\VisaNationality::where('resort_id', $rid)
+                    ->where(function ($q) use ($natRaw) {
+                        $q->whereRaw('LOWER(TRIM(nationality)) = ?', [$natRaw])
+                          ->orWhereRaw("? LIKE CONCAT(LOWER(TRIM(nationality)), '%')", [$natRaw])
+                          ->orWhereRaw("LOWER(TRIM(nationality)) LIKE CONCAT(?, '%')", [$natRaw]);
+                    })
+                    ->first(['amt']);
+                if ($rate) {
+                    $depositAmount = (float) $rate->amt;
+                }
+            }
+        }
+        $data['totalDepositAmount'] = $depositAmount;
 
         return $data;
    }

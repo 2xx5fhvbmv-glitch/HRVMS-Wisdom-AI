@@ -68,7 +68,7 @@
                                         <div class="insurance-Ibox">
                                             <label class="d-block">Work Permit
                                                 @if($PaymentRequestChild->WorkPermitPaid ?? false)
-                                                    <span class="badge badge-themeNeon ms-1">Renewed@if($PaymentRequestChild->WorkPermitPaidBy) by {{ $PaymentRequestChild->WorkPermitPaidBy }}@endif@if($PaymentRequestChild->WorkPermitPaidAt) on {{ \Carbon\Carbon::parse($PaymentRequestChild->WorkPermitPaidAt)->format('d M Y') }}@endif</span>
+                                                    <span class="badge badge-themeNeon ms-1">Renewed{{ ($PaymentRequestChild->WorkPermitPaidBy ?? null) ? ' by '.$PaymentRequestChild->WorkPermitPaidBy : '' }}{{ ($PaymentRequestChild->WorkPermitPaidAt ?? null) ? ' on '.\Carbon\Carbon::parse($PaymentRequestChild->WorkPermitPaidAt)->format('d M Y') : '' }}</span>
                                                 @else
                                                     <span class="badge badge-themeDanger ms-1">Pending</span>
                                                 @endif
@@ -101,7 +101,7 @@
                                         <div class="insurance-Ibox">
                                             <label class="d-block">Quota Slot
                                                 @if($PaymentRequestChild->QuotaslotPaid ?? false)
-                                                    <span class="badge badge-themeNeon ms-1">Renewed@if($PaymentRequestChild->QuotaslotPaidBy) by {{ $PaymentRequestChild->QuotaslotPaidBy }}@endif@if($PaymentRequestChild->QuotaslotPaidAt) on {{ \Carbon\Carbon::parse($PaymentRequestChild->QuotaslotPaidAt)->format('d M Y') }}@endif</span>
+                                                    <span class="badge badge-themeNeon ms-1">Renewed{{ ($PaymentRequestChild->QuotaslotPaidBy ?? null) ? ' by '.$PaymentRequestChild->QuotaslotPaidBy : '' }}{{ ($PaymentRequestChild->QuotaslotPaidAt ?? null) ? ' on '.\Carbon\Carbon::parse($PaymentRequestChild->QuotaslotPaidAt)->format('d M Y') : '' }}</span>
                                                 @else
                                                     <span class="badge badge-themeDanger ms-1">Pending</span>
                                                 @endif
