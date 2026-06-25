@@ -549,6 +549,14 @@ class XpactEmployeeController extends Controller
         $child_id = base64_decode($request->child_id);
         $child    = $child_id ? PaymentRequestChild::find($child_id) : null;
 
+        // Who is settling this — the logged-in (Finance) user — so the details
+        // page can show "Renewed by …".
+        $payer     = $this->resort;
+        $payerName = $payer ? trim(($payer->first_name ?? '') . ' ' . ($payer->last_name ?? '')) : '';
+        if ($payerName === '') {
+            $payerName = optional($payer)->email ?: 'Finance';
+        }
+
         // Advance the payment-request child one step (a fee type is one step,
         // regardless of how many months it covered) and complete it when done.
         $advanceChild = function ($child, string $showField, string $stepField) {
@@ -586,6 +594,7 @@ class XpactEmployeeController extends Controller
                 $WorkPermit->Status        = "Paid";
                 $WorkPermit->ReceiptNumber = $request->Receipt_number;
                 $WorkPermit->Payment_Date  = Carbon::now()->format('Y-m-d');
+                $WorkPermit->paid_by       = $payerName;
                 $WorkPermit->save();
                 $paidSum += (float) $WorkPermit->Amt;
             }
@@ -618,6 +627,7 @@ class XpactEmployeeController extends Controller
                 $QuotaSlotRenewal->Status        = "Paid";
                 $QuotaSlotRenewal->ReceiptNumber = $request->Receipt_number;
                 $QuotaSlotRenewal->Payment_Date  = Carbon::now()->format('Y-m-d');
+                $QuotaSlotRenewal->paid_by       = $payerName;
                 $QuotaSlotRenewal->save();
                 $paidSum += (float) $QuotaSlotRenewal->Amt;
             }
