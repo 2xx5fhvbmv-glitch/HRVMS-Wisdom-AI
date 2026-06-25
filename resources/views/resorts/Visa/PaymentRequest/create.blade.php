@@ -317,7 +317,10 @@ $(document).ready(function(){
         for (var i = 0; i < n && i < dues.length; i++) { sum += parseFloat(dues[i].amt) || 0; }
         var $cell = $input.closest('.fee-cell');
         $cell.find('.fee-amt').first().text('MVR ' + sum.toFixed(2));
-        $cell.find('.fee-months-note').text(n > 1 ? '(' + n + ' months)' : '');
+        var note = n > 1
+            ? 'Paying ' + n + ' months in advance (through ' + (dues[n - 1] ? dues[n - 1].date : '') + ')'
+            : 'Paying current month only';
+        $cell.find('.fee-months-note').text(note);
         recomputeRowTotal($input.closest('tr'));
         updateTopTotal();
     });

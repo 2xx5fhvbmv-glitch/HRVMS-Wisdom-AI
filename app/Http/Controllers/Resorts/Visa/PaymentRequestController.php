@@ -440,12 +440,15 @@ class PaymentRequestController extends Controller
         $first    = $dues[0];
         $count    = count($dues);
         $duesJson = htmlspecialchars(json_encode($dues), ENT_QUOTES);
+        $maxNote = $count > 1
+            ? 'Pay 1 (current) or up to ' . $count . ' months in advance.'
+            : 'Only the current month is due.';
         $html  = '<div class="fee-cell" data-fee="' . $fee . '">';
         $html .= '<b class="fee-amt">MVR ' . number_format($first['amt'], 2) . '</b> ';
         $html .= '<span class="fee-status">' . $this->getFormattedExpiryStatus($first['date']) . '</span>';
-        $html .= '<div class="fee-months-wrap mt-1"><label class="me-1 mb-0">Months:</label>';
-        $html .= '<input type="number" class="form-control form-control-sm fee-months d-inline-block" style="width:72px" min="1" max="' . $count . '" value="1" data-fee="' . $fee . '" data-dues="' . $duesJson . '">';
-        $html .= '<small class="text-muted ms-1 fee-months-note"></small></div>';
+        $html .= '<div class="fee-months-wrap mt-1"><label class="me-1 mb-0 fw-500">Months to pay:</label>';
+        $html .= '<input type="number" class="form-control form-control-sm fee-months d-inline-block" style="width:64px" min="1" max="' . $count . '" value="1" data-fee="' . $fee . '" data-dues="' . $duesJson . '" title="1 = current month due. Enter 2+ to pay upcoming months in advance.">';
+        $html .= '<small class="text-muted d-block fee-months-note">' . $maxNote . '</small></div>';
         $html .= '</div>';
         return $html;
     }
