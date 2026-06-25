@@ -70,7 +70,7 @@
                                                 </div>
                                                 <div class="form-check">
                                                     <input class="form-check-input toggle-checkbox PaymentcheckCancle" type="checkbox" data-id="{{$resignation['id']}}"  id="no-check-{{$resignation['id']}}"
-                                                        value="Status1">
+                                                        name="no_refund[]" value="{{$resignation['employee_id']}}">
                                                     <label class="form-check-label text-nowrap" for="check">No</label>
                                                 </div>
                                             </div>
