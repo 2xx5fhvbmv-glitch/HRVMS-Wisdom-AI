@@ -20,3 +20,17 @@
         @endforelse
     </tbody>
 </table>
+
+@if(!empty($insights))
+    <table>
+        <thead>
+            <tr><th>WAI Insights</th></tr>
+        </thead>
+        <tbody>
+            @foreach($insights as $line)
+                <tr><td>{{ $line }}</td></tr>
+            @endforeach
+        </tbody>
+    </table>
+@endif
+

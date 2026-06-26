@@ -110,7 +110,7 @@
                                         </div>                                    
                                     </div>
                                     <div class="d-flex align-items-center ms-2">
-                                        <button class="btn btn-sm btn-theme AIInSide" disabled type="button"aria-expanded="false">AI InSide</button>
+                                        <button class="btn btn-sm btn-theme AIInSide" disabled type="button"aria-expanded="false">WAI Insights</button>
                                     </div>
                                 </div>
                             </div>
@@ -132,9 +132,14 @@
                      
                     </table>                    
                 </div>
-                   <div class="row" >
-                    <div id="jsonContainer" style="white-space: pre-wrap; background-color: #f1f1f1; padding: 10px; border: 1px solid #ccc; margin-top: 10px;">
-                    </div>
+                   <div id="insightsWrapper" style="display:none;">
+                        <div class="d-flex justify-content-between align-items-center mt-3 mb-2">
+                            <h5 class="mb-0"><i class="fa fa-robot me-1"></i> WAI Insights</h5>
+                            <button type="button" class="btn btn-sm btn-secondary" id="backToReportData">
+                                <i class="fa fa-arrow-left me-1"></i> Back to Report Data
+                            </button>
+                        </div>
+                        <div id="jsonContainer" class="wai-insights"></div>
                     </div>
             </div>
             <div class="card-footer">
@@ -158,19 +163,34 @@
 
 @section('import-css')
 <style>
-    .relation-info {
-        margin-bottom: 0;
-        font-size: 0.9rem;
+    .wai-insights {
+        background-color: #fff;
+        border: 1px solid #e3e6ef;
+        border-radius: 8px;
+        padding: 20px 24px;
+        color: #2b2f3a;
+        line-height: 1.6;
+        font-size: 0.95rem;
     }
-    .relation-item {
-        margin-bottom: 4px;
-    }
-    .relation-item:last-child {
-        margin-bottom: 0;
-    }
+    .wai-insights h1 { font-size: 1.5rem; font-weight: 700; margin: 0 0 .75rem; padding-bottom: .4rem; border-bottom: 2px solid #eef0f5; }
+    .wai-insights h2 { font-size: 1.25rem; font-weight: 700; margin: 1.4rem 0 .6rem; color: #1f2733; }
+    .wai-insights h3 { font-size: 1.05rem; font-weight: 600; margin: 1.1rem 0 .4rem; color: #2b6cb0; }
+    .wai-insights h4 { font-size: .98rem; font-weight: 600; margin: .9rem 0 .35rem; }
+    .wai-insights p { margin: 0 0 .8rem; }
+    .wai-insights ul, .wai-insights ol { margin: 0 0 .9rem; padding-left: 1.4rem; }
+    .wai-insights li { margin-bottom: .35rem; }
+    .wai-insights strong { color: #1f2733; font-weight: 600; }
+    .wai-insights code { background: #f3f4f6; padding: 1px 6px; border-radius: 4px; font-size: .85em; }
+    .wai-insights table { width: 100%; border-collapse: collapse; margin: 0 0 1rem; }
+    .wai-insights th, .wai-insights td { border: 1px solid #e3e6ef; padding: 6px 10px; text-align: left; }
+    .wai-insights th { background: #f7f8fc; }
+    .wai-insights hr { border: 0; border-top: 1px solid #eef0f5; margin: 1.2rem 0; }
+    .wai-insights > *:first-child { margin-top: 0; }
+    .wai-insights > *:last-child { margin-bottom: 0; }
 </style>
 @endsection
 @section('import-scripts')
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 <script>
 $(document).ready(function() {
 
@@ -264,7 +284,7 @@ $(document).ready(function() {
     
     $(".AIInSide").on("click",function(e)
     {
-        $(this).attr('disabled',true).text('Ai Insights working... Please Wait');
+        $(this).attr('disabled',true).text('WAI Insights working... Please Wait');
         e.preventDefault();
         $.ajax({
                 type: 'POST',
@@ -275,21 +295,33 @@ $(document).ready(function() {
                         "todate": $("#todate").val(),
                         "formdate": $("#formdate").val()
                 },
-                success: function (response) 
+                success: function (response)
                 {
-                    $('#reportTableData').empty();
-                    $('#jsonContainer').empty();
-                    $(".AIInSide").attr('disabled', false).text('Ai Insights');
+                    $(".AIInSide").attr('disabled', false).text('WAI Insights');
 
-                    // const formattedJson = JSON.stringify(response, null, 4);
-                    // const pre = $('<pre></pre>').text(formattedJson);
-                    $('#jsonContainer').append(response.data);
+                    // Render the markdown the AI returns as formatted HTML.
+                    var md = response.data || '';
+                    var html = (typeof marked !== 'undefined')
+                        ? (marked.parse ? marked.parse(md) : marked(md))
+                        : $('<div>').text(md).html();
+                    $('#jsonContainer').html(html);
 
+                    // Show insights, keep the report data intact behind it so the
+                    // user can return to it without reloading.
+                    $('#reportTableData').hide();
+                    $('#insightsWrapper').show();
                 },
                 error: function (xhr, status, error) {
+                    $(".AIInSide").attr('disabled', false).text('WAI Insights');
                     console.error(xhr.responseText);
                 }
             });
+    });
+
+    // Return from the insights view back to the report data table.
+    $(document).on('click', '#backToReportData', function () {
+        $('#insightsWrapper').hide();
+        $('#reportTableData').show();
     });
  
     $(document).on("click", ".exportReports", function(e) {

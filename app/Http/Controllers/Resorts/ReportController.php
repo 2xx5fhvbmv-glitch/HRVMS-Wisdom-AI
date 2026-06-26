@@ -9,7 +9,7 @@ use Illuminate\Http\Request;
 use App\Models\ResortReports;
 use App\Helpers\Common;
 use App\Exports\ReportExport;
-use Barryvdh\DomPDF\Facade\PDF;
+use Barryvdh\DomPDF\Facade\Pdf;
 use App\Http\Controllers\Controller;
 use Maatwebsite\Excel\Facades\Excel;
 class ReportController extends Controller
@@ -25,8 +25,9 @@ class ReportController extends Controller
         $r = $this->resort;
         if($request->ajax())
         {
+            $dateFormat = Common::getDateFormateFromSettings();
             $reports = ResortReports::where('resort_id', $r->resort_id)->orderBy("created_at","desc")->get();
-        
+
             return datatables()->of($reports)
             ->addColumn('action', function ($row)
             {
@@ -38,9 +39,9 @@ class ReportController extends Controller
             {
                 return  $row->name;
             })
-            ->editColumn('CareatedAt', function ($row) 
+            ->editColumn('CareatedAt', function ($row) use ($dateFormat)
             {
-                return  $row->created_at->format('d/m/Y');
+                return  $row->created_at->format($dateFormat);
             })
             ->editColumn('description', function ($row) 
             {
@@ -327,7 +328,8 @@ class ReportController extends Controller
 
         // ---- Resolve each base row into a label => display-value array ----
         $eligibility = config('settings.eligibilty', []);
-        $format = function ($fd, array $baseRow) use ($employeeFor, $lookupMaps, $eligibility) {
+        $dateFormat  = Common::getDateFormateFromSettings();
+        $format = function ($fd, array $baseRow) use ($employeeFor, $lookupMaps, $eligibility, $dateFormat) {
             if (isset($fd['employee_name'])) {
                 $emp = $employeeFor($baseRow);
                 $admin = $emp ? ($lookupMaps['resort_admins'][$emp['Admin_Parent_id'] ?? null] ?? null) : null;
@@ -349,9 +351,10 @@ class ReportController extends Controller
 
             // Plain / employee column with optional cast.
             if (isset($fd['employee_col'])) {
-                $emp = $employeeFor($baseRow);
-                $v = $emp[$fd['employee_col']] ?? null;
+                $srcRow = $employeeFor($baseRow);
+                $v = $srcRow[$fd['employee_col']] ?? null;
             } else {
+                $srcRow = $baseRow;
                 $v = $baseRow[$fd['col']] ?? null;
             }
             if ($v === null || $v === '') return 'N/A';
@@ -361,7 +364,14 @@ class ReportController extends Controller
                 return $eligibility[$v] ?? $v;
             }
             if ($cast === 'date') {
-                try { return Carbon::parse($v)->format('d/m/Y'); } catch (\Exception) { return $v; }
+                try { return Carbon::parse($v)->format($dateFormat); } catch (\Exception) { return $v; }
+            }
+            if ($cast === 'money') {
+                // Salaries can be held in USD or MVR per employee, so show the
+                // currency alongside the amount instead of a bare number.
+                $amount = is_numeric($v) ? number_format((float) $v, 2) : $v;
+                $currency = isset($fd['currency_col']) ? ($srcRow[$fd['currency_col']] ?? null) : null;
+                return $currency ? trim($amount . ' ' . $currency) : $amount;
             }
             return $v;
         };
@@ -509,25 +519,147 @@ class ReportController extends Controller
         $columns = $result['columns'];
         $data    = $result['rows'];
 
+        // Every export carries the WAI Insights too. Use the cached analysis if
+        // present, otherwise generate it now (gracefully '' if the AI is down).
+        $insights = $this->aiAnalysisText($report, $columns, $data);
+
         switch ($format)
         {
             case 'pdf':
-                $pdf = PDF::loadView('resorts.reports.pdf', [
-                    'report'  => $report,
-                    'data'    => $data,
-                    'columns' => $columns,
+                $pdf = Pdf::loadView('resorts.reports.pdf', [
+                    'report'       => $report,
+                    'data'         => $data,
+                    'columns'      => $columns,
+                    'insightsHtml' => $insights !== '' ? $this->markdownToHtml($insights) : '',
                 ]);
                 return $pdf->download($report->name.'.pdf');
 
             case 'excel':
-                return Excel::download(new ReportExport($data, $columns), $report->name.'.xlsx');
+                return Excel::download(new ReportExport($data, $columns, $this->markdownToLines($insights)), $report->name.'.xlsx');
 
             case 'csv':
-                return Excel::download(new ReportExport($data, $columns), $report->name.'.csv');
+                return Excel::download(new ReportExport($data, $columns, $this->markdownToLines($insights)), $report->name.'.csv');
 
             default:
                 abort(400, 'Unsupported export format');
         }
+    }
+
+    /**
+     * Resolve the WAI Insights analysis text for a report: return the cached
+     * analysis when present, otherwise call the AI service once and cache it.
+     * Returns '' if no insight could be produced (e.g. AI service unreachable),
+     * so callers can degrade gracefully.
+     */
+    private function aiAnalysisText($report, array $columns, array $rows): string
+    {
+        $extractAnalysis = function ($value) {
+            if (is_array($value))  { return (string) ($value['analysis'] ?? ''); }
+            if (is_object($value)) { return (string) ($value->analysis ?? ''); }
+            if (is_string($value)) {
+                $decoded = json_decode($value, true);
+                return is_array($decoded) ? (string) ($decoded['analysis'] ?? '') : '';
+            }
+            return '';
+        };
+
+        // Cached insight wins (also what the "WAI Insights" button stored).
+        $analysisText = empty($report->AiInsights) ? '' : $extractAnalysis($report->AiInsights);
+        if ($analysisText !== '') {
+            return $analysisText;
+        }
+
+        $reportInfo = [
+            "name"        => $report->name,
+            "resort_id"   => $this->resort->resort_id,
+            "description" => $report->description,
+            "created_at"  => $report->created_at->format('d/m/Y'),
+        ];
+        $formattedData = [];
+        foreach ($rows as $row) {
+            $row['report'] = $reportInfo;
+            $formattedData[] = $row;
+        }
+        $requestData = ['resort_data' => ['additionalProp1' => ['columns' => $columns, 'data' => $formattedData]]];
+
+        $jsonData = json_encode($requestData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $curl = curl_init();
+        curl_setopt_array($curl, [
+            CURLOPT_URL => env('AI_Report_fetch_URL'),
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST => true,
+            CURLOPT_POSTFIELDS => $jsonData,
+            CURLOPT_HTTPHEADER => [
+                'Content-Type: application/json',
+                'Accept: application/json',
+                'Content-Length: ' . strlen($jsonData),
+            ],
+        ]);
+        $response = curl_exec($curl);
+        $err = curl_error($curl);
+        curl_close($curl);
+        if ($err) {
+            return '';
+        }
+        $analysisText = $extractAnalysis($response);
+        if ($analysisText !== '') {
+            $report->AiInsights = json_encode(['analysis' => $analysisText]);
+            $report->save();
+        }
+        return $analysisText;
+    }
+
+    /**
+     * Minimal Markdown -> HTML for the insights block in PDF exports. Handles the
+     * subset the AI emits: #/##/### headings, **bold**, and - / * bullet lists.
+     */
+    private function markdownToHtml(string $md): string
+    {
+        $lines = preg_split('/\r\n|\r|\n/', $md);
+        $html = '';
+        $inList = false;
+        $closeList = function () use (&$html, &$inList) {
+            if ($inList) { $html .= "</ul>\n"; $inList = false; }
+        };
+        $inline = function ($text) {
+            $text = e($text);
+            $text = preg_replace('/\*\*(.+?)\*\*/s', '<strong>$1</strong>', $text);
+            return $text;
+        };
+        foreach ($lines as $line) {
+            $trim = trim($line);
+            if ($trim === '') { $closeList(); continue; }
+            if (preg_match('/^(#{1,6})\s+(.*)$/', $trim, $m)) {
+                $closeList();
+                $level = min(strlen($m[1]) + 1, 6); // shift so # -> h2 etc.
+                $html .= "<h{$level}>" . $inline($m[2]) . "</h{$level}>\n";
+            } elseif (preg_match('/^[-*]\s+(.*)$/', $trim, $m)) {
+                if (!$inList) { $html .= "<ul>\n"; $inList = true; }
+                $html .= '<li>' . $inline($m[1]) . "</li>\n";
+            } else {
+                $closeList();
+                $html .= '<p>' . $inline($trim) . "</p>\n";
+            }
+        }
+        $closeList();
+        return $html;
+    }
+
+    /**
+     * Strip Markdown markers to plain text lines for spreadsheet/CSV exports.
+     */
+    private function markdownToLines(string $md): array
+    {
+        if ($md === '') { return []; }
+        $out = [];
+        foreach (preg_split('/\r\n|\r|\n/', $md) as $line) {
+            $t = trim($line);
+            $t = preg_replace('/^#{1,6}\s+/', '', $t);   // headings
+            $t = preg_replace('/^[-*]\s+/', '• ', $t);    // bullets
+            $t = preg_replace('/\*\*(.+?)\*\*/s', '$1', $t); // bold
+            $out[] = $t;
+        }
+        return $out;
     }
     public function edit($id)
     {
@@ -564,78 +696,9 @@ class ReportController extends Controller
 
         // Data is already resolved to business labels -> display values.
         $result  = $this->runReport($report_id, $todate, $formdate);
-        $columns = $result['columns'];
 
-        // Prepare report info to embed in each row
-        $reportInfo = [
-            "name" => $report->name,
-            "resort_id" => $this->resort->resort_id,
-            "description" => $report->description,
-            "created_at" => $report->created_at->format('d/m/Y')
-        ];
-
-        $formattedData = [];
-        foreach ($result['rows'] as $row)
-        {
-            $row['report'] = $reportInfo;
-            $formattedData[] = $row;
-        }
-
-        $requestData = [
-            'resort_data' => [
-                'additionalProp1' => [
-                    'columns' => $columns,
-                    'data' => $formattedData
-                ]
-            ]
-        ];
-        
-        // Pull the "analysis" string out of whatever shape we have — the FastAPI
-        // response or the cached AiInsights column. Returns '' for anything that
-        // isn't a valid {"analysis": ...} payload (incl. legacy corrupt values),
-        // so a bad cache simply triggers a clean re-fetch below.
-        $extractAnalysis = function ($value) {
-            if (is_array($value))  { return (string) ($value['analysis'] ?? ''); }
-            if (is_object($value)) { return (string) ($value->analysis ?? ''); }
-            if (is_string($value)) {
-                $decoded = json_decode($value, true);
-                return is_array($decoded) ? (string) ($decoded['analysis'] ?? '') : '';
-            }
-            return '';
-        };
-
-        // Use the cached insight when it's valid; otherwise (empty or legacy
-        // corrupt) fall through and regenerate.
-        $analysisText = empty($report->AiInsights) ? '' : $extractAnalysis($report->AiInsights);
-
-        if ($analysisText === '') {
-            $jsonData = json_encode($requestData, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
-            $url = env('AI_Report_fetch_URL');
-            $curl = curl_init();
-            curl_setopt_array($curl, [
-                CURLOPT_URL => $url,
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_POST => true,
-                CURLOPT_POSTFIELDS => $jsonData,
-                CURLOPT_HTTPHEADER => [
-                    'Content-Type: application/json',
-                    'Accept: application/json',
-                    'Content-Length: ' . strlen($jsonData)
-                ],
-            ]);
-            $response = curl_exec($curl);
-            $err = curl_error($curl);
-            curl_close($curl);
-            if ($err) {
-                return response()->json(['status' => false, 'message' => $err]);
-            }
-            $analysisText = $extractAnalysis($response);
-            if ($analysisText !== '') {
-                // Cache as canonical JSON so future reads are unambiguous.
-                $report->AiInsights = json_encode(['analysis' => $analysisText]);
-                $report->save();
-            }
-        }
+        // Cached insight wins; otherwise call the AI service once and cache it.
+        $analysisText = $this->aiAnalysisText($report, $result['columns'], $result['rows']);
 
         return response()->json(['status' => true, 'data' => $analysisText]);
     }
