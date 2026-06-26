@@ -772,7 +772,7 @@ class PaymentRequestController extends Controller
                                 {
                                     // Approved = fully settled by Finance -> show as Paid.
                                     if ($row->Status === 'Approved') {
-                                        return '<span class="badge badge-themeNeon">Paid</span>';
+                                        return '<span class="badge badge-themeSuccess">Paid</span>';
                                     }
                                     return '<span class="badge badge-warning">' . htmlspecialchars($row->Status) . '</span>';
                                 })
