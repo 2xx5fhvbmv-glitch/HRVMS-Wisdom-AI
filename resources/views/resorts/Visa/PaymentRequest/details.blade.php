@@ -151,37 +151,41 @@
 $(document).ready(function(){
 
     $(document).on("click",".PrintPaymentRequest",function(){
-            var printContents = $('<div>');
-            // Clone the payment request details and total
-            $('.PayReq-Details-box').each(function() {
-                printContents.append($(this).clone());
-            });
-            printContents.append($('.PayReqprice-bar').clone());
+            // Gather the markup to print (details boxes + total).
+            var bodyHtml = '';
+            $('.PayReq-Details-box').each(function() { bodyHtml += this.outerHTML; });
+            $('.PayReqprice-bar').each(function() { bodyHtml += this.outerHTML; });
 
-            // Create a new window for printing
-            var printWindow = window.open('', '_blank', 'height=600,width=800');
-            printWindow.document.write('<html><head><title>Payment Request Details</title>');
+            // Build the print window via the DOM (no inline HTML-literal tags in
+            // this script — avoids any chance of markup leaking onto the page).
+            var w = window.open('', '_blank', 'height=600,width=800');
+            var doc = w.document;
 
-            // Include CSS stylesheets
+            var title = doc.createElement('title');
+            title.textContent = 'Payment Request Details';
+            doc.head.appendChild(title);
+
             $('link[rel="stylesheet"]').each(function() {
-                printWindow.document.write('<link rel="stylesheet" href="' + $(this).attr('href') + '">');
+                var l = doc.createElement('link');
+                l.rel = 'stylesheet';
+                l.href = $(this).attr('href');
+                doc.head.appendChild(l);
             });
 
-            // Add print-specific styles
-            // printWindow.document.write('<style>@media print { body { padding: 20px; } .btn { display: none !important; } }</style>');
-            printWindow.document.write('</head><body>');
-            printWindow.document.write('<div class="container-fluid">');
-            printWindow.document.write('<h2 class="text-center mb-4">Payment Request Details</h2>');
-            printWindow.document.write(printContents.html());
-            printWindow.document.write('</div></body></html>');
+            var heading = doc.createElement('h2');
+            heading.className = 'text-center mb-4';
+            heading.textContent = 'Payment Request Details';
+            doc.body.appendChild(heading);
 
-            printWindow.document.close();
-            printWindow.focus();
+            var wrap = doc.createElement('div');
+            wrap.className = 'container-fluid';
+            wrap.innerHTML = bodyHtml;
+            doc.body.appendChild(wrap);
+
+            w.focus();
             setTimeout(function() {
-                printWindow.print();
-                printWindow.onafterprint = function() {
-                    printWindow.close();
-                };
+                w.print();
+                w.onafterprint = function() { w.close(); };
             }, 500);
     });
 
