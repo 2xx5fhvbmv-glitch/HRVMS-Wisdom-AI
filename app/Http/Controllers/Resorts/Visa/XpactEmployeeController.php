@@ -623,16 +623,13 @@ class XpactEmployeeController extends Controller
                     }
                   
                 })
-                ->editColumn('PaymentDate', function ($row) 
+                ->editColumn('PaymentDate', function ($row)
                 {
-                    if(isset($row->PaymentDate))
-                    {
-                         return Carbon::parse($row->PaymentDate)->format('d M Y');
-                    }
-                    else
-                    {
-                        return '-';
-                    }
+                    // Field is Payment_Date (underscore); reading ->PaymentDate was
+                    // always null, so the column always showed '-'.
+                    return !empty($row->Payment_Date)
+                        ? Carbon::parse($row->Payment_Date)->format('d M Y')
+                        : '-';
                 })
                 ->editColumn('Action', function ($row) 
                 {
