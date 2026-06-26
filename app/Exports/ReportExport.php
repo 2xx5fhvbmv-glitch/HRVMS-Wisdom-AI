@@ -8,11 +8,13 @@ class ReportExport implements FromView
 {
     protected $data;
     protected $columns;
+    protected $insights;
 
-    public function __construct($data, $columns)
+    public function __construct($data, $columns, $insights = [])
     {
         $this->data = $data;
         $this->columns = $columns;
+        $this->insights = $insights;
     }
 
     public function view(): View
@@ -20,6 +22,7 @@ class ReportExport implements FromView
         return view('resorts.reports.CsvOrExcel', [
             'data' => $this->data,
             'columns' => $this->columns,
+            'insights' => $this->insights,
         ]);
     }
 }

@@ -28,6 +28,8 @@
 | Optional cast on any column-based field:
 |   'cast' => 'date'         -> formatted d/m/Y
 |   'cast' => 'eligibility'  -> mapped through config('settings.eligibilty') (rank/grade)
+|   'cast' => 'money'        -> number_format(2) + currency from 'currency_col'
+|                               (salaries are held per-employee in USD or MVR)
 |
 | This list is ALSO the security allow-list: ReportController only ever runs a
 | query against a table/field that appears here, so the builder can never reach
@@ -61,7 +63,7 @@ return [
                 'Probation Status'   => ['col' => 'probation_status'],
                 'Probation End Date' => ['col' => 'probation_end_date', 'cast' => 'date'],
                 'Confirmation Date'  => ['col' => 'confirmation_date', 'cast' => 'date'],
-                'Basic Salary'       => ['col' => 'basic_salary'],
+                'Basic Salary'       => ['col' => 'basic_salary', 'cast' => 'money', 'currency_col' => 'basic_salary_currency'],
                 'Passport Number'    => ['col' => 'passport_number'],
                 'Work Location'      => ['col' => 'work_location'],
             ],
@@ -222,6 +224,264 @@ return [
                 'Due Date'     => ['col' => 'Due_Date', 'cast' => 'date'],
                 'Status'       => ['col' => 'Status'],
                 'Payment Type' => ['col' => 'PaymentType'],
+            ],
+        ],
+
+    ],
+
+    'Talent Acquisition' => [
+
+        'Applicants' => [
+            'table'       => 'applicant_form_data',
+            'employee_fk' => null,
+            'fields' => [
+                'First Name'         => ['col' => 'first_name'],
+                'Last Name'          => ['col' => 'last_name'],
+                'Gender'             => ['col' => 'gender'],
+                'Date of Birth'      => ['col' => 'dob', 'cast' => 'date'],
+                'Email'              => ['col' => 'email'],
+                'Mobile Number'      => ['col' => 'mobile_number'],
+                'Country'            => ['col' => 'country'],
+                'Marital Status'     => ['col' => 'marital_status'],
+                'Application Date'   => ['col' => 'Application_date', 'cast' => 'date'],
+                'Employment Status'  => ['col' => 'employment_status'],
+                'Applicant Source'   => ['col' => 'Applicant_Source'],
+                'Salary Expectation' => ['col' => 'SalaryExpectation'],
+                'Total Experience'   => ['col' => 'Total_Experiance'],
+            ],
+        ],
+
+        'Vacancies' => [
+            'table'       => 'vacancies',
+            'employee_fk' => null,
+            'fields' => [
+                'Position'           => ['lookup' => 'resort_positions',   'fk' => 'position',   'name' => 'position_title'],
+                'Department'         => ['lookup' => 'resort_departments', 'fk' => 'department', 'name' => 'name'],
+                'Division'           => ['lookup' => 'resort_divisions',   'fk' => 'division',   'name' => 'name'],
+                'Section'            => ['lookup' => 'resort_sections',     'fk' => 'section',    'name' => 'name'],
+                'Rank'               => ['col' => 'rank', 'cast' => 'eligibility'],
+                'Employee Type'      => ['col' => 'employee_type'],
+                'Total Positions'    => ['col' => 'Total_position_required'],
+                'Salary'             => ['col' => 'salary'],
+                'Required Start Date'=> ['col' => 'required_starting_date', 'cast' => 'date'],
+                'Status'             => ['col' => 'status'],
+            ],
+        ],
+
+        'Offers & Contracts' => [
+            'table'       => 'applicant_offer_contracts',
+            'employee_fk' => null,
+            'fields' => [
+                'Applicant'        => ['lookup' => 'applicant_form_data', 'fk' => 'applicant_id', 'name' => 'first_name'],
+                'Type'             => ['col' => 'type'],
+                'Status'           => ['col' => 'status'],
+                'Responded At'     => ['col' => 'responded_at', 'cast' => 'date'],
+                'Rejection Reason' => ['col' => 'rejection_reason'],
+            ],
+        ],
+
+    ],
+
+    'Learning & Development' => [
+
+        'Learning Programs' => [
+            'table'       => 'learning_programs',
+            'employee_fk' => null,
+            'fields' => [
+                'Name'                    => ['col' => 'name'],
+                'Category'                => ['lookup' => 'learning_categories', 'fk' => 'learning_category_id', 'name' => 'category'],
+                'Delivery Mode'           => ['col' => 'delivery_mode'],
+                'Audience Type'           => ['col' => 'audience_type'],
+                'Hours'                   => ['col' => 'hours'],
+                'Days'                    => ['col' => 'days'],
+                'Frequency'               => ['col' => 'frequency'],
+                'External Trainer Company'=> ['col' => 'external_trainer_company'],
+            ],
+        ],
+
+        'Learning Requests' => [
+            'table'       => 'learning_requests',
+            'employee_fk' => null,
+            'fields' => [
+                'Learning Program' => ['lookup' => 'learning_programs', 'fk' => 'learning_id', 'name' => 'name'],
+                'Reason'           => ['col' => 'reason'],
+                'Start Date'       => ['col' => 'start_date', 'cast' => 'date'],
+                'End Date'         => ['col' => 'end_date', 'cast' => 'date'],
+                'Status'           => ['col' => 'status'],
+            ],
+        ],
+
+        'Training Schedules' => [
+            'table'       => 'training_schedules',
+            'employee_fk' => null,
+            'fields' => [
+                'Venue'       => ['col' => 'venue'],
+                'Start Date'  => ['col' => 'start_date', 'cast' => 'date'],
+                'End Date'    => ['col' => 'end_date', 'cast' => 'date'],
+                'Start Time'  => ['col' => 'start_time'],
+                'End Time'    => ['col' => 'end_time'],
+                'Description' => ['col' => 'description'],
+                'Status'      => ['col' => 'status'],
+            ],
+        ],
+
+    ],
+
+    'Time & Attendance' => [
+
+        'Attendance' => [
+            'table'       => 'parent_attendaces',
+            'employee_fk' => 'Emp_id',
+            'fields' => [
+                'Employee ID'   => ['employee_col' => 'Emp_id'],
+                'Employee Name' => ['employee_name' => true],
+                'Date'          => ['col' => 'date', 'cast' => 'date'],
+                'Status'        => ['col' => 'Status'],
+                'Check In'      => ['col' => 'CheckingTime'],
+                'Check Out'     => ['col' => 'CheckingOutTime'],
+                'Total Hours'   => ['col' => 'DayWiseTotalHours'],
+                'Overtime'      => ['col' => 'OverTime'],
+                'OT Status'     => ['col' => 'OTStatus'],
+                'Note'          => ['col' => 'note'],
+            ],
+        ],
+
+    ],
+
+    'Budget' => [
+
+        'Budget Costs' => [
+            'table'       => 'resort_budget_costs',
+            'employee_fk' => null,
+            'fields' => [
+                'Cost Title'  => ['col' => 'cost_title'],
+                'Particulars' => ['col' => 'particulars'],
+                'Amount'      => ['col' => 'amount'],
+                'Amount Unit' => ['col' => 'amount_unit'],
+                'Cost Type'   => ['col' => 'cost_type'],
+                'Frequency'   => ['col' => 'frequency'],
+                'Status'      => ['col' => 'status'],
+            ],
+        ],
+
+        'Employee Budget' => [
+            'table'       => 'resort_employee_budget_cost_configurations',
+            'employee_fk' => 'employee_id',
+            'fields' => [
+                'Employee ID'    => ['employee_col' => 'Emp_id'],
+                'Employee Name'  => ['employee_name' => true],
+                'Department'     => ['lookup' => 'resort_departments', 'fk' => 'department_id', 'name' => 'name'],
+                'Position'       => ['lookup' => 'resort_positions',   'fk' => 'position_id',   'name' => 'position_title'],
+                'Value'          => ['col' => 'value'],
+                'Currency'       => ['col' => 'currency'],
+                'Basic Salary'   => ['col' => 'basic_salary'],
+                'Current Salary' => ['col' => 'current_salary'],
+                'Year'           => ['col' => 'year'],
+                'Month'          => ['col' => 'month'],
+            ],
+        ],
+
+    ],
+
+    'Accommodation' => [
+
+        'Bed Assignments' => [
+            'table'       => 'assing_accommodations',
+            'employee_fk' => 'emp_id',
+            'fields' => [
+                'Employee ID'   => ['employee_col' => 'Emp_id'],
+                'Employee Name' => ['employee_name' => true],
+                'Room'          => ['lookup' => 'available_accommodation_models', 'fk' => 'available_a_id', 'name' => 'RoomNo'],
+                'Bed No'        => ['col' => 'BedNo'],
+                'Effected Date' => ['col' => 'effected_date', 'cast' => 'date'],
+            ],
+        ],
+
+        'Maintenance Requests' => [
+            'table'       => 'maintanace_requests',
+            'employee_fk' => 'Raised_By',
+            'fields' => [
+                'Raised By' => ['employee_name' => true],
+                'Building'  => ['lookup' => 'building_models', 'fk' => 'building_id', 'name' => 'BuildingName'],
+                'Floor No'  => ['col' => 'FloorNo'],
+                'Room No'   => ['col' => 'RoomNo'],
+                'Issue'     => ['col' => 'descriptionIssues'],
+                'Priority'  => ['col' => 'priority'],
+                'Status'    => ['col' => 'Status'],
+                'Date'      => ['col' => 'date', 'cast' => 'date'],
+            ],
+        ],
+
+    ],
+
+    'Incident' => [
+
+        'Incidents' => [
+            'table'       => 'incidents',
+            'employee_fk' => 'reporter_id',
+            'fields' => [
+                'Incident ID'   => ['col' => 'incident_id'],
+                'Incident Name' => ['col' => 'incident_name'],
+                'Reporter'      => ['employee_name' => true],
+                'Description'   => ['col' => 'description'],
+                'Incident Date' => ['col' => 'incident_date', 'cast' => 'date'],
+                'Location'      => ['col' => 'location'],
+                'Priority'      => ['col' => 'priority'],
+                'Severity'      => ['col' => 'severity'],
+                'Status'        => ['col' => 'status'],
+                'Outcome Type'  => ['col' => 'outcome_type'],
+                'Action Taken'  => ['col' => 'action_taken'],
+            ],
+        ],
+
+    ],
+
+    'Grievance & Disciplinary' => [
+
+        'Grievances' => [
+            'table'       => 'grivance_submission_models',
+            'employee_fk' => 'Employee_id',
+            'fields' => [
+                'Grievance ID'  => ['col' => 'Grivance_id'],
+                'Employee Name' => ['employee_name' => true],
+                'Date'          => ['col' => 'date', 'cast' => 'date'],
+                'Location'      => ['col' => 'location'],
+                'Description'   => ['col' => 'Grivance_description'],
+                'Status'        => ['col' => 'status'],
+                'Priority'      => ['col' => 'Priority'],
+                'Outcome Type'  => ['col' => 'outcome_type'],
+                'Action Taken'  => ['col' => 'action_taken'],
+            ],
+        ],
+
+        'Disciplinary Cases' => [
+            'table'       => 'disciplinary_submits',
+            'employee_fk' => 'Employee_id',
+            'fields' => [
+                'Disciplinary ID' => ['col' => 'Disciplinary_id'],
+                'Employee Name'   => ['employee_name' => true],
+                'Description'     => ['col' => 'Incident_description'],
+                'Status'          => ['col' => 'status'],
+                'Priority'        => ['col' => 'Priority'],
+                'Expiry Date'     => ['col' => 'Expiry_date', 'cast' => 'date'],
+            ],
+        ],
+
+    ],
+
+    'Survey' => [
+
+        'Surveys' => [
+            'table'       => 'parent_surveys',
+            'employee_fk' => null,
+            'fields' => [
+                'Survey Title' => ['col' => 'Surevey_title'],
+                'Start Date'   => ['col' => 'Start_date', 'cast' => 'date'],
+                'End Date'     => ['col' => 'End_date', 'cast' => 'date'],
+                'Status'       => ['col' => 'Status'],
+                'Recurring'    => ['col' => 'Recurring_survey'],
+                'Min Response' => ['col' => 'Min_response'],
+                'Privacy Type' => ['col' => 'survey_privacy_type'],
             ],
         ],
 
