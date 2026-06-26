@@ -707,11 +707,20 @@ class XpactEmployeeController extends Controller
             $child->OngoingSteps = $child->OngoingSteps + 1;
             if ($child->OverallSteps == $child->OngoingSteps) {
                 $child->ChildStatus = 'Complete';
-                PaymentRequest::where('id', $child->Requested_Id)->update(['Status' => 'Approved']);
             }
             $child->{$showField} = 'No';
             $child->{$stepField} = 'Yes';
             $child->save();
+
+            // Mark the WHOLE request Paid (Approved) only once EVERY child/employee
+            // in it is complete — not when just one employee's fees are settled.
+            $hasIncomplete = PaymentRequestChild::where('Requested_Id', $child->Requested_Id)
+                ->where(function ($q) {
+                    $q->whereNull('ChildStatus')->orWhere('ChildStatus', '!=', 'Complete');
+                })->exists();
+            if (!$hasIncomplete) {
+                PaymentRequest::where('id', $child->Requested_Id)->update(['Status' => 'Approved']);
+            }
         };
 
         if($request->TypeofModel =="WorkPermit")

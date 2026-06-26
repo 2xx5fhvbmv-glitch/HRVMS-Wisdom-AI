@@ -57,7 +57,11 @@
                                         </div>
                                     </div>
                                     <strong class="d-block text-end mt-sm-0 mt-2">Amount : {!! Common::formatMvr($PaymentRequestChild->TotalAmount) !!}</strong>
-                                    <a target="_blank" href="{{route('resort.visa.PaymentRequestThrowRenewal',[$id,base64_encode($PaymentRequestChild->id)])}}"  class="btn btn-themeBlue btn-sm btn-xs me-3">Renewal</a>
+                                    @if(($PaymentRequestChild->ChildStatus ?? '') === 'Complete')
+                                        <span class="badge badge-themeSuccess me-3">Renewed</span>
+                                    @else
+                                        <a target="_blank" href="{{route('resort.visa.PaymentRequestThrowRenewal',[$id,base64_encode($PaymentRequestChild->id)])}}"  class="btn btn-themeBlue btn-sm btn-xs me-3">Renewal</a>
+                                    @endif
 
                                 </div>
                                 @if($PaymentRequestChild->WorkPermitDate)
