@@ -27,22 +27,7 @@
                 <div class="card-header">
                     <div class="row g-md-3 g-2 align-items-center">
 
-                        <div class="col-xl-3 col-lg-4 col-md-5 col-sm-6 col ">
-                            <label for="date-duration" class="form-label d-block">DURATION</label>
-                                 <div class="dateRangeAb"  id="datapicker">
-                                    <div>
-                                        <!-- Hidden input field to attach the calendar to -->
-                                        <input type="text" class="form-control" name="hiddenInput" id="hiddenInput">
-                                    </div>
-                                    <p id="startDate" class="d-none">Start Date:</p>
-                                    <p id="endDate" class="d-none">End Date:</p>
-                                </div>
-
-
-                        </div>
-                        <div class="col-auto">
-                            <label for="date-duration" class="form-label d-block">&nbsp;</label>
-
+                        <div class="col-auto ms-auto">
                             <a href="#" class="btn btn-themeBlue btn-sm">Download</a>
                         </div>
                     </div>
@@ -99,32 +84,6 @@
 <script>
 $(document).ready(function(){
 $("#PaymentRequestRejectedForm").parsley();
-    $("#date").datepicker({
-        format: 'yyyy-mm-dd',
-        autoclose: true,
-        todayHighlight: true,
-        orientation: "bottom auto",
-    });
-
-    $("#hiddenInput").daterangepicker({
-       autoApply: true,
-       startDate: moment().subtract(1, 'year'), // Start date set to one year ago
-        endDate: moment().startOf('month'),
-       opens: 'right',
-       parentEl: '#datapicker',
-       alwaysShowCalendars: true,
-       linkedCalendars: false,
-       locale: 
-       {
-          format: "DD/MM/YYYY", // Ensure the format matches your date parsing logic
-       }
-    });
-
-       $("#hiddenInput").on("change",function()
-       {
-          LiabilityTableIndex();
-       });
-
 
     $(document).on("click", ".findEmploees", function() {
         var date = $("#hiddenInput").val();
