@@ -664,8 +664,10 @@ $(document).ready(function ()
                 DasbhoardFlagWiseGetData(triggerPoint, formattedDate);
             } 
        });
-    function DasbhoardFlagWiseGetData(triggerPoint, formattedDate ) 
+    function DasbhoardFlagWiseGetData(triggerPoint, formattedDate )
     {
+        // Show a loader while the tab content is fetched.
+        $("#myTabContent").html('<div class="text-center py-5"><div class="spinner-border text-themeBlue" role="status"><span class="visually-hidden">Loading...</span></div></div>');
         $.ajax({
             url: "{{ route('resort.visa.DasbhoardFlagWiseGetData') }}",
             type: "get",
