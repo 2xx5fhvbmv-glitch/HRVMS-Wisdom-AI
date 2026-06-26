@@ -113,7 +113,10 @@ class XpactEmployeeController extends Controller
                                 // "Work Permit Fee Expiry" card, which reads the AI-extracted
                                 // 'Work Permit Expiry Date (Expiry On)' field. Set below once
                                 // the statistic header blob ($statisctic_emp_header) is loaded.
-                                $i->WorkPermitDueDate = null;
+                                // Reliable WP expiry from the live schedule (see helper),
+                                // not the AI blob field a re-sync can corrupt.
+                                $wpExp = $this->workPermitExpiryDate($i->id);
+                                $i->WorkPermitDueDate = $wpExp ? $this->getFormattedExpiryStatus($wpExp) : null;
    
                                 $QuotaSlotRenewal = QuotaSlotRenewal::where('employee_id', $i->id)
                                         ->where('resort_id', $this->resort->resort_id)
@@ -139,12 +142,6 @@ class XpactEmployeeController extends Controller
 
                                             $i->InsuranceRenewalDate = $this->getFormattedExpiryStatus($insuranceExpiryRaw);
 
-                                        }
-
-                                        // Same field the Details "Work Permit Fee Expiry" card uses.
-                                        $wpExpiryRaw = $statisctic_emp_header['Ai_extracted_data']['extracted_fields']['Work Permit Expiry Date (Expiry On)'] ?? null;
-                                        if ($wpExpiryRaw) {
-                                            $i->WorkPermitDueDate = $this->getFormattedExpiryStatus($wpExpiryRaw);
                                         }
                                     } else {
                                         $i->InsuranceRenewalDate = null;
@@ -305,12 +302,14 @@ class XpactEmployeeController extends Controller
                 $statisctic_emp_header->InsuranceRemingDays = $this->getFormattedExpiryStatus($fields['Insurance Expiry Date']);
                 $statisctic_emp_header->QuotaSlotNumber = $fields['Quota Slot Number'] ?? null;
             }
-            // Work permit Expiry
-            if(!empty($fields['Work Permit Expiry Date (Expiry On)']))
+            // Work permit Expiry — derived from the live fee schedule (reliable),
+            // not the AI blob field which a re-sync can corrupt.
+            $wpExpiry = $this->workPermitExpiryDate($id);
+            if (!empty($wpExpiry))
             {
                 $statisctic_emp_header->Name ="Work Permit Expiry";
-                $statisctic_emp_header->WorkPermitExpiryDate = $this->safeDate($fields['Work Permit Expiry Date (Expiry On)']);
-                $statisctic_emp_header->WorkPermitRemingDays = $this->getFormattedExpiryStatus($fields['Work Permit Expiry Date (Expiry On)']);
+                $statisctic_emp_header->WorkPermitExpiryDate = $this->safeDate($wpExpiry);
+                $statisctic_emp_header->WorkPermitRemingDays = $this->getFormattedExpiryStatus($wpExpiry);
             }
         }
         // Work Permit Card Expiry
@@ -1218,6 +1217,29 @@ class XpactEmployeeController extends Controller
         {
             return $end->format('d M Y')."  (Expires in " . ($daysDiff + 1) . " days)";
         }
+    }
+
+    /**
+     * Reliable Work Permit "Expiry On" date. The fee schedule is generated as the
+     * months AFTER the permit expiry through December, so the earliest scheduled
+     * Due_Date minus one month is the real expiry. This survives re-syncs that
+     * overwrite (or wrongly populate) the AI 'Other' blob's expiry field; falls
+     * back to that blob field only when there's no schedule.
+     */
+    private function workPermitExpiryDate($empId)
+    {
+        $firstDue = WorkPermit::where('employee_id', $empId)->where('resort_id', $this->resort->resort_id)
+            ->whereNotNull('Due_Date')->orderBy('Due_Date', 'asc')->value('Due_Date');
+        if ($firstDue) {
+            return Carbon::parse($firstDue)->subMonthNoOverflow()->format('Y-m-d');
+        }
+        $o = VisaEmployeeExpiryData::where('employee_id', $empId)->where('resort_id', $this->resort->resort_id)
+            ->where('DocumentName', 'Other')->latest('id')->first();
+        if ($o) {
+            $data = is_array($o->Ai_extracted_data) ? $o->Ai_extracted_data : (json_decode($o->Ai_extracted_data, true) ?: []);
+            return $data['extracted_fields']['Work Permit Expiry Date (Expiry On)'] ?? null;
+        }
+        return null;
     }
 
    private function  TotalExpensessSinceJoing($id)
