@@ -156,37 +156,48 @@ $(document).ready(function(){
             $('.PayReq-Details-box').each(function() { bodyHtml += this.outerHTML; });
             $('.PayReqprice-bar').each(function() { bodyHtml += this.outerHTML; });
 
-            // Build the print window via the DOM (no inline HTML-literal tags in
-            // this script — avoids any chance of markup leaking onto the page).
-            var w = window.open('', '_blank', 'height=600,width=800');
+            var w = window.open('', '_blank', 'height=700,width=900');
             var doc = w.document;
 
             var title = doc.createElement('title');
             title.textContent = 'Payment Request Details';
             doc.head.appendChild(title);
 
-            $('link[rel="stylesheet"]').each(function() {
-                var l = doc.createElement('link');
-                l.rel = 'stylesheet';
-                l.href = $(this).attr('href');
-                doc.head.appendChild(l);
-            });
+            // Self-contained print styles — the app's stylesheets often haven't
+            // loaded in the popup before print() fires, which made the output look
+            // unstyled. These inline rules guarantee a clean, consistent layout.
+            var style = doc.createElement('style');
+            style.textContent =
+                'body{font-family:Arial,Helvetica,sans-serif;color:#222;padding:24px;margin:0;}' +
+                'h2{text-align:center;margin:0 0 20px;font-size:20px;}' +
+                '.PayReq-Details-box{border:1px solid #ddd;border-radius:8px;padding:14px 16px;margin-bottom:14px;page-break-inside:avoid;}' +
+                '.PayReq-Details-box h6{margin:0 0 4px;font-size:15px;font-weight:700;display:flex;align-items:center;gap:6px;}' +
+                '.PayReq-Details-box p{margin:0;color:#666;font-size:12px;}' +
+                '.insurance-Ibox{border-top:1px solid #eee;padding:8px 0;}' +
+                '.insurance-Ibox label,.PayReq-Details-box label{display:block;font-weight:700;font-size:13px;margin-bottom:2px;}' +
+                '.PayReq-Details-box span{font-size:12px;color:#333;}' +
+                '.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;border:1px solid #bbb;font-weight:600;}' +
+                'img{max-height:42px;max-width:42px;border-radius:50%;object-fit:cover;}' +
+                '.img-circle{margin-right:8px;}' +
+                '.d-sm-flex,.d-flex{display:flex;align-items:center;justify-content:space-between;}' +
+                '.PayReqprice-bar{display:flex;justify-content:space-between;align-items:center;border-top:2px solid #333;padding-top:10px;margin-top:14px;font-weight:700;font-size:16px;}' +
+                'a,.btn,button{display:none !important;}';
+            doc.head.appendChild(style);
 
             var heading = doc.createElement('h2');
-            heading.className = 'text-center mb-4';
             heading.textContent = 'Payment Request Details';
             doc.body.appendChild(heading);
 
             var wrap = doc.createElement('div');
-            wrap.className = 'container-fluid';
             wrap.innerHTML = bodyHtml;
             doc.body.appendChild(wrap);
 
+            doc.close();
             w.focus();
             setTimeout(function() {
                 w.print();
                 w.onafterprint = function() { w.close(); };
-            }, 500);
+            }, 300);
     });
 
 });

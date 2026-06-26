@@ -1005,6 +1005,14 @@ class DashboardController extends Controller
         // the card title (blade) and the date range filter is paused. Hidden
         // input is still emitted so the post-AJAX daterangepicker init in JS
         // doesn\'t blow up looking for #hiddenInput.
+        // "Total Xpats" = total active expat headcount for the resort, consistent
+        // across all fee tabs (it previously showed the per-fee row count which
+        // changed tab-to-tab and did not match the actual expat total).
+        $Totalemployees = Employee::where('resort_id', $resort_id)
+            ->where('status', 'Active')
+            ->where('nationality', '!=', 'Maldivian')
+            ->count();
+
         $row='<div class="tab-pane fade show active" id="'.$flag.'" role="tabpanel" aria-labelledby="'.$flag.'">
                                 <input type="hidden" id="hiddenInput" value="'.$newDate.'">
                                 <!--
@@ -1051,7 +1059,7 @@ class DashboardController extends Controller
                                     <div class="col-md-7">
                                         <div class="bg-themeGrayLight overdue-alerts-box h-100">
                                             <h6 class="mb-3">Overdue Alerts</h6>
-                                            '.$row1.'
+                                            <div class="overdue-alerts-scroll" style="max-height:300px;overflow-y:auto;padding-right:6px;">'.$row1.'</div>
                                         </div>
                                     </div>
                                 </div>
