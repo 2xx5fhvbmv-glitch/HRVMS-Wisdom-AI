@@ -198,7 +198,27 @@
                 </div>
                 <div class="XpatDetail-documents-box XpatDet-paySchedule mb-4">
                     <div class="card-title">
-                        <h3>Payment Schedule</h3>
+                        <div class="row justify-content-between align-items-center g-md-2 g-1">
+                            <div class="col">
+                                <h3 class="text-nowrap">Payment Schedule</h3>
+                            </div>
+                            <div class="col-6">
+                                <div class="row justify-content-end g-md-3 g-2 align-items-center">
+                                    <div class="col-xl-3 col-md-4 col-sm-4 col-6">
+                                        <select class="form-select" id="ScheduleYear" name="ScheduleYear">
+                                            <option value="ALL"> All Year</option>
+                                           <?php
+                                            $ScheduleYears = range(date('Y') + 1, date('Y') - 14);
+                                            array_multisort($ScheduleYears, SORT_DESC);
+                                            ?>
+                                            @foreach($ScheduleYears as $year)
+                                                <option value="{{$year}}">{{$year}}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <input type="hidden" name="employee_id" id="employee_id" value="{{base64_encode($Employee->id)}}">
                     <div class="row  gx-2">
@@ -550,6 +570,10 @@ $(document).ready(function(){
         placeholder: "Select Year",
         allowClear: true
     });
+    $("#ScheduleYear").select2({
+        placeholder: "Select Year",
+        allowClear: true
+    });
     $("#DocumentType").select2({
         placeholder: "Select Document Type",
         allowClear: true
@@ -560,13 +584,17 @@ $(document).ready(function(){
      QuotaSlotFeeTable();
      PastTransectionData();
 
-      $("#SelectYear").change(function() 
+      $("#SelectYear").change(function()
        {
             var selectedYear = $(this).val();
-            if (selectedYear) 
+            if (selectedYear)
             {
                 PastTransectionData();
             }
+        });
+      $("#ScheduleYear").change(function()
+       {
+            QuotaSlotFeeTable();
         });
         $(".VisaFileUpload").on("click", function() {
             $("#VisaModuleFileUpload-modal").modal('show');
@@ -755,10 +783,11 @@ function QuotaSlotFeeTable()
             {
                 url: "{{ route('resort.visa.Quota_Slot_PendingFee') }}",
                 type: 'GET',
-                data: function(d) 
+                data: function(d)
                 {
                     d.flag = flag,
                     d.employee_id = $("#employee_id").val();
+                    d.ScheduleYear = $("#ScheduleYear").val();
                 }
             },
             columns: [
@@ -769,12 +798,12 @@ function QuotaSlotFeeTable()
                     { data: 'PaymentDate', name: 'PaymentDate' },
                     { data: 'Action', name: 'Action' },
                     {data:'created_at', visible:false,searchable:false},
-        
+
             ]
         });
-        
+
     }
-    
+
     if(flag =="Work_Permit_Fee")
     {
         if($.fn.DataTable.isDataTable('#Work_Permit_Fee_table'))
@@ -795,10 +824,11 @@ function QuotaSlotFeeTable()
             {
                 url: "{{ route('resort.visa.Quota_Slot_PendingFee') }}",
                 type: 'GET',
-                data: function(d) 
+                data: function(d)
                 {
                     d.flag = flag,
                     d.employee_id = $("#employee_id").val();
+                    d.ScheduleYear = $("#ScheduleYear").val();
                 }
             },
             columns: [
@@ -809,14 +839,12 @@ function QuotaSlotFeeTable()
                     { data: 'PaymentDate', name: 'PaymentDate' },
                     { data: 'Action', name: 'Action' },
                     {data:'created_at', visible:false,searchable:false},
-        
+
             ]
         });
-        
+
     }
-    
-        
-   
+
         productTable.on('xhr', function(e, settings, json){
             if(json && json.footerData){
                 // Scope to the active tab's listing-box — `$('.listing-box ul')`
