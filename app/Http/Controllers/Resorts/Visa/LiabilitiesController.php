@@ -50,10 +50,13 @@ class LiabilitiesController extends Controller
                     $flags = ['visa', 'insurance', 'work_permit', 'MedicalReport', 'slot_payment'];
                 }
 
-                    $filterStart = Carbon::now()->startOfMonth();
-                    $filterEnd = Carbon::now()->endOfMonth();
+                    // Duration filter removed — default to the FULL liability picture
+                    // (all months/years), not just the current month, so every
+                    // outstanding fee from the xpat employees is included.
+                    $filterStart = Carbon::create(2000, 1, 1)->startOfDay();
+                    $filterEnd   = Carbon::now()->addYears(5)->endOfYear();
 
-                if($date) 
+                if($date)
                 {
                 
                     $date = $request->input('date');
@@ -364,10 +367,12 @@ class LiabilitiesController extends Controller
     public function FetchTotalEmployees(Request $request)
     {
         $date = $request->date;
-        $filterStart = Carbon::now()->startOfMonth();
-        $filterEnd = Carbon::now()->endOfMonth();
+        // Duration filter removed — default to the full range so the employee list
+        // matches the (un-windowed) liability totals.
+        $filterStart = Carbon::create(2000, 1, 1)->startOfDay();
+        $filterEnd   = Carbon::now()->addYears(5)->endOfYear();
 
-        if($date) 
+        if($date)
         {
             [$from, $to] = explode(' - ', $date);
             try {
