@@ -4609,6 +4609,22 @@ class Common
     }
 
     /**
+     * Format a date as "d M Y" (e.g. 02 Dec 2025), returning "N/A" for null,
+     * empty, or zero dates (0000-00-00) so the UI never shows raw/garbage dates.
+     */
+    public static function prettyDate($date, $format = 'd M Y')
+    {
+        if (empty($date) || in_array((string) $date, ['0000-00-00', '0000-00-00 00:00:00'], true)) {
+            return 'N/A';
+        }
+        try {
+            return \Carbon\Carbon::parse($date)->format($format);
+        } catch (\Throwable $e) {
+            return 'N/A';
+        }
+    }
+
+    /**
      * Format amount with currency symbol and conversion.
      * Converts from the stored source currency to the resort's active display
      * currency, then prefixes the current symbol ($ / MVR).
