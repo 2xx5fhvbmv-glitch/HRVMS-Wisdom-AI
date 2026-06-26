@@ -707,7 +707,7 @@ class RenewalController extends Controller
                                                 'employee_id'=> $emp_id,
                                                 'Month'=> $new_date->format('m'),
                                                 "Currency"=> $WorkPermit_amt['unit'] ?? 'MVR',
-                                                "Amt"=> $WorkPermit_amt['amount']/12,
+                                                "Amt"=> $WorkPermit_amt['amount'],
                                             ]);
                 }
             return  response()->json(['success'=>true,'message'=>' WorkPermit Renewal  successfully using the Installment Payment Type.','status'=>200]);
