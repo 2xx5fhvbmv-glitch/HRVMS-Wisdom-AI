@@ -762,8 +762,14 @@ class RenewalController extends Controller
                                         ]);
                 }
                
-                 $TotalExpensessSinceJoing->Total_slot_Payment += $qotaslotAMt['amount'] ?? 0.00;  
-                $TotalExpensessSinceJoing->save();
+                 // $TotalExpensessSinceJoing isn't fetched in this method, so fetch +
+                 // guard it (was crashing "assign property on null" for employees
+                 // without a TotalExpensessSinceJoing record).
+                 $TotalExpensessSinceJoing = TotalExpensessSinceJoing::where('resort_id', $this->resort->resort_id)->where('employees_id', $emp_id)->first();
+                 if ($TotalExpensessSinceJoing) {
+                     $TotalExpensessSinceJoing->Total_slot_Payment += $qotaslotAMt['amount'] ?? 0.00;
+                     $TotalExpensessSinceJoing->save();
+                 }
             
             return  response()->json(['success'=>true,'message'=>' Quota Slot Renewal  successfully using the Installment Payment Type.','status'=>200]);
             }

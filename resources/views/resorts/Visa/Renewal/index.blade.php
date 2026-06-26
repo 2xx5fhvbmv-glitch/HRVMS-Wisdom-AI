@@ -472,16 +472,10 @@ $(document).ready(function ()
                                     <span>Last Slot month: ${WorkPermitRenewal.WorkPermitRenewal_end_date}</span>
                                 </div>
                                 <div class="row  gx-2">
-                                    <div class="col-sm-6">
+                                    <div class="col-12">
                                         <div class="renewal-innerbox">
                                             <label>New slot</label>
                                             <p>${WorkPermitRenewal.NewSlot}</p>
-                                        </div>
-                                    </div>
-                                    <div class="col-sm-6">
-                                        <div class="renewal-innerbox">
-                                            <label>Payment Type</label>
-                                            <p>${WorkPermitRenewal.PaymentType}</p>
                                         </div>
                                     </div>
                                     <div class="col-12">
@@ -609,6 +603,30 @@ $(document).ready(function ()
     $(document).on("click", ".QuotaSlot", function() {
         var emp_id = $(this).data("emp_id");
         var flag = $(this).data("flag");
+
+        // Work Permit has no Lumpsum/Installment choice — renew directly (Installment),
+        // skipping the payment-type modal.
+        if (flag === "WorkPermit") {
+            $.ajax({
+                url: "{{ route('resorts.visa.renewal.UploadQuotaSlot') }}",
+                type: "POST",
+                data: { _token: "{{ csrf_token() }}", emp_id: emp_id, flag: flag, payment_type: "Installment" },
+                success: function(response) {
+                    if (response.success) {
+                        toastr.success(response.message, "Success", { positionClass: 'toast-bottom-right' });
+                        $(".Updated_Employee_details").html('');
+                        $("#Visa_select_emp").val('').trigger('change');
+                    } else {
+                        toastr.error(response.message, "Error", { positionClass: 'toast-bottom-right' });
+                    }
+                },
+                error: function() {
+                    toastr.error("An unexpected error occurred.", "Error", { positionClass: 'toast-bottom-right' });
+                }
+            });
+            return;
+        }
+
         $("#QuotaSlot_emp_id").val(emp_id);
         $("#QuotaSlot_flag").val(flag);
         $("#quotaslot-modal").modal('show');
