@@ -608,7 +608,6 @@ $(document).ready(function ()
     });
     $(document).on("click", ".QuotaSlot", function() {
         var emp_id = $(this).data("emp_id");
-        alert("test");
         var flag = $(this).data("flag");
         $("#QuotaSlot_emp_id").val(emp_id);
         $("#QuotaSlot_flag").val(flag);

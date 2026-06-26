@@ -144,7 +144,7 @@ class RenewalController extends Controller
                 } 
                 $WorkPermitMedicalRenewal->workpermitcost =  Common::formatMvr($WorkPermitMedicalRenewal->Amt);
                 $WorkPermitMedicalRenewal->employee_id =base64_encode($WorkPermitMedicalRenewal->employee_id);
-                $WorkPermitMedicalRenewal->medical_end_date = Carbon::parse($WorkPermitMedicalRenewal->medical_end_date)->format('d M Y');
+                $WorkPermitMedicalRenewal->medical_end_date = $medical_end_date->format('d M Y');
             }
             // Quota Slot Renewal Details
             $firstDateOfMonth = Carbon::now()->startOfMonth(); 
@@ -174,7 +174,7 @@ class RenewalController extends Controller
                 {
                     $QuotaSlotRenewal->QuotaSlotRenewalDate = "$QuotaSlotRenewal_months_diff month(s) remaining";
                 } 
-                $QuotaSlotRenewal->QuotaSlotRenewal_end_date = Carbon::parse($QuotaSlotRenewal_end_date)->format('Y-m-d');
+                $QuotaSlotRenewal->QuotaSlotRenewal_end_date = Carbon::parse($QuotaSlotRenewal_end_date)->format('d M Y');
                 $QuotaSlotRenewal->employee_id =base64_encode($QuotaSlotRenewal->employee_id);
                 if($QuotaSlotRenewal)
                 {
@@ -213,7 +213,7 @@ class RenewalController extends Controller
                 {
                     $WorkPermitRenewal->WorkPermitRenewalDate = "$WorkPermitRenewal_months_diff month(s) remaining";
                 } 
-                $WorkPermitRenewal->WorkPermitRenewal_end_date = Carbon::parse($WorkPermitRenewal_end_date)->format('Y-m-d');
+                $WorkPermitRenewal->WorkPermitRenewal_end_date = Carbon::parse($WorkPermitRenewal_end_date)->format('d M Y');
                 $WorkPermitRenewal->employee_id =base64_encode($WorkPermitRenewal->employee_id);
                 if($WorkPermitRenewal)
                 {
@@ -727,7 +727,7 @@ class RenewalController extends Controller
 
                
 
-                $next_year_due_date = $due_date->copy()->addYear();
+                $next_year_due_date = $start_date->copy()->addYear();
         
                     QuotaSlotRenewal::create([
                                             'resort_id'=>$this->resort->resort_id,
