@@ -851,8 +851,11 @@ $(document).on("submit", "#MarkAsReadForm", function(e) {
             {
     
                 toastr.success(response.message, "Success", { positionClass: 'toast-bottom-right' });
+                // Refresh the schedule (active tab) AND the transaction history in
+                // real time so the new payment shows without a page reload.
                 QuotaSlotFeeTable();
-            } 
+                PastTransectionData();
+            }
             else 
             {
                 toastr.error(response.message, "Error", { positionClass: 'toast-bottom-right' });
