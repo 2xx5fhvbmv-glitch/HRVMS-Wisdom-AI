@@ -157,7 +157,9 @@ $(document).on('click', '.delete-row-btn', function (e) {
             var Del_cat_id = $(this).attr('data-del_cat_id');
             
             var DiscriplineryName = $row.find("td:nth-child(1)").text().trim();
-            var Description = $row.find("td:nth-child(2)").text().trim();
+            // Use the RAW amount (data-amt), not the formatted "MVR 4,000.00" cell text,
+            // so the edit input holds a clean number that submits correctly.
+            var Description = $(this).attr('data-amt') || '';
             var editRowHtml = `
                     <td class="py-1">
                         <div class="form-group">
