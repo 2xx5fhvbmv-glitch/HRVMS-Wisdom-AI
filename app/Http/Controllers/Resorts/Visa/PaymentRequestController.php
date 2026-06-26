@@ -522,6 +522,41 @@ class PaymentRequestController extends Controller
         return [$ids, round($sum, 2)];
     }
 
+    /**
+     * Whether a payment-request child is fully settled, derived from the ACTUAL
+     * fee rows (not the fragile OngoingSteps counter). For each fee type the
+     * child requested, the linked rows must all be Paid. This stays correct no
+     * matter how the fee was paid (renewal page, bulk page, or another request
+     * that shares the same fee rows).
+     */
+    private function isChildFullyPaid($child): bool
+    {
+        $allPaid = function ($modelClass, $idsCsv) {
+            $ids = array_filter(array_map('intval', explode(',', (string) $idsCsv)));
+            if (empty($ids)) {
+                return null; // no linked rows — caller falls back to the Step flag
+            }
+            return !$modelClass::whereIn('id', $ids)->where('Status', '!=', 'Paid')->exists();
+        };
+
+        if (strtolower((string) $child->WorkPermitShow) === 'yes') {
+            $paid = $allPaid(WorkPermit::class, $child->WorkPermitIds);
+            if ($paid === false) return false;
+            if ($paid === null && ($child->WorkPermitStep ?? '') !== 'Yes') return false;
+        }
+        if (strtolower((string) $child->QuotaslotShow) === 'yes') {
+            $paid = $allPaid(QuotaSlotRenewal::class, $child->QuotaslotIds);
+            if ($paid === false) return false;
+            if ($paid === null && ($child->QuotaslotStep ?? '') !== 'Yes') return false;
+        }
+        // Insurance / Medical / Visa aren't row-tracked here — rely on their Step flag.
+        if (strtolower((string) $child->InsuranceShow) === 'yes' && ($child->InsuranceStep ?? '') !== 'Yes') return false;
+        if (strtolower((string) $child->MedicalReportShow) === 'yes' && ($child->MedicalReportStep ?? '') !== 'Yes') return false;
+        if (strtolower((string) $child->VisaShow) === 'yes' && ($child->VisaStep ?? '') !== 'Yes') return false;
+
+        return true;
+    }
+
     private function buildMultiMonthFeeCell(array $dues, string $fee)
     {
         if (empty($dues)) {
@@ -753,6 +788,19 @@ class PaymentRequestController extends Controller
                     ->orderBy('id', 'desc')
                     ->get(['id', 'Requestd_id', 'Request_date', 'Status', 'created_at']);
 
+                    // Derive the real paid state from the actual fee rows (robust no
+                    // matter how the fees were settled), and keep the stored Status in
+                    // sync so it doesn't drift.
+                    $PaymentRequest->each(function ($pr) {
+                        $children = PaymentRequestChild::where('Requested_Id', $pr->id)->get();
+                        $pr->IsPaid = $children->isNotEmpty() && $children->every(fn ($c) => $this->isChildFullyPaid($c));
+                        $derived = $pr->IsPaid ? 'Approved' : 'Pending';
+                        if ($pr->Status !== $derived) {
+                            PaymentRequest::where('id', $pr->id)->update(['Status' => $derived]);
+                            $pr->Status = $derived;
+                        }
+                    });
+
                     $edit_class = '';
                     if(Common::checkRouteWisePermission('resort.visa.PaymentRequestIndex',config('settings.resort_permissions.edit')) == false){
                         $edit_class = 'd-none';
@@ -770,19 +818,19 @@ class PaymentRequestController extends Controller
                                 })
                                 ->editColumn('Status', function ($row)
                                 {
-                                    // Approved = fully settled by Finance -> show as Paid.
-                                    if ($row->Status === 'Approved') {
+                                    // Paid only when every employee's fees are settled.
+                                    if (!empty($row->IsPaid)) {
                                         return '<span class="badge badge-themeSuccess">Paid</span>';
                                     }
-                                    return '<span class="badge badge-warning">' . htmlspecialchars($row->Status) . '</span>';
+                                    return '<span class="badge badge-warning">Pending</span>';
                                 })
                                 ->addColumn('Action', function ($row) use ($edit_class)
                                 {
                                     $encodedId = base64_encode($row->id);
                                     $viewUrl2 = route('resort.visa.PaymentRequestDetails', ['id' => $encodedId]);
                                     $view = '<a target="_blank" href="' . $viewUrl2 . '" class="btn-tableIcon btnIcon-blue   btn-sm"><i class="fa-regular fa-eye"></i></a>';
-                                    // Once paid (Approved) only View remains — no reject action.
-                                    if ($row->Status === 'Approved') {
+                                    // Once paid only View remains — no reject action.
+                                    if (!empty($row->IsPaid)) {
                                         return $view;
                                     }
                                     return $view . '
@@ -873,6 +921,9 @@ class PaymentRequestController extends Controller
                                     } elseif (($employee->QuotaslotStep ?? '') === 'Yes') {
                                         $employee->QuotaslotPaid = true;
                                     }
+
+                                    // Whole-child settled? Derived from the actual fee rows.
+                                    $employee->FullyPaid = $this->isChildFullyPaid($employee);
 
                                 return $employee;
                             });
