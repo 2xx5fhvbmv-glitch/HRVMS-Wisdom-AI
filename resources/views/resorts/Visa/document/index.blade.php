@@ -1121,6 +1121,10 @@
 <script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js"></script>
+{{-- tesseract.js — in-browser OCR engine used to read the passport MRZ and any
+     scanned-CV text locally, so document fields auto-fill WITHOUT the external
+     AI service. --}}
+<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <script> pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';</script>
 <script>
     const documentTypes = {!! json_encode($documentTypes) !!};
@@ -1459,7 +1463,25 @@
                                     $("#passport_numb").val(expiryResult.passportno || "");
                                     $("#txt-passport-number").val(expiryResult.passportno || "");
                                     $("#Passport_expiry_date").val(formattedDate || "");
-                                    if (expiryResult.status === "VALID") 
+
+                                    // Passport MRZ is authoritative for the legal name / DOB —
+                                    // override anything the CV heuristic guessed.
+                                    if (expiryResult.first_name) {
+                                        $("#txt-first-name").val(expiryResult.first_name);
+                                        $("#employeeF_name").val(expiryResult.first_name);
+                                    }
+                                    if (expiryResult.last_name) {
+                                        $("#txt-last-name").val(expiryResult.last_name);
+                                        $("#employeeL_name").val(expiryResult.last_name);
+                                    }
+                                    if (expiryResult.dob) {
+                                        const dp = expiryResult.dob.split('-');
+                                        const dobFmt = `${dp[2]}/${dp[1]}/${dp[0]}`;
+                                        $("#db_dob").val(dobFmt);
+                                        $("#date_birth").val(dobFmt);
+                                    }
+
+                                    if (expiryResult.status === "VALID")
                                     {
                                         photoListItem.html(`✅ Passport validity verified: Valid until ${formattedDate}`);
                                     } 
@@ -2345,197 +2367,295 @@
     }
 
 
-    async function PassportExpiry() 
-    {
-        let PassportBlobUrl = '';
+    /*
+     |--------------------------------------------------------------------------
+     | Client-side document extraction (no external AI service)
+     |--------------------------------------------------------------------------
+     | These helpers OCR the uploaded passport in the browser (tesseract.js) and
+     | read its machine-readable zone (MRZ), and pull email/phone/name out of the
+     | CV text (pdf.js). Everything runs on the user's device — nothing is sent to
+     | the AI_URL service. All entry points resolve (never reject) so a failed or
+     | low-quality scan can never block the wizard; the user just types the field.
+     */
 
+    // Render the first page of an uploaded document (PDF or image) to a high-res
+    // canvas suitable for OCR. `scale` ~3 gives tesseract enough pixels on the MRZ.
+    async function renderDocumentToCanvas(fileLike, scale = 3) {
+        // Resolve to an ArrayBuffer regardless of the wrapper shape used by the wizard.
+        let arrayBuffer;
+        if (fileLike instanceof File || fileLike instanceof Blob) {
+            arrayBuffer = await fileLike.arrayBuffer();
+        } else if (fileLike && fileLike.pdfUrl) {
+            arrayBuffer = await (await fetch(fileLike.pdfUrl)).arrayBuffer();
+        } else if (fileLike && fileLike.dataUrl) {
+            arrayBuffer = await (await fetch(fileLike.dataUrl)).arrayBuffer();
+        } else {
+            throw new Error('Unsupported passport file');
+        }
+
+        // Detect PDF by its %PDF- magic header; otherwise treat bytes as an image.
+        const head = new Uint8Array(arrayBuffer.slice(0, 5));
+        const isPdf = head[0] === 0x25 && head[1] === 0x50 && head[2] === 0x44 && head[3] === 0x46; // %PDF
+
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+
+        if (isPdf) {
+            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            const page = await pdf.getPage(1);
+            const viewport = page.getViewport({ scale });
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            await page.render({ canvasContext: ctx, viewport }).promise;
+        } else {
+            const blob = new Blob([arrayBuffer]);
+            const img = await new Promise((res, rej) => {
+                const im = new Image();
+                im.onload = () => res(im);
+                im.onerror = rej;
+                im.src = URL.createObjectURL(blob);
+            });
+            canvas.width = img.naturalWidth * 1.5;
+            canvas.height = img.naturalHeight * 1.5;
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        }
+        return canvas;
+    }
+
+    // OCR a canvas, restricting tesseract to the MRZ alphabet for accuracy.
+    async function ocrCanvasForMRZ(canvas) {
+        const { data } = await Tesseract.recognize(canvas, 'eng', {
+            tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<',
+        });
+        return (data && data.text) ? data.text : '';
+    }
+
+    // Convert a 6-digit MRZ date (YYMMDD) to YYYY-MM-DD. `isExpiry` decides the
+    // century window: expiry dates are always 20xx; birth dates pivot on today.
+    function mrzDateToISO(yymmdd, isExpiry) {
+        if (!/^\d{6}$/.test(yymmdd)) return '';
+        const yy = parseInt(yymmdd.slice(0, 2), 10);
+        const mm = yymmdd.slice(2, 4);
+        const dd = yymmdd.slice(4, 6);
+        if (mm < '01' || mm > '12' || dd < '01' || dd > '31') return '';
+        let year;
+        if (isExpiry) {
+            year = 2000 + yy;
+        } else {
+            const pivot = (new Date().getFullYear()) % 100;
+            year = yy > pivot + 1 ? 1900 + yy : 2000 + yy;
+        }
+        return `${year}-${mm}-${dd}`;
+    }
+
+    // Parse a TD3 (passport) MRZ out of raw OCR text. Tolerant of OCR noise:
+    // strips spaces, fixes common <-> confusions, and locates the two 44-char
+    // lines heuristically. Returns null when no plausible MRZ is found.
+    function parsePassportMRZ(rawText) {
+        if (!rawText) return null;
+        // Normalise: uppercase, drop spaces, split to lines, keep MRZ-ish lines.
+        const lines = rawText.toUpperCase().split(/\r?\n/)
+            .map(l => l.replace(/\s+/g, '').replace(/[«»]/g, '<'))
+            .filter(l => l.length >= 28 && /[A-Z0-9<]/.test(l) && (l.match(/</g) || []).length >= 2);
+        if (lines.length < 2) return null;
+
+        // Line 1 starts with P (document type). Line 2 is the data line.
+        let l1 = lines.find(l => /^P[A-Z0-9<]/.test(l));
+        let l2 = lines.find(l => l !== l1 && /^[A-Z0-9<]{20,}$/.test(l) && /\d/.test(l));
+        if (!l1 || !l2) {
+            // Fall back to the two longest qualifying lines.
+            const sorted = [...lines].sort((a, b) => b.length - a.length);
+            l1 = l1 || sorted[0];
+            l2 = l2 || sorted.find(l => l !== l1) || sorted[1];
+        }
+        if (!l1 || !l2) return null;
+
+        const result = { surname: '', givenNames: '', passportno: '', nationality: '', dob: '', expiry: '', sex: '' };
+
+        // --- Line 1: P<ISS SURNAME<<GIVEN<NAMES<<<... ---
+        const nameSection = l1.replace(/^P[A-Z0-9<]?/, '').replace(/^[A-Z<]{3}/, ''); // drop 'P<' + issuing country
+        const nameParts = nameSection.split('<<');
+        if (nameParts.length >= 1) result.surname = (nameParts[0] || '').replace(/</g, ' ').trim();
+        if (nameParts.length >= 2) result.givenNames = (nameParts[1] || '').replace(/</g, ' ').trim();
+
+        // --- Line 2: PASSPORTNO(9) CHK(1) NAT(3) DOB(6) CHK(1) SEX(1) EXP(6) ... ---
+        result.passportno = l2.slice(0, 9).replace(/</g, '').trim();
+        result.nationality = l2.slice(10, 13).replace(/</g, '').trim();
+        result.dob = mrzDateToISO(l2.slice(13, 19), false);
+        result.sex = l2.slice(20, 21).replace(/[^MF]/g, '');
+        result.expiry = mrzDateToISO(l2.slice(21, 27), true);
+
+        // Plausibility: need at least a passport number or a date to call it a hit.
+        if (!result.passportno && !result.expiry && !result.dob) return null;
+        return result;
+    }
+
+    async function PassportExpiry()
+    {
+        // Locate the uploaded passport (PDF or image). Resolve gracefully if none.
+        let passportFile = null;
         $("fieldset:eq(1) select[name^='docType']").each(function (index) {
             const selectedType = $(this).find('option:selected').text().toLowerCase();
-            // The configured document type is just "Passport" — checking for
-            // "passport main" never matched, so PassportBlobUrl stayed empty
-            // and PassportExpiry() rejected, silently blocking step 2 → 3.
-            if (selectedType.includes('passport'))
-            {
-                const file = selectedFiles[index]; // Assuming selectedFiles exists
-                if (file)
-                {
-                    PassportBlobUrl = file['pdfUrl'] || URL.createObjectURL(file);
-                }
+            if (selectedType.includes('passport')) {
+                const f = selectedFiles[index];
+                if (f) passportFile = f;
             }
         });
 
-        if (!PassportBlobUrl)
-        {
-            return Promise.reject("No passport file selected");
+        const photoListItem = $("fieldset:eq(2)").find('li:contains("Passport validity verified")');
+
+        if (!passportFile) {
+            return { status: '', message: 'No passport file', expiryDate: '', issue_date: '', passportno: '' };
         }
 
+        // Keep the exact marker text the step-transition .then() searches for
+        // (li:contains "Please Wait passport is verifying.") so it can update the
+        // line afterwards. Shown to the user while the on-device OCR runs.
+        photoListItem.html('Please Wait passport is verifying.');
+
         try {
-            const response = await fetch(PassportBlobUrl);
-            if (!response.ok) throw new Error("Failed to fetch blob URL");
-            const blob = await response.blob();
-            const file = new File([blob], 'passport.pdf', { type: blob.type });
+            const canvas = await renderDocumentToCanvas(passportFile, 3);
+            const rawText = await ocrCanvasForMRZ(canvas);
+            const mrz = parsePassportMRZ(rawText);
 
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('_token', '{{ csrf_token() }}');
-            formData.append('flag', 'passport');
+            if (mrz && (mrz.passportno || mrz.expiry)) {
+                // Derive a VALID / NOT VALID badge from the MRZ expiry (>= 6 months).
+                let validity = '';
+                if (mrz.expiry) {
+                    const exp = new Date(mrz.expiry + 'T00:00:00');
+                    const minValid = new Date();
+                    minValid.setMonth(minValid.getMonth() + 6);
+                    validity = exp < minValid ? 'NOT VALID' : 'VALID';
+                }
+                return {
+                    status: validity,           // '', 'VALID' or 'NOT VALID' (badge only; never blocks)
+                    message: 'Passport read',
+                    expiryDate: mrz.expiry || '',
+                    issue_date: '',             // issue date is not encoded in the MRZ
+                    passportno: mrz.passportno || '',
+                    first_name: mrz.givenNames || '',
+                    last_name: mrz.surname || '',
+                    dob: mrz.dob || '',
+                    nationality: mrz.nationality || '',
+                };
+            }
 
-            var photoListItem = $("fieldset:eq(2)").find('li:contains("Passport validity verified")');
-            photoListItem.html(`Please Wait passport is verifying.`);
-            return new Promise((resolve, reject) => {
-
-                $(".next").attr("disabled", true);
-                $.ajax({
-                    url: "{{ route('resort.visa.PassportExpiryManual') }}",
-                    type: "POST",
-                    data: formData,
-                    contentType: false,
-                    processData: false,
-                    success: function (response) 
-                    {
-                        if (response.status) 
-                        {
-                          resolve(response);
-                        } 
-                        else
-                        {
-                            photoListItem.html(response.message);
-                            reject(response);
-                        }
-                    },
-                    error: function (xhr, status, error) {
-                   
-                        reject(error);
-
-                    }
-                });
-            });
-
+            return { status: '', message: 'Could not read passport automatically', expiryDate: '', issue_date: '', passportno: '' };
         } catch (err) {
-            return Promise.reject(err);
+            console.error('Passport OCR failed:', err);
+            return { status: '', message: 'Passport OCR failed', expiryDate: '', issue_date: '', passportno: '' };
         }
     }
 
-    async function Cvcheck() 
-    {
-        let cvBlobUrls = [];
+    // Pull the text out of a CV file. Text-based PDFs are read directly with
+    // pdf.js (instant); if a page has almost no text (a scanned CV) we OCR that
+    // page as a fallback. Capped at the first 3 pages — contact details live up top.
+    async function extractCvText(fileLike) {
+        let arrayBuffer;
+        if (fileLike instanceof File || fileLike instanceof Blob) arrayBuffer = await fileLike.arrayBuffer();
+        else if (fileLike && fileLike.pdfUrl) arrayBuffer = await (await fetch(fileLike.pdfUrl)).arrayBuffer();
+        else if (fileLike && fileLike.dataUrl) arrayBuffer = await (await fetch(fileLike.dataUrl)).arrayBuffer();
+        else return '';
 
+        const head = new Uint8Array(arrayBuffer.slice(0, 5));
+        const isPdf = head[0] === 0x25 && head[1] === 0x50 && head[2] === 0x44 && head[3] === 0x46;
+        if (!isPdf) return ''; // images skipped for CV text extraction
+
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        const maxPages = Math.min(pdf.numPages, 3);
+        let text = '';
+        for (let p = 1; p <= maxPages; p++) {
+            const page = await pdf.getPage(p);
+            const content = await page.getTextContent();
+            const pageText = content.items.map(it => it.str).join(' ');
+            if (pageText.replace(/\s/g, '').length > 30) {
+                text += '\n' + pageText;
+            } else {
+                // Scanned page — OCR it (no MRZ whitelist; we want full text).
+                try {
+                    const viewport = page.getViewport({ scale: 2 });
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    canvas.width = viewport.width; canvas.height = viewport.height;
+                    await page.render({ canvasContext: ctx, viewport }).promise;
+                    const { data } = await Tesseract.recognize(canvas, 'eng');
+                    text += '\n' + ((data && data.text) || '');
+                } catch (e) { /* ignore a bad page */ }
+            }
+        }
+        return text;
+    }
+
+    // Best-effort field extraction from raw CV text. Email & phone are reliable
+    // (regex); name is a heuristic (first name-like line near the top).
+    function parseCvFields(text) {
+        const data = { first_name: '', last_name: '', email: '', phone_no: '', dob: '', nationality: '', address: '' };
+        if (!text) return data;
+
+        const emailMatch = text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+        if (emailMatch) data.email = emailMatch[0];
+
+        // Phone: longest run with >= 8 digits, allowing +(). spaces and dashes.
+        const phoneCandidates = (text.match(/\+?\d[\d\s().-]{7,}\d/g) || [])
+            .map(s => s.trim())
+            .filter(s => (s.replace(/\D/g, '').length >= 8 && s.replace(/\D/g, '').length <= 15));
+        if (phoneCandidates.length) {
+            phoneCandidates.sort((a, b) => b.replace(/\D/g, '').length - a.replace(/\D/g, '').length);
+            data.phone_no = phoneCandidates[0];
+        }
+
+        // DOB near a "birth"/"dob" label, common date layouts.
+        const dobMatch = text.match(/(?:date of birth|d\.?o\.?b\.?|birth\s*date)\D{0,15}(\d{1,2}[\/\-.]\d{1,2}[\/\-.]\d{2,4}|\d{4}[\/\-.]\d{1,2}[\/\-.]\d{1,2})/i);
+        if (dobMatch) data.dob = dobMatch[1];
+
+        // Name heuristic: first non-empty top line that is 2-4 alphabetic words,
+        // not containing an email/phone/keyword.
+        const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+        for (let i = 0; i < Math.min(lines.length, 12); i++) {
+            const l = lines[i];
+            if (/@|\d|curriculum|resume|cv|profile|email|phone|mobile|address/i.test(l)) continue;
+            const words = l.split(/\s+/).filter(w => /^[A-Za-z'’.-]{2,}$/.test(w));
+            if (words.length >= 2 && words.length <= 4 && words.join(' ').length <= 40) {
+                data.first_name = words[0];
+                data.last_name = words[words.length - 1];
+                break;
+            }
+        }
+        return data;
+    }
+
+    async function Cvcheck()
+    {
+        // Collect CV files.
+        const cvFiles = [];
         $("fieldset:eq(1) select[name^='docType']").each(function(index) {
             const selectedType = $(this).find('option:selected').text().toLowerCase();
             if (selectedType.includes('cv')) {
                 const file = selectedFiles[index];
-                if (file) {
-                    const url = file['pdfUrl'] || URL.createObjectURL(file);
-                    cvBlobUrls.push(url);
-                }
+                if (file) cvFiles.push(file);
             }
         });
 
-        // CV is optional — if none was uploaded, skip the check quietly
-        // instead of rejecting (a rejection here aborts the whole
-        // Promise.all and blocks Passport/Photo from advancing).
-        if (cvBlobUrls.length === 0) {
-            return Promise.resolve({ status: false, skipped: true });
+        // CV is optional — resolve quietly when none was uploaded.
+        if (cvFiles.length === 0) {
+            return { status: true, skipped: true, data: '' };
         }
 
         try {
-            const MAX_PAGES_PER_DOCUMENT = 5;
-            const MAX_TOTAL_PAGES = 20;
-            let totalPageCount = 0;
-
-            const mergedPdf = await PDFLib.PDFDocument.create();
-            let processingMessage = "Processing CV documents...";
-            $(".file-error-message").html(processingMessage);
-
-            for (let i = 0; i < cvBlobUrls.length; i++) {
-                const url = cvBlobUrls[i];
-                const response = await fetch(url);
-                if (!response.ok) throw new Error(`Failed to fetch CV #${i + 1}`);
-
-                const arrayBuffer = await response.arrayBuffer();
-                const pdfToMerge = await PDFLib.PDFDocument.load(arrayBuffer);
-                const pageCount = pdfToMerge.getPageCount();
-                
-                // Determine how many pages to copy
-                const pagesToCopy = Math.min(pageCount, MAX_PAGES_PER_DOCUMENT);
-                if (pageCount > MAX_PAGES_PER_DOCUMENT) {
-                    processingMessage += `<br>⚠️ Document #${i+1} has ${pageCount} pages. Only first ${MAX_PAGES_PER_DOCUMENT} pages will be processed.`;
-                    $(".file-error-message").html(processingMessage);
-                }
-                
-                // Check if adding these pages would exceed the total limit
-                if (totalPageCount + pagesToCopy > MAX_TOTAL_PAGES) {
-                    const remainingSlots = MAX_TOTAL_PAGES - totalPageCount;
-                    if (remainingSlots <= 0) {
-                        processingMessage += `<br>⚠️ Maximum total page limit (${MAX_TOTAL_PAGES}) reached. Skipping remaining documents.`;
-                        $(".file-error-message").html(processingMessage);
-                        break;
-                    }
-                    processingMessage += `<br>⚠️ Only processing first ${remainingSlots} pages from document #${i+1} to stay within limit.`;
-                    $(".file-error-message").html(processingMessage);
-                    
-                    // Only copy pages up to the remaining limit
-                    const pageIndicesToCopy = Array.from({ length: remainingSlots }, (_, j) => j);
-                    const copiedPages = await mergedPdf.copyPages(pdfToMerge, pageIndicesToCopy);
-                    copiedPages.forEach(page => mergedPdf.addPage(page));
-                    totalPageCount += remainingSlots;
-                    break;
-                }
-                
-                // Copy the determined number of pages
-                const pageIndicesToCopy = Array.from({ length: pagesToCopy }, (_, j) => j);
-                const copiedPages = await mergedPdf.copyPages(pdfToMerge, pageIndicesToCopy);
-                copiedPages.forEach(page => mergedPdf.addPage(page));
-                totalPageCount += pagesToCopy;
-                
-                processingMessage += `<br>✅ Processed document #${i+1} (${pagesToCopy} pages)`;
-                $(".file-error-message").html(processingMessage);
+            $(".file-error-message").html('Reading CV on your device (no upload)…');
+            let allText = '';
+            for (const f of cvFiles) {
+                allText += '\n' + await extractCvText(f);
             }
+            setTimeout(() => { $(".file-error-message").html(""); }, 2500);
 
-            // Clear message after successful processing
-            setTimeout(() => {
-                $(".file-error-message").html("");
-            }, 3000);
-
-            const mergedPdfBytes = await mergedPdf.save();
-            const mergedBlob = new Blob([mergedPdfBytes], { type: 'application/pdf' });
-            const mergedFile = new File([mergedBlob], 'merged_cv.pdf', { type: 'application/pdf' });
-
-            const formData = new FormData();
-            formData.append('file', mergedFile);
-            formData.append('_token', '{{ csrf_token() }}');
-            formData.append('flag', 'cv');
-            $(".next").attr("disabled", true);
-
-            return new Promise((resolve, reject) => 
-            {
-                $.ajax({
-                    url: "{{ route('resort.visa.CheckCvManual') }}",
-                    type: "POST",
-                    data: formData,
-                    contentType: false,
-                    processData: false,
-                    success: function(response)
-                    {
-                        if(response.status) 
-                        {
-                    
-                            resolve(response);
-                        } 
-                        else
-                        {
-                            reject(false);
-                        }
-                    },
-                    error: function(xhr, status, error) 
-                    {
-                        reject(error);
-                    }
-                });
-            });
-
+            const data = parseCvFields(allText);
+            // Non-blocking: always resolve with whatever we found (may be partial).
+            return { status: true, message: 'CV read', data: data };
         } catch (err) {
-            return Promise.reject(err.message);
+            console.error('CV extraction failed:', err);
+            // Never block the wizard — proceed with manual entry.
+            return { status: true, message: 'CV extraction failed', data: '' };
         }
     }
    
