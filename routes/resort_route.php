@@ -1368,6 +1368,14 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
       Route::get('visa/document-management', 'Visa\DocumentController@index')->name('resort.visa.DocumentManage');
       Route::get('visa/xpatsync', 'Visa\DocumentController@Xpatsync')->name('resort.visa.Xpatsync');
 
+      // Manual (no-AI) document-extraction endpoints — replace the AI_URL calls
+      // so the create-employee wizard advances past step 2 even when the AI
+      // service is down. See DocumentController for details.
+      Route::post('visa/manual/passport-expiry', 'Visa\DocumentController@PassportExpiryManual')->name('resort.visa.PassportExpiryManual');
+      Route::post('visa/manual/check-cv', 'Visa\DocumentController@CheckCvManual')->name('resort.visa.CheckCvManual');
+      Route::post('visa/manual/education', 'Visa\DocumentController@EducationManual')->name('resort.visa.EducationManual');
+      Route::post('visa/manual/experience', 'Visa\DocumentController@ExperienceManual')->name('resort.visa.ExperienceManual');
+
       Route::post('visa/xpact-edit-amt', 'Visa\DashboardController@VisaXpactUpdateAmt')->name('resort.visa.VisaXpactEditAmt');
 
 

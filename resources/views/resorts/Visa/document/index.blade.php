@@ -2386,7 +2386,7 @@
 
                 $(".next").attr("disabled", true);
                 $.ajax({
-                    url: "{{ route('visa.passport.Checkexpiry') }}",
+                    url: "{{ route('resort.visa.PassportExpiryManual') }}",
                     type: "POST",
                     data: formData,
                     contentType: false,
@@ -2510,7 +2510,7 @@
             return new Promise((resolve, reject) => 
             {
                 $.ajax({
-                    url: "{{ route('resort.visa.CheckCv') }}",
+                    url: "{{ route('resort.visa.CheckCvManual') }}",
                     type: "POST",
                     data: formData,
                     contentType: false,
@@ -2868,7 +2868,7 @@
             formData.append('flag', 'education');
             let response = await new Promise((resolve, reject) => {
                 $.ajax({
-                    url: "{{ route('resort.visa.Education') }}",
+                    url: "{{ route('resort.visa.EducationManual') }}",
                     type: "POST",
                     data: formData,
                     contentType: false,
@@ -2971,7 +2971,7 @@
             formData.append('flag', 'experience');
             let response = await new Promise((resolve, reject) => {
                 $.ajax({
-                    url: "{{ route('resort.visa.Experience') }}",
+                    url: "{{ route('resort.visa.ExperienceManual') }}",
                     type: "POST",
                     data: formData,
                     contentType: false,

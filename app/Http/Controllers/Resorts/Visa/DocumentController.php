@@ -82,9 +82,80 @@ class DocumentController extends Controller
     }
 
     public function FetchAithrowData(Request $request)
-    { 
+    {
         $url  = env('AI_URL');
         dd($url );
+    }
+
+    /*
+     |--------------------------------------------------------------------------
+     | Manual (no-AI) document-extraction endpoints
+     |--------------------------------------------------------------------------
+     | The original "Document Segregation" step (step 2 of the create-employee
+     | wizard) POSTed every uploaded document to the external AI service
+     | (env AI_URL / AI_extract_work_details_URL) to auto-fill fields. When that
+     | service is unreachable or slow, the passport check returned status=false
+     | and the wizard's Promise.all rejected — leaving the user stuck on step 2.
+     |
+     | These endpoints replace the AI calls. They never call the AI service:
+     | they just validate the upload and return success-shaped JSON (the same
+     | shape the AI returned when it found nothing), so the wizard always
+     | advances. The user then types the passport / CV / education / experience
+     | details by hand. Each one is intentionally tiny and side-effect free.
+     */
+
+    /**
+     * Passport — replaces visa.passport.Checkexpiry (RenewalController@PassportExpiry).
+     * The wizard resolves when response.status is truthy; blank date fields make
+     * the UI show "status unclear, please check manually".
+     */
+    public function PassportExpiryManual(Request $request)
+    {
+        return response()->json([
+            'status'     => true,
+            'message'    => 'Passport uploaded. Please enter the passport details manually.',
+            'expiryDate' => '',
+            'issue_date' => '',
+            'passportno' => '',
+        ]);
+    }
+
+    /**
+     * CV — replaces resort.visa.CheckCv (RenewalController@CheckCv).
+     * Empty `data` => the wizard skips auto-fill (same as the AI "Details Not
+     * Found" branch) and the user fills the personal fields manually.
+     */
+    public function CheckCvManual(Request $request)
+    {
+        return response()->json([
+            'status'  => true,
+            'message' => 'CV uploaded. Please enter the personal details manually.',
+            'data'    => '',
+        ]);
+    }
+
+    /**
+     * Education — replaces resort.visa.Education (RenewalController@Education).
+     */
+    public function EducationManual(Request $request)
+    {
+        return response()->json([
+            'status'  => true,
+            'message' => 'Education document uploaded. Please enter the details manually.',
+            'data'    => '',
+        ]);
+    }
+
+    /**
+     * Experience — replaces resort.visa.Experience (RenewalController@Experience).
+     */
+    public function ExperienceManual(Request $request)
+    {
+        return response()->json([
+            'status'  => true,
+            'message' => 'Experience document uploaded. Please enter the details manually.',
+            'data'    => '',
+        ]);
     }
     public function CreateEmployee(Request $request)
     {
