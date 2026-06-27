@@ -66,6 +66,133 @@ class ApplicantsController extends Controller
         return view("resorts.talentacquisition.Applicants.index",compact('EmailTamplete','page_title','id','currentUserRank','isHrDepartment','offerLetterTemplates','contractTemplates'));
     }
 
+    /**
+     * WAI Insights — on-demand AI compatibility check for a single applicant.
+     * Scores the applicant's CV against the position's Job Description via the
+     * Wisdom AI /score_resume (ATS) endpoint and returns a 0-100 match score so
+     * HR can gauge fit. Read-only: it does NOT change the applicant's stage.
+     */
+    public function WaiApplicantInsights(Request $request)
+    {
+        $resort_id   = $this->resort->resort_id;
+        $applicantId = (int) base64_decode($request->id);
+        $applicant   = Applicant_form_data::where('resort_id', $resort_id)->find($applicantId);
+
+        if (!$applicant) {
+            return response()->json(['success' => false, 'message' => 'Applicant not found.']);
+        }
+
+        // 1) CV file
+        if (empty($applicant->curriculum_vitae)) {
+            return response()->json(['success' => false, 'message' => 'This applicant has no CV on file to analyse.']);
+        }
+        $cvBytes = $this->getApplicantFileBytes($applicant->curriculum_vitae);
+        if (!$cvBytes) {
+            return response()->json(['success' => false, 'message' => 'The applicant CV file could not be read from storage.']);
+        }
+
+        // 2) Job Description for this applicant's vacancy position
+        $vacancy       = $applicant->Parent_v_id ? Vacancies::find($applicant->Parent_v_id) : null;
+        $positionId    = $vacancy->position ?? null;
+        $positionTitle = $positionId ? \App\Models\ResortPosition::where('id', $positionId)->value('position_title') : null;
+        $jd = $positionId
+            ? \App\Models\JobDescription::where('Resort_id', $resort_id)->where('Position_id', $positionId)->latest('id')->first()
+            : null;
+
+        if (!$jd || trim(strip_tags($jd->jobdescription ?? '')) === '') {
+            return response()->json(['success' => false, 'message' => 'No Job Description is configured for this position'.($positionTitle ? " ({$positionTitle})" : '').'. Add one under Job Descriptions to enable WAI Insights.']);
+        }
+
+        // 3) Render the JD HTML to a PDF (the AI ATS endpoint expects PDFs)
+        try {
+            $jdPdf = \Barryvdh\DomPDF\Facade\Pdf::loadHTML(
+                '<h2 style="font-family:Arial,sans-serif">'.e($positionTitle ?: 'Job Description').'</h2>'.$jd->jobdescription
+            )->output();
+        } catch (\Throwable $e) {
+            \Log::warning('WAI insights JD->PDF failed: '.$e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Could not prepare the job description for analysis.']);
+        }
+
+        // 4) Call the Wisdom AI ATS scorer (JD PDF + CV PDF -> {score})
+        $jdTmp = tempnam(sys_get_temp_dir(), 'wai_jd_') . '.pdf';
+        $cvTmp = tempnam(sys_get_temp_dir(), 'wai_cv_') . '.pdf';
+        file_put_contents($jdTmp, $jdPdf);
+        file_put_contents($cvTmp, $cvBytes);
+
+        $url  = rtrim((string) (env('AI_BASE_URL') ?: env('AI_URL', 'http://localhost:8001')), '/') . '/score_resume';
+        $curl = curl_init();
+        curl_setopt_array($curl, [
+            CURLOPT_URL            => $url,
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_POST           => true,
+            CURLOPT_POSTFIELDS     => [
+                'job_description' => curl_file_create($jdTmp, 'application/pdf', 'job_description.pdf'),
+                'resume'          => curl_file_create($cvTmp, 'application/pdf', 'cv.pdf'),
+            ],
+            CURLOPT_HTTPHEADER     => ['Accept: application/json'],
+            CURLOPT_TIMEOUT        => 120,
+            CURLOPT_CONNECTTIMEOUT => 5,
+        ]);
+        $response = curl_exec($curl);
+        $errno    = curl_errno($curl);
+        $err      = curl_error($curl);
+        $httpCode = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        curl_close($curl);
+        @unlink($jdTmp);
+        @unlink($cvTmp);
+
+        if ($errno !== 0 || !$response || $httpCode >= 400) {
+            \Log::warning("WAI score_resume failed (url={$url}, http={$httpCode}): ".($err ?: $response));
+            return response()->json(['success' => false, 'message' => 'The Wisdom AI service is unavailable right now. Please try again shortly.']);
+        }
+
+        $data  = json_decode($response, true);
+        $score = isset($data['score']) ? (int) $data['score'] : null;
+        if ($score === null) {
+            return response()->json(['success' => false, 'message' => 'The AI returned an unexpected response.']);
+        }
+        $score = max(0, min(100, $score));
+
+        // Cache the latest score on the applicant for quick reference.
+        $applicant->Scoring = $score;
+        $applicant->save();
+
+        if     ($score >= 75) { $label = 'Strong match';   $color = 'success'; }
+        elseif ($score >= 50) { $label = 'Moderate match'; $color = 'warning'; }
+        else                  { $label = 'Weak match';     $color = 'danger';  }
+
+        return response()->json([
+            'success'   => true,
+            'score'     => $score,
+            'label'     => $label,
+            'color'     => $color,
+            'applicant' => ucfirst(trim($applicant->first_name.' '.$applicant->last_name)),
+            'position'  => $positionTitle ?: '—',
+        ]);
+    }
+
+    /**
+     * Read raw bytes of an applicant upload from whichever storage disk is
+     * configured (wasabi/s3/local), mirroring Common::GetApplicantAWSFile's
+     * existence fallbacks.
+     */
+    private function getApplicantFileBytes($path)
+    {
+        $driver   = config('settings.storage_driver');
+        $diskName = $driver === 'local' ? 'local' : ($driver === 'wasabi' ? 'wasabi' : 's3');
+        try {
+            $disk = \Illuminate\Support\Facades\Storage::disk($diskName);
+            if ($disk->exists($path)) return $disk->get($path);
+        } catch (\Throwable $e) { /* fall through to local fallbacks */ }
+        if (file_exists(public_path($path))) return file_get_contents(public_path($path));
+        try {
+            if (\Illuminate\Support\Facades\Storage::disk('local')->exists('public/'.$path)) {
+                return \Illuminate\Support\Facades\Storage::disk('local')->get('public/'.$path);
+            }
+        } catch (\Throwable $e) { /* ignore */ }
+        return null;
+    }
+
     public function GetVacnacyWiseApplicants(Request $request)
     {
         if($request->ajax())
@@ -195,7 +322,8 @@ class ApplicantsController extends Controller
             ->addColumn('action', function ($row) use ($isHrUser) {
                 $id = base64_encode($row->id);
                 $actions = '<a href="javascript:void(0)" class="btn btn-sm btn-themeBlue me-1 userApplicants-btn" data-id="'.$row->applicant_id.'" data-bs-toggle="tooltip" data-bs-placement="top" title="View Applicant"><i class="fa-solid fa-eye"></i></a>
-                        <a href="javascript:void(0)" class="btn btn-sm btn-theme ApplicantsNotes" data-notes="'.$row->Notes.'" data-id="'.$id.'" data-bs-toggle="tooltip" data-bs-placement="top" title="Notes"><i class="fa-solid fa-note-sticky"></i></a>';
+                        <a href="javascript:void(0)" class="btn btn-sm btn-theme ApplicantsNotes" data-notes="'.$row->Notes.'" data-id="'.$id.'" data-bs-toggle="tooltip" data-bs-placement="top" title="Notes"><i class="fa-solid fa-note-sticky"></i></a>
+                        <a href="javascript:void(0)" class="btn btn-sm btn-themeNeon waiInsightsBtn" data-id="'.$id.'" data-bs-toggle="tooltip" data-bs-placement="top" title="WAI Insights — CV vs Job Description"><i class="fa-solid fa-robot"></i></a>';
 
                 // Show Selected/Rejected buttons when final round is complete (only for HR)
                 if ($isHrUser) {

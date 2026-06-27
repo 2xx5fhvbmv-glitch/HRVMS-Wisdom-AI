@@ -576,6 +576,24 @@
         </div>
     </div>
 
+    <!-- WAI Insights — CV vs Job Description compatibility -->
+    <div class="modal fade" id="wai-insights-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"><i class="fa-solid fa-robot me-2"></i>WAI Insights</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center" id="wai-insights-body">
+                    <!-- filled by JS -->
+                </div>
+                <div class="modal-footer">
+                    <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Close</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
 @endsection
 
 @section('import-css')
@@ -597,6 +615,41 @@
         $(document).ready(function() {
             datatablelist();
             $('.table-applicants tbody').empty();
+
+            // WAI Insights — score this applicant's CV against the position's Job Description.
+            $(document).on('click', '.waiInsightsBtn', function () {
+                var id = $(this).data('id');
+                var $body = $('#wai-insights-body');
+                $body.html('<div class="py-4">'
+                    + '<div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div>'
+                    + '<p class="mt-3 mb-0">Wisdom AI is reviewing the CV against the job description…</p>'
+                    + '<small class="text-muted">This can take up to a minute.</small></div>');
+                $('#wai-insights-modal').modal('show');
+                $.ajax({
+                    url: "{{ route('resort.ta.WaiInsights') }}",
+                    type: 'POST',
+                    data: { id: id, _token: "{{ csrf_token() }}" },
+                    success: function (res) {
+                        if (res && res.success) {
+                            $body.html(
+                                '<div class="mb-2"><span class="fw-bold">' + (res.applicant || 'Applicant') + '</span>'
+                                + '<div class="text-muted small">Position: ' + (res.position || '—') + '</div></div>'
+                                + '<div style="font-size:48px;font-weight:700;line-height:1.1;" class="text-' + res.color + '">' + res.score + '%</div>'
+                                + '<div class="mb-2"><span class="badge bg-' + res.color + '">' + res.label + '</span></div>'
+                                + '<div class="progress" style="height:10px;"><div class="progress-bar bg-' + res.color + '" role="progressbar" style="width:' + res.score + '%;"></div></div>'
+                                + '<small class="text-muted d-block mt-3">AI-estimated match between the applicant\'s CV and the job description. Use as guidance alongside your own review.</small>'
+                            );
+                        } else {
+                            $body.html('<div class="py-3"><i class="fa-solid fa-circle-info text-warning fa-2x mb-2"></i>'
+                                + '<p class="mb-0">' + ((res && res.message) || 'Could not generate insights.') + '</p></div>');
+                        }
+                    },
+                    error: function () {
+                        $body.html('<div class="py-3"><i class="fa-solid fa-triangle-exclamation text-danger fa-2x mb-2"></i>'
+                            + '<p class="mb-0">Something went wrong contacting Wisdom AI. Please try again.</p></div>');
+                    }
+                });
+            });
 
             $(document).on('click', 'a.details-toggle', function () {
                 const $link = $(this);
