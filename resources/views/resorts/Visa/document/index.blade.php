@@ -1751,7 +1751,11 @@
                 updateEducationButtons();
                 updateEducationFieldNames();
             });
-                $('#division').on('change', function() {
+                // Cascade handlers are DELEGATED ($(document).on) so they keep
+                // working after select2 re-initialises the selects (a direct
+                // $('#x').on bind can be left detached in this multi-step form,
+                // which left Section / Position / Reporting Person empty).
+                $(document).on('change', '#division', function() {
                     let divisionId = $(this).val();
                     $('#department').html('<option></option>').trigger('change');
                     $('#section').html('<option></option>').trigger('change');
@@ -1763,49 +1767,59 @@
                         data: { division_id: divisionId },
                         success: function(res) {
                             let html = '<option></option>';
-                            $.each(res.departments, function(_, department) {
+                            $.each((res && res.departments) || [], function(_, department) {
                                 html += `<option value="${department.id}">${department.name}</option>`;
                             });
                             $('#department').html(html).trigger('change');
-                        }
+                        },
+                        error: function(xhr) { console.error('getDepartmentsByDivision failed', xhr.status, xhr.responseText); }
                     });
                 });
 
-        // Department -> Section
-        $('#department').on('change', function() {
+        // Department -> Section (+ Reporting Person + Positions)
+        $(document).on('change', '#department', function() {
             let departmentId = $(this).val();
             $('#section').html('<option></option>').trigger('change');
             $('#position').html('<option></option>').trigger('change');
             if (!departmentId) return;
-            getReportingPerson(departmentId);
+            // Guard: a throw here must NOT stop Section / Position from loading.
+            try { if (typeof getReportingPerson === 'function') getReportingPerson(departmentId); }
+            catch (e) { console.error('getReportingPerson threw', e); }
             $.ajax({
                 url: '{{ route("people.getSectionByDepartment") }}',
                 type: 'GET',
                 data: { department_id: departmentId },
                 success: function(res) {
-                    let html = '<option></option>';
-                    if (res.sections.length > 0) {
-                        $.each(res.sections, function(_, section) {
+                    let sections = (res && res.sections) || [];
+                    if (sections.length > 0) {
+                        let html = '<option></option>';
+                        $.each(sections, function(_, section) {
                             html += `<option value="${section.id}">${section.name}</option>`;
                         });
                         $('#section').html(html).trigger('change');
                     } else {
-                        // No sections, load positions directly
+                        // No sections under this department — load positions directly off it.
                         loadPositions({ department_id: departmentId });
                     }
+                },
+                error: function(xhr) {
+                    console.error('getSectionByDepartment failed', xhr.status, xhr.responseText);
+                    // Still try to load positions by department so the user isn't stuck.
+                    loadPositions({ department_id: departmentId });
                 }
             });
         });
 
         // Section -> Position
-        $('#section').on('change', function() {
+        $(document).on('change', '#section', function() {
             let sectionId = $(this).val();
             $('#position').html('<option></option>').trigger('change');
             if (!sectionId) return;
             loadPositions({ section_id: sectionId });
         });
-            $('#position').on('change', function() {
-        
+
+        // Position -> Benefit Grid
+        $(document).on('change', '#position', function() {
                 let positionId = $(this).val();
                 $('#benefit_grid_level').html('<option></option>').trigger('change');
                 if (!positionId) return;
@@ -1814,7 +1828,6 @@
                     type: 'GET',
                     data: { position_id: positionId },
                     success: function(res) {
-                        console.log(res);
                         let html = '<option></option>';
                         html += `<option value="${res.benfitGrid_emp_id}" selected>${res.emp_grade_name}</option>`;
                         $('#entitle_switch').prop('checked', res.service === 'yes');
@@ -1822,7 +1835,8 @@
                         $('#entitle_overtime').prop('checked', res.overtime === 'yes');
                         $('#position_rank').val(res.position_rank);
                         $('#benefit_grid_level').html(html).trigger('change');
-                    }
+                    },
+                    error: function(xhr) { console.error('getBenefitGridByPosition failed', xhr.status, xhr.responseText); }
                 });
             });
        
@@ -1853,7 +1867,7 @@
         });
     }
 
-    function loadPositions(params) 
+    function loadPositions(params)
     {
         $.ajax({
             url: '{{ route("people.getPositionBySection") }}',
@@ -1861,11 +1875,12 @@
             data: params,
             success: function(res) {
                 let html = '<option></option>';
-                $.each(res.positions, function(_, position) {
+                $.each((res && res.positions) || [], function(_, position) {
                     html += `<option value="${position.id}">${position.position_title}</option>`;
                 });
                 $('#position').html(html).trigger('change');
-            }
+            },
+            error: function(xhr) { console.error('getPositionBySection failed', xhr.status, xhr.responseText); }
         });
     }
 
