@@ -144,7 +144,10 @@
                                 <th>Experience:</th>
                                 <td>
                                     @php
-                                        $totalExp = $Applicant_form_data->Total_Experiance ?? 0;
+                                        // Total_Experiance can be stored as a non-numeric string
+                                        // (e.g. "2 years"); cast to float so floor()/round() below
+                                        // don't TypeError in PHP 8 ("2 years" -> 2.0, "2.5" -> 2.5).
+                                        $totalExp = (float) ($Applicant_form_data->Total_Experiance ?? 0);
                                         if ($totalExp >= 1) {
                                             $years = floor($totalExp);
                                             $months = round(($totalExp - $years) * 12);
