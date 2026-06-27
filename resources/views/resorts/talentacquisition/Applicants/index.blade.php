@@ -628,6 +628,7 @@
                 $.ajax({
                     url: "{{ route('resort.ta.WaiInsights') }}",
                     type: 'POST',
+                    global: false, // we show our own modal spinner — suppress the page-level global loader
                     data: { id: id, _token: "{{ csrf_token() }}" },
                     success: function (res) {
                         if (res && res.success) {
