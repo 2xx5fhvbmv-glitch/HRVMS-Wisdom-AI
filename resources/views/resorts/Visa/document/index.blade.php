@@ -1480,6 +1480,14 @@
                                         $("#db_dob").val(dobFmt);
                                         $("#date_birth").val(dobFmt);
                                     }
+                                    // Map the MRZ ISO-3 nationality code to the dropdown's demonym
+                                    // and select it only if that option actually exists.
+                                    if (expiryResult.nationality) {
+                                        const demonym = MRZ_NATIONALITY_TO_DEMONYM[String(expiryResult.nationality).toUpperCase()];
+                                        if (demonym && $("#nationality option[value='" + demonym + "']").length) {
+                                            $("#nationality").val(demonym).trigger('change');
+                                        }
+                                    }
 
                                     if (expiryResult.status === "VALID")
                                     {
@@ -2490,6 +2498,56 @@
         return result;
     }
 
+    // MRZ encodes nationality as an ISO-3166 alpha-3 code; the dropdown uses
+    // demonyms. Map the codes we actually see for resort expats to the exact
+    // option strings used in #nationality. Unmapped codes are left for manual pick.
+    const MRZ_NATIONALITY_TO_DEMONYM = {
+        BGD: 'Bangladeshi', IND: 'Indian',     LKA: 'Sri Lankan', NPL: 'Nepalese',
+        PHL: 'Filipino',    PAK: 'Pakistani',   MDV: 'Maldivian',  IDN: 'Indonesian',
+        MMR: 'Burmese',     CHN: 'Chinese',     THA: 'Thai',       VNM: 'Vietnamese',
+        KEN: 'Kenyan',      NGA: 'Nigerian',    UGA: 'Ugandan',    EGY: 'Egyptian',
+        GBR: 'British',     USA: 'American',    RUS: 'Russian',    UKR: 'Ukrainian',
+        DEU: 'German',      FRA: 'French',      ITA: 'Italian',    ESP: 'Spanish',
+        ZAF: 'South African'
+    };
+
+    // Normalise a date string found on the passport's visual zone to DD/MM/YYYY.
+    // Handles "12 SEP 2024", "12/09/2024", "12-09-24" etc.
+    function normaliseVisualDate(raw) {
+        if (!raw) return '';
+        const months = { JAN:'01',FEB:'02',MAR:'03',APR:'04',MAY:'05',JUN:'06',JUL:'07',AUG:'08',SEP:'09',OCT:'10',NOV:'11',DEC:'12' };
+        let m = raw.match(/(\d{1,2})[\s\/\-.]+([A-Z]{3})[A-Z]*[\s\/\-.]+(\d{2,4})/i);
+        if (m) {
+            const mon = months[m[2].toUpperCase()];
+            if (!mon) return '';
+            let y = m[3].length === 2 ? '20' + m[3] : m[3];
+            return `${m[1].padStart(2,'0')}/${mon}/${y}`;
+        }
+        m = raw.match(/(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})/);
+        if (m) {
+            let y = m[3].length === 2 ? '20' + m[3] : m[3];
+            return `${m[1].padStart(2,'0')}/${m[2].padStart(2,'0')}/${y}`;
+        }
+        return '';
+    }
+
+    // Best-effort issue-date extraction from full-page (non-MRZ) passport OCR.
+    // The issue date isn't in the MRZ, so we look for a date next to an
+    // "issue"-type label. Returns DD/MM/YYYY or ''.
+    function findIssueDate(fullText) {
+        if (!fullText) return '';
+        const t = fullText.replace(/\r/g, ' ');
+        const m = t.match(/(?:date\s*of\s*issue|issue\s*date|issued\s*on|date\s*d['’]?\s*issue)\D{0,25}(\d{1,2}[\s\/\-.]+(?:[A-Z]{3}[A-Z]*|\d{1,2})[\s\/\-.]+\d{2,4})/i);
+        if (m) return normaliseVisualDate(m[1]);
+        return '';
+    }
+
+    // OCR a canvas for free text (no MRZ whitelist) — used for the visual zone.
+    async function ocrCanvasFullText(canvas) {
+        const { data } = await Tesseract.recognize(canvas, 'eng');
+        return (data && data.text) ? data.text : '';
+    }
+
     async function PassportExpiry()
     {
         // Locate the uploaded passport (PDF or image). Resolve gracefully if none.
@@ -2527,16 +2585,26 @@
                     minValid.setMonth(minValid.getMonth() + 6);
                     validity = exp < minValid ? 'NOT VALID' : 'VALID';
                 }
+
+                // Second pass (best-effort): the issue date lives in the visual
+                // zone, not the MRZ, so OCR the page again without the whitelist
+                // and look for a date next to an "issue" label. Never blocks.
+                let issueDate = '';
+                try {
+                    const fullText = await ocrCanvasFullText(canvas);
+                    issueDate = findIssueDate(fullText);
+                } catch (e) { /* ignore — issue date stays manual */ }
+
                 return {
                     status: validity,           // '', 'VALID' or 'NOT VALID' (badge only; never blocks)
                     message: 'Passport read',
                     expiryDate: mrz.expiry || '',
-                    issue_date: '',             // issue date is not encoded in the MRZ
+                    issue_date: issueDate,      // best-effort from the visual zone (may be '')
                     passportno: mrz.passportno || '',
                     first_name: mrz.givenNames || '',
                     last_name: mrz.surname || '',
                     dob: mrz.dob || '',
-                    nationality: mrz.nationality || '',
+                    nationality: mrz.nationality || '',   // ISO-3 code; mapped to a demonym at fill time
                 };
             }
 
