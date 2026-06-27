@@ -638,6 +638,7 @@
                                 + '<div style="font-size:48px;font-weight:700;line-height:1.1;" class="text-' + res.color + '">' + res.score + '%</div>'
                                 + '<div class="mb-2"><span class="badge bg-' + res.color + '">' + res.label + '</span></div>'
                                 + '<div class="progress" style="height:10px;"><div class="progress-bar bg-' + res.color + '" role="progressbar" style="width:' + res.score + '%;"></div></div>'
+                                + (res.summary ? '<p class="mt-3 mb-0 text-start">' + $('<div>').text(res.summary).html() + '</p>' : '')
                                 + '<small class="text-muted d-block mt-3">AI-estimated match between the applicant\'s CV and the job description. Use as guidance alongside your own review.</small>'
                             );
                         } else {

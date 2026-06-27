@@ -161,11 +161,14 @@ class ApplicantsController extends Controller
         elseif ($score >= 50) { $label = 'Moderate match'; $color = 'warning'; }
         else                  { $label = 'Weak match';     $color = 'danger';  }
 
+        $summary = isset($data['summary']) ? trim((string) $data['summary']) : '';
+
         return response()->json([
             'success'   => true,
             'score'     => $score,
             'label'     => $label,
             'color'     => $color,
+            'summary'   => $summary,
             'applicant' => ucfirst(trim($applicant->first_name.' '.$applicant->last_name)),
             'position'  => $positionTitle ?: '—',
         ]);
