@@ -445,6 +445,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get('/talent-acquisition/fresh-applicant', 'TalentAcquisition\VacancyController@GetAllApplicatioWiseVacancies')->name('resort.vacancies.FreshApplicant');
 
     Route::get('/talent-acquisition/vacancies/fresh-applicant', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','GetVacnacyWiseApplicants'])->name('resort.ta.getApplicant');
+    Route::post('/talent-acquisition/applicant/wai-insights', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','WaiApplicantInsights'])->name('resort.ta.WaiInsights');
     Route::Post('/talent-acquisition/applicant-note', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','ApplicantNote'])->name('resort.ta.ApplicantNote');
 
     Route::post('/talent-acquisition/applicant-status', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','ApplicantWiseStatus'])->name('resort.ta.ApplicantWiseStatus');
