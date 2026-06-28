@@ -1419,7 +1419,7 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
        Route::get('visa/nationality-wise-employee-deposit-and-count-details', 'Visa\DashboardController@NatioanlityWiseEmployeeDepositAndCountDetails')->name('resort.visa.NatioanlityWiseEmployeeDepositAndCountDetails');
 
 
-      Route::get('visa/liability-breakdown', 'Visa\DashboardController@LiabilityBreakDown')->name('resort.visa.LiabilityBreakDown');
+      Route::get('visa/dashboard/liability-breakdown', 'Visa\DashboardController@LiabilityBreakDown')->name('resort.visa.LiabilityBreakDown');
       Route::get('visa/nationality-wise-employee-breakdown-chart', 'Visa\DashboardController@NatioanlityWiseEmployeeBreakDownChart')->name('resort.visa.NatioanlityWiseEmployeeBreakDownChart');
       Route::get('visa/dashboard-flag-wise-get-data', 'Visa\DashboardController@DasbhoardFlagWiseGetData')->name('resort.visa.DasbhoardFlagWiseGetData');
 
