@@ -674,6 +674,54 @@ class DashboardController extends Controller
         ]);
     }
 
+    /**
+     * Build the per-row employee entries the Overdue Alerts list renders from a
+     * collection of fee rows — WITHOUT the per-row Employee query that made tab
+     * switching slow. The old code ran `Employee::with(...)->first()` AND a
+     * profile-picture lookup for EVERY fee row, so an employee with 12 monthly
+     * installments was fetched 12× (a classic N+1). This loads every employee in
+     * one query and caches each profile picture once.
+     *
+     * @param  \Illuminate\Support\Collection $rows    Fee rows (need employee_id + $dateCol)
+     * @param  string                         $dateCol Date column used for the overdue calc
+     */
+    private function buildDashboardOverdueEntries($rows, string $dateCol): array
+    {
+        if ($rows->isEmpty()) {
+            return [];
+        }
+        $empIds = $rows->pluck('employee_id')->filter()->unique()->values();
+        $emps = Employee::with(['resortAdmin', 'position', 'department'])
+            ->whereIn('id', $empIds)->get()->keyBy('id');
+
+        $now = Carbon::now();
+        $picCache = [];
+        $entries = [];
+        foreach ($rows as $w) {
+            $emp = $emps->get($w->employee_id);
+            if (!$emp) {
+                continue;
+            }
+            $overdueDays = $w->$dateCol ? Carbon::parse($w->$dateCol)->diffInDays($now, false) : 0;
+            $due = $overdueDays > 0 ? " $overdueDays days overdue." : null;
+
+            $adminId = $emp->resortAdmin->id ?? null;
+            if ($adminId !== null && !array_key_exists($adminId, $picCache)) {
+                $picCache[$adminId] = Common::getResortUserPicture($adminId);
+            }
+
+            $entries[] = [
+                "Emp_name"        => trim(($emp->resortAdmin->first_name ?? '') . ' ' . ($emp->resortAdmin->last_name ?? '')),
+                "Emp_id"          => $emp->Emp_id,
+                "Department_name" => $emp->department->name ?? 'N/A',
+                "Position_name"   => $emp->position->position_title ?? 'N/A',
+                "ProfilePic"      => $adminId !== null ? $picCache[$adminId] : null,
+                'overDue_status'  => $due,
+            ];
+        }
+        return $entries;
+    }
+
     public function DasbhoardFlagWiseGetData(Request $request)
     {
         $flag            = $request->triggerPoint;
@@ -738,35 +786,8 @@ class DashboardController extends Controller
         {
             
             $WorkPermit =    WorkPermit::where('resort_id', $resort_id)->whereBetween("Due_Date",[$StartDate,$EndDate])->get();
-            $WorkPermit->map(function($w) use(&$employee)
-            {
+            $employee = $this->buildDashboardOverdueEntries($WorkPermit, 'Due_Date');
 
-                 $today = Carbon::now();
-                        $dueDate = Carbon::parse($w->Due_Date);
-                        $overdueDays = $dueDate->diffInDays($today, false);
-                        if ($overdueDays > 0) 
-                        {
-                            $due = " $overdueDays days overdue.";
-                        } else {
-                            $due = null; 
-                        }
-            
-                        $w->overdue_status = $due;
-
-                    $emp = Employee::with(['resortAdmin', 'position', 'department'])->where('id', $w->employee_id)->first();
-                    $employee[]=[      
-                                    "Emp_name"=>$emp->resortAdmin->first_name . ' ' . $emp->resortAdmin->last_name,
-                                    "Emp_id" => $emp->Emp_id,
-                                    "Department_name" => $emp->department->name ?? 'N/A',
-                                    "Position_name"=> $emp->position->position_title ?? 'N/A',
-                                    "ProfilePic"  => Common::getResortUserPicture($emp->resortAdmin->id),
-                                    'overDue_status' =>  $due,
-                                ];
-                   
-
-                    return $w;
-            });
-            
             $TotalPaidAmt         =    Common::formatMvr($WorkPermit->where('Status', 'Paid')->sum('Amt'));
             $TotalUnpaidAmt       =    Common::formatMvr($WorkPermit->where('Status', 'Unpaid')->sum('Amt'));
             $Totalemployees       =    $WorkPermit->groupBy('employee_id')->count('employee_id');
@@ -783,34 +804,7 @@ class DashboardController extends Controller
         {
 
             $QuotaSlotRenewal     =   QuotaSlotRenewal::where('resort_id', $resort_id)->whereBetween("Due_Date",[$StartDate,$EndDate])->get();
-           
-                $QuotaSlotRenewal->map(function($w) use(&$employee)
-                {
-                     $today = Carbon::now();
-                        $dueDate = Carbon::parse($w->Due_Date);
-                        $overdueDays = $dueDate->diffInDays($today, false);
-                        if ($overdueDays > 0) 
-                        {
-                            $due = " $overdueDays days overdue.";
-                        } else {
-                            $due = null; 
-                        }
-            
-                        $w->overdue_status = $due;
-
-                    $emp = Employee::with(['resortAdmin', 'position', 'department'])->where('id', $w->employee_id)->first();
-                    $employee[]=[      
-                                    "Emp_name"=>$emp->resortAdmin->first_name . ' ' . $emp->resortAdmin->last_name,
-                                    "Emp_id" => $emp->Emp_id,
-                                    "Department_name" => $emp->department->name ?? 'N/A',
-                                    "Position_name"=> $emp->position->position_title ?? 'N/A',
-                                    "ProfilePic"  => Common::getResortUserPicture($emp->resortAdmin->id),
-                                    'overDue_status' =>  $due,
-                                ];
-                   
-
-                    return $w;
-                });
+            $employee = $this->buildDashboardOverdueEntries($QuotaSlotRenewal, 'Due_Date');
             $TotalPaidAmt         =    Common::formatMvr($QuotaSlotRenewal->where('Status', 'Paid')->sum('Amt'));
 
             $TotalUnpaidAmt       =    Common::formatMvr($QuotaSlotRenewal->where('Status', 'Unpaid')->sum('Amt'));
@@ -823,35 +817,7 @@ class DashboardController extends Controller
         elseif($flag == "Insurance")
         {
             $EmployeeInsurance    =   EmployeeInsurance::where('resort_id', $resort_id)->whereBetween("insurance_end_date",[$StartDate,$EndDate])->get();
-
-            $EmployeeInsurance->map(function($w) use(&$employee)
-            {
-                $today = Carbon::now();
-                // EmployeeInsurance has no Due_Date column — use insurance_end_date
-                // to compute the overdue label (same column used in the filter above).
-                $dueDate = Carbon::parse($w->insurance_end_date);
-                $overdueDays = $dueDate->diffInDays($today, false);
-                if ($overdueDays > 0) 
-                {
-                    $due = " $overdueDays days overdue.";
-                } else {
-                    $due = null; 
-                }
-    
-                $w->overdue_status = $due;
-
-                $emp = Employee::with(['resortAdmin', 'position', 'department'])->where('id', $w->employee_id)->first();
-                $employee[]=[      
-                                "Emp_name"=>$emp->resortAdmin->first_name . ' ' . $emp->resortAdmin->last_name,
-                                "Emp_id" => $emp->Emp_id,
-                                "Department_name" => $emp->department->name ?? 'N/A',
-                                "Position_name"=> $emp->position->position_title ?? 'N/A',
-                                "ProfilePic"  => Common::getResortUserPicture($emp->resortAdmin->id),
-                                'overDue_status' =>  $due,
-                            ];
-               
-                return $w;
-            });
+            $employee = $this->buildDashboardOverdueEntries($EmployeeInsurance, 'insurance_end_date');
             // Total Paid = sum of Premium for policies whose start falls in the
             // selected window AND are marked Status='Paid' (column added in
             // 2026_05_14 migration). Existing rows backfilled to Paid.
@@ -868,33 +834,7 @@ class DashboardController extends Controller
         elseif($flag == "PermitMedicalFee")
         {
             $WorkPermitMedicalRenewal    =   WorkPermitMedicalRenewal::where('resort_id', $resort_id)->whereBetween("end_date",[$StartDate,$EndDate])->get();
-            $WorkPermitMedicalRenewal->map(function($w) use(&$employee)
-            {
-
-                $today = Carbon::now();
-                // WorkPermitMedicalRenewal has no Due_Date column — use end_date
-                // to compute overdue (same column used in the filter above).
-                $dueDate = Carbon::parse($w->end_date);
-                $overdueDays = $dueDate->diffInDays($today, false);
-                if ($overdueDays > 0) 
-                {
-                    $due = " $overdueDays days overdue.";
-                } else {
-                    $due = null; 
-                }
-    
-                $w->overdue_status = $due;
-
-                $emp = Employee::with(['resortAdmin', 'position', 'department'])->where('id', $w->employee_id)->first();
-                $employee[]=[      
-                                "Emp_name"=>$emp->resortAdmin->first_name . ' ' . $emp->resortAdmin->last_name,
-                                "Emp_id" => $emp->Emp_id,
-                                "Department_name" => $emp->department->name ?? 'N/A',
-                                "Position_name"=> $emp->position->position_title ?? 'N/A',
-                                "ProfilePic"  => Common::getResortUserPicture($emp->resortAdmin->id),
-                                'overDue_status' =>  $due,
-                            ];
-            });
+            $employee = $this->buildDashboardOverdueEntries($WorkPermitMedicalRenewal, 'end_date');
             // Total Paid = sum Amt for renewals whose start falls in the selected
             // window AND are marked Status='Paid' (column added in 2026_05_14
             // migration). Was using current month + no Status filter.
@@ -909,35 +849,7 @@ class DashboardController extends Controller
         elseif($flag == "WorkVisa")
         {
             $VisaRenewal                 =   VisaRenewal::where('resort_id', $resort_id)->whereBetween("end_date",[$StartDate,$EndDate])->get();
-            $VisaRenewal->map(function($w) use(&$employee)
-            {
-
-                $today = Carbon::now();
-                // VisaRenewal has no Due_Date column — use end_date
-                // to compute overdue (same column used in the filter above).
-                $dueDate = Carbon::parse($w->end_date);
-                $overdueDays = $dueDate->diffInDays($today, false);
-                if ($overdueDays > 0) 
-                {
-                    $due = " $overdueDays days overdue.";
-                } else {
-                    $due = null; 
-                }
-    
-                $w->overdue_status = $due;
-
-                $emp = Employee::with(['resortAdmin', 'position', 'department'])->where('id', $w->employee_id)->first();
-                $employee[]=[      
-                                "Emp_name"=>$emp->resortAdmin->first_name . ' ' . $emp->resortAdmin->last_name,
-                                "Emp_id" => $emp->Emp_id,
-                                "Department_name" => $emp->department->name ?? 'N/A',
-                                "Position_name"=> $emp->position->position_title ?? 'N/A',
-                                "ProfilePic"  => Common::getResortUserPicture($emp->resortAdmin->id),
-                                'overDue_status' =>  $due,
-                            ];
-
-                return $w;
-            });
+            $employee = $this->buildDashboardOverdueEntries($VisaRenewal, 'end_date');
             // Total Paid = sum Amt for visas whose start falls in the selected
             // window AND are marked Status='Paid' (column added in 2026_05_14
             // migration).
