@@ -41,6 +41,22 @@
 
         </div>
     </div>
+  <!-- Per-category liability breakdown (how Total / Paid / Balance add up per employee) -->
+  <div class="modal fade" id="liability-breakdown-modal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="liabilityBreakdownTitle">Breakdown</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="liabilityBreakdownBody"></div>
+                <div class="modal-footer">
+                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Close</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
   <div class="modal fade" id="EmployeeList-modal-lg" tabindex="-1" aria-labelledby="myLargeModalLabel"
         aria-hidden="true">
         <div class="modal-dialog modal-lg">
@@ -84,6 +100,32 @@
 <script>
 $(document).ready(function(){
 $("#PaymentRequestRejectedForm").parsley();
+
+    // Per-category breakdown — show how the card's Total / Paid / Balance add up
+    // across each expat employee.
+    $(document).on("click", ".liabilityBreakdown", function() {
+        var flag = $(this).data("flag");
+        $("#liabilityBreakdownTitle").text("Liability Breakdown");
+        $("#liabilityBreakdownBody").html('<div class="text-center py-4"><div class="spinner-border text-primary" role="status"></div><p class="mt-2 mb-0">Loading breakdown…</p></div>');
+        $("#liability-breakdown-modal").modal("show");
+        $.ajax({
+            url: "{{ route('resort.visa.LiabilityBreakdown') }}",
+            type: "GET",
+            global: false,
+            data: { flag: flag, "_token": "{{ csrf_token() }}" },
+            success: function(response) {
+                if (response && response.success) {
+                    $("#liabilityBreakdownTitle").text((response.label || "Liability") + " — Breakdown");
+                    $("#liabilityBreakdownBody").html(response.html);
+                } else {
+                    $("#liabilityBreakdownBody").html('<p class="text-muted mb-0">' + ((response && response.message) || 'Could not load the breakdown.') + '</p>');
+                }
+            },
+            error: function() {
+                $("#liabilityBreakdownBody").html('<p class="text-danger mb-0">Something went wrong loading the breakdown.</p>');
+            }
+        });
+    });
 
     $(document).on("click", ".findEmploees", function() {
         var date = $("#hiddenInput").val();

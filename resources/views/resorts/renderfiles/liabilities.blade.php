@@ -57,7 +57,7 @@
                     <li>Paid Liability: {!! Common::formatCurrency($totalPermit, 'USD') !!}</li>
                     <li>Balance Liability: {!! Common::formatCurrency($TotalBalanceWorkPermitfees, 'USD') !!}</li>
                 </ul>
-
+                <a href="javascript:void(0)" class="a-link liabilityBreakdown" data-flag="WorkPermit"><i class="fa-solid fa-list-ul me-1"></i>View breakdown</a>
             </div>
         </div>
         <div class="d-lg-flex align-items-center">
@@ -74,7 +74,7 @@
                     <li>Paid Liability: {!! Common::formatCurrency($totalQuota, 'USD') !!}</li>
                     <li>Balance Liability: {!! Common::formatCurrency($TotalBalanceQuotaSlotDeposit, 'USD') !!}</li>
                 </ul>
-
+                <a href="javascript:void(0)" class="a-link liabilityBreakdown" data-flag="QuotaSlot"><i class="fa-solid fa-list-ul me-1"></i>View breakdown</a>
             </div>
         </div>
         {{-- <div class="d-lg-flex align-items-center">
@@ -106,7 +106,7 @@
                     <li>Paid Liability: {!! Common::formatCurrency($totalInsurance, 'USD') !!}</li>
                     <li>Balance Liability: {!! Common::formatCurrency($TotalBalanceMedicalInsuranceInternational, 'USD') !!}</li>
                 </ul>
-
+                <a href="javascript:void(0)" class="a-link liabilityBreakdown" data-flag="Insurance"><i class="fa-solid fa-list-ul me-1"></i>View breakdown</a>
             </div>
         </div>
         <div class="d-lg-flex align-items-center">
@@ -122,7 +122,7 @@
                     <li>Paid Liability: {!! Common::formatCurrency($totalMedical, 'USD') !!}</li>
                     <li>Balance Liability: {!! Common::formatCurrency($TotalBalanceWorkPermitMedicalTestFee, 'USD') !!}</li>
                 </ul>
-
+                <a href="javascript:void(0)" class="a-link liabilityBreakdown" data-flag="Medical"><i class="fa-solid fa-list-ul me-1"></i>View breakdown</a>
             </div>
         </div>
     </div>
