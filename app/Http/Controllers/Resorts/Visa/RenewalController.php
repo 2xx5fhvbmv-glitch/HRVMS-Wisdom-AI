@@ -159,9 +159,11 @@ class RenewalController extends Controller
                                                 ->first(['employee_id', 'Month', 'Amt', 'Payment_Date', 'Due_Date', 'Currency', 'Reciept_file','PaymentType']);
             if($QuotaSlotRenewal)
             {
-                // Unified "next due" — earliest UNPAID slot installment (matches the
-                // Payment Request + Xpat pages); falls back to this row's date.
-                $slotDue = \App\Helpers\Common::visaNextDue(QuotaSlotRenewal::class, $this->resort->resort_id, $emp_id, 'Due_Date', 'asc') ?: $QuotaSlotRenewal->Due_Date;
+                // "Last Slot month" = the LAST month of the current schedule (latest
+                // Due_Date), so the card matches the schedule's final row — not the
+                // next-due date used on the Payment Request / Xpat pages.
+                $slotDue = QuotaSlotRenewal::where('resort_id', $this->resort->resort_id)->where('employee_id', $emp_id)
+                    ->whereNotNull('Due_Date')->max('Due_Date') ?: $QuotaSlotRenewal->Due_Date;
                 $QuotaSlotRenewal_end_date = Carbon::parse($slotDue);
 
                 $QuotaSlotRenewal_months_diff = $start->diffInMonths($QuotaSlotRenewal_end_date);
@@ -193,9 +195,10 @@ class RenewalController extends Controller
      
             if($WorkPermitRenewal)
             {
-                // Unified "next due" — earliest UNPAID Work Permit fee (matches the
-                // Payment Request + Xpat pages); falls back to this row's date.
-                $wpDue = \App\Helpers\Common::visaNextDue(WorkPermit::class, $this->resort->resort_id, $emp_id, 'Due_Date', 'asc') ?: $WorkPermitRenewal->Due_Date;
+                // "Last Work Permit month" = the LAST month of the current schedule
+                // (latest Due_Date), so the card matches the schedule's final row.
+                $wpDue = WorkPermit::where('resort_id', $this->resort->resort_id)->where('employee_id', $emp_id)
+                    ->whereNotNull('Due_Date')->max('Due_Date') ?: $WorkPermitRenewal->Due_Date;
                 $WorkPermitRenewal_end_date = Carbon::parse($wpDue);
 
                 $WorkPermitRenewal_months_diff = $start->diffInMonths($WorkPermitRenewal_end_date);
