@@ -334,6 +334,129 @@ class LiabilitiesController extends Controller
             $page_title =  'Liabilities';
             return view('resorts.Visa.liabilities.index',compact('page_title'));
     }
+
+    /**
+     * Per-employee breakdown for one liability category, so HR can see exactly
+     * how the card's Total / Paid / Balance add up (they couldn't reconcile it
+     * manually). For every active expat it shows:
+     *   - Budgeted : the configured fee (USD) — the same per-employee amount the
+     *                card's "Total Liability" projects across the headcount.
+     *   - Paid     : that employee's actual settled amount for the category (USD),
+     *                computed identically to the Index() totals so they reconcile.
+     *   - Balance  : Budgeted − Paid.
+     * The column sums equal the card's Total / Paid / Balance.
+     */
+    public function LiabilityBreakdown(Request $request)
+    {
+        $flag = $request->flag;
+        $rid  = $this->resort->resort_id;
+
+        // Full range — matches the (un-windowed) card totals.
+        $filterStart = Carbon::create(2000, 1, 1)->startOfDay();
+        $filterEnd   = Carbon::now()->addYears(5)->endOfYear();
+
+        $map = [
+            'WorkPermit' => ['label' => 'Work Permit Fee', 'cfg' => 'WORK PERMIT FEE'],
+            'QuotaSlot'  => ['label' => 'Slot Payment',    'cfg' => 'QUOTA SLOT DEPOSIT'],
+            'Insurance'  => ['label' => 'Insurance',       'cfg' => 'MEDICAL INSURANCE - INTERNATIONAL'],
+            'Medical'    => ['label' => 'Medical',         'cfg' => 'WORK VISA MEDICAL TEST FEE'],
+        ];
+        if (!isset($map[$flag])) {
+            return response()->json(['success' => false, 'message' => 'Unknown category'], 422);
+        }
+
+        $config       = Common::VisaRenewalCost($rid);
+        $cfgKey       = $map[$flag]['cfg'];
+        $budgetPerEmp = $this->toUsd($config[$cfgKey]['amount'] ?? 0, $config[$cfgKey]['unit'] ?? 'MVR');
+
+        $employees = Employee::with(['resortAdmin', 'position', 'department', 'WorkPermit', 'EmployeeInsurance', 'WorkPermitMedicalRenewal', 'QuotaSlotRenewal'])
+            ->whereRaw('LOWER(TRIM(nationality)) != ?', ['maldivian'])
+            ->where('status', 'Active')
+            ->where('resort_id', $rid)
+            ->get();
+
+        $rows = [];
+        $sumBudget = $sumPaid = 0;
+        $paidCount = 0;
+
+        foreach ($employees as $employee) {
+            $paid = 0.0;
+
+            if ($flag === 'WorkPermit') {
+                $amt = $employee->WorkPermit->where('Status', 'Paid')
+                    ->filter(fn($w) => $w->Due_Date && Carbon::parse($w->Due_Date)->between($filterStart, $filterEnd))
+                    ->sum('Amt');
+                $paid = $this->toUsd($amt, 'MVR');
+            } elseif ($flag === 'QuotaSlot') {
+                $amt = $employee->QuotaSlotRenewal->where('Status', 'Paid')
+                    ->filter(fn($w) => $w->Due_Date && Carbon::parse($w->Due_Date)->between($filterStart, $filterEnd))
+                    ->sum('Amt');
+                $paid = $this->toUsd($amt, 'MVR');
+            } elseif ($flag === 'Insurance') {
+                // Latest insurance — same source as Index() so the totals reconcile.
+                $ins = $employee->EmployeeInsurance()->orderBy('id', 'desc')->first();
+                if ($ins && $ins->insurance_end_date && Carbon::parse($ins->insurance_end_date)->between($filterStart, $filterEnd)) {
+                    $paid = $this->toUsd($ins->Premium, $ins->Currency ?? 'MVR');
+                }
+            } elseif ($flag === 'Medical') {
+                $med = $employee->WorkPermitMedicalRenewal;
+                if ($med && $med->end_date && Carbon::parse($med->end_date)->between($filterStart, $filterEnd)) {
+                    $paid = $this->toUsd($med->Amt, $med->Currency ?? 'MVR');
+                }
+            }
+
+            $balance = $budgetPerEmp - $paid;
+            if ($paid > 0) { $paidCount++; }
+            $sumBudget += $budgetPerEmp;
+            $sumPaid   += $paid;
+
+            $rows[] = [
+                'name'    => trim(($employee->resortAdmin->first_name ?? '') . ' ' . ($employee->resortAdmin->last_name ?? '')),
+                'emp_id'  => $employee->Emp_id,
+                'dept'    => $employee->department->name ?? 'N/A',
+                'budget'  => $budgetPerEmp,
+                'paid'    => $paid,
+                'balance' => $balance,
+            ];
+        }
+
+        // Paid first (most relevant), then by name.
+        usort($rows, function ($a, $b) {
+            if (($b['paid'] <=> $a['paid']) !== 0) return $b['paid'] <=> $a['paid'];
+            return strcmp($a['name'], $b['name']);
+        });
+
+        $sumBalance = $sumBudget - $sumPaid;
+
+        $body = '';
+        foreach ($rows as $i => $r) {
+            $body .= '<tr>'
+                . '<td>' . ($i + 1) . '</td>'
+                . '<td><div class="fw-600">' . e($r['name']) . '</div><small class="text-muted">' . e($r['emp_id']) . ' · ' . e($r['dept']) . '</small></td>'
+                . '<td class="text-end">' . Common::formatCurrency($r['budget'], 'USD') . '</td>'
+                . '<td class="text-end">' . Common::formatCurrency($r['paid'], 'USD') . '</td>'
+                . '<td class="text-end">' . Common::formatCurrency($r['balance'], 'USD') . '</td>'
+                . '</tr>';
+        }
+
+        $html = '<div class="mb-2 small text-muted">Total Liability is the configured fee (<b>'
+            . Common::formatCurrency($budgetPerEmp, 'USD') . '</b> per expat) projected across <b>' . count($rows)
+            . '</b> active expats. <b>' . $paidCount . '</b> have paid so far.</div>'
+            . '<div class="table-responsive"><table class="table table-bordered table-sm align-middle mb-0">'
+            . '<thead><tr><th>#</th><th>Employee</th><th class="text-end">Budgeted</th><th class="text-end">Paid</th><th class="text-end">Balance</th></tr></thead>'
+            . '<tbody>' . $body . '</tbody>'
+            . '<tfoot><tr class="fw-bold table-light"><td colspan="2" class="text-end">Total</td>'
+            . '<td class="text-end">' . Common::formatCurrency($sumBudget, 'USD') . '</td>'
+            . '<td class="text-end">' . Common::formatCurrency($sumPaid, 'USD') . '</td>'
+            . '<td class="text-end">' . Common::formatCurrency($sumBalance, 'USD') . '</td></tr></tfoot>'
+            . '</table></div>';
+
+        return response()->json([
+            'success' => true,
+            'label'   => $map[$flag]['label'],
+            'html'    => $html,
+        ]);
+    }
     /**
      * Convert a stored amount (in its own currency) to USD. The liability
      * summary view renders every figure via formatCurrency(..,'USD'), so all

@@ -1464,6 +1464,7 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
       // Liabilities
       Route::get('visa/liabilities','Visa\LiabilitiesController@Index')->name('resort.visa.Liabilities');
       Route::get('visa/fetch-total-employees','Visa\LiabilitiesController@FetchTotalEmployees')->name('resort.visa.FetchTotalEmployees');
+      Route::get('visa/liability-breakdown','Visa\LiabilitiesController@LiabilityBreakdown')->name('resort.visa.LiabilityBreakdown');
 
     //Incident Module
 
