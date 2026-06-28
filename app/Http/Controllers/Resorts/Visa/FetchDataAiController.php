@@ -333,13 +333,18 @@ class FetchDataAiController extends Controller
         $insuranceExpiry = $this->aiDate($fields['Insurance Expiry Date'] ?? null);
         if ($insuranceExpiry) {
             $medical_data = $ResortBudgetCost['MEDICAL INSURANCE - INTERNATIONAL'] ?? null;
+            // 1-year validity: prefer the document's FROM date, else end - 1 year.
+            $insuranceStart = $this->aiDate($fields['Insurance Start Date'] ?? null)
+                ?? $insuranceExpiry->copy()->subYearNoOverflow()->addDay();
             EmployeeInsurance::create([
-                'resort_id'            => $resortId,
-                'employee_id'          => $employee->id,
-                'Premium'              => $medical_data['amount'] ?? 0.00,
-                'Currency'             => $medical_data['unit'] ?? null,
-                'insurance_start_date' => $insuranceExpiry->format('Y-m-d'),
-                'insurance_end_date'   => $insuranceExpiry->format('Y-m-d'),
+                'resort_id'               => $resortId,
+                'employee_id'             => $employee->id,
+                'insurance_company'       => $fields['Insurance Company Name'] ?? null,
+                'insurance_policy_number' => $fields['Policy Number'] ?? null,
+                'Premium'                 => $medical_data['amount'] ?? 0.00,
+                'Currency'                => $medical_data['unit'] ?? null,
+                'insurance_start_date'    => $insuranceStart->format('Y-m-d'),
+                'insurance_end_date'      => $insuranceExpiry->format('Y-m-d'),
             ]);
             $insuranceAmt = $medical_data['amount'] ?? 0.00;
         }
