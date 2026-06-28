@@ -754,12 +754,24 @@ class RenewalController extends Controller
         } 
         if($flag =="QuotaSlot")
         {
-            // Guard against duplicate schedules (same reason as Work Permit above):
-            // renewing again while a schedule is unpaid, or once as Lumpsum and once
-            // as Installment, appended a second set of rows — double-charging.
-            if (QuotaSlotRenewal::where('resort_id', $this->resort->resort_id)->where('employee_id', $emp_id)
-                    ->whereRaw("LOWER(COALESCE(Status,'')) <> 'paid'")->exists()) {
-                return response()->json(['success'=>false,'message'=>'A pending Quota Slot schedule already exists for this employee. Settle (or remove) it before renewing again.','status'=>409]);
+            // Guard against overlapping / premature re-renewal.
+            //  - Installment cycle: block while any row is still unpaid — settle the
+            //    current cycle first; once fully paid HR may renew the next cycle.
+            //  - Lumpsum cycle: it is created already-PAID, so "all paid" is NOT a
+            //    readiness signal. Block until the covered period has actually ended
+            //    (its latest Due_Date reaches today), otherwise a second renewal
+            //    stacks another year ahead (the bug where the slot showed
+            //    Jun 2027-May 2028 a year early).
+            $slotBase   = QuotaSlotRenewal::where('resort_id', $this->resort->resort_id)->where('employee_id', $emp_id);
+            $slotLatest = (clone $slotBase)->whereNotNull('Due_Date')->orderByDesc('Due_Date')->first();
+            if ($slotLatest) {
+                $isLumpsumCycle = strtolower((string) $slotLatest->PaymentType) === 'lumpsum';
+                $hasUnpaid      = (clone $slotBase)->whereRaw("LOWER(COALESCE(Status,'')) <> 'paid'")->exists();
+                $coversFuture   = Carbon::parse($slotLatest->Due_Date)->gt(Carbon::today());
+                if (($isLumpsumCycle && $coversFuture) || (!$isLumpsumCycle && $hasUnpaid)) {
+                    $until = Carbon::parse($slotLatest->Due_Date)->format('d M Y');
+                    return response()->json(['success'=>false,'message'=>"This employee's Quota Slot is already scheduled through {$until}. Settle the current cycle (installment) or wait until it ends (lump-sum) before renewing again.",'status'=>409]);
+                }
             }
 
             $qotaslotAMt =  $ResortBudgetCost['QUOTA SLOT DEPOSIT'] ?? 0.00;
