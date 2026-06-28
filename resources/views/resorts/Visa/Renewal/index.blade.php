@@ -455,14 +455,17 @@ $(document).ready(function ()
                                                     <h3>Quota Slot Renewal</h3>
                                                 </div>
                                                 <div class="col-sm-auto col-12 order-sm-last order-1 text-end">
-                                                
+
                                                 </div>
                                             </div>
-                                            
+
                                         </div>
                                         <div class="card-body">
                                             <div class="row gx-2">
-                                                No  Record Found
+                                                <p class="mb-2">No active slot schedule.</p>
+                                                <div class="col-12">
+                                                    <a href="javascript:void(0)" data-emp_id="${id}" data-flag="QuotaSlot" class="QuotaSlot btn btn-themeBlue btn-sm">Renew</a>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -506,17 +509,20 @@ $(document).ready(function ()
                                         <div class="card-title">
                                             <div class="row g-2 ">
                                                 <div class="col order-sm-1 order-last">
-                                                    <h3>Work Permit</h3>
+                                                    <h3>Work Permit Renewal</h3>
                                                 </div>
                                                 <div class="col-sm-auto col-12 order-sm-last order-1 text-end">
-                                                
+
                                                 </div>
                                             </div>
-                                            
+
                                         </div>
                                         <div class="card-body">
                                             <div class="row gx-2">
-                                                No  Record Found
+                                                <p class="mb-2">No active work permit schedule.</p>
+                                                <div class="col-12">
+                                                    <a href="javascript:void(0)" data-emp_id="${id}" data-flag="WorkPermit" class="QuotaSlot btn btn-themeBlue btn-sm">Renew</a>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
