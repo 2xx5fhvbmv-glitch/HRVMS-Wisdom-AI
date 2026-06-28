@@ -279,13 +279,37 @@ $(document).ready(function(){
         var $cell = $input.closest('.fee-cell');
         $cell.find('.fee-amt').first().text('MVR ' + sum.toFixed(2));
         var note = n > 1
-            ? 'Paying ' + n + ' months in advance (through ' + (dues[n - 1] ? dues[n - 1].date : '') + ')'
+            ? 'Paying ' + n + ' months in advance (through ' + feeThroughDate(dues, n) + ')'
             : 'Paying current month only';
         $cell.find('.fee-months-note').text(note);
         recomputeRowTotal($input.closest('tr'));
         updateTopTotal();
     });
 });
+
+// Coverage-end date when paying N months: the next unpaid due (dues[n]) — the
+// due one month after the last month paid. e.g. dues = Dec, Jan, Feb… and you
+// pay 2 (Dec+Jan) → covered "through" Feb's due date. Falls back to last-paid +
+// 1 month when the schedule doesn't extend that far. Returned as "dd Mon yyyy".
+function feeMonthNames() {
+    return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+}
+function feeIsoToDMY(iso) {
+    if (!iso) return '';
+    var p = String(iso).split('-');
+    if (p.length < 3) return iso;
+    var mon = feeMonthNames()[parseInt(p[1], 10) - 1] || '';
+    return p[2] + ' ' + mon + ' ' + p[0];
+}
+function feeThroughDate(dues, n) {
+    if (dues[n] && dues[n].date) return feeIsoToDMY(dues[n].date);
+    var last = dues[n - 1] && dues[n - 1].date;
+    if (!last) return '';
+    var p = String(last).split('-');
+    var dt = new Date(parseInt(p[0], 10), parseInt(p[1], 10) - 1, parseInt(p[2], 10));
+    dt.setMonth(dt.getMonth() + 1);
+    return ('0' + dt.getDate()).slice(-2) + ' ' + feeMonthNames()[dt.getMonth()] + ' ' + dt.getFullYear();
+}
 
 // Row data-total = sum of every fee amount shown in the row, so the live top
 // total reflects multi-month selections.
