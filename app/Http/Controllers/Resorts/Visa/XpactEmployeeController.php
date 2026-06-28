@@ -543,6 +543,32 @@ class XpactEmployeeController extends Controller
         return response()->json(['status' => true, 'message' => 'Details updated successfully.']);
     }
 
+    /**
+     * Rows of the CURRENT renewal cycle for a fee schedule (Work Permit / Quota
+     * Slot). A renewal inserts all of its months in one batch (same created_at),
+     * and the renewal guard prevents a new renewal until the previous cycle is
+     * fully paid — so the NEWEST created_at batch is the active cycle.
+     *
+     * We return that whole batch (paid AND pending), so a month stays on the
+     * schedule after it's marked paid and only drops off when the NEXT renewal
+     * begins a fresh cycle (the prior, fully-paid cycle then shows only in the
+     * Past Transaction History). Falls back to all rows when created_at is absent.
+     */
+    private function currentScheduleCycle(string $modelClass, $employeeId)
+    {
+        $rid  = $this->resort->resort_id;
+        $base = $modelClass::where('employee_id', $employeeId)->where('resort_id', $rid);
+
+        $latest = (clone $base)->max('created_at');
+        if ($latest) {
+            // A renewal writes its rows within seconds; the previous cycle is a
+            // whole payment-cycle older, so a short window cleanly isolates the
+            // latest batch.
+            $base->where('created_at', '>=', Carbon::parse($latest)->subMinutes(2));
+        }
+        return $base->orderBy('Due_Date', 'ASC')->get();
+    }
+
     public function XpactEmpBudgetCost(Request $request)
     {
 
@@ -558,20 +584,14 @@ class XpactEmployeeController extends Controller
 
             if($request->flag =="Quota_Slot_Fee")
             {
-                $QuotaSlotRenewalPaid =  QuotaSlotRenewal::where('employee_id', $employee_id)->where('resort_id', $this->resort->resort_id)->orderBy('Month', 'ASC')
-                                                        ->get();
-                $PaidAmt = $QuotaSlotRenewalPaid->where("Status","Paid")->sum('Amt');
-                $UnPaidAmt = $QuotaSlotRenewalPaid->where("Status","Unpaid")->sum('Amt');
-
-                // Schedule shows only the CURRENT, still-payable cycle (pending
-                // rows). Once a month is paid it leaves the schedule and appears in
-                // the Past Transaction History — so previously-paid cycles don't
-                // pile up here after each renewal.
-                $CommonVariable = QuotaSlotRenewal::where('employee_id', $employee_id)->where('resort_id', $this->resort->resort_id)
-                                ->whereRaw("LOWER(COALESCE(Status,'')) <> 'paid'")
-                                ->orderBy('Due_Date', 'ASC')
-                                ->get()
-                                ->map(function($i)
+                // Show the CURRENT renewal cycle only (paid + pending). A paid month
+                // stays on the schedule until the NEXT renewal starts a fresh cycle,
+                // at which point the old cycle's rows drop out (they live in the Past
+                // Transaction History). See currentScheduleCycle().
+                $cycle = $this->currentScheduleCycle(QuotaSlotRenewal::class, $employee_id);
+                $PaidAmt   = $cycle->filter(fn($r) => strtolower((string) $r->Status) === 'paid')->sum('Amt');
+                $UnPaidAmt = $cycle->filter(fn($r) => strtolower((string) $r->Status) !== 'paid')->sum('Amt');
+                $CommonVariable = $cycle->map(function($i)
                                 {
                                     $i->type="QuotaSlot";
                                     return $i;
@@ -582,19 +602,10 @@ class XpactEmployeeController extends Controller
             }
             else
             {
-                $WorkPermit =  WorkPermit::where('employee_id', $employee_id)->where('resort_id', $this->resort->resort_id)->orderBy('Month', 'ASC')
-                    ->get();
-
-                    $PaidAmt = $WorkPermit->where("Status","Paid")->sum('Amt');
-                    $UnPaidAmt = $WorkPermit->where("Status","Unpaid")->sum('Amt');
-
-                    // Pending-only — paid months move to Past Transaction History
-                    // (see the Quota Slot branch above for the rationale).
-                    $CommonVariable = WorkPermit::where('employee_id', $employee_id)->where('resort_id', $this->resort->resort_id)
-                                    ->whereRaw("LOWER(COALESCE(Status,'')) <> 'paid'")
-                                    ->orderBy('Due_Date', 'ASC')
-                                    ->get()
-                                     ->map(function($i)
+                $cycle = $this->currentScheduleCycle(WorkPermit::class, $employee_id);
+                $PaidAmt   = $cycle->filter(fn($r) => strtolower((string) $r->Status) === 'paid')->sum('Amt');
+                $UnPaidAmt = $cycle->filter(fn($r) => strtolower((string) $r->Status) !== 'paid')->sum('Amt');
+                    $CommonVariable = $cycle->map(function($i)
                                     {
                                         $i->type="WorkPermit";
                                         return $i;
