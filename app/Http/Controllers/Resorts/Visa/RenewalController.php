@@ -700,22 +700,49 @@ class RenewalController extends Controller
             }
             elseif($payment_type =="Installment")
             {
-                $start_date = Carbon::today();
+                // Calendar-year aligned renewal. Continue from the month AFTER the
+                // latest existing row, through DECEMBER of that year — NOT a rolling
+                // 12-month window from today. This stops the schedule spilling into
+                // the next year and stops re-creating already-paid months as new
+                // "Pending" rows. Once the year's months are paid, the next renewal
+                // covers Jan–Dec of the following year.
+                $last = WorkPermit::where('resort_id', $this->resort->resort_id)
+                    ->where('employee_id', $emp_id)->whereNotNull('Due_Date')
+                    ->orderBy('Due_Date', 'desc')->first();
 
-               
-                for ($i = 1; $i <=12; $i++) 
-                {
-                    $new_date = $start_date->copy()->addMonths($i);
-                    WorkPermit::create([
-                                                'resort_id'=>$this->resort->resort_id,
-                                                'Due_Date'=> $new_date->format('Y-m-d'),
-                                                'employee_id'=> $emp_id,
-                                                'Month'=> $new_date->format('m'),
-                                                "Currency"=> $WorkPermit_amt['unit'] ?? 'MVR',
-                                                "Amt"=> $WorkPermit_amt['amount'],
-                                            ]);
+                if ($last) {
+                    $anchor = Carbon::parse($last->Due_Date)->addMonthNoOverflow(); // first month to create
+                    $dueDay = Carbon::parse($last->Due_Date)->day;                  // keep the same day-of-month
+                } else {
+                    $anchor = Carbon::today();
+                    $dueDay = Carbon::today()->day;
                 }
-            return  response()->json(['success'=>true,'message'=>' WorkPermit Renewal  successfully using the Installment Payment Type.','status'=>200]);
+
+                $year    = $anchor->year;
+                $created = 0;
+                for ($m = $anchor->month; $m <= 12; $m++) {
+                    // Defensive: never duplicate a month that already has a row.
+                    $exists = WorkPermit::where('resort_id', $this->resort->resort_id)
+                        ->where('employee_id', $emp_id)
+                        ->whereYear('Due_Date', $year)->whereMonth('Due_Date', $m)->exists();
+                    if ($exists) { continue; }
+
+                    $monthStart = Carbon::create($year, $m, 1);
+                    $day = min($dueDay, $monthStart->copy()->endOfMonth()->day);
+                    $due = $monthStart->copy()->day($day);
+
+                    WorkPermit::create([
+                        'resort_id'   => $this->resort->resort_id,
+                        'Due_Date'    => $due->format('Y-m-d'),
+                        'employee_id' => $emp_id,
+                        'Month'       => $due->format('m'),
+                        'Currency'    => $WorkPermit_amt['unit'] ?? 'MVR',
+                        'Amt'         => $WorkPermit_amt['amount'],
+                    ]);
+                    $created++;
+                }
+
+                return  response()->json(['success'=>true,'message'=>"Work Permit renewed for {$created} month(s) through December {$year}.",'status'=>200]);
             }
             else
             {
