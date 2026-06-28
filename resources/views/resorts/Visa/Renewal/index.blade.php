@@ -489,7 +489,7 @@ $(document).ready(function ()
                                 <div class="row  gx-2">
                                     <div class="col-12">
                                         <div class="renewal-innerbox">
-                                            <label>New slot</label>
+                                            <label>New Work Permit</label>
                                             <p>${WorkPermitRenewal.NewSlot}</p>
                                         </div>
                                     </div>
