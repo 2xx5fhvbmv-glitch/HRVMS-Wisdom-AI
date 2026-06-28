@@ -563,10 +563,13 @@ class XpactEmployeeController extends Controller
                 $PaidAmt = $QuotaSlotRenewalPaid->where("Status","Paid")->sum('Amt');
                 $UnPaidAmt = $QuotaSlotRenewalPaid->where("Status","Unpaid")->sum('Amt');
 
-                // Show ALL installments (paid + pending), chronologically — the
-                // schedule previously hid paid rows (Status=Unpaid filter), which
-                // dropped the paid months (e.g. the paid August installment).
-                $CommonVariable = QuotaSlotRenewal::where('employee_id', $employee_id)->where('resort_id', $this->resort->resort_id)->orderBy('Due_Date', 'ASC')
+                // Schedule shows only the CURRENT, still-payable cycle (pending
+                // rows). Once a month is paid it leaves the schedule and appears in
+                // the Past Transaction History — so previously-paid cycles don't
+                // pile up here after each renewal.
+                $CommonVariable = QuotaSlotRenewal::where('employee_id', $employee_id)->where('resort_id', $this->resort->resort_id)
+                                ->whereRaw("LOWER(COALESCE(Status,'')) <> 'paid'")
+                                ->orderBy('Due_Date', 'ASC')
                                 ->get()
                                 ->map(function($i)
                                 {
@@ -585,7 +588,11 @@ class XpactEmployeeController extends Controller
                     $PaidAmt = $WorkPermit->where("Status","Paid")->sum('Amt');
                     $UnPaidAmt = $WorkPermit->where("Status","Unpaid")->sum('Amt');
 
-                    $CommonVariable = WorkPermit::where('employee_id', $employee_id)->where('resort_id', $this->resort->resort_id)->orderBy('Due_Date', 'ASC')
+                    // Pending-only — paid months move to Past Transaction History
+                    // (see the Quota Slot branch above for the rationale).
+                    $CommonVariable = WorkPermit::where('employee_id', $employee_id)->where('resort_id', $this->resort->resort_id)
+                                    ->whereRaw("LOWER(COALESCE(Status,'')) <> 'paid'")
+                                    ->orderBy('Due_Date', 'ASC')
                                     ->get()
                                      ->map(function($i)
                                     {
