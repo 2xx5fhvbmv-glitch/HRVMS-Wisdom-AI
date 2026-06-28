@@ -790,6 +790,13 @@ class RenewalController extends Controller
                 $dueDay = Carbon::today()->day;
             }
 
+            // Lumpsum = one upfront payment, so every month is created already PAID
+            // with today's payment date. Installment = pay monthly, so rows start
+            // Pending (Unpaid).
+            $isLumpsum    = ($payment_type === 'Lumpsum');
+            $rowStatus    = $isLumpsum ? 'Paid' : 'Unpaid';
+            $rowPaymentDt = $isLumpsum ? Carbon::today()->format('Y-m-d') : null;
+
             $allocated = 0;
             for ($i = 0; $i < 12; $i++) {
                 $monthDate = $anchor->copy()->addMonths($i);
@@ -802,13 +809,15 @@ class RenewalController extends Controller
                 $allocated += $amt;
 
                 QuotaSlotRenewal::create([
-                    'resort_id'   => $this->resort->resort_id,
-                    'Due_Date'    => $due->format('Y-m-d'),
-                    'employee_id' => $emp_id,
-                    'Month'       => $due->format('m'),
-                    'Currency'    => $unit,
-                    'Amt'         => $amt,
-                    'PaymentType' => $payment_type,
+                    'resort_id'    => $this->resort->resort_id,
+                    'Due_Date'     => $due->format('Y-m-d'),
+                    'employee_id'  => $emp_id,
+                    'Month'        => $due->format('m'),
+                    'Currency'     => $unit,
+                    'Amt'          => $amt,
+                    'PaymentType'  => $payment_type,
+                    'Status'       => $rowStatus,
+                    'Payment_Date' => $rowPaymentDt,
                 ]);
             }
 
