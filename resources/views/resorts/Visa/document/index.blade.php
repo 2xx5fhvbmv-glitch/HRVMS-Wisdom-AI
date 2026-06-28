@@ -32,10 +32,12 @@
                                 <li class="active current"> <span>Uploading Documents</span></li>
                                 <li><span>Document Segregation & Naming</span></li>
                                 <li><span>Document Validation & Processing</span></li>
+                                {{-- Steps 4-7 removed from this wizard (handled in the final stage):
                                 <li><span>Database Creation</span></li>
                                 <li><span>Employment<br>Information</span></li>
                                 <li><span>Education / Qualification</span></li>
                                 <li><span>Experience</span></li>
+                                --}}
                             </ul>
                         </div>
                         <hr>
@@ -116,7 +118,11 @@
                             </div>
                             <div class="d-none d-md-block" style="height: 209px;"></div>
                             <hr class="hr-footer">
-                            <a href="javascript:void(0);" class=" btn btn-themeBlue btn-sm float-end next ">Next</a>
+                            {{-- Steps 4-7 (Database Creation / Employment / Education / Experience) are
+                                 commented out below — step 3 is now the final step, so it carries the
+                                 Submit button (handler unchanged; the employee details are completed
+                                 in the separate final stage). --}}
+                            <button type="submit" class="btn btn-themeBlue btn-sm float-end" id="SubmitVisaform">Submit</button>
                             <a href="javascript:void(0);" class=" btn btn-themeSkyblue btn-sm float-end previous me-2">Back</a>
                         </fieldset>
 
@@ -143,6 +149,8 @@
                             <a href=" # " class=" btn btn-themeSkyblue btn-sm float-end previous me-2">Back</a>
                         </fieldset> -->
 
+                        {{-- ===== Steps 4-7 (Database Creation / Employment / Education / Experience) removed from this wizard; completed in the final stage ===== --}}
+                        {{--
                         <fieldset>
                             <div class=" mb-3">
                                 <h2 class="text-center">Database Creation</h2>
@@ -1107,6 +1115,7 @@
                             <button type="submit" class="btn btn-themeBlue btn-sm float-end " style="margin-right: 10px;" id="SubmitVisaform">Submit</button>
                             <a href=" # " class=" btn btn-themeSkyblue btn-sm float-end previous me-2">Back</a>
                         </fieldset>
+                        --}}
                     </form>
                 </div>
         </div>
