@@ -414,8 +414,14 @@ $(document).ready(function ()
                         html+=`<div class="col-xl-6">
                             <div class="renewal-box mb-4">
                                 <div class="card-title">
-                                    <h3>Quota Slot Renewal</h3>
-                                    <span>Last Slot month: ${QuotaSlotRenewal.QuotaSlotRenewal_end_date}</span>
+                                    <div class="row g-2 ">
+                                        <div class="col order-sm-1 order-last">
+                                            <h3>Quota Slot Renewal</h3>
+                                            <span>Last Slot month: ${QuotaSlotRenewal.QuotaSlotRenewal_end_date}</span>
+                                        </div>
+                                        <div class="col-sm-auto col-12 order-sm-last order-1 text-end"><span class="badge badge-themeWarning">${QuotaSlotRenewal.QuotaSlotRenewalDate}</span>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="row  gx-2">
                                     <div class="col-sm-6">
@@ -468,8 +474,14 @@ $(document).ready(function ()
                         html+=`<div class="col-xl-6">
                             <div class="renewal-box mb-4">
                                 <div class="card-title">
-                                    <h3>Work Permit Renewal</h3>
-                                    <span>Last Slot month: ${WorkPermitRenewal.WorkPermitRenewal_end_date}</span>
+                                    <div class="row g-2 ">
+                                        <div class="col order-sm-1 order-last">
+                                            <h3>Work Permit Renewal</h3>
+                                            <span>Last Work Permit month: ${WorkPermitRenewal.WorkPermitRenewal_end_date}</span>
+                                        </div>
+                                        <div class="col-sm-auto col-12 order-sm-last order-1 text-end"><span class="badge badge-themeWarning">${WorkPermitRenewal.WorkPermitRenewalDate}</span>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="row  gx-2">
                                     <div class="col-12">
