@@ -674,6 +674,15 @@ class RenewalController extends Controller
        
         if($flag == "WorkPermit")
         {
+            // Guard against duplicate schedules. Renewing again while a schedule
+            // is still unpaid (or double-clicking, or renewing once as Lumpsum and
+            // once as Installment) appended a second set of rows — double-charging
+            // the employee. Block while any unpaid Work Permit row exists.
+            if (WorkPermit::where('resort_id', $this->resort->resort_id)->where('employee_id', $emp_id)
+                    ->whereRaw("LOWER(COALESCE(Status,'')) <> 'paid'")->exists()) {
+                return response()->json(['success'=>false,'message'=>'A pending Work Permit schedule already exists for this employee. Settle (or remove) it before renewing again.','status'=>409]);
+            }
+
             $WorkPermit_amt =  $ResortBudgetCost['WORK PERMIT FEE'] ?? null;
 
             if($payment_type =="Lumpsum")
@@ -715,7 +724,14 @@ class RenewalController extends Controller
         } 
         if($flag =="QuotaSlot")
         {
-            
+            // Guard against duplicate schedules (same reason as Work Permit above):
+            // renewing again while a schedule is unpaid, or once as Lumpsum and once
+            // as Installment, appended a second set of rows — double-charging.
+            if (QuotaSlotRenewal::where('resort_id', $this->resort->resort_id)->where('employee_id', $emp_id)
+                    ->whereRaw("LOWER(COALESCE(Status,'')) <> 'paid'")->exists()) {
+                return response()->json(['success'=>false,'message'=>'A pending Quota Slot schedule already exists for this employee. Settle (or remove) it before renewing again.','status'=>409]);
+            }
+
             $qotaslotAMt =  $ResortBudgetCost['QUOTA SLOT DEPOSIT'] ?? 0.00;
             if($payment_type =="Lumpsum")
             { 
