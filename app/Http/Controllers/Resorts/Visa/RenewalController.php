@@ -754,24 +754,32 @@ class RenewalController extends Controller
         } 
         if($flag =="QuotaSlot")
         {
-            // Guard against overlapping / premature re-renewal.
-            //  - Installment cycle: block while any row is still unpaid — settle the
-            //    current cycle first; once fully paid HR may renew the next cycle.
-            //  - Lumpsum cycle: it is created already-PAID, so "all paid" is NOT a
-            //    readiness signal. Block until the covered period has actually ended
-            //    (its latest Due_Date reaches today), otherwise a second renewal
-            //    stacks another year ahead (the bug where the slot showed
-            //    Jun 2027-May 2028 a year early).
-            $slotBase   = QuotaSlotRenewal::where('resort_id', $this->resort->resort_id)->where('employee_id', $emp_id);
-            $slotLatest = (clone $slotBase)->whereNotNull('Due_Date')->orderByDesc('Due_Date')->first();
-            if ($slotLatest) {
-                $isLumpsumCycle = strtolower((string) $slotLatest->PaymentType) === 'lumpsum';
-                $hasUnpaid      = (clone $slotBase)->whereRaw("LOWER(COALESCE(Status,'')) <> 'paid'")->exists();
-                $coversFuture   = Carbon::parse($slotLatest->Due_Date)->gt(Carbon::today());
-                if (($isLumpsumCycle && $coversFuture) || (!$isLumpsumCycle && $hasUnpaid)) {
-                    $until = Carbon::parse($slotLatest->Due_Date)->format('d M Y');
-                    return response()->json(['success'=>false,'message'=>"This employee's Quota Slot is already scheduled through {$until}. Settle the current cycle (installment) or wait until it ends (lump-sum) before renewing again.",'status'=>409]);
-                }
+            // Guard against overlapping / runaway renewal. HR may renew the NEXT
+            // cycle once the current one is fully PAID (lump-sum or installment) —
+            // the next cycle simply starts after the current one's last month — but
+            // NOT while the current cycle still has unpaid months, and NOT a second
+            // time once a next cycle is already scheduled ahead (so it can't stack
+            // years in advance).
+            $slotBase  = QuotaSlotRenewal::where('resort_id', $this->resort->resort_id)->where('employee_id', $emp_id);
+            $hasUnpaid = (clone $slotBase)->whereRaw("LOWER(COALESCE(Status,'')) <> 'paid'")->exists();
+
+            // "Already scheduled ahead" = the newest renewal batch hasn't started yet
+            // (its earliest Due_Date is in the future) => a next cycle already exists.
+            $latestCreatedAt      = (clone $slotBase)->max('created_at');
+            $coverUntil           = (clone $slotBase)->max('Due_Date');
+            $nextAlreadyScheduled = false;
+            if ($latestCreatedAt) {
+                $batchMinDue = (clone $slotBase)
+                    ->where('created_at', '>=', Carbon::parse($latestCreatedAt)->subMinutes(2))
+                    ->min('Due_Date');
+                $nextAlreadyScheduled = $batchMinDue && Carbon::parse($batchMinDue)->gt(Carbon::today());
+            }
+
+            if ($hasUnpaid || $nextAlreadyScheduled) {
+                $msg = $hasUnpaid
+                    ? "This employee's current Quota Slot cycle still has unpaid months — settle them before renewing the next cycle."
+                    : 'The next Quota Slot cycle is already scheduled' . ($coverUntil ? ' (through ' . Carbon::parse($coverUntil)->format('d M Y') . ')' : '') . '.';
+                return response()->json(['success'=>false,'message'=>$msg,'status'=>409]);
             }
 
             $qotaslotAMt =  $ResortBudgetCost['QUOTA SLOT DEPOSIT'] ?? 0.00;
