@@ -4625,6 +4625,40 @@ class Common
     }
 
     /**
+     * Single source of truth for a visa fee's "next outstanding" date, so every
+     * visa page (Xpat list/details, Renewal, Payment Request) shows the SAME date
+     * for the same fee. Prefers the most relevant UNPAID row; when everything is
+     * settled it falls back to the latest row so overview columns never go blank.
+     *
+     *   Work Permit / Quota Slot : ('Due_Date', 'asc')  -> earliest unpaid month
+     *   Insurance / Medical      : ('insurance_end_date'|'end_date', 'desc') -> latest unpaid policy
+     *
+     * @param string $modelClass  Fully-qualified Eloquent model (e.g. \App\Models\WorkPermit::class)
+     * @param int    $resortId
+     * @param int    $empId
+     * @param string $dateCol     Date column to read/order on
+     * @param string $order       'asc' (earliest) or 'desc' (latest)
+     * @return string|null        The date value, or null when no rows exist
+     */
+    public static function visaNextDue(string $modelClass, $resortId, $empId, string $dateCol = 'Due_Date', string $order = 'asc')
+    {
+        $base = $modelClass::where('resort_id', $resortId)
+            ->where('employee_id', $empId)
+            ->whereNotNull($dateCol);
+
+        $unpaid = (clone $base)
+            ->whereRaw("LOWER(COALESCE(Status, '')) <> 'paid'")
+            ->orderBy($dateCol, $order)
+            ->value($dateCol);
+        if (!empty($unpaid)) {
+            return $unpaid;
+        }
+        // Everything is settled (or there's no Status column) — show the latest
+        // known date so the overview column still reflects the current expiry.
+        return (clone $base)->orderBy($dateCol, 'desc')->value($dateCol);
+    }
+
+    /**
      * Format amount with currency symbol and conversion.
      * Converts from the stored source currency to the resort's active display
      * currency, then prefixes the current symbol ($ / MVR).

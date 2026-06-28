@@ -101,13 +101,10 @@ class XpactEmployeeController extends Controller
                                 // NOTE: do NOT use $i->WorkPermit here — that name collides with
                                 // the Employee::WorkPermit() hasMany relation and would resolve to
                                 // an (empty) Collection that renders as "[]" in the table.
-                                $i->MedicalExpiryDate = null;
-                                if($WorkPermitMedicalRenewal)
-                                {
-                                    // getFormattedExpiryStatus already prefixes the formatted date,
-                                    // so don't prepend it again (was showing "01 Jan 2027 01 Jan 2027 …").
-                                    $i->MedicalExpiryDate = $this->getFormattedExpiryStatus($WorkPermitMedicalRenewal->end_date);
-                                }
+                                // Unified medical expiry — latest UNPAID medical record
+                                // (falls back to latest). Same source/logic on list, details & renewal.
+                                $medDue = Common::visaNextDue(WorkPermitMedicalRenewal::class, $this->resort->resort_id, $i->id, 'end_date', 'desc');
+                                $i->MedicalExpiryDate = $medDue ? $this->getFormattedExpiryStatus($medDue) : null;
 
                                 // Work Permit Expiry — MUST match the Details page's
                                 // "Work Permit Fee Expiry" card, which reads the AI-extracted
@@ -118,15 +115,14 @@ class XpactEmployeeController extends Controller
                                 $wpExp = $this->workPermitExpiryDate($i->id);
                                 $i->WorkPermitDueDate = $wpExp ? $this->getFormattedExpiryStatus($wpExp) : null;
    
-                                $QuotaSlotRenewal = QuotaSlotRenewal::where('employee_id', $i->id)
-                                        ->where('resort_id', $this->resort->resort_id)
-                                        ->orderBy('id', 'DESC')
-                                        ->where('Month',12)
-                                        ->first(['employee_id', 'Month', 'Amt', 'Payment_Date', 'Due_Date', 'Currency', 'Reciept_file', 'PaymentType']);
-
-                                if ($QuotaSlotRenewal) 
+                                // Unified "next due" — earliest UNPAID slot installment
+                                // (matches Payment Request). Previously read the fragile
+                                // "Month=12" marker row and ignored paid status, which showed
+                                // an already-paid month (e.g. 04 May when next due was 04 Jul).
+                                $slotDue = Common::visaNextDue(QuotaSlotRenewal::class, $this->resort->resort_id, $i->id, 'Due_Date', 'asc');
+                                if ($slotDue)
                                 {
-                                    $i->QuotaSlotRenewalDate =$this->getFormattedExpiryStatus($QuotaSlotRenewal->Due_Date);
+                                    $i->QuotaSlotRenewalDate = $this->getFormattedExpiryStatus($slotDue);
                                 }
                                 $VisaEmployeeExpiryData1 = $this->GetemployeeDocument($i->id);
                                 if ($VisaEmployeeExpiryData1) 
@@ -134,18 +130,14 @@ class XpactEmployeeController extends Controller
                                     $VisaEmployeeExpiryData = $VisaEmployeeExpiryData1[0];
                                     $statisctic_emp_header = $VisaEmployeeExpiryData1[1] ?? null;
 
-                                    if ($statisctic_emp_header) {
-                                        $insuranceExpiryRaw = $statisctic_emp_header['Ai_extracted_data']['extracted_fields']['Insurance Expiry Date'] ?? null;
-
-                                        if ($insuranceExpiryRaw)
-                                        {
-
-                                            $i->InsuranceRenewalDate = $this->getFormattedExpiryStatus($insuranceExpiryRaw);
-
-                                        }
-                                    } else {
-                                        $i->InsuranceRenewalDate = null;
+                                    // Insurance expiry — prefer the EmployeeInsurance record
+                                    // (status-aware, matches Payment Request); fall back to the
+                                    // AI-extracted blob when there's no insurance record.
+                                    $insDue = Common::visaNextDue(\App\Models\EmployeeInsurance::class, $this->resort->resort_id, $i->id, 'insurance_end_date', 'desc');
+                                    if (!$insDue && $statisctic_emp_header) {
+                                        $insDue = $statisctic_emp_header['Ai_extracted_data']['extracted_fields']['Insurance Expiry Date'] ?? null;
                                     }
+                                    $i->InsuranceRenewalDate = $insDue ? $this->getFormattedExpiryStatus($insDue) : null;
                                 }
                                 else
                                 {
@@ -294,12 +286,15 @@ class XpactEmployeeController extends Controller
                 $statisctic_emp_header->VisaExpiryDate = $this->safeDate($fields['Visa Expiry Date']);
                 $statisctic_emp_header->VisaRemingDays = $this->getFormattedExpiryStatus($fields['Visa Expiry Date']);
             }
-             // Insurance Expiry Date ->
-            if(!empty($fields['Insurance Expiry Date']))
+             // Insurance Expiry — prefer the EmployeeInsurance record (status-aware,
+             // matches Payment Request); fall back to the AI-extracted blob field.
+            $insDue = Common::visaNextDue(\App\Models\EmployeeInsurance::class, $this->resort->resort_id, $id, 'insurance_end_date', 'desc');
+            if (empty($insDue)) { $insDue = $fields['Insurance Expiry Date'] ?? null; }
+            if(!empty($insDue))
             {
                 $statisctic_emp_header->Name ="Insurance Expiry";
-                $statisctic_emp_header->InsuranceExpiryDate = $this->safeDate($fields['Insurance Expiry Date']);
-                $statisctic_emp_header->InsuranceRemingDays = $this->getFormattedExpiryStatus($fields['Insurance Expiry Date']);
+                $statisctic_emp_header->InsuranceExpiryDate = $this->safeDate($insDue);
+                $statisctic_emp_header->InsuranceRemingDays = $this->getFormattedExpiryStatus($insDue);
                 $statisctic_emp_header->QuotaSlotNumber = $fields['Quota Slot Number'] ?? null;
             }
             // Work permit Expiry — derived from the live fee schedule (reliable),
@@ -322,8 +317,11 @@ class XpactEmployeeController extends Controller
         }
         if($QuotaSlotRenewal)
         {
-            $QuotaSlotRenewal->QuotaslotExpiryDate = $this->safeDate($QuotaSlotRenewal->Due_Date);
-            $QuotaSlotRenewal->QuotaslotRemingDays = $this->getFormattedExpiryStatus($QuotaSlotRenewal->Due_Date);
+            // Unified "next due" — earliest UNPAID slot installment (matches the
+            // Payment Request + Xpat list). Falls back to this row's date if none.
+            $slotDue = Common::visaNextDue(QuotaSlotRenewal::class, $this->resort->resort_id, $id, 'Due_Date', 'asc') ?: $QuotaSlotRenewal->Due_Date;
+            $QuotaSlotRenewal->QuotaslotExpiryDate = $this->safeDate($slotDue);
+            $QuotaSlotRenewal->QuotaslotRemingDays = $this->getFormattedExpiryStatus($slotDue);
         }
 
         // Passport Expiry — from the OCR-extracted Passport_Copy document.
@@ -357,15 +355,14 @@ class XpactEmployeeController extends Controller
             }
         }
 
-        // Medical Expiry — from the employee's Work Permit Medical Renewal record
-        // (same source as the Medical Expiry column on the xpat-employee list).
+        // Medical Expiry — unified "next due" (latest UNPAID medical record, falls
+        // back to latest). Same helper as the xpat-employee list & Renewal pages.
         $medicalExpiryDate = null;
         $medicalExpiryStatus = null;
-        $wpMedical = WorkPermitMedicalRenewal::where('resort_id', $this->resort->resort_id)
-            ->where('employee_id', $id)->orderBy('id', 'desc')->first(['end_date']);
-        if ($wpMedical && $wpMedical->end_date) {
-            $medicalExpiryDate   = Carbon::parse($wpMedical->end_date)->format('d M Y');
-            $medicalExpiryStatus = $this->getFormattedExpiryStatus($wpMedical->end_date);
+        $medDue = Common::visaNextDue(WorkPermitMedicalRenewal::class, $this->resort->resort_id, $id, 'end_date', 'desc');
+        if ($medDue) {
+            $medicalExpiryDate   = Carbon::parse($medDue)->format('d M Y');
+            $medicalExpiryStatus = $this->getFormattedExpiryStatus($medDue);
         }
 
         $TotalExpensessSinceJoing = $this->TotalExpensessSinceJoing($id);
@@ -1236,11 +1233,16 @@ class XpactEmployeeController extends Controller
      */
     private function workPermitExpiryDate($empId)
     {
-        $firstDue = WorkPermit::where('employee_id', $empId)->where('resort_id', $this->resort->resort_id)
-            ->whereNotNull('Due_Date')->orderBy('Due_Date', 'asc')->value('Due_Date');
-        if ($firstDue) {
-            return Carbon::parse($firstDue)->subMonthNoOverflow()->format('Y-m-d');
+        // Unified "next due" — the earliest UNPAID Work Permit fee (falls back to
+        // the latest row when all are settled). This matches the Payment Request
+        // page so every visa screen shows the same Work Permit date. Previously
+        // this returned earliest-due − 1 month and ignored paid status, which
+        // showed an already-paid/stale date (e.g. 02 Oct when the next due was 02 Dec).
+        $due = Common::visaNextDue(WorkPermit::class, $this->resort->resort_id, $empId, 'Due_Date', 'asc');
+        if ($due) {
+            return Carbon::parse($due)->format('Y-m-d');
         }
+        // No fee schedule at all — fall back to the AI-extracted blob field.
         $o = VisaEmployeeExpiryData::where('employee_id', $empId)->where('resort_id', $this->resort->resort_id)
             ->where('DocumentName', 'Other')->latest('id')->first();
         if ($o) {

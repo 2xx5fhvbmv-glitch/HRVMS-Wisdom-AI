@@ -106,7 +106,9 @@ class RenewalController extends Controller
             if ($EmployeeInsurance) 
             {
             
-                $insurance_end_date = Carbon::parse($EmployeeInsurance->insurance_end_date);
+                // Unified — latest UNPAID insurance policy (falls back to latest).
+                $insDue = \App\Helpers\Common::visaNextDue(EmployeeInsurance::class, $this->resort->resort_id, $emp_id, 'insurance_end_date', 'desc') ?: $EmployeeInsurance->insurance_end_date;
+                $insurance_end_date = Carbon::parse($insDue);
                 $insurance_months_diff = $start->diffInMonths($insurance_end_date);
 
                 if ($insurance_months_diff < 1) 
@@ -122,7 +124,7 @@ class RenewalController extends Controller
 
                 $EmployeeInsurance->cost =   $EmployeeInsurance->Premium.' '.$EmployeeInsurance->Currency ??  $medical_amt ['amount'].' '.$medical_amt['unit'];
                 $EmployeeInsurance->employee_id =base64_encode($EmployeeInsurance->employee_id);
-                $EmployeeInsurance->insurance_end_date = Carbon::parse($EmployeeInsurance->insurance_end_date)->format('d M Y');
+                $EmployeeInsurance->insurance_end_date = $insurance_end_date->format('d M Y');
 
             }
         
@@ -131,7 +133,9 @@ class RenewalController extends Controller
             {
                 $work_permit_amt =  $ResortBudgetCost['WORK VISA MEDICAL TEST FEE'];
 
-                $medical_end_date = Carbon::parse($WorkPermitMedicalRenewal->end_date);
+                // Unified — latest UNPAID medical record (falls back to latest).
+                $medDue = \App\Helpers\Common::visaNextDue(WorkPermitMedicalRenewal::class, $this->resort->resort_id, $emp_id, 'end_date', 'desc') ?: $WorkPermitMedicalRenewal->end_date;
+                $medical_end_date = Carbon::parse($medDue);
                 $medical_months_diff = $start->diffInMonths($medical_end_date);
                 if ($medical_months_diff < 1) 
                 {
@@ -155,14 +159,10 @@ class RenewalController extends Controller
                                                 ->first(['employee_id', 'Month', 'Amt', 'Payment_Date', 'Due_Date', 'Currency', 'Reciept_file','PaymentType']);
             if($QuotaSlotRenewal)
             {
-                if ($QuotaSlotRenewal->PaymentType == "Installment") 
-                {
-                    $QuotaSlotRenewal_end_date = Carbon::parse($QuotaSlotRenewal->Due_Date);
-                } 
-                else
-                {
-                    $QuotaSlotRenewal_end_date = Carbon::parse($QuotaSlotRenewal->Due_Date);
-                }
+                // Unified "next due" — earliest UNPAID slot installment (matches the
+                // Payment Request + Xpat pages); falls back to this row's date.
+                $slotDue = \App\Helpers\Common::visaNextDue(QuotaSlotRenewal::class, $this->resort->resort_id, $emp_id, 'Due_Date', 'asc') ?: $QuotaSlotRenewal->Due_Date;
+                $QuotaSlotRenewal_end_date = Carbon::parse($slotDue);
 
                 $QuotaSlotRenewal_months_diff = $start->diffInMonths($QuotaSlotRenewal_end_date);
                 if ($QuotaSlotRenewal_months_diff < 1) 
@@ -193,14 +193,10 @@ class RenewalController extends Controller
      
             if($WorkPermitRenewal)
             {
-                if ($WorkPermitRenewal->PaymentType == "Installment") 
-                {
-                    $WorkPermitRenewal_end_date = Carbon::parse($WorkPermitRenewal->Due_Date);
-                } 
-                else
-                {
-                    $WorkPermitRenewal_end_date = Carbon::parse($WorkPermitRenewal->Due_Date);
-                }
+                // Unified "next due" — earliest UNPAID Work Permit fee (matches the
+                // Payment Request + Xpat pages); falls back to this row's date.
+                $wpDue = \App\Helpers\Common::visaNextDue(WorkPermit::class, $this->resort->resort_id, $emp_id, 'Due_Date', 'asc') ?: $WorkPermitRenewal->Due_Date;
+                $WorkPermitRenewal_end_date = Carbon::parse($wpDue);
 
                 $WorkPermitRenewal_months_diff = $start->diffInMonths($WorkPermitRenewal_end_date);
                 if ($WorkPermitRenewal_months_diff < 1) 
