@@ -198,10 +198,11 @@ class WisdomTools
             self::fn('get_visa_summary',
                 'Immigration/visa dashboard summary: expat employee count, employees with work permits, documents expiring in 30 days, unpaid work-permit & slot fees, and pending payment requests. Use for "give me a visa summary", "current immigration status", "what compliance items need attention".', []),
             self::fn('get_visa_expiries',
-                'Documents expiring within N days (default 30): visa, work permit, insurance, medical, slot fee. Each item has employee, document type, expiry date, days left and amount. Use for "which documents expire this week/month", "upcoming expiries", "urgent renewals", "expired documents" (pass negative days span via within_days for overdue is not supported — use period words in your question).',
+                'Visa/immigration documents (visa, work permit, insurance, medical, slot fee) by expiry status. Each item has employee, document type, expiry date, days left (negative = already expired) and amount. Use `status=upcoming` (default) for "which documents expire this week/month", "upcoming expiries", "urgent renewals"; `status=expired` for "which documents/work permits are expired", "overdue documents", "how many work permits expired"; `status=all` for both. Filter to one kind with doc_type.',
                 [
                     'doc_type'    => ['type' => 'string', 'description' => 'One of: all (default), visa, work_permit, insurance, medical, slot.'],
-                    'within_days' => ['type' => 'integer', 'description' => 'Look-ahead window in days (default 30, e.g. 7 for this week).'],
+                    'status'      => ['type' => 'string', 'description' => 'One of: upcoming (default, not yet expired), expired (already past due), all.'],
+                    'within_days' => ['type' => 'integer', 'description' => 'Look-ahead window in days for upcoming/all (default 30, e.g. 7 for this week). Ignored for status=expired.'],
                 ]),
             self::fn('get_visa_liability',
                 'Immigration liability (money due) including overdue, up to the end of a period. Breaks down by work permit, slot fee, insurance, medical and visa, plus total. Use for "total immigration liability", "slot/work-permit fee liability", "what is due this month/week".',
@@ -1740,14 +1741,27 @@ class WisdomTools
 
     private static function getVisaExpiries(int $rid, array $args): array
     {
-        $type = strtolower(trim($args['doc_type'] ?? 'all'));
-        $days = (int) ($args['within_days'] ?? 30);
+        $type   = strtolower(trim($args['doc_type'] ?? 'all'));
+        $status = strtolower(trim($args['status'] ?? 'upcoming'));
+        $days   = (int) ($args['within_days'] ?? 30);
         if ($days < 1)   $days = 30;
         if ($days > 365) $days = 365;
 
-        $from = Carbon::today();
-        $to   = (clone $from)->addDays($days);
-        $docs = self::visaDocs($rid, $type, $from, $to);
+        $today = Carbon::today();
+        if ($status === 'expired') {
+            // Already past due: scan from far past up to (and including) today.
+            $from = (clone $today)->subYears(5);
+            $to   = $today;
+        } elseif ($status === 'all') {
+            $from = (clone $today)->subYears(5);
+            $to   = (clone $today)->addDays($days);
+        } else {
+            $status = 'upcoming';
+            $from   = $today;
+            $to     = (clone $today)->addDays($days);
+        }
+
+        $docs  = self::visaDocs($rid, $type, $from, $to);
         $names = self::resolveEmpNames($rid, $docs->pluck('employee_id')->all());
 
         $list = $docs->sortBy('expiry')->map(fn ($d) => [
@@ -1758,7 +1772,7 @@ class WisdomTools
             'amount'    => Common::formatCurrency($d['amount'], 'MVR'),
         ])->values();
 
-        return ['doc_type' => $type, 'within_days' => $days, 'count' => $list->count(), 'documents' => $list];
+        return ['doc_type' => $type, 'status' => $status, 'within_days' => $days, 'count' => $list->count(), 'documents' => $list];
     }
 
     private static function getVisaLiability(int $rid, array $args): array
