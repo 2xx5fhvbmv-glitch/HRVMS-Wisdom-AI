@@ -115,6 +115,20 @@
                                     <li>Passport validity verified: Valid for XX years</li>
                                 </ul>
 
+                                {{-- Passport number drives the employee lookup. It is
+                                     auto-filled from the MRZ; HR can correct it if the
+                                     scan was unclear before filing the documents. --}}
+                                <div class="row g-2 mt-2 align-items-end">
+                                    <div class="col-md-6">
+                                        <label for="submit_passport_numb" class="form-label">PASSPORT NUMBER (used to find the employee)</label>
+                                        <input type="text" class="form-control text-uppercase" id="submit_passport_numb"
+                                               placeholder="e.g. MA1234567" autocomplete="off">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <small class="text-muted" id="submit_passport_hint">These documents will be filed in the matching employee's File Management folder.</small>
+                                    </div>
+                                </div>
+
                             </div>
                             <div class="d-none d-md-block" style="height: 209px;"></div>
                             <hr class="hr-footer">
@@ -1202,36 +1216,96 @@
         });
 
         
-        $(document).on("click", "#SubmitVisaform", function(e) 
+        $(document).on("click", "#SubmitVisaform", async function(e)
         {
             e.preventDefault();
-            var formData = $('#msform').serialize();
+
+            // Re-entrancy guard (same reason as the Next button — it's a <button>
+            // here but the user reported repeated submits, so keep it explicit).
+            if (window.__docSubmitBusy) return false;
+
+            // New flow: this wizard does NOT create an employee. We post the
+            // passport number (read from the MRZ) plus the uploaded documents, and
+            // the server files them into the matching existing employee's folder.
+            // Prefer what HR sees/typed on step 3, fall back to the MRZ value.
+            const passportNo = ($("#submit_passport_numb").val() || window.__extractedPassportNo || "").trim();
+            if (!passportNo) {
+                toastr.error(
+                    "Couldn't read a passport number from the uploaded passport. Please type the passport number in the field above before submitting.",
+                    "Passport number missing",
+                    { positionClass: 'toast-bottom-right', timeOut: 9000 }
+                );
+                $("#submit_passport_numb").focus();
+                return false;
+            }
+
+            const fd = new FormData();
+            fd.append('_token', '{{ csrf_token() }}');
+            fd.append('passport_numb', passportNo);
+
+            // Each document-segregation select maps 1:1 to selectedFiles[index].
+            // Re-read the file bytes (handles File / {pdfUrl} / {dataUrl} shapes)
+            // and attach them with their chosen type label.
+            const $selects = $("fieldset:eq(1) select[name^='docType']");
+            let docCount = 0;
+            for (let i = 0; i < $selects.length; i++) {
+                const typeLabel = ($selects.eq(i).find('option:selected').text() || '').trim();
+                const fileLike  = (typeof selectedFiles !== 'undefined') ? selectedFiles[i] : null;
+                if (!fileLike) continue;
+                try {
+                    const bytes = await fetchFileBytes(fileLike);
+                    const blob  = new Blob([bytes], { type: 'application/pdf' });
+                    const safe  = (typeLabel || ('document_' + (i + 1))).replace(/[^\w\-]+/g, '_');
+                    fd.append('documents[]', blob, safe + '.pdf');
+                    fd.append('document_types[]', typeLabel || ('Document ' + (i + 1)));
+                    docCount++;
+                } catch (err) {
+                    console.error('Could not read document', i, err);
+                }
+            }
+
+            if (docCount === 0) {
+                toastr.error("No documents were found to save. Please go back and upload the documents.", "Nothing to submit", { positionClass: 'toast-bottom-right' });
+                return false;
+            }
+
+            // Attach the processed/whitened passport photo if we produced one.
+            if (window.__processedPhotoBlobUrl) {
+                try {
+                    const pBytes = await (await fetch(window.__processedPhotoBlobUrl)).arrayBuffer();
+                    fd.append('photo', new Blob([pBytes], { type: 'image/jpeg' }), 'employee_photo.jpg');
+                } catch (err) {
+                    console.error('Could not attach processed photo', err);
+                }
+            }
+
+            window.__docSubmitBusy = true;
+            $("#SubmitVisaform").prop("disabled", true).text("Saving…");
+
+            const unlock = () => {
+                window.__docSubmitBusy = false;
+                $("#SubmitVisaform").prop("disabled", false).text("Submit");
+            };
+
             $.ajax({
                 url: '{{ route("resort.visa.CreateEmployee") }}',
                 type: 'POST',
-                data: formData,
-                processData: true,        
-                contentType: 'application/x-www-form-urlencoded', // ✅ this is default for serialize()
-                headers: {
-                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                },
+                data: fd,
+                processData: false,
+                contentType: false,
+                headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
                 success: function(response) {
-                    if(response.success) {
-                        toastr.success(response.message, "Success", {
-                            positionClass: 'toast-bottom-right'
-                        });
-                        // reload the page
-                        location.reload();
-                    }else{
-                        toastr.error(response.message || "An error occurred", "Error", {
-                            positionClass: 'toast-bottom-right'
-                        });
+                    if (response.success) {
+                        toastr.success(response.message, "Documents filed", { positionClass: 'toast-bottom-right', timeOut: 9000 });
+                        setTimeout(function () { location.reload(); }, 1800);
+                    } else {
+                        unlock();
+                        toastr.error(response.message || "An error occurred", "Error", { positionClass: 'toast-bottom-right', timeOut: 9000 });
                     }
                 },
                 error: function(xhr) {
-                   toastr.error(xhr.responseJSON.message || "An error occurred", "Error", {
-                        positionClass: 'toast-bottom-right'
-                    });
+                    unlock();
+                    toastr.error((xhr.responseJSON && xhr.responseJSON.message) || "An error occurred", "Error", { positionClass: 'toast-bottom-right', timeOut: 9000 });
                 }
             });
         });
@@ -1239,6 +1313,16 @@
         
             $(".next").click(function(e) {
                     e.preventDefault();
+
+                    // Re-entrancy guard. The Next control is an <a> anchor, so the
+                    // `disabled` attribute does NOT stop clicks — without this flag
+                    // the user could click repeatedly while the step-2 OCR checks
+                    // are running and fire the whole pipeline (and the step advance)
+                    // over and over ("next button is clickable after submitting it,
+                    // let me submit again and again"). window-scoped so it survives
+                    // any re-binding of this handler.
+                    if (window.__docWizardNavBusy) return false;
+
                     const current_fs = $(this).parent();          // current fieldset
                     const next_fs    = current_fs.next();         // next fieldset
                     const currentIdx = $("fieldset").index(current_fs); // 0-based step index
@@ -1371,6 +1455,11 @@
                             if (!docTypeValid) return false;
 
                                
+                            // Lock the Next control for the whole async run so the
+                            // user can't re-fire these checks by clicking again.
+                            window.__docWizardNavBusy = true;
+                            $(".next").addClass("disabled").css("pointer-events", "none");
+
                             // Run all async checks in parallel.
                             // NOTE: there are 6 promises but the destructure
                             // below only consumes 4 — EducationCheck() and
@@ -1392,7 +1481,8 @@
                                     // the user clicked Next forever with no feedback.
                                     // Now: re-enable the button and toast the specific
                                     // failure reason so they know what to fix.
-                                    $(".next").removeAttr("disabled");
+                                    window.__docWizardNavBusy = false;
+                                    $(".next").removeAttr("disabled").removeClass("disabled").css("pointer-events", "");
                                     var failures = [];
                                     if (!dpiResult.success) failures.push("Passport quality: " + (dpiResult.message || "check failed"));
                                     if (!photoResult.success) failures.push("Photo: " + (photoResult.message || "check failed"));
@@ -1473,6 +1563,19 @@
                                     $("#txt-passport-number").val(expiryResult.passportno || "");
                                     $("#Passport_expiry_date").val(formattedDate || "");
 
+                                    // The personal-detail fields are no longer in the
+                                    // DOM (steps 4-7 removed), so stash the MRZ passport
+                                    // number in a global — the Submit handler posts this
+                                    // to look up the existing employee to file under.
+                                    if (expiryResult.passportno) {
+                                        window.__extractedPassportNo = expiryResult.passportno;
+                                        // Mirror into the editable field on step 3 only
+                                        // if HR hasn't already typed something there.
+                                        if (!$("#submit_passport_numb").val()) {
+                                            $("#submit_passport_numb").val(expiryResult.passportno);
+                                        }
+                                    }
+
                                     // Passport MRZ is authoritative for the legal name / DOB —
                                     // override anything the CV heuristic guessed.
                                     if (expiryResult.first_name) {
@@ -1512,7 +1615,8 @@
                                     }
                                 }
 
-                                $(".next").removeAttr("disabled");
+                                window.__docWizardNavBusy = false;
+                                $(".next").removeAttr("disabled").removeClass("disabled").css("pointer-events", "");
                                 moveToNextStep(current_fs, next_fs);
                             })
                             .catch((err) => {
@@ -1523,7 +1627,8 @@
                                 // clicking Next thinking it was broken (live:
                                 // "user is unable to go to the 3rd step").
                                 console.error("Document Segregation check failed:", err);
-                                $(".next").removeAttr("disabled");
+                                window.__docWizardNavBusy = false;
+                                $(".next").removeAttr("disabled").removeClass("disabled").css("pointer-events", "");
 
                                 // err can arrive as a string ("No passport file
                                 // selected"), an XHR error object, the server
@@ -2266,13 +2371,32 @@
                 const conversionResult = await convertDocumentToExact200DPI(combinedPassport);
 
                 if (conversionResult.success) {
-                    passportListItem.html('Passport copy converted to 200 DPI');
+                    // Keep the converted blob around and expose a download link on
+                    // the validation row so HR can open the file and confirm the
+                    // 200-DPI conversion actually produced a readable passport copy.
+                    window.__converted200DpiUrl = conversionResult.pdfUrl;
+                    passportListItem.html(
+                        '✅ Passport copy converted to 200 DPI '
+                        + '<a href="' + conversionResult.pdfUrl + '" download="passport_200dpi.pdf" '
+                        + 'class="ms-2 text-decoration-underline" style="color:#0d6efd;cursor:pointer;">'
+                        + '<i class="fa fa-download me-1"></i>Download to verify</a>'
+                    );
                 } else {
                     passportListItem.html('<i class="fa fa-exclamation-circle text-danger me-2"></i> Error converting passport: ' + conversionResult.message);
                     return { success: false, message: conversionResult.message };
                 }
             } else {
-                passportListItem.html('Passport copy is already in 200 DPI');
+                // Already 200 DPI — still let HR open the (combined) passport copy.
+                const origUrl = (combinedPassport && combinedPassport.pdfUrl)
+                    ? combinedPassport.pdfUrl
+                    : URL.createObjectURL(combinedPassport);
+                window.__converted200DpiUrl = origUrl;
+                passportListItem.html(
+                    '✅ Passport copy is already in 200 DPI '
+                    + '<a href="' + origUrl + '" download="passport_200dpi.pdf" '
+                    + 'class="ms-2 text-decoration-underline" style="color:#0d6efd;cursor:pointer;">'
+                    + '<i class="fa fa-download me-1"></i>Download to verify</a>'
+                );
             }
 
             return { success: true, message: "Passport DPI verified" };
@@ -2973,6 +3097,48 @@
                 }
             }
 
+            // Border-connected flood fill — erase the printed photo frame/border.
+            // The segmentation keeps thin high-contrast frame lines as "foreground"
+            // and the white-only cleanup above never touches a dark line, so the
+            // original photo's border survived ("the real deal is border"). The
+            // subject is centred with a white margin, so a fill seeded from all four
+            // edges reaches every background pixel and consumes anything connected to
+            // the border — including thin black frame lines — but stops the moment it
+            // meets the strongly-coloured person. We treat a pixel as background when
+            // it is light (white/grey margin) OR near-black (a frame line); mid-tone
+            // colours (skin, hair, clothing) are preserved so the fill can't bleed in.
+            (function eraseBorderArtifacts() {
+                const N = passportSize;
+                const visited = new Uint8Array(N * N);
+                const stack = [];
+                for (let x = 0; x < N; x++) { stack.push(x); stack.push((N - 1) * N + x); }
+                for (let y = 0; y < N; y++) { stack.push(y * N); stack.push(y * N + (N - 1)); }
+
+                const isBackground = (p) => {
+                    const o = p * 4;
+                    const r = finalPixels[o], g = finalPixels[o + 1], b = finalPixels[o + 2];
+                    if (r > 200 && g > 200 && b > 200) return true;            // light margin
+                    const mx = Math.max(r, g, b), mn = Math.min(r, g, b);
+                    const sat = mx === 0 ? 0 : (mx - mn) / mx;
+                    const bright = (r + g + b) / 3;
+                    return sat < 0.30 && bright < 90;                          // dark/near-black frame line
+                };
+
+                while (stack.length) {
+                    const p = stack.pop();
+                    if (visited[p]) continue;
+                    visited[p] = 1;
+                    if (!isBackground(p)) continue;                           // reached the subject -> stop
+                    const o = p * 4;
+                    finalPixels[o] = 255; finalPixels[o + 1] = 255; finalPixels[o + 2] = 255; finalPixels[o + 3] = 255;
+                    const x = p % N, y = (p - x) / N;
+                    if (x > 0)     stack.push(p - 1);
+                    if (x < N - 1) stack.push(p + 1);
+                    if (y > 0)     stack.push(p - N);
+                    if (y < N - 1) stack.push(p + N);
+                }
+            })();
+
             finalCtx.putImageData(finalImageData, 0, 0);
 
             // Export final image with high quality
@@ -2980,6 +3146,9 @@
                 finalCanvas.toBlob(resolve, "image/jpeg", 0.95)
             );
             const photoUrl = URL.createObjectURL(blob);
+            // Keep the processed photo so the Submit handler can file it alongside
+            // the documents in the employee's folder.
+            window.__processedPhotoBlobUrl = photoUrl;
 
             // Update UI
             const photoListItem = $("fieldset:eq(2)").find('li:contains("Employee photo digitized and background whitened")');
