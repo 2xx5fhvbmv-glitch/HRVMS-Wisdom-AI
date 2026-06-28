@@ -556,18 +556,9 @@ class XpactEmployeeController extends Controller
         {
              $employee_id = base64_decode($request->employee_id);
 
-            // Optional year filter coming from the Payment Schedule "Year" dropdown.
-            $scheduleYear = $request->ScheduleYear;
-            $applyYear = function ($query) use ($scheduleYear) {
-                if (!empty($scheduleYear) && $scheduleYear !== 'ALL') {
-                    $query->whereYear('Due_Date', (int) $scheduleYear);
-                }
-                return $query;
-            };
-
             if($request->flag =="Quota_Slot_Fee")
             {
-                $QuotaSlotRenewalPaid =  $applyYear(QuotaSlotRenewal::where('employee_id', $employee_id)->where('resort_id', $this->resort->resort_id))->orderBy('Month', 'ASC')
+                $QuotaSlotRenewalPaid =  QuotaSlotRenewal::where('employee_id', $employee_id)->where('resort_id', $this->resort->resort_id)->orderBy('Month', 'ASC')
                                                         ->get();
                 $PaidAmt = $QuotaSlotRenewalPaid->where("Status","Paid")->sum('Amt');
                 $UnPaidAmt = $QuotaSlotRenewalPaid->where("Status","Unpaid")->sum('Amt');
@@ -575,7 +566,7 @@ class XpactEmployeeController extends Controller
                 // Show ALL installments (paid + pending), chronologically — the
                 // schedule previously hid paid rows (Status=Unpaid filter), which
                 // dropped the paid months (e.g. the paid August installment).
-                $CommonVariable = $applyYear(QuotaSlotRenewal::where('employee_id', $employee_id)->where('resort_id', $this->resort->resort_id))->orderBy('Due_Date', 'ASC')
+                $CommonVariable = QuotaSlotRenewal::where('employee_id', $employee_id)->where('resort_id', $this->resort->resort_id)->orderBy('Due_Date', 'ASC')
                                 ->get()
                                 ->map(function($i)
                                 {
@@ -588,13 +579,13 @@ class XpactEmployeeController extends Controller
             }
             else
             {
-                $WorkPermit =  $applyYear(WorkPermit::where('employee_id', $employee_id)->where('resort_id', $this->resort->resort_id))->orderBy('Month', 'ASC')
+                $WorkPermit =  WorkPermit::where('employee_id', $employee_id)->where('resort_id', $this->resort->resort_id)->orderBy('Month', 'ASC')
                     ->get();
 
                     $PaidAmt = $WorkPermit->where("Status","Paid")->sum('Amt');
                     $UnPaidAmt = $WorkPermit->where("Status","Unpaid")->sum('Amt');
 
-                    $CommonVariable = $applyYear(WorkPermit::where('employee_id', $employee_id)->where('resort_id', $this->resort->resort_id))->orderBy('Due_Date', 'ASC')
+                    $CommonVariable = WorkPermit::where('employee_id', $employee_id)->where('resort_id', $this->resort->resort_id)->orderBy('Due_Date', 'ASC')
                                     ->get()
                                      ->map(function($i)
                                     {
