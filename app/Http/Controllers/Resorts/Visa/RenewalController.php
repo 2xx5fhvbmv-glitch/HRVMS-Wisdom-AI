@@ -763,17 +763,12 @@ class RenewalController extends Controller
             $slotBase  = QuotaSlotRenewal::where('resort_id', $this->resort->resort_id)->where('employee_id', $emp_id);
             $hasUnpaid = (clone $slotBase)->whereRaw("LOWER(COALESCE(Status,'')) <> 'paid'")->exists();
 
-            // "Already scheduled ahead" = the newest renewal batch hasn't started yet
-            // (its earliest Due_Date is in the future) => a next cycle already exists.
-            $latestCreatedAt      = (clone $slotBase)->max('created_at');
+            // "Already scheduled ahead" — a single cycle covers ~12 months, so if the
+            // schedule already reaches beyond ~13 months from today, the next cycle is
+            // already in place. (Duration-based, so it's immune to rapid back-to-back
+            // renewals, unlike a created_at window.)
             $coverUntil           = (clone $slotBase)->max('Due_Date');
-            $nextAlreadyScheduled = false;
-            if ($latestCreatedAt) {
-                $batchMinDue = (clone $slotBase)
-                    ->where('created_at', '>=', Carbon::parse($latestCreatedAt)->subMinutes(2))
-                    ->min('Due_Date');
-                $nextAlreadyScheduled = $batchMinDue && Carbon::parse($batchMinDue)->gt(Carbon::today());
-            }
+            $nextAlreadyScheduled = $coverUntil && Carbon::parse($coverUntil)->gt(Carbon::today()->addMonths(13));
 
             if ($hasUnpaid || $nextAlreadyScheduled) {
                 $msg = $hasUnpaid
