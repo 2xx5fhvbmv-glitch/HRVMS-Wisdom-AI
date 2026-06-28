@@ -198,27 +198,7 @@
                 </div>
                 <div class="XpatDetail-documents-box XpatDet-paySchedule mb-4">
                     <div class="card-title">
-                        <div class="row justify-content-between align-items-center g-md-2 g-1">
-                            <div class="col">
-                                <h3 class="text-nowrap">Payment Schedule</h3>
-                            </div>
-                            <div class="col-6">
-                                <div class="row justify-content-end g-md-3 g-2 align-items-center">
-                                    <div class="col-xl-3 col-md-4 col-sm-4 col-6">
-                                        <select class="form-select" id="ScheduleYear" name="ScheduleYear">
-                                            <option value="ALL"> All Year</option>
-                                           <?php
-                                            $ScheduleYears = range(date('Y') + 1, date('Y') - 14);
-                                            array_multisort($ScheduleYears, SORT_DESC);
-                                            ?>
-                                            @foreach($ScheduleYears as $year)
-                                                <option value="{{$year}}">{{$year}}</option>
-                                            @endforeach
-                                        </select>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                        <h3>Payment Schedule</h3>
                     </div>
                     <input type="hidden" name="employee_id" id="employee_id" value="{{base64_encode($Employee->id)}}">
                     <div class="row  gx-2">
@@ -570,10 +550,6 @@ $(document).ready(function(){
         placeholder: "Select Year",
         allowClear: true
     });
-    $("#ScheduleYear").select2({
-        placeholder: "Select Year",
-        allowClear: true
-    });
     $("#DocumentType").select2({
         placeholder: "Select Document Type",
         allowClear: true
@@ -591,10 +567,6 @@ $(document).ready(function(){
             {
                 PastTransectionData();
             }
-        });
-      $("#ScheduleYear").change(function()
-       {
-            QuotaSlotFeeTable();
         });
         $(".VisaFileUpload").on("click", function() {
             $("#VisaModuleFileUpload-modal").modal('show');
@@ -787,7 +759,6 @@ function QuotaSlotFeeTable()
                 {
                     d.flag = flag,
                     d.employee_id = $("#employee_id").val();
-                    d.ScheduleYear = $("#ScheduleYear").val();
                 }
             },
             columns: [
@@ -828,7 +799,6 @@ function QuotaSlotFeeTable()
                 {
                     d.flag = flag,
                     d.employee_id = $("#employee_id").val();
-                    d.ScheduleYear = $("#ScheduleYear").val();
                 }
             },
             columns: [
