@@ -41,29 +41,36 @@ class DedupeVisaFeeSchedules extends Command
 
         $grandDeleted = 0;
 
+        // A slot lump-sum (Amt >= this) is bucketed separately so it is never
+        // collapsed into a monthly installment of the same calendar month.
+        $LUMPSUM_MIN = 1000;
+
         foreach ($tables as $table => $label) {
-            $groups = DB::table($table)
-                ->select('resort_id', 'employee_id', 'Due_Date', DB::raw('COUNT(*) as c'))
+            // Group by CALENDAR MONTH, not exact Due_Date — a re-renewal on a
+            // different day produced e.g. 2026-07-17 AND 2026-07-26 (same month,
+            // different day), which an exact-date match could never dedupe.
+            $rows = DB::table($table)
                 ->whereNotNull('Due_Date')
                 ->when($resort, fn($q) => $q->where('resort_id', $resort))
-                ->groupBy('resort_id', 'employee_id', 'Due_Date')
-                ->havingRaw('COUNT(*) > 1')
-                ->get();
+                ->orderBy('id')
+                ->get(['id', 'resort_id', 'employee_id', 'Due_Date', 'Status', 'Amt']);
+
+            $groups = $rows->groupBy(function ($r) use ($LUMPSUM_MIN) {
+                $bucket = ((float) $r->Amt >= $LUMPSUM_MIN) ? 'L' : 'I'; // lump-sum vs installment
+                return $r->resort_id . '|' . $r->employee_id . '|' . substr((string) $r->Due_Date, 0, 7) . '|' . $bucket;
+            });
 
             $deleted = 0;
-            foreach ($groups as $g) {
-                $rows = DB::table($table)
-                    ->where('resort_id', $g->resort_id)
-                    ->where('employee_id', $g->employee_id)
-                    ->where('Due_Date', $g->Due_Date)
-                    ->orderBy('id')
-                    ->get(['id', 'Status', 'Amt']);
-
+            foreach ($groups as $key => $g) {
+                if ($g->count() < 2) {
+                    continue;
+                }
                 // Keep a Paid row if any (lowest id), else the lowest id overall.
-                $keep = $rows->first(fn($r) => strtolower((string) $r->Status) === 'paid') ?? $rows->first();
-                $toDelete = $rows->where('id', '!=', $keep->id)->pluck('id');
+                $keep = $g->first(fn($r) => strtolower((string) $r->Status) === 'paid') ?? $g->first();
+                $toDelete = $g->where('id', '!=', $keep->id)->pluck('id');
 
-                $this->line("  {$label} emp {$g->employee_id} due {$g->Due_Date}: {$g->c} rows -> keep #{$keep->id}, delete " . $toDelete->implode(','));
+                [$rid, $emp, $ym, $bucket] = explode('|', $key);
+                $this->line("  {$label} emp {$emp} {$ym} (" . ($bucket === 'L' ? 'lump-sum' : 'installment') . "): {$g->count()} rows -> keep #{$keep->id}, delete " . $toDelete->implode(','));
                 if (!$dryRun && $toDelete->isNotEmpty()) {
                     DB::table($table)->whereIn('id', $toDelete)->delete();
                 }
