@@ -40,6 +40,33 @@ class RenewalController extends Controller
         }
 
 
+    /**
+     * Resolve an insurance policy's [start, end] (both Y-m-d) given the FROM/TO
+     * dates read from the document. Expatriate medical insurance is always a
+     * 1-year term, so:
+     *   - both present  -> use as-is
+     *   - only TO/expiry -> start = end - 1 year
+     *   - only FROM      -> end   = start + 1 year
+     *   - neither        -> [null, null]
+     * Uses safeAiDate so OCR sentinels ("Unavailable", "", odd formats) never throw.
+     */
+    private function resolveInsurancePeriod($fromRaw, $toRaw): array
+    {
+        $from = \App\Helpers\Common::safeAiDate($fromRaw);
+        $to   = \App\Helpers\Common::safeAiDate($toRaw);
+
+        if ($from && !$to) {
+            $to = $from->copy()->addYearNoOverflow()->subDay();
+        } elseif ($to && !$from) {
+            $from = $to->copy()->subYearNoOverflow()->addDay();
+        }
+
+        return [
+            $from ? $from->format('Y-m-d') : null,
+            $to   ? $to->format('Y-m-d')   : null,
+        ];
+    }
+
     public function index()
     {
         $page_title = 'Renewals';
@@ -109,16 +136,29 @@ class RenewalController extends Controller
                 // Unified — latest UNPAID insurance policy (falls back to latest).
                 $insDue = \App\Helpers\Common::visaNextDue(EmployeeInsurance::class, $this->resort->resort_id, $emp_id, 'insurance_end_date', 'desc') ?: $EmployeeInsurance->insurance_end_date;
                 $insurance_end_date = Carbon::parse($insDue);
-                $insurance_months_diff = $start->diffInMonths($insurance_end_date);
 
-                if ($insurance_months_diff < 1) 
+                // diffInMonths is UNSIGNED — an already-expired policy was reading
+                // "7 month(s) remaining" instead of expired. Branch on past/future.
+                if ($insurance_end_date->isPast())
                 {
-                    $days_diff = $start->diffInDays($insurance_end_date);
-                    $EmployeeInsurance->InsuranceRenewalTime = "Expires in $days_diff days";
-                } 
-                else 
+                    $monthsAgo = $insurance_end_date->diffInMonths($start);
+                    $daysAgo   = $insurance_end_date->diffInDays($start);
+                    $EmployeeInsurance->InsuranceRenewalTime = $monthsAgo >= 1
+                        ? "Expired $monthsAgo month(s) ago"
+                        : "Expired $daysAgo day(s) ago";
+                }
+                else
                 {
-                    $EmployeeInsurance->InsuranceRenewalTime = "$insurance_months_diff month(s) remaining";
+                    $insurance_months_diff = $start->diffInMonths($insurance_end_date);
+                    if ($insurance_months_diff < 1)
+                    {
+                        $days_diff = $start->diffInDays($insurance_end_date);
+                        $EmployeeInsurance->InsuranceRenewalTime = "Expires in $days_diff days";
+                    }
+                    else
+                    {
+                        $EmployeeInsurance->InsuranceRenewalTime = "$insurance_months_diff month(s) remaining";
+                    }
                 }
                 $medical_amt =  $ResortBudgetCost['MEDICAL INSURANCE - INTERNATIONAL'];
 
@@ -373,21 +413,31 @@ class RenewalController extends Controller
                                                         'insurance_end_date' =>$EmployeeInsurance->insurance_end_date,
                                                        
                                                     ]);
+                            // Insurance validity is exactly one year. Prefer the
+                            // explicit FROM/TO from the document; if only one date is
+                            // read, derive the other so the span is 1 year.
+                            [$insStartYmd, $insEndYmd] = $this->resolveInsurancePeriod(
+                                $AI_Data['extracted_fields']['Insurance Start Date']  ?? null,
+                                $AI_Data['extracted_fields']['Insurance Expiry Date'] ?? null
+                            );
+
+                            // NOTE (bug fix): the previous code passed TWO arrays to
+                            // ->update(), but Eloquent's update() takes only ONE — so
+                            // the dates/company/policy were silently dropped and the
+                            // card showed "Policy Number: N/A". This writes a single
+                            // array with every field, including the company + policy.
                             EmployeeInsurance::where('resort_id', $this->resort->resort_id)
                                                        ->where('employee_id', $emp_id)
-                                                       ->update(["resort_id"=>$this->resort->resort_id,'employee_id' => $emp_id],
-                                                    [   
-                                                        'insurance_file' =>$aws['Chil_file_id'] ? $aws['Chil_file_id'] : null,
-                                                        'resort_id'  => $this->resort->resort_id,
-                                                        'employee_id'=> $emp_id,
-                                                        'Premium'    => $Insurance_data['amount'] ?? 0.00,
-                                                        "Currency"   => $Insurance_data['unit'] ?? null,
-                                                        'insurance_file'=> $aws['Chil_file_id'] ?? null,
-                                                        // safeAiDate tolerates OCR sentinels ("Unavailable", "Not Exit", "")
-                                                        // and multiple date formats. Was: Carbon::parse(... ) which threw
-                                                        // "A two digit day could not be found" and produced a 500.
-                                                        'insurance_start_date' => optional(\App\Helpers\Common::safeAiDate($AI_Data['extracted_fields']['Insurance Expiry Date'] ?? null))->format('Y-m-d'),
-                                                        'insurance_end_date'   => optional(\App\Helpers\Common::safeAiDate($AI_Data['extracted_fields']['Insurance Expiry Date'] ?? null))->format('Y-m-d'),
+                                                       ->update([
+                                                        'resort_id'               => $this->resort->resort_id,
+                                                        'employee_id'             => $emp_id,
+                                                        'insurance_company'       => $AI_Data['extracted_fields']['Insurance Company Name'] ?? $EmployeeInsurance->insurance_company,
+                                                        'insurance_policy_number' => $AI_Data['extracted_fields']['Policy Number'] ?? $EmployeeInsurance->insurance_policy_number,
+                                                        'Premium'                 => $Insurance_data['amount'] ?? 0.00,
+                                                        'Currency'                => $Insurance_data['unit'] ?? null,
+                                                        'insurance_file'          => $aws['Chil_file_id'] ?? null,
+                                                        'insurance_start_date'    => $insStartYmd,
+                                                        'insurance_end_date'      => $insEndYmd,
                                                     ]);
 
                             $TotalExpensessSinceJoing->Total_insurance_Payment += $Insurance_data['amount'] ?? 0.00;
@@ -439,7 +489,11 @@ class RenewalController extends Controller
                     DB::beginTransaction();
                     try {
                         $Insurance_data = $ResortBudgetCost['MEDICAL INSURANCE - INTERNATIONAL'] ?? null;
-                        $insExpiry = optional(\App\Helpers\Common::safeAiDate($AI_Data['extracted_fields']['Insurance Expiry Date'] ?? null))->format('Y-m-d');
+                        // 1-year validity: prefer FROM/TO from the doc, else derive.
+                        [$insStartYmd, $insEndYmd] = $this->resolveInsurancePeriod(
+                            $AI_Data['extracted_fields']['Insurance Start Date']  ?? null,
+                            $AI_Data['extracted_fields']['Insurance Expiry Date'] ?? null
+                        );
                         EmployeeInsurance::create([
                             'resort_id'               => $this->resort->resort_id,
                             'employee_id'             => $emp_id,
@@ -447,8 +501,8 @@ class RenewalController extends Controller
                             'insurance_policy_number' => $AI_Data['extracted_fields']['Policy Number'] ?? null,
                             'Premium'                 => $Insurance_data['amount'] ?? 0.00,
                             'Currency'                => $Insurance_data['unit'] ?? null,
-                            'insurance_start_date'    => $insExpiry,
-                            'insurance_end_date'      => $insExpiry,
+                            'insurance_start_date'    => $insStartYmd,
+                            'insurance_end_date'      => $insEndYmd,
                             'insurance_file'          => $aws['Chil_file_id'] ?? null,
                         ]);
 

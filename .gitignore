@@ -44,3 +44,7 @@ vendor/composer/autoload_psr4.php
 vendor/composer/autoload_namespaces.php
 vendor/composer/autoload_files.php
 node_modules/
+
+# Local sample document folders (insurance policies / medical reports) — not for the repo
+/Insurance
+/public/OneDrive_2_6-28-2026
