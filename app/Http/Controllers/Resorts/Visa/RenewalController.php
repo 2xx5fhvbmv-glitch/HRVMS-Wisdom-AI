@@ -178,14 +178,10 @@ class RenewalController extends Controller
                 } 
                 $QuotaSlotRenewal->QuotaSlotRenewal_end_date = Carbon::parse($QuotaSlotRenewal_end_date)->format('d M Y');
                 $QuotaSlotRenewal->employee_id =base64_encode($QuotaSlotRenewal->employee_id);
-                if($QuotaSlotRenewal)
-                {
-                    $QuotaSlotRenewal->NewSlot =Carbon::parse($QuotaSlotRenewal->Payment_Date)->format('d M Y') .' Until 12 Months';
-                }
-                else
-                {
-                    $QuotaSlotRenewal->NewSlot =Carbon::now()->format('d M Y') .' Until 12 Months';
-                }
+                // "New slot" = the current 12-month cycle's START (its last month − 11),
+                // so it matches the schedule. Was showing today's date because it read
+                // Payment_Date (null for an unpaid installment cycle).
+                $QuotaSlotRenewal->NewSlot = $QuotaSlotRenewal_end_date->copy()->subMonthsNoOverflow(11)->format('d M Y') .' Until 12 Months';
 
             }
             $WorkPermitRenewal = WorkPermit::where('employee_id', $emp_id)
