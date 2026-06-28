@@ -760,62 +760,66 @@ class RenewalController extends Controller
             }
 
             $qotaslotAMt =  $ResortBudgetCost['QUOTA SLOT DEPOSIT'] ?? 0.00;
-            if($payment_type =="Lumpsum")
-            { 
-        
 
-               
-
-                $next_year_due_date = $start_date->copy()->addYear();
-        
-                    QuotaSlotRenewal::create([
-                                            'resort_id'=>$this->resort->resort_id,
-                                            'Due_Date'=> $next_year_due_date->format('Y-m-d'),
-                                            'employee_id'=> $emp_id,
-                                            'Month'=> 12,
-                                            "Currency"=> $qotaslotAMt['unit'] ?? 'MVR',
-                                            "Amt"=> $qotaslotAMt['amount'],
-                                            ]);
-
-             
-                return response()->json(['success'=>true,'message'=>'Quota Slot Renewal  Successfully Using the Lumpsum Payment Type','status'=>200]);
+            if (!in_array($payment_type, ['Lumpsum', 'Installment'], true)) {
+                return response()->json(['success'=>false,'message'=>'Please select a payment type.','status'=>500]);
             }
-            elseif($payment_type =="Installment")
-            {
-                $start_date = Carbon::today();
-                $Eleven_month_installment= ($qotaslotAMt['amount'] - 174) / 11 ?? 0.00;
-                
 
-                for ($i = 1; $i <=11; $i++) 
-                {
-                   
-                    $new_date = $start_date->copy()->addMonths($i);
-                    $amt = ($i==1) ? 174: number_format($Eleven_month_installment,2);
-                    QuotaSlotRenewal::create([
-                                          'resort_id'=>$this->resort->resort_id,
-                                          'Due_Date'=> $new_date->format('Y-m-d'),
-                                          'employee_id'=> $emp_id,
-                                          'Month'=> $new_date->format('m'),
-                                          "Currency"=> $qotaslotAMt['unit'] ?? 'MVR',
-                                          "Amt"=> $amt,
-                                        ]);
-                }
-               
-                 // $TotalExpensessSinceJoing isn't fetched in this method, so fetch +
-                 // guard it (was crashing "assign property on null" for employees
-                 // without a TotalExpensessSinceJoing record).
-                 $TotalExpensessSinceJoing = TotalExpensessSinceJoing::where('resort_id', $this->resort->resort_id)->where('employees_id', $emp_id)->first();
-                 if ($TotalExpensessSinceJoing) {
-                     $TotalExpensessSinceJoing->Total_slot_Payment += $qotaslotAMt['amount'] ?? 0.00;
-                     $TotalExpensessSinceJoing->save();
-                 }
-            
-            return  response()->json(['success'=>true,'message'=>' Quota Slot Renewal  successfully using the Installment Payment Type.','status'=>200]);
+            // Both Lumpsum and Installment create the SAME 12-month schedule — the
+            // yearly Quota Slot deposit split across 12 months (first month 174, the
+            // remaining 11 share the balance and the last absorbs any rounding so the
+            // rows total the deposit exactly). The Lumpsum option used to create a
+            // SINGLE row, so it never appeared as a 12-month schedule. payment_type is
+            // recorded on each row; how it's settled (all at once vs monthly) is a
+            // payment-time concern.
+            $deposit  = (float) ($qotaslotAMt['amount'] ?? 0);
+            $unit     = $qotaslotAMt['unit'] ?? 'MVR';
+            $firstAmt = 174;
+            $perMonth = $deposit > $firstAmt ? round(($deposit - $firstAmt) / 11, 2) : 0;
+
+            // Continue from the month after the latest existing row so cycles don't
+            // overlap (mirrors the Work Permit renewal).
+            $last = QuotaSlotRenewal::where('resort_id', $this->resort->resort_id)
+                ->where('employee_id', $emp_id)->whereNotNull('Due_Date')
+                ->orderBy('Due_Date', 'desc')->first();
+            if ($last) {
+                $anchor = Carbon::parse($last->Due_Date)->addMonthNoOverflow();
+                $dueDay = Carbon::parse($last->Due_Date)->day;
+            } else {
+                $anchor = Carbon::today();
+                $dueDay = Carbon::today()->day;
             }
-            else
-            {
-                return response()->json(['success'=>false,'message'=>'Please  Add  Xpact Page','status'=>500]);
+
+            $allocated = 0;
+            for ($i = 0; $i < 12; $i++) {
+                $monthDate = $anchor->copy()->addMonths($i);
+                $day = min($dueDay, $monthDate->copy()->endOfMonth()->day);
+                $due = $monthDate->copy()->day($day);
+
+                if ($i === 0)        { $amt = $firstAmt; }
+                elseif ($i === 11)   { $amt = round($deposit - $allocated, 2); }
+                else                 { $amt = $perMonth; }
+                $allocated += $amt;
+
+                QuotaSlotRenewal::create([
+                    'resort_id'   => $this->resort->resort_id,
+                    'Due_Date'    => $due->format('Y-m-d'),
+                    'employee_id' => $emp_id,
+                    'Month'       => $due->format('m'),
+                    'Currency'    => $unit,
+                    'Amt'         => $amt,
+                    'PaymentType' => $payment_type,
+                ]);
             }
+
+            // Track the lifetime slot total (guard against a missing snapshot row).
+            $TotalExpensessSinceJoing = TotalExpensessSinceJoing::where('resort_id', $this->resort->resort_id)->where('employees_id', $emp_id)->first();
+            if ($TotalExpensessSinceJoing) {
+                $TotalExpensessSinceJoing->Total_slot_Payment += $deposit;
+                $TotalExpensessSinceJoing->save();
+            }
+
+            return response()->json(['success'=>true,'message'=>"Quota Slot renewed for 12 months ({$payment_type}).",'status'=>200]);
         }
 
         return response()->json(['success'=>false,'message'=>'Invalid Selection','status'=>500]);
