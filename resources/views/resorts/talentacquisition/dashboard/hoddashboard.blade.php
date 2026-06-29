@@ -174,7 +174,11 @@
                          on THEIR approval (rank-filtered server-side by
                          Common::GetTheFreshVacancies), so the permission
                          check is both redundant and wrong. --}}
-                    @if(isset($Vacancies) && $Vacancies->count() > 0)
+                    {{-- Always render the card (with an empty state) so Finance
+                         HOD / EXCOM see it consistently with the HR dashboard.
+                         Previously the whole card was wrapped in @if($Vacancies->count() > 0)
+                         with no @else, so it vanished entirely when the user had
+                         nothing pending — which read as "the card is missing". --}}
                     <div class="col-lg-12">
                         <div class="card h-auto">
                             <div class="card-title">
@@ -188,6 +192,7 @@
                                 </div>
                             </div>
                             <div class="hireReq-main" id="FreshHiringRequest">
+                                @if(isset($Vacancies) && $Vacancies->count() > 0)
                                 @foreach ($Vacancies->take(5) as $vacancy)
                                     <div class="hireReq-block">
                                         <div class="img-circle">
@@ -213,10 +218,12 @@
                                         </div>
                                     </div>
                                 @endforeach
+                                @else
+                                    <p>No new hire requests available.</p>
+                                @endif
                             </div>
                         </div>
                     </div>
-                    @endif
 
                     <div class="col-lg-12 @if(App\Helpers\Common::checkRouteWisePermission('resort.vacancies.FreshApplicant',config('settings.resort_permissions.view')) == false) d-none @endif">
                         <div class="card h-auto" id="card-vac">
