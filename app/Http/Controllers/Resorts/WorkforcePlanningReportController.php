@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Resorts;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Resorts\Concerns\PredefinedReportActions;
 use App\Helpers\Common;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -22,6 +23,8 @@ use Illuminate\Support\Facades\DB;
  */
 class WorkforcePlanningReportController extends Controller
 {
+    use PredefinedReportActions;
+
     protected $resort;
 
     public function __construct()
@@ -116,6 +119,31 @@ class WorkforcePlanningReportController extends Controller
         return view('resorts.reports.workforce_planning', compact('page_title', 'reports', 'departments', 'years', 'positions'));
     }
 
+    private function filtersFrom(Request $request): array
+    {
+        return [
+            'year'       => $request->input('year') ?: null,
+            'department' => $request->input('department') ?: null,
+            'position'   => $request->input('position') ?: null,
+        ];
+    }
+
+    /** Resolve a report key + filters to ['name','description','columns','rows'] or null. */
+    private function compute(string $key, array $filters): ?array
+    {
+        $registry = $this->registry();
+        if (!isset($registry[$key])) {
+            return null;
+        }
+        $res = $this->{$registry[$key]['handler']}($filters);
+        return [
+            'name'        => $registry[$key]['name'],
+            'description' => $registry[$key]['description'],
+            'columns'     => $res['columns'],
+            'rows'        => $res['rows'],
+        ];
+    }
+
     /** Run a predefined report and return the rendered table HTML. */
     public function run(Request $request)
     {
@@ -123,29 +151,45 @@ class WorkforcePlanningReportController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
         }
 
-        $key      = (string) $request->input('report');
-        $registry = $this->registry();
-        if (!isset($registry[$key])) {
+        $c = $this->compute((string) $request->input('report'), $this->filtersFrom($request));
+        if (!$c) {
             return response()->json(['success' => false, 'message' => 'Unknown report.'], 422);
         }
 
-        $filters = [
-            'year'       => $request->input('year') ?: null,
-            'department' => $request->input('department') ?: null,
-            'position'   => $request->input('position') ?: null,
-        ];
-
-        $result  = $this->{$registry[$key]['handler']}($filters);
-        $columns = $result['columns'];
-        $data    = $result['rows'];
-
         $html = view('resorts.renderfiles.ReportFilterData', [
-            'report'  => (object) ['name' => $registry[$key]['name']],
-            'columns' => $columns,
-            'data'    => $data,
+            'report'  => (object) ['name' => $c['name']],
+            'columns' => $c['columns'],
+            'data'    => $c['rows'],
         ])->render();
 
-        return response()->json(['success' => true, 'html' => $html, 'count' => count($data)]);
+        return response()->json(['success' => true, 'html' => $html, 'count' => count($c['rows'])]);
+    }
+
+    /** Export a predefined report (csv / excel / pdf). */
+    public function export(Request $request)
+    {
+        if (Common::checkRouteWisePermission('resort.report.index', config('settings.resort_permissions.view')) == false) {
+            return abort(403, 'Unauthorized access');
+        }
+        $c = $this->compute((string) $request->input('report'), $this->filtersFrom($request));
+        if (!$c) {
+            return abort(404, 'Unknown report');
+        }
+        return $this->exportComputedReport($c['name'], $c['description'], $c['columns'], $c['rows'], $request->input('format', 'pdf'));
+    }
+
+    /** WAI Insights for a predefined report. */
+    public function insights(Request $request)
+    {
+        if (Common::checkRouteWisePermission('resort.report.index', config('settings.resort_permissions.view')) == false) {
+            return response()->json(['status' => false, 'message' => 'Unauthorized'], 403);
+        }
+        $c = $this->compute((string) $request->input('report'), $this->filtersFrom($request));
+        if (!$c) {
+            return response()->json(['status' => false, 'message' => 'Unknown report.'], 422);
+        }
+        $text = $this->computeAiInsightsText($c['name'], $c['description'], $c['columns'], $c['rows']);
+        return response()->json(['status' => true, 'data' => $text]);
     }
 
     /**
