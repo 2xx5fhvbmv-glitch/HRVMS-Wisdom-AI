@@ -1971,6 +1971,10 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
     Route::put('report/{report}', 'ReportController@update')->name('resort.report.update');
     Route::post('report/ai-inside', 'ReportController@AiInsideReport')->name('reports.AiInsideReport');
 
+    // Predefined Workforce Planning reports (Option B — computed, dept-scoped).
+    Route::get('report/workforce-planning', 'WorkforcePlanningReportController@index')->name('resort.report.wfp.index');
+    Route::post('report/workforce-planning/run', 'WorkforcePlanningReportController@run')->name('resort.report.wfp.run');
+
 
     Route::delete('report/{id}', 'ReportController@destroy')->name('reports.destroy');
 
