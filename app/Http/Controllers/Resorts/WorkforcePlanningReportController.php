@@ -54,6 +54,30 @@ class WorkforcePlanningReportController extends Controller
                 'filters'     => ['department'],
                 'handler'     => 'departmentVacancySummary',
             ],
+            'approved_positions' => [
+                'name'        => 'Approved Positions',
+                'description' => 'All approved positions and their approved headcount.',
+                'filters'     => ['department', 'position'],
+                'handler'     => 'approvedPositions',
+            ],
+            'grade_wise_plan' => [
+                'name'        => 'Grade-wise Workforce Plan',
+                'description' => 'Planned headcount by job grade.',
+                'filters'     => ['department'],
+                'handler'     => 'gradeWisePlan',
+            ],
+            'recruitment_demand' => [
+                'name'        => 'Recruitment Demand Forecast',
+                'description' => 'Future hiring requirements from open vacancies.',
+                'filters'     => ['department'],
+                'handler'     => 'recruitmentDemand',
+            ],
+            'local_vs_expat' => [
+                'name'        => 'Local vs Expatriate Workforce',
+                'description' => 'Local and expatriate headcount distribution by department.',
+                'filters'     => ['department'],
+                'handler'     => 'localVsExpat',
+            ],
         ];
     }
 
@@ -229,6 +253,107 @@ class WorkforcePlanningReportController extends Controller
 
         return [
             'columns' => ['Department', 'Total Positions', 'Filled Positions', 'Vacant Positions', 'Vacancy (%)'],
+            'rows'    => $rows,
+        ];
+    }
+
+    /** #8 Approved Positions — every planned position + approved headcount. */
+    public function approvedPositions(array $filters): array
+    {
+        $rows = $this->seatQuery($filters)
+            ->orderBy('d.name')->orderBy('p.position_title')
+            ->get()
+            ->map(fn($r) => [
+                'Department'         => $r->department ?? 'N/A',
+                'Position'           => $r->position_title,
+                'Grade'              => $r->grade !== null ? (string) $r->grade : 'N/A',
+                'Approved Headcount' => (int) $r->approved,
+            ])->all();
+
+        return [
+            'columns' => ['Department', 'Position', 'Grade', 'Approved Headcount'],
+            'rows'    => $rows,
+        ];
+    }
+
+    /** #17 Grade-wise Workforce Plan — planned headcount by job grade. */
+    public function gradeWisePlan(array $filters): array
+    {
+        $rows = $this->seatQuery($filters)
+            ->orderBy('p.Rank')->orderBy('p.position_title')
+            ->get()
+            ->map(fn($r) => [
+                'Grade'            => $r->grade !== null ? (string) $r->grade : 'N/A',
+                'Position'         => $r->position_title,
+                'Department'       => $r->department ?? 'N/A',
+                'Planned Headcount'=> (int) $r->approved,
+            ])->all();
+
+        return [
+            'columns' => ['Grade', 'Position', 'Department', 'Planned Headcount'],
+            'rows'    => $rows,
+        ];
+    }
+
+    /** #11 Recruitment Demand Forecast — open vacancies + expected start date. */
+    public function recruitmentDemand(array $filters): array
+    {
+        $resortId = $this->resort->resort_id;
+        $scoped   = Common::getScopedDepartmentIds();
+
+        $rows = DB::table('vacancies as v')
+            ->leftJoin('resort_departments as d', 'd.id', '=', 'v.department')
+            ->leftJoin('resort_positions as p', 'p.id', '=', 'v.position')
+            ->where('v.Resort_id', $resortId)
+            ->when($scoped !== null, fn($q) => $q->whereIn('v.department', $scoped))
+            ->when($filters['department'], fn($q) => $q->where('v.department', $filters['department']))
+            ->when($filters['year'], fn($q) => $q->whereYear('v.required_starting_date', $filters['year']))
+            ->orderBy('v.required_starting_date')
+            ->get(['d.name as department', 'p.position_title', 'v.Total_position_required', 'v.required_starting_date'])
+            ->map(fn($r) => [
+                'Department'              => $r->department ?? 'N/A',
+                'Position'                => $r->position_title ?? 'N/A',
+                'Required Headcount'      => (int) ($r->Total_position_required ?: 1),
+                'Expected Recruitment Date' => $r->required_starting_date
+                    ? \Carbon\Carbon::parse($r->required_starting_date)->format('d M Y') : 'N/A',
+            ])->all();
+
+        return [
+            'columns' => ['Department', 'Position', 'Required Headcount', 'Expected Recruitment Date'],
+            'rows'    => $rows,
+        ];
+    }
+
+    /** #15 Local vs Expatriate Workforce — headcount split by nationality. */
+    public function localVsExpat(array $filters): array
+    {
+        $resortId = $this->resort->resort_id;
+        $scoped   = Common::getScopedDepartmentIds();
+
+        $rows = DB::table('employees as e')
+            ->leftJoin('resort_departments as d', 'd.id', '=', 'e.Dept_id')
+            ->where('e.resort_id', $resortId)
+            ->whereIn('e.status', ['Active', 'Probationary'])
+            ->when($scoped !== null, fn($q) => $q->whereIn('e.Dept_id', $scoped))
+            ->when($filters['department'], fn($q) => $q->where('e.Dept_id', $filters['department']))
+            ->groupBy('e.Dept_id', 'd.name')
+            ->orderBy('d.name')
+            ->select(
+                'd.name as department',
+                DB::raw("SUM(CASE WHEN e.nationality = 'Maldivian' THEN 1 ELSE 0 END) as local"),
+                DB::raw("SUM(CASE WHEN e.nationality <> 'Maldivian' THEN 1 ELSE 0 END) as expat"),
+                DB::raw('COUNT(*) as total')
+            )
+            ->get()
+            ->map(fn($r) => [
+                'Department'           => $r->department ?? 'N/A',
+                'Local Headcount'      => (int) $r->local,
+                'Expatriate Headcount' => (int) $r->expat,
+                'Total Headcount'      => (int) $r->total,
+            ])->all();
+
+        return [
+            'columns' => ['Department', 'Local Headcount', 'Expatriate Headcount', 'Total Headcount'],
             'rows'    => $rows,
         ];
     }
