@@ -29,6 +29,7 @@
                     </div>
                     <div class="col-auto">
                         <a href="{{ route('resort.report.wfp.index') }}" class="btn btn-sm btn-themeSkyblue me-1">Workforce Planning Reports</a>
+                        <a href="{{ route('resort.report.payroll.index') }}" class="btn btn-sm btn-themeSkyblue me-1">Payroll Reports</a>
                         <a href="{{ route('reports.create') }}" class="btn btn-sm btn-theme @if(Common::checkRouteWisePermission('resort.report.index',config('settings.resort_permissions.create')) == false) d-none @endif">Create Report</a>
                     </div>
                 </div>  
