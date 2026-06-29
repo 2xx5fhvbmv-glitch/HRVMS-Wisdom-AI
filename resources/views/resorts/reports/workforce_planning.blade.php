@@ -77,6 +77,36 @@
                                 </select>
                             </div>
 
+                            <div class="col-sm-4 wfp-filter" data-filter="month">
+                                <label class="form-label">Month</label>
+                                <select class="form-select" id="wfpMonth">
+                                    <option value="">All months</option>
+                                    @foreach($months as $m)
+                                        <option value="{{ $m['value'] }}">{{ $m['label'] }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <div class="col-sm-4 wfp-filter" data-filter="status">
+                                <label class="form-label">Status</label>
+                                <select class="form-select" id="wfpStatus">
+                                    <option value="">All statuses</option>
+                                    @foreach($statuses as $s)
+                                        <option value="{{ $s }}">{{ $s }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <div class="col-sm-4 wfp-filter" data-filter="employment_type">
+                                <label class="form-label">Employment Type</label>
+                                <select class="form-select" id="wfpEmploymentType">
+                                    <option value="">All types</option>
+                                    @foreach($employmentTypes as $et)
+                                        <option value="{{ $et }}">{{ $et }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+
                             <div class="col-12 d-flex flex-wrap gap-2 align-items-center">
                                 <button type="submit" class="btn btn-sm btn-theme" id="wfpRunBtn">Run Report</button>
 
@@ -121,7 +151,10 @@
                 report: $('#wfpReportKey').val(),
                 year: $('#wfpYear').val(),
                 department: $('#wfpDepartment').val(),
-                position: $('#wfpPosition').val()
+                position: $('#wfpPosition').val(),
+                month: $('#wfpMonth').val(),
+                status: $('#wfpStatus').val(),
+                employment_type: $('#wfpEmploymentType').val()
             };
         }
         function setActionsEnabled(on) {
