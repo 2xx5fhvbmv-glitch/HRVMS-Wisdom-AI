@@ -1975,6 +1975,10 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
     Route::get('report/workforce-planning', 'WorkforcePlanningReportController@index')->name('resort.report.wfp.index');
     Route::post('report/workforce-planning/run', 'WorkforcePlanningReportController@run')->name('resort.report.wfp.run');
 
+    // Predefined Payroll reports (Option B — computed, dept-scoped).
+    Route::get('report/payroll', 'PayrollReportController@index')->name('resort.report.payroll.index');
+    Route::post('report/payroll/run', 'PayrollReportController@run')->name('resort.report.payroll.run');
+
 
     Route::delete('report/{id}', 'ReportController@destroy')->name('reports.destroy');
 
