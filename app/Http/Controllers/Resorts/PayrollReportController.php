@@ -40,6 +40,7 @@ class PayrollReportController extends Controller
         return [
             'payroll_summary'        => ['name' => 'Payroll Summary', 'description' => 'Summarised payroll for the selected period.', 'filters' => ['payroll'], 'handler' => 'payrollSummary'],
             'detailed_register'      => ['name' => 'Detailed Payroll Register', 'description' => 'Full payroll breakdown per employee.', 'filters' => ['payroll', 'department'], 'handler' => 'detailedRegister'],
+            'upcoming_projection'    => ['name' => 'Upcoming Payroll Projection', 'description' => 'Estimated payroll for a draft/in-progress run before it is finalised.', 'filters' => ['payroll', 'department'], 'handler' => 'upcomingProjection'],
             'payroll_comparison'     => ['name' => 'Payroll Comparison', 'description' => 'Compare payroll cost between two periods.', 'filters' => ['from_payroll', 'to_payroll'], 'handler' => 'payrollComparison'],
             'cost_by_department'     => ['name' => 'Payroll Cost by Department', 'description' => 'Payroll expenditure per department.', 'filters' => ['payroll'], 'handler' => 'costByDepartment'],
             'cost_by_designation'    => ['name' => 'Payroll Cost by Designation', 'description' => 'Payroll expenditure per designation.', 'filters' => ['payroll'], 'handler' => 'costByDesignation'],
@@ -50,19 +51,26 @@ class PayrollReportController extends Controller
             'net_salary'             => ['name' => 'Net Salary Report', 'description' => 'Final payable salary after deductions.', 'filters' => ['payroll'], 'handler' => 'netSalary'],
             'allowance_report'       => ['name' => 'Allowance Report', 'description' => 'Allowances paid during the period.', 'filters' => ['payroll', 'allowance_type'], 'handler' => 'allowanceReport'],
             'deduction_report'       => ['name' => 'Deduction Report', 'description' => 'Deductions made during payroll processing.', 'filters' => ['payroll', 'deduction_type'], 'handler' => 'deductionReport'],
+            'component_analysis'     => ['name' => 'Payroll Component Analysis', 'description' => 'Payroll cost grouped by salary component.', 'filters' => ['payroll'], 'handler' => 'componentAnalysis'],
             'service_charge_dist'    => ['name' => 'Service Charge Distribution', 'description' => 'Service charge per employee.', 'filters' => ['payroll'], 'handler' => 'serviceChargeDistribution'],
             'service_charge_trend'   => ['name' => 'Service Charge Trend', 'description' => 'Monthly service charge trend.', 'filters' => ['year'], 'handler' => 'serviceChargeTrend'],
             'avg_service_charge'     => ['name' => 'Average Service Charge', 'description' => 'Average service charge per employee by department.', 'filters' => ['year', 'department'], 'handler' => 'averageServiceCharge'],
+            'overtime_summary'       => ['name' => 'Overtime Summary', 'description' => 'Overtime hours and pay per employee for the period.', 'filters' => ['payroll'], 'handler' => 'overtimeSummary'],
             'top_overtime'           => ['name' => 'Top Overtime Employees', 'description' => 'Highest overtime payments.', 'filters' => ['payroll'], 'handler' => 'topOvertime'],
+            'overtime_trend'         => ['name' => 'Overtime Trend', 'description' => 'Monthly overtime hours and cost.', 'filters' => ['year'], 'handler' => 'overtimeTrend'],
+            'pension_contribution'   => ['name' => 'Pension Contribution Report', 'description' => 'Employee and employer pension contributions.', 'filters' => ['payroll'], 'handler' => 'pensionContribution'],
+            'annual_pension'         => ['name' => 'Annual Pension Summary', 'description' => 'Pension contributions accumulated during the year.', 'filters' => ['year'], 'handler' => 'annualPension'],
             'ewt_report'             => ['name' => 'Employee Withholding Tax (EWT) Report', 'description' => 'EWT deducted during the period.', 'filters' => ['payroll'], 'handler' => 'ewtReport'],
             'annual_tax_summary'     => ['name' => 'Annual Tax Summary', 'description' => 'Total tax deducted per employee for the year.', 'filters' => ['year'], 'handler' => 'annualTaxSummary'],
             'ff_settlement_register' => ['name' => 'Full & Final Settlement Register', 'description' => 'Employees undergoing final settlement.', 'filters' => ['year', 'settlement_status'], 'handler' => 'ffSettlementRegister'],
             'ff_settlement_pending'  => ['name' => 'Pending Full & Final Settlement', 'description' => 'Outstanding (not finalized) settlements.', 'filters' => [], 'handler' => 'ffSettlementPending'],
             'tuckshop_deduction'     => ['name' => 'Tuck Shop Deduction Summary', 'description' => 'Tuck shop deductions per employee.', 'filters' => ['payroll'], 'handler' => 'tuckshopDeduction'],
+            'tuckshop_payable'       => ['name' => 'Tuck Shop Outstanding Payable', 'description' => 'Outstanding amount payable per tuck shop vendor.', 'filters' => ['payroll'], 'handler' => 'tuckshopPayable'],
             'tuckshop_purchases'     => ['name' => 'Tuck Shop Purchase Details', 'description' => 'Itemised tuck shop purchases.', 'filters' => ['payroll'], 'handler' => 'tuckshopPurchases'],
             'salary_advance'         => ['name' => 'Salary Advance Report', 'description' => 'Advances issued and recovered.', 'filters' => ['department'], 'handler' => 'salaryAdvance'],
             'payroll_exceptions'     => ['name' => 'Payroll Exceptions Report', 'description' => 'Anomalies to review before approval.', 'filters' => ['payroll'], 'handler' => 'payrollExceptions'],
             'payroll_audit_trail'    => ['name' => 'Payroll Audit Trail', 'description' => 'Processing history and approvals.', 'filters' => ['payroll'], 'handler' => 'payrollAuditTrail'],
+            'processing_status'      => ['name' => 'Payroll Processing Status', 'description' => 'Processing status of payroll runs.', 'filters' => ['payroll'], 'handler' => 'processingStatus'],
             'local_vs_expat'         => ['name' => 'Local vs Expat Payroll Summary', 'description' => 'Payroll cost for local vs expatriate staff.', 'filters' => ['payroll'], 'handler' => 'localVsExpat'],
             'executive_summary'      => ['name' => 'Payroll Executive Summary', 'description' => 'Consolidated payroll overview for management.', 'filters' => ['payroll'], 'handler' => 'executiveSummary'],
         ];
@@ -983,5 +991,213 @@ class PayrollReportController extends Controller
                 'Total Deductions'    => $this->n($r->ded ?? 0),
             ]],
         ];
+    }
+
+    /* ------------------------------------------------ catalog completion */
+
+    /** #3 Upcoming Payroll Projection — the selected run's payslips as estimates. */
+    public function upcomingProjection(array $filters): array
+    {
+        $pid = $this->resolvePayrollId($filters);
+        $rows = $this->basePayslip($pid, $filters)
+            ->orderBy('ra.first_name')
+            ->get([$this->nameExpr(), 'pr.earnings_basic', 'pr.earnings_overtime', 'pr.regularOTPay', 'pr.holidayOTPay', 'pr.service_charge', 'pr.earnings_allowance', 'pr.total_deductions', 'pr.net_salary'])
+            ->map(fn($r) => [
+                'Employee Name'           => $r->employee_name,
+                'Estimated Basic Salary'  => $this->n($r->earnings_basic),
+                'Estimated OT'            => $this->n($r->earnings_overtime ?: ($r->regularOTPay + $r->holidayOTPay)),
+                'Estimated Service Charge'=> $this->n($r->service_charge),
+                'Estimated Allowances'    => $this->n($r->earnings_allowance),
+                'Estimated Deductions'    => $this->n($r->total_deductions),
+                'Estimated Net Salary'    => $this->n($r->net_salary),
+            ])->all();
+
+        return [
+            'columns' => ['Employee Name', 'Estimated Basic Salary', 'Estimated OT', 'Estimated Service Charge', 'Estimated Allowances', 'Estimated Deductions', 'Estimated Net Salary'],
+            'rows'    => $rows,
+        ];
+    }
+
+    /** #10 Payroll Component Analysis — totals per salary component (one row). */
+    public function componentAnalysis(array $filters): array
+    {
+        $pid = $this->resolvePayrollId($filters);
+        $t = $this->basePayslip($pid, $filters)->selectRaw(
+            'SUM(pr.earnings_basic) basic, SUM(pr.regularOTPay + pr.holidayOTPay) ot, SUM(pr.service_charge) sc,
+             SUM(pr.earnings_allowance) allow, SUM(pr.kpi_bonus) bonus, SUM(pr.total_deductions) ded'
+        )->first();
+
+        $scoped = Common::getScopedDepartmentIds();
+        $employer = DB::table('payroll_deductions as pd')
+            ->join('employees as e', 'e.id', '=', 'pd.employee_id')
+            ->where('pd.payroll_id', $pid)
+            ->when($scoped !== null, fn($q) => $q->whereIn('e.Dept_id', $scoped))
+            ->when($filters['department'], fn($q) => $q->where('e.Dept_id', $filters['department']))
+            ->sum('pd.pension'); // employer share mirrors the 7% employee pension
+
+        return [
+            'columns' => ['Basic Salary', 'OT', 'Service Charge', 'Allowances', 'Bonuses', 'Deductions', 'Employer Contributions'],
+            'rows'    => [[
+                'Basic Salary'           => $this->n($t->basic ?? 0),
+                'OT'                     => $this->n($t->ot ?? 0),
+                'Service Charge'         => $this->n($t->sc ?? 0),
+                'Allowances'             => $this->n($t->allow ?? 0),
+                'Bonuses'                => $this->n($t->bonus ?? 0),
+                'Deductions'             => $this->n($t->ded ?? 0),
+                'Employer Contributions' => $this->n($employer),
+            ]],
+        ];
+    }
+
+    /** #18 Overtime Summary — OT hours + pay per employee (no Friday OT tracked). */
+    public function overtimeSummary(array $filters): array
+    {
+        $pid = $this->resolvePayrollId($filters);
+        $rows = $this->basePayslip($pid, $filters)
+            ->leftJoin('payroll_time_and_attandance as ta', function ($j) {
+                $j->on('ta.payroll_id', '=', 'pr.payroll_id')->on('ta.employee_id', '=', 'pr.employee_id');
+            })
+            ->whereRaw('(pr.regularOTPay + pr.holidayOTPay) > 0 OR ta.total_ot > 0')
+            ->orderBy('ra.first_name')
+            ->get([$this->nameExpr(), 'ta.regular_ot_hours', 'ta.holiday_ot_hours', 'pr.regularOTPay', 'pr.holidayOTPay'])
+            ->map(fn($r) => [
+                'Employee Name'    => $r->employee_name,
+                'Normal OT Hours'  => $this->n($r->regular_ot_hours ?? 0),
+                'Friday OT Hours'  => 'N/A', // not tracked separately
+                'Holiday OT Hours' => $this->n($r->holiday_ot_hours ?? 0),
+                'OT Amount'        => $this->n($r->regularOTPay + $r->holidayOTPay),
+            ])->all();
+
+        return ['columns' => ['Employee Name', 'Normal OT Hours', 'Friday OT Hours', 'Holiday OT Hours', 'OT Amount'], 'rows' => $rows];
+    }
+
+    /** #20 Overtime Trend — monthly OT hours + cost for a year. */
+    public function overtimeTrend(array $filters): array
+    {
+        $year = $filters['year'] ?: Carbon::now()->year;
+        $rows = DB::table('payroll_time_and_attandance as ta')
+            ->join('payroll as pay', 'pay.id', '=', 'ta.payroll_id')
+            ->join('payroll_reviews as pr', function ($j) {
+                $j->on('pr.payroll_id', '=', 'ta.payroll_id')->on('pr.employee_id', '=', 'ta.employee_id');
+            })
+            ->where('pay.resort_id', $this->resort->resort_id)
+            ->whereRaw('YEAR(pay.start_date) = ?', [$year])
+            ->groupBy(DB::raw('MONTH(pay.start_date)'))
+            ->select(
+                DB::raw('MONTH(pay.start_date) as m'),
+                DB::raw('SUM(ta.regular_ot_hours) as normal_h'),
+                DB::raw('SUM(ta.holiday_ot_hours) as holiday_h'),
+                DB::raw('SUM(pr.regularOTPay + pr.holidayOTPay) as cost')
+            )->orderBy('m')->get()
+            ->map(fn($r) => [
+                'Month'           => Carbon::create()->month((int) $r->m)->format('F'),
+                'Normal OT Hours' => $this->n($r->normal_h),
+                'Friday OT Hours' => 'N/A',
+                'Holiday OT Hours'=> $this->n($r->holiday_h),
+                'Total OT Cost'   => $this->n($r->cost),
+            ])->all();
+
+        return ['columns' => ['Month', 'Normal OT Hours', 'Friday OT Hours', 'Holiday OT Hours', 'Total OT Cost'], 'rows' => $rows];
+    }
+
+    /** #21 Pension Contribution Report (employer share mirrors the 7% employee share). */
+    public function pensionContribution(array $filters): array
+    {
+        $pid = $this->resolvePayrollId($filters);
+        $rows = $this->basePayslip($pid, $filters)
+            ->join('payroll_deductions as pd', function ($j) {
+                $j->on('pd.payroll_id', '=', 'pr.payroll_id')->on('pd.employee_id', '=', 'pr.employee_id');
+            })
+            ->where('pd.pension', '>', 0)
+            ->orderBy('ra.first_name')
+            ->get([$this->nameExpr(), 'pr.earnings_basic', 'pd.pension'])
+            ->map(fn($r) => [
+                'Employee Name'             => $r->employee_name,
+                'Pensionable Salary'        => $this->n($r->earnings_basic),
+                'Employee Contribution (7%)'=> $this->n($r->pension),
+                'Employer Contribution (7%)'=> $this->n($r->pension),
+                'Total Contribution'        => $this->n($r->pension * 2),
+            ])->all();
+
+        return ['columns' => ['Employee Name', 'Pensionable Salary', 'Employee Contribution (7%)', 'Employer Contribution (7%)', 'Total Contribution'], 'rows' => $rows];
+    }
+
+    /** #22 Annual Pension Summary (per employee, employer mirrors employee). */
+    public function annualPension(array $filters): array
+    {
+        $year   = $filters['year'] ?: Carbon::now()->year;
+        $scoped = Common::getScopedDepartmentIds();
+        $rows = DB::table('payroll_deductions as pd')
+            ->join('payroll as pay', 'pay.id', '=', 'pd.payroll_id')
+            ->join('employees as e', 'e.id', '=', 'pd.employee_id')
+            ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
+            ->where('pay.resort_id', $this->resort->resort_id)
+            ->whereRaw('YEAR(pay.start_date) = ?', [$year])
+            ->when($scoped !== null, fn($q) => $q->whereIn('e.Dept_id', $scoped))
+            ->groupBy('e.id', 'ra.first_name', 'ra.last_name')
+            ->havingRaw('SUM(pd.pension) > 0')
+            ->select($this->nameExpr(), DB::raw('SUM(pd.pension) emp'))
+            ->orderBy('ra.first_name')->get()
+            ->map(fn($r) => [
+                'Employee Name'              => $r->employee_name,
+                'Total Employee Contribution'=> $this->n($r->emp),
+                'Total Employer Contribution'=> $this->n($r->emp),
+                'Total Annual Contribution'  => $this->n($r->emp * 2),
+            ])->all();
+
+        return ['columns' => ['Employee Name', 'Total Employee Contribution', 'Total Employer Contribution', 'Total Annual Contribution'], 'rows' => $rows];
+    }
+
+    /** #28 Tuck Shop Outstanding Payable — unpaid purchases grouped by vendor. */
+    public function tuckshopPayable(array $filters): array
+    {
+        $pid = $this->resolvePayrollId($filters);
+        $pay = DB::table('payroll')->where('id', $pid)->first();
+        $scoped = Common::getScopedDepartmentIds();
+
+        $q = DB::table('payments as pmt')
+            ->join('employees as e', 'e.id', '=', 'pmt.emp_id')
+            ->leftJoin('shopkeepers as sk', 'sk.id', '=', 'pmt.shopkeeper_id')
+            ->where('e.resort_id', $this->resort->resort_id)
+            ->whereRaw('LOWER(COALESCE(pmt.status, "")) <> ?', ['paid'])   // outstanding only
+            ->when($scoped !== null, fn($x) => $x->whereIn('e.Dept_id', $scoped));
+
+        if ($pay) {
+            $q->whereBetween('pmt.purchased_date', [$pay->start_date, $pay->end_date]);
+        }
+
+        $rows = $q->groupBy('pmt.shopkeeper_id', 'sk.name')
+            ->select('sk.name as vendor', DB::raw('SUM(pmt.price * pmt.quantity) as total'), DB::raw('COUNT(*) as items'))
+            ->orderBy('sk.name')->get()
+            ->map(fn($r) => [
+                'Vendor Name'    => $r->vendor ?? 'N/A',
+                'Invoice Number' => 'N/A', // no invoice records in schema
+                'Invoice Date'   => 'N/A',
+                'Total Amount'   => $this->n($r->total),
+                'Payment Status' => 'Outstanding',
+            ])->all();
+
+        return ['columns' => ['Vendor Name', 'Invoice Number', 'Invoice Date', 'Total Amount', 'Payment Status'], 'rows' => $rows];
+    }
+
+    /** #33 Payroll Processing Status — status of each payroll run (no payroll groups). */
+    public function processingStatus(array $filters): array
+    {
+        $runs = DB::table('payroll')->where('resort_id', $this->resort->resort_id)
+            ->when($filters['payroll'], fn($q) => $q->where('id', $filters['payroll']))
+            ->orderByDesc('start_date')->get();
+
+        $rows = $runs->map(function ($p) {
+            $approvedAt = DB::table('payroll_approvals')->where('payroll_id', $p->id)
+                ->where('status', 'approved')->max('approved_at');
+            return [
+                'Payroll Period' => $this->periodLabel($p),
+                'Status'         => ucfirst($p->status),
+                'Processed Date' => $p->draft_date ? Carbon::parse($p->draft_date)->format('d M Y') : 'N/A',
+                'Approved Date'  => $approvedAt ? Carbon::parse($approvedAt)->format('d M Y') : 'N/A',
+            ];
+        })->all();
+
+        return ['columns' => ['Payroll Period', 'Status', 'Processed Date', 'Approved Date'], 'rows' => $rows];
     }
 }
