@@ -24,6 +24,15 @@ class LiabilitiesController extends Controller
 
     protected $resort;
     protected $underEmp_id=[];
+
+    /**
+     * The Work Permit Fee is configured as a MONTHLY amount but is payable every
+     * month, so the annual liability per expat is the monthly fee × 12. All the
+     * other Xpat costs (slot deposit, insurance, medical, visa fee) are billed
+     * once per period and project ×1.
+     */
+    const WORK_PERMIT_MONTHS = 12;
+
     public function __construct()
     {
         $this->resort = $resortId = auth()->guard('resort-admin')->user();
@@ -280,7 +289,7 @@ class LiabilitiesController extends Controller
                 // so the budget total matches the USD the view renders.
                 $TotalBudgetQuotaSlotDeposit               = $this->toUsd($ResortBudgetCost['QUOTA SLOT DEPOSIT']['amount'] ?? 0, $ResortBudgetCost['QUOTA SLOT DEPOSIT']['unit'] ?? 'MVR') * $TotalExpactEmployeecounts;
                 $TotalBudgetMedicalInsuranceInternational  = $this->toUsd($ResortBudgetCost['MEDICAL INSURANCE - INTERNATIONAL']['amount'] ?? 0, $ResortBudgetCost['MEDICAL INSURANCE - INTERNATIONAL']['unit'] ?? 'MVR') * $TotalExpactEmployeecounts;
-                $TotalBudgetWorkPermitFees                 = $this->toUsd($ResortBudgetCost['WORK PERMIT FEE']['amount'] ?? 0, $ResortBudgetCost['WORK PERMIT FEE']['unit'] ?? 'MVR') * $TotalExpactEmployeecounts;
+                $TotalBudgetWorkPermitFees                 = $this->toUsd($ResortBudgetCost['WORK PERMIT FEE']['amount'] ?? 0, $ResortBudgetCost['WORK PERMIT FEE']['unit'] ?? 'MVR') * $TotalExpactEmployeecounts * self::WORK_PERMIT_MONTHS;
                 $TotalBudgetWorkPermitMedicalTestFee       = $this->toUsd($ResortBudgetCost['WORK VISA MEDICAL TEST FEE']['amount'] ?? 0, $ResortBudgetCost['WORK VISA MEDICAL TEST FEE']['unit'] ?? 'MVR') * $TotalExpactEmployeecounts;
                 $TotalBudgetVisaFees                       = $this->toUsd($ResortBudgetCost['VISA FEE']['amount'] ?? 0, $ResortBudgetCost['VISA FEE']['unit'] ?? 'MVR') * $TotalExpactEmployeecounts;
 
@@ -367,7 +376,10 @@ class LiabilitiesController extends Controller
 
         $config       = Common::VisaRenewalCost($rid);
         $cfgKey       = $map[$flag]['cfg'];
-        $budgetPerEmp = $this->toUsd($config[$cfgKey]['amount'] ?? 0, $config[$cfgKey]['unit'] ?? 'MVR');
+        // Work Permit Fee is a monthly charge, so the annual liability is ×12;
+        // every other category is billed once per period (×1). Mirrors Index().
+        $months       = $flag === 'WorkPermit' ? self::WORK_PERMIT_MONTHS : 1;
+        $budgetPerEmp = $this->toUsd($config[$cfgKey]['amount'] ?? 0, $config[$cfgKey]['unit'] ?? 'MVR') * $months;
 
         $employees = Employee::with(['resortAdmin', 'position', 'department', 'WorkPermit', 'EmployeeInsurance', 'WorkPermitMedicalRenewal', 'QuotaSlotRenewal'])
             ->whereRaw('LOWER(TRIM(nationality)) != ?', ['maldivian'])

@@ -7404,7 +7404,15 @@ class Common
             'work permit fee'                   => 'WORK PERMIT FEE',
             'work visa medical test fee'        => 'WORK VISA MEDICAL TEST FEE',
             'work visa medical test'            => 'WORK VISA MEDICAL TEST FEE',
-            'medical insurance - international'  => 'MEDICAL INSURANCE - INTERNATIONAL',
+            // The expat insurance liability must come from the DEDICATED expat
+            // insurance row ("Expat Insurance" / "Xpat Insurance", details
+            // 'Xpat Only'), NOT the generic "Medical Insurance - International" /
+            // "Medical Insurance" operational costs (details 'Both'), which were
+            // wrongly inflating the figure. The canonical key name is kept as
+            // 'MEDICAL INSURANCE - INTERNATIONAL' so every existing caller that
+            // reads that key transparently receives the expat-insurance amount.
+            'expat insurance'                   => 'MEDICAL INSURANCE - INTERNATIONAL',
+            'xpat insurance'                    => 'MEDICAL INSURANCE - INTERNATIONAL',
         ];
 
         $rows = ResortBudgetCost::whereIn('details', ['Xpat Only', 'Both'])

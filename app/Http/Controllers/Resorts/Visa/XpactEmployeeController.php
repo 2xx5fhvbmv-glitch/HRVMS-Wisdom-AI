@@ -485,7 +485,7 @@ class XpactEmployeeController extends Controller
         // Insurance Expiry — create/update the EmployeeInsurance record.
         if (!empty($request->insurance_expiry)) {
             $insEnd = \Carbon\Carbon::parse($request->insurance_expiry)->format('Y-m-d');
-            $insFee = $feeFor(['MEDICAL INSURANCE - INTERNATIONAL', 'Medical Insurance - International', 'medical insurance - international']);
+            $insFee = $feeFor(['Expat Insurance', 'Xpat Insurance', 'expat insurance', 'xpat insurance']);
             $ins = EmployeeInsurance::where('employee_id', $eid)->where('resort_id', $rid)->orderBy('id', 'desc')->first();
             if ($ins) {
                 $ins->insurance_end_date = $insEnd;
