@@ -77,14 +77,29 @@
                                 </select>
                             </div>
 
-                            <div class="col-12">
+                            <div class="col-12 d-flex flex-wrap gap-2 align-items-center">
                                 <button type="submit" class="btn btn-sm btn-theme" id="wfpRunBtn">Run Report</button>
+
+                                <div class="dropdown">
+                                    <button class="btn btn-sm btn-primary dropdown-toggle wfpActionBtn" disabled type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                        <i class="fa fa-download"></i> Export
+                                    </button>
+                                    <ul class="dropdown-menu">
+                                        <li><a class="dropdown-item wfpExport" href="javascript:void(0)" data-format="csv"><i class="fa fa-file-csv"></i> CSV</a></li>
+                                        <li><a class="dropdown-item wfpExport" href="javascript:void(0)" data-format="excel"><i class="fa fa-file-excel"></i> Excel</a></li>
+                                        <li><a class="dropdown-item wfpExport" href="javascript:void(0)" data-format="pdf"><i class="fa fa-file-pdf"></i> PDF</a></li>
+                                    </ul>
+                                </div>
+
+                                <button type="button" class="btn btn-sm btn-theme wfpActionBtn" id="wfpInsightsBtn" disabled>WAI Insights</button>
+                                <button type="button" class="btn btn-sm btn-themeSkyblue d-none" id="wfpBackToData">Back to Data</button>
                             </div>
                         </form>
 
                         <div id="wfpResults">
                             <p class="text-muted text-center mb-0">Choose a report and click <strong>Run Report</strong>.</p>
                         </div>
+                        <div id="wfpInsights" class="wai-insights d-none"></div>
                     </div>
                 </div>
             </div>
@@ -96,8 +111,27 @@
 @section('import-scripts')
 <script>
     $(function () {
-        var RUN_URL = '{{ route("resort.report.wfp.run") }}';
-        var TOKEN   = '{{ csrf_token() }}';
+        var RUN_URL      = '{{ route("resort.report.wfp.run") }}';
+        var EXPORT_URL   = '{{ route("resort.report.wfp.export") }}';
+        var INSIGHTS_URL = '{{ route("resort.report.wfp.insights") }}';
+        var TOKEN        = '{{ csrf_token() }}';
+
+        function currentFilters() {
+            return {
+                report: $('#wfpReportKey').val(),
+                year: $('#wfpYear').val(),
+                department: $('#wfpDepartment').val(),
+                position: $('#wfpPosition').val()
+            };
+        }
+        function setActionsEnabled(on) {
+            $('.wfpActionBtn').prop('disabled', !on);
+        }
+        function showData() {
+            $('#wfpInsights').addClass('d-none').empty();
+            $('#wfpResults').show();
+            $('#wfpBackToData').addClass('d-none');
+        }
 
         // Show only the filters a report declares; keep the rest hidden.
         function applyFilterVisibility($item) {
@@ -125,6 +159,8 @@
             $('#wfpReportKey').val($(this).data('key'));
             $('#wfpReportTitle').text($(this).find('strong').text());
             applyFilterVisibility($(this));
+            showData();
+            setActionsEnabled(false);
             $('#wfpResults').html('<p class="text-muted text-center mb-0">Click <strong>Run Report</strong> to load.</p>');
         });
 
@@ -132,34 +168,71 @@
 
         $('#wfpFilterForm').on('submit', function (e) {
             e.preventDefault();
+            showData();
             var $btn = $('#wfpRunBtn').prop('disabled', true).text('Running…');
             $('#wfpResults').html('<p class="text-center mb-0"><i class="fa fa-spinner fa-spin"></i> Loading…</p>');
 
             $.ajax({
                 url: RUN_URL,
                 type: 'POST',
-                data: {
-                    _token: TOKEN,
-                    report: $('#wfpReportKey').val(),
-                    year: $('#wfpYear').val(),
-                    department: $('#wfpDepartment').val(),
-                    position: $('#wfpPosition').val()
-                },
+                data: $.extend({ _token: TOKEN }, currentFilters()),
                 success: function (res) {
                     if (res.success) {
                         $('#wfpResults').html(res.html);
+                        setActionsEnabled(res.count > 0);
                     } else {
                         $('#wfpResults').html('<p class="text-danger text-center mb-0">' + (res.message || 'Failed to run report.') + '</p>');
+                        setActionsEnabled(false);
                     }
                 },
                 error: function (xhr) {
                     $('#wfpResults').html('<p class="text-danger text-center mb-0">' + ((xhr.responseJSON && xhr.responseJSON.message) || 'Failed to run report.') + '</p>');
+                    setActionsEnabled(false);
                 },
                 complete: function () {
                     $btn.prop('disabled', false).text('Run Report');
                 }
             });
         });
+
+        // Export — POST the current filters + format via a real form so the
+        // browser downloads the file.
+        $('.wfpExport').on('click', function () {
+            var data = $.extend({ _token: TOKEN, format: $(this).data('format') }, currentFilters());
+            var $f = $('<form>', { method: 'POST', action: EXPORT_URL }).css('display', 'none');
+            $.each(data, function (k, v) { $f.append($('<input>', { type: 'hidden', name: k, value: v == null ? '' : v })); });
+            $f.appendTo('body').submit().remove();
+        });
+
+        // WAI Insights — render the AI markdown analysis in place of the table.
+        $('#wfpInsightsBtn').on('click', function () {
+            var $b = $(this).prop('disabled', true).text('Working… Please Wait');
+            $.ajax({
+                url: INSIGHTS_URL,
+                type: 'POST',
+                data: $.extend({ _token: TOKEN }, currentFilters()),
+                success: function (res) {
+                    var md = (res && res.data) || '';
+                    if (!md) {
+                        $('#wfpInsights').html('<p class="text-muted">No insights available (the WAI service may be offline).</p>');
+                    } else {
+                        var html = (typeof marked !== 'undefined') ? (marked.parse ? marked.parse(md) : marked(md)) : $('<div>').text(md).html();
+                        $('#wfpInsights').html(html);
+                    }
+                    $('#wfpResults').hide();
+                    $('#wfpInsights').removeClass('d-none');
+                    $('#wfpBackToData').removeClass('d-none');
+                },
+                error: function () {
+                    $('#wfpInsights').html('<p class="text-danger">Failed to load insights.</p>').removeClass('d-none');
+                    $('#wfpResults').hide();
+                    $('#wfpBackToData').removeClass('d-none');
+                },
+                complete: function () { $b.prop('disabled', false).text('WAI Insights'); }
+            });
+        });
+
+        $('#wfpBackToData').on('click', showData);
 
         // Initialise from the first (active) report.
         applyFilterVisibility($('.wfp-report-item.active').first());

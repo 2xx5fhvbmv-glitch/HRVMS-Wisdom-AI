@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Resorts;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Resorts\Concerns\PredefinedReportActions;
 use App\Helpers\Common;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -21,6 +22,8 @@ use Illuminate\Support\Facades\DB;
  */
 class PayrollReportController extends Controller
 {
+    use PredefinedReportActions;
+
     protected $resort;
 
     // Tunable thresholds for the Payroll Exceptions rules.
@@ -117,19 +120,9 @@ class PayrollReportController extends Controller
         ));
     }
 
-    public function run(Request $request)
+    private function filtersFrom(Request $request): array
     {
-        if (Common::checkRouteWisePermission('resort.report.index', config('settings.resort_permissions.view')) == false) {
-            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
-        }
-
-        $key      = (string) $request->input('report');
-        $registry = $this->registry();
-        if (!isset($registry[$key])) {
-            return response()->json(['success' => false, 'message' => 'Unknown report.'], 422);
-        }
-
-        $filters = [
+        return [
             'payroll'           => $request->input('payroll') ?: null,
             'from_payroll'      => $request->input('from_payroll') ?: null,
             'to_payroll'        => $request->input('to_payroll') ?: null,
@@ -140,16 +133,69 @@ class PayrollReportController extends Controller
             'bank'              => $request->input('bank') ?: null,
             'settlement_status' => $request->input('settlement_status') ?: null,
         ];
+    }
 
-        $result = $this->{$registry[$key]['handler']}($filters);
+    /** Resolve a report key + filters to ['name','description','columns','rows'] or null. */
+    private function compute(string $key, array $filters): ?array
+    {
+        $registry = $this->registry();
+        if (!isset($registry[$key])) {
+            return null;
+        }
+        $res = $this->{$registry[$key]['handler']}($filters);
+        return [
+            'name'        => $registry[$key]['name'],
+            'description' => $registry[$key]['description'],
+            'columns'     => $res['columns'],
+            'rows'        => $res['rows'],
+        ];
+    }
+
+    public function run(Request $request)
+    {
+        if (Common::checkRouteWisePermission('resort.report.index', config('settings.resort_permissions.view')) == false) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 403);
+        }
+
+        $c = $this->compute((string) $request->input('report'), $this->filtersFrom($request));
+        if (!$c) {
+            return response()->json(['success' => false, 'message' => 'Unknown report.'], 422);
+        }
 
         $html = view('resorts.renderfiles.ReportFilterData', [
-            'report'  => (object) ['name' => $registry[$key]['name']],
-            'columns' => $result['columns'],
-            'data'    => $result['rows'],
+            'report'  => (object) ['name' => $c['name']],
+            'columns' => $c['columns'],
+            'data'    => $c['rows'],
         ])->render();
 
-        return response()->json(['success' => true, 'html' => $html, 'count' => count($result['rows'])]);
+        return response()->json(['success' => true, 'html' => $html, 'count' => count($c['rows'])]);
+    }
+
+    /** Export a predefined report (csv / excel / pdf). */
+    public function export(Request $request)
+    {
+        if (Common::checkRouteWisePermission('resort.report.index', config('settings.resort_permissions.view')) == false) {
+            return abort(403, 'Unauthorized access');
+        }
+        $c = $this->compute((string) $request->input('report'), $this->filtersFrom($request));
+        if (!$c) {
+            return abort(404, 'Unknown report');
+        }
+        return $this->exportComputedReport($c['name'], $c['description'], $c['columns'], $c['rows'], $request->input('format', 'pdf'));
+    }
+
+    /** WAI Insights for a predefined report. */
+    public function insights(Request $request)
+    {
+        if (Common::checkRouteWisePermission('resort.report.index', config('settings.resort_permissions.view')) == false) {
+            return response()->json(['status' => false, 'message' => 'Unauthorized'], 403);
+        }
+        $c = $this->compute((string) $request->input('report'), $this->filtersFrom($request));
+        if (!$c) {
+            return response()->json(['status' => false, 'message' => 'Unknown report.'], 422);
+        }
+        $text = $this->computeAiInsightsText($c['name'], $c['description'], $c['columns'], $c['rows']);
+        return response()->json(['status' => true, 'data' => $text]);
     }
 
     /* ---------------------------------------------------------------- helpers */
