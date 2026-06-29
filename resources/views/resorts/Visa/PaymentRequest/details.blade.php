@@ -74,17 +74,18 @@
                                                     <span class="badge badge-themeDanger ms-1">Pending</span>
                                                 @endif
                                             </label>
-                                            <span>Last Paid: {{ Common::prettyDate($PaymentRequestChild->LastWorkPermitDate) }} | Due Date: {{ Common::prettyDate($PaymentRequestChild->WorkPermitDate) }} | Amount: {!! Common::formatMvr($PaymentRequestChild->WorkPermitAmt) !!}
-                                                @if(($PaymentRequestChild->WorkPermitMonths ?? 1) > 1)<span class="badge badge-themeNew ms-1">{{ $PaymentRequestChild->WorkPermitMonths }} months</span>@endif
-                                            </span>
+                                            <span>Amount: {!! Common::formatMvr($PaymentRequestChild->WorkPermitAmt) !!}</span>
+                                            @if(($PaymentRequestChild->WorkPermitMonths ?? 1) > 1)
+                                                <span class="d-block text-muted" style="font-size:12px;">Paying {{ $PaymentRequestChild->WorkPermitMonths }} months in advance (through {{ \Carbon\Carbon::parse($PaymentRequestChild->WorkPermitDate)->addMonthsNoOverflow((int) $PaymentRequestChild->WorkPermitMonths)->format('d M Y') }})</span>
+                                            @endif
                                         </div>
                                     </div>
                                 @endif
-                                @if($PaymentRequestChild->InsuranceDate)
+                                @if(($PaymentRequestChild->InsurancePrimume ?? 0) > 0)
                                     <div class="border-top">
                                         <div class="insurance-Ibox">
                                             <label class="d-block">Insurance</label>
-                                            <span>Last Paid: {{ Common::prettyDate($PaymentRequestChild->LastInsuranceDate) }} | Due Date:  {{ Common::prettyDate($PaymentRequestChild->InsuranceDate) }} | Amount: {!! Common::formatMvr($PaymentRequestChild->InsurancePrimume) !!}</span>
+                                            <span>Amount: {!! Common::formatMvr($PaymentRequestChild->InsurancePrimume) !!}</span>
                                         </div>
                                     </div>
                                 @endif
@@ -93,7 +94,7 @@
                                     <div class="border-top">
                                         <div class="insurance-Ibox">
                                             <label class="d-block">Work Permit Medical Test Fee </label>
-                                            <span>Last Paid: {{ Common::prettyDate($PaymentRequestChild->LastMedicalReportDate) }} | Due Date: {{ Common::prettyDate($PaymentRequestChild->MedicalReportDate) }} | Amount: {!! Common::formatMvr($PaymentRequestChild->MedicalReportFees) !!}</span>
+                                            <span>Amount: {!! Common::formatMvr($PaymentRequestChild->MedicalReportFees) !!}</span>
                                         </div>
                                     </div>
                                 @endif
@@ -107,9 +108,10 @@
                                                     <span class="badge badge-themeDanger ms-1">Pending</span>
                                                 @endif
                                             </label>
-                                            <span>Last Paid: {{ Common::prettyDate($PaymentRequestChild->LastQuotaslotDate) }} | Due Date: {{ Common::prettyDate($PaymentRequestChild->QuotaslotDate) }} | Amount: {!! Common::formatMvr($PaymentRequestChild->QuotaslotAmt) !!}
-                                                @if(($PaymentRequestChild->QuotaslotMonths ?? 1) > 1)<span class="badge badge-themeNew ms-1">{{ $PaymentRequestChild->QuotaslotMonths }} months</span>@endif
-                                            </span>
+                                            <span>Amount: {!! Common::formatMvr($PaymentRequestChild->QuotaslotAmt) !!}</span>
+                                            @if(($PaymentRequestChild->QuotaslotMonths ?? 1) > 1)
+                                                <span class="d-block text-muted" style="font-size:12px;">Paying {{ $PaymentRequestChild->QuotaslotMonths }} months in advance (through {{ \Carbon\Carbon::parse($PaymentRequestChild->QuotaslotDate)->addMonthsNoOverflow((int) $PaymentRequestChild->QuotaslotMonths)->format('d M Y') }})</span>
+                                            @endif
                                         </div>
                                     </div>
                                 @endif
@@ -117,7 +119,7 @@
                                     <div class="border-top">
                                         <div class="insurance-Ibox">
                                             <label class="d-block">Visa</label>
-                                            <span>Last Paid: {{ Common::prettyDate($PaymentRequestChild->LastVisaDate) }} | Due Date: {{ Common::prettyDate($PaymentRequestChild->VisaDate) }} | Amount: {!! Common::formatMvr($PaymentRequestChild->VisaAmt) !!} </span>
+                                            <span>Amount: {!! Common::formatMvr($PaymentRequestChild->VisaAmt) !!} </span>
                                         </div>
                                     </div>
                                 @endif

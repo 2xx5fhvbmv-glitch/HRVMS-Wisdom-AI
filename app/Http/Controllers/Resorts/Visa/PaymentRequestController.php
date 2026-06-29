@@ -883,7 +883,11 @@ class PaymentRequestController extends Controller
                             ->get()->map(function ($employee) use(&$GrandTotal) 
                                 {
                                     $sum= $employee->WorkPermitAmt + $employee->QuotaslotAmt + $employee->InsurancePrimume + $employee->MedicalReportFees + $employee->VisaAmt;
-                                    $employee->TotalAmount = number_format($sum, 2);
+                                    // Keep the RAW numeric sum — the view passes it through
+                                    // Common::formatMvr(). Pre-formatting with number_format()
+                                    // inserted a thousands comma ("1,032.00") which (float)-cast
+                                    // back to 1.0, so the row showed "MVR 1.00".
+                                    $employee->TotalAmount = $sum;
                                     $employee->Emp_name = $employee->RequestedEmployees->resortAdmin->first_name .'  '. $employee->RequestedEmployees->resortAdmin->last_name;
                                     $employee->Emp_id = $employee->RequestedEmployees->Emp_id;
                                     $employee->Department_name = $employee->RequestedEmployees->department->name ?? 'N/A';
