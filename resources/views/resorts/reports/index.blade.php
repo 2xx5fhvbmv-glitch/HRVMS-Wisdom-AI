@@ -37,7 +37,7 @@
                                 <li><a class="dropdown-item" href="{{ route('resort.report.payroll.index') }}">Payroll Reports</a></li>
                             </ul>
                         </div>
-                        <a href="{{ route('reports.create') }}" class="btn btn-sm btn-theme @if(Common::checkRouteWisePermission('resort.report.index',config('settings.resort_permissions.create')) == false) d-none @endif">Create Report</a>
+                        <a href="{{ route('reports.create') }}" class="btn btn-sm btn-theme @if(Common::checkRouteWisePermission('resort.report.index',config('settings.resort_permissions.create')) == false) d-none @endif">Custom Report</a>
                     </div>
                 </div>  
             </div>  

@@ -24,6 +24,7 @@
                 <div class="card h-100">
                     <div class="card-title"><h3>Predefined Reports</h3></div>
                     <div class="card-body">
+                        <input type="text" class="form-control form-control-sm mb-3" id="wfpReportSearch" placeholder="Search reports…" autocomplete="off">
                         <div class="list-group" id="wfpReportList">
                             @foreach($reports as $i => $r)
                                 <button type="button"
@@ -107,6 +108,15 @@
                                 </select>
                             </div>
 
+                            <div class="col-sm-4 wfp-filter" data-filter="duration">
+                                <label class="form-label">From Date</label>
+                                <input type="date" class="form-control" id="wfpFromDate">
+                            </div>
+                            <div class="col-sm-4 wfp-filter" data-filter="duration">
+                                <label class="form-label">To Date</label>
+                                <input type="date" class="form-control" id="wfpToDate">
+                            </div>
+
                             <div class="col-12 d-flex flex-wrap gap-2 align-items-center">
                                 <button type="submit" class="btn btn-sm btn-theme" id="wfpRunBtn">Run Report</button>
 
@@ -154,7 +164,9 @@
                 position: $('#wfpPosition').val(),
                 month: $('#wfpMonth').val(),
                 status: $('#wfpStatus').val(),
-                employment_type: $('#wfpEmploymentType').val()
+                employment_type: $('#wfpEmploymentType').val(),
+                from_date: $('#wfpFromDate').val(),
+                to_date: $('#wfpToDate').val()
             };
         }
         function setActionsEnabled(on) {
@@ -266,6 +278,14 @@
         });
 
         $('#wfpBackToData').on('click', showData);
+
+        // Search/filter the report list by name + description.
+        $('#wfpReportSearch').on('input', function () {
+            var q = $(this).val().toLowerCase();
+            $('.wfp-report-item').each(function () {
+                $(this).toggle($(this).text().toLowerCase().indexOf(q) !== -1);
+            });
+        });
 
         // Initialise from the first (active) report.
         applyFilterVisibility($('.wfp-report-item.active').first());

@@ -58,7 +58,7 @@ class ReportController extends Controller
          if(Common::checkRouteWisePermission('resort.report.index',config('settings.resort_permissions.create')) == false){
             return abort(403, 'Unauthorized access');
          }
-         $page_title = 'Create Report';
+         $page_title = 'Custom Report';
         // HR picks by Module -> Entity -> curated business Fields. They never see
         // raw table or column names; the catalog below is the only vocabulary.
         $catalog = $this->reportFieldCatalog();

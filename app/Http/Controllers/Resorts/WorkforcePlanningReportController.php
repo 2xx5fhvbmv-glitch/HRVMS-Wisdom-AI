@@ -103,25 +103,25 @@ class WorkforcePlanningReportController extends Controller
             'recruitment_demand' => [
                 'name'        => 'Recruitment Demand Forecast',
                 'description' => 'Future hiring requirements from open vacancies.',
-                'filters'     => ['year', 'department'],
+                'filters'     => ['year', 'department', 'duration'],
                 'handler'     => 'recruitmentDemand',
             ],
             'new_position_requests' => [
                 'name'        => 'New Position Requests',
                 'description' => 'Newly requested positions awaiting approval or budgeting.',
-                'filters'     => ['year', 'status'],
+                'filters'     => ['year', 'status', 'duration'],
                 'handler'     => 'newPositionRequests',
             ],
             'approval_status' => [
                 'name'        => 'Workforce Planning Approval Status',
                 'description' => 'Approval status of workforce plans submitted for review.',
-                'filters'     => ['year', 'status'],
+                'filters'     => ['year', 'status', 'duration'],
                 'handler'     => 'approvalStatus',
             ],
             'revision_history' => [
                 'name'        => 'Workforce Planning Revision History',
                 'description' => 'Revisions made to workforce plans for audit and history.',
-                'filters'     => ['year'],
+                'filters'     => ['year', 'duration'],
                 'handler'     => 'revisionHistory',
             ],
             'local_vs_expat' => [
@@ -222,7 +222,16 @@ class WorkforcePlanningReportController extends Controller
             'month'           => $request->input('month') ?: null,
             'status'          => $request->input('status') ?: null,
             'employment_type' => $request->input('employment_type') ?: null,
+            'from_date'       => $request->input('from_date') ?: null,
+            'to_date'         => $request->input('to_date') ?: null,
         ];
+    }
+
+    /** Apply the optional duration (from/to date) to a query's date column. */
+    private function applyDuration($q, array $filters, string $col)
+    {
+        return $q->when($filters['from_date'] ?? null, fn($x) => $x->whereDate($col, '>=', $filters['from_date']))
+                 ->when($filters['to_date'] ?? null, fn($x) => $x->whereDate($col, '<=', $filters['to_date']));
     }
 
     /** Resolve a report key + filters to ['name','description','columns','rows'] or null. */
@@ -237,7 +246,7 @@ class WorkforcePlanningReportController extends Controller
             'name'        => $registry[$key]['name'],
             'description' => $registry[$key]['description'],
             'columns'     => $res['columns'],
-            'rows'        => $res['rows'],
+            'rows'        => $this->appendTotalsRow($res['columns'], $res['rows']),
         ];
     }
 
@@ -458,6 +467,7 @@ class WorkforcePlanningReportController extends Controller
             ->when($scoped !== null, fn($q) => $q->whereIn('v.department', $scoped))
             ->when($filters['department'], fn($q) => $q->where('v.department', $filters['department']))
             ->when($filters['year'], fn($q) => $q->whereYear('v.required_starting_date', $filters['year']))
+            ->when(true, fn($q) => $this->applyDuration($q, $filters, 'v.required_starting_date'))
             ->orderBy('v.required_starting_date')
             ->get(['d.name as department', 'p.position_title', 'v.Total_position_required', 'v.required_starting_date'])
             ->map(fn($r) => [
@@ -780,6 +790,7 @@ class WorkforcePlanningReportController extends Controller
             ->when($scoped !== null, fn($q) => $q->whereIn('v.department', $scoped))
             ->when($filters['year'], fn($q) => $q->whereRaw('YEAR(v.created_at) = ?', [$filters['year']]))
             ->when($filters['status'], fn($q) => $q->where('v.status', $filters['status']))
+            ->when(true, fn($q) => $this->applyDuration($q, $filters, 'v.created_at'))
             ->orderByDesc('v.created_at')
             ->get([
                 'v.created_at', 'd.name as department', 'p.position_title', 'v.Total_position_required', 'v.status',
@@ -812,6 +823,7 @@ class WorkforcePlanningReportController extends Controller
             ->when($filters['year'], fn($q) => $q->where('mr.year', $filters['year']))
             ->when($scoped !== null, fn($q) => $q->whereIn('bs.Department_id', $scoped))
             ->when($filters['status'], fn($q) => $q->where('bs.status', $filters['status']))
+            ->when(true, fn($q) => $this->applyDuration($q, $filters, 'bs.created_at'))
             ->orderByDesc('bs.created_at')
             ->get([
                 'd.name as dept', 'mr.year', 'bs.status', 'bs.created_at', 'bs.updated_at',
@@ -842,6 +854,7 @@ class WorkforcePlanningReportController extends Controller
             ->where('bs.resort_id', $resortId)
             ->when($filters['year'], fn($q) => $q->where('mr.year', $filters['year']))
             ->when($scoped !== null, fn($q) => $q->whereIn('bs.Department_id', $scoped))
+            ->when(true, fn($q) => $this->applyDuration($q, $filters, 'bs.updated_at'))
             ->orderBy('bs.created_at')
             ->get([
                 'bs.updated_at', 'bs.status', 'bs.comments', 'bs.OtherComments',

@@ -93,6 +93,49 @@ trait PredefinedReportActions
         return is_array($decoded) ? (string) ($decoded['analysis'] ?? '') : '';
     }
 
+    /**
+     * Append a "Total" footer row summing the numeric columns. Skipped when there
+     * are fewer than 2 data rows (single-row summaries are already totals) or when
+     * no column is numeric. Percentage and text columns are left blank in the total.
+     */
+    protected function appendTotalsRow(array $columns, array $rows): array
+    {
+        if (count($rows) < 2) {
+            return $rows;
+        }
+
+        $isNumeric = fn($v) => is_string($v) && preg_match('/^-?[\d,]+(\.\d+)?$/', trim($v));
+        $total = [];
+        $anyNumeric = false;
+
+        foreach ($columns as $i => $col) {
+            if ($i === 0) { $total[$col] = 'Total'; continue; }
+
+            $values = array_map(fn($r) => (string) ($r[$col] ?? ''), $rows);
+            // Percentage columns can't be summed meaningfully.
+            if (count(array_filter($values, fn($v) => strpos($v, '%') !== false))) {
+                $total[$col] = '';
+                continue;
+            }
+            $nums = array_filter($values, $isNumeric);
+            if (!count($nums)) {
+                $total[$col] = '';
+                continue;
+            }
+            $anyNumeric = true;
+            $hasDecimal = (bool) count(array_filter($nums, fn($v) => strpos($v, '.') !== false));
+            $sum = array_sum(array_map(fn($v) => (float) str_replace(',', '', $v), $nums));
+            $total[$col] = $hasDecimal ? number_format($sum, 2) : number_format($sum);
+        }
+
+        if (!$anyNumeric) {
+            return $rows; // nothing to total (all text columns)
+        }
+
+        $rows[] = $total;
+        return $rows;
+    }
+
     /** Minimal Markdown -> HTML for the PDF insights block (#headings, **bold**, - lists). */
     protected function markdownToHtmlSimple(string $md): string
     {

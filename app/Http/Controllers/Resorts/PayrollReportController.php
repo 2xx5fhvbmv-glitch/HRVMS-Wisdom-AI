@@ -62,12 +62,12 @@ class PayrollReportController extends Controller
             'annual_pension'         => ['name' => 'Annual Pension Summary', 'description' => 'Pension contributions accumulated during the year.', 'filters' => ['year'], 'handler' => 'annualPension'],
             'ewt_report'             => ['name' => 'Employee Withholding Tax (EWT) Report', 'description' => 'EWT deducted during the period.', 'filters' => ['payroll'], 'handler' => 'ewtReport'],
             'annual_tax_summary'     => ['name' => 'Annual Tax Summary', 'description' => 'Total tax deducted per employee for the year.', 'filters' => ['year'], 'handler' => 'annualTaxSummary'],
-            'ff_settlement_register' => ['name' => 'Full & Final Settlement Register', 'description' => 'Employees undergoing final settlement.', 'filters' => ['year', 'settlement_status'], 'handler' => 'ffSettlementRegister'],
-            'ff_settlement_pending'  => ['name' => 'Pending Full & Final Settlement', 'description' => 'Outstanding (not finalized) settlements.', 'filters' => [], 'handler' => 'ffSettlementPending'],
+            'ff_settlement_register' => ['name' => 'Full & Final Settlement Register', 'description' => 'Employees undergoing final settlement.', 'filters' => ['year', 'settlement_status', 'duration'], 'handler' => 'ffSettlementRegister'],
+            'ff_settlement_pending'  => ['name' => 'Pending Full & Final Settlement', 'description' => 'Outstanding (not finalized) settlements.', 'filters' => ['duration'], 'handler' => 'ffSettlementPending'],
             'tuckshop_deduction'     => ['name' => 'Tuck Shop Deduction Summary', 'description' => 'Tuck shop deductions per employee.', 'filters' => ['payroll'], 'handler' => 'tuckshopDeduction'],
             'tuckshop_payable'       => ['name' => 'Tuck Shop Outstanding Payable', 'description' => 'Outstanding amount payable per tuck shop vendor.', 'filters' => ['payroll'], 'handler' => 'tuckshopPayable'],
             'tuckshop_purchases'     => ['name' => 'Tuck Shop Purchase Details', 'description' => 'Itemised tuck shop purchases.', 'filters' => ['payroll'], 'handler' => 'tuckshopPurchases'],
-            'salary_advance'         => ['name' => 'Salary Advance Report', 'description' => 'Advances issued and recovered.', 'filters' => ['department'], 'handler' => 'salaryAdvance'],
+            'salary_advance'         => ['name' => 'Salary Advance Report', 'description' => 'Advances issued and recovered.', 'filters' => ['department', 'duration'], 'handler' => 'salaryAdvance'],
             'payroll_exceptions'     => ['name' => 'Payroll Exceptions Report', 'description' => 'Anomalies to review before approval.', 'filters' => ['payroll'], 'handler' => 'payrollExceptions'],
             'payroll_audit_trail'    => ['name' => 'Payroll Audit Trail', 'description' => 'Processing history and approvals.', 'filters' => ['payroll'], 'handler' => 'payrollAuditTrail'],
             'processing_status'      => ['name' => 'Payroll Processing Status', 'description' => 'Processing status of payroll runs.', 'filters' => ['payroll'], 'handler' => 'processingStatus'],
@@ -140,7 +140,16 @@ class PayrollReportController extends Controller
             'deduction_type'    => $request->input('deduction_type') ?: null,
             'bank'              => $request->input('bank') ?: null,
             'settlement_status' => $request->input('settlement_status') ?: null,
+            'from_date'         => $request->input('from_date') ?: null,
+            'to_date'           => $request->input('to_date') ?: null,
         ];
+    }
+
+    /** Apply the optional duration (from/to date) to a query's date column. */
+    private function applyDuration($q, array $filters, string $col)
+    {
+        return $q->when($filters['from_date'] ?? null, fn($x) => $x->whereDate($col, '>=', $filters['from_date']))
+                 ->when($filters['to_date'] ?? null, fn($x) => $x->whereDate($col, '<=', $filters['to_date']));
     }
 
     /** Resolve a report key + filters to ['name','description','columns','rows'] or null. */
@@ -155,7 +164,7 @@ class PayrollReportController extends Controller
             'name'        => $registry[$key]['name'],
             'description' => $registry[$key]['description'],
             'columns'     => $res['columns'],
-            'rows'        => $res['rows'],
+            'rows'        => $this->appendTotalsRow($res['columns'], $res['rows']),
         ];
     }
 
@@ -632,15 +641,18 @@ class PayrollReportController extends Controller
             })
             ->whereRaw('(pr.regularOTPay + pr.holidayOTPay) > 0')
             ->orderByDesc(DB::raw('pr.regularOTPay + pr.holidayOTPay'))
-            ->get([$this->nameExpr(), 'd.name as dept', 'ta.total_ot', 'pr.regularOTPay', 'pr.holidayOTPay'])
+            ->get([$this->nameExpr(), 'd.name as dept', 'ta.regular_ot_hours', 'ta.holiday_ot_hours', 'ta.total_ot', 'pr.regularOTPay', 'pr.holidayOTPay'])
             ->map(fn($r) => [
-                'Employee Name' => $r->employee_name,
-                'Department'    => $r->dept ?? 'N/A',
-                'Total OT Hours'=> $this->n($r->total_ot ?? 0),
-                'OT Amount'     => $this->n($r->regularOTPay + $r->holidayOTPay),
+                'Employee Name'   => $r->employee_name,
+                'Department'      => $r->dept ?? 'N/A',
+                'Normal OT Hours' => $this->n($r->regular_ot_hours ?? 0),
+                'Friday OT Hours' => 'N/A', // not tracked separately
+                'Holiday OT Hours'=> $this->n($r->holiday_ot_hours ?? 0),
+                'Total OT Hours'  => $this->n($r->total_ot ?? 0),
+                'OT Amount'       => $this->n($r->regularOTPay + $r->holidayOTPay),
             ])->all();
 
-        return ['columns' => ['Employee Name', 'Department', 'Total OT Hours', 'OT Amount'], 'rows' => $rows];
+        return ['columns' => ['Employee Name', 'Department', 'Normal OT Hours', 'Friday OT Hours', 'Holiday OT Hours', 'Total OT Hours', 'OT Amount'], 'rows' => $rows];
     }
 
     /** #23 EWT Report. */
@@ -755,7 +767,8 @@ class PayrollReportController extends Controller
             ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
             ->leftJoin('resort_departments as d', 'd.id', '=', 'e.Dept_id')
             ->where('e.resort_id', $this->resort->resort_id)
-            ->when($scoped !== null, fn($q) => $q->whereIn('e.Dept_id', $scoped));
+            ->when($scoped !== null, fn($q) => $q->whereIn('e.Dept_id', $scoped))
+            ->when(true, fn($q) => $this->applyDuration($q, $filters, 'fs.last_working_date'));
     }
 
     /** #27 Tuck Shop Deduction Summary. */
@@ -822,6 +835,7 @@ class PayrollReportController extends Controller
             ->where('a.resort_id', $this->resort->resort_id)
             ->when($scoped !== null, fn($q) => $q->whereIn('e.Dept_id', $scoped))
             ->when($filters['department'], fn($q) => $q->where('e.Dept_id', $filters['department']))
+            ->when(true, fn($q) => $this->applyDuration($q, $filters, 'a.request_date'))
             ->orderByDesc('a.request_date')
             ->get([$this->nameExpr(), 'a.request_amount', DB::raw('COALESCE(rs.recovered,0) as recovered')])
             ->map(fn($r) => [
