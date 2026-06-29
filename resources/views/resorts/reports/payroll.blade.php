@@ -23,6 +23,7 @@
                 <div class="card h-100">
                     <div class="card-title"><h3>Payroll Reports</h3></div>
                     <div class="card-body">
+                        <input type="text" class="form-control form-control-sm mb-3" id="plReportSearch" placeholder="Search reports…" autocomplete="off">
                         <div class="list-group" id="plReportList" style="max-height:70vh;overflow:auto">
                             @foreach($reports as $i => $r)
                                 <button type="button"
@@ -131,6 +132,15 @@
                                 </select>
                             </div>
 
+                            <div class="col-sm-6 pl-filter" data-filter="duration">
+                                <label class="form-label">From Date</label>
+                                <input type="date" class="form-control" id="plFromDate">
+                            </div>
+                            <div class="col-sm-6 pl-filter" data-filter="duration">
+                                <label class="form-label">To Date</label>
+                                <input type="date" class="form-control" id="plToDate">
+                            </div>
+
                             <div class="col-12 d-flex flex-wrap gap-2 align-items-center">
                                 <button type="submit" class="btn btn-sm btn-theme" id="plRunBtn">Run Report</button>
 
@@ -181,7 +191,9 @@
                 allowance_type: $('#plAllowanceType').val(),
                 deduction_type: $('#plDeductionType').val(),
                 bank: $('#plBank').val(),
-                settlement_status: $('#plSettlementStatus').val()
+                settlement_status: $('#plSettlementStatus').val(),
+                from_date: $('#plFromDate').val(),
+                to_date: $('#plToDate').val()
             };
         }
         function setActionsEnabled(on) { $('.plActionBtn').prop('disabled', !on); }
@@ -267,6 +279,14 @@
         });
 
         $('#plBackToData').on('click', showData);
+
+        // Search/filter the report list by name + description.
+        $('#plReportSearch').on('input', function () {
+            var q = $(this).val().toLowerCase();
+            $('.pl-report-item').each(function () {
+                $(this).toggle($(this).text().toLowerCase().indexOf(q) !== -1);
+            });
+        });
 
         applyFilterVisibility($('.pl-report-item.active').first());
     });
