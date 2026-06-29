@@ -186,6 +186,14 @@ class WorkforcePlanningReportController extends Controller
         return round(($numerator / $denominator) * 100, 1) . '%';
     }
 
+    /** Map a position's Rank (grade id) to its grade name (EXCOM, HOD, MGR …). */
+    private function gradeName($rank): string
+    {
+        if ($rank === null || $rank === '') return 'N/A';
+        $map = config('settings.Position_Rank', []);
+        return $map[(int) $rank] ?? ('Grade ' . $rank);
+    }
+
     /** #7 Vacancy Analysis — vacant seats per position + vacancy %. */
     public function vacancyAnalysis(array $filters): array
     {
@@ -266,7 +274,7 @@ class WorkforcePlanningReportController extends Controller
             ->map(fn($r) => [
                 'Department'         => $r->department ?? 'N/A',
                 'Position'           => $r->position_title,
-                'Grade'              => $r->grade !== null ? (string) $r->grade : 'N/A',
+                'Grade'              => $this->gradeName($r->grade),
                 'Approved Headcount' => (int) $r->approved,
             ])->all();
 
@@ -283,7 +291,7 @@ class WorkforcePlanningReportController extends Controller
             ->orderBy('p.Rank')->orderBy('p.position_title')
             ->get()
             ->map(fn($r) => [
-                'Grade'            => $r->grade !== null ? (string) $r->grade : 'N/A',
+                'Grade'            => $this->gradeName($r->grade),
                 'Position'         => $r->position_title,
                 'Department'       => $r->department ?? 'N/A',
                 'Planned Headcount'=> (int) $r->approved,
