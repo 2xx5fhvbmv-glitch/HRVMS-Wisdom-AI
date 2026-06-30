@@ -47,7 +47,7 @@
 
     <!-- Launcher -->
     <button type="button" id="wai-launcher" aria-label="Open Wisdom AI assistant">
-        <span class="wai-launcher-icon"><i class="fa-solid fa-robot"></i></span>
+        <span class="wai-launcher-icon"><img src="{{ URL::asset('resorts_assets/images/wisdom-ai-icon.jpeg') }}" class="wai-bot-img" alt="Wisdom AI"></span>
         <span class="wai-launcher-spark"><i class="fa-solid fa-wand-magic-sparkles"></i></span>
     </button>
 
@@ -55,7 +55,7 @@
     <div id="wai-panel" role="dialog" aria-label="Wisdom AI chat">
         <div class="wai-header">
             <div class="wai-header-id">
-                <div class="wai-avatar"><i class="fa-solid fa-robot"></i></div>
+                <div class="wai-avatar"><img src="{{ URL::asset('resorts_assets/images/wisdom-ai-icon.jpeg') }}" class="wai-bot-img" alt="Wisdom AI"></div>
                 <div class="wai-titles">
                     <div class="wai-title">Wisdom AI <span class="wai-online"></span></div>
                     <div class="wai-subtitle">{{ $wisdomCtx['tier_label'] }}</div>
@@ -114,6 +114,12 @@
     70%  { box-shadow: 0 10px 28px rgba(11,46,55,.45), 0 0 0 16px rgba(28,124,129,0); }
     100% { box-shadow: 0 10px 28px rgba(11,46,55,.45), 0 0 0 0 rgba(28,124,129,0); }
 }
+
+/* Wisdom AI brand mark (replaces the generic robot icon) — fills its round
+   container as a clean circle regardless of the container's shape. */
+.wai-bot-img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block; }
+.wai-launcher-icon { width: 100%; height: 100%; display: flex; }
+.wai-avatar, .wai-bot .wai-mini-avatar, .wai-welcome .wai-wel-icon { overflow: hidden; border-radius: 50%; padding: 0; }
 
 /* Panel */
 #wai-panel {
@@ -286,7 +292,8 @@
         return html;
     }
 
-    function botAvatar() { return '<div class="wai-mini-avatar"><i class="fa-solid fa-robot"></i></div>'; }
+    var WAI_BOT_ICON = "{{ URL::asset('resorts_assets/images/wisdom-ai-icon.jpeg') }}";
+    function botAvatar() { return '<div class="wai-mini-avatar"><img src="' + WAI_BOT_ICON + '" class="wai-bot-img" alt="Wisdom AI"></div>'; }
     function userAvatar() { return '<div class="wai-mini-avatar"><i class="fa-solid fa-user"></i></div>'; }
 
     function addMessage(role, text) {
@@ -314,7 +321,7 @@
     function showWelcome() {
         msgs.innerHTML =
             '<div class="wai-welcome">' +
-                '<div class="wai-wel-icon"><i class="fa-solid fa-robot"></i></div>' +
+                '<div class="wai-wel-icon"><img src="' + WAI_BOT_ICON + '" class="wai-bot-img" alt="Wisdom AI"></div>' +
                 '<h4>Hi ' + escapeHtml(USER_NAME.split(' ')[0]) + ' 👋</h4>' +
                 '<p>I\'m Wisdom AI, your HR assistant. Ask me anything I\'m allowed to help with.</p>' +
             '</div>';

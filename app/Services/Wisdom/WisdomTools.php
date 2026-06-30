@@ -26,6 +26,7 @@ use App\Models\QuotaSlotRenewal;
 use App\Models\EmployeeInsurance;
 use App\Models\WorkPermitMedicalRenewal;
 use App\Models\VisaRenewal;
+use App\Models\VisaEmployeeExpiryData;
 use App\Models\PaymentRequest;
 use App\Models\VisaWallets;
 use App\Models\disciplinarySubmit;
@@ -198,7 +199,7 @@ class WisdomTools
             self::fn('get_visa_summary',
                 'Immigration/visa dashboard summary: expat employee count, employees with work permits, documents expiring in 30 days, unpaid work-permit & slot fees, and pending payment requests. Use for "give me a visa summary", "current immigration status", "what compliance items need attention".', []),
             self::fn('get_visa_expiries',
-                'Visa/immigration documents (visa, work permit, insurance, medical, slot fee) by expiry status. Each item has employee, document type, expiry date, days left (negative = already expired) and amount. Use `status=upcoming` (default) for "which documents expire this week/month", "upcoming expiries", "urgent renewals"; `status=expired` for "which documents/work permits are expired", "overdue documents", "how many work permits expired"; `status=all` for both. Filter to one kind with doc_type.',
+                'Visa/immigration documents (visa, work permit, insurance, medical, slot fee) by expiry status, for active expats. Each item has employee, document type, expiry date and days left (negative = already expired); the expiry shown is the SAME current date the Xpat employee page shows. Use `status=upcoming` (default) for "which documents expire this week/month", "upcoming expiries", "urgent renewals"; `status=expired` for "which documents/work permits are expired", "overdue documents", "how many work permits expired"; `status=all` for both. Filter to one kind with doc_type. One employee can own several expiring documents, so the result also has `distinct_employees` and a `by_employee` roll-up (employee, documents count, types) — when listing names, use this roll-up and say e.g. "10 expired across 4 employees: Anastasia (5), Priya (3)…"; do NOT repeat the same name once per row.',
                 [
                     'doc_type'    => ['type' => 'string', 'description' => 'One of: all (default), visa, work_permit, insurance, medical, slot.'],
                     'status'      => ['type' => 'string', 'description' => 'One of: upcoming (default, not yet expired), expired (already past due), all.'],
@@ -1746,33 +1747,87 @@ class WisdomTools
         $days   = (int) ($args['within_days'] ?? 30);
         if ($days < 1)   $days = 30;
         if ($days > 365) $days = 365;
-
-        $today = Carbon::today();
-        if ($status === 'expired') {
-            // Already past due: scan from far past up to (and including) today.
-            $from = (clone $today)->subYears(5);
-            $to   = $today;
-        } elseif ($status === 'all') {
-            $from = (clone $today)->subYears(5);
-            $to   = (clone $today)->addDays($days);
-        } else {
+        if (!in_array($status, ['upcoming', 'expired', 'all'], true)) {
             $status = 'upcoming';
-            $from   = $today;
-            $to     = (clone $today)->addDays($days);
         }
 
-        $docs  = self::visaDocs($rid, $type, $from, $to);
-        $names = self::resolveEmpNames($rid, $docs->pluck('employee_id')->all());
+        // Immigration documents only apply to active expats (non-Maldivian).
+        $employees = Employee::where('resort_id', $rid)->where('status', 'Active')
+            ->whereRaw('LOWER(TRIM(nationality)) != ?', ['maldivian'])
+            ->with('resortAdmin:id,first_name,last_name')
+            ->get(['id', 'Emp_id', 'Admin_Parent_id']);
 
-        $list = $docs->sortBy('expiry')->map(fn ($d) => [
-            'employee'  => $names[$d['employee_id']] ?? ('Employee #' . $d['employee_id']),
-            'document'  => $d['type'],
-            'expiry'    => $d['expiry'],
-            'days_left' => (int) Carbon::today()->diffInDays(Carbon::parse($d['expiry']), false),
-            'amount'    => Common::formatCurrency($d['amount'], 'MVR'),
+        // Use the SAME "next due" the Xpat employee page and Payment Request
+        // screens show — Common::visaNextDue: the actionable UNPAID date (in the
+        // per-doc direction below), else the latest known date. This guarantees
+        // the chatbot reports exactly the date the user sees on the page, and a
+        // PAID-but-lapsed document still surfaces as expired. (Slot & work permit
+        // take the earliest unpaid 'asc'; insurance/medical/visa the latest 'desc'.)
+        // get_visa_liability remains the separate money/unpaid view.
+        $specs = [
+            'work_permit' => [WorkPermit::class,               'Due_Date',           'asc',  'Work Permit'],
+            'slot'        => [QuotaSlotRenewal::class,          'Due_Date',           'asc',  'Slot Fee'],
+            'insurance'   => [EmployeeInsurance::class,         'insurance_end_date', 'desc', 'Insurance'],
+            'medical'     => [WorkPermitMedicalRenewal::class,  'end_date',           'desc', 'Medical'],
+            'visa'        => [VisaRenewal::class,               'end_date',           'desc', 'Visa'],
+        ];
+
+        $rows = collect();
+        foreach ($employees as $emp) {
+            foreach ($specs as $key => [$model, $dateCol, $order, $label]) {
+                if ($type !== 'all' && $type !== $key) {
+                    continue;
+                }
+                $date = $key === 'work_permit'
+                    ? self::workPermitDue($rid, $emp->id)
+                    : Common::visaNextDue($model, $rid, $emp->id, $dateCol, $order);
+                if (!$date) {
+                    continue;
+                }
+                $daysLeft = (int) Carbon::today()->diffInDays(Carbon::parse($date), false);
+                $keep = $status === 'expired' ? $daysLeft < 0
+                      : ($status === 'all'    ? $daysLeft <= $days
+                      :  ($daysLeft >= 0 && $daysLeft <= $days)); // upcoming
+                if (!$keep) {
+                    continue;
+                }
+                $rows->push([
+                    'employee'  => self::empName($emp),
+                    'document'  => $label,
+                    'expiry'    => self::fmtDate($date),
+                    'sort'      => Carbon::parse($date)->timestamp,
+                    'days_left' => $daysLeft,
+                ]);
+            }
+        }
+
+        $list = $rows->sortBy('sort')->map(fn ($r) => [
+            'employee'  => $r['employee'],
+            'document'  => $r['document'],
+            'expiry'    => $r['expiry'],
+            'days_left' => $r['days_left'],
         ])->values();
 
-        return ['doc_type' => $type, 'status' => $status, 'within_days' => $days, 'count' => $list->count(), 'documents' => $list];
+        // One employee can own several expiring documents (e.g. multiple quota
+        // slots), so also return a per-employee roll-up. Without this the model
+        // sees only the flat row list and repeats the same name once per row
+        // instead of explaining "N documents across M employees".
+        $byEmployee = $list->groupBy('employee')->map(fn ($g, $emp) => [
+            'employee'  => $emp,
+            'documents' => $g->count(),
+            'types'     => $g->pluck('document')->countBy()
+                             ->map(fn ($n, $t) => $n > 1 ? "$t ×$n" : $t)->values()->all(),
+        ])->sortByDesc('documents')->values();
+
+        return [
+            'doc_type'           => $type,
+            'status'             => $status,
+            'within_days'        => $days,
+            'count'              => $list->count(),
+            'distinct_employees' => $byEmployee->count(),
+            'by_employee'        => $byEmployee,
+            'documents'          => $list,
+        ];
     }
 
     private static function getVisaLiability(int $rid, array $args): array
@@ -1862,7 +1917,7 @@ class WisdomTools
             }
             $d = Carbon::parse($date);
             $days = (int) Carbon::today()->diffInDays($d, false);
-            return ['expiry' => $d->toDateString(), 'days_left' => $days, 'status' => $days < 0 ? 'EXPIRED' : 'valid'];
+            return ['expiry' => self::fmtDate($date), 'days_left' => $days, 'status' => $days < 0 ? 'EXPIRED' : 'valid'];
         };
 
         $wp   = WorkPermit::where('resort_id', $rid)->where('employee_id', $emp->id)->whereNotNull('Due_Date')->orderByDesc('Due_Date')->first();
@@ -2821,6 +2876,45 @@ class WisdomTools
         $ra = $e->resortAdmin;
         $name = $ra ? trim($ra->first_name . ' ' . $ra->last_name) : '';
         return $name !== '' ? $name : ('Employee ' . ($e->Emp_id ?: '#' . $e->id));
+    }
+
+    /**
+     * Format a raw date/datetime to the resort's configured display format
+     * (e.g. d/m/Y) so chat replies never show raw ISO (2026-07-01) values.
+     * Returns null for empty input and the original string if it can't parse.
+     */
+    /**
+     * Work-permit expiry, identical to the Xpat employee page's
+     * workPermitExpiryDate(): the actionable next-due fee (earliest unpaid, else
+     * latest), falling back to the AI-extracted "Work Permit Expiry Date" blob
+     * when an employee has no fee schedule at all. Keeps the chatbot in lockstep
+     * with the page.
+     */
+    private static function workPermitDue(int $rid, int $empId): ?string
+    {
+        $due = Common::visaNextDue(WorkPermit::class, $rid, $empId, 'Due_Date', 'asc');
+        if ($due) {
+            return $due;
+        }
+        $o = VisaEmployeeExpiryData::where('employee_id', $empId)->where('resort_id', $rid)
+            ->where('DocumentName', 'Other')->latest('id')->first();
+        if ($o) {
+            $data = is_array($o->Ai_extracted_data) ? $o->Ai_extracted_data : (json_decode($o->Ai_extracted_data, true) ?: []);
+            return $data['extracted_fields']['Work Permit Expiry Date (Expiry On)'] ?? null;
+        }
+        return null;
+    }
+
+    private static function fmtDate($value): ?string
+    {
+        if (empty($value)) {
+            return null;
+        }
+        try {
+            return Carbon::parse($value)->format(Common::getDateFormateFromSettings());
+        } catch (\Throwable) {
+            return is_string($value) ? $value : null;
+        }
     }
 
     private static function cleanDate($value): string
