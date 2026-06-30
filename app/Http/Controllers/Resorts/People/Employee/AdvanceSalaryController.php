@@ -52,14 +52,21 @@ class AdvanceSalaryController extends Controller
             $isGM = ($available_rank === "GM");
 
             // dd($available_rank);
-            if($isHR ){
-                $payroll_data_query = PayrollAdvance::where('resort_id',$resort_id)->with(['employee.resortAdmin','employee.position','employee.department'])->wherehas('employee.resortAdmin')->orderBy('created_at','DESC');
-            }elseif($isFinance){
-                $payroll_data_query = PayrollAdvance::where('resort_id',$resort_id)->where('hr_status','Approved')->with(['employee.resortAdmin','employee.position','employee.department'])->wherehas('employee.resortAdmin')->orderBy('created_at','DESC');
-            }elseif($isGM){
-                $payroll_data_query = PayrollAdvance::where('resort_id',$resort_id)->where('finance_status','Approved')->with(['employee.resortAdmin','employee.position','employee.department'])->wherehas('employee.resortAdmin')->orderBy('created_at','DESC');
-            }elseif ($this->resort->is_master_admin != 0) {
-                $payroll_data_query = PayrollAdvance::where('resort_id',$resort_id)->with(['employee.resortAdmin','employee.position','employee.department'])->wherehas('employee.resortAdmin')->orderBy('created_at','DESC');
+            // Base resort-scoped query — always defined so the variable can't be
+            // undefined for roles outside HR/Finance/GM/master (e.g. a Finance
+            // HOD/XCOM whose RANK maps to "HOD"/"EXCOM", not "Finance"), which
+            // previously threw and surfaced as a DataTables "Ajax error".
+            $payroll_data_query = PayrollAdvance::where('resort_id', $resort_id)
+                ->with(['employee.resortAdmin', 'employee.position', 'employee.department'])
+                ->whereHas('employee.resortAdmin')
+                ->orderBy('created_at', 'DESC');
+
+            // Stage filters: Finance sees HR-approved; GM sees Finance-approved.
+            // HR / master / other authorised roles see the full resort list.
+            if ($isFinance) {
+                $payroll_data_query->where('hr_status', 'Approved');
+            } elseif ($isGM) {
+                $payroll_data_query->where('finance_status', 'Approved');
             }
 
             if($request->has('status') && $request->status != 'n/a'){
