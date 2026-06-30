@@ -2019,6 +2019,12 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
     Route::post('report/incident/export', 'IncidentReportController@export')->name('resort.report.incident.export');
     Route::post('report/incident/insights', 'IncidentReportController@insights')->name('resort.report.incident.insights');
 
+    // Predefined Accommodation reports (Option B).
+    Route::get('report/accommodation', 'AccommodationReportController@index')->name('resort.report.accommodation.index');
+    Route::post('report/accommodation/run', 'AccommodationReportController@run')->name('resort.report.accommodation.run');
+    Route::post('report/accommodation/export', 'AccommodationReportController@export')->name('resort.report.accommodation.export');
+    Route::post('report/accommodation/insights', 'AccommodationReportController@insights')->name('resort.report.accommodation.insights');
+
 
     Route::delete('report/{id}', 'ReportController@destroy')->name('reports.destroy');
 
