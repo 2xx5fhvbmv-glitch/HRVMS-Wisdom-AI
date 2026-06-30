@@ -287,7 +287,7 @@
                                             <th class="employee-col">EMPLOYEE</th>
                                             @foreach ($monthwiseheaders as $h)
                                                 @php
-                                                    $currentDate = isset($h['newdate']) ? \Carbon\Carbon::createFromFormat('d-m-Y', $h['newdate'])->format('Y-m-d') : (date('Y-m') . '-' . str_pad($h['day'], 2, '0', STR_PAD_LEFT));
+                                                    $currentDate = isset($h['newdate']) ? \Carbon\Carbon::parse($h['newdate'])->format('Y-m-d') : (date('Y-m') . '-' . str_pad($h['day'], 2, '0', STR_PAD_LEFT));
                                                     $isPublicHoliday = isset($publicHolidays) && in_array($currentDate, $publicHolidays);
                                                 @endphp
                                                 <th class="date-col {{ $isPublicHoliday ? 'public-holiday-header' : '' }}">
@@ -364,7 +364,7 @@
                                                     </td>
                                                     @foreach ($monthwiseheaders as $h)
                                                         @php
-                                                            $date = isset($h['newdate']) ? \Carbon\Carbon::createFromFormat('d-m-Y', $h['newdate'])->format('Y-m-d') : (date('Y-m') . '-' . str_pad($h['day'], 2, '0', STR_PAD_LEFT));
+                                                            $date = isset($h['newdate']) ? \Carbon\Carbon::parse($h['newdate'])->format('Y-m-d') : (date('Y-m') . '-' . str_pad($h['day'], 2, '0', STR_PAD_LEFT));
                                                             $isPublicHoliday = isset($publicHolidays) && in_array($date, $publicHolidays);
                                                             $shiftData = $RosterInternalDataMonth->firstWhere('date', $date);
                                                             $overtimeForDate = null;
@@ -629,7 +629,7 @@
                             <div class="timeline-scroll">
                                 @foreach ($monthwiseheaders as $h)
                                     @php
-                                        $date = isset($h['newdate']) ? \Carbon\Carbon::createFromFormat('d-m-Y', $h['newdate'])->format('Y-m-d') : (date('Y-m') . '-' . str_pad($h['day'], 2, '0', STR_PAD_LEFT));
+                                        $date = isset($h['newdate']) ? \Carbon\Carbon::parse($h['newdate'])->format('Y-m-d') : (date('Y-m') . '-' . str_pad($h['day'], 2, '0', STR_PAD_LEFT));
                                         $isPublicHoliday = isset($publicHolidays) && in_array($date, $publicHolidays);
                                         $shiftData = $RosterInternalDataMonth->firstWhere('date', $date);
                                         $overtimeForDate = null;
