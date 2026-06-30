@@ -2001,6 +2001,12 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
     Route::post('report/survey/export', 'SurveyReportController@export')->name('resort.report.survey.export');
     Route::post('report/survey/insights', 'SurveyReportController@insights')->name('resort.report.survey.insights');
 
+    // Predefined Learning & Development reports (Option B).
+    Route::get('report/learning', 'LearningReportController@index')->name('resort.report.learning.index');
+    Route::post('report/learning/run', 'LearningReportController@run')->name('resort.report.learning.run');
+    Route::post('report/learning/export', 'LearningReportController@export')->name('resort.report.learning.export');
+    Route::post('report/learning/insights', 'LearningReportController@insights')->name('resort.report.learning.insights');
+
 
     Route::delete('report/{id}', 'ReportController@destroy')->name('reports.destroy');
 
