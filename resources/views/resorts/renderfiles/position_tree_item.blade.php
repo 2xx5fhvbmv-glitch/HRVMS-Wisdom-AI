@@ -9,7 +9,11 @@
                 <span>{{ $positionName }}</span>
                 <span class="badge badge-info ms-2 small">Filled: {{ $positionData['max_counts']['max_filledcount'] }}</span>
                 <span class="badge badge-warning ms-1 small">Vacant: {{ $positionData['max_counts']['max_vacantcount'] }}</span>
-                <span class="badge badge-dark ms-2 small positionGrandTotal">Budget: {!! Common::formatCurrency($positionGrandTotal ?? 0, 'USD') !!}</span>
+                {{-- Use the controller's canonical per-position total (same aggregator
+                     as the section/department/division badges). The old $positionGrandTotal
+                     was only computed in the Totals Row at the BOTTOM of the table, so the
+                     header badge — rendered first — always read 0. --}}
+                <span class="badge badge-dark ms-2 small positionGrandTotal">Budget: {!! Common::formatCurrency($positionData['calculated_total'] ?? 0, 'USD') !!}</span>
             </button>
         </h2>
 
