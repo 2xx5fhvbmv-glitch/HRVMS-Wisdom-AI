@@ -2013,6 +2013,12 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
     Route::post('report/grievance/export', 'GrievanceReportController@export')->name('resort.report.grievance.export');
     Route::post('report/grievance/insights', 'GrievanceReportController@insights')->name('resort.report.grievance.insights');
 
+    // Predefined Incident Management reports (Option B).
+    Route::get('report/incident', 'IncidentReportController@index')->name('resort.report.incident.index');
+    Route::post('report/incident/run', 'IncidentReportController@run')->name('resort.report.incident.run');
+    Route::post('report/incident/export', 'IncidentReportController@export')->name('resort.report.incident.export');
+    Route::post('report/incident/insights', 'IncidentReportController@insights')->name('resort.report.incident.insights');
+
 
     Route::delete('report/{id}', 'ReportController@destroy')->name('reports.destroy');
 
