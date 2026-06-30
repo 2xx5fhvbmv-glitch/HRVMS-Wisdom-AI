@@ -293,8 +293,16 @@
     }
 
     var WAI_BOT_ICON = "{{ URL::asset('resorts_assets/images/wisdom-ai-icon.jpeg') }}";
+    // Current logged-in user's profile picture (falls back to the configured
+    // default placeholder URL when none is set), so the user bubble shows their
+    // avatar instead of a generic icon.
+    var WAI_USER_AVATAR = "{{ Common::getResortUserPicture(auth()->guard('resort-admin')->id() ?? 0) }}";
     function botAvatar() { return '<div class="wai-mini-avatar"><img src="' + WAI_BOT_ICON + '" class="wai-bot-img" alt="Wisdom AI"></div>'; }
-    function userAvatar() { return '<div class="wai-mini-avatar"><i class="fa-solid fa-user"></i></div>'; }
+    function userAvatar() {
+        return WAI_USER_AVATAR
+            ? '<div class="wai-mini-avatar"><img src="' + WAI_USER_AVATAR + '" class="wai-bot-img" alt="You"></div>'
+            : '<div class="wai-mini-avatar"><i class="fa-solid fa-user"></i></div>';
+    }
 
     function addMessage(role, text) {
         clearWelcome();
