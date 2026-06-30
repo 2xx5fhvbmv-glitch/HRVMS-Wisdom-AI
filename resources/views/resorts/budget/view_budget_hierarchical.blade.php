@@ -1301,18 +1301,14 @@ $(document).ready(function() {
                         }
                     }
 
-                    // After all data is loaded, calculate badges
-                    Promise.all(loadPromises).then(() => {
-                        setTimeout(() => {
-                            console.log('All position data loaded, updating badges for position:', positionId);
-                            // Update badges for this position and all parents
-                            updateBadgesHierarchy(positionId);
-                            // Also recalculate all totals to ensure consistency
-                            setTimeout(() => {
-                                window.recalculateAllTotals();
-                            }, 500);
-                        }, 1500);
-                    });
+                    // Badges are authoritative from the server (canonical
+                    // per-position calculated_total — includes vacant slots +
+                    // per-employee allowances). Do NOT recompute from the
+                    // freshly-loaded table here: only THIS position's table is
+                    // loaded, so a global recompute reads every OTHER position's
+                    // table as 0 and wipes the correct department/division totals.
+                    // (Reported: expanding one position zeroed all other budgets.)
+                    Promise.all(loadPromises).then(() => {});
 
                 } else {
                     $container.html('<p class="text-danger">' + response.message + '</p>');
@@ -1506,14 +1502,9 @@ $(document).ready(function() {
 
                     $container.html(html);
 
-                    // After loading, recalculate badges for this position hierarchy
-                    setTimeout(function() {
-                        console.log('Triggering badge update after employee data load for position:', positionId);
-                        // Update badges for this specific position and all parents
-                        updateBadgesHierarchy(positionId);
-                        // Also do a full recalculation to ensure all badges are accurate
-                        window.recalculateAllTotals();
-                    }, 800);
+                    // Server-rendered badges are authoritative — do not recompute
+                    // from this freshly-loaded table (it would read sibling
+                    // positions' unloaded tables as 0 and wipe their totals).
                 } else {
                     $container.html('<p class="text-danger">' + response.message + '</p>');
                 }
@@ -1714,14 +1705,9 @@ $(document).ready(function() {
 
                     $container.html(html);
 
-                    // After loading, recalculate badges for this position hierarchy
-                    setTimeout(function() {
-                        console.log('Triggering badge update after vacant data load for position:', positionId);
-                        // Update badges for this specific position and all parents
-                        updateBadgesHierarchy(positionId);
-                        // Also do a full recalculation to ensure all badges are accurate
-                        window.recalculateAllTotals();
-                    }, 800);
+                    // Server-rendered badges are authoritative — do not recompute
+                    // from this freshly-loaded table (it would read sibling
+                    // positions' unloaded tables as 0 and wipe their totals).
                 } else {
                     $container.html('<p class="text-danger">' + response.message + '</p>');
                 }
@@ -2654,6 +2640,18 @@ $(document).ready(function() {
     // Calculate position total from all employee and vacant tables
     function calculatePositionTotal($positionElement) {
         let total = 0;
+
+        // If this position's data hasn't been loaded yet (no rendered total row),
+        // fall back to the server-rendered badge value. Without this, a parent
+        // (section/department/division) recompute would read every unexpanded
+        // position as 0 and collapse the correct totals — the root of the bug
+        // where expanding/editing one position zeroed the others.
+        const $loadedTotalRows = $positionElement.find('.accordion-body[data-position-id] .budget-monthly-table .table-total-row');
+        if (!$loadedTotalRows.length) {
+            const badgeTxt = $positionElement.find('.positionGrandTotal').first().text().replace(/[^0-9.\-]/g, '');
+            const badgeVal = parseFloat(badgeTxt);
+            return isNaN(badgeVal) ? 0 : badgeVal;
+        }
 
         // Find the accordion body that contains the tables
         const $positionBody = $positionElement.find('.accordion-body[data-position-id]').first();
