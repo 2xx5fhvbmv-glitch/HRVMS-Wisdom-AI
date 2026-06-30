@@ -1989,6 +1989,12 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
     Route::post('report/visa/export', 'Visa\VisaReportController@export')->name('resort.report.visa.export');
     Route::post('report/visa/insights', 'Visa\VisaReportController@insights')->name('resort.report.visa.insights');
 
+    // Predefined File Management reports (Option B — computed, dept-scoped).
+    Route::get('report/file-management', 'FileManagementReportController@index')->name('resort.report.filemgmt.index');
+    Route::post('report/file-management/run', 'FileManagementReportController@run')->name('resort.report.filemgmt.run');
+    Route::post('report/file-management/export', 'FileManagementReportController@export')->name('resort.report.filemgmt.export');
+    Route::post('report/file-management/insights', 'FileManagementReportController@insights')->name('resort.report.filemgmt.insights');
+
 
     Route::delete('report/{id}', 'ReportController@destroy')->name('reports.destroy');
 
