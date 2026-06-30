@@ -1983,6 +1983,12 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
     Route::post('report/payroll/export', 'PayrollReportController@export')->name('resort.report.payroll.export');
     Route::post('report/payroll/insights', 'PayrollReportController@insights')->name('resort.report.payroll.insights');
 
+    // Predefined Visa / Immigration reports (Option B — computed, dept-scoped).
+    Route::get('report/visa', 'Visa\VisaReportController@index')->name('resort.report.visa.index');
+    Route::post('report/visa/run', 'Visa\VisaReportController@run')->name('resort.report.visa.run');
+    Route::post('report/visa/export', 'Visa\VisaReportController@export')->name('resort.report.visa.export');
+    Route::post('report/visa/insights', 'Visa\VisaReportController@insights')->name('resort.report.visa.insights');
+
 
     Route::delete('report/{id}', 'ReportController@destroy')->name('reports.destroy');
 
