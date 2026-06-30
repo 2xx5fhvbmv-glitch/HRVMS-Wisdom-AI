@@ -1995,6 +1995,12 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
     Route::post('report/file-management/export', 'FileManagementReportController@export')->name('resort.report.filemgmt.export');
     Route::post('report/file-management/insights', 'FileManagementReportController@insights')->name('resort.report.filemgmt.insights');
 
+    // Predefined Survey reports (Option B).
+    Route::get('report/survey', 'SurveyReportController@index')->name('resort.report.survey.index');
+    Route::post('report/survey/run', 'SurveyReportController@run')->name('resort.report.survey.run');
+    Route::post('report/survey/export', 'SurveyReportController@export')->name('resort.report.survey.export');
+    Route::post('report/survey/insights', 'SurveyReportController@insights')->name('resort.report.survey.insights');
+
 
     Route::delete('report/{id}', 'ReportController@destroy')->name('reports.destroy');
 
