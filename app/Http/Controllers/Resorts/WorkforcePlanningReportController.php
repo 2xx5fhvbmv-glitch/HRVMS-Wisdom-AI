@@ -43,13 +43,13 @@ class WorkforcePlanningReportController extends Controller
             'annual_plan' => [
                 'name'        => 'Annual Workforce Plan',
                 'description' => 'Approved workforce plan for the year — headcount and budget across departments.',
-                'filters'     => ['year'],
+                'filters'     => ['year', 'month'],
                 'handler'     => 'annualPlan',
             ],
             'monthly_plan' => [
                 'name'        => 'Monthly Workforce Plan',
                 'description' => 'Workforce plan month-by-month for seasonal/operational planning.',
-                'filters'     => ['year', 'month'],
+                'filters'     => ['year', 'month', 'department', 'position'],
                 'handler'     => 'monthlyPlan',
             ],
             'department_headcount_plan' => [
@@ -61,19 +61,19 @@ class WorkforcePlanningReportController extends Controller
             'position_wise_plan' => [
                 'name'        => 'Position-wise Workforce Plan',
                 'description' => 'Planned headcount and budgeted cost for every approved position.',
-                'filters'     => ['year', 'position'],
+                'filters'     => ['year', 'position', 'month'],
                 'handler'     => 'positionWisePlan',
             ],
             'budget_summary' => [
                 'name'        => 'Workforce Budget Summary',
                 'description' => 'Estimated workforce budget per department for the period.',
-                'filters'     => ['year'],
+                'filters'     => ['year', 'month', 'department'],
                 'handler'     => 'budgetSummary',
             ],
             'budget_vs_actual' => [
                 'name'        => 'Workforce Budget vs Actual',
                 'description' => 'Planned workforce cost vs actual payroll expenditure.',
-                'filters'     => ['year', 'department'],
+                'filters'     => ['year', 'department', 'month'],
                 'handler'     => 'budgetVsActual',
             ],
             'vacancy_analysis' => [
@@ -97,7 +97,7 @@ class WorkforcePlanningReportController extends Controller
             'department_workforce_cost' => [
                 'name'        => 'Department Workforce Cost',
                 'description' => 'Planned workforce expenditure per department.',
-                'filters'     => ['year', 'department'],
+                'filters'     => ['year', 'department', 'month'],
                 'handler'     => 'departmentWorkforceCost',
             ],
             'recruitment_demand' => [
@@ -519,42 +519,10 @@ class WorkforcePlanningReportController extends Controller
     }
 
     /* ----------------------------------------------------- budget helpers */
-
-    /** Per-department total budget for a year (stored manning budget). */
-    private function deptBudgetMap($year): array
-    {
-        return DB::table('store_manning_response_parents as p')
-            ->join('manning_responses as mr', 'mr.id', '=', 'p.Budget_id')
-            ->where('p.Resort_id', $this->resort->resort_id)
-            ->when($year, fn($q) => $q->where('mr.year', $year))
-            ->groupBy('p.Department_id')
-            ->selectRaw('p.Department_id as did, SUM(p.Total_Department_budget) as tot')
-            ->pluck('tot', 'did')->toArray();
-    }
-
-    /** Per-department planned salary for a year (sum of proposed basic salaries). */
-    private function deptSalaryMap($year): array
-    {
-        return DB::table('store_manning_response_children as c')
-            ->join('store_manning_response_parents as p', 'p.id', '=', 'c.Parent_SMRP_id')
-            ->join('manning_responses as mr', 'mr.id', '=', 'p.Budget_id')
-            ->where('p.Resort_id', $this->resort->resort_id)
-            ->when($year, fn($q) => $q->where('mr.year', $year))
-            ->groupBy('p.Department_id')
-            ->selectRaw('p.Department_id as did, SUM(c.Proposed_Basic_salary) as tot')
-            ->pluck('tot', 'did')->toArray();
-    }
-
-    /** Per-position budgeted salary for a year (vacant-seat budget). */
-    private function positionBudgetMap($year): array
-    {
-        return DB::table('resort_vacant_budget_costs')
-            ->where('resort_id', $this->resort->resort_id)
-            ->when($year, fn($q) => $q->where('year', $year))
-            ->groupBy('position_id')
-            ->selectRaw('position_id as pid, SUM(basic_salary) as tot')
-            ->pluck('tot', 'pid')->toArray();
-    }
+    // NOTE: the former deptBudgetMap()/deptSalaryMap()/positionBudgetMap() helpers
+    // read store_manning_response_* / resort_vacant_budget_costs.basic_salary, which
+    // are empty for live resorts (→ the 0.00 / N/A budget bug). They were replaced by
+    // salaryMap()/allowanceMap() below, which read the actual Budget module config tables.
 
     /** Per-department ACTUAL payroll cost for a year (sum of gross earnings). */
     private function actualByDeptMap($year): array
@@ -569,9 +537,89 @@ class WorkforcePlanningReportController extends Controller
             ->pluck('tot', 'did')->toArray();
     }
 
-    private function money($v): string
+    private function money($v, $cur = 'USD'): string
     {
-        return number_format((float) $v, 2);
+        $c = strtoupper(trim((string) $cur));
+        $prefix = ($c === 'MVR' || $c === 'RF') ? 'MVR ' : '$';
+        return $prefix . number_format((float) $v, 2);
+    }
+
+    /* --------------- corrected budget sources (Budget module config tables) ---------------
+     * The real approved budget lives per-employee / per-vacant-seat, PER MONTH, in
+     * resort_employee_budget_cost_configurations + resort_vacant_budget_cost_configurations:
+     *   - `value` holds each cost-component amount (allowances / other costs);
+     *   - basic salary is NOT in these (their basic_salary is 0) — it lives on
+     *     employees.basic_salary (filled seats) and resort_vacant_budget_costs.basic_salary
+     *     (vacant seats), both MONTHLY figures.
+     * The old deptSalaryMap()/positionBudgetMap() read empty tables -> 0.00 / N/A.
+     */
+
+    /** Monthly basic-salary budget grouped by position_id|Dept_id: [id => ['amt','cur']]. */
+    private function salaryMap(string $by, $year): array
+    {
+        $rid = $this->resort->resort_id;
+        $out = [];
+        $add = function (&$out, $id, $amt, $cur) {
+            $id = (int) $id;
+            $out[$id]['amt'] = ($out[$id]['amt'] ?? 0) + (float) $amt;
+            $out[$id]['cur'] = $out[$id]['cur'] ?? ($cur ?: 'USD');
+        };
+        // Filled seats — current employees' (monthly) basic salary.
+        $empCol = $by === 'position' ? 'Position_id' : 'Dept_id';
+        foreach (DB::table('employees')->where('resort_id', $rid)->whereNotNull($empCol)->where($empCol, '>', 0)
+            ->groupBy($empCol, 'basic_salary_currency')
+            ->selectRaw("$empCol as gid, basic_salary_currency as cur, SUM(basic_salary) as tot")->get() as $r) {
+            $add($out, $r->gid, $r->tot, $r->cur);
+        }
+        // Vacant seats — configured vacant basic salary.
+        $vCol = $by === 'position' ? 'position_id' : 'department_id';
+        foreach (DB::table('resort_vacant_budget_costs')->where('resort_id', $rid)
+            ->when($year, fn($q) => $q->where('year', $year))
+            ->groupBy($vCol)->selectRaw("$vCol as gid, SUM(basic_salary) as tot")->get() as $r) {
+            $add($out, $r->gid, $r->tot, 'USD');
+        }
+        return $out;
+    }
+
+    /** Budgeted allowances/other costs grouped by position_id|department_id.
+     *  $month null = full-year (sum all months); otherwise a single month. */
+    private function allowanceMap(string $by, $year, $month = null): array
+    {
+        $rid = $this->resort->resort_id;
+        $groupCol = $by === 'position' ? 'position_id' : 'department_id';
+        $out = [];
+        foreach (['resort_employee_budget_cost_configurations', 'resort_vacant_budget_cost_configurations'] as $t) {
+            foreach (DB::table($t)->where('resort_id', $rid)
+                ->when($year, fn($q) => $q->where('year', $year))
+                ->when($month, fn($q) => $q->where('month', $month))
+                ->groupBy($groupCol, 'currency')
+                ->selectRaw("$groupCol as gid, currency, SUM(value) as tot")->get() as $r) {
+                $id = (int) $r->gid;
+                $out[$id]['amt'] = ($out[$id]['amt'] ?? 0) + (float) $r->tot;
+                $out[$id]['cur'] = $out[$id]['cur'] ?? ($r->currency ?: 'USD');
+            }
+        }
+        return $out;
+    }
+
+    /** Pick a display currency for a group from salary/allowance maps (uniform, else USD). */
+    private function curFor($id, array ...$maps): string
+    {
+        foreach ($maps as $m) {
+            if (!empty($m[$id]['cur'])) return $m[$id]['cur'];
+        }
+        return 'USD';
+    }
+
+    /** Planned headcount per department (manning total_headcount) for a year. */
+    private function deptHeadcountMap($year): array
+    {
+        $scoped = Common::getScopedDepartmentIds();
+        return DB::table('manning_responses')->where('resort_id', $this->resort->resort_id)
+            ->when($year, fn($q) => $q->where('year', $year))
+            ->when($scoped !== null, fn($q) => $q->whereIn('dept_id', $scoped))
+            ->groupBy('dept_id')->selectRaw('dept_id as did, SUM(total_headcount) as tot')
+            ->pluck('tot', 'did')->toArray();
     }
 
     /* ----------------------------------------------------- budget/plan reports */
@@ -579,19 +627,23 @@ class WorkforcePlanningReportController extends Controller
     /** #1 Annual Workforce Plan. */
     public function annualPlan(array $filters): array
     {
-        $posBudget = $this->positionBudgetMap($filters['year']);
+        $sal = $this->salaryMap('position', $filters['year']);
+        $alw = $this->allowanceMap('position', $filters['year']);
         $rows = $this->seatQuery($filters)->orderBy('d.name')->orderBy('p.position_title')->get()
-            ->map(function ($r) use ($posBudget) {
-                $salary = $posBudget[$r->position_id] ?? 0;
+            ->map(function ($r) use ($sal, $alw) {
+                $pid = (int) $r->position_id;
+                $cur = $this->curFor($pid, $sal, $alw);
+                $salary = ($sal[$pid]['amt'] ?? 0) * 12;   // annual = monthly basic × 12
+                $allow  = $alw[$pid]['amt'] ?? 0;          // config values already span the year
                 return [
                     'Department'         => $r->department ?? 'N/A',
                     'Position'           => $r->position_title,
                     'Grade'              => $this->gradeName($r->grade),
                     'Approved Headcount' => (int) $r->approved,
                     'Planned Headcount'  => (int) $r->approved,
-                    'Budgeted Salary'    => $this->money($salary),
-                    'Budgeted Allowances'=> 'N/A',
-                    'Total Budget'       => $this->money($salary),
+                    'Budgeted Salary'    => $this->money($salary, $cur),
+                    'Budgeted Allowances'=> $this->money($allow, $cur),
+                    'Total Budget'       => $this->money($salary + $allow, $cur),
                 ];
             })->all();
 
@@ -606,7 +658,20 @@ class WorkforcePlanningReportController extends Controller
     {
         $resortId  = $this->resort->resort_id;
         $scoped    = Common::getScopedDepartmentIds();
-        $posBudget = $this->positionBudgetMap($filters['year']);
+        $sal       = $this->salaryMap('position', $filters['year']);   // monthly basic per position
+
+        // Per-position, per-month allowances from the budget config tables.
+        $alwPM = [];
+        foreach (['resort_employee_budget_cost_configurations', 'resort_vacant_budget_cost_configurations'] as $t) {
+            foreach (DB::table($t)->where('resort_id', $resortId)
+                ->when($filters['year'], fn($q) => $q->where('year', $filters['year']))
+                ->groupBy('position_id', 'month', 'currency')
+                ->selectRaw('position_id as pid, month, currency, SUM(value) as tot')->get() as $r) {
+                $pid = (int) $r->pid; $m = (int) $r->month;
+                $alwPM[$pid][$m]['amt'] = ($alwPM[$pid][$m]['amt'] ?? 0) + (float) $r->tot;
+                $alwPM[$pid][$m]['cur'] = $alwPM[$pid][$m]['cur'] ?? ($r->currency ?: 'USD');
+            }
+        }
 
         $rows = DB::table('position_monthly_data as pmd')
             ->join('manning_responses as mr', 'mr.id', '=', 'pmd.manning_response_id')
@@ -616,17 +681,22 @@ class WorkforcePlanningReportController extends Controller
             ->when($filters['year'], fn($q) => $q->where('mr.year', $filters['year']))
             ->when($filters['month'], fn($q) => $q->where('pmd.month', $filters['month']))
             ->when($scoped !== null, fn($q) => $q->whereIn('mr.dept_id', $scoped))
+            ->when($filters['department'], fn($q) => $q->where('mr.dept_id', $filters['department']))
+            ->when($filters['position'], fn($q) => $q->where('pmd.position_id', $filters['position']))
             ->orderBy('pmd.month')->orderBy('d.name')->orderBy('p.position_title')
             ->get(['pmd.month', 'd.name as department', 'p.position_title', 'pmd.position_id', 'pmd.headcount'])
-            ->map(function ($r) use ($posBudget) {
-                $annual = $posBudget[$r->position_id] ?? 0;
+            ->map(function ($r) use ($sal, $alwPM) {
+                $pid = (int) $r->position_id; $m = (int) $r->month;
+                $cur = $alwPM[$pid][$m]['cur'] ?? ($sal[$pid]['cur'] ?? 'USD');
+                $salary = $sal[$pid]['amt'] ?? 0;              // monthly basic salary
+                $allow  = $alwPM[$pid][$m]['amt'] ?? 0;        // that month's allowances
                 return [
                     'Month'                 => Carbon::create()->month((int) $r->month)->format('F'),
                     'Department'            => $r->department ?? 'N/A',
                     'Position'              => $r->position_title,
                     'Planned Headcount'     => (int) $r->headcount,
-                    'Planned Salary Cost'   => $this->money($annual / 12), // annual budget prorated
-                    'Planned Allowance Cost'=> 'N/A',
+                    'Planned Salary Cost'   => $this->money($salary, $cur),
+                    'Planned Allowance Cost'=> $this->money($allow, $cur),
                 ];
             })->all();
 
@@ -680,15 +750,22 @@ class WorkforcePlanningReportController extends Controller
     /** #4 Position-wise Workforce Plan. */
     public function positionWisePlan(array $filters): array
     {
-        $posBudget = $this->positionBudgetMap($filters['year']);
+        $sal = $this->salaryMap('position', $filters['year']);
+        $alw = $this->allowanceMap('position', $filters['year']);
         $rows = $this->seatQuery($filters)->orderBy('p.position_title')->get()
-            ->map(fn($r) => [
-                'Position'         => $r->position_title,
-                'Grade'            => $this->gradeName($r->grade),
-                'Department'       => $r->department ?? 'N/A',
-                'Planned Headcount'=> (int) $r->approved,
-                'Budgeted Cost'    => $this->money($posBudget[$r->position_id] ?? 0),
-            ])->all();
+            ->map(function ($r) use ($sal, $alw) {
+                $pid = (int) $r->position_id;
+                $cur = $this->curFor($pid, $sal, $alw);
+                // Consolidated ANNUAL budget: monthly basic × 12 + full-year allowances.
+                $annual = ($sal[$pid]['amt'] ?? 0) * 12 + ($alw[$pid]['amt'] ?? 0);
+                return [
+                    'Position'         => $r->position_title,
+                    'Grade'            => $this->gradeName($r->grade),
+                    'Department'       => $r->department ?? 'N/A',
+                    'Planned Headcount'=> (int) $r->approved,
+                    'Budgeted Cost'    => $this->money($annual, $cur),
+                ];
+            })->all();
 
         return ['columns' => ['Position', 'Grade', 'Department', 'Planned Headcount', 'Budgeted Cost'], 'rows' => $rows];
     }
@@ -698,25 +775,33 @@ class WorkforcePlanningReportController extends Controller
     {
         $resortId = $this->resort->resort_id;
         $scoped   = Common::getScopedDepartmentIds();
-        $total    = $this->deptBudgetMap($filters['year']);
-        $salary   = $this->deptSalaryMap($filters['year']);
+        $annualMode = empty($filters['month']);
+        $factor   = $annualMode ? 12 : 1;                       // basic salary is monthly
+        $salary   = $this->salaryMap('dept', $filters['year']);
+        $allow    = $this->allowanceMap('dept', $filters['year'], $filters['month'] ?? null);
+        $head     = $this->deptHeadcountMap($filters['year']);
         $deptNames = DB::table('resort_departments')->where('resort_id', $resortId)
             ->when($scoped !== null, fn($q) => $q->whereIn('id', $scoped))
             ->pluck('name', 'id')->toArray();
 
         $rows = [];
-        foreach (array_unique(array_merge(array_keys($total), array_keys($salary))) as $did) {
+        foreach (array_unique(array_merge(array_keys($salary), array_keys($allow), array_keys($head))) as $did) {
             if ($scoped !== null && !in_array((int) $did, $scoped)) continue;
+            if ($filters['department'] && (int) $did !== (int) $filters['department']) continue;
+            $cur = $this->curFor($did, $salary, $allow);
+            $s = ($salary[$did]['amt'] ?? 0) * $factor;
+            $a = $allow[$did]['amt'] ?? 0;
             $rows[] = [
                 'Department'              => $deptNames[$did] ?? 'N/A',
-                'Salary Budget'           => $this->money($salary[$did] ?? 0),
-                'Allowance Budget'        => 'N/A',
-                'Total Workforce Budget'  => $this->money($total[$did] ?? 0),
+                'Headcount'               => (int) ($head[$did] ?? 0),
+                'Salary Budget'           => $this->money($s, $cur),
+                'Allowance Budget'        => $this->money($a, $cur),
+                'Total Workforce Budget'  => $this->money($s + $a, $cur),
             ];
         }
         usort($rows, fn($x, $y) => strcmp($x['Department'], $y['Department']));
 
-        return ['columns' => ['Department', 'Salary Budget', 'Allowance Budget', 'Total Workforce Budget'], 'rows' => $rows];
+        return ['columns' => ['Department', 'Headcount', 'Salary Budget', 'Allowance Budget', 'Total Workforce Budget'], 'rows' => $rows];
     }
 
     /** #6 Workforce Budget vs Actual. */
@@ -724,29 +809,35 @@ class WorkforcePlanningReportController extends Controller
     {
         $resortId = $this->resort->resort_id;
         $scoped   = Common::getScopedDepartmentIds();
-        $budget   = $this->deptBudgetMap($filters['year']);
+        $annualMode = empty($filters['month']);
+        $factor   = $annualMode ? 12 : 1;
+        $salary   = $this->salaryMap('dept', $filters['year']);
+        $allow    = $this->allowanceMap('dept', $filters['year'], $filters['month'] ?? null);
         $actual   = $this->actualByDeptMap($filters['year']);
+        $head     = $this->deptHeadcountMap($filters['year']);
         $deptNames = DB::table('resort_departments')->where('resort_id', $resortId)
             ->when($scoped !== null, fn($q) => $q->whereIn('id', $scoped))
             ->pluck('name', 'id')->toArray();
 
         $rows = [];
-        foreach (array_unique(array_merge(array_keys($budget), array_keys($actual))) as $did) {
+        foreach (array_unique(array_merge(array_keys($salary), array_keys($allow), array_keys($actual))) as $did) {
             if ($scoped !== null && !in_array((int) $did, $scoped)) continue;
             if ($filters['department'] && (int) $did !== (int) $filters['department']) continue;
-            $b = (float) ($budget[$did] ?? 0);
+            $cur = $this->curFor($did, $salary, $allow);
+            $b = ($salary[$did]['amt'] ?? 0) * $factor + ($allow[$did]['amt'] ?? 0);
             $a = (float) ($actual[$did] ?? 0);
             $rows[] = [
                 'Department'      => $deptNames[$did] ?? 'N/A',
-                'Budgeted Cost'   => $this->money($b),
-                'Actual Cost'     => $this->money($a),
-                'Budget Variance' => $this->money($b - $a),
+                'Headcount'       => (int) ($head[$did] ?? 0),
+                'Budgeted Cost'   => $this->money($b, $cur),
+                'Actual Cost'     => $this->money($a, $cur),
+                'Budget Variance' => $this->money($b - $a, $cur),
                 'Variance (%)'    => $this->pct($b - $a, $b),
             ];
         }
         usort($rows, fn($x, $y) => strcmp($x['Department'], $y['Department']));
 
-        return ['columns' => ['Department', 'Budgeted Cost', 'Actual Cost', 'Budget Variance', 'Variance (%)'], 'rows' => $rows];
+        return ['columns' => ['Department', 'Headcount', 'Budgeted Cost', 'Actual Cost', 'Budget Variance', 'Variance (%)'], 'rows' => $rows];
     }
 
     /** #10 Department Workforce Cost. */
@@ -754,26 +845,33 @@ class WorkforcePlanningReportController extends Controller
     {
         $resortId = $this->resort->resort_id;
         $scoped   = Common::getScopedDepartmentIds();
-        $total    = $this->deptBudgetMap($filters['year']);
-        $salary   = $this->deptSalaryMap($filters['year']);
+        $annualMode = empty($filters['month']);
+        $factor   = $annualMode ? 12 : 1;
+        $salary   = $this->salaryMap('dept', $filters['year']);
+        $allow    = $this->allowanceMap('dept', $filters['year'], $filters['month'] ?? null);
+        $head     = $this->deptHeadcountMap($filters['year']);
         $deptNames = DB::table('resort_departments')->where('resort_id', $resortId)
             ->when($scoped !== null, fn($q) => $q->whereIn('id', $scoped))
             ->pluck('name', 'id')->toArray();
 
         $rows = [];
-        foreach (array_unique(array_merge(array_keys($total), array_keys($salary))) as $did) {
+        foreach (array_unique(array_merge(array_keys($salary), array_keys($allow), array_keys($head))) as $did) {
             if ($scoped !== null && !in_array((int) $did, $scoped)) continue;
             if ($filters['department'] && (int) $did !== (int) $filters['department']) continue;
+            $cur = $this->curFor($did, $salary, $allow);
+            $s = ($salary[$did]['amt'] ?? 0) * $factor;
+            $a = $allow[$did]['amt'] ?? 0;
             $rows[] = [
                 'Department'        => $deptNames[$did] ?? 'N/A',
-                'Planned Salary'    => $this->money($salary[$did] ?? 0),
-                'Planned Allowances'=> 'N/A',
-                'Total Cost'        => $this->money($total[$did] ?? 0),
+                'Headcount'         => (int) ($head[$did] ?? 0),
+                'Planned Salary'    => $this->money($s, $cur),
+                'Planned Allowances'=> $this->money($a, $cur),
+                'Total Cost'        => $this->money($s + $a, $cur),
             ];
         }
         usort($rows, fn($x, $y) => strcmp($x['Department'], $y['Department']));
 
-        return ['columns' => ['Department', 'Planned Salary', 'Planned Allowances', 'Total Cost'], 'rows' => $rows];
+        return ['columns' => ['Department', 'Headcount', 'Planned Salary', 'Planned Allowances', 'Total Cost'], 'rows' => $rows];
     }
 
     /** #12 New Position Requests (from vacancies). */
@@ -905,17 +1003,21 @@ class WorkforcePlanningReportController extends Controller
     /** #19 Workforce Cost by Position. */
     public function costByPosition(array $filters): array
     {
-        $posBudget = $this->positionBudgetMap($filters['year']);
+        $sal = $this->salaryMap('position', $filters['year']);
+        $alw = $this->allowanceMap('position', $filters['year']);
         $rows = $this->seatQuery($filters)->orderBy('p.position_title')->get()
-            ->map(function ($r) use ($posBudget) {
-                $salary = $posBudget[$r->position_id] ?? 0;
+            ->map(function ($r) use ($sal, $alw) {
+                $pid = (int) $r->position_id;
+                $cur = $this->curFor($pid, $sal, $alw);
+                $salary = ($sal[$pid]['amt'] ?? 0) * 12;   // consolidated annual basic
+                $allow  = $alw[$pid]['amt'] ?? 0;          // full-year allowances
                 return [
                     'Position'         => $r->position_title,
                     'Grade'            => $this->gradeName($r->grade),
                     'Planned Headcount'=> (int) $r->approved,
-                    'Salary Budget'    => $this->money($salary),
-                    'Allowance Budget' => 'N/A',
-                    'Total Cost'       => $this->money($salary),
+                    'Salary Budget'    => $this->money($salary, $cur),
+                    'Allowance Budget' => $this->money($allow, $cur),
+                    'Total Cost'       => $this->money($salary + $allow, $cur),
                 ];
             })->all();
 
@@ -926,7 +1028,9 @@ class WorkforcePlanningReportController extends Controller
     public function executiveSummary(array $filters): array
     {
         $seats = $this->seatQuery($filters)->get();
-        $budget = array_sum($this->deptBudgetMap($filters['year']));
+        $salary = $this->salaryMap('dept', $filters['year']);
+        $allow  = $this->allowanceMap('dept', $filters['year']);
+        $budget = array_sum(array_map(fn($v) => ($v['amt'] ?? 0) * 12, $salary)) + array_sum(array_map(fn($v) => $v['amt'] ?? 0, $allow));
         $actual = array_sum($this->actualByDeptMap($filters['year']));
 
         return [

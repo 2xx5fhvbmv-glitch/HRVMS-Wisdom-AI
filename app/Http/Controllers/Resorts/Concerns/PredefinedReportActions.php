@@ -128,7 +128,20 @@ trait PredefinedReportActions
             return $rows;
         }
 
-        $isNumeric = fn($v) => is_string($v) && preg_match('/^-?[\d,]+(\.\d+)?$/', trim($v));
+        // Parse a cell into [isNumeric, value, hasDecimal, currencySymbol]. Accepts a
+        // leading currency indicator ($ / MVR / Rf) so currency-formatted columns
+        // still total (and the total keeps the same currency prefix).
+        $parse = function ($v) {
+            $t = trim((string) $v);
+            $sym = '';
+            if (stripos($t, 'MVR') === 0)      { $sym = 'MVR '; $t = trim(substr($t, 3)); }
+            elseif (stripos($t, 'Rf') === 0)   { $sym = 'MVR '; $t = trim(substr($t, 2)); }
+            elseif ($t !== '' && $t[0] === '$') { $sym = '$'; $t = trim(substr($t, 1)); }
+            if (preg_match('/^-?[\d,]+(\.\d+)?$/', $t)) {
+                return [true, (float) str_replace(',', '', $t), strpos($t, '.') !== false, $sym];
+            }
+            return [false, 0.0, false, ''];
+        };
         $total = [];
         $anyNumeric = false;
 
@@ -141,15 +154,17 @@ trait PredefinedReportActions
                 $total[$col] = '';
                 continue;
             }
-            $nums = array_filter($values, $isNumeric);
-            if (!count($nums)) {
+            $parsed = array_values(array_filter(array_map($parse, $values), fn($p) => $p[0]));
+            if (!count($parsed)) {
                 $total[$col] = '';
                 continue;
             }
             $anyNumeric = true;
-            $hasDecimal = (bool) count(array_filter($nums, fn($v) => strpos($v, '.') !== false));
-            $sum = array_sum(array_map(fn($v) => (float) str_replace(',', '', $v), $nums));
-            $total[$col] = $hasDecimal ? number_format($sum, 2) : number_format($sum);
+            $hasDecimal = (bool) count(array_filter($parsed, fn($p) => $p[2]));
+            $sym = '';
+            foreach ($parsed as $p) { if ($p[3] !== '') { $sym = $p[3]; break; } }
+            $sum = array_sum(array_map(fn($p) => $p[1], $parsed));
+            $total[$col] = $sym . ($hasDecimal ? number_format($sum, 2) : number_format($sum));
         }
 
         if (!$anyNumeric) {
