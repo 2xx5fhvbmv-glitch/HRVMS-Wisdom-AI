@@ -70,7 +70,8 @@ class MasterSearchController extends Controller
                                 ->orWhere('email', 'LIKE', "%{$search_key}%")
                                 ->orWhere('personal_phone', 'LIKE', "%{$search_key}%");
                             })
-                            ->orWhere('Emp_id', 'LIKE', "%{$search_key}%");
+                            ->orWhere('Emp_id', 'LIKE', "%{$search_key}%")
+                            ->orWhere('passport_number', 'LIKE', "%{$search_key}%");
                         }
                     })->get();
                     
