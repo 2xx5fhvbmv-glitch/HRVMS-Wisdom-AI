@@ -99,6 +99,36 @@
                                 </select>
                             </div>
 
+                            <div class="col-sm-6 pl-filter" data-filter="position">
+                                <label class="form-label">Position</label>
+                                <select class="form-select" id="plPosition">
+                                    <option value="">All positions</option>
+                                    @foreach($positions as $p)
+                                        <option value="{{ $p->id }}">{{ $p->position_title }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <div class="col-sm-6 pl-filter" data-filter="employee">
+                                <label class="form-label">Employee</label>
+                                <select class="form-select" id="plEmployee">
+                                    <option value="">All employees</option>
+                                    @foreach($employees as $e)
+                                        <option value="{{ $e->id }}">{{ $e->name }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <div class="col-sm-6 pl-filter" data-filter="month">
+                                <label class="form-label">Month</label>
+                                <select class="form-select" id="plMonth">
+                                    <option value="">All months</option>
+                                    @foreach($months as $m)
+                                        <option value="{{ $m['value'] }}">{{ $m['label'] }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+
                             <div class="col-sm-6 pl-filter" data-filter="allowance_type">
                                 <label class="form-label">Allowance Type</label>
                                 <select class="form-select" id="plAllowanceType">
@@ -198,6 +228,9 @@
                 from_payroll: $('#plFromPayroll').val(),
                 to_payroll: $('#plToPayroll').val(),
                 department: $('#plDepartment').val(),
+                position: $('#plPosition').val(),
+                employee: $('#plEmployee').val(),
+                month: $('#plMonth').val(),
                 year: $('#plYear').val(),
                 allowance_type: $('#plAllowanceType').val(),
                 deduction_type: $('#plDeductionType').val(),

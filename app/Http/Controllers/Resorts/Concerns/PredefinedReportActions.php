@@ -128,6 +128,14 @@ trait PredefinedReportActions
             return $rows;
         }
 
+        // A report that already supplies its own trailing "Total" row (e.g. to show
+        // a 100% share) keeps it — don't append a second totals row.
+        $firstCol = $columns[0] ?? null;
+        $last = end($rows);
+        if ($firstCol !== null && is_array($last) && (($last[$firstCol] ?? null) === 'Total')) {
+            return $rows;
+        }
+
         // Parse a cell into [isNumeric, value, hasDecimal, currencySymbol]. Accepts a
         // leading currency indicator ($ / MVR / Rf) so currency-formatted columns
         // still total (and the total keeps the same currency prefix).
