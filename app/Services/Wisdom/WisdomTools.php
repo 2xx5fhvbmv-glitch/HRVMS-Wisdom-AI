@@ -225,6 +225,8 @@ class WisdomTools
                 [
                     'type' => ['type' => 'string', 'description' => 'One of: localization, minimum_wage. Default localization.'],
                 ]),
+            self::fn('get_compliance_issues',
+                'Flagged compliance breaches from the compliance directory, prioritised by severity (Critical→High→Medium/Low), with counts by severity and by module and a top actionable list (issue, module, employee, suggested fix). Use for "what compliance issues should I resolve first", "compliance violations", "which non-compliant cases to address". Do NOT answer this with just localization %.', []),
 
             // ---- Performance Management ----
             self::fn('get_performance_summary',
@@ -535,6 +537,7 @@ class WisdomTools
                         return ['error' => 'Access denied: minimum-wage / compensation data is restricted for your role.'];
                     }
                     return self::getWorkforceCompliance($rid, $args);
+                case 'get_compliance_issues':    return self::getComplianceIssues($rid, $args);
                 case 'get_performance_summary':  return self::getPerformanceSummary($rid);
                 case 'get_pip_overview':         return self::getPlanOverview($rid, $args, 'pip');
                 case 'get_pdp_overview':         return self::getPlanOverview($rid, $args, 'pdp');
@@ -2971,7 +2974,10 @@ class WisdomTools
 
     private static function getPendingApprovals(int $rid): array
     {
-        return [
+        // Mirror the unified approvals page (People\ApprovalController): promotions,
+        // transfers, resignations, salary increments, salary advances, leave
+        // requests and employee info-update requests.
+        $counts = [
             'promotions_pending'        => EmployeePromotion::where('resort_id', $rid)->where('status', 'Pending')->count(),
             'transfers_pending'         => EmployeeTransfer::where('resort_id', $rid)->where('status', 'Pending')->count(),
             'resignations_pending'      => EmployeeResignation::where('resort_id', $rid)->where('status', 'Pending')->count(),
@@ -2979,7 +2985,13 @@ class WisdomTools
             'salary_advances_pending'   => PayrollAdvance::where('resort_id', $rid)
                 ->where(fn ($q) => $q->where('hr_status', 'Pending')->orWhere('finance_status', 'Pending')->orWhere('gm_status', 'Pending'))
                 ->count(),
+            'leave_requests_pending'    => DB::table('employees_leaves')->where('resort_id', $rid)
+                ->whereRaw("LOWER(COALESCE(status,'')) NOT IN ('approved','rejected','cancelled','withdrawn','declined')")->count(),
+            'info_update_requests_pending' => DB::table('employee_info_update_request')->where('resort_id', $rid)
+                ->whereRaw("LOWER(COALESCE(status,'')) IN ('pending','')")->count(),
         ];
+        $counts['total_pending'] = array_sum($counts);
+        return $counts;
     }
 
     private static function empName(Employee $e): string
@@ -3513,6 +3525,41 @@ class WisdomTools
             'arrival'   => self::fmtDate($r->arrival_date),
         ])->values();
         return ['count' => $list->count(), 'requests' => $list];
+    }
+
+    /** Flagged compliance breaches, prioritised by severity (for "what to fix first"). */
+    private static function getComplianceIssues(int $rid, array $args): array
+    {
+        // Active breaches = not resolved and not dismissed — matches the compliance
+        // directory. Localization at/above target is NOT a breach and won't appear.
+        $rows = DB::table('compliances')->where('resort_id', $rid)->whereNull('deleted_at')
+            ->whereRaw("LOWER(COALESCE(status,'')) <> 'resolved'")
+            ->whereRaw("LOWER(COALESCE(Dismissal_status,'')) <> 'rejected'")
+            ->get(['employee_id', 'module_name', 'compliance_breached_name', 'severity_ai', 'remediation_ai']);
+
+        $names = self::resolveEmpNames($rid, $rows->pluck('employee_id')->filter()->all());
+        $order = ['Critical' => 0, 'High' => 1, 'Medium' => 2, 'Low' => 3, 'Info' => 4, '' => 5];
+
+        $bySeverity = $rows->groupBy(fn ($r) => $r->severity_ai ?: 'Unspecified')->map->count();
+        $byModule   = $rows->groupBy(fn ($r) => $r->module_name ?: 'Other')->map->count();
+
+        // Prioritised list: Critical → High first, most actionable at the top.
+        $sorted = $rows->sortBy(fn ($r) => $order[$r->severity_ai] ?? 5)->values();
+        $top = $sorted->take(25)->map(fn ($r) => [
+            'severity'  => $r->severity_ai ?: 'Unspecified',
+            'issue'     => $r->compliance_breached_name ?: $r->module_name,
+            'module'    => $r->module_name,
+            'employee'  => $r->employee_id ? ($names[$r->employee_id] ?? ('Employee #' . $r->employee_id)) : null,
+            'fix'       => $r->remediation_ai,
+        ])->values();
+
+        return [
+            'total_open_issues' => $rows->count(),
+            'by_severity'       => $bySeverity,
+            'by_module'         => $byModule,
+            'priority_order'    => 'Resolve Critical, then High, then Medium/Low.',
+            'top_issues'        => $top,
+        ];
     }
 
     /** Pending visa deposit-refund requests (approved resignations, deposit not yet withdrawn). */
