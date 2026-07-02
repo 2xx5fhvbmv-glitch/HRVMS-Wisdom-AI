@@ -90,7 +90,31 @@ trait PredefinedReportActions
         }
 
         $decoded = json_decode($response, true);
-        return is_array($decoded) ? (string) ($decoded['analysis'] ?? '') : '';
+        return $this->sanitizeInsights(is_array($decoded) ? (string) ($decoded['analysis'] ?? '') : '');
+    }
+
+    /**
+     * Clean the AI analysis before it reaches the user. The upstream service
+     * narrates its input as "JSON data" / "the provided JSON" — an internal
+     * representation that should never surface on the client. Replace those
+     * with plain-English "report data" wording without altering the analysis.
+     */
+    protected function sanitizeInsights(string $md): string
+    {
+        if (trim($md) === '') {
+            return '';
+        }
+        $md = preg_replace([
+            '/\b(the\s+)?(provided|given|supplied|following|above)\s+JSON\s+data\b/i',
+            '/\bJSON\s+(data|object|array|structure|format|file|payload|response|input)\b/i',
+            '/\bJSON\b/i',
+        ], [
+            'the report data',
+            'report data',
+            'data',
+        ], $md);
+
+        return trim($md);
     }
 
     /**
