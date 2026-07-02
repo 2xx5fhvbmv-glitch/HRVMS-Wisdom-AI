@@ -2,6 +2,11 @@
 @section('page_tab_title', $page_title)
 
 @section('content')
+<style>
+    /* Keep the selected report's description readable on the active (blue) background. */
+    .list-group-item.active, .list-group-item.active strong { color:#fff !important; }
+    .list-group-item.active .text-muted, .list-group-item.active small { color:rgba(255,255,255,.85) !important; }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
         <div class="page-hedding">

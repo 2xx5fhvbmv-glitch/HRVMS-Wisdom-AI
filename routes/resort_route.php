@@ -2037,6 +2037,12 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
     Route::post('report/compliance/export', 'ComplianceReportController@export')->name('resort.report.compliance.export');
     Route::post('report/compliance/insights', 'ComplianceReportController@insights')->name('resort.report.compliance.insights');
 
+    // Predefined People Management – Employee Master reports (Option B).
+    Route::get('report/employee', 'EmployeeMasterReportController@index')->name('resort.report.employee.index');
+    Route::post('report/employee/run', 'EmployeeMasterReportController@run')->name('resort.report.employee.run');
+    Route::post('report/employee/export', 'EmployeeMasterReportController@export')->name('resort.report.employee.export');
+    Route::post('report/employee/insights', 'EmployeeMasterReportController@insights')->name('resort.report.employee.insights');
+
 
     Route::delete('report/{id}', 'ReportController@destroy')->name('reports.destroy');
 
