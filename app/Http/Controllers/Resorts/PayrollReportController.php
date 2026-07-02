@@ -86,9 +86,15 @@ class PayrollReportController extends Controller
         $resortId   = $this->resort->resort_id;
         $scoped     = Common::getScopedDepartmentIds();
 
-        $reports = collect($this->registry())->map(fn($r, $key) => [
-            'key' => $key, 'name' => $r['name'], 'description' => $r['description'], 'filters' => $r['filters'],
-        ])->values();
+        $reports = collect($this->registry())->map(function ($r, $key) {
+            $filters = $r['filters'];
+            // Period-based reports also accept an independent Year + From/To date
+            // window, so the Payroll Period can be left blank (see resolvePayrollId).
+            if (in_array('payroll', $filters, true)) {
+                $filters = array_values(array_unique(array_merge($filters, ['year', 'duration'])));
+            }
+            return ['key' => $key, 'name' => $r['name'], 'description' => $r['description'], 'filters' => $filters];
+        })->values();
 
         $payrolls = DB::table('payroll')->where('resort_id', $resortId)
             ->orderBy('start_date', 'desc')
@@ -233,6 +239,29 @@ class PayrollReportController extends Controller
         return Carbon::parse($pay->start_date)->format('d M Y') . ' – ' . Carbon::parse($pay->end_date)->format('d M Y');
     }
 
+    /** The payroll run rows for a resolved id set, ordered by start date. */
+    private function payrollRuns($pids)
+    {
+        $pids = array_values(array_filter((array) $pids));
+        if (empty($pids)) return collect();
+        return DB::table('payroll')->where('resort_id', $this->resort->resort_id)
+            ->whereIn('id', $pids)->orderBy('start_date')->get();
+    }
+
+    /**
+     * Human period label for a resolved id set: a single run shows its own
+     * period; multiple aggregated runs show the spanning date range + count.
+     */
+    private function periodLabelFor($pids): string
+    {
+        $runs = $this->payrollRuns($pids);
+        if ($runs->isEmpty()) return 'N/A';
+        if ($runs->count() === 1) return $this->periodLabel($runs->first());
+        return Carbon::parse($runs->min('start_date'))->format('d M Y') . ' – '
+            . Carbon::parse($runs->max('end_date'))->format('d M Y')
+            . ' (' . $runs->count() . ' runs)';
+    }
+
     private function nameExpr()
     {
         return DB::raw("TRIM(CONCAT(COALESCE(ra.first_name,''),' ',COALESCE(ra.last_name,''))) as employee_name");
@@ -251,21 +280,43 @@ class PayrollReportController extends Controller
         ];
     }
 
-    private function resolvePayrollId(array $filters)
+    /**
+     * Resolve report filters to the SET of payroll run ids to include (returns
+     * an array so reports can span an independent window):
+     *   - an explicit Payroll Period always wins → just that run;
+     *   - otherwise a Year and/or From/To date window aggregates across every
+     *     run whose period overlaps it (Payroll Period left blank);
+     *   - with nothing chosen, default to the latest run that has payslips
+     *     (the original single-period behaviour), so the initial view isn't empty.
+     */
+    private function resolvePayrollId(array $filters): array
     {
-        if (!empty($filters['payroll'])) return $filters['payroll'];
+        $rid = $this->resort->resort_id;
 
-        // Default to the most recent run that actually has payslips, so the
-        // initial view isn't an empty draft. Fall back to the latest overall.
+        if (!empty($filters['payroll'])) return [(int) $filters['payroll']];
+
+        $from = $filters['from_date'] ?? null;
+        $to   = $filters['to_date'] ?? null;
+        $year = $filters['year'] ?? null;
+
+        if ($from || $to || $year) {
+            $q = DB::table('payroll')->where('resort_id', $rid);
+            if ($year) $q->whereRaw('YEAR(start_date) = ?', [$year]);
+            // Period overlaps the window: run.start_date <= to AND run.end_date >= from.
+            if ($to)   $q->whereDate('start_date', '<=', $to);
+            if ($from) $q->whereDate('end_date', '>=', $from);
+            return $q->orderBy('start_date')->pluck('id')->map(fn($v) => (int) $v)->all();
+        }
+
         $latest = DB::table('payroll as p')
-            ->where('p.resort_id', $this->resort->resort_id)
+            ->where('p.resort_id', $rid)
             ->whereExists(fn($q) => $q->select(DB::raw(1))->from('payroll_reviews')
                 ->whereColumn('payroll_reviews.payroll_id', 'p.id'))
             ->orderBy('p.start_date', 'desc')->first()
-            ?: DB::table('payroll')->where('resort_id', $this->resort->resort_id)
+            ?: DB::table('payroll')->where('resort_id', $rid)
                 ->orderBy('start_date', 'desc')->first();
 
-        return $latest->id ?? 0;
+        return $latest ? [(int) $latest->id] : [];
     }
 
     /** Base per-employee payslip query for a payroll run, dept-scoped. */
@@ -279,7 +330,7 @@ class PayrollReportController extends Controller
             ->leftJoin('resort_departments as d', 'd.id', '=', 'e.Dept_id')
             ->leftJoin('resort_positions as p', 'p.id', '=', 'e.Position_id')
             ->where('pay.resort_id', $this->resort->resort_id)
-            ->where('pr.payroll_id', $payrollId)
+            ->whereIn('pr.payroll_id', (array) $payrollId)
             ->when($scoped !== null, fn($q) => $q->whereIn('e.Dept_id', $scoped))
             ->when($filters['department'] ?? null, fn($q) => $q->where('e.Dept_id', $filters['department']));
     }
@@ -290,7 +341,6 @@ class PayrollReportController extends Controller
     public function payrollSummary(array $filters): array
     {
         $pid = $this->resolvePayrollId($filters);
-        $pay = DB::table('payroll')->where('id', $pid)->first();
         $t = $this->basePayslip($pid, $filters)->selectRaw(
             'COUNT(*) emp, SUM(pr.total_earnings) gross, SUM(pr.total_deductions) ded, SUM(pr.net_salary) net'
         )->first();
@@ -298,7 +348,7 @@ class PayrollReportController extends Controller
         return [
             'columns' => ['Payroll Period', 'Total Employees', 'Gross Salary', 'Total Deductions', 'Net Salary', 'Total Payroll Cost'],
             'rows'    => [[
-                'Payroll Period'     => $pay ? $this->periodLabel($pay) : 'N/A',
+                'Payroll Period'     => $this->periodLabelFor($pid),
                 'Total Employees'    => (int) ($t->emp ?? 0),
                 'Gross Salary'       => $this->n($t->gross ?? 0),
                 'Total Deductions'   => $this->n($t->ded ?? 0),
@@ -519,7 +569,7 @@ class PayrollReportController extends Controller
             ->join('payroll_reviews as pr', 'pr.id', '=', 'a.payroll_review_id')
             ->join('employees as e', 'e.id', '=', 'pr.employee_id')
             ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
-            ->where('pr.payroll_id', $pid)
+            ->whereIn('pr.payroll_id', (array) $pid)
             ->when($scoped !== null, fn($q) => $q->whereIn('e.Dept_id', $scoped))
             ->when($filters['department'], fn($q) => $q->where('e.Dept_id', $filters['department']))
             ->when($filters['allowance_type'], fn($q) => $q->where('a.allowance_type', $filters['allowance_type']))
@@ -795,7 +845,7 @@ class PayrollReportController extends Controller
     public function tuckshopPurchases(array $filters): array
     {
         $pid = $this->resolvePayrollId($filters);
-        $pay = DB::table('payroll')->where('id', $pid)->first();
+        $runs = $this->payrollRuns($pid);
         $scoped = Common::getScopedDepartmentIds();
 
         $q = DB::table('payments as pmt')
@@ -807,8 +857,8 @@ class PayrollReportController extends Controller
             ->when($scoped !== null, fn($x) => $x->whereIn('e.Dept_id', $scoped))
             ->when($filters['department'], fn($x) => $x->where('e.Dept_id', $filters['department']));
 
-        if ($pay) {
-            $q->whereBetween('pmt.purchased_date', [$pay->start_date, $pay->end_date]);
+        if ($runs->isNotEmpty()) {
+            $q->whereBetween('pmt.purchased_date', [$runs->min('start_date'), $runs->max('end_date')]);
         }
 
         $rows = $q->orderBy('pmt.purchased_date')
@@ -852,13 +902,13 @@ class PayrollReportController extends Controller
     public function payrollExceptions(array $filters): array
     {
         $pid = $this->resolvePayrollId($filters);
-        $pay = DB::table('payroll')->where('id', $pid)->where('resort_id', $this->resort->resort_id)->first();
+        $runs = $this->payrollRuns($pid);
 
-        // Previous run (by start_date) for pay-swing comparison.
+        // Previous run (immediately before the earliest run in scope) for pay-swing comparison.
         $prevNet = [];
-        if ($pay) {
+        if ($runs->isNotEmpty()) {
             $prev = DB::table('payroll')->where('resort_id', $this->resort->resort_id)
-                ->where('start_date', '<', $pay->start_date)->orderByDesc('start_date')->first();
+                ->where('start_date', '<', $runs->min('start_date'))->orderByDesc('start_date')->first();
             if ($prev) {
                 $prevNet = DB::table('payroll_reviews')->where('payroll_id', $prev->id)
                     ->pluck('net_salary', 'employee_id')->toArray();
@@ -930,10 +980,9 @@ class PayrollReportController extends Controller
     public function payrollAuditTrail(array $filters): array
     {
         $pid = $this->resolvePayrollId($filters);
-        $pay = DB::table('payroll')->where('id', $pid)->where('resort_id', $this->resort->resort_id)->first();
-        $label = $pay ? $this->periodLabel($pay) : 'N/A';
+        $label = $this->periodLabelFor($pid);
 
-        $rows = DB::table('payroll_approvals')->where('payroll_id', $pid)
+        $rows = DB::table('payroll_approvals')->whereIn('payroll_id', (array) $pid)
             ->orderBy('step_order')->get()
             ->map(fn($a) => [
                 'Payroll Period' => $label,
@@ -987,7 +1036,7 @@ class PayrollReportController extends Controller
         $scoped = Common::getScopedDepartmentIds();
         $d = DB::table('payroll_deductions as pd')
             ->join('employees as e', 'e.id', '=', 'pd.employee_id')
-            ->where('pd.payroll_id', $pid)
+            ->whereIn('pd.payroll_id', (array) $pid)
             ->when($scoped !== null, fn($q) => $q->whereIn('e.Dept_id', $scoped))
             ->when($filters['department'], fn($q) => $q->where('e.Dept_id', $filters['department']))
             ->selectRaw('SUM(pd.pension) pension, SUM(pd.ewt) ewt')->first();
@@ -1044,7 +1093,7 @@ class PayrollReportController extends Controller
         $scoped = Common::getScopedDepartmentIds();
         $employer = DB::table('payroll_deductions as pd')
             ->join('employees as e', 'e.id', '=', 'pd.employee_id')
-            ->where('pd.payroll_id', $pid)
+            ->whereIn('pd.payroll_id', (array) $pid)
             ->when($scoped !== null, fn($q) => $q->whereIn('e.Dept_id', $scoped))
             ->when($filters['department'], fn($q) => $q->where('e.Dept_id', $filters['department']))
             ->sum('pd.pension'); // employer share mirrors the 7% employee pension
@@ -1166,7 +1215,7 @@ class PayrollReportController extends Controller
     public function tuckshopPayable(array $filters): array
     {
         $pid = $this->resolvePayrollId($filters);
-        $pay = DB::table('payroll')->where('id', $pid)->first();
+        $runs = $this->payrollRuns($pid);
         $scoped = Common::getScopedDepartmentIds();
 
         $q = DB::table('payments as pmt')
@@ -1176,8 +1225,8 @@ class PayrollReportController extends Controller
             ->whereRaw('LOWER(COALESCE(pmt.status, "")) <> ?', ['paid'])   // outstanding only
             ->when($scoped !== null, fn($x) => $x->whereIn('e.Dept_id', $scoped));
 
-        if ($pay) {
-            $q->whereBetween('pmt.purchased_date', [$pay->start_date, $pay->end_date]);
+        if ($runs->isNotEmpty()) {
+            $q->whereBetween('pmt.purchased_date', [$runs->min('start_date'), $runs->max('end_date')]);
         }
 
         $rows = $q->groupBy('pmt.shopkeeper_id', 'sk.name')

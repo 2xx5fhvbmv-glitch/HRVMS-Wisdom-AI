@@ -49,6 +49,7 @@
                             <div class="col-sm-6 pl-filter" data-filter="payroll">
                                 <label class="form-label">Payroll Period</label>
                                 <select class="form-select" id="plPayroll">
+                                    <option value="">All periods (use date range)</option>
                                     @foreach($payrolls as $p)
                                         <option value="{{ $p['id'] }}">{{ $p['label'] }}</option>
                                     @endforeach
@@ -86,6 +87,7 @@
                             <div class="col-sm-6 pl-filter" data-filter="year">
                                 <label class="form-label">Year</label>
                                 <select class="form-select" id="plYear">
+                                    <option value="">All years</option>
                                     @foreach($years as $y)
                                         <option value="{{ $y }}">{{ $y }}</option>
                                     @endforeach
