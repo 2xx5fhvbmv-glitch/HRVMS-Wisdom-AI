@@ -91,6 +91,13 @@ class WisdomTools
                 [
                     'date' => ['type' => 'string', 'description' => 'Date in YYYY-MM-DD format. Defaults to today.'],
                 ]),
+            self::fn('get_pending_leave_approvals',
+                'Leave requests that are still awaiting approval (employee, leave type, dates, days, status). Use for "which leave requests are pending approval", "pending leave". Do NOT confuse with who is on leave today.', []),
+            self::fn('get_leave_balance',
+                'Leave balance for ONE employee by name: per leave type, the entitlement, days taken this year and remaining balance. Use for "what is X\'s leave balance", "how much leave does X have left".',
+                [
+                    'name' => ['type' => 'string', 'description' => 'Employee full/partial name or Emp_id.'],
+                ], ['name']),
             self::fn('list_employees',
                 'List active employees with their names, department, position and nationality. Optionally filter by department. Use this for "who works here", "list the employees" or "employee names" type questions.',
                 [
@@ -106,6 +113,16 @@ class WisdomTools
                 ], ['name']),
             self::fn('get_recruitment_pipeline',
                 'Get a summary of the recruitment pipeline: vacancies grouped by status and applicants grouped by status.', []),
+            self::fn('get_vacancy_applicants',
+                'Vacancies with how many applicants each has received (highest first), plus the position, department, required headcount and status. Use for "which vacancy has the most applicants", "which vacancies are open" (pass open_only=true), "applicants per vacancy".',
+                [
+                    'open_only' => ['type' => 'boolean', 'description' => 'true → only currently-open vacancies (exclude cancelled/closed/filled).'],
+                ]),
+            self::fn('get_scheduled_interviews',
+                'Scheduled applicant interviews: applicant, date, time and status. Defaults to upcoming (today onward); pass a date for one day. Use for "how many interviews are scheduled tomorrow", "upcoming interviews".',
+                [
+                    'date' => ['type' => 'string', 'description' => 'A single date YYYY-MM-DD (e.g. tomorrow). Omit for all upcoming.'],
+                ]),
             self::fn('get_attendance_summary',
                 'Get an attendance summary for a given date (defaults to today): how many employees checked in vs. total active.',
                 [
@@ -119,6 +136,32 @@ class WisdomTools
                     'from' => ['type' => 'string', 'description' => 'Range start YYYY-MM-DD (use with to). For "this month" pass the 1st of the month.'],
                     'to'   => ['type' => 'string', 'description' => 'Range end YYYY-MM-DD (use with from).'],
                 ], ['name']),
+            self::fn('get_attendance_register',
+                'Who was present / absent on a date (defaults today) across the whole resort. Returns the present list, the absent list, who was on approved leave, and any "unverified" staff (have a record but no punch-in/out logged). Use for "who was present/absent on <date>", "today\'s attendance", "who did not come in".',
+                [
+                    'date' => ['type' => 'string', 'description' => 'Date YYYY-MM-DD. Defaults to today.'],
+                ]),
+            self::fn('get_late_arrivals',
+                'Employees who punched in AFTER their shift start time on a date (defaults today), with how many minutes late. Use for "who arrived late today", "late arrivals".',
+                [
+                    'date' => ['type' => 'string', 'description' => 'Date YYYY-MM-DD. Defaults to today.'],
+                ]),
+            self::fn('get_overtime',
+                'Overtime hours by employee over a period, highest first. Use for "who worked the most overtime", "overtime this month/week".',
+                [
+                    'period' => ['type' => 'string', 'description' => 'today, week, month (default), or year.'],
+                ]),
+            self::fn('get_duty_roster',
+                'The duty roster (who is scheduled, and on which shift) for a date, or — with off=true — who has a day off / is not scheduled. Use for "today\'s roster / duty roster", "who is off / has a day-off tomorrow". Compute the actual date before calling.',
+                [
+                    'date' => ['type' => 'string', 'description' => 'Date YYYY-MM-DD. Defaults to today.'],
+                    'off'  => ['type' => 'boolean', 'description' => 'true → list employees who are OFF (not scheduled) that date instead of the roster.'],
+                ]),
+            self::fn('get_understaffed_today',
+                'Departments that are short-handed on a date (defaults today): active headcount vs how many are actually present, with the absent count and coverage %. Use for "are we understaffed / short-handed today", "which department is short today".',
+                [
+                    'date' => ['type' => 'string', 'description' => 'Date YYYY-MM-DD. Defaults to today.'],
+                ]),
             self::fn('get_upcoming_birthdays',
                 'List active employees whose birthday falls in a given month (defaults to the current month). Use for "whose birthday is coming up", "birthdays this month" type questions.',
                 [
@@ -128,6 +171,23 @@ class WisdomTools
                 'List active / ongoing SOS emergency incidents at the resort (those not yet resolved, rejected or closed): emergency type, who raised it, location, date/time and status. Use for "any active SOS", "current emergencies" questions.', []),
             self::fn('get_accommodation_summary',
                 'Staff accommodation capacity & occupancy: total rooms, total beds (capacity), occupied beds, available (free) beds and occupancy rate. Use for "how many beds are available", "accommodation occupancy", "free rooms" questions.', []),
+            self::fn('get_available_beds',
+                'List the rooms that have FREE beds, with building, room, capacity and free-bed count; optionally filtered by gender. Use for "which beds are available", "available/free accommodation", "show available female/male accommodation".',
+                [
+                    'gender' => ['type' => 'string', 'description' => 'Optional: male or female (filters by the room\'s block-for). Omit for any.'],
+                ]),
+            self::fn('get_maintenance_requests',
+                'Accommodation maintenance requests with room, priority, status, issue and date. Defaults to open/pending ones. Use for "show maintenance requests", "pending maintenance", "accommodation repairs".',
+                [
+                    'status' => ['type' => 'string', 'description' => 'open (default), completed, all, or an exact status.'],
+                ]),
+            self::fn('get_employee_accommodation',
+                'Where a specific employee is staying (building, room, bed) and who their roommates are. Use for "where does X stay / live", "which room is X in", "who are X\'s roommates".',
+                [
+                    'name' => ['type' => 'string', 'description' => 'Employee full/partial name or Emp_id.'],
+                ], ['name']),
+            self::fn('get_building_occupancy',
+                'Occupancy per accommodation building (beds, occupied, available, occupancy %), highest first. Use for "which building has the highest occupancy", "occupancy by building".', []),
 
             // --- Workforce Planning (non-monetary) ---------------------------
             self::fn('get_budgeted_headcount',
@@ -182,6 +242,11 @@ class WisdomTools
                 'List performance (appraisal) cycles with status (Active/Pending/Closed) and dates. Use for "what performance cycles are active", "which cycle is running", "show cycle status".', []),
             self::fn('get_kpi_overview',
                 'KPI overview: total KPIs and counts grouped by workflow status (pending, responded, approved, rejected). Use for "show all KPIs", "how many KPIs exist", "which KPIs are pending/approved".', []),
+            self::fn('get_kpi_details',
+                'Detailed KPI list: each goal name, its target budget, weightage and approval status. Optionally filter by status. Use for "which KPIs are approved/pending/rejected (by name)", "what is the target budget for the KPIs", "list the KPI goals".',
+                [
+                    'status' => ['type' => 'string', 'description' => 'Optional: approved, pending, rejected, etc. Omit for all.'],
+                ]),
             self::fn('get_monthly_checkins',
                 'Monthly check-in status: totals grouped by check-in status (Pending/Conducted/Confirm/Rescheduled) and by approval status (pending/approved). Use for "how many check-ins are pending", "monthly check-in status".', []),
             self::fn('get_performance_meetings',
@@ -240,6 +305,10 @@ class WisdomTools
                 ]),
             self::fn('get_disciplinary_outcomes',
                 'Disciplinary outcomes: counts of cases grouped by the action taken (e.g. Verbal Warning, Written Warning, Suspension, Termination). Use for "how many written warnings were issued", "how many terminations", "show disciplinary outcomes".', []),
+            self::fn('get_repeat_offenders',
+                'Employees with more than one disciplinary case, with each one\'s case count (highest first). Use for "which employees are repeat offenders", "who has multiple disciplinary cases".', []),
+            self::fn('get_confidential_cases',
+                'Confidential grievance cases (where the complainant chose NOT to disclose their identity): category, status and date. Identity is withheld. Use for "show confidential cases / grievances".', []),
             self::fn('get_employee_relations_history',
                 'Grievance and disciplinary history for one employee by name: their disciplinary cases (category, action, status) and grievances filed (category, status). Use for "has Ahmed received disciplinary action", "has Ahmed filed any grievances", "show Ahmed\'s case history".',
                 [
@@ -425,15 +494,28 @@ class WisdomTools
                 case 'get_department_breakdown': return self::getDepartmentBreakdown($rid);
                 case 'count_employees_by_status':return self::countByStatus($rid);
                 case 'get_employees_on_leave':   return self::getEmployeesOnLeave($rid, $args);
+                case 'get_pending_leave_approvals': return self::getPendingLeaveApprovals($rid, $args);
+                case 'get_leave_balance':        return self::getLeaveBalance($rid, $args);
                 case 'list_employees':           return self::listEmployees($rid, $args);
                 case 'get_nationality_breakdown':return self::getNationalityBreakdown($rid);
                 case 'find_employee':            return self::findEmployee($rid, $args);
                 case 'get_recruitment_pipeline': return self::getRecruitmentPipeline($rid);
+                case 'get_vacancy_applicants':   return self::getVacancyApplicants($rid, $args);
+                case 'get_scheduled_interviews': return self::getScheduledInterviews($rid, $args);
                 case 'get_attendance_summary':   return self::getAttendanceSummary($rid, $args);
                 case 'get_employee_attendance':  return self::getEmployeeAttendance($rid, $args);
+                case 'get_attendance_register':  return self::getAttendanceRegister($rid, $args);
+                case 'get_late_arrivals':        return self::getLateArrivals($rid, $args);
+                case 'get_overtime':             return self::getOvertime($rid, $args);
+                case 'get_duty_roster':          return self::getDutyRoster($rid, $args);
+                case 'get_understaffed_today':   return self::getUnderstaffedToday($rid, $args);
                 case 'get_upcoming_birthdays':   return self::getUpcomingBirthdays($rid, $args);
                 case 'get_active_sos':           return self::getActiveSos($rid);
                 case 'get_accommodation_summary':return self::getAccommodationSummary($rid);
+                case 'get_available_beds':       return self::getAvailableBeds($rid, $args);
+                case 'get_maintenance_requests': return self::getMaintenanceRequests($rid, $args);
+                case 'get_employee_accommodation': return self::getEmployeeAccommodation($rid, $args);
+                case 'get_building_occupancy':   return self::getBuildingOccupancy($rid, $args);
                 case 'get_budgeted_headcount':   return self::getBudgetedHeadcount($rid, $args);
                 case 'get_vacancy_analysis':     return self::getVacancyAnalysis($rid, $args);
                 case 'get_gender_breakdown':     return self::getGenderBreakdown($rid, $args);
@@ -451,6 +533,7 @@ class WisdomTools
                 case 'get_appraisal_status':     return self::getAppraisalStatus($rid);
                 case 'get_performance_cycles':   return self::getPerformanceCycles($rid);
                 case 'get_kpi_overview':         return self::getKpiOverview($rid);
+                case 'get_kpi_details':          return self::getKpiDetails($rid, $args);
                 case 'get_monthly_checkins':     return self::getMonthlyCheckins($rid);
                 case 'get_performance_meetings': return self::getPerformanceMeetings($rid, $args);
                 case 'get_employee_performance': return self::getEmployeePerformance($rid, $args);
@@ -463,6 +546,8 @@ class WisdomTools
                 case 'get_employee_relations_summary': return self::getEmployeeRelationsSummary($rid);
                 case 'get_disciplinary_cases':   return self::getDisciplinaryCases($rid, $args);
                 case 'get_grievance_cases':      return self::getGrievanceCases($rid, $args);
+                case 'get_repeat_offenders':     return self::getRepeatOffenders($rid, $args);
+                case 'get_confidential_cases':   return self::getConfidentialCases($rid, $args);
                 case 'get_disciplinary_outcomes':return self::getDisciplinaryOutcomes($rid);
                 case 'get_employee_relations_history': return self::getEmployeeRelationsHistory($rid, $args);
                 case 'get_learning_summary':     return self::getLearningSummary($rid);
@@ -604,6 +689,9 @@ class WisdomTools
             ->limit(10)
             ->get();
 
+        // Resolve each employee's reporting manager (reporting_to → employees.id).
+        $managers = self::resolveEmpNames($rid, $employees->pluck('reporting_to')->filter()->all());
+
         $list = $employees->map(fn ($e) => [
             'name'        => self::empName($e),
             'employee_id' => $e->Emp_id,
@@ -611,7 +699,13 @@ class WisdomTools
             'position'    => $e->position->position_title ?? null,
             'status'      => $e->status,
             'employment_type' => $e->employment_type,
-            'joining_date' => $e->getRawOriginal('joining_date'),
+            'nationality' => $e->nationality,
+            'joining_date' => self::fmtDate($e->getRawOriginal('joining_date')),
+            'date_of_birth' => self::fmtDate($e->getRawOriginal('dob')),
+            'manager'      => $e->reporting_to ? ($managers[$e->reporting_to] ?? null) : null,
+            'passport_number' => $e->passport_number ?: null,
+            'probation_status' => $e->probation_status ?: null,
+            'probation_end_date' => self::fmtDate($e->getRawOriginal('probation_end_date')),
         ])->values();
 
         return [
@@ -2883,6 +2977,461 @@ class WisdomTools
         $name = $ra ? trim($ra->first_name . ' ' . $ra->last_name) : '';
         return $name !== '' ? $name : ('Employee ' . ($e->Emp_id ?: '#' . $e->id));
     }
+
+    /** Resolve ONE employee at this resort by full/partial name or Emp_id. */
+    private static function resolveEmployee(int $rid, string $term, array $with = ['resortAdmin:id,first_name,last_name'])
+    {
+        $term = trim($term);
+        if ($term === '') return null;
+        return Employee::where('resort_id', $rid)
+            ->where(function ($q) use ($term) {
+                $q->whereHas('resortAdmin', function ($r) use ($term) {
+                        $r->where('first_name', 'like', "%{$term}%")
+                          ->orWhere('last_name', 'like', "%{$term}%")
+                          ->orWhereRaw("CONCAT(first_name,' ',last_name) LIKE ?", ["%{$term}%"]);
+                    })
+                  ->orWhere('Emp_id', 'like', "%{$term}%");
+            })
+            ->with($with)->first();
+    }
+
+    // ---------------------------------------------------------------------
+    // Time & Attendance (register, late arrivals, overtime, roster, staffing)
+    // ---------------------------------------------------------------------
+
+    /** Compare "HH:MM" strings; returns minutes of a - b (positive = a later). */
+    private static function minutesDiff(?string $a, ?string $b): ?int
+    {
+        if (!$a || !$b) return null;
+        $pa = array_map('intval', explode(':', trim($a)));
+        $pb = array_map('intval', explode(':', trim($b)));
+        if (count($pa) < 2 || count($pb) < 2) return null;
+        return ($pa[0] * 60 + $pa[1]) - ($pb[0] * 60 + $pb[1]);
+    }
+
+    /** Present / absent / unverified breakdown for a date, from the attendance log. */
+    private static function getAttendanceRegister(int $rid, array $args): array
+    {
+        $date   = self::cleanDate($args['date'] ?? null);
+        $active = Employee::where('resort_id', $rid)->where('status', 'Active')->pluck('id')->all();
+        $rows   = DB::table('parent_attendaces')->where('resort_id', $rid)->whereDate('date', $date)
+            ->get(['Emp_id', 'CheckingTime', 'CheckingOutTime']);
+        $names  = self::resolveEmpNames($rid, array_merge($active, $rows->pluck('Emp_id')->all()));
+
+        $present = $unverified = [];
+        $seen = [];
+        foreach ($rows as $r) {
+            $seen[$r->Emp_id] = true;
+            $nm = $names[$r->Emp_id] ?? ('Employee #' . $r->Emp_id);
+            if (!empty($r->CheckingTime)) {
+                $present[] = $nm;
+            } else {
+                $unverified[] = $nm; // has a row but no punch-in/out logged
+            }
+        }
+        // On approved leave that day — so they're not counted as unexplained absent.
+        $onLeave = DB::table('employees_leaves')->where('resort_id', $rid)
+            ->whereRaw("LOWER(status) IN ('approved','recommended')")
+            ->whereDate('from_date', '<=', $date)->whereDate('to_date', '>=', $date)
+            ->pluck('emp_id')->all();
+        $leaveNames = [];
+        $absent = [];
+        foreach ($active as $id) {
+            if (isset($seen[$id])) continue;
+            if (in_array($id, $onLeave)) { $leaveNames[] = $names[$id] ?? ('Employee #' . $id); }
+            else { $absent[] = $names[$id] ?? ('Employee #' . $id); }
+        }
+        sort($present); sort($absent); sort($unverified); sort($leaveNames);
+
+        return [
+            'date'             => self::fmtDate($date),
+            'present_count'    => count($present),
+            'present'          => $present,
+            'absent_count'     => count($absent),
+            'absent'           => $absent,
+            'on_leave'         => $leaveNames,
+            'unverified'       => $unverified,
+            'note'             => $unverified ? 'Employees under "unverified" have an attendance record but no punch-in/out logged, so presence cannot be confirmed.' : null,
+        ];
+    }
+
+    /** Employees who punched in later than their shift start time on a date. */
+    private static function getLateArrivals(int $rid, array $args): array
+    {
+        $date   = self::cleanDate($args['date'] ?? null);
+        $shifts = DB::table('shift_settings')->where('resort_id', $rid)->pluck('StartTime', 'id')->all();
+        $rows   = DB::table('parent_attendaces')->where('resort_id', $rid)->whereDate('date', $date)
+            ->whereNotNull('CheckingTime')->where('CheckingTime', '!=', '')
+            ->get(['Emp_id', 'Shift_id', 'CheckingTime']);
+        $names  = self::resolveEmpNames($rid, $rows->pluck('Emp_id')->all());
+
+        $late = [];
+        foreach ($rows as $r) {
+            $start = $shifts[$r->Shift_id] ?? null;
+            $mins  = self::minutesDiff($r->CheckingTime, $start);
+            if ($mins !== null && $mins > 0) {
+                $late[] = [
+                    'employee'      => $names[$r->Emp_id] ?? ('Employee #' . $r->Emp_id),
+                    'punched_in'    => $r->CheckingTime,
+                    'shift_start'   => $start,
+                    'minutes_late'  => $mins,
+                ];
+            }
+        }
+        usort($late, fn ($a, $b) => $b['minutes_late'] <=> $a['minutes_late']);
+        return ['date' => self::fmtDate($date), 'count' => count($late), 'late_arrivals' => $late];
+    }
+
+    /** Overtime hours by employee over a period; top spenders first. */
+    private static function getOvertime(int $rid, array $args): array
+    {
+        $period = strtolower(trim($args['period'] ?? 'month'));
+        $today  = Carbon::today();
+        if ($period === 'today')      { $from = $today; }
+        elseif ($period === 'week')   { $from = (clone $today)->subDays(7); }
+        elseif ($period === 'year')   { $from = (clone $today)->startOfYear(); }
+        else { $period = 'month'; $from = (clone $today)->startOfMonth(); }
+
+        $rows = DB::table('parent_attendaces')->where('resort_id', $rid)
+            ->whereDate('date', '>=', $from->toDateString())
+            ->whereNotNull('OverTime')->where('OverTime', '!=', '')
+            ->get(['Emp_id', 'OverTime']);
+        $names = self::resolveEmpNames($rid, $rows->pluck('Emp_id')->all());
+
+        $mins = [];
+        foreach ($rows as $r) {
+            $m = self::minutesDiff($r->OverTime, '0:0'); // OverTime stored as "H:M"
+            if ($m !== null && $m > 0) {
+                $mins[$r->Emp_id] = ($mins[$r->Emp_id] ?? 0) + $m;
+            }
+        }
+        arsort($mins);
+        $list = [];
+        foreach ($mins as $id => $m) {
+            $list[] = [
+                'employee'       => $names[$id] ?? ('Employee #' . $id),
+                'overtime_hours' => round($m / 60, 1),
+            ];
+        }
+        return ['period' => $period, 'count' => count($list), 'overtime' => $list];
+    }
+
+    /** Duty roster for a date, or who is scheduled off (best-effort — roster data is sparse). */
+    private static function getDutyRoster(int $rid, array $args): array
+    {
+        $date   = self::cleanDate($args['date'] ?? null);
+        $offOnly = !empty($args['off']);
+        $shifts = DB::table('shift_settings')->where('resort_id', $rid)->pluck('ShiftName', 'id')->all();
+        // ShiftDate is stored doubled ("Y-m-d-Y-m-d"), so match by prefix.
+        $rows = DB::table('duty_rosters')->where('resort_id', $rid)
+            ->where('ShiftDate', 'like', $date . '%')
+            ->get(['Emp_id', 'Shift_id']);
+        $scheduledIds = $rows->pluck('Emp_id')->unique()->all();
+        $active = Employee::where('resort_id', $rid)->where('status', 'Active')->pluck('id')->all();
+        $names  = self::resolveEmpNames($rid, array_merge($active, $scheduledIds));
+
+        if ($offOnly) {
+            $off = [];
+            foreach ($active as $id) {
+                if (!in_array($id, $scheduledIds)) $off[] = $names[$id] ?? ('Employee #' . $id);
+            }
+            sort($off);
+            return ['date' => self::fmtDate($date), 'scope' => 'day_off', 'count' => count($off), 'employees_off' => $off,
+                    'note' => empty($scheduledIds) ? 'No duty-roster entries exist for this date, so "off" is inferred as every active employee.' : null];
+        }
+
+        $scheduled = $rows->map(fn ($r) => [
+            'employee' => $names[$r->Emp_id] ?? ('Employee #' . $r->Emp_id),
+            'shift'    => $shifts[$r->Shift_id] ?? 'Shift #' . $r->Shift_id,
+        ])->values()->all();
+        return ['date' => self::fmtDate($date), 'scope' => 'scheduled', 'count' => count($scheduled), 'roster' => $scheduled,
+                'note' => empty($scheduled) ? 'No duty-roster entries found for this date.' : null];
+    }
+
+    /** Departments short-handed today: active vs actually present (absent/on-leave). */
+    private static function getUnderstaffedToday(int $rid, array $args): array
+    {
+        $date = self::cleanDate($args['date'] ?? null);
+        $emps = Employee::where('resort_id', $rid)->where('status', 'Active')
+            ->with('department:id,name')->get(['id', 'Dept_id']);
+        $presentIds = DB::table('parent_attendaces')->where('resort_id', $rid)->whereDate('date', $date)
+            ->whereNotNull('CheckingTime')->where('CheckingTime', '!=', '')->pluck('Emp_id')->all();
+
+        $byDept = [];
+        foreach ($emps as $e) {
+            $d = $e->department->name ?? 'Unassigned';
+            $byDept[$d]['total'] = ($byDept[$d]['total'] ?? 0) + 1;
+            if (in_array($e->id, $presentIds)) $byDept[$d]['present'] = ($byDept[$d]['present'] ?? 0) + 1;
+        }
+        $depts = [];
+        foreach ($byDept as $name => $c) {
+            $total = $c['total']; $present = $c['present'] ?? 0; $absent = $total - $present;
+            $depts[] = ['department' => $name, 'active' => $total, 'present' => $present, 'absent' => $absent,
+                        'coverage_percent' => $total ? round($present / $total * 100) : 0];
+        }
+        usort($depts, fn ($a, $b) => $b['absent'] <=> $a['absent']);
+        $short = array_values(array_filter($depts, fn ($d) => $d['absent'] > 0));
+        return ['date' => self::fmtDate($date), 'understaffed_departments' => count($short), 'departments' => $depts];
+    }
+
+    // ---------------------------------------------------------------------
+    // Accommodation (beds, maintenance, who-stays-where, building occupancy)
+    // ---------------------------------------------------------------------
+
+    /** Occupied bed count per room id, counting only currently-active employees. */
+    private static function occupiedByRoom(int $rid): array
+    {
+        $active = Employee::where('resort_id', $rid)->where('status', 'Active')->pluck('id')->all();
+        return DB::table('assing_accommodations')->where('resort_id', $rid)
+            ->whereIn('emp_id', $active)
+            ->select('available_a_id', DB::raw('COUNT(DISTINCT emp_id) c'))
+            ->groupBy('available_a_id')->pluck('c', 'available_a_id')->all();
+    }
+
+    /** Rooms with free beds, optionally filtered by gender (blockFor). */
+    private static function getAvailableBeds(int $rid, array $args): array
+    {
+        $gender = strtolower(trim($args['gender'] ?? ''));
+        $q = DB::table('available_accommodation_models')->where('resort_id', $rid);
+        if (in_array($gender, ['male', 'female'], true)) {
+            $q->whereRaw('LOWER(blockFor) = ?', [$gender]);
+        }
+        $rooms    = $q->get(['id', 'BuildingName', 'RoomNo', 'Capacity', 'blockFor']);
+        $occupied = self::occupiedByRoom($rid);
+
+        $list = []; $free = 0;
+        foreach ($rooms as $r) {
+            $used = (int) ($occupied[$r->id] ?? 0);
+            $avail = max(0, (int) $r->Capacity - $used);
+            if ($avail > 0) {
+                $free += $avail;
+                $list[] = ['building' => $r->BuildingName, 'room' => $r->RoomNo, 'for' => $r->blockFor,
+                           'capacity' => (int) $r->Capacity, 'available_beds' => $avail];
+            }
+        }
+        usort($list, fn ($a, $b) => $b['available_beds'] <=> $a['available_beds']);
+        return ['gender' => $gender ?: 'any', 'available_beds_total' => $free, 'rooms_with_space' => count($list), 'rooms' => $list];
+    }
+
+    /** Maintenance requests (defaults to pending/open) for accommodation. */
+    private static function getMaintenanceRequests(int $rid, array $args): array
+    {
+        $status = strtolower(trim($args['status'] ?? 'open'));
+        $q = DB::table('maintanace_requests')->where('resort_id', $rid);
+        if ($status === 'open')          { $q->whereRaw("LOWER(COALESCE(Status,'')) NOT IN ('completed','done','resolved','closed')"); }
+        elseif ($status === 'completed') { $q->whereRaw("LOWER(COALESCE(Status,'')) IN ('completed','done','resolved','closed')"); }
+        elseif ($status !== 'all')       { $q->whereRaw('LOWER(Status) = ?', [$status]); }
+
+        $rows = $q->orderByDesc('id')->limit(100)->get(['Request_id', 'RoomNo', 'FloorNo', 'priority', 'Status', 'descriptionIssues', 'date']);
+        $list = $rows->map(fn ($m) => [
+            'request_id'  => $m->Request_id,
+            'room'        => $m->RoomNo,
+            'floor'       => $m->FloorNo,
+            'priority'    => $m->priority,
+            'status'      => $m->Status,
+            'issue'       => $m->descriptionIssues,
+            'date'        => self::fmtDate($m->date),
+        ])->values();
+        return ['status_filter' => $status, 'count' => $list->count(), 'requests' => $list];
+    }
+
+    /** Where an employee stays + their roommates. */
+    private static function getEmployeeAccommodation(int $rid, array $args): array
+    {
+        $emp = self::resolveEmployee($rid, $args['name'] ?? '');
+        if (!$emp) {
+            return ['query' => $args['name'] ?? '', 'found' => false, 'message' => 'No matching employee found.'];
+        }
+        $assign = DB::table('assing_accommodations')->where('resort_id', $rid)->where('emp_id', $emp->id)
+            ->orderByDesc('id')->first(['available_a_id', 'BedNo']);
+        if (!$assign) {
+            return ['employee' => self::empName($emp), 'found' => true, 'accommodation' => 'Not assigned to any room.'];
+        }
+        $room = DB::table('available_accommodation_models')->where('id', $assign->available_a_id)
+            ->first(['BuildingName', 'RoomNo', 'blockFor', 'Capacity']);
+        $mateIds = DB::table('assing_accommodations')->where('resort_id', $rid)
+            ->where('available_a_id', $assign->available_a_id)->where('emp_id', '!=', $emp->id)
+            ->pluck('emp_id')->all();
+        $mateNames = array_values(self::resolveEmpNames($rid, $mateIds));
+
+        return [
+            'employee'  => self::empName($emp),
+            'found'     => true,
+            'building'  => $room->BuildingName ?? 'N/A',
+            'room'      => $room->RoomNo ?? 'N/A',
+            'bed'       => $assign->BedNo,
+            'roommates' => $mateNames ?: ['(none — sole occupant)'],
+        ];
+    }
+
+    /** Occupancy per building, highest first. */
+    private static function getBuildingOccupancy(int $rid, array $args): array
+    {
+        $rooms    = DB::table('available_accommodation_models')->where('resort_id', $rid)
+            ->get(['id', 'BuildingName', 'Capacity']);
+        $occupied = self::occupiedByRoom($rid);
+        $byB = [];
+        foreach ($rooms as $r) {
+            $b = $r->BuildingName ?: 'Unknown';
+            $byB[$b]['capacity'] = ($byB[$b]['capacity'] ?? 0) + (int) $r->Capacity;
+            $byB[$b]['occupied'] = ($byB[$b]['occupied'] ?? 0) + (int) ($occupied[$r->id] ?? 0);
+        }
+        $list = [];
+        foreach ($byB as $b => $c) {
+            $list[] = ['building' => $b, 'beds' => $c['capacity'], 'occupied' => $c['occupied'],
+                       'available' => max(0, $c['capacity'] - $c['occupied']),
+                       'occupancy_percent' => $c['capacity'] ? round($c['occupied'] / $c['capacity'] * 100, 1) : 0];
+        }
+        usort($list, fn ($a, $b) => $b['occupancy_percent'] <=> $a['occupancy_percent']);
+        return ['buildings' => $list];
+    }
+
+    // ---------------------------------------------------------------------
+    // Leave (pending approvals, balance) & Employee Relations extras
+    // ---------------------------------------------------------------------
+
+    /** Leave requests still awaiting approval. */
+    private static function getPendingLeaveApprovals(int $rid, array $args): array
+    {
+        $rows = DB::table('employees_leaves as l')
+            ->leftJoin('leave_categories as c', 'c.id', '=', 'l.leave_category_id')
+            ->where('l.resort_id', $rid)
+            ->whereRaw("LOWER(COALESCE(l.status,'')) NOT IN ('approved','rejected','cancelled','withdrawn','declined')")
+            ->orderByDesc('l.id')->limit(100)
+            ->get(['l.emp_id', 'l.from_date', 'l.to_date', 'l.total_days', 'l.status', 'c.leave_type']);
+        $names = self::resolveEmpNames($rid, $rows->pluck('emp_id')->all());
+        $list = $rows->map(fn ($l) => [
+            'employee'   => $names[$l->emp_id] ?? ('Employee #' . $l->emp_id),
+            'leave_type' => $l->leave_type ?: 'N/A',
+            'from'       => self::fmtDate($l->from_date),
+            'to'         => self::fmtDate($l->to_date),
+            'days'       => $l->total_days,
+            'status'     => $l->status,
+        ])->values();
+        return ['count' => $list->count(), 'pending_leave_requests' => $list];
+    }
+
+    /** Per-category leave balance for one employee (entitlement − taken this year). */
+    private static function getLeaveBalance(int $rid, array $args): array
+    {
+        $emp = self::resolveEmployee($rid, $args['name'] ?? '');
+        if (!$emp) {
+            return ['query' => $args['name'] ?? '', 'found' => false, 'message' => 'No matching employee found.'];
+        }
+        $yearStart = Carbon::today()->startOfYear()->toDateString();
+        $cats = DB::table('leave_categories')->where('resort_id', $rid)->get(['id', 'leave_type', 'number_of_days']);
+        $taken = DB::table('employees_leaves')->where('resort_id', $rid)->where('emp_id', $emp->id)
+            ->whereRaw("LOWER(COALESCE(status,'')) = 'approved'")
+            ->whereDate('from_date', '>=', $yearStart)
+            ->select('leave_category_id', DB::raw('SUM(total_days) t'))
+            ->groupBy('leave_category_id')->pluck('t', 'leave_category_id')->all();
+
+        $balances = [];
+        foreach ($cats as $c) {
+            $entitled = (float) $c->number_of_days;
+            $used     = (float) ($taken[$c->id] ?? 0);
+            $balances[] = ['leave_type' => $c->leave_type, 'entitled' => $entitled, 'taken' => $used,
+                           'balance' => round($entitled - $used, 1)];
+        }
+        return ['employee' => self::empName($emp), 'found' => true, 'year' => (int) date('Y'), 'balances' => $balances];
+    }
+
+    /** Employees with more than one disciplinary case (repeat offenders). */
+    private static function getRepeatOffenders(int $rid, array $args): array
+    {
+        $counts = disciplinarySubmit::where('resort_id', $rid)
+            ->select('Employee_id', DB::raw('COUNT(*) c'))
+            ->groupBy('Employee_id')->having('c', '>', 1)->orderByDesc('c')->get();
+        $names = self::resolveEmpNames($rid, $counts->pluck('Employee_id')->all());
+        $list = $counts->map(fn ($r) => [
+            'employee' => $names[$r->Employee_id] ?? ('Employee #' . $r->Employee_id),
+            'cases'    => (int) $r->c,
+        ])->values();
+        return ['count' => $list->count(), 'repeat_offenders' => $list];
+    }
+
+    /** Confidential grievance cases (complainant chose not to disclose identity). */
+    private static function getConfidentialCases(int $rid, array $args): array
+    {
+        $rows = GrivanceSubmissionModel::where('resort_id', $rid)
+            ->where('Request_Identity_Disclosure', 'No')
+            ->with(['category:id,name'])
+            ->orderByDesc('id')->limit(100)->get();
+        $list = $rows->map(fn ($c) => [
+            'category'   => optional($c->category)->name ?? 'N/A',
+            'status'     => $c->status,
+            'date'       => $c->getRawOriginal('Grivance_date_time') ? self::fmtDate($c->getRawOriginal('Grivance_date_time')) : null,
+        ])->values();
+        return ['count' => $list->count(), 'note' => 'Confidential grievances — the complainant\'s identity is withheld.', 'cases' => $list];
+    }
+
+    // ---------------------------------------------------------------------
+    // Recruitment, Performance & Learning detail tools
+    // ---------------------------------------------------------------------
+
+    /** Vacancies with their applicant counts (and open/required info). */
+    private static function getVacancyApplicants(int $rid, array $args): array
+    {
+        $openOnly = !empty($args['open_only']);
+        $vac = DB::table('vacancies')->where('Resort_id', $rid)
+            ->get(['id', 'position', 'department', 'Total_position_required', 'status']);
+        if ($openOnly) {
+            $vac = $vac->filter(fn ($v) => !in_array(strtolower((string) $v->status), ['cancelled', 'closed', 'filled', 'completed'], true));
+        }
+        $counts = DB::table('applicant_form_data')->where('resort_id', $rid)
+            ->select('Parent_v_id', DB::raw('COUNT(*) c'))->groupBy('Parent_v_id')->pluck('c', 'Parent_v_id')->all();
+        $positions   = DB::table('resort_positions')->pluck('position_title', 'id')->all();
+        $departments = DB::table('resort_departments')->pluck('name', 'id')->all();
+
+        $list = $vac->map(fn ($v) => [
+            'position'   => $positions[$v->position] ?? ('Position #' . $v->position),
+            'department' => $departments[$v->department] ?? 'N/A',
+            'required'   => (int) $v->Total_position_required,
+            'applicants' => (int) ($counts[$v->id] ?? 0),
+            'status'     => $v->status,
+        ])->sortByDesc('applicants')->values();
+        return ['count' => $list->count(), 'vacancies' => $list];
+    }
+
+    /** Scheduled interviews (defaults to upcoming from today; pass a date for one day). */
+    private static function getScheduledInterviews(int $rid, array $args): array
+    {
+        $date = (isset($args['date']) && preg_match('/^\d{4}-\d{2}-\d{2}$/', trim((string) $args['date'])))
+            ? trim((string) $args['date']) : null;
+        $q = DB::table('applicant_inter_view_details as i')
+            ->leftJoin('applicant_form_data as a', 'a.id', '=', 'i.Applicant_id')
+            ->where('i.resort_id', $rid);
+        if ($date) { $q->whereDate('i.InterViewDate', $date); }
+        else       { $q->whereDate('i.InterViewDate', '>=', Carbon::today()->toDateString()); }
+
+        $rows = $q->orderBy('i.InterViewDate')->limit(100)
+            ->get(['a.first_name', 'a.last_name', 'i.InterViewDate', 'i.ApplicantInterviewtime', 'i.Status', 'i.MeetingLink']);
+        $list = $rows->map(fn ($r) => [
+            'applicant' => trim(($r->first_name ?? '') . ' ' . ($r->last_name ?? '')) ?: 'N/A',
+            'date'      => self::fmtDate($r->InterViewDate),
+            'time'      => $r->ApplicantInterviewtime,
+            'status'    => $r->Status,
+        ])->values();
+        return ['scope' => $date ? self::fmtDate($date) : 'upcoming', 'count' => $list->count(), 'interviews' => $list];
+    }
+
+    /** KPI (performance goal) details with budgets and approval status. */
+    private static function getKpiDetails(int $rid, array $args): array
+    {
+        $status = strtolower(trim($args['status'] ?? 'all'));
+        $q = DB::table('performance_kpi_parents')->where('resort_id', $rid);
+        if ($status !== 'all' && $status !== '') { $q->whereRaw('LOWER(COALESCE(status,"")) = ?', [$status]); }
+        $rows = $q->orderByDesc('id')->limit(100)
+            ->get(['property_goal', 'individual_goal', 'PropertyGoalbudget', 'budget_currency', 'PropertyGoalweightage', 'status']);
+        $list = $rows->map(fn ($k) => [
+            'goal'      => $k->property_goal ?: $k->individual_goal ?: 'Unnamed KPI',
+            'budget'    => $k->PropertyGoalbudget !== null ? Common::formatCurrency((float) $k->PropertyGoalbudget, $k->budget_currency === '$' || strtoupper((string) $k->budget_currency) === 'USD' ? 'USD' : 'MVR') : null,
+            'weightage' => $k->PropertyGoalweightage,
+            'status'    => $k->status,
+        ])->values();
+        return ['status_filter' => $status, 'count' => $list->count(), 'kpis' => $list];
+    }
+
 
     /**
      * Format a raw date/datetime to the resort's configured display format
