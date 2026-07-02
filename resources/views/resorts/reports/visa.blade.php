@@ -65,6 +65,12 @@
                                     @foreach($statuses as $s)<option value="{{ $s }}">{{ $s }}</option>@endforeach
                                 </select>
                             </div>
+                            <div class="col-sm-6 vs-filter" data-filter="employment_status">
+                                <label class="form-label">Employment Status</label>
+                                <select class="form-select" id="vsEmploymentStatus"><option value="">All employment statuses</option>
+                                    @foreach($employmentStatuses as $es)<option value="{{ $es }}">{{ $es }}</option>@endforeach
+                                </select>
+                            </div>
                             <div class="col-sm-6 vs-filter" data-filter="liability_type">
                                 <label class="form-label">Liability Type</label>
                                 <select class="form-select" id="vsLiabilityType"><option value="">All types</option>
@@ -144,6 +150,7 @@
                 nationality: $('#vsNationality').val(),
                 employee: $('#vsEmployee').val(),
                 status: $('#vsStatus').val(),
+                employment_status: $('#vsEmploymentStatus').val(),
                 liability_type: $('#vsLiabilityType').val(),
                 expiry_period: $('#vsExpiryPeriod').val(),
                 year: $('#vsYear').val(),
