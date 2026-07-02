@@ -42,23 +42,23 @@ class PayrollReportController extends Controller
             'detailed_register'      => ['name' => 'Detailed Payroll Register', 'description' => 'Full payroll breakdown per employee.', 'filters' => ['payroll', 'department'], 'handler' => 'detailedRegister'],
             'upcoming_projection'    => ['name' => 'Upcoming Payroll Projection', 'description' => 'Estimated payroll for a draft/in-progress run before it is finalised.', 'filters' => ['payroll', 'department'], 'handler' => 'upcomingProjection'],
             'payroll_comparison'     => ['name' => 'Payroll Comparison', 'description' => 'Compare payroll cost between two periods.', 'filters' => ['from_payroll', 'to_payroll'], 'handler' => 'payrollComparison'],
-            'cost_by_department'     => ['name' => 'Payroll Cost by Department', 'description' => 'Payroll expenditure per department.', 'filters' => ['payroll'], 'handler' => 'costByDepartment'],
-            'cost_by_designation'    => ['name' => 'Payroll Cost by Designation', 'description' => 'Payroll expenditure per designation.', 'filters' => ['payroll'], 'handler' => 'costByDesignation'],
+            'cost_by_department'     => ['name' => 'Payroll Cost by Department', 'description' => 'Payroll expenditure per department.', 'filters' => ['payroll', 'department'], 'handler' => 'costByDepartment'],
+            'cost_by_designation'    => ['name' => 'Payroll Cost by Designation', 'description' => 'Payroll expenditure per designation.', 'filters' => ['payroll', 'position'], 'handler' => 'costByDesignation'],
             'payment_distribution'   => ['name' => 'Payroll Distribution (Bank vs Cash)', 'description' => 'How salaries are split between bank and cash.', 'filters' => ['payroll'], 'handler' => 'paymentDistribution'],
             'bank_transfer'          => ['name' => 'Bank Transfer Report', 'description' => 'Employees paid by bank transfer.', 'filters' => ['payroll', 'bank'], 'handler' => 'bankTransfer'],
             'cash_payment'           => ['name' => 'Cash Payment Report', 'description' => 'Employees paid in cash.', 'filters' => ['payroll'], 'handler' => 'cashPayment'],
             'gross_salary'           => ['name' => 'Gross Salary Report', 'description' => 'Gross salary earned per employee.', 'filters' => ['payroll'], 'handler' => 'grossSalary'],
             'net_salary'             => ['name' => 'Net Salary Report', 'description' => 'Final payable salary after deductions.', 'filters' => ['payroll'], 'handler' => 'netSalary'],
-            'allowance_report'       => ['name' => 'Allowance Report', 'description' => 'Allowances paid during the period.', 'filters' => ['payroll', 'allowance_type'], 'handler' => 'allowanceReport'],
-            'deduction_report'       => ['name' => 'Deduction Report', 'description' => 'Deductions made during payroll processing.', 'filters' => ['payroll', 'deduction_type'], 'handler' => 'deductionReport'],
+            'allowance_report'       => ['name' => 'Allowance Report', 'description' => 'Allowances paid during the period.', 'filters' => ['payroll', 'allowance_type', 'employee'], 'handler' => 'allowanceReport'],
+            'deduction_report'       => ['name' => 'Deduction Report', 'description' => 'Deductions made during payroll processing.', 'filters' => ['payroll', 'deduction_type', 'employee'], 'handler' => 'deductionReport'],
             'service_charge_dist'    => ['name' => 'Service Charge Distribution', 'description' => 'Service charge per employee.', 'filters' => ['payroll'], 'handler' => 'serviceChargeDistribution'],
             'service_charge_trend'   => ['name' => 'Service Charge Trend', 'description' => 'Monthly service charge trend.', 'filters' => ['year'], 'handler' => 'serviceChargeTrend'],
-            'avg_service_charge'     => ['name' => 'Average Service Charge', 'description' => 'Average service charge per employee by department.', 'filters' => ['year', 'department'], 'handler' => 'averageServiceCharge'],
+            'avg_service_charge'     => ['name' => 'Average Service Charge', 'description' => 'Average service charge per employee by department.', 'filters' => ['year', 'department', 'month'], 'handler' => 'averageServiceCharge'],
             'overtime_summary'       => ['name' => 'Overtime Summary', 'description' => 'Overtime hours and pay per employee for the period.', 'filters' => ['payroll'], 'handler' => 'overtimeSummary'],
             'top_overtime'           => ['name' => 'Top Overtime Employees', 'description' => 'Highest overtime payments.', 'filters' => ['payroll'], 'handler' => 'topOvertime'],
-            'overtime_trend'         => ['name' => 'Overtime Trend', 'description' => 'Monthly overtime hours and cost.', 'filters' => ['year'], 'handler' => 'overtimeTrend'],
+            'overtime_trend'         => ['name' => 'Overtime Trend', 'description' => 'Monthly overtime hours and cost.', 'filters' => ['year', 'month'], 'handler' => 'overtimeTrend'],
             'pension_contribution'   => ['name' => 'Pension Contribution Report', 'description' => 'Employee and employer pension contributions.', 'filters' => ['payroll'], 'handler' => 'pensionContribution'],
-            'annual_pension'         => ['name' => 'Annual Pension Summary', 'description' => 'Pension contributions accumulated during the year.', 'filters' => ['year'], 'handler' => 'annualPension'],
+            'annual_pension'         => ['name' => 'Annual Pension Summary', 'description' => 'Pension contributions accumulated during the year.', 'filters' => ['year', 'month'], 'handler' => 'annualPension'],
             'ewt_report'             => ['name' => 'Employee Withholding Tax (EWT) Report', 'description' => 'EWT deducted during the period.', 'filters' => ['payroll'], 'handler' => 'ewtReport'],
             'annual_tax_summary'     => ['name' => 'Annual Tax Summary', 'description' => 'Total tax deducted per employee for the year.', 'filters' => ['year'], 'handler' => 'annualTaxSummary'],
             'ff_settlement_register' => ['name' => 'Full & Final Settlement Register', 'description' => 'Employees undergoing final settlement.', 'filters' => ['year', 'settlement_status', 'duration'], 'handler' => 'ffSettlementRegister'],
@@ -107,6 +107,16 @@ class PayrollReportController extends Controller
             ->when($scoped !== null, fn($q) => $q->whereIn('id', $scoped))
             ->orderBy('name')->get(['id', 'name']);
 
+        $positions = DB::table('resort_positions')->where('resort_id', $resortId)
+            ->when($scoped !== null, fn($q) => $q->whereIn('dept_id', $scoped))
+            ->orderBy('position_title')->get(['id', 'position_title']);
+
+        $employees = DB::table('employees as e')->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
+            ->where('e.resort_id', $resortId)->when($scoped !== null, fn($q) => $q->whereIn('e.Dept_id', $scoped))
+            ->orderBy('ra.first_name')->get(['e.id', DB::raw("TRIM(CONCAT(COALESCE(ra.first_name,''),' ',COALESCE(ra.last_name,''))) as name")]);
+
+        $months = collect(range(1, 12))->map(fn($m) => ['value' => $m, 'label' => Carbon::create()->month($m)->format('F')]);
+
         $years = DB::table('payroll')->where('resort_id', $resortId)
             ->selectRaw('DISTINCT YEAR(start_date) as y')->orderBy('y', 'desc')->pluck('y');
 
@@ -128,7 +138,7 @@ class PayrollReportController extends Controller
         $settlementStatuses = ['draft', 'review', 'finalized'];
 
         return view('resorts.reports.payroll', compact(
-            'page_title', 'reports', 'payrolls', 'departments', 'years',
+            'page_title', 'reports', 'payrolls', 'departments', 'positions', 'employees', 'months', 'years',
             'allowanceTypes', 'deductionTypes', 'banks', 'settlementStatuses'
         ));
     }
@@ -140,6 +150,9 @@ class PayrollReportController extends Controller
             'from_payroll'      => $request->input('from_payroll') ?: null,
             'to_payroll'        => $request->input('to_payroll') ?: null,
             'department'        => $request->input('department') ?: null,
+            'position'          => $request->input('position') ?: null,
+            'employee'          => $request->input('employee') ?: null,
+            'month'             => $request->input('month') ?: null,
             'year'              => $request->input('year') ?: null,
             'allowance_type'    => $request->input('allowance_type') ?: null,
             'deduction_type'    => $request->input('deduction_type') ?: null,
@@ -389,14 +402,15 @@ class PayrollReportController extends Controller
                 'OT'            => $this->n(($r->earnings_overtime ?: ($r->regularOTPay + $r->holidayOTPay))),
                 'Service Charge'=> $this->n($r->service_charge),
                 'Gross Salary'  => $this->n($r->total_earnings),
-                'Deductions'    => $this->n($r->total_deductions),
                 'Pension'       => $this->n($r->pension ?? 0),
                 'Tax'           => $this->n($r->ewt ?? 0),
+                'Deduction'     => $this->n($r->total_deductions),
                 'Net Salary'    => $this->n($r->net_salary),
             ])->all();
 
         return [
-            'columns' => ['Employee ID', 'Employee Name', 'Department', 'Designation', 'Basic Salary', 'Allowances', 'OT', 'Service Charge', 'Gross Salary', 'Deductions', 'Pension', 'Tax', 'Net Salary'],
+            // Deductions positioned after Pension + Tax, per the requirements doc.
+            'columns' => ['Employee ID', 'Employee Name', 'Department', 'Designation', 'Basic Salary', 'Allowances', 'OT', 'Service Charge', 'Gross Salary', 'Pension', 'Tax', 'Deduction', 'Net Salary'],
             'rows'    => $rows,
         ];
     }
@@ -438,19 +452,30 @@ class PayrollReportController extends Controller
         $pid = $this->resolvePayrollId($filters);
         $raw = $this->basePayslip($pid, $filters)
             ->groupBy('e.Dept_id', 'd.name')
-            ->select('d.name as dept', DB::raw('COUNT(*) emp'), DB::raw('SUM(pr.total_earnings) gross'), DB::raw('SUM(pr.net_salary) net'))
+            ->select('d.name as dept', DB::raw('COUNT(*) emp'), DB::raw('SUM(pr.total_earnings) gross'), DB::raw('SUM(pr.total_deductions) ded'), DB::raw('SUM(pr.net_salary) net'))
             ->get();
         $grand = $raw->sum('gross') ?: 0;
         $rows = $raw->map(fn($r) => [
             'Department'              => $r->dept ?? 'N/A',
             'Total Employees'         => (int) $r->emp,
-            'Gross Payroll'           => $this->n($r->gross),
+            'Gross Salary'            => $this->n($r->gross),
+            'Deductions'              => $this->n($r->ded),
             'Net Payroll'             => $this->n($r->net),
             'Percentage of Total Payroll' => $this->pct($r->gross, $grand),
         ])->all();
 
+        // The generic totals row blanks percentage columns; the department shares
+        // add up to the whole payroll, so show 100% explicitly in the footer.
+        if (count($rows) > 1) {
+            $rows[] = [
+                'Department' => 'Total', 'Total Employees' => (int) $raw->sum('emp'),
+                'Gross Salary' => $this->n($grand), 'Deductions' => $this->n($raw->sum('ded')),
+                'Net Payroll' => $this->n($raw->sum('net')), 'Percentage of Total Payroll' => $grand ? '100%' : '0%',
+            ];
+        }
+
         return [
-            'columns' => ['Department', 'Total Employees', 'Gross Payroll', 'Net Payroll', 'Percentage of Total Payroll'],
+            'columns' => ['Department', 'Total Employees', 'Gross Salary', 'Deductions', 'Net Payroll', 'Percentage of Total Payroll'],
             'rows'    => $rows,
         ];
     }
@@ -460,17 +485,23 @@ class PayrollReportController extends Controller
     {
         $pid = $this->resolvePayrollId($filters);
         $rows = $this->basePayslip($pid, $filters)
+            ->when($filters['position'] ?? null, fn($q) => $q->where('e.Position_id', $filters['position']))
             ->groupBy('e.Position_id', 'p.position_title')
-            ->select('p.position_title', DB::raw('COUNT(*) emp'), DB::raw('SUM(pr.total_earnings) cost'))
+            ->select('p.position_title', DB::raw('COUNT(*) emp'),
+                DB::raw('SUM(pr.earnings_basic) basic'), DB::raw('SUM(pr.earnings_allowance) allow'),
+                DB::raw('SUM(pr.total_earnings) cost'))
             ->orderByDesc(DB::raw('SUM(pr.total_earnings)'))
             ->get()
             ->map(fn($r) => [
                 'Designation'       => $r->position_title ?? 'N/A',
                 'Employee Count'    => (int) $r->emp,
+                'Basic Salary'      => $this->n($r->basic ?? 0),
+                'Total Salary'      => $this->n(($r->basic ?? 0) + ($r->allow ?? 0)),
+                'Total Allowances'  => $this->n($r->allow ?? 0),
                 'Total Payroll Cost'=> $this->n($r->cost),
             ])->all();
 
-        return ['columns' => ['Designation', 'Employee Count', 'Total Payroll Cost'], 'rows' => $rows];
+        return ['columns' => ['Designation', 'Employee Count', 'Basic Salary', 'Total Salary', 'Total Allowances', 'Total Payroll Cost'], 'rows' => $rows];
     }
 
     /** #7 Payroll Distribution (Bank vs Cash). */
@@ -571,23 +602,35 @@ class PayrollReportController extends Controller
     {
         $pid = $this->resolvePayrollId($filters);
         $scoped = Common::getScopedDepartmentIds();
-        $rows = DB::table('payroll_review_allowances as a')
+        $records = DB::table('payroll_review_allowances as a')
             ->join('payroll_reviews as pr', 'pr.id', '=', 'a.payroll_review_id')
             ->join('employees as e', 'e.id', '=', 'pr.employee_id')
             ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
+            ->leftJoin('resort_positions as p', 'p.id', '=', 'e.Position_id')
             ->whereIn('pr.payroll_id', (array) $pid)
             ->when($scoped !== null, fn($q) => $q->whereIn('e.Dept_id', $scoped))
             ->when($filters['department'], fn($q) => $q->where('e.Dept_id', $filters['department']))
+            ->when($filters['employee'] ?? null, fn($q) => $q->where('e.id', $filters['employee']))
             ->when($filters['allowance_type'], fn($q) => $q->where('a.allowance_type', $filters['allowance_type']))
             ->orderBy('ra.first_name')
-            ->get([$this->nameExpr(), 'a.allowance_type', 'a.amount', 'a.amount_unit'])
-            ->map(fn($r) => [
-                'Employee Name'  => $r->employee_name,
-                'Allowance Type' => $r->allowance_type,
-                'Amount'         => $this->n($r->amount) . ' ' . ($r->amount_unit ?? ''),
-            ])->all();
+            ->get(['e.id as eid', 'e.Emp_id', $this->nameExpr(), 'p.position_title', 'a.allowance_type', 'a.amount']);
 
-        return ['columns' => ['Employee Name', 'Allowance Type', 'Amount'], 'rows' => $rows];
+        // De-duplicate: one row per employee, allowance types listed together.
+        $rows = $records->groupBy('eid')->map(function ($grp) {
+            $first = $grp->first();
+            // Collapse repeated allowance types (across runs) into one entry per type.
+            $types = $grp->groupBy('allowance_type')
+                ->map(fn($g, $t) => $t . ' (' . $this->n($g->sum('amount')) . ')')->implode(', ');
+            return [
+                'Employee ID'       => $first->Emp_id ?: 'N/A',
+                'Employee Name'     => $first->employee_name,
+                'Employee Position' => $first->position_title ?? 'N/A',
+                'Allowances'        => $types ?: 'N/A',
+                'Total Allowance'   => $this->n($grp->sum('amount')),
+            ];
+        })->values()->all();
+
+        return ['columns' => ['Employee ID', 'Employee Name', 'Employee Position', 'Allowances', 'Total Allowance'], 'rows' => $rows];
     }
 
     /** #14 Deduction Report. */
@@ -599,25 +642,28 @@ class PayrollReportController extends Controller
             ? [$filters['deduction_type'] => $cols[$filters['deduction_type']]] : $cols;
 
         $records = $this->basePayslip($pid, $filters)
+            ->when($filters['employee'] ?? null, fn($q) => $q->where('e.id', $filters['employee']))
             ->join('payroll_deductions as pd', function ($j) {
                 $j->on('pd.payroll_id', '=', 'pr.payroll_id')->on('pd.employee_id', '=', 'pr.employee_id');
             })
             ->orderBy('ra.first_name')
-            ->get(array_merge([$this->nameExpr()], array_map(fn($c) => "pd.$c", array_values($wanted))));
+            ->get(array_merge(['e.Emp_id', $this->nameExpr(), 'p.position_title'], array_map(fn($c) => "pd.$c", array_values($wanted))));
 
         $rows = [];
         foreach ($records as $r) {
             foreach ($wanted as $label => $col) {
                 if ((float) $r->$col == 0) continue; // only non-zero deductions
                 $rows[] = [
-                    'Employee Name'  => $r->employee_name,
-                    'Deduction Type' => $label,
-                    'Amount'         => $this->n($r->$col),
+                    'Employee ID'       => $r->Emp_id ?: 'N/A',
+                    'Employee Name'     => $r->employee_name,
+                    'Employee Position' => $r->position_title ?? 'N/A',
+                    'Deduction Type'    => $label,
+                    'Amount'            => $this->n($r->$col),
                 ];
             }
         }
 
-        return ['columns' => ['Employee Name', 'Deduction Type', 'Amount'], 'rows' => $rows];
+        return ['columns' => ['Employee ID', 'Employee Name', 'Employee Position', 'Deduction Type', 'Amount'], 'rows' => $rows];
     }
 
     /** #15 Service Charge Distribution. */
@@ -626,14 +672,16 @@ class PayrollReportController extends Controller
         $pid = $this->resolvePayrollId($filters);
         $rows = $this->basePayslip($pid, $filters)
             ->orderBy('d.name')->orderBy('ra.first_name')
-            ->get([$this->nameExpr(), 'd.name as dept', 'pr.service_charge'])
+            ->get(['e.Emp_id', $this->nameExpr(), 'p.position_title', 'd.name as dept', 'pr.service_charge'])
             ->map(fn($r) => [
+                'Employee ID'         => $r->Emp_id ?: 'N/A',
                 'Employee Name'       => $r->employee_name,
+                'Employee Position'   => $r->position_title ?? 'N/A',
                 'Department'          => $r->dept ?? 'N/A',
                 'Service Charge Amount'=> $this->n($r->service_charge),
             ])->all();
 
-        return ['columns' => ['Employee Name', 'Department', 'Service Charge Amount'], 'rows' => $rows];
+        return ['columns' => ['Employee ID', 'Employee Name', 'Employee Position', 'Department', 'Service Charge Amount'], 'rows' => $rows];
     }
 
     /** #16 Service Charge Trend (by month for a year). */
@@ -673,6 +721,7 @@ class PayrollReportController extends Controller
             ->leftJoin('resort_departments as d', 'd.id', '=', 'e.Dept_id')
             ->where('pay.resort_id', $this->resort->resort_id)
             ->whereRaw('YEAR(pay.start_date) = ?', [$year])
+            ->when($filters['month'] ?? null, fn($q) => $q->whereRaw('MONTH(pay.start_date) = ?', [$filters['month']]))
             ->when($scoped !== null, fn($q) => $q->whereIn('e.Dept_id', $scoped))
             ->when($filters['department'], fn($q) => $q->where('e.Dept_id', $filters['department']))
             ->groupBy('e.Dept_id', 'd.name')
@@ -1120,6 +1169,7 @@ class PayrollReportController extends Controller
             })
             ->where('pay.resort_id', $this->resort->resort_id)
             ->whereRaw('YEAR(pay.start_date) = ?', [$year])
+            ->when($filters['month'] ?? null, fn($q) => $q->whereRaw('MONTH(pay.start_date) = ?', [$filters['month']]))
             ->groupBy(DB::raw('MONTH(pay.start_date)'))
             ->select(
                 DB::raw('MONTH(pay.start_date) as m'),
@@ -1148,16 +1198,18 @@ class PayrollReportController extends Controller
             })
             ->where('pd.pension', '>', 0)
             ->orderBy('ra.first_name')
-            ->get([$this->nameExpr(), 'pr.earnings_basic', 'pd.pension'])
+            ->get(['e.Emp_id', $this->nameExpr(), 'p.position_title', 'pr.earnings_basic', 'pd.pension'])
             ->map(fn($r) => [
+                'Employee ID'               => $r->Emp_id ?: 'N/A',
                 'Employee Name'             => $r->employee_name,
+                'Employee Position'         => $r->position_title ?? 'N/A',
                 'Pensionable Salary'        => $this->n($r->earnings_basic),
                 'Employee Contribution (7%)'=> $this->n($r->pension),
                 'Employer Contribution (7%)'=> $this->n($r->pension),
                 'Total Contribution'        => $this->n($r->pension * 2),
             ])->all();
 
-        return ['columns' => ['Employee Name', 'Pensionable Salary', 'Employee Contribution (7%)', 'Employer Contribution (7%)', 'Total Contribution'], 'rows' => $rows];
+        return ['columns' => ['Employee ID', 'Employee Name', 'Employee Position', 'Pensionable Salary', 'Employee Contribution (7%)', 'Employer Contribution (7%)', 'Total Contribution'], 'rows' => $rows];
     }
 
     /** #22 Annual Pension Summary (per employee, employer mirrors employee). */
@@ -1169,21 +1221,26 @@ class PayrollReportController extends Controller
             ->join('payroll as pay', 'pay.id', '=', 'pd.payroll_id')
             ->join('employees as e', 'e.id', '=', 'pd.employee_id')
             ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
+            ->leftJoin('resort_positions as p', 'p.id', '=', 'e.Position_id')
             ->where('pay.resort_id', $this->resort->resort_id)
             ->whereRaw('YEAR(pay.start_date) = ?', [$year])
+            ->when($filters['month'] ?? null, fn($q) => $q->whereRaw('MONTH(pay.start_date) = ?', [$filters['month']]))
             ->when($scoped !== null, fn($q) => $q->whereIn('e.Dept_id', $scoped))
-            ->groupBy('e.id', 'ra.first_name', 'ra.last_name')
+            ->groupBy('e.id', 'e.Emp_id', 'ra.first_name', 'ra.last_name', 'p.position_title', DB::raw('MONTH(pay.start_date)'))
             ->havingRaw('SUM(pd.pension) > 0')
-            ->select($this->nameExpr(), DB::raw('SUM(pd.pension) emp'))
-            ->orderBy('ra.first_name')->get()
+            ->select('e.Emp_id', $this->nameExpr(), 'p.position_title', DB::raw('MONTH(pay.start_date) as m'), DB::raw('SUM(pd.pension) emp'))
+            ->orderBy('ra.first_name')->orderBy('m')->get()
             ->map(fn($r) => [
+                'Month'                      => Carbon::create()->month((int) $r->m)->format('F'),
+                'Employee ID'                => $r->Emp_id ?: 'N/A',
                 'Employee Name'              => $r->employee_name,
+                'Employee Position'          => $r->position_title ?? 'N/A',
                 'Total Employee Contribution'=> $this->n($r->emp),
                 'Total Employer Contribution'=> $this->n($r->emp),
                 'Total Annual Contribution'  => $this->n($r->emp * 2),
             ])->all();
 
-        return ['columns' => ['Employee Name', 'Total Employee Contribution', 'Total Employer Contribution', 'Total Annual Contribution'], 'rows' => $rows];
+        return ['columns' => ['Month', 'Employee ID', 'Employee Name', 'Employee Position', 'Total Employee Contribution', 'Total Employer Contribution', 'Total Annual Contribution'], 'rows' => $rows];
     }
 
     /** #28 Tuck Shop Outstanding Payable — unpaid purchases grouped by vendor. */
