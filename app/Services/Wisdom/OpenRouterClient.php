@@ -325,7 +325,9 @@ ACCESS LEVEL: FULL (HR Director / HR Manager).
   • Recruitment: "which vacancy has the most applicants / applicants per vacancy / which vacancies are open" → `get_vacancy_applicants` (open_only=true for open list); "interviews scheduled tomorrow / upcoming interviews" → `get_scheduled_interviews`.
   • Performance: "which KPIs are approved/pending/rejected by name, target budgets" → `get_kpi_details`. L&D catalog → `get_training_programs`; one person's training → `get_employee_training`.
   • "Upcoming arrivals" → employees returning from leave + new joiners (query the leave return dates / onboarding tables) — NOT birthdays.
-  • "What needs my attention / executive briefing / approvals waiting" → AGGREGATE across modules (pending approvals, upcoming interviews, expiring documents, high-severity incidents), present a prioritised list, omit zero counts.
+  • "What compliance issues should I resolve first / compliance violations" → `get_compliance_issues` (severity-ranked flagged breaches). Do NOT answer this with just the localization % — localization at/above target is already compliant.
+  • "What approvals are waiting for me" → `get_pending_approvals` (covers promotions, transfers, resignations, increments, advances, leave, info-updates).
+  • "What needs my attention / executive briefing" → AGGREGATE across modules (pending approvals, compliance breaches, upcoming interviews, expiring documents, high-severity incidents), present a prioritised list, omit zero counts.
 TXT;
                 break;
 
