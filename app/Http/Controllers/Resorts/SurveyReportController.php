@@ -66,7 +66,9 @@ class SurveyReportController extends Controller
         $page_title = 'Survey Reports';
         $resortId   = $this->resort->resort_id;
         $reports = collect($this->registry())->map(fn($r, $key) => [
-            'key' => $key, 'name' => $r['name'], 'description' => $r['description'], 'filters' => $r['filters'],
+            'key' => $key, 'name' => $r['name'], 'description' => $r['description'],
+            // Every report exposes the duration (From/To date) filter, like the Custom Report.
+            'filters' => array_values(array_unique(array_merge($r['filters'], ['duration']))),
         ])->values();
         $surveys = DB::table('parent_surveys')->where('resort_id', $resortId)->orderByDesc('created_at')->get(['id', 'Surevey_title']);
 
@@ -179,12 +181,13 @@ class SurveyReportController extends Controller
     {
         $rid = $this->resort->resort_id;
         $b = DB::table('parent_surveys')->where('resort_id', $rid);
+        $this->applyDuration($b, $f, 'created_at');
         $total = (clone $b)->count();
         $pub = (clone $b)->whereIn('Status', ['Publish', 'OnGoing'])->count();
         $draft = (clone $b)->where('Status', 'SaveAsDraft')->count();
         $done = (clone $b)->where('Status', 'Complete')->count();
-        $inv = DB::table('survey_employees as se')->join('parent_surveys as s', 's.id', '=', 'se.Parent_survey_id')->where('s.resort_id', $rid)->count();
-        $comp = DB::table('survey_employees as se')->join('parent_surveys as s', 's.id', '=', 'se.Parent_survey_id')->where('s.resort_id', $rid)->where('se.emp_status', 'yes')->count();
+        $inv = DB::table('survey_employees as se')->join('parent_surveys as s', 's.id', '=', 'se.Parent_survey_id')->where('s.resort_id', $rid)->when(true, fn($q) => $this->applyDuration($q, $f, 's.created_at'))->count();
+        $comp = DB::table('survey_employees as se')->join('parent_surveys as s', 's.id', '=', 'se.Parent_survey_id')->where('s.resort_id', $rid)->where('se.emp_status', 'yes')->when(true, fn($q) => $this->applyDuration($q, $f, 's.created_at'))->count();
         return ['columns' => ['Total Surveys', 'Published Surveys', 'Draft Surveys', 'Completed Surveys', 'Overall Participation Rate'],
             'rows' => [['Total Surveys' => $total, 'Published Surveys' => $pub, 'Draft Surveys' => $draft, 'Completed Surveys' => $done, 'Overall Participation Rate' => $this->pct($comp, $inv)]]];
     }
@@ -208,7 +211,8 @@ class SurveyReportController extends Controller
 
     public function published(array $f): array
     {
-        $rows = $this->surveyBase()->whereIn('s.Status', ['Publish', 'OnGoing'])->orderByDesc('s.Start_date')->get()
+        $rows = $this->surveyBase()->whereIn('s.Status', ['Publish', 'OnGoing'])
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 's.Start_date'))->orderByDesc('s.Start_date')->get()
             ->map(fn($r) => [
                 'Survey Name'        => $r->Surevey_title ?? 'N/A',
                 'Published Date'     => $this->dmy($r->Start_date),
@@ -220,7 +224,8 @@ class SurveyReportController extends Controller
 
     public function draft(array $f): array
     {
-        $rows = $this->surveyBase()->where('s.Status', 'SaveAsDraft')->orderByDesc('s.updated_at')->get()
+        $rows = $this->surveyBase()->where('s.Status', 'SaveAsDraft')
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 's.updated_at'))->orderByDesc('s.updated_at')->get()
             ->map(fn($r) => [
                 'Survey Name'        => $r->Surevey_title ?? 'N/A',
                 'Created By'         => trim($r->created_by_name) ?: 'N/A',
@@ -246,7 +251,8 @@ class SurveyReportController extends Controller
 
     public function open(array $f): array
     {
-        $rows = $this->surveyBase()->where('s.Status', 'OnGoing')->orderBy('s.End_date')->get()
+        $rows = $this->surveyBase()->where('s.Status', 'OnGoing')
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 's.Start_date'))->orderBy('s.End_date')->get()
             ->map(fn($r) => [
                 'Survey Name'         => $r->Surevey_title ?? 'N/A',
                 'Opening Date'        => $this->dmy($r->Start_date),
@@ -259,7 +265,8 @@ class SurveyReportController extends Controller
     public function expiring(array $f): array
     {
         $rows = $this->surveyBase()->whereIn('s.Status', ['Publish', 'OnGoing'])
-            ->whereDate('s.End_date', '>=', Carbon::today())->orderBy('s.End_date')->get()
+            ->whereDate('s.End_date', '>=', Carbon::today())
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 's.End_date'))->orderBy('s.End_date')->get()
             ->map(fn($r) => [
                 'Survey Name'        => $r->Surevey_title ?? 'N/A',
                 'Closing Date'       => $this->dmy($r->End_date),
@@ -271,7 +278,8 @@ class SurveyReportController extends Controller
 
     public function participation(array $f): array
     {
-        $rows = $this->surveyBase()->when($f['survey'], fn($q) => $q->where('s.id', $f['survey']))->orderByDesc('s.created_at')->get()
+        $rows = $this->surveyBase()->when($f['survey'], fn($q) => $q->where('s.id', $f['survey']))
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 's.created_at'))->orderByDesc('s.created_at')->get()
             ->map(fn($r) => [
                 'Survey Name'         => $r->Surevey_title ?? 'N/A',
                 'Invited Participants' => (int) $r->invited,
@@ -295,7 +303,8 @@ class SurveyReportController extends Controller
 
     public function completion(array $f): array
     {
-        $rows = $this->participantBase($f['survey'])->orderBy('employee_name')->get()
+        $rows = $this->participantBase($f['survey'])
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 's.created_at'))->orderBy('employee_name')->get()
             ->map(fn($r) => [
                 'Employee Name'   => trim($r->employee_name) ?: 'N/A',
                 'Department'      => $r->dept ?? 'N/A',
@@ -307,7 +316,8 @@ class SurveyReportController extends Controller
 
     public function resultsSummary(array $f): array
     {
-        $rows = $this->surveyBase()->where('s.Status', 'Complete')->orderByDesc('s.End_date')->get()
+        $rows = $this->surveyBase()->where('s.Status', 'Complete')
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 's.End_date'))->orderByDesc('s.End_date')->get()
             ->map(fn($r) => [
                 'Survey Name'    => $r->Surevey_title ?? 'N/A',
                 'Total Responses' => (int) $r->responses,
@@ -324,6 +334,7 @@ class SurveyReportController extends Controller
             ->join('parent_surveys as s', 's.id', '=', 'q.Parent_survey_id')
             ->where('s.resort_id', $rid)
             ->when($f['survey'], fn($x) => $x->where('q.Parent_survey_id', $f['survey']))
+            ->when(true, fn($x) => $this->applyDuration($x, $f, 's.created_at'))
             ->orderBy('q.id')->get(['q.id', 'q.Question_Text', 'q.type'])
             ->map(function ($q) {
                 $dist = DB::table('survey_results')->where('Question_id', $q->id)
@@ -343,7 +354,7 @@ class SurveyReportController extends Controller
 
     public function categoryAnalysis(array $f): array
     {
-        $rows = $this->surveyBase()->get()->groupBy(fn($r) => $r->survey_privacy_type ?: 'Neutral')
+        $rows = $this->surveyBase()->when(true, fn($q) => $this->applyDuration($q, $f, 's.created_at'))->get()->groupBy(fn($r) => $r->survey_privacy_type ?: 'Neutral')
             ->map(function ($grp, $cat) {
                 $inv = $grp->sum('invited'); $comp = $grp->sum('completed');
                 $ratings = $grp->pluck('avg_rating')->filter(fn($v) => $v !== null);
@@ -367,6 +378,7 @@ class SurveyReportController extends Controller
             ->leftJoin('resort_positions as p', 'p.id', '=', 'e.Position_id')
             ->where('s.resort_id', $rid)
             ->when($f['survey'], fn($q) => $q->where('se.Parent_survey_id', $f['survey']))
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 's.created_at'))
             ->groupBy($col)
             ->selectRaw("$col as grp, COUNT(*) invited, SUM(CASE WHEN se.emp_status='yes' THEN 1 ELSE 0 END) responses")
             ->orderBy($col)->get()
@@ -420,7 +432,8 @@ class SurveyReportController extends Controller
 
     public function attendance(array $f): array
     {
-        $rows = $this->participantBase($f['survey'])->orderBy('employee_name')->get()
+        $rows = $this->participantBase($f['survey'])
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 's.created_at'))->orderBy('employee_name')->get()
             ->map(fn($r) => [
                 'Employee Name'   => trim($r->employee_name) ?: 'N/A',
                 'Department'      => $r->dept ?? 'N/A',
@@ -433,7 +446,8 @@ class SurveyReportController extends Controller
     public function reminder(array $f): array
     {
         $rid = $this->resort->resort_id;
-        $rows = $this->participantBase($f['survey'])->where('se.emp_status', '<>', 'yes')->orderBy('employee_name')->get()
+        $rows = $this->participantBase($f['survey'])->where('se.emp_status', '<>', 'yes')
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 's.created_at'))->orderBy('employee_name')->get()
             ->map(function ($r) use ($f) {
                 $end = DB::table('parent_surveys')->where('id', $f['survey'])->value('End_date');
                 return [
@@ -449,7 +463,8 @@ class SurveyReportController extends Controller
     public function anonymous(array $f): array
     {
         $rows = $this->surveyBase()->where('s.survey_privacy_type', 'Anonymous')
-            ->when($f['survey'], fn($q) => $q->where('s.id', $f['survey']))->get()
+            ->when($f['survey'], fn($q) => $q->where('s.id', $f['survey']))
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 's.created_at'))->get()
             ->map(fn($r) => [
                 'Survey Name'        => $r->Surevey_title ?? 'N/A',
                 'Total Invitations'  => (int) $r->invited,
@@ -473,7 +488,8 @@ class SurveyReportController extends Controller
 
     public function distribution(array $f): array
     {
-        $rows = $this->surveyBase()->when($f['survey'], fn($q) => $q->where('s.id', $f['survey']))->orderByDesc('s.created_at')->get()
+        $rows = $this->surveyBase()->when($f['survey'], fn($q) => $q->where('s.id', $f['survey']))
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 's.created_at'))->orderByDesc('s.created_at')->get()
             ->map(fn($r) => [
                 'Survey Name'        => $r->Surevey_title ?? 'N/A',
                 'Distribution Method' => 'In-app (invited)',
@@ -487,13 +503,14 @@ class SurveyReportController extends Controller
     {
         $rid = $this->resort->resort_id;
         $b = DB::table('parent_surveys')->where('resort_id', $rid);
+        $this->applyDuration($b, $f, 'created_at');
         $total = (clone $b)->count();
         $active = (clone $b)->where('Status', 'OnGoing')->count();
         $draft = (clone $b)->where('Status', 'SaveAsDraft')->count();
-        $inv = DB::table('survey_employees as se')->join('parent_surveys as s', 's.id', '=', 'se.Parent_survey_id')->where('s.resort_id', $rid)->count();
-        $comp = DB::table('survey_employees as se')->join('parent_surveys as s', 's.id', '=', 'se.Parent_survey_id')->where('s.resort_id', $rid)->where('se.emp_status', 'yes')->count();
+        $inv = DB::table('survey_employees as se')->join('parent_surveys as s', 's.id', '=', 'se.Parent_survey_id')->where('s.resort_id', $rid)->when(true, fn($q) => $this->applyDuration($q, $f, 's.created_at'))->count();
+        $comp = DB::table('survey_employees as se')->join('parent_surveys as s', 's.id', '=', 'se.Parent_survey_id')->where('s.resort_id', $rid)->where('se.emp_status', 'yes')->when(true, fn($q) => $this->applyDuration($q, $f, 's.created_at'))->count();
         $avg = DB::table('survey_results as r')->join('survey_questions as q', 'q.id', '=', 'r.Question_id')->join('parent_surveys as s', 's.id', '=', 'r.Parent_survey_id')
-            ->where('s.resort_id', $rid)->where('q.type', 'Rating')->whereRaw("r.Emp_Ans REGEXP '^[0-9.]+$'")->avg(DB::raw('CAST(r.Emp_Ans AS DECIMAL(10,2))'));
+            ->where('s.resort_id', $rid)->where('q.type', 'Rating')->whereRaw("r.Emp_Ans REGEXP '^[0-9.]+$'")->when(true, fn($q) => $this->applyDuration($q, $f, 's.created_at'))->avg(DB::raw('CAST(r.Emp_Ans AS DECIMAL(10,2))'));
         return ['columns' => ['Total Surveys', 'Active Surveys', 'Draft Surveys', 'Participation %', 'Completion %', 'Average Rating'],
             'rows' => [['Total Surveys' => $total, 'Active Surveys' => $active, 'Draft Surveys' => $draft, 'Participation %' => $this->pct($comp, $inv), 'Completion %' => $this->pct($comp, $inv), 'Average Rating' => $avg !== null ? number_format($avg, 2) : 'N/A']]];
     }

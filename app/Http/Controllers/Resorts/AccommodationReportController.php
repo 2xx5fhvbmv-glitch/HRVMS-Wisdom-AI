@@ -69,7 +69,11 @@ class AccommodationReportController extends Controller
         if (Common::checkRouteWisePermission('resort.report.index', config('settings.resort_permissions.view')) == false) return abort(403, 'Unauthorized access');
         $rid = $this->resort->resort_id;
         $scoped = Common::getScopedDepartmentIds();
-        $reports = collect($this->registry())->map(fn($r, $key) => ['key' => $key, 'name' => $r['name'], 'description' => $r['description'], 'filters' => $r['filters']])->values();
+        $reports = collect($this->registry())->map(fn($r, $key) => [
+            'key' => $key, 'name' => $r['name'], 'description' => $r['description'],
+            // Every report exposes the duration (From/To date) filter, like the Custom Report.
+            'filters' => array_values(array_unique(array_merge($r['filters'], ['duration']))),
+        ])->values();
 
         $buildings = DB::table('available_accommodation_models')->where('resort_id', $rid)->whereNotNull('BuildingName')->distinct()->orderBy('BuildingName')->pluck('BuildingName');
         $departments = DB::table('resort_departments')->where('resort_id', $rid)->when($scoped !== null, fn($q) => $q->whereIn('id', $scoped))->orderBy('name')->get(['id', 'name']);
@@ -133,6 +137,11 @@ class AccommodationReportController extends Controller
     }
 
     /* helpers */
+    private function applyDuration($q, array $f, string $col)
+    {
+        return $q->when($f['from_date'] ?? null, fn($x) => $x->whereDate($col, '>=', $f['from_date']))
+                 ->when($f['to_date'] ?? null, fn($x) => $x->whereDate($col, '<=', $f['to_date']));
+    }
     private function dmy($d): string { return $d ? Carbon::parse($d)->format('d M Y') : 'N/A'; }
     private function pct($n, $d): string { return $d ? round($n / $d * 100, 1) . '%' : '0%'; }
     private $occSub = "(SELECT COUNT(*) FROM assing_accommodations a WHERE a.available_a_id = aam.id AND a.emp_id > 0)";
@@ -173,8 +182,8 @@ class AccommodationReportController extends Controller
         $buildings = DB::table('available_accommodation_models')->where('resort_id', $rid)->distinct('BuildingName')->count('BuildingName');
         $rooms = DB::table('available_accommodation_models')->where('resort_id', $rid)->count();
         $beds = (int) DB::table('available_accommodation_models')->where('resort_id', $rid)->sum('Capacity');
-        $occupied = DB::table('assing_accommodations')->where('resort_id', $rid)->where('emp_id', '>', 0)->count();
-        $openM = DB::table('maintanace_requests')->where('resort_id', $rid)->where('Status', 'not like', '%clos%')->count();
+        $occupied = DB::table('assing_accommodations')->where('resort_id', $rid)->where('emp_id', '>', 0)->when(true, fn($q) => $this->applyDuration($q, $f, 'effected_date'))->count();
+        $openM = DB::table('maintanace_requests')->where('resort_id', $rid)->where('Status', 'not like', '%clos%')->when(true, fn($q) => $this->applyDuration($q, $f, 'date'))->count();
         return ['columns' => ['Total Buildings', 'Total Rooms', 'Total Beds', 'Occupied Beds', 'Available Beds', 'Occupancy Rate', 'Open Maintenance Requests'],
             'rows' => [['Total Buildings' => $buildings, 'Total Rooms' => $rooms, 'Total Beds' => $beds, 'Occupied Beds' => $occupied, 'Available Beds' => max(0, $beds - $occupied), 'Occupancy Rate' => $this->pct($occupied, $beds), 'Open Maintenance Requests' => $openM]]];
     }
@@ -228,6 +237,7 @@ class AccommodationReportController extends Controller
             ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
             ->where('a.resort_id', $this->resort->resort_id)
             ->when($f['building'], fn($q) => $q->where('aam.BuildingName', $f['building']))
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 'a.effected_date'))
             ->orderBy('aam.BuildingName')->orderBy('aam.RoomNo')
             ->get(['aam.BuildingName', 'aam.Floor', 'aam.RoomNo', 'a.BedNo', 'a.emp_id', DB::raw("TRIM(CONCAT(COALESCE(ra.first_name,''),' ',COALESCE(ra.last_name,''))) as emp_name")])
             ->map(fn($r) => [
@@ -261,7 +271,8 @@ class AccommodationReportController extends Controller
             ->where('a.resort_id', $this->resort->resort_id)->where('a.emp_id', '>', 0)
             ->when($f['building'] ?? null, fn($q) => $q->where('aam.BuildingName', $f['building']))
             ->when($f['department'] ?? null, fn($q) => $q->where('e.Dept_id', $f['department']))
-            ->when($f['employee'] ?? null, fn($q) => $q->where('e.id', $f['employee']));
+            ->when($f['employee'] ?? null, fn($q) => $q->where('e.id', $f['employee']))
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 'a.effected_date'));
     }
     private $empName = "TRIM(CONCAT(COALESCE(ra.first_name,''),' ',COALESCE(ra.last_name,''))) as emp_name";
 
@@ -298,6 +309,7 @@ class AccommodationReportController extends Controller
             ->leftJoin('available_accommodation_models as oldr', 'oldr.id', '=', 't.OldAccommodation_id')
             ->leftJoin('available_accommodation_models as newr', 'newr.id', '=', 't.NewAccommodation_id')
             ->where('t.resort_id', $rid)->when($f['employee'], fn($q) => $q->where('t.Emp_id', $f['employee']))
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 't.NewdDate'))
             ->orderByDesc('t.NewdDate')
             ->get([DB::raw($this->empName), 'oldr.BuildingName as ob', 'oldr.RoomNo as orm', 'newr.BuildingName as nb', 'newr.RoomNo as nrm', 't.NewdDate'])
             ->map(fn($r) => [
@@ -373,6 +385,7 @@ class AccommodationReportController extends Controller
         $rows = DB::table('assing_accommodations as a')->join('employees as e', 'e.id', '=', 'a.emp_id')
             ->leftJoin('resort_departments as d', 'd.id', '=', 'e.Dept_id')
             ->where('a.resort_id', $rid)->where('a.emp_id', '>', 0)
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 'a.effected_date'))
             ->groupBy('d.name')->select('d.name as cat', DB::raw('COUNT(*) occ'))->orderBy('d.name')->get()
             ->map(fn($r) => ['Category' => $r->cat ?? 'N/A', 'Total Beds' => (int) $r->occ, 'Occupied Beds' => (int) $r->occ, 'Available Beds' => 'N/A'])->all();
         return ['columns' => ['Category', 'Total Beds', 'Occupied Beds', 'Available Beds'], 'rows' => $rows];
@@ -566,6 +579,7 @@ class AccommodationReportController extends Controller
         $rid = $this->resort->resort_id;
         $rows = DB::table('events')->where('resort_id', $rid)
             ->when($f['month'], fn($q) => $q->whereRaw('MONTH(date)=?', [$f['month']]))
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 'date'))
             ->orderBy('date')->get(['title', 'location', 'date', 'events_for'])
             ->map(fn($r) => ['Event Title' => $r->title ?? 'N/A', 'Building' => $r->location ?? 'N/A', 'Floor' => 'N/A', 'Event Date' => $this->dmy($r->date), 'Event Type' => $r->events_for ?? 'N/A'])->all();
         return ['columns' => ['Event Title', 'Building', 'Floor', 'Event Date', 'Event Type'], 'rows' => $rows];
@@ -574,7 +588,7 @@ class AccommodationReportController extends Controller
     public function buildingEvent(array $f): array
     {
         $rid = $this->resort->resort_id;
-        $rows = DB::table('events')->where('resort_id', $rid)->orderByDesc('date')->get(['title', 'date', 'location', 'events_for'])
+        $rows = DB::table('events')->where('resort_id', $rid)->when(true, fn($q) => $this->applyDuration($q, $f, 'date'))->orderByDesc('date')->get(['title', 'date', 'location', 'events_for'])
             ->map(fn($r) => ['Event Name' => $r->title ?? 'N/A', 'Event Date' => $this->dmy($r->date), 'Building' => $r->location ?? 'N/A', 'Target Audience' => $r->events_for ?? 'N/A'])->all();
         return ['columns' => ['Event Name', 'Event Date', 'Building', 'Target Audience'], 'rows' => $rows];
     }
@@ -584,6 +598,7 @@ class AccommodationReportController extends Controller
         $rid = $this->resort->resort_id;
         $rows = DB::table('housekeeping_schedules as h')->leftJoin('employees as e', 'e.id', '=', 'h.Assigned_To')->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
             ->where('h.resort_id', $rid)->when($f['building'], fn($q) => $q->where('h.BuildingName', $f['building']))
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 'h.date'))
             ->orderByDesc('h.date')
             ->get(['h.BuildingName', 'h.RoomNo', 'h.date', 'h.status', DB::raw("TRIM(CONCAT(COALESCE(ra.first_name,''),' ',COALESCE(ra.last_name,''))) as staff")])
             ->map(fn($r) => ['Building' => $r->BuildingName ?? 'N/A', 'Room Number' => $r->RoomNo ?? 'N/A', 'Cleaning Date' => $this->dmy($r->date), 'Assigned Staff' => trim($r->staff) ?: 'N/A', 'Status' => $r->status ?? 'N/A'])->all();

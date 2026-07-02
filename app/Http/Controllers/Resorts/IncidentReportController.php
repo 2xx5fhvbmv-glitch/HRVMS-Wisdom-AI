@@ -68,7 +68,11 @@ class IncidentReportController extends Controller
         if (Common::checkRouteWisePermission('resort.report.index', config('settings.resort_permissions.view')) == false) return abort(403, 'Unauthorized access');
         $rid = $this->resort->resort_id;
         $scoped = Common::getScopedDepartmentIds();
-        $reports = collect($this->registry())->map(fn($r, $key) => ['key' => $key, 'name' => $r['name'], 'description' => $r['description'], 'filters' => $r['filters']])->values();
+        $reports = collect($this->registry())->map(fn($r, $key) => [
+            'key' => $key, 'name' => $r['name'], 'description' => $r['description'],
+            // Every report exposes the duration (From/To date) filter, like the Custom Report.
+            'filters' => array_values(array_unique(array_merge($r['filters'], ['duration']))),
+        ])->values();
 
         $departments = DB::table('resort_departments')->where('resort_id', $rid)->when($scoped !== null, fn($q) => $q->whereIn('id', $scoped))->orderBy('name')->get(['id', 'name']);
         $categories = DB::table('incident_categories')->where('resort_id', $rid)->orderBy('category_name')->get(['id', 'category_name']);
@@ -132,6 +136,12 @@ class IncidentReportController extends Controller
     }
 
     /* helpers */
+    private function applyDuration($q, array $f, string $col)
+    {
+        return $q->when($f['from_date'] ?? null, fn($x) => $x->whereDate($col, '>=', $f['from_date']))
+                 ->when($f['to_date'] ?? null, fn($x) => $x->whereDate($col, '<=', $f['to_date']));
+    }
+
     private function dmy($d): string { return $d ? Carbon::parse($d)->format('d M Y') : 'N/A'; }
     private function pct($n, $d): string { return $d ? round($n / $d * 100, 1) . '%' : '0%'; }
     private function isClosed($s): bool { return stripos((string) $s, 'clos') !== false || stripos((string) $s, 'resolv') !== false; }
@@ -170,6 +180,7 @@ class IncidentReportController extends Controller
     {
         $rid = $this->resort->resort_id;
         $b = DB::table('incidents')->where('resort_id', $rid);
+        $this->applyDuration($b, $f, 'incident_date');
         $total = (clone $b)->count();
         $closed = (clone $b)->where(fn($q) => $q->where('status', 'like', '%clos%')->orWhere('status', 'like', '%resolv%'))->count();
         $invest = (clone $b)->where('status', 'like', '%investigat%')->count();
@@ -292,6 +303,7 @@ class IncidentReportController extends Controller
             ->where('i.resort_id', $rid)
             ->when($scoped !== null, fn($q) => $q->whereIn('e.Dept_id', $scoped))
             ->when($f['department'], fn($q) => $q->where('e.Dept_id', $f['department']))
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 'i.incident_date'))
             ->orderByDesc('i.incident_date')
             ->get(['i.incident_id', 'i.status', DB::raw("TRIM(CONCAT(COALESCE(ra.first_name,''),' ',COALESCE(ra.last_name,''))) as emp_name")])
             ->map(fn($r) => ['Employee Name' => trim($r->emp_name) ?: 'N/A', 'Incident ID' => $r->incident_id ?? 'N/A', 'Role (Victim/Witness/Involved)' => 'Witness', 'Incident Status' => $r->status ?? 'N/A'])->all();
@@ -324,7 +336,9 @@ class IncidentReportController extends Controller
 
     public function investigationProgress(array $f): array
     {
-        $rows = $this->investBase()->orderByDesc('ii.start_date')
+        $rows = $this->investBase()
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 'ii.start_date'))
+            ->orderByDesc('ii.start_date')
             ->get(['i.incident_id', 'c.commitee_name', 'ii.start_date', 'ii.expected_resolution_date', 'i.resolved_at'])
             ->map(fn($r) => [
                 'Incident ID' => $r->incident_id ?? 'N/A', 'Investigator' => $r->commitee_name ?? 'Committee',
@@ -409,17 +423,18 @@ class IncidentReportController extends Controller
         return ['columns' => ['Incident ID', 'Assigned Investigator', 'Target Date', 'Actual Resolution Date', 'Days Overdue'], 'rows' => $rows];
     }
 
-    private function committeeAgg(): \Illuminate\Support\Collection
+    private function committeeAgg(array $f = []): \Illuminate\Support\Collection
     {
         $rid = $this->resort->resort_id;
         return DB::table('incidents_investigation as ii')->join('incidents as i', 'i.id', '=', 'ii.incident_id')
             ->join('incident_committee as c', 'c.id', '=', 'ii.committee_id')->where('i.resort_id', $rid)
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 'i.incident_date'))
             ->get(['c.commitee_name', 'i.status', 'i.incident_date', 'i.resolved_at'])->groupBy('commitee_name');
     }
 
     public function committeeAssignment(array $f): array
     {
-        $rows = $this->committeeAgg()->map(fn($items, $name) => [
+        $rows = $this->committeeAgg($f)->map(fn($items, $name) => [
             'Committee Name' => $name ?: 'N/A', 'Assigned Cases' => $items->count(),
             'Open Cases' => $items->filter(fn($r) => !$this->isClosed($r->status))->count(),
             'Closed Cases' => $items->filter(fn($r) => $this->isClosed($r->status))->count(),
@@ -429,7 +444,7 @@ class IncidentReportController extends Controller
 
     public function committeePerformance(array $f): array
     {
-        $rows = $this->committeeAgg()->map(function ($items, $name) {
+        $rows = $this->committeeAgg($f)->map(function ($items, $name) {
             $times = $items->filter(fn($r) => $r->resolved_at)->map(fn($r) => Carbon::parse($r->incident_date)->diffInDays(Carbon::parse($r->resolved_at)));
             return ['Committee Name' => $name ?: 'N/A', 'Total Cases' => $items->count(), 'Completed Cases' => $items->filter(fn($r) => $this->isClosed($r->status))->count(), 'Average Resolution Time' => $times->count() ? round($times->avg(), 1) . ' day(s)' : 'N/A'];
         })->values()->all();
@@ -507,6 +522,7 @@ class IncidentReportController extends Controller
     public function rootCause(array $f): array
     {
         $rows = $this->investBase()
+            ->leftJoin('incident_categories as ic', 'ic.id', '=', 'i.category')
             ->when($f['from_date'], fn($q) => $q->whereDate('ii.start_date', '>=', $f['from_date']))
             ->when($f['to_date'], fn($q) => $q->whereDate('ii.start_date', '<=', $f['to_date']))
             ->whereNotNull('ii.investigation_findings')
@@ -549,6 +565,7 @@ class IncidentReportController extends Controller
     {
         $rid = $this->resort->resort_id;
         $b = DB::table('incidents')->where('resort_id', $rid);
+        $this->applyDuration($b, $f, 'incident_date');
         $total = (clone $b)->count();
         $closed = (clone $b)->where(fn($q) => $q->where('status', 'like', '%clos%')->orWhere('status', 'like', '%resolv%'))->count();
         $open = $total - $closed;

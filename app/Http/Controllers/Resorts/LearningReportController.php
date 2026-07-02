@@ -58,7 +58,11 @@ class LearningReportController extends Controller
         if (Common::checkRouteWisePermission('resort.report.index', config('settings.resort_permissions.view')) == false) return abort(403, 'Unauthorized access');
         $rid = $this->resort->resort_id;
         $scoped = Common::getScopedDepartmentIds();
-        $reports = collect($this->registry())->map(fn($r, $key) => ['key' => $key, 'name' => $r['name'], 'description' => $r['description'], 'filters' => $r['filters']])->values();
+        $reports = collect($this->registry())->map(fn($r, $key) => [
+            'key' => $key, 'name' => $r['name'], 'description' => $r['description'],
+            // Every report exposes the duration (From/To date) filter, like the Custom Report.
+            'filters' => array_values(array_unique(array_merge($r['filters'], ['duration']))),
+        ])->values();
 
         $programs = DB::table('learning_programs')->where('resort_id', $rid)->orderBy('name')->get(['id', 'name']);
         $categories = DB::table('learning_categories')->where('resort_id', $rid)->orderBy('category')->get(['id', 'category']);
@@ -155,12 +159,12 @@ class LearningReportController extends Controller
     public function execSummary(array $f): array
     {
         $rid = $this->resort->resort_id;
-        $total = DB::table('learning_programs')->where('resort_id', $rid)->count();
-        $sched = DB::table('training_schedules')->where('resort_id', $rid)->count();
-        $done = DB::table('training_schedules')->where('resort_id', $rid)->whereDate('end_date', '<', Carbon::today())->count();
-        $pending = DB::table('training_schedules')->where('resort_id', $rid)->whereDate('end_date', '>=', Carbon::today())->count();
-        $present = DB::table('training_attendance as ta')->join('training_schedules as ts','ts.id','=','ta.training_schedule_id')->where('ts.resort_id',$rid)->where('ta.status','Present')->count();
-        $att = DB::table('training_attendance as ta')->join('training_schedules as ts','ts.id','=','ta.training_schedule_id')->where('ts.resort_id',$rid)->count();
+        $total = DB::table('learning_programs')->where('resort_id', $rid)->when(true, fn($q) => $this->applyDuration($q, $f, 'created_at'))->count();
+        $sched = DB::table('training_schedules')->where('resort_id', $rid)->when(true, fn($q) => $this->applyDuration($q, $f, 'start_date'))->count();
+        $done = DB::table('training_schedules')->where('resort_id', $rid)->whereDate('end_date', '<', Carbon::today())->when(true, fn($q) => $this->applyDuration($q, $f, 'start_date'))->count();
+        $pending = DB::table('training_schedules')->where('resort_id', $rid)->whereDate('end_date', '>=', Carbon::today())->when(true, fn($q) => $this->applyDuration($q, $f, 'start_date'))->count();
+        $present = DB::table('training_attendance as ta')->join('training_schedules as ts','ts.id','=','ta.training_schedule_id')->where('ts.resort_id',$rid)->where('ta.status','Present')->when(true, fn($q) => $this->applyDuration($q, $f, 'ts.start_date'))->count();
+        $att = DB::table('training_attendance as ta')->join('training_schedules as ts','ts.id','=','ta.training_schedule_id')->where('ts.resort_id',$rid)->when(true, fn($q) => $this->applyDuration($q, $f, 'ts.start_date'))->count();
         return ['columns' => ['Total Programs', 'Scheduled Programs', 'Completed Programs', 'Pending Programs', 'Overall Completion %'],
             'rows' => [['Total Programs' => $total, 'Scheduled Programs' => $sched, 'Completed Programs' => $done, 'Pending Programs' => $pending, 'Overall Completion %' => $this->pct($present, $att)]]];
     }
@@ -251,6 +255,7 @@ class LearningReportController extends Controller
             ->join('training_schedules as ts', 'ts.id', '=', 'ta.training_schedule_id')
             ->join('learning_programs as lp', 'lp.id', '=', 'ts.training_id')
             ->where('ts.resort_id', $rid)->when($f['program'], fn($q) => $q->where('lp.id', $f['program']))
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 'ts.start_date'))
             ->groupBy('lp.id', 'lp.name')
             ->select('lp.name', DB::raw('COUNT(*) total'), DB::raw("SUM(CASE WHEN ta.status='Present' THEN 1 ELSE 0 END) attended"), DB::raw("SUM(CASE WHEN ta.status='Absent' THEN 1 ELSE 0 END) absent"))
             ->orderBy('lp.name')->get()
@@ -312,6 +317,7 @@ class LearningReportController extends Controller
     public function employeeRecord(array $f): array
     {
         $rows = $this->attBase($f)->where('ta.status', 'Present')
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 'ta.attendance_date'))
             ->groupBy('e.id', 'ra.first_name', 'ra.last_name')->orderBy('ra.first_name')
             ->select([$this->nm(), DB::raw('COUNT(DISTINCT lp.id) programs'), DB::raw('SUM(lp.hours) hours')])->get()
             ->map(fn($r) => [
@@ -370,6 +376,7 @@ class LearningReportController extends Controller
     public function learningHours(array $f): array
     {
         $rows = $this->attBase($f)->where('ta.status', 'Present')
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 'ta.attendance_date'))
             ->groupBy('e.id', 'ra.first_name', 'ra.last_name', 'd.name')->orderBy('ra.first_name')
             ->select([$this->nm(), 'd.name as dept', DB::raw('SUM(lp.hours) hours'), DB::raw('COUNT(DISTINCT lp.id) progs')])->get()
             ->map(fn($r) => [
@@ -383,7 +390,9 @@ class LearningReportController extends Controller
     public function hoursByProgram(array $f): array
     {
         $rid = $this->resort->resort_id;
-        $rows = DB::table('learning_programs as lp')->where('lp.resort_id', $rid)->orderBy('lp.name')->get(['lp.id', 'lp.name', 'lp.hours'])
+        $rows = DB::table('learning_programs as lp')->where('lp.resort_id', $rid)
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 'lp.created_at'))
+            ->orderBy('lp.name')->get(['lp.id', 'lp.name', 'lp.hours'])
             ->map(function ($r) {
                 $sessions = DB::table('training_schedules')->where('training_id', $r->id)->count();
                 $parts = DB::table('training_attendance as ta')->join('training_schedules as ts', 'ts.id', '=', 'ta.training_schedule_id')->where('ts.training_id', $r->id)->count();
@@ -401,6 +410,7 @@ class LearningReportController extends Controller
         $rid = $this->resort->resort_id;
         $rows = DB::table('learning_programs as lp')->leftJoin('learning_categories as lc', 'lc.id', '=', 'lp.learning_category_id')
             ->where('lp.resort_id', $rid)->when($f['category'], fn($q) => $q->where('lp.learning_category_id', $f['category']))
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 'lp.created_at'))
             ->orderBy('lp.name')->get(['lp.name', 'lc.category', 'lp.audience_type', 'lp.hours', 'lp.days', 'lp.frequency', 'lp.delivery_mode'])
             ->map(fn($r) => [
                 'Program Name' => $r->name ?? 'N/A', 'Category' => $r->category ?? 'N/A',
@@ -425,7 +435,7 @@ class LearningReportController extends Controller
 
     public function learningRequest(array $f): array
     {
-        $rows = $this->requestBase($f)->orderByDesc('lr.created_at')
+        $rows = $this->requestBase($f)->when(true, fn($q) => $this->applyDuration($q, $f, 'lr.created_at'))->orderByDesc('lr.created_at')
             ->get(['lp.name', 'lr.reason', 'lr.status', 'lr.start_date', 'lr.end_date',
                 DB::raw("TRIM(CONCAT(COALESCE(req.first_name,''),' ',COALESCE(req.last_name,''))) as requested_by")])
             ->map(fn($r) => [
@@ -439,7 +449,7 @@ class LearningReportController extends Controller
 
     public function requestApproval(array $f): array
     {
-        $rows = $this->requestBase($f)->orderByDesc('lr.updated_at')
+        $rows = $this->requestBase($f)->when(true, fn($q) => $this->applyDuration($q, $f, 'lr.updated_at'))->orderByDesc('lr.updated_at')
             ->get(['lp.name', 'lr.status', 'lr.updated_at',
                 DB::raw("TRIM(CONCAT(COALESCE(req.first_name,''),' ',COALESCE(req.last_name,''))) as requested_by"),
                 DB::raw("TRIM(CONCAT(COALESCE(mra.first_name,''),' ',COALESCE(mra.last_name,''))) as approver")])
@@ -454,7 +464,7 @@ class LearningReportController extends Controller
 
     public function pendingActions(array $f): array
     {
-        $rows = $this->requestBase(['status' => 'Pending'])->orderByDesc('lr.created_at')
+        $rows = $this->requestBase(['status' => 'Pending'])->when(true, fn($q) => $this->applyDuration($q, $f, 'lr.created_at'))->orderByDesc('lr.created_at')
             ->get(['lp.name', 'lr.reason', 'lr.start_date', DB::raw("TRIM(CONCAT(COALESCE(req.first_name,''),' ',COALESCE(req.last_name,''))) as requested_by")])
             ->map(fn($r) => [
                 'Program Name' => $r->name ?? 'N/A', 'Reason for Pending' => $r->reason ?? 'Awaiting approval',
@@ -473,6 +483,7 @@ class LearningReportController extends Controller
             ->leftJoin('training_schedules as ts', 'ts.id', '=', 'fr.training_id')
             ->leftJoin('learning_programs as lp', 'lp.id', '=', 'ts.training_id')
             ->when($f['program'], fn($q) => $q->where('lp.id', $f['program']))
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 'fr.created_at'))
             ->orderByDesc('fr.created_at')->limit(1000)
             ->get([$this->nm(), 'lp.name'])
             ->map(fn($r) => [
@@ -486,6 +497,7 @@ class LearningReportController extends Controller
     {
         $rid = $this->resort->resort_id;
         $rows = DB::table('learning_programs as lp')->where('lp.resort_id', $rid)->when($f['program'], fn($q) => $q->where('lp.id', $f['program']))
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 'lp.created_at'))
             ->orderBy('lp.name')->get(['lp.id', 'lp.name'])
             ->map(function ($r) {
                 $tot = DB::table('training_attendance as ta')->join('training_schedules as ts', 'ts.id', '=', 'ta.training_schedule_id')->where('ts.training_id', $r->id)->count();
@@ -507,11 +519,11 @@ class LearningReportController extends Controller
     public function execDashboard(array $f): array
     {
         $rid = $this->resort->resort_id;
-        $present = DB::table('training_attendance as ta')->join('training_schedules as ts','ts.id','=','ta.training_schedule_id')->where('ts.resort_id',$rid)->where('ta.status','Present')->count();
-        $att = DB::table('training_attendance as ta')->join('training_schedules as ts','ts.id','=','ta.training_schedule_id')->where('ts.resort_id',$rid)->count();
-        $active = DB::table('training_schedules')->where('resort_id', $rid)->whereDate('end_date', '>=', Carbon::today())->count();
-        $pendingReq = DB::table('learning_requests')->where('resort_id', $rid)->where('status', 'Pending')->count();
-        $hours = (float) DB::table('training_attendance as ta')->join('training_schedules as ts', 'ts.id', '=', 'ta.training_schedule_id')->join('learning_programs as lp', 'lp.id', '=', 'ts.training_id')->where('ts.resort_id', $rid)->where('ta.status', 'Present')->sum('lp.hours');
+        $present = DB::table('training_attendance as ta')->join('training_schedules as ts','ts.id','=','ta.training_schedule_id')->where('ts.resort_id',$rid)->where('ta.status','Present')->when(true, fn($q) => $this->applyDuration($q, $f, 'ts.start_date'))->count();
+        $att = DB::table('training_attendance as ta')->join('training_schedules as ts','ts.id','=','ta.training_schedule_id')->where('ts.resort_id',$rid)->when(true, fn($q) => $this->applyDuration($q, $f, 'ts.start_date'))->count();
+        $active = DB::table('training_schedules')->where('resort_id', $rid)->whereDate('end_date', '>=', Carbon::today())->when(true, fn($q) => $this->applyDuration($q, $f, 'start_date'))->count();
+        $pendingReq = DB::table('learning_requests')->where('resort_id', $rid)->where('status', 'Pending')->when(true, fn($q) => $this->applyDuration($q, $f, 'created_at'))->count();
+        $hours = (float) DB::table('training_attendance as ta')->join('training_schedules as ts', 'ts.id', '=', 'ta.training_schedule_id')->join('learning_programs as lp', 'lp.id', '=', 'ts.training_id')->where('ts.resort_id', $rid)->where('ta.status', 'Present')->when(true, fn($q) => $this->applyDuration($q, $f, 'ts.start_date'))->sum('lp.hours');
         return ['columns' => ['Completion Rate', 'Attendance Rate', 'Active Programs', 'Pending Requests', 'Learning Hours', 'Compliance Rate'],
             'rows' => [['Completion Rate' => $this->pct($present, $att), 'Attendance Rate' => $this->pct($present, $att), 'Active Programs' => $active, 'Pending Requests' => $pendingReq, 'Learning Hours' => number_format($hours, 1), 'Compliance Rate' => $this->pct($present, $att)]]];
     }
