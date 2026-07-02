@@ -891,7 +891,13 @@ class WisdomTools
     {
         $totalRooms = DB::table('available_accommodation_models')->where('resort_id', $rid)->count();
         $totalBeds  = (int) DB::table('available_accommodation_models')->where('resort_id', $rid)->sum('Capacity');
-        $occupied   = DB::table('assing_accommodations')->where('resort_id', $rid)->count();
+        // Occupied = beds held by CURRENTLY-ACTIVE employees. Counting every
+        // assing_accommodations row also included assignments left behind by
+        // inactive/departed staff, which over-counted occupancy (showed 27/27,
+        // 0 free) and diverged from the accommodation dashboard.
+        $activeEmpIds = Employee::where('resort_id', $rid)->where('status', 'Active')->pluck('id');
+        $occupied   = DB::table('assing_accommodations')->where('resort_id', $rid)
+            ->whereIn('emp_id', $activeEmpIds)->distinct()->count('emp_id');
         $available  = max(0, $totalBeds - $occupied);
 
         return [
