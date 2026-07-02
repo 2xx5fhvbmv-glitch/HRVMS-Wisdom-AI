@@ -35,9 +35,9 @@ class VisaReportController extends Controller
     {
         return [
             'exec_summary'             => ['name' => 'Visa Management Executive Summary', 'description' => 'Consolidated overview of expat employees, visa status, liabilities and deposits.', 'filters' => [], 'handler' => 'execSummary'],
-            'expat_register'           => ['name' => 'Expat Employee Register', 'description' => 'All expatriate employees with visa-relevant details.', 'filters' => ['department', 'nationality'], 'handler' => 'expatRegister'],
+            'expat_register'           => ['name' => 'Expat Employee Register', 'description' => 'All expatriate employees with visa-relevant details.', 'filters' => ['department', 'nationality', 'employment_status'], 'handler' => 'expatRegister'],
             'nationality_distribution' => ['name' => 'Nationality Distribution Report', 'description' => 'Expat workforce distribution by nationality.', 'filters' => ['nationality'], 'handler' => 'nationalityDistribution'],
-            'nationality_employees'    => ['name' => 'Nationality Employee Report', 'description' => 'Employees grouped by nationality.', 'filters' => ['nationality'], 'handler' => 'nationalityEmployees'],
+            'nationality_employees'    => ['name' => 'Nationality Employee Report', 'description' => 'Employees grouped by nationality.', 'filters' => ['nationality', 'employment_status'], 'handler' => 'nationalityEmployees'],
             'nationality_deposit'      => ['name' => 'Nationality Deposit Summary', 'description' => 'Total deposit held per nationality.', 'filters' => ['nationality'], 'handler' => 'nationalityDeposit'],
             'deposit_rate_master'      => ['name' => 'Deposit Rate Master Report', 'description' => 'Configured deposit rate per nationality.', 'filters' => ['nationality'], 'handler' => 'depositRateMaster'],
             'wallet_balance'           => ['name' => 'Wallet Balance Summary', 'description' => 'Balances across visa wallets.', 'filters' => [], 'handler' => 'walletBalance'],
@@ -57,7 +57,7 @@ class VisaReportController extends Controller
             'medical_expiry'           => ['name' => 'Medical Expiry Report', 'description' => 'Medical certificates expiring within the window.', 'filters' => ['expiry_period'], 'handler' => 'medicalExpiry'],
             'passport_expiry'          => ['name' => 'Passport Expiry Report', 'description' => 'Passport numbers (expiry date not stored in the system).', 'filters' => ['expiry_period'], 'handler' => 'passportExpiry'],
             'slot_expiry'              => ['name' => 'Quota Slot Expiry Report', 'description' => 'Quota slots due within the window.', 'filters' => ['expiry_period'], 'handler' => 'slotExpiry'],
-            'comprehensive_expiry'     => ['name' => 'Comprehensive Expiry Tracker', 'description' => 'All document expiries per employee.', 'filters' => ['department'], 'handler' => 'comprehensiveExpiry'],
+            'comprehensive_expiry'     => ['name' => 'Comprehensive Expiry Tracker', 'description' => 'All document expiries per employee.', 'filters' => ['department', 'employment_status'], 'handler' => 'comprehensiveExpiry'],
             'liability_summary'        => ['name' => 'Liability Summary Report', 'description' => 'Outstanding visa liabilities by type.', 'filters' => [], 'handler' => 'liabilitySummary'],
             'liability_breakdown'      => ['name' => 'Liability Breakdown Report', 'description' => 'Total / paid / outstanding per liability type.', 'filters' => [], 'handler' => 'liabilityBreakdown'],
             'outstanding_liability'    => ['name' => 'Outstanding Liability Report', 'description' => 'Unpaid fees per employee.', 'filters' => ['liability_type'], 'handler' => 'outstandingLiability'],
@@ -65,13 +65,13 @@ class VisaReportController extends Controller
             'payment_status'           => ['name' => 'Payment Status Report', 'description' => 'Requested / paid / pending per fee type.', 'filters' => ['duration'], 'handler' => 'paymentStatus'],
             'immigration_transactions' => ['name' => 'Immigration Transaction History', 'description' => 'Wallet/immigration transactions.', 'filters' => ['duration'], 'handler' => 'immigrationTransactions'],
             'employee_immigration'     => ['name' => 'Employee Immigration Profile', 'description' => 'A single employee\'s immigration document status.', 'filters' => ['employee'], 'handler' => 'employeeImmigration'],
-            'immigration_compliance'   => ['name' => 'Immigration Compliance Report', 'description' => 'Per-employee visa/WP/medical/insurance status.', 'filters' => ['department'], 'handler' => 'immigrationCompliance'],
+            'immigration_compliance'   => ['name' => 'Immigration Compliance Report', 'description' => 'Per-employee visa/WP/medical/insurance status.', 'filters' => ['department', 'employment_status'], 'handler' => 'immigrationCompliance'],
             'immigration_audit'        => ['name' => 'Immigration Audit Trail', 'description' => 'Document activity log.', 'filters' => ['duration'], 'handler' => 'immigrationAudit'],
             'exec_dashboard'           => ['name' => 'Visa Management Executive Dashboard', 'description' => 'Headline immigration metrics.', 'filters' => [], 'handler' => 'execDashboard'],
             'renewal_forecast'         => ['name' => 'Immigration Renewal Forecast Report', 'description' => 'Upcoming renewals and estimated cost.', 'filters' => ['expiry_period'], 'handler' => 'renewalForecast'],
             'cost_by_nationality'      => ['name' => 'Immigration Cost by Nationality Report', 'description' => 'Immigration spend per nationality.', 'filters' => ['nationality'], 'handler' => 'costByNationality'],
             'deposit_exposure'         => ['name' => 'Deposit Exposure Report', 'description' => 'Employee deposit exposure and refund eligibility.', 'filters' => ['nationality'], 'handler' => 'depositExposure'],
-            'document_compliance'      => ['name' => 'Document Compliance Matrix', 'description' => 'Which documents each employee has on file.', 'filters' => ['department', 'nationality'], 'handler' => 'documentCompliance'],
+            'document_compliance'      => ['name' => 'Document Compliance Matrix', 'description' => 'Which documents each employee has on file.', 'filters' => ['department', 'nationality', 'employment_status'], 'handler' => 'documentCompliance'],
             'budget_forecast'          => ['name' => 'Immigration Budget Forecast Report', 'description' => 'Forecasted monthly immigration cost.', 'filters' => ['year'], 'handler' => 'budgetForecast'],
             'deposit_aging'            => ['name' => 'Deposit Aging Report', 'description' => 'How long deposits have been held.', 'filters' => ['duration'], 'handler' => 'depositAging'],
         ];
@@ -114,6 +114,11 @@ class VisaReportController extends Controller
             ->get(['e.id', DB::raw("TRIM(CONCAT(COALESCE(ra.first_name,''),' ',COALESCE(ra.last_name,''))) as name")]);
 
         $statuses        = ['Pending', 'SendtoFinance', 'Approved', 'Rejact'];
+        $employmentStatuses = DB::table('employees')->where('resort_id', $resortId)
+            ->whereRaw("LOWER(TRIM(COALESCE(nationality,''))) <> 'maldivian'")
+            ->whereNotNull('status')->where('status', '<>', '')
+            ->when($scoped !== null, fn($q) => $q->whereIn('Dept_id', $scoped))
+            ->distinct()->orderBy('status')->pluck('status');
         $liabilityTypes  = ['Work Permit', 'Quota Slot', 'Insurance', 'Medical', 'Visa'];
         $expiryPeriods   = [['v' => '30', 'l' => 'Next 30 days'], ['v' => '60', 'l' => 'Next 60 days'], ['v' => '90', 'l' => 'Next 90 days'], ['v' => '180', 'l' => 'Next 180 days'], ['v' => 'all', 'l' => 'All']];
         $years           = range((int) date('Y') + 1, (int) date('Y') - 4);
@@ -122,17 +127,18 @@ class VisaReportController extends Controller
 
         return view('resorts.reports.visa', compact(
             'page_title', 'reports', 'departments', 'nationalities', 'employees',
-            'statuses', 'liabilityTypes', 'expiryPeriods', 'years', 'paymentRequests'
+            'statuses', 'employmentStatuses', 'liabilityTypes', 'expiryPeriods', 'years', 'paymentRequests'
         ));
     }
 
     private function filtersFrom(Request $request): array
     {
         return [
-            'department'      => $request->input('department') ?: null,
-            'nationality'     => $request->input('nationality') ?: null,
-            'employee'        => $request->input('employee') ?: null,
-            'status'          => $request->input('status') ?: null,
+            'department'        => $request->input('department') ?: null,
+            'nationality'       => $request->input('nationality') ?: null,
+            'employee'          => $request->input('employee') ?: null,
+            'employment_status' => $request->input('employment_status') ?: null,
+            'status'            => $request->input('status') ?: null,
             'liability_type'  => $request->input('liability_type') ?: null,
             'expiry_period'   => $request->input('expiry_period') ?: null,
             'year'            => $request->input('year') ?: null,
@@ -238,6 +244,7 @@ class VisaReportController extends Controller
             ->when($scoped !== null, fn($q) => $q->whereIn('e.Dept_id', $scoped))
             ->when($f['department'] ?? null, fn($q) => $q->where('e.Dept_id', $f['department']))
             ->when($f['nationality'] ?? null, fn($q) => $q->where('e.nationality', $f['nationality']))
+            ->when($f['employment_status'] ?? null, fn($q) => $q->where('e.status', $f['employment_status']))
             ->when($f['employee'] ?? null, fn($q) => $q->where('e.id', $f['employee']));
     }
 
