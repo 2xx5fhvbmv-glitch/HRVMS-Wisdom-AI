@@ -90,7 +90,9 @@ class VisaReportController extends Controller
         $scoped     = Common::getScopedDepartmentIds();
 
         $reports = collect($this->registry())->map(fn($r, $key) => [
-            'key' => $key, 'name' => $r['name'], 'description' => $r['description'], 'filters' => $r['filters'],
+            'key' => $key, 'name' => $r['name'], 'description' => $r['description'],
+            // Every report exposes the duration (From/To date) filter, like the Custom Report.
+            'filters' => array_values(array_unique(array_merge($r['filters'], ['duration']))),
         ])->values();
 
         $departments = DB::table('resort_departments')->where('resort_id', $resortId)
@@ -249,6 +251,7 @@ class VisaReportController extends Controller
                 $q->selectRaw('MAX(id)')->from($table)->groupBy('employee_id');
             })
             ->when($period && $period !== 'all', fn($q) => $q->whereDate("t.$dateCol", '<=', Carbon::today()->addDays((int) $period)))
+            ->when(true, fn($q) => $this->applyDuration($q, $f, "t.$dateCol"))
             ->orderBy("t.$dateCol")
             ->get(array_merge([$this->nameExpr(), 'e.nationality', "t.$dateCol as expiry_date"], $extra('select')))
             ->map(fn($r) => $extra('row', $r))->all();
@@ -262,13 +265,13 @@ class VisaReportController extends Controller
     public function execSummary(array $f): array
     {
         $rid = $this->resort->resort_id;
-        $expat = (clone $this->expatBase($f))->count();
-        $activeWP = DB::table('work_permits')->where('resort_id', $rid)->where('Status', 'Paid')->distinct('employee_id')->count('employee_id');
+        $expat = (clone $this->expatBase($f))->when(true, fn($q) => $this->applyDuration($q, $f, 'e.joining_date'))->count();
+        $activeWP = DB::table('work_permits')->where('resort_id', $rid)->where('Status', 'Paid')->when(true, fn($q) => $this->applyDuration($q, $f, 'Due_Date'))->distinct('employee_id')->count('employee_id');
         $upcoming = DB::table('visa_renewals')->where('resort_id', $rid)
-            ->whereBetween('end_date', [Carbon::today(), Carbon::today()->addDays(90)])->count();
-        $liability = (float) DB::table('work_permits')->where('resort_id', $rid)->whereRaw("LOWER(COALESCE(Status,''))<>'paid'")->sum('Amt')
-            + (float) DB::table('quota_slot_renewals')->where('resort_id', $rid)->whereRaw("LOWER(COALESCE(Status,''))<>'paid'")->sum('Amt');
-        $deposit = (float) DB::table('total_expensess_since_joings')->where('resort_id', $rid)->sum('Deposit_Amt');
+            ->whereBetween('end_date', [Carbon::today(), Carbon::today()->addDays(90)])->when(true, fn($q) => $this->applyDuration($q, $f, 'end_date'))->count();
+        $liability = (float) DB::table('work_permits')->where('resort_id', $rid)->whereRaw("LOWER(COALESCE(Status,''))<>'paid'")->when(true, fn($q) => $this->applyDuration($q, $f, 'Due_Date'))->sum('Amt')
+            + (float) DB::table('quota_slot_renewals')->where('resort_id', $rid)->whereRaw("LOWER(COALESCE(Status,''))<>'paid'")->when(true, fn($q) => $this->applyDuration($q, $f, 'Due_Date'))->sum('Amt');
+        $deposit = (float) DB::table('total_expensess_since_joings')->where('resort_id', $rid)->when(true, fn($q) => $this->applyDuration($q, $f, 'Date'))->sum('Deposit_Amt');
 
         return [
             'columns' => ['Total Expat Employees', 'Active Work Permits', 'Upcoming Expiries (90d)', 'Total Outstanding Liability', 'Total Deposit Balance'],
@@ -285,7 +288,7 @@ class VisaReportController extends Controller
     /** #2 Expat Employee Register. */
     public function expatRegister(array $f): array
     {
-        $rows = $this->expatBase($f)->orderBy('ra.first_name')
+        $rows = $this->expatBase($f)->when(true, fn($q) => $this->applyDuration($q, $f, 'e.joining_date'))->orderBy('ra.first_name')
             ->get(['e.Emp_id', $this->nameExpr(), 'e.nationality', 'p.position_title', 'd.name as dept', 'e.joining_date', 'e.status'])
             ->map(fn($r) => [
                 'Employee ID'       => $r->Emp_id,
@@ -302,7 +305,7 @@ class VisaReportController extends Controller
     /** #3 Nationality Distribution. */
     public function nationalityDistribution(array $f): array
     {
-        $raw = $this->expatBase($f)->groupBy('e.nationality')
+        $raw = $this->expatBase($f)->when(true, fn($q) => $this->applyDuration($q, $f, 'e.joining_date'))->groupBy('e.nationality')
             ->select('e.nationality', DB::raw('COUNT(*) c'))->orderByDesc(DB::raw('COUNT(*)'))->get();
         $total = $raw->sum('c') ?: 1;
         $rows = $raw->map(fn($r) => [
@@ -316,7 +319,7 @@ class VisaReportController extends Controller
     /** #4 Nationality Employee Report. */
     public function nationalityEmployees(array $f): array
     {
-        $rows = $this->expatBase($f)->orderBy('e.nationality')->orderBy('ra.first_name')
+        $rows = $this->expatBase($f)->when(true, fn($q) => $this->applyDuration($q, $f, 'e.joining_date'))->orderBy('e.nationality')->orderBy('ra.first_name')
             ->get(['e.Emp_id', $this->nameExpr(), 'e.nationality', 'p.position_title', 'd.name as dept', 'e.joining_date'])
             ->map(fn($r) => [
                 'Employee ID'   => $r->Emp_id,
@@ -334,6 +337,7 @@ class VisaReportController extends Controller
     {
         $rows = $this->expatBase($f)
             ->leftJoin('total_expensess_since_joings as t', 't.employees_id', '=', 'e.id')
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 't.Date'))
             ->groupBy('e.nationality')
             ->select('e.nationality', DB::raw('COUNT(DISTINCT e.id) c'), DB::raw('SUM(t.Deposit_Amt) dep'))
             ->orderBy('e.nationality')->get()
@@ -423,6 +427,7 @@ class VisaReportController extends Controller
         $rows = $this->expatBase($f)
             ->join('total_expensess_since_joings as t', 't.employees_id', '=', 'e.id')
             ->where('t.Deposit_Amt', '>', 0)
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 't.Date'))
             ->orderBy('ra.first_name')
             ->get(['e.Emp_id', $this->nameExpr(), 'e.nationality', 't.Deposit_Amt', 't.Date'])
             ->map(fn($r) => [
@@ -465,6 +470,7 @@ class VisaReportController extends Controller
             ->where('r.resort_id', $this->resort->resort_id)
             ->whereNotNull('r.Deposit_Amt')->where('r.Deposit_Amt', '>', 0)
             ->where(fn($q) => $q->whereNull('r.Deposit_withdraw')->orWhere('r.Deposit_withdraw', '<>', 'Yes'))
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 'r.last_working_day'))
             ->orderBy('r.last_working_day')
             ->get([$this->nameExpr(), 'e.nationality', 'r.Deposit_Amt', 'r.last_working_day'])
             ->map(fn($r) => [
@@ -502,10 +508,12 @@ class VisaReportController extends Controller
     {
         $rows = DB::table('payment_request_children as c')
             ->join('employees as e', 'e.id', '=', 'c.Employee_id')
+            ->leftJoin('payment_requests as pr', 'pr.id', '=', 'c.Requested_Id')
             ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
             ->leftJoin('resort_departments as d', 'd.id', '=', 'e.Dept_id')
             ->leftJoin('resort_positions as p', 'p.id', '=', 'e.Position_id')
             ->when($f['payment_request'], fn($q) => $q->where('c.Requested_Id', $f['payment_request']))
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 'pr.Request_date'))
             ->get([$this->nameExpr(), 'd.name as dept', 'p.position_title',
                 'c.WorkPermitAmt', 'c.QuotaslotAmt', 'c.InsurancePrimume', 'c.MedicalReportFees', 'c.VisaAmt', 'c.ChildStatus']);
 
@@ -533,6 +541,7 @@ class VisaReportController extends Controller
             ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
             ->where('t.resort_id', $this->resort->resort_id)
             ->when($f['employee'], fn($q) => $q->where('t.employee_id', $f['employee']))
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 't.Due_Date'))
             ->orderBy('ra.first_name')->orderBy('t.Due_Date')
             ->get([$this->nameExpr(), 't.Month', 't.Due_Date', 't.Amt', 't.Currency', 't.Payment_Date', 't.Status'])
             ->map(fn($r) => [
@@ -603,6 +612,7 @@ class VisaReportController extends Controller
             ->join('work_permits as t', 't.employee_id', '=', 'e.id')
             ->whereIn('t.id', fn($q) => $q->selectRaw('MAX(id)')->from('work_permits')->groupBy('employee_id'))
             ->when($period && $period !== 'all', fn($q) => $q->whereDate('t.Due_Date', '<=', Carbon::today()->addDays((int) $period)))
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 't.Due_Date'))
             ->orderBy('t.Due_Date')
             ->get([$this->nameExpr(), 't.Work_Permit_Number', 't.Due_Date'])
             ->map(fn($r) => [
@@ -621,6 +631,7 @@ class VisaReportController extends Controller
             ->join('employee_insurances as t', 't.employee_id', '=', 'e.id')
             ->whereIn('t.id', fn($q) => $q->selectRaw('MAX(id)')->from('employee_insurances')->groupBy('employee_id'))
             ->when($period && $period !== 'all', fn($q) => $q->whereDate('t.insurance_end_date', '<=', Carbon::today()->addDays((int) $period)))
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 't.insurance_end_date'))
             ->orderBy('t.insurance_end_date')
             ->get([$this->nameExpr(), 't.insurance_company', 't.insurance_end_date'])
             ->map(fn($r) => [
@@ -639,6 +650,7 @@ class VisaReportController extends Controller
             ->join('work_permit_medical_renewals as t', 't.employee_id', '=', 'e.id')
             ->whereIn('t.id', fn($q) => $q->selectRaw('MAX(id)')->from('work_permit_medical_renewals')->groupBy('employee_id'))
             ->when($period && $period !== 'all', fn($q) => $q->whereDate('t.end_date', '<=', Carbon::today()->addDays((int) $period)))
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 't.end_date'))
             ->orderBy('t.end_date')
             ->get([$this->nameExpr(), 't.end_date'])
             ->map(fn($r) => [
@@ -652,7 +664,7 @@ class VisaReportController extends Controller
     public function passportExpiry(array $f): array
     {
         // Passport EXPIRY date isn't stored in the schema — only passport_number.
-        $rows = $this->expatBase($f)->orderBy('ra.first_name')
+        $rows = $this->expatBase($f)->when(true, fn($q) => $this->applyDuration($q, $f, 'e.joining_date'))->orderBy('ra.first_name')
             ->get([$this->nameExpr(), 'e.passport_number'])
             ->map(fn($r) => [
                 'Employee Name'        => trim($r->employee_name) ?: 'N/A',
@@ -670,6 +682,7 @@ class VisaReportController extends Controller
             ->join('quota_slot_renewals as t', 't.employee_id', '=', 'e.id')
             ->whereIn('t.id', fn($q) => $q->selectRaw('MAX(id)')->from('quota_slot_renewals')->groupBy('employee_id'))
             ->when($period && $period !== 'all', fn($q) => $q->whereDate('t.Due_Date', '<=', Carbon::today()->addDays((int) $period)))
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 't.Due_Date'))
             ->orderBy('t.Due_Date')
             ->get([$this->nameExpr(), 't.Due_Date'])
             ->map(fn($r) => [
@@ -687,7 +700,7 @@ class VisaReportController extends Controller
         $latest = fn($table, $col) => DB::table($table)->whereColumn('employee_id', 'e.id')
             ->where('resort_id', $rid)->orderByDesc('id')->limit(1)->select($col);
 
-        $rows = $this->expatBase($f)->orderBy('ra.first_name')
+        $rows = $this->expatBase($f)->when(true, fn($q) => $this->applyDuration($q, $f, 'e.joining_date'))->orderBy('ra.first_name')
             ->select([$this->nameExpr(),
                 DB::raw('(' . $this->latestSub('visa_renewals', 'end_date', $rid) . ') as visa_exp'),
                 DB::raw('(' . $this->latestSub('work_permits', 'Due_Date', $rid) . ') as wp_exp'),
@@ -716,11 +729,11 @@ class VisaReportController extends Controller
     public function liabilitySummary(array $f): array
     {
         $rid = $this->resort->resort_id;
-        $unpaid = fn($table) => (float) DB::table($table)->where('resort_id', $rid)->whereRaw("LOWER(COALESCE(Status,''))<>'paid'")->sum('Amt');
-        $wp = $unpaid('work_permits');
-        $slot = $unpaid('quota_slot_renewals');
-        $ins = (float) DB::table('employee_insurances')->where('resort_id', $rid)->whereRaw("LOWER(COALESCE(Status,''))<>'paid'")->sum('Premium');
-        $med = (float) DB::table('work_permit_medical_renewals')->where('resort_id', $rid)->whereRaw("LOWER(COALESCE(Status,''))<>'paid'")->sum('Amt');
+        $unpaid = fn($table, $dateCol) => (float) DB::table($table)->where('resort_id', $rid)->whereRaw("LOWER(COALESCE(Status,''))<>'paid'")->when(true, fn($q) => $this->applyDuration($q, $f, $dateCol))->sum('Amt');
+        $wp = $unpaid('work_permits', 'Due_Date');
+        $slot = $unpaid('quota_slot_renewals', 'Due_Date');
+        $ins = (float) DB::table('employee_insurances')->where('resort_id', $rid)->whereRaw("LOWER(COALESCE(Status,''))<>'paid'")->when(true, fn($q) => $this->applyDuration($q, $f, 'insurance_end_date'))->sum('Premium');
+        $med = (float) DB::table('work_permit_medical_renewals')->where('resort_id', $rid)->whereRaw("LOWER(COALESCE(Status,''))<>'paid'")->when(true, fn($q) => $this->applyDuration($q, $f, 'end_date'))->sum('Amt');
         return [
             'columns' => ['Work Permit Liability', 'Slot Fee Liability', 'Insurance Liability', 'Medical Liability', 'Total Liability'],
             'rows'    => [[
@@ -738,15 +751,15 @@ class VisaReportController extends Controller
     {
         $rid = $this->resort->resort_id;
         $defs = [
-            ['Work Permit', 'work_permits', 'Amt'],
-            ['Quota Slot', 'quota_slot_renewals', 'Amt'],
-            ['Insurance', 'employee_insurances', 'Premium'],
-            ['Medical', 'work_permit_medical_renewals', 'Amt'],
+            ['Work Permit', 'work_permits', 'Amt', 'Due_Date'],
+            ['Quota Slot', 'quota_slot_renewals', 'Amt', 'Due_Date'],
+            ['Insurance', 'employee_insurances', 'Premium', 'insurance_end_date'],
+            ['Medical', 'work_permit_medical_renewals', 'Amt', 'end_date'],
         ];
         $rows = [];
-        foreach ($defs as [$label, $table, $col]) {
-            $total = (float) DB::table($table)->where('resort_id', $rid)->sum($col);
-            $paid  = (float) DB::table($table)->where('resort_id', $rid)->whereRaw("LOWER(COALESCE(Status,''))='paid'")->sum($col);
+        foreach ($defs as [$label, $table, $col, $dateCol]) {
+            $total = (float) DB::table($table)->where('resort_id', $rid)->when(true, fn($q) => $this->applyDuration($q, $f, $dateCol))->sum($col);
+            $paid  = (float) DB::table($table)->where('resort_id', $rid)->whereRaw("LOWER(COALESCE(Status,''))='paid'")->when(true, fn($q) => $this->applyDuration($q, $f, $dateCol))->sum($col);
             $rows[] = [
                 'Liability Type'      => $label,
                 'Total Liability'     => $this->money($total),
@@ -775,6 +788,7 @@ class VisaReportController extends Controller
                 ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
                 ->where('t.resort_id', $rid)->whereRaw("LOWER(COALESCE(t.Status,''))<>'paid'")
                 ->where("t.$col", '>', 0)
+                ->when(true, fn($q) => $this->applyDuration($q, $f, "t.$dueCol"))
                 ->get([$this->nameExpr(), "t.$col as amt", "t.$dueCol as due"]);
             foreach ($rows as $r) {
                 $out[] = [
@@ -816,11 +830,11 @@ class VisaReportController extends Controller
     public function paymentStatus(array $f): array
     {
         $rid = $this->resort->resort_id;
-        $defs = [['Work Permit', 'work_permits', 'Amt'], ['Quota Slot', 'quota_slot_renewals', 'Amt'], ['Insurance', 'employee_insurances', 'Premium'], ['Medical', 'work_permit_medical_renewals', 'Amt']];
+        $defs = [['Work Permit', 'work_permits', 'Amt', 'Due_Date'], ['Quota Slot', 'quota_slot_renewals', 'Amt', 'Due_Date'], ['Insurance', 'employee_insurances', 'Premium', 'insurance_end_date'], ['Medical', 'work_permit_medical_renewals', 'Amt', 'end_date']];
         $rows = [];
-        foreach ($defs as [$label, $table, $col]) {
-            $total = (float) DB::table($table)->where('resort_id', $rid)->sum($col);
-            $paid  = (float) DB::table($table)->where('resort_id', $rid)->whereRaw("LOWER(COALESCE(Status,''))='paid'")->sum($col);
+        foreach ($defs as [$label, $table, $col, $dateCol]) {
+            $total = (float) DB::table($table)->where('resort_id', $rid)->when(true, fn($q) => $this->applyDuration($q, $f, $dateCol))->sum($col);
+            $paid  = (float) DB::table($table)->where('resort_id', $rid)->whereRaw("LOWER(COALESCE(Status,''))='paid'")->when(true, fn($q) => $this->applyDuration($q, $f, $dateCol))->sum($col);
             $rows[] = [
                 'Payment Type'     => $label,
                 'Requested Amount' => $this->money($total),
@@ -855,7 +869,7 @@ class VisaReportController extends Controller
     public function employeeImmigration(array $f): array
     {
         $rid = $this->resort->resort_id;
-        $rows = $this->expatBase($f)->orderBy('ra.first_name')
+        $rows = $this->expatBase($f)->when(true, fn($q) => $this->applyDuration($q, $f, 'e.joining_date'))->orderBy('ra.first_name')
             ->select([$this->nameExpr(), 'e.passport_number',
                 DB::raw('(' . $this->latestSub('visa_renewals', 'end_date', $rid) . ') as visa_exp'),
                 DB::raw('(' . $this->latestSub('work_permits', 'Due_Date', $rid) . ') as wp_exp'),
@@ -879,7 +893,7 @@ class VisaReportController extends Controller
     public function immigrationCompliance(array $f): array
     {
         $rid = $this->resort->resort_id;
-        $rows = $this->expatBase($f)->orderBy('ra.first_name')
+        $rows = $this->expatBase($f)->when(true, fn($q) => $this->applyDuration($q, $f, 'e.joining_date'))->orderBy('ra.first_name')
             ->select([$this->nameExpr(),
                 DB::raw('(' . $this->latestSub('visa_renewals', 'end_date', $rid) . ') as visa_exp'),
                 DB::raw('(' . $this->latestSub('work_permits', 'Due_Date', $rid) . ') as wp_exp'),
@@ -925,10 +939,10 @@ class VisaReportController extends Controller
     {
         $rid = $this->resort->resort_id;
         $s = $this->execSummary($f)['rows'][0];
-        $outstanding = (float) DB::table('work_permits')->where('resort_id', $rid)->whereRaw("LOWER(COALESCE(Status,''))<>'paid'")->sum('Amt')
-            + (float) DB::table('quota_slot_renewals')->where('resort_id', $rid)->whereRaw("LOWER(COALESCE(Status,''))<>'paid'")->sum('Amt');
+        $outstanding = (float) DB::table('work_permits')->where('resort_id', $rid)->whereRaw("LOWER(COALESCE(Status,''))<>'paid'")->when(true, fn($q) => $this->applyDuration($q, $f, 'Due_Date'))->sum('Amt')
+            + (float) DB::table('quota_slot_renewals')->where('resort_id', $rid)->whereRaw("LOWER(COALESCE(Status,''))<>'paid'")->when(true, fn($q) => $this->applyDuration($q, $f, 'Due_Date'))->sum('Amt');
         $wallet = (float) DB::table('visa_wallets')->where('resort_id', $rid)->sum('Amt');
-        $pending = DB::table('payment_requests')->where('resort_id', $rid)->whereIn('Status', ['Pending', 'SendtoFinance'])->count();
+        $pending = DB::table('payment_requests')->where('resort_id', $rid)->whereIn('Status', ['Pending', 'SendtoFinance'])->when(true, fn($q) => $this->applyDuration($q, $f, 'Request_date'))->count();
         $compliance = $this->immigrationCompliance($f)['rows'];
         $compliant = collect($compliance)->where('Compliance Status', 'Compliant')->count();
         $rate = count($compliance) ? round($compliant / count($compliance) * 100, 1) . '%' : '0%';
@@ -965,6 +979,7 @@ class VisaReportController extends Controller
                 ->where('t.resort_id', $rid)
                 ->whereIn('t.id', fn($q) => $q->selectRaw('MAX(id)')->from($table)->groupBy('employee_id'))
                 ->whereDate("t.$dateCol", '<=', $cut)
+                ->when(true, fn($q) => $this->applyDuration($q, $f, "t.$dateCol"))
                 ->get([$this->nameExpr(), "t.$dateCol as d", "t.$amtCol as amt"]);
             foreach ($rows as $r) {
                 $out[] = [
@@ -986,6 +1001,7 @@ class VisaReportController extends Controller
     {
         $rows = $this->expatBase($f)
             ->leftJoin('total_expensess_since_joings as t', 't.employees_id', '=', 'e.id')
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 't.Date'))
             ->groupBy('e.nationality')
             ->select('e.nationality', DB::raw('COUNT(DISTINCT e.id) c'),
                 DB::raw('SUM(t.Deposit_Amt) dep'), DB::raw('SUM(t.Total_work_permit) wp'),
@@ -1010,6 +1026,7 @@ class VisaReportController extends Controller
             ->leftJoin('total_expensess_since_joings as t', 't.employees_id', '=', 'e.id')
             ->leftJoin('employee_resignation as r', 'r.employee_id', '=', 'e.id')
             ->where('t.Deposit_Amt', '>', 0)
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 't.Date'))
             ->orderBy('ra.first_name')
             ->get([$this->nameExpr(), 'e.nationality', 't.Deposit_Amt', 'r.Deposit_withdraw', 'e.status'])
             ->map(fn($r) => [
@@ -1027,7 +1044,7 @@ class VisaReportController extends Controller
     {
         $rid = $this->resort->resort_id;
         $has = fn($table) => "(EXISTS (SELECT 1 FROM $table WHERE $table.employee_id = e.id AND $table.resort_id = $rid))";
-        $rows = $this->expatBase($f)->orderBy('ra.first_name')
+        $rows = $this->expatBase($f)->when(true, fn($q) => $this->applyDuration($q, $f, 'e.joining_date'))->orderBy('ra.first_name')
             ->select([$this->nameExpr(),
                 'e.passport_number',
                 DB::raw($has('visa_renewals') . ' as has_visa'),

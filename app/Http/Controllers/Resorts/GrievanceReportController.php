@@ -66,7 +66,10 @@ class GrievanceReportController extends Controller
         if (Common::checkRouteWisePermission('resort.report.index', config('settings.resort_permissions.view')) == false) return abort(403, 'Unauthorized access');
         $rid = $this->resort->resort_id;
         $scoped = Common::getScopedDepartmentIds();
-        $reports = collect($this->registry())->map(fn($r, $key) => ['key' => $key, 'name' => $r['name'], 'description' => $r['description'], 'filters' => $r['filters']])->values();
+        $reports = collect($this->registry())->map(fn($r, $key) => ['key' => $key, 'name' => $r['name'], 'description' => $r['description'],
+            // Every report exposes the duration (From/To date) filter, like the Custom Report.
+            'filters' => array_values(array_unique(array_merge($r['filters'], ['duration']))),
+        ])->values();
 
         $departments = DB::table('resort_departments')->where('resort_id', $rid)->when($scoped !== null, fn($q) => $q->whereIn('id', $scoped))->orderBy('name')->get(['id', 'name']);
         $employees = DB::table('employees as e')->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')->where('e.resort_id', $rid)->when($scoped !== null, fn($q) => $q->whereIn('e.Dept_id', $scoped))->orderBy('ra.first_name')->get(['e.id', DB::raw("TRIM(CONCAT(COALESCE(ra.first_name,''),' ',COALESCE(ra.last_name,''))) as name")]);
@@ -128,6 +131,12 @@ class GrievanceReportController extends Controller
     }
 
     /* helpers */
+    private function applyDuration($q, array $f, string $col)
+    {
+        return $q->when($f['from_date'] ?? null, fn($x) => $x->whereDate($col, '>=', $f['from_date']))
+                 ->when($f['to_date'] ?? null, fn($x) => $x->whereDate($col, '<=', $f['to_date']));
+    }
+
     private function dmy($d): string { return $d ? Carbon::parse($d)->format('d M Y') : 'N/A'; }
     private function pct($n, $d): string { return $d ? round($n / $d * 100, 1) . '%' : '0%'; }
     private function isOpen($s): bool { return in_array(strtolower((string) $s), ['pending', 'in_review']); }
@@ -198,7 +207,10 @@ class GrievanceReportController extends Controller
                     'confidential' => null, 'expiry' => $r->Expiry_date]);
             }
         }
-        return $cases;
+        // Centralised duration (From/To date) filter on the normalised case-created date,
+        // so every in-memory consumer of allCases() honours the duration filter.
+        return $cases->filter(fn($c) => (!($f['from_date'] ?? null) || ($c['created'] && substr($c['created'], 0, 10) >= $f['from_date']))
+            && (!($f['to_date'] ?? null) || ($c['created'] && substr($c['created'], 0, 10) <= $f['to_date'])))->values();
     }
 
     private function resolutionDays($created, $resolved)
@@ -211,7 +223,7 @@ class GrievanceReportController extends Controller
 
     public function execSummary(array $f): array
     {
-        $cases = $this->allCases([]);
+        $cases = $this->allCases(['from_date' => $f['from_date'] ?? null, 'to_date' => $f['to_date'] ?? null]);
         $griev = $cases->where('type', 'Grievance')->count();
         $disc = $cases->where('type', 'Disciplinary')->count();
         $open = $cases->filter(fn($c) => $this->isOpen($c['status']))->count();
@@ -223,7 +235,7 @@ class GrievanceReportController extends Controller
 
     public function grievanceRegister(array $f): array
     {
-        $rows = $this->grievanceQuery($f)->when(true, fn($q) => $q->when($f['from_date'], fn($x) => $x->whereDate('g.created_at', '>=', $f['from_date']))->when($f['to_date'], fn($x) => $x->whereDate('g.created_at', '<=', $f['to_date'])))
+        $rows = $this->grievanceQuery($f)->when(true, fn($q) => $this->applyDuration($q, $f, 'g.created_at'))
             ->orderByDesc('g.created_at')->get(['g.id', 'g.Grivance_id', 'gc.Category_Name', 'g.status', 'g.created_at', 'g.Grivance_date_time', 'g.Request_Identity_Disclosure', 'd.name as dept', DB::raw($this->nm)])
             ->map(fn($r) => [
                 'Grievance ID' => $r->Grivance_id ?: ('GRV-' . $r->id), 'Category' => $r->Category_Name ?? 'N/A',
@@ -237,7 +249,7 @@ class GrievanceReportController extends Controller
 
     public function disciplinaryRegister(array $f): array
     {
-        $rows = $this->disciplinaryQuery($f)->when(true, fn($q) => $q->when($f['from_date'], fn($x) => $x->whereDate('ds.created_at', '>=', $f['from_date']))->when($f['to_date'], fn($x) => $x->whereDate('ds.created_at', '<=', $f['to_date'])))
+        $rows = $this->disciplinaryQuery($f)->when(true, fn($q) => $this->applyDuration($q, $f, 'ds.created_at'))
             ->orderByDesc('ds.created_at')->get(['ds.id', 'ds.Disciplinary_id', 'dc.DisciplinaryCategoryName', 'of.OffensesName', 'ds.status', 'ds.created_at', 'ds.Expiry_date', 'd.name as dept', DB::raw($this->nm)])
             ->map(fn($r) => [
                 'Case ID' => $r->Disciplinary_id ?: ('DSP-' . $r->id), 'Category' => $r->DisciplinaryCategoryName ?? 'N/A',
@@ -273,9 +285,10 @@ class GrievanceReportController extends Controller
 
     public function closedCases(array $f): array
     {
-        $rows = $this->allCases($f)->reject(fn($c) => $this->isOpen($c['status']))
-            ->when($f['from_date'], fn($col) => $col->filter(fn($c) => $c['resolved'] && $c['resolved'] >= $f['from_date']))
-            ->when($f['to_date'], fn($col) => $col->filter(fn($c) => $c['resolved'] && $c['resolved'] <= $f['to_date']))
+        // Duration applies to the resolution date here, so bypass allCases()'s created-date filter.
+        $rows = $this->allCases(['case_type' => $f['case_type'] ?? null, 'department' => $f['department'] ?? null, 'employee' => $f['employee'] ?? null, 'status' => $f['status'] ?? null])->reject(fn($c) => $this->isOpen($c['status']))
+            ->when($f['from_date'], fn($col) => $col->filter(fn($c) => $c['resolved'] && substr($c['resolved'], 0, 10) >= $f['from_date']))
+            ->when($f['to_date'], fn($col) => $col->filter(fn($c) => $c['resolved'] && substr($c['resolved'], 0, 10) <= $f['to_date']))
             ->sortByDesc('resolved')
             ->map(fn($c) => [
                 'Case ID' => $c['case_id'], 'Employee Name' => $c['employee'], 'Resolution Date' => $this->dmy($c['resolved']),
@@ -288,6 +301,7 @@ class GrievanceReportController extends Controller
     public function confidentialCases(array $f): array
     {
         $rows = $this->grievanceQuery($f)->whereNotNull('g.Request_Identity_Disclosure')->where('g.Request_Identity_Disclosure', '<>', '')
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 'g.created_at'))
             ->orderByDesc('g.created_at')->get(['g.id', 'g.Grivance_id', 'g.Request_Identity_Disclosure', 'g.status', DB::raw($this->nm)])
             ->map(fn($r) => [
                 'Case ID' => $r->Grivance_id ?: ('GRV-' . $r->id), 'Employee Name' => trim($r->employee_name) ?: 'N/A',
@@ -359,8 +373,7 @@ class GrievanceReportController extends Controller
     public function expiredOffense(array $f): array
     {
         $rows = $this->disciplinaryQuery($f)->whereNotNull('ds.Expiry_date')
-            ->when($f['from_date'], fn($q) => $q->whereDate('ds.Expiry_date', '>=', $f['from_date']))
-            ->when($f['to_date'], fn($q) => $q->whereDate('ds.Expiry_date', '<=', $f['to_date']))
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 'ds.Expiry_date'))
             ->orderByDesc('ds.Expiry_date')->get([DB::raw($this->nm), 'of.OffensesName', 'ac.ActionName', 'ds.Expiry_date'])
             ->map(fn($r) => [
                 'Employee Name' => trim($r->employee_name) ?: 'N/A', 'Offense' => $r->OffensesName ?? 'N/A',
@@ -371,14 +384,14 @@ class GrievanceReportController extends Controller
 
     public function grievanceCategory(array $f): array
     {
-        $raw = $this->grievanceQuery($f)->groupBy('gc.Category_Name')->select('gc.Category_Name', DB::raw('COUNT(*) c'))->get();
+        $raw = $this->grievanceQuery($f)->when(true, fn($q) => $this->applyDuration($q, $f, 'g.created_at'))->groupBy('gc.Category_Name')->select('gc.Category_Name', DB::raw('COUNT(*) c'))->get();
         $total = $raw->sum('c') ?: 1;
         return ['columns' => ['Category', 'Total Cases', 'Percentage'], 'rows' => $raw->map(fn($r) => ['Category' => $r->Category_Name ?? 'N/A', 'Total Cases' => (int) $r->c, 'Percentage' => round($r->c / $total * 100, 1) . '%'])->all()];
     }
 
     public function disciplinaryCategory(array $f): array
     {
-        $raw = $this->disciplinaryQuery($f)->groupBy('dc.DisciplinaryCategoryName')->select('dc.DisciplinaryCategoryName', DB::raw('COUNT(*) c'))->get();
+        $raw = $this->disciplinaryQuery($f)->when(true, fn($q) => $this->applyDuration($q, $f, 'ds.created_at'))->groupBy('dc.DisciplinaryCategoryName')->select('dc.DisciplinaryCategoryName', DB::raw('COUNT(*) c'))->get();
         $total = $raw->sum('c') ?: 1;
         return ['columns' => ['Offense Category', 'Number of Cases', 'Percentage'], 'rows' => $raw->map(fn($r) => ['Offense Category' => $r->DisciplinaryCategoryName ?? 'N/A', 'Number of Cases' => (int) $r->c, 'Percentage' => round($r->c / $total * 100, 1) . '%'])->all()];
     }
@@ -412,14 +425,14 @@ class GrievanceReportController extends Controller
             $g = DB::table('grivance_investigation_child_models as c')
                 ->join('grivance_investigation_models as ip', 'ip.id', '=', 'c.investigation_p_id')
                 ->join('grivance_submission_models as g', 'g.id', '=', 'ip.Grievance_s_id')
-                ->where('g.resort_id', $rid)->get(['g.Grivance_id', 'c.investigation_stage', 'c.resolution_date']);
+                ->where('g.resort_id', $rid)->when(true, fn($q) => $this->applyDuration($q, $f, 'g.created_at'))->get(['g.Grivance_id', 'c.investigation_stage', 'c.resolution_date']);
             foreach ($g as $r) $rows->push(['Case ID' => $r->Grivance_id, 'Investigator' => 'Committee', 'Current Stage' => $r->investigation_stage ?? 'N/A', 'Completion Percentage' => $r->resolution_date ? '100%' : 'In Progress']);
         }
         if (($f['case_type'] ?? null) !== 'Grievance') {
             $d = DB::table('disciplinary_investigation_children as c')
                 ->join('disciplinary_investigation_parents as ip', 'ip.id', '=', 'c.Disciplinary_P_id')
                 ->join('disciplinary_submits as ds', 'ds.id', '=', 'ip.Disciplinary_id')
-                ->where('ds.resort_id', $rid)->get(['ds.Disciplinary_id', 'c.investigation_stage', 'ip.resolution_date']);
+                ->where('ds.resort_id', $rid)->when(true, fn($q) => $this->applyDuration($q, $f, 'ds.created_at'))->get(['ds.Disciplinary_id', 'c.investigation_stage', 'ip.resolution_date']);
             foreach ($d as $r) $rows->push(['Case ID' => $r->Disciplinary_id, 'Investigator' => 'Committee', 'Current Stage' => $r->investigation_stage ?? 'N/A', 'Completion Percentage' => $r->resolution_date ? '100%' : 'In Progress']);
         }
         return ['columns' => ['Case ID', 'Investigator', 'Current Stage', 'Completion Percentage'], 'rows' => $rows->all()];
@@ -432,8 +445,7 @@ class GrievanceReportController extends Controller
             ->join('grivance_investigation_models as ip', 'ip.id', '=', 'c.investigation_p_id')
             ->join('grivance_submission_models as g', 'g.id', '=', 'ip.Grievance_s_id')
             ->where('g.resort_id', $rid)->whereNotNull('c.resolution_date')
-            ->when($f['from_date'], fn($q) => $q->whereDate('c.resolution_date', '>=', $f['from_date']))
-            ->when($f['to_date'], fn($q) => $q->whereDate('c.resolution_date', '<=', $f['to_date']))
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 'c.resolution_date'))
             ->orderByDesc('c.resolution_date')
             ->get(['g.Grivance_id', 'c.inves_find_recommendations', 'c.resolution_note'])
             ->map(fn($r) => [
@@ -448,11 +460,11 @@ class GrievanceReportController extends Controller
         $rid = $this->resort->resort_id;
         $rows = collect();
         if (($f['case_type'] ?? null) !== 'Disciplinary') {
-            $g = DB::table('grivance_investigation_child_models as c')->join('grivance_investigation_models as ip', 'ip.id', '=', 'c.investigation_p_id')->join('grivance_submission_models as g', 'g.id', '=', 'ip.Grievance_s_id')->where('g.resort_id', $rid)->whereNotNull('c.follow_up_action')->get(['g.Grivance_id', 'c.follow_up_action', 'c.follow_up_description', 'c.resolution_date']);
+            $g = DB::table('grivance_investigation_child_models as c')->join('grivance_investigation_models as ip', 'ip.id', '=', 'c.investigation_p_id')->join('grivance_submission_models as g', 'g.id', '=', 'ip.Grievance_s_id')->where('g.resort_id', $rid)->whereNotNull('c.follow_up_action')->when(true, fn($q) => $this->applyDuration($q, $f, 'g.created_at'))->get(['g.Grivance_id', 'c.follow_up_action', 'c.follow_up_description', 'c.resolution_date']);
             foreach ($g as $r) $rows->push(['Case ID' => $r->Grivance_id, 'Action Description' => $r->follow_up_action ?? ($r->follow_up_description ?? 'N/A'), 'Responsible Person' => 'Committee', 'Due Date' => 'N/A', 'Status' => $r->resolution_date ? 'Completed' : 'Open']);
         }
         if (($f['case_type'] ?? null) !== 'Grievance') {
-            $d = DB::table('disciplinary_investigation_children as c')->join('disciplinary_investigation_parents as ip', 'ip.id', '=', 'c.Disciplinary_P_id')->join('disciplinary_submits as ds', 'ds.id', '=', 'ip.Disciplinary_id')->where('ds.resort_id', $rid)->whereNotNull('c.follow_up_action')->get(['ds.Disciplinary_id', 'c.follow_up_action', 'c.follow_up_description', 'ip.resolution_date']);
+            $d = DB::table('disciplinary_investigation_children as c')->join('disciplinary_investigation_parents as ip', 'ip.id', '=', 'c.Disciplinary_P_id')->join('disciplinary_submits as ds', 'ds.id', '=', 'ip.Disciplinary_id')->where('ds.resort_id', $rid)->whereNotNull('c.follow_up_action')->when(true, fn($q) => $this->applyDuration($q, $f, 'ds.created_at'))->get(['ds.Disciplinary_id', 'c.follow_up_action', 'c.follow_up_description', 'ip.resolution_date']);
             foreach ($d as $r) $rows->push(['Case ID' => $r->Disciplinary_id, 'Action Description' => $r->follow_up_action ?? ($r->follow_up_description ?? 'N/A'), 'Responsible Person' => 'Committee', 'Due Date' => 'N/A', 'Status' => $r->resolution_date ? 'Completed' : 'Open']);
         }
         return ['columns' => ['Case ID', 'Action Description', 'Responsible Person', 'Due Date', 'Status'], 'rows' => $rows->all()];
@@ -460,9 +472,10 @@ class GrievanceReportController extends Controller
 
     public function resolutionSummary(array $f): array
     {
-        $rows = $this->allCases($f)->reject(fn($c) => $this->isOpen($c['status']))
-            ->when($f['from_date'], fn($col) => $col->filter(fn($c) => $c['resolved'] && $c['resolved'] >= $f['from_date']))
-            ->when($f['to_date'], fn($col) => $col->filter(fn($c) => $c['resolved'] && $c['resolved'] <= $f['to_date']))
+        // Duration applies to the resolution date here, so bypass allCases()'s created-date filter.
+        $rows = $this->allCases(['case_type' => $f['case_type'] ?? null, 'department' => $f['department'] ?? null, 'employee' => $f['employee'] ?? null, 'status' => $f['status'] ?? null])->reject(fn($c) => $this->isOpen($c['status']))
+            ->when($f['from_date'], fn($col) => $col->filter(fn($c) => $c['resolved'] && substr($c['resolved'], 0, 10) >= $f['from_date']))
+            ->when($f['to_date'], fn($col) => $col->filter(fn($c) => $c['resolved'] && substr($c['resolved'], 0, 10) <= $f['to_date']))
             ->sortByDesc('resolved')->map(fn($c) => [
                 'Case ID' => $c['case_id'], 'Resolution Type' => $this->statusLabel($c['status']),
                 'Resolution Notes' => 'N/A', 'Resolution Date' => $this->dmy($c['resolved']),
@@ -513,7 +526,7 @@ class GrievanceReportController extends Controller
 
     public function repeatOffender(array $f): array
     {
-        $rows = $this->disciplinaryQuery($f)->select('ds.Employee_id', DB::raw('COUNT(*) c'), DB::raw('MAX(of.OffensesName) latest_offense'), DB::raw('MAX(ds.status) latest_status'), DB::raw($this->nm))
+        $rows = $this->disciplinaryQuery($f)->when(true, fn($q) => $this->applyDuration($q, $f, 'ds.created_at'))->select('ds.Employee_id', DB::raw('COUNT(*) c'), DB::raw('MAX(of.OffensesName) latest_offense'), DB::raw('MAX(ds.status) latest_status'), DB::raw($this->nm))
             ->groupBy('ds.Employee_id', 'ra.first_name', 'ra.last_name')->having('c', '>', 1)->orderByDesc('c')->get()
             ->map(fn($r) => [
                 'Employee Name' => trim($r->employee_name) ?: 'N/A', 'Number of Cases' => (int) $r->c,
@@ -524,7 +537,7 @@ class GrievanceReportController extends Controller
 
     public function offenseFrequency(array $f): array
     {
-        $raw = $this->disciplinaryQuery($f)->groupBy('of.OffensesName')->select('of.OffensesName', DB::raw('COUNT(*) c'))->orderByDesc(DB::raw('COUNT(*)'))->get();
+        $raw = $this->disciplinaryQuery($f)->when(true, fn($q) => $this->applyDuration($q, $f, 'ds.created_at'))->groupBy('of.OffensesName')->select('of.OffensesName', DB::raw('COUNT(*) c'))->orderByDesc(DB::raw('COUNT(*)'))->get();
         $total = $raw->sum('c') ?: 1;
         return ['columns' => ['Offense', 'Number of Occurrences', 'Percentage'], 'rows' => $raw->map(fn($r) => ['Offense' => $r->OffensesName ?? 'N/A', 'Number of Occurrences' => (int) $r->c, 'Percentage' => round($r->c / $total * 100, 1) . '%'])->all()];
     }
@@ -540,10 +553,10 @@ class GrievanceReportController extends Controller
         // Only letter TEMPLATES are stored; issued letters per case are not tracked.
         $rid = $this->resort->resort_id;
         $rows = collect();
-        foreach (DB::table('grievance_templete_models')->where('resort_id', $rid)->get(['Grievance_Temp_name', 'created_at']) as $r) {
+        foreach (DB::table('grievance_templete_models')->where('resort_id', $rid)->when(true, fn($q) => $this->applyDuration($q, $f, 'created_at'))->get(['Grievance_Temp_name', 'created_at']) as $r) {
             $rows->push(['Letter Name' => $r->Grievance_Temp_name, 'Employee Name' => 'N/A', 'Issue Date' => $this->dmy($r->created_at), 'Status' => 'Template']);
         }
-        foreach (DB::table('disciplinery_latter_templetes')->where('resort_id', $rid)->get(['Latter_Temp_name', 'created_at']) as $r) {
+        foreach (DB::table('disciplinery_latter_templetes')->where('resort_id', $rid)->when(true, fn($q) => $this->applyDuration($q, $f, 'created_at'))->get(['Latter_Temp_name', 'created_at']) as $r) {
             $rows->push(['Letter Name' => $r->Latter_Temp_name, 'Employee Name' => 'N/A', 'Issue Date' => $this->dmy($r->created_at), 'Status' => 'Template']);
         }
         return ['columns' => ['Letter Name', 'Employee Name', 'Issue Date', 'Status'], 'rows' => $rows->all()];
@@ -551,9 +564,8 @@ class GrievanceReportController extends Controller
 
     public function documentAudit(array $f): array
     {
-        $rows = $this->allCases($f)->filter(fn($c) => true)
-            ->when($f['from_date'], fn($col) => $col->filter(fn($c) => $c['created'] && $c['created'] >= $f['from_date']))
-            ->when($f['to_date'], fn($col) => $col->filter(fn($c) => $c['created'] && $c['created'] <= $f['to_date']))
+        // Duration on the case-created (upload) date is applied centrally in allCases().
+        $rows = $this->allCases($f)
             ->sortByDesc('created')->map(fn($c) => [
                 'Case ID' => $c['case_id'], 'Document Type' => $c['type'] . ' attachment',
                 'Uploaded By' => $c['employee'], 'Upload Date' => $this->dmy($c['created']),

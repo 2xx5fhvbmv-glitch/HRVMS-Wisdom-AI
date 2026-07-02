@@ -56,7 +56,9 @@ class FileManagementReportController extends Controller
         $scoped     = Common::getScopedDepartmentIds();
 
         $reports = collect($this->registry())->map(fn($r, $key) => [
-            'key' => $key, 'name' => $r['name'], 'description' => $r['description'], 'filters' => $r['filters'],
+            'key' => $key, 'name' => $r['name'], 'description' => $r['description'],
+            // Every report exposes the duration (From/To date) filter, like the Custom Report.
+            'filters' => array_values(array_unique(array_merge($r['filters'], ['duration']))),
         ])->values();
 
         $departments = DB::table('resort_departments')->where('resort_id', $resortId)
@@ -160,9 +162,12 @@ class FileManagementReportController extends Controller
     public function execSummary(array $f): array
     {
         $rid = $this->resort->resort_id;
-        $totalDocs = (clone $this->docBase($f))->count();
-        $folders = DB::table('filemangement_systems')->where('resort_id', $rid)->where('Folder_Type', 'categorized')->count();
-        $recent = (clone $this->docBase($f))->where('ed.created_at', '>=', Carbon::today()->subDays(30))->count();
+        $base = $this->docBase($f);
+        $this->applyDuration($base, $f, 'ed.created_at');
+        $totalDocs = (clone $base)->count();
+        $folders = DB::table('filemangement_systems')->where('resort_id', $rid)->where('Folder_Type', 'categorized')
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 'created_at'))->count();
+        $recent = (clone $base)->where('ed.created_at', '>=', Carbon::today()->subDays(30))->count();
         return [
             'columns' => ['Total Documents', 'Total Employee Folders', 'Unsigned Documents', 'Shared Files', 'Recent Uploads (30d)'],
             'rows'    => [[
@@ -179,7 +184,9 @@ class FileManagementReportController extends Controller
     public function docRegister(array $f): array
     {
         $rid = $this->resort->resort_id;
-        $rows = $this->docBase($f)->orderBy('ra.first_name')->orderByDesc('ed.created_at')
+        $rows = $this->docBase($f)
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 'ed.created_at'))
+            ->orderBy('ra.first_name')->orderByDesc('ed.created_at')
             ->get(['e.Emp_id', $this->nameExpr(), 'ed.id as doc_id', 'ed.document_title', 'ed.document_category', 'ed.created_at'])
             ->map(function ($r) use ($rid) {
                 $ver = DB::table('file_versions')->where('resort_id', $rid)->where('file_id', $r->doc_id)->max('version_number');
@@ -208,6 +215,7 @@ class FileManagementReportController extends Controller
             ->where('fs.resort_id', $rid)->where('fs.Folder_Type', 'categorized')
             ->when($scoped !== null, fn($q) => $q->whereIn('e.Dept_id', $scoped))
             ->when($f['department'], fn($q) => $q->where('e.Dept_id', $f['department']))
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 'fs.created_at'))
             ->leftJoin('child_file_management as c', 'c.Parent_File_ID', '=', 'fs.id')
             ->groupBy('fs.id', 'fs.Folder_Name', 'fs.updated_at', 'ra.first_name', 'ra.last_name')
             ->orderBy('ra.first_name')
@@ -231,6 +239,7 @@ class FileManagementReportController extends Controller
             ->where('e.resort_id', $this->resort->resort_id)
             ->when($scoped !== null, fn($q) => $q->whereIn('e.Dept_id', $scoped))
             ->when($f['employee'], fn($q) => $q->where('e.id', $f['employee']))
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 'ed.created_at'))
             ->groupBy('e.id', 'ra.first_name', 'ra.last_name')
             ->orderBy('ra.first_name')
             ->get([$this->nameExpr(), DB::raw("GROUP_CONCAT(LOWER(COALESCE(ed.document_title,'')) SEPARATOR '|') as titles")]);
@@ -304,6 +313,7 @@ class FileManagementReportController extends Controller
             ->leftJoin('resort_admins as ra', 'ra.id', '=', 'v.created_by')
             ->where('v.resort_id', $this->resort->resort_id)
             ->when($f['document_name'], fn($q) => $q->where('c.File_Name', 'like', '%' . $f['document_name'] . '%'))
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 'v.created_at'))
             ->orderBy('c.File_Name')->orderBy('v.version_number')
             ->get(['c.File_Name', 'v.version_number', 'v.created_at',
                 DB::raw("TRIM(CONCAT(COALESCE(ra.first_name,''),' ',COALESCE(ra.last_name,''))) as modified_by")])
@@ -336,6 +346,7 @@ class FileManagementReportController extends Controller
             ->where('c.resort_id', $rid)->where('fs.Folder_Type', 'categorized')
             ->when($scoped !== null, fn($q) => $q->whereIn('e.Dept_id', $scoped))
             ->when($f['department'], fn($q) => $q->where('e.Dept_id', $f['department']))
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 'c.created_at'))
             ->groupBy('e.Dept_id', 'd.name')
             ->orderBy('d.name')
             ->get(['d.name as dept', DB::raw('COUNT(c.id) as files'), DB::raw('SUM(c.File_Size) as storage')])
@@ -351,6 +362,7 @@ class FileManagementReportController extends Controller
     public function docSummary(array $f): array
     {
         $rows = $this->docBase($f)
+            ->when(true, fn($q) => $this->applyDuration($q, $f, 'ed.created_at'))
             ->groupBy('e.id', 'ra.first_name', 'ra.last_name')
             ->orderBy('ra.first_name')
             ->get([$this->nameExpr(), DB::raw('COUNT(ed.id) as total'), DB::raw('MAX(ed.updated_at) as last_updated'),
