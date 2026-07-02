@@ -2025,6 +2025,12 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
     Route::post('report/accommodation/export', 'AccommodationReportController@export')->name('resort.report.accommodation.export');
     Route::post('report/accommodation/insights', 'AccommodationReportController@insights')->name('resort.report.accommodation.insights');
 
+    // Predefined SOS / Emergency reports (Option B).
+    Route::get('report/sos', 'SosReportController@index')->name('resort.report.sos.index');
+    Route::post('report/sos/run', 'SosReportController@run')->name('resort.report.sos.run');
+    Route::post('report/sos/export', 'SosReportController@export')->name('resort.report.sos.export');
+    Route::post('report/sos/insights', 'SosReportController@insights')->name('resort.report.sos.insights');
+
 
     Route::delete('report/{id}', 'ReportController@destroy')->name('reports.destroy');
 

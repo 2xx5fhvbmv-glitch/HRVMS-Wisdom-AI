@@ -42,6 +42,7 @@
                                 <li><a class="dropdown-item" href="{{ route('resort.report.grievance.index') }}">Grievance & Disciplinary Reports</a></li>
                                 <li><a class="dropdown-item" href="{{ route('resort.report.incident.index') }}">Incident Management Reports</a></li>
                                 <li><a class="dropdown-item" href="{{ route('resort.report.accommodation.index') }}">Accommodation Reports</a></li>
+                                <li><a class="dropdown-item" href="{{ route('resort.report.sos.index') }}">SOS / Emergency Reports</a></li>
                             </ul>
                         </div>
                         <a href="{{ route('reports.create') }}" class="btn btn-sm btn-theme @if(Common::checkRouteWisePermission('resort.report.index',config('settings.resort_permissions.create')) == false) d-none @endif">Custom Report</a>
