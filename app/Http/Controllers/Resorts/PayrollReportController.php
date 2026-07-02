@@ -51,7 +51,6 @@ class PayrollReportController extends Controller
             'net_salary'             => ['name' => 'Net Salary Report', 'description' => 'Final payable salary after deductions.', 'filters' => ['payroll'], 'handler' => 'netSalary'],
             'allowance_report'       => ['name' => 'Allowance Report', 'description' => 'Allowances paid during the period.', 'filters' => ['payroll', 'allowance_type'], 'handler' => 'allowanceReport'],
             'deduction_report'       => ['name' => 'Deduction Report', 'description' => 'Deductions made during payroll processing.', 'filters' => ['payroll', 'deduction_type'], 'handler' => 'deductionReport'],
-            'component_analysis'     => ['name' => 'Payroll Component Analysis', 'description' => 'Payroll cost grouped by salary component.', 'filters' => ['payroll'], 'handler' => 'componentAnalysis'],
             'service_charge_dist'    => ['name' => 'Service Charge Distribution', 'description' => 'Service charge per employee.', 'filters' => ['payroll'], 'handler' => 'serviceChargeDistribution'],
             'service_charge_trend'   => ['name' => 'Service Charge Trend', 'description' => 'Monthly service charge trend.', 'filters' => ['year'], 'handler' => 'serviceChargeTrend'],
             'avg_service_charge'     => ['name' => 'Average Service Charge', 'description' => 'Average service charge per employee by department.', 'filters' => ['year', 'department'], 'handler' => 'averageServiceCharge'],
@@ -223,7 +222,14 @@ class PayrollReportController extends Controller
 
     /* ---------------------------------------------------------------- helpers */
 
+    /** Money formatter — payroll figures are stored in USD (base currency). */
     private function n($v): string
+    {
+        return '$' . number_format((float) $v, 2);
+    }
+
+    /** Non-currency numeric formatter (e.g. overtime hours). */
+    private function hrs($v): string
     {
         return number_format((float) $v, 2);
     }
@@ -695,10 +701,10 @@ class PayrollReportController extends Controller
             ->map(fn($r) => [
                 'Employee Name'   => $r->employee_name,
                 'Department'      => $r->dept ?? 'N/A',
-                'Normal OT Hours' => $this->n($r->regular_ot_hours ?? 0),
+                'Normal OT Hours' => $this->hrs($r->regular_ot_hours ?? 0),
                 'Friday OT Hours' => 'N/A', // not tracked separately
-                'Holiday OT Hours'=> $this->n($r->holiday_ot_hours ?? 0),
-                'Total OT Hours'  => $this->n($r->total_ot ?? 0),
+                'Holiday OT Hours'=> $this->hrs($r->holiday_ot_hours ?? 0),
+                'Total OT Hours'  => $this->hrs($r->total_ot ?? 0),
                 'OT Amount'       => $this->n($r->regularOTPay + $r->holidayOTPay),
             ])->all();
 
@@ -1081,37 +1087,6 @@ class PayrollReportController extends Controller
         ];
     }
 
-    /** #10 Payroll Component Analysis — totals per salary component (one row). */
-    public function componentAnalysis(array $filters): array
-    {
-        $pid = $this->resolvePayrollId($filters);
-        $t = $this->basePayslip($pid, $filters)->selectRaw(
-            'SUM(pr.earnings_basic) basic, SUM(pr.regularOTPay + pr.holidayOTPay) ot, SUM(pr.service_charge) sc,
-             SUM(pr.earnings_allowance) allow, SUM(pr.kpi_bonus) bonus, SUM(pr.total_deductions) ded'
-        )->first();
-
-        $scoped = Common::getScopedDepartmentIds();
-        $employer = DB::table('payroll_deductions as pd')
-            ->join('employees as e', 'e.id', '=', 'pd.employee_id')
-            ->whereIn('pd.payroll_id', (array) $pid)
-            ->when($scoped !== null, fn($q) => $q->whereIn('e.Dept_id', $scoped))
-            ->when($filters['department'], fn($q) => $q->where('e.Dept_id', $filters['department']))
-            ->sum('pd.pension'); // employer share mirrors the 7% employee pension
-
-        return [
-            'columns' => ['Basic Salary', 'OT', 'Service Charge', 'Allowances', 'Bonuses', 'Deductions', 'Employer Contributions'],
-            'rows'    => [[
-                'Basic Salary'           => $this->n($t->basic ?? 0),
-                'OT'                     => $this->n($t->ot ?? 0),
-                'Service Charge'         => $this->n($t->sc ?? 0),
-                'Allowances'             => $this->n($t->allow ?? 0),
-                'Bonuses'                => $this->n($t->bonus ?? 0),
-                'Deductions'             => $this->n($t->ded ?? 0),
-                'Employer Contributions' => $this->n($employer),
-            ]],
-        ];
-    }
-
     /** #18 Overtime Summary — OT hours + pay per employee (no Friday OT tracked). */
     public function overtimeSummary(array $filters): array
     {
@@ -1125,9 +1100,9 @@ class PayrollReportController extends Controller
             ->get([$this->nameExpr(), 'ta.regular_ot_hours', 'ta.holiday_ot_hours', 'pr.regularOTPay', 'pr.holidayOTPay'])
             ->map(fn($r) => [
                 'Employee Name'    => $r->employee_name,
-                'Normal OT Hours'  => $this->n($r->regular_ot_hours ?? 0),
+                'Normal OT Hours'  => $this->hrs($r->regular_ot_hours ?? 0),
                 'Friday OT Hours'  => 'N/A', // not tracked separately
-                'Holiday OT Hours' => $this->n($r->holiday_ot_hours ?? 0),
+                'Holiday OT Hours' => $this->hrs($r->holiday_ot_hours ?? 0),
                 'OT Amount'        => $this->n($r->regularOTPay + $r->holidayOTPay),
             ])->all();
 
@@ -1154,9 +1129,9 @@ class PayrollReportController extends Controller
             )->orderBy('m')->get()
             ->map(fn($r) => [
                 'Month'           => Carbon::create()->month((int) $r->m)->format('F'),
-                'Normal OT Hours' => $this->n($r->normal_h),
+                'Normal OT Hours' => $this->hrs($r->normal_h),
                 'Friday OT Hours' => 'N/A',
-                'Holiday OT Hours'=> $this->n($r->holiday_h),
+                'Holiday OT Hours'=> $this->hrs($r->holiday_h),
                 'Total OT Cost'   => $this->n($r->cost),
             ])->all();
 
