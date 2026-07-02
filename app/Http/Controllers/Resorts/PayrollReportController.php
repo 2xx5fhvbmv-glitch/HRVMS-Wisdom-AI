@@ -550,15 +550,16 @@ class PayrollReportController extends Controller
         $rows = $this->basePayslip($pid, $filters)
             ->where('e.payment_mode', 'Cash')
             ->orderBy('d.name')->orderBy('ra.first_name')
-            ->get(['pr.Emp_id', $this->nameExpr(), 'd.name as dept', 'pr.net_salary'])
+            ->get(['pr.Emp_id', $this->nameExpr(), 'p.position_title', 'd.name as dept', 'pr.net_salary'])
             ->map(fn($r) => [
-                'Employee Name' => $r->employee_name,
-                'Employee ID'   => $r->Emp_id,
-                'Department'    => $r->dept ?? 'N/A',
-                'Net Salary'    => $this->n($r->net_salary),
+                'Employee ID'       => $r->Emp_id,
+                'Employee Name'     => $r->employee_name,
+                'Employee Position' => $r->position_title ?? 'N/A',
+                'Employee Department'=> $r->dept ?? 'N/A',
+                'Net Salary'        => $this->n($r->net_salary),
             ])->all();
 
-        return ['columns' => ['Employee Name', 'Employee ID', 'Department', 'Net Salary'], 'rows' => $rows];
+        return ['columns' => ['Employee ID', 'Employee Name', 'Employee Position', 'Employee Department', 'Net Salary'], 'rows' => $rows];
     }
 
     /** #11 Gross Salary Report. */
@@ -567,9 +568,11 @@ class PayrollReportController extends Controller
         $pid = $this->resolvePayrollId($filters);
         $rows = $this->basePayslip($pid, $filters)
             ->orderBy('ra.first_name')
-            ->get([$this->nameExpr(), 'pr.earnings_basic', 'pr.earnings_allowance', 'pr.earnings_overtime', 'pr.regularOTPay', 'pr.holidayOTPay', 'pr.service_charge', 'pr.total_earnings'])
+            ->get(['e.Emp_id', $this->nameExpr(), 'p.position_title', 'pr.earnings_basic', 'pr.earnings_allowance', 'pr.earnings_overtime', 'pr.regularOTPay', 'pr.holidayOTPay', 'pr.service_charge', 'pr.total_earnings'])
             ->map(fn($r) => [
-                'Employee Name'  => $r->employee_name,
+                'Employee ID'       => $r->Emp_id ?: 'N/A',
+                'Employee Name'     => $r->employee_name,
+                'Employee Position' => $r->position_title ?? 'N/A',
                 'Basic Salary'   => $this->n($r->earnings_basic),
                 'Allowances'     => $this->n($r->earnings_allowance),
                 'OT'             => $this->n($r->earnings_overtime ?: ($r->regularOTPay + $r->holidayOTPay)),
@@ -577,7 +580,7 @@ class PayrollReportController extends Controller
                 'Gross Salary'   => $this->n($r->total_earnings),
             ])->all();
 
-        return ['columns' => ['Employee Name', 'Basic Salary', 'Allowances', 'OT', 'Service Charge', 'Gross Salary'], 'rows' => $rows];
+        return ['columns' => ['Employee ID', 'Employee Name', 'Employee Position', 'Basic Salary', 'Allowances', 'OT', 'Service Charge', 'Gross Salary'], 'rows' => $rows];
     }
 
     /** #12 Net Salary Report. */
@@ -586,15 +589,17 @@ class PayrollReportController extends Controller
         $pid = $this->resolvePayrollId($filters);
         $rows = $this->basePayslip($pid, $filters)
             ->orderBy('ra.first_name')
-            ->get([$this->nameExpr(), 'pr.total_earnings', 'pr.total_deductions', 'pr.net_salary'])
+            ->get(['e.Emp_id', $this->nameExpr(), 'p.position_title', 'pr.total_earnings', 'pr.total_deductions', 'pr.net_salary'])
             ->map(fn($r) => [
-                'Employee Name'   => $r->employee_name,
-                'Gross Salary'    => $this->n($r->total_earnings),
-                'Total Deductions'=> $this->n($r->total_deductions),
-                'Net Salary'      => $this->n($r->net_salary),
+                'Employee ID'       => $r->Emp_id ?: 'N/A',
+                'Employee Name'     => $r->employee_name,
+                'Employee Position' => $r->position_title ?? 'N/A',
+                'Gross Salary'      => $this->n($r->total_earnings),
+                'Total Deduction'   => $this->n($r->total_deductions),
+                'Net Salary'        => $this->n($r->net_salary),
             ])->all();
 
-        return ['columns' => ['Employee Name', 'Gross Salary', 'Total Deductions', 'Net Salary'], 'rows' => $rows];
+        return ['columns' => ['Employee ID', 'Employee Name', 'Employee Position', 'Gross Salary', 'Total Deduction', 'Net Salary'], 'rows' => $rows];
     }
 
     /** #13 Allowance Report. */
@@ -746,18 +751,20 @@ class PayrollReportController extends Controller
             })
             ->whereRaw('(pr.regularOTPay + pr.holidayOTPay) > 0')
             ->orderByDesc(DB::raw('pr.regularOTPay + pr.holidayOTPay'))
-            ->get([$this->nameExpr(), 'd.name as dept', 'ta.regular_ot_hours', 'ta.holiday_ot_hours', 'ta.total_ot', 'pr.regularOTPay', 'pr.holidayOTPay'])
+            ->get(['e.Emp_id', $this->nameExpr(), 'p.position_title', 'd.name as dept', 'ta.regular_ot_hours', 'ta.holiday_ot_hours', 'ta.total_ot', 'pr.regularOTPay', 'pr.holidayOTPay'])
             ->map(fn($r) => [
+                'Employee ID'     => $r->Emp_id ?: 'N/A',
                 'Employee Name'   => $r->employee_name,
+                'Employee Position'=> $r->position_title ?? 'N/A',
                 'Department'      => $r->dept ?? 'N/A',
                 'Normal OT Hours' => $this->hrs($r->regular_ot_hours ?? 0),
                 'Friday OT Hours' => 'N/A', // not tracked separately
                 'Holiday OT Hours'=> $this->hrs($r->holiday_ot_hours ?? 0),
                 'Total OT Hours'  => $this->hrs($r->total_ot ?? 0),
-                'OT Amount'       => $this->n($r->regularOTPay + $r->holidayOTPay),
+                'Total Amount'    => $this->n($r->regularOTPay + $r->holidayOTPay),
             ])->all();
 
-        return ['columns' => ['Employee Name', 'Department', 'Normal OT Hours', 'Friday OT Hours', 'Holiday OT Hours', 'Total OT Hours', 'OT Amount'], 'rows' => $rows];
+        return ['columns' => ['Employee ID', 'Employee Name', 'Employee Position', 'Department', 'Normal OT Hours', 'Friday OT Hours', 'Holiday OT Hours', 'Total OT Hours', 'Total Amount'], 'rows' => $rows];
     }
 
     /** #23 EWT Report. */
@@ -772,14 +779,16 @@ class PayrollReportController extends Controller
             })
             ->where('pd.ewt', '>', 0)
             ->orderBy('ra.first_name')
-            ->get([$this->nameExpr(), 'pr.total_earnings', 'pd.ewt'])
+            ->get(['e.Emp_id', $this->nameExpr(), 'p.position_title', 'pr.total_earnings', 'pd.ewt'])
             ->map(function ($r) use ($brackets) {
                 $bracket = $brackets->first(function ($b) use ($r) {
                     return $r->total_earnings >= $b->min_salary
                         && ($b->max_salary === null || $r->total_earnings <= $b->max_salary);
                 });
                 return [
+                    'Employee ID'   => $r->Emp_id ?: 'N/A',
                     'Employee Name' => $r->employee_name,
+                    'Employee Position'=> $r->position_title ?? 'N/A',
                     'Taxable Income'=> $this->n($r->total_earnings),
                     'Tax Bracket'   => $bracket
                         ? $this->n($bracket->min_salary) . '–' . ($bracket->max_salary === null ? '∞' : $this->n($bracket->max_salary)) . ' @ ' . $bracket->tax_rate . '%'
@@ -788,7 +797,7 @@ class PayrollReportController extends Controller
                 ];
             })->all();
 
-        return ['columns' => ['Employee Name', 'Taxable Income', 'Tax Bracket', 'EWT Amount'], 'rows' => $rows];
+        return ['columns' => ['Employee ID', 'Employee Name', 'Employee Position', 'Taxable Income', 'Tax Bracket', 'EWT Amount'], 'rows' => $rows];
     }
 
     /** #24 Annual Tax Summary. */
@@ -803,20 +812,23 @@ class PayrollReportController extends Controller
             })
             ->join('employees as e', 'e.id', '=', 'pd.employee_id')
             ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
+            ->leftJoin('resort_positions as p', 'p.id', '=', 'e.Position_id')
             ->where('pay.resort_id', $this->resort->resort_id)
             ->whereRaw('YEAR(pay.start_date) = ?', [$year])
             ->when($scoped !== null, fn($q) => $q->whereIn('e.Dept_id', $scoped))
-            ->groupBy('e.id', 'ra.first_name', 'ra.last_name')
+            ->groupBy('e.id', 'e.Emp_id', 'ra.first_name', 'ra.last_name', 'p.position_title')
             ->havingRaw('SUM(pd.ewt) > 0')
-            ->select($this->nameExpr(), DB::raw('SUM(pr.total_earnings) gross'), DB::raw('SUM(pd.ewt) ewt'))
+            ->select('e.Emp_id', $this->nameExpr(), 'p.position_title', DB::raw('SUM(pr.total_earnings) gross'), DB::raw('SUM(pd.ewt) ewt'))
             ->orderBy('ra.first_name')->get()
             ->map(fn($r) => [
+                'Employee ID'         => $r->Emp_id ?: 'N/A',
                 'Employee Name'       => $r->employee_name,
+                'Employee Position'   => $r->position_title ?? 'N/A',
                 'Gross Taxable Income'=> $this->n($r->gross),
                 'Total EWT'           => $this->n($r->ewt),
             ])->all();
 
-        return ['columns' => ['Employee Name', 'Gross Taxable Income', 'Total EWT'], 'rows' => $rows];
+        return ['columns' => ['Employee ID', 'Employee Name', 'Employee Position', 'Gross Taxable Income', 'Total EWT'], 'rows' => $rows];
     }
 
     /** #25 Full & Final Settlement Register. */
@@ -827,22 +839,22 @@ class PayrollReportController extends Controller
             ->when($filters['year'], fn($q) => $q->whereRaw('YEAR(fs.last_working_date) = ?', [$filters['year']]))
             ->orderByDesc('fs.last_working_date')
             ->get([
-                $this->nameExpr(), 'fs.last_working_date', 'fs.basic_salary', 'fs.leave_encashment',
+                'e.Emp_id', $this->nameExpr(), 'p.position_title', 'd.name as dept', 'fs.last_working_date', 'fs.basic_salary', 'fs.leave_encashment',
                 'fs.total_deductions', 'fs.net_pay', 'fs.status',
             ])
             ->map(fn($r) => [
+                'Employee ID'           => $r->Emp_id ?: 'N/A',
                 'Employee Name'         => $r->employee_name,
-                'Separation Date'       => $r->last_working_date ? Carbon::parse($r->last_working_date)->format('d M Y') : 'N/A',
-                'Final Salary'          => $this->n($r->basic_salary ?? 0),
+                'Employee Position'     => $r->position_title ?? 'N/A',
+                'Employee Department'   => $r->dept ?? 'N/A',
+                'Earnings'              => $this->n($r->basic_salary ?? 0),
+                'Deduction'             => $this->n($r->total_deductions ?? 0),
                 'Leave Encashment'      => $this->n($r->leave_encashment ?? 0),
-                'Gratuity'              => 'N/A', // not modelled separately
-                'Deductions'            => $this->n($r->total_deductions ?? 0),
                 'Final Settlement Amount'=> $this->n($r->net_pay ?? 0),
-                'Settlement Status'     => ucfirst($r->status ?? ''),
             ])->all();
 
         return [
-            'columns' => ['Employee Name', 'Separation Date', 'Final Salary', 'Leave Encashment', 'Gratuity', 'Deductions', 'Final Settlement Amount', 'Settlement Status'],
+            'columns' => ['Employee ID', 'Employee Name', 'Employee Position', 'Employee Department', 'Earnings', 'Deduction', 'Leave Encashment', 'Final Settlement Amount'],
             'rows'    => $rows,
         ];
     }
@@ -853,15 +865,18 @@ class PayrollReportController extends Controller
         $rows = $this->settlementQuery($filters)
             ->where('fs.status', '<>', 'finalized')
             ->orderByDesc('fs.last_working_date')
-            ->get([$this->nameExpr(), 'd.name as dept', 'fs.last_working_date', 'fs.net_pay'])
+            ->get(['e.Emp_id', $this->nameExpr(), 'p.position_title', 'd.name as dept', 'fs.last_working_date', 'fs.net_pay', 'fs.status'])
             ->map(fn($r) => [
+                'Employee ID'     => $r->Emp_id ?: 'N/A',
                 'Employee Name'   => $r->employee_name,
+                'Employee Position'=> $r->position_title ?? 'N/A',
                 'Department'      => $r->dept ?? 'N/A',
                 'Separation Date' => $r->last_working_date ? Carbon::parse($r->last_working_date)->format('d M Y') : 'N/A',
                 'Pending Amount'  => $this->n($r->net_pay ?? 0),
+                'Status'          => ucfirst($r->status ?? ''),
             ])->all();
 
-        return ['columns' => ['Employee Name', 'Department', 'Separation Date', 'Pending Amount'], 'rows' => $rows];
+        return ['columns' => ['Employee ID', 'Employee Name', 'Employee Position', 'Department', 'Separation Date', 'Pending Amount', 'Status'], 'rows' => $rows];
     }
 
     private function settlementQuery(array $filters)
@@ -871,6 +886,7 @@ class PayrollReportController extends Controller
             ->join('employees as e', 'e.id', '=', 'fs.employee_id')
             ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
             ->leftJoin('resort_departments as d', 'd.id', '=', 'e.Dept_id')
+            ->leftJoin('resort_positions as p', 'p.id', '=', 'e.Position_id')
             ->where('e.resort_id', $this->resort->resort_id)
             ->when($scoped !== null, fn($q) => $q->whereIn('e.Dept_id', $scoped))
             ->when(true, fn($q) => $this->applyDuration($q, $filters, 'fs.last_working_date'));
@@ -886,14 +902,16 @@ class PayrollReportController extends Controller
             })
             ->where('pd.staff_shop', '>', 0)
             ->orderBy('d.name')->orderBy('ra.first_name')
-            ->get([$this->nameExpr(), 'd.name as dept', 'pd.staff_shop'])
+            ->get(['e.Emp_id', $this->nameExpr(), 'p.position_title', 'd.name as dept', 'pd.staff_shop'])
             ->map(fn($r) => [
+                'Employee ID'             => $r->Emp_id ?: 'N/A',
                 'Employee Name'           => $r->employee_name,
+                'Employee Position'       => $r->position_title ?? 'N/A',
                 'Department'              => $r->dept ?? 'N/A',
                 'Total Tuck Shop Deduction'=> $this->n($r->staff_shop),
             ])->all();
 
-        return ['columns' => ['Employee Name', 'Department', 'Total Tuck Shop Deduction'], 'rows' => $rows];
+        return ['columns' => ['Employee ID', 'Employee Name', 'Employee Position', 'Department', 'Total Tuck Shop Deduction'], 'rows' => $rows];
     }
 
     /** #29 Tuck Shop Purchase Details (within the payroll period's date range). */
@@ -907,26 +925,30 @@ class PayrollReportController extends Controller
             ->join('employees as e', 'e.id', '=', 'pmt.emp_id')
             ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
             ->leftJoin('products as pr2', 'pr2.id', '=', 'pmt.product_id')
-            ->leftJoin('shopkeepers as sk', 'sk.id', '=', 'pmt.shopkeeper_id')
             ->where('e.resort_id', $this->resort->resort_id)
             ->when($scoped !== null, fn($x) => $x->whereIn('e.Dept_id', $scoped))
-            ->when($filters['department'], fn($x) => $x->where('e.Dept_id', $filters['department']));
+            ->when($filters['department'], fn($x) => $x->where('e.Dept_id', $filters['department']))
+            ->when($filters['employee'] ?? null, fn($x) => $x->where('e.id', $filters['employee']));
 
         if ($runs->isNotEmpty()) {
             $q->whereBetween('pmt.purchased_date', [$runs->min('start_date'), $runs->max('end_date')]);
         }
 
-        $rows = $q->orderBy('pmt.purchased_date')
-            ->get([$this->nameExpr(), 'pr2.name as item', 'pmt.quantity', 'pmt.price', 'sk.name as vendor'])
-            ->map(fn($r) => [
-                'Employee Name' => $r->employee_name,
-                'Item Name'     => $r->item ?? 'N/A',
-                'Quantity'      => (int) $r->quantity,
-                'Amount'        => $this->n($r->price),
-                'Vendor'        => $r->vendor ?? 'N/A',
-            ])->all();
+        // Consolidate to one row per employee: item list + total quantity + total amount.
+        $rows = $q->get(['e.id as eid', 'e.Emp_id', $this->nameExpr(), 'pr2.name as item', 'pmt.quantity', 'pmt.price'])
+            ->groupBy('eid')->map(function ($grp) {
+                $first = $grp->first();
+                $items = $grp->map(fn($x) => $x->item ?? 'Item')->unique()->implode(', ');
+                return [
+                    'Employee ID'    => $first->Emp_id ?: 'N/A',
+                    'Employee Name'  => $first->employee_name,
+                    'Total Items'    => $items ?: 'N/A',
+                    'Total Quantity' => (int) $grp->sum('quantity'),
+                    'Total Amount'   => $this->n($grp->sum('price')),
+                ];
+            })->values()->all();
 
-        return ['columns' => ['Employee Name', 'Item Name', 'Quantity', 'Amount', 'Vendor'], 'rows' => $rows];
+        return ['columns' => ['Employee ID', 'Employee Name', 'Total Items', 'Total Quantity', 'Total Amount'], 'rows' => $rows];
     }
 
     /** #30 Salary Advance Report. */
@@ -936,21 +958,26 @@ class PayrollReportController extends Controller
         $rows = DB::table('payroll_advance as a')
             ->join('employees as e', 'e.id', '=', 'a.employee_id')
             ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
+            ->leftJoin('resort_positions as p', 'p.id', '=', 'e.Position_id')
+            ->leftJoin('resort_departments as d', 'd.id', '=', 'e.Dept_id')
             ->leftJoin(DB::raw('(SELECT payroll_advance_id, SUM(CASE WHEN status = "Paid" THEN amount ELSE 0 END) recovered FROM payroll_recovery_schedule GROUP BY payroll_advance_id) rs'), 'rs.payroll_advance_id', '=', 'a.id')
             ->where('a.resort_id', $this->resort->resort_id)
             ->when($scoped !== null, fn($q) => $q->whereIn('e.Dept_id', $scoped))
             ->when($filters['department'], fn($q) => $q->where('e.Dept_id', $filters['department']))
             ->when(true, fn($q) => $this->applyDuration($q, $filters, 'a.request_date'))
             ->orderByDesc('a.request_date')
-            ->get([$this->nameExpr(), 'a.request_amount', DB::raw('COALESCE(rs.recovered,0) as recovered')])
+            ->get(['e.Emp_id', $this->nameExpr(), 'p.position_title', 'd.name as dept', 'a.request_amount', DB::raw('COALESCE(rs.recovered,0) as recovered')])
             ->map(fn($r) => [
+                'Employee ID'        => $r->Emp_id ?: 'N/A',
                 'Employee Name'      => $r->employee_name,
+                'Employee Position'  => $r->position_title ?? 'N/A',
+                'Employee Department'=> $r->dept ?? 'N/A',
                 'Advance Amount'     => $this->n($r->request_amount),
                 'Recovered Amount'   => $this->n($r->recovered),
                 'Outstanding Balance'=> $this->n($r->request_amount - $r->recovered),
             ])->all();
 
-        return ['columns' => ['Employee Name', 'Advance Amount', 'Recovered Amount', 'Outstanding Balance'], 'rows' => $rows];
+        return ['columns' => ['Employee ID', 'Employee Name', 'Employee Position', 'Employee Department', 'Advance Amount', 'Recovered Amount', 'Outstanding Balance'], 'rows' => $rows];
     }
 
     /** #31 Payroll Exceptions Report — derived anomalies (no stored table). */
@@ -979,7 +1006,7 @@ class PayrollReportController extends Controller
             })
             ->leftJoin('employee_bank_details as bd', 'bd.employee_id', '=', 'e.id')
             ->get([
-                'pr.employee_id', $this->nameExpr(),
+                'pr.employee_id', 'e.Emp_id', $this->nameExpr(), 'p.position_title',
                 'pr.total_earnings', 'pr.total_deductions', 'pr.net_salary',
                 'e.payment_mode', 'bd.account_no', 'e.ewt_status', 'e.pension as emp_pension',
                 'pd.ewt', 'pd.pension as ded_pension',
@@ -987,48 +1014,54 @@ class PayrollReportController extends Controller
             ]);
 
         $rows = [];
-        $add = function ($name, $type, $remark) use (&$rows) {
-            $rows[] = ['Employee Name' => $name, 'Exception Type' => $type, 'Remarks' => $remark];
+        $add = function ($r, $type, $remark) use (&$rows) {
+            $rows[] = [
+                'Employee ID'    => $r->Emp_id ?: 'N/A',
+                'Employee Name'  => $r->employee_name,
+                'Employee Position' => $r->position_title ?? 'N/A',
+                'Exception Type' => $type,
+                'Remarks'        => $remark,
+            ];
         };
 
         foreach ($records as $r) {
             $name = $r->employee_name;
             if ((float) $r->net_salary <= 0) {
-                $add($name, 'Negative/zero net salary', 'Net salary is ' . $this->n($r->net_salary));
+                $add($r, 'Negative/zero net salary', 'Net salary is ' . $this->n($r->net_salary));
             }
             if ((float) $r->net_salary > (float) $r->total_earnings) {
-                $add($name, 'Net exceeds gross', 'Net ' . $this->n($r->net_salary) . ' > gross ' . $this->n($r->total_earnings));
+                $add($r, 'Net exceeds gross', 'Net ' . $this->n($r->net_salary) . ' > gross ' . $this->n($r->total_earnings));
             }
             if ((float) $r->total_deductions > (float) $r->total_earnings) {
-                $add($name, 'Deductions exceed earnings', 'Deductions ' . $this->n($r->total_deductions) . ' > earnings ' . $this->n($r->total_earnings));
+                $add($r, 'Deductions exceed earnings', 'Deductions ' . $this->n($r->total_deductions) . ' > earnings ' . $this->n($r->total_earnings));
             }
             if ($r->payment_mode === 'Bank' && empty($r->account_no)) {
-                $add($name, 'Missing bank details', 'Paid by bank but no account number on file');
+                $add($r, 'Missing bank details', 'Paid by bank but no account number on file');
             }
             if ((int) ($r->present_days ?? 0) === 0 && (float) $r->net_salary > 0) {
-                $add($name, 'Paid with no attendance', 'Zero present days but net ' . $this->n($r->net_salary));
+                $add($r, 'Paid with no attendance', 'Zero present days but net ' . $this->n($r->net_salary));
             }
             if (strtolower((string) $r->ewt_status) === 'yes' && (float) ($r->ewt ?? 0) == 0) {
-                $add($name, 'EWT expected but zero', 'EWT-eligible employee has no EWT deducted');
+                $add($r, 'EWT expected but zero', 'EWT-eligible employee has no EWT deducted');
             }
             if ((float) ($r->emp_pension ?? 0) > 0 && (float) ($r->ded_pension ?? 0) == 0) {
-                $add($name, 'Pension expected but zero', 'Pension-eligible employee has no pension deducted');
+                $add($r, 'Pension expected but zero', 'Pension-eligible employee has no pension deducted');
             }
             if ((float) ($r->total_ot ?? 0) > self::OT_HOURS_THRESHOLD) {
-                $add($name, 'Abnormal overtime', $this->n($r->total_ot) . ' OT hours exceeds threshold of ' . self::OT_HOURS_THRESHOLD);
+                $add($r, 'Abnormal overtime', $this->n($r->total_ot) . ' OT hours exceeds threshold of ' . self::OT_HOURS_THRESHOLD);
             }
             if ((float) $r->total_earnings == 0) {
-                $add($name, 'Zero gross', 'Processed payslip with zero earnings');
+                $add($r, 'Zero gross', 'Processed payslip with zero earnings');
             }
             if (isset($prevNet[$r->employee_id]) && (float) $prevNet[$r->employee_id] > 0) {
                 $swing = abs((float) $r->net_salary - (float) $prevNet[$r->employee_id]) / (float) $prevNet[$r->employee_id] * 100;
                 if ($swing > self::PAY_SWING_PCT) {
-                    $add($name, 'Large pay swing vs last run', round($swing, 1) . '% change (prev ' . $this->n($prevNet[$r->employee_id]) . ' → now ' . $this->n($r->net_salary) . ')');
+                    $add($r, 'Large pay swing vs last run', round($swing, 1) . '% change (prev ' . $this->n($prevNet[$r->employee_id]) . ' → now ' . $this->n($r->net_salary) . ')');
                 }
             }
         }
 
-        return ['columns' => ['Employee Name', 'Exception Type', 'Remarks'], 'rows' => $rows];
+        return ['columns' => ['Employee ID', 'Employee Name', 'Employee Position', 'Exception Type', 'Remarks'], 'rows' => $rows];
     }
 
     /** #32 Payroll Audit Trail. */
@@ -1037,17 +1070,24 @@ class PayrollReportController extends Controller
         $pid = $this->resolvePayrollId($filters);
         $label = $this->periodLabelFor($pid);
 
+        // Who submitted the payroll — the first ("submitted"/initiating) approval step's
+        // actor if recorded; the payroll table itself stores no submitter column.
+        $submittedBy = DB::table('payroll_approvals')->whereIn('payroll_id', (array) $pid)
+            ->whereNotNull('approver_name')->where('approver_name', '<>', '')
+            ->orderBy('step_order')->value('approver_name') ?: 'N/A';
+
         $rows = DB::table('payroll_approvals')->whereIn('payroll_id', (array) $pid)
             ->orderBy('step_order')->get()
             ->map(fn($a) => [
                 'Payroll Period' => $label,
+                'Submitted By'   => $submittedBy,
                 'Approval Step'  => $a->role_title,
                 'Approved By'    => $a->approver_name ?? '—',
                 'Status'         => ucfirst($a->status),
                 'Approved Date'  => $a->approved_at ? Carbon::parse($a->approved_at)->format('d M Y H:i') : '—',
             ])->all();
 
-        return ['columns' => ['Payroll Period', 'Approval Step', 'Approved By', 'Status', 'Approved Date'], 'rows' => $rows];
+        return ['columns' => ['Payroll Period', 'Submitted By', 'Approval Step', 'Approved By', 'Status', 'Approved Date'], 'rows' => $rows];
     }
 
     /** #34 Local vs Expat Payroll Summary. */
@@ -1096,17 +1136,24 @@ class PayrollReportController extends Controller
             ->when($filters['department'], fn($q) => $q->where('e.Dept_id', $filters['department']))
             ->selectRaw('SUM(pd.pension) pension, SUM(pd.ewt) ewt')->first();
 
+        $pension = (float) ($d->pension ?? 0);
+        $tax     = (float) ($d->ewt ?? 0);
+        $totalDed = (float) ($r->ded ?? 0);
+        $otherDed = max(0, $totalDed - $pension - $tax);
+
         return [
-            'columns' => ['Employee Count', 'Gross Payroll', 'Net Payroll', 'Total OT', 'Total Service Charge', 'Total Pension', 'Total Tax', 'Total Deductions'],
+            // Column order per the requirements doc.
+            'columns' => ['Employee Count', 'Gross Payroll', 'Total OT', 'Total Service Charge', 'Deductions', 'Tax Deductions', 'Pension Deductions', 'Total Deductions', 'Net Payroll'],
             'rows'    => [[
                 'Employee Count'      => (int) ($r->emp ?? 0),
                 'Gross Payroll'       => $this->n($r->gross ?? 0),
-                'Net Payroll'         => $this->n($r->net ?? 0),
                 'Total OT'            => $this->n($r->ot ?? 0),
                 'Total Service Charge'=> $this->n($r->sc ?? 0),
-                'Total Pension'       => $this->n($d->pension ?? 0),
-                'Total Tax'           => $this->n($d->ewt ?? 0),
-                'Total Deductions'    => $this->n($r->ded ?? 0),
+                'Deductions'          => $this->n($otherDed),
+                'Tax Deductions'      => $this->n($tax),
+                'Pension Deductions'  => $this->n($pension),
+                'Total Deductions'    => $this->n($totalDed),
+                'Net Payroll'         => $this->n($r->net ?? 0),
             ]],
         ];
     }
@@ -1119,9 +1166,11 @@ class PayrollReportController extends Controller
         $pid = $this->resolvePayrollId($filters);
         $rows = $this->basePayslip($pid, $filters)
             ->orderBy('ra.first_name')
-            ->get([$this->nameExpr(), 'pr.earnings_basic', 'pr.earnings_overtime', 'pr.regularOTPay', 'pr.holidayOTPay', 'pr.service_charge', 'pr.earnings_allowance', 'pr.total_deductions', 'pr.net_salary'])
+            ->get(['e.Emp_id', $this->nameExpr(), 'p.position_title', 'pr.earnings_basic', 'pr.earnings_overtime', 'pr.regularOTPay', 'pr.holidayOTPay', 'pr.service_charge', 'pr.earnings_allowance', 'pr.total_deductions', 'pr.net_salary'])
             ->map(fn($r) => [
+                'Employee ID'             => $r->Emp_id ?: 'N/A',
                 'Employee Name'           => $r->employee_name,
+                'Employee Position'       => $r->position_title ?? 'N/A',
                 'Estimated Basic Salary'  => $this->n($r->earnings_basic),
                 'Estimated OT'            => $this->n($r->earnings_overtime ?: ($r->regularOTPay + $r->holidayOTPay)),
                 'Estimated Service Charge'=> $this->n($r->service_charge),
@@ -1131,7 +1180,7 @@ class PayrollReportController extends Controller
             ])->all();
 
         return [
-            'columns' => ['Employee Name', 'Estimated Basic Salary', 'Estimated OT', 'Estimated Service Charge', 'Estimated Allowances', 'Estimated Deductions', 'Estimated Net Salary'],
+            'columns' => ['Employee ID', 'Employee Name', 'Employee Position', 'Estimated Basic Salary', 'Estimated OT', 'Estimated Service Charge', 'Estimated Allowances', 'Estimated Deductions', 'Estimated Net Salary'],
             'rows'    => $rows,
         ];
     }
@@ -1146,16 +1195,22 @@ class PayrollReportController extends Controller
             })
             ->whereRaw('(pr.regularOTPay + pr.holidayOTPay) > 0 OR ta.total_ot > 0')
             ->orderBy('ra.first_name')
-            ->get([$this->nameExpr(), 'ta.regular_ot_hours', 'ta.holiday_ot_hours', 'pr.regularOTPay', 'pr.holidayOTPay'])
-            ->map(fn($r) => [
-                'Employee Name'    => $r->employee_name,
-                'Normal OT Hours'  => $this->hrs($r->regular_ot_hours ?? 0),
-                'Friday OT Hours'  => 'N/A', // not tracked separately
-                'Holiday OT Hours' => $this->hrs($r->holiday_ot_hours ?? 0),
-                'OT Amount'        => $this->n($r->regularOTPay + $r->holidayOTPay),
-            ])->all();
+            ->get(['e.id as eid', 'e.Emp_id', $this->nameExpr(), 'p.position_title', 'ta.regular_ot_hours', 'ta.holiday_ot_hours', 'pr.regularOTPay', 'pr.holidayOTPay'])
+            // Consolidate to one row per employee (aggregate across runs in scope).
+            ->groupBy('eid')->map(function ($grp) {
+                $first = $grp->first();
+                return [
+                    'Employee ID'      => $first->Emp_id ?: 'N/A',
+                    'Employee Name'    => $first->employee_name,
+                    'Employee Position'=> $first->position_title ?? 'N/A',
+                    'Normal OT Hours'  => $this->hrs($grp->sum('regular_ot_hours')),
+                    'Friday OT Hours'  => 'N/A', // not tracked separately
+                    'Holiday OT Hours' => $this->hrs($grp->sum('holiday_ot_hours')),
+                    'OT Amount'        => $this->n($grp->sum(fn($x) => $x->regularOTPay + $x->holidayOTPay)),
+                ];
+            })->values()->all();
 
-        return ['columns' => ['Employee Name', 'Normal OT Hours', 'Friday OT Hours', 'Holiday OT Hours', 'OT Amount'], 'rows' => $rows];
+        return ['columns' => ['Employee ID', 'Employee Name', 'Employee Position', 'Normal OT Hours', 'Friday OT Hours', 'Holiday OT Hours', 'OT Amount'], 'rows' => $rows];
     }
 
     /** #20 Overtime Trend — monthly OT hours + cost for a year. */
