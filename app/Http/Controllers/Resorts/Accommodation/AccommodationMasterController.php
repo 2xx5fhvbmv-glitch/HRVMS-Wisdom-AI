@@ -58,23 +58,16 @@ class AccommodationMasterController extends Controller
                                     $accommodation->bedAvailable = $accommodation->AssingAccommodationCount;
                                     return $accommodation;
                                 });
-                                $a = AvailableAccommodationModel::join('assing_accommodations as t1', 't1.available_a_id', '=', 'available_accommodation_models.id')
+                                // Rooms Available = every room in the building that has at
+                                // least one free (unassigned, emp_id = 0) bed. The old query
+                                // used ->first() + a hard-coded 1, so it could only ever return
+                                // 0 or 1 even when several rooms had free beds.
+                                $AvailableRooms = AvailableAccommodationModel::join('assing_accommodations as t1', 't1.available_a_id', '=', 'available_accommodation_models.id')
                                                                 ->where('available_accommodation_models.resort_id', $this->resort->resort_id)
-                                                                ->where("BuildingName", $building->id)
+                                                                ->where("available_accommodation_models.BuildingName", $building->id)
                                                                 ->where("t1.emp_id", 0)
-                                                                ->groupBy('t1.available_a_id')
-                                                                ->first(['available_accommodation_models.id','available_accommodation_models.Capacity',DB::raw('COUNT(t1.id ) as AvailableRooms')]);
-                                $AvailableRooms=0;
-                                    if( isset($a->AvailableRooms))
-                                    {
-                                        if( $a->AvailableRooms < $a->Capacity)
-                                        {
-                                            $AvailableRooms = 1;
-                                        }
-                                        else {
-                                            $AvailableRooms = $a->AvailableRooms;
-                                        }
-                                    }
+                                                                ->distinct('available_accommodation_models.id')
+                                                                ->count('available_accommodation_models.id');
 
 
                                 $BedCapacity = AssingAccommodation::join('available_accommodation_models as a', 'a.id', '=', 'assing_accommodations.available_a_id')
@@ -669,23 +662,15 @@ class AccommodationMasterController extends Controller
 
                                             return $accommodation;
                                         });
-                                        $a = AvailableAccommodationModel::join('assing_accommodations as t1', 't1.available_a_id', '=', 'available_accommodation_models.id')
+                                        // Rooms Available = distinct rooms in the building with at
+                                        // least one free (emp_id = 0) bed. The old ->first()/=1
+                                        // logic could only ever report 0 or 1 room.
+                                        $AvailableRooms = AvailableAccommodationModel::join('assing_accommodations as t1', 't1.available_a_id', '=', 'available_accommodation_models.id')
                                                                         ->where('available_accommodation_models.resort_id', $this->resort->resort_id)
-                                                                        ->where("BuildingName", $building->id)
+                                                                        ->where("available_accommodation_models.BuildingName", $building->id)
                                                                         ->where("t1.emp_id", 0)
-                                                                        ->groupBy('t1.available_a_id')
-                                                                        ->first(['available_accommodation_models.id','available_accommodation_models.Capacity',DB::raw('COUNT(t1.id ) as AvailableRooms')]);
-                                        $AvailableRooms=0;
-                                            if( isset($a->AvailableRooms))
-                                            {
-                                                if( $a->AvailableRooms < $a->Capacity)
-                                                {
-                                                    $AvailableRooms = 1;
-                                                }
-                                                else {
-                                                    $AvailableRooms = $a->AvailableRooms;
-                                                }
-                                            }
+                                                                        ->distinct('available_accommodation_models.id')
+                                                                        ->count('available_accommodation_models.id');
                                         $BedCapacity = AvailableAccommodationModel::where('resort_id', $this->resort->resort_id)
                                                                                 ->where("BuildingName", $building->id)
                                                                                 ->get([DB::RAW('SUM(available_accommodation_models.Capacity) as BedCapacity')]);
@@ -753,7 +738,11 @@ class AccommodationMasterController extends Controller
                                                                 return $row;
                                                             });
                     $accommodation->AssingAccommodation =$AssingAccommodation;
-                    $accommodation->AssingAccommodationCount = $AssingAccommodation->where("assing_accommodations.emp_id", 0)->count();
+                    // Free beds = unassigned (emp_id 0) slots. Count them straight from
+                    // the table: $AssingAccommodation above is INNER-joined to employees,
+                    // so its emp_id=0 rows are already gone and would always count 0.
+                    $accommodation->AssingAccommodationCount = AssingAccommodation::where("available_a_id", $accommodation->id)
+                                                            ->where("emp_id", 0)->count();
                     return $accommodation;
                 });
 
@@ -789,7 +778,10 @@ class AccommodationMasterController extends Controller
                 })
                 ->editColumn('RoomStatus', function ($row) {
                     $availableBeds = $row->AssingAccommodationCount ?? 0;
-                    $totalBeds = AssingAccommodation::where('available_a_id', $row->available_a_id)->count();
+                    // Use the numeric room id ($row->id); $row->available_a_id was
+                    // base64-encoded for the Assign button, so querying with it
+                    // matched no rows and made every room read "No Beds Configured".
+                    $totalBeds = AssingAccommodation::where('available_a_id', $row->id)->count();
                     $occupiedBeds = $totalBeds - $availableBeds;
 
                     if ($totalBeds == 0) {
