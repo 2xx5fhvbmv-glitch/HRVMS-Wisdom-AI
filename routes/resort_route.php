@@ -2031,6 +2031,12 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
     Route::post('report/sos/export', 'SosReportController@export')->name('resort.report.sos.export');
     Route::post('report/sos/insights', 'SosReportController@insights')->name('resort.report.sos.insights');
 
+    // Predefined Compliance reports (Option B).
+    Route::get('report/compliance', 'ComplianceReportController@index')->name('resort.report.compliance.index');
+    Route::post('report/compliance/run', 'ComplianceReportController@run')->name('resort.report.compliance.run');
+    Route::post('report/compliance/export', 'ComplianceReportController@export')->name('resort.report.compliance.export');
+    Route::post('report/compliance/insights', 'ComplianceReportController@insights')->name('resort.report.compliance.insights');
+
 
     Route::delete('report/{id}', 'ReportController@destroy')->name('reports.destroy');
 
