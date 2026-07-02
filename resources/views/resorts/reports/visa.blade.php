@@ -125,6 +125,10 @@
 </div>
 @endsection
 
+@section('import-css')
+    @include('resorts.reports.partials.wai_insights_css')
+@endsection
+
 @section('import-scripts')
 <script>
     $(function () {
