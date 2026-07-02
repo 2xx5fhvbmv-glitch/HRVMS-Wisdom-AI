@@ -17,7 +17,8 @@
         <div class="col-xxl-cust5 col-xl-3 col-lg-4 col-sm-6">
             <div class="empListPeopleEmp-block text-center">
                 <div class="img-circle">
-                    <img src="{{ Common::getResortUserPicture($employee->Admin_Parent_id ?? null) }}" alt="image">
+                    <img src="{{ Common::getResortUserPicture($employee->Admin_Parent_id ?? null) }}" alt="image"
+                         onerror="this.onerror=null;this.src='{{ url(config('settings.default_picture')) }}';">
                 </div>
                 <h6>{{ $employee->resortAdmin->full_name ?? '' }}</h6>
                 <span class="badge badge-themeNew">#{{ $employee->Emp_id }}</span>
