@@ -98,6 +98,11 @@ class WisdomTools
                 [
                     'name' => ['type' => 'string', 'description' => 'Employee full/partial name or Emp_id.'],
                 ], ['name']),
+            self::fn('get_boarding_pass_requests',
+                'Boarding pass / island pass / travel pass requests (employee, departure & arrival dates, status). Defaults to pending. "Boarding pass" and "island pass" are the SAME thing. Use for "pending boarding pass requests", "island pass requests".',
+                [
+                    'status' => ['type' => 'string', 'description' => 'pending (default), approved, rejected, or all.'],
+                ]),
             self::fn('list_employees',
                 'List active employees with their names, department, position and nationality. Optionally filter by department. Use this for "who works here", "list the employees" or "employee names" type questions.',
                 [
@@ -107,9 +112,9 @@ class WisdomTools
             self::fn('get_nationality_breakdown',
                 'Count active employees grouped by nationality, including a local (Maldivian) vs foreign split. Use this for "how many are local/foreign/expat" questions.', []),
             self::fn('find_employee',
-                'Look up a specific employee by name or employee ID. Returns profile details (department, position, status, joining date). Does NOT return salary.',
+                'Look up an employee by name, employee ID, OR passport number (reverse lookup — "whose passport is X"). Returns profile: department, position, status, joining date, nationality, date-of-birth/birthday, reporting manager, passport number, and on_probation (true/false, already computed — trust it over the raw probation_status). Does NOT return salary. If several employees match a partial name, ALL matches are returned — list them and ask the user which one rather than guessing.',
                 [
-                    'name' => ['type' => 'string', 'description' => 'Full or partial name, or employee ID to search for.'],
+                    'name' => ['type' => 'string', 'description' => 'Full/partial name, employee ID, or a passport number.'],
                 ], ['name']),
             self::fn('get_recruitment_pipeline',
                 'Get a summary of the recruitment pipeline: vacancies grouped by status and applicants grouped by status.', []),
@@ -282,6 +287,8 @@ class WisdomTools
                 [
                     'status' => ['type' => 'string', 'description' => 'Pending (default), Approved, Rejected, or all.'],
                 ]),
+            self::fn('get_deposit_refunds',
+                'Pending visa deposit-refund requests: employees (resigned, HR-approved) whose security deposit has not yet been refunded. Use for "pending deposit refunds", "deposit refund requests". This is distinct from visa payment requests.', []),
             self::fn('get_employee_immigration',
                 'Full immigration profile for one employee by name: visa, work permit, insurance, medical and slot-payment expiry dates with days-left and an EXPIRED/valid flag. Use for "when does Rani\'s visa expire", "show Rani\'s immigration profile", "is this employee compliant".',
                 [
@@ -496,6 +503,7 @@ class WisdomTools
                 case 'get_employees_on_leave':   return self::getEmployeesOnLeave($rid, $args);
                 case 'get_pending_leave_approvals': return self::getPendingLeaveApprovals($rid, $args);
                 case 'get_leave_balance':        return self::getLeaveBalance($rid, $args);
+                case 'get_boarding_pass_requests': return self::getBoardingPassRequests($rid, $args);
                 case 'list_employees':           return self::listEmployees($rid, $args);
                 case 'get_nationality_breakdown':return self::getNationalityBreakdown($rid);
                 case 'find_employee':            return self::findEmployee($rid, $args);
@@ -542,6 +550,7 @@ class WisdomTools
                 case 'get_visa_liability':       return self::getVisaLiability($rid, $args);
                 case 'get_visa_wallet':          return self::getVisaWallet($rid);
                 case 'get_visa_payment_requests':return self::getVisaPaymentRequests($rid, $args);
+                case 'get_deposit_refunds':      return self::getDepositRefunds($rid, $args);
                 case 'get_employee_immigration': return self::getEmployeeImmigration($rid, $args);
                 case 'get_employee_relations_summary': return self::getEmployeeRelationsSummary($rid);
                 case 'get_disciplinary_cases':   return self::getDisciplinaryCases($rid, $args);
@@ -683,7 +692,8 @@ class WisdomTools
                           ->orWhere('last_name', 'like', "%{$term}%")
                           ->orWhereRaw("CONCAT(first_name,' ',last_name) LIKE ?", ["%{$term}%"]);
                     })
-                  ->orWhere('Emp_id', 'like', "%{$term}%");
+                  ->orWhere('Emp_id', 'like', "%{$term}%")
+                  ->orWhere('passport_number', 'like', "%{$term}%"); // reverse passport lookup
             })
             ->with(['resortAdmin:id,first_name,last_name', 'department:id,name', 'position:id,position_title'])
             ->limit(10)
@@ -691,6 +701,7 @@ class WisdomTools
 
         // Resolve each employee's reporting manager (reporting_to → employees.id).
         $managers = self::resolveEmpNames($rid, $employees->pluck('reporting_to')->filter()->all());
+        $today = Carbon::today();
 
         $list = $employees->map(fn ($e) => [
             'name'        => self::empName($e),
@@ -704,8 +715,8 @@ class WisdomTools
             'date_of_birth' => self::fmtDate($e->getRawOriginal('dob')),
             'manager'      => $e->reporting_to ? ($managers[$e->reporting_to] ?? null) : null,
             'passport_number' => $e->passport_number ?: null,
+            'on_probation'   => self::isOnProbation($e, $today),
             'probation_status' => $e->probation_status ?: null,
-            'probation_end_date' => self::fmtDate($e->getRawOriginal('probation_end_date')),
         ])->values();
 
         return [
@@ -2978,6 +2989,27 @@ class WisdomTools
         return $name !== '' ? $name : ('Employee ' . ($e->Emp_id ?: '#' . $e->id));
     }
 
+    /**
+     * Whether an employee is CURRENTLY on probation — mirrors the People
+     * dashboard: probation_status in (Active, Extended) AND the probation window
+     * (probation_end_date, or joining_date + 3 months when unset) has not passed.
+     * probation_status defaults to 'Active' forever, so the date check is required.
+     */
+    private static function isOnProbation(Employee $e, ?Carbon $today = null): bool
+    {
+        $today = $today ?: Carbon::today();
+        if (!in_array($e->probation_status, ['Active', 'Extended'], true)) {
+            return false;
+        }
+        $end = $e->getRawOriginal('probation_end_date');
+        if (!$end) {
+            $join = $e->getRawOriginal('joining_date');
+            if (!$join) return false;
+            try { $end = Carbon::parse($join)->addMonths(3)->toDateString(); } catch (\Throwable) { return false; }
+        }
+        try { return Carbon::parse($end)->gte($today); } catch (\Throwable) { return false; }
+    }
+
     /** Resolve ONE employee at this resort by full/partial name or Emp_id. */
     private static function resolveEmployee(int $rid, string $term, array $with = ['resortAdmin:id,first_name,last_name'])
     {
@@ -3013,7 +3045,10 @@ class WisdomTools
     private static function getAttendanceRegister(int $rid, array $args): array
     {
         $date   = self::cleanDate($args['date'] ?? null);
-        $active = Employee::where('resort_id', $rid)->where('status', 'Active')->pluck('id')->all();
+        // Only employees who were actually employed on that date — exclude anyone
+        // hired afterwards (they can't be "absent" before their joining date).
+        $active = Employee::where('resort_id', $rid)->where('status', 'Active')
+            ->whereDate('joining_date', '<=', $date)->pluck('id')->all();
         $rows   = DB::table('parent_attendaces')->where('resort_id', $rid)->whereDate('date', $date)
             ->get(['Emp_id', 'CheckingTime', 'CheckingOutTime']);
         $names  = self::resolveEmpNames($rid, array_merge($active, $rows->pluck('Emp_id')->all()));
@@ -3060,6 +3095,13 @@ class WisdomTools
     {
         $date   = self::cleanDate($args['date'] ?? null);
         $shifts = DB::table('shift_settings')->where('resort_id', $rid)->pluck('StartTime', 'id')->all();
+        // Distinguish "nobody was late" from "no attendance recorded at all".
+        $anyPunch = DB::table('parent_attendaces')->where('resort_id', $rid)->whereDate('date', $date)
+            ->whereNotNull('CheckingTime')->where('CheckingTime', '!=', '')->exists();
+        if (!$anyPunch) {
+            return ['date' => self::fmtDate($date), 'count' => 0, 'late_arrivals' => [],
+                    'note' => 'No punch-in / attendance data has been recorded for this date, so lateness cannot be determined.'];
+        }
         $rows   = DB::table('parent_attendaces')->where('resort_id', $rid)->whereDate('date', $date)
             ->whereNotNull('CheckingTime')->where('CheckingTime', '!=', '')
             ->get(['Emp_id', 'Shift_id', 'CheckingTime']);
@@ -3127,6 +3169,15 @@ class WisdomTools
             ->where('ShiftDate', 'like', $date . '%')
             ->get(['Emp_id', 'Shift_id']);
         $scheduledIds = $rows->pluck('Emp_id')->unique()->all();
+
+        // No published roster for this date → we cannot say who is on/off. Do NOT
+        // infer that everyone is off (that produced hallucinated day-off lists).
+        if (empty($scheduledIds)) {
+            return ['date' => self::fmtDate($date), 'scope' => $offOnly ? 'day_off' : 'scheduled', 'count' => 0,
+                    'roster_published' => false,
+                    'note' => 'No duty roster has been published for this date, so scheduled/off-day status is not available.'];
+        }
+
         $active = Employee::where('resort_id', $rid)->where('status', 'Active')->pluck('id')->all();
         $names  = self::resolveEmpNames($rid, array_merge($active, $scheduledIds));
 
@@ -3136,8 +3187,8 @@ class WisdomTools
                 if (!in_array($id, $scheduledIds)) $off[] = $names[$id] ?? ('Employee #' . $id);
             }
             sort($off);
-            return ['date' => self::fmtDate($date), 'scope' => 'day_off', 'count' => count($off), 'employees_off' => $off,
-                    'note' => empty($scheduledIds) ? 'No duty-roster entries exist for this date, so "off" is inferred as every active employee.' : null];
+            return ['date' => self::fmtDate($date), 'scope' => 'day_off', 'roster_published' => true,
+                    'count' => count($off), 'employees_off' => $off];
         }
 
         $scheduled = $rows->map(fn ($r) => [
@@ -3178,6 +3229,12 @@ class WisdomTools
     // Accommodation (beds, maintenance, who-stays-where, building occupancy)
     // ---------------------------------------------------------------------
 
+    /** building_models.id → front-end building name (Building A, GM Building, …). */
+    private static function buildingMap(): array
+    {
+        return DB::table('building_models')->pluck('BuildingName', 'id')->all();
+    }
+
     /** Occupied bed count per room id, counting only currently-active employees. */
     private static function occupiedByRoom(int $rid): array
     {
@@ -3196,8 +3253,9 @@ class WisdomTools
         if (in_array($gender, ['male', 'female'], true)) {
             $q->whereRaw('LOWER(blockFor) = ?', [$gender]);
         }
-        $rooms    = $q->get(['id', 'BuildingName', 'RoomNo', 'Capacity', 'blockFor']);
+        $rooms    = $q->get(['id', 'BuildingName', 'Floor', 'RoomNo', 'Capacity', 'blockFor']);
         $occupied = self::occupiedByRoom($rid);
+        $buildings = self::buildingMap();
 
         $list = []; $free = 0;
         foreach ($rooms as $r) {
@@ -3205,7 +3263,8 @@ class WisdomTools
             $avail = max(0, (int) $r->Capacity - $used);
             if ($avail > 0) {
                 $free += $avail;
-                $list[] = ['building' => $r->BuildingName, 'room' => $r->RoomNo, 'for' => $r->blockFor,
+                $list[] = ['building' => $buildings[$r->BuildingName] ?? ('Building ' . $r->BuildingName),
+                           'floor' => $r->Floor, 'room' => $r->RoomNo, 'for' => $r->blockFor,
                            'capacity' => (int) $r->Capacity, 'available_beds' => $avail];
             }
         }
@@ -3248,16 +3307,18 @@ class WisdomTools
             return ['employee' => self::empName($emp), 'found' => true, 'accommodation' => 'Not assigned to any room.'];
         }
         $room = DB::table('available_accommodation_models')->where('id', $assign->available_a_id)
-            ->first(['BuildingName', 'RoomNo', 'blockFor', 'Capacity']);
+            ->first(['BuildingName', 'Floor', 'RoomNo', 'blockFor', 'Capacity']);
         $mateIds = DB::table('assing_accommodations')->where('resort_id', $rid)
             ->where('available_a_id', $assign->available_a_id)->where('emp_id', '!=', $emp->id)
             ->pluck('emp_id')->all();
         $mateNames = array_values(self::resolveEmpNames($rid, $mateIds));
+        $buildings = self::buildingMap();
 
         return [
             'employee'  => self::empName($emp),
             'found'     => true,
-            'building'  => $room->BuildingName ?? 'N/A',
+            'building'  => $room ? ($buildings[$room->BuildingName] ?? ('Building ' . $room->BuildingName)) : 'N/A',
+            'floor'     => $room->Floor ?? 'N/A',
             'room'      => $room->RoomNo ?? 'N/A',
             'bed'       => $assign->BedNo,
             'roommates' => $mateNames ?: ['(none — sole occupant)'],
@@ -3270,9 +3331,10 @@ class WisdomTools
         $rooms    = DB::table('available_accommodation_models')->where('resort_id', $rid)
             ->get(['id', 'BuildingName', 'Capacity']);
         $occupied = self::occupiedByRoom($rid);
+        $buildings = self::buildingMap();
         $byB = [];
         foreach ($rooms as $r) {
-            $b = $r->BuildingName ?: 'Unknown';
+            $b = $buildings[$r->BuildingName] ?? ('Building ' . ($r->BuildingName ?: '?'));
             $byB[$b]['capacity'] = ($byB[$b]['capacity'] ?? 0) + (int) $r->Capacity;
             $byB[$b]['occupied'] = ($byB[$b]['occupied'] ?? 0) + (int) ($occupied[$r->id] ?? 0);
         }
@@ -3430,6 +3492,49 @@ class WisdomTools
             'status'    => $k->status,
         ])->values();
         return ['status_filter' => $status, 'count' => $list->count(), 'kpis' => $list];
+    }
+
+    /** Boarding / island / travel pass requests — mirrors the boarding-pass screen. */
+    private static function getBoardingPassRequests(int $rid, array $args): array
+    {
+        // The boarding-pass-requests page lists passes that are Approved and have
+        // cleared the rank-2 approval — that is what HR sees as the pending list.
+        $rows = DB::table('employee_travel_passes as t')
+            ->join('employee_travel_pass_status as s', 's.travel_pass_id', '=', 't.id')
+            ->where('t.resort_id', $rid)
+            ->where('t.status', 'Approved')
+            ->where('s.status', 'Approved')->where('s.approver_rank', 2)
+            ->orderByDesc('t.id')
+            ->get(['t.employee_id', 't.departure_date', 't.arrival_date', 't.status']);
+        $names = self::resolveEmpNames($rid, $rows->pluck('employee_id')->all());
+        $list = $rows->map(fn ($r) => [
+            'employee'  => $names[$r->employee_id] ?? ('Employee #' . $r->employee_id),
+            'departure' => self::fmtDate($r->departure_date),
+            'arrival'   => self::fmtDate($r->arrival_date),
+        ])->values();
+        return ['count' => $list->count(), 'requests' => $list];
+    }
+
+    /** Pending visa deposit-refund requests (approved resignations, deposit not yet withdrawn). */
+    private static function getDepositRefunds(int $rid, array $args): array
+    {
+        $rows = EmployeeResignation::where('resort_id', $rid)->where('hr_status', 'Approved')
+            ->where(function ($q) {
+                $q->whereNull('deposit_refund_snooze_until')->orWhereDate('deposit_refund_snooze_until', '<=', Carbon::today());
+            })
+            ->where(function ($q) {
+                $q->whereNull('Deposit_withdraw')->orWhere('Deposit_withdraw', '!=', 'Yes');
+            })
+            ->with(['employee.resortAdmin:id,first_name,last_name', 'employee.department:id,name'])
+            ->orderByDesc('id')->get();
+        $list = $rows->map(fn ($r) => [
+            'employee'         => ($r->employee && $r->employee->resortAdmin)
+                                    ? trim($r->employee->resortAdmin->first_name . ' ' . $r->employee->resortAdmin->last_name)
+                                    : 'Unknown',
+            'department'       => optional(optional($r->employee)->department)->name,
+            'resignation_date' => self::fmtDate($r->getRawOriginal('resignation_date')),
+        ])->values();
+        return ['count' => $list->count(), 'pending_deposit_refunds' => $list];
     }
 
 
