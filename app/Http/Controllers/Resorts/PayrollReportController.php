@@ -418,32 +418,42 @@ class PayrollReportController extends Controller
     /** #4 Payroll Comparison. */
     public function payrollComparison(array $filters): array
     {
-        $fromId = $filters['from_payroll'];
-        $toId   = $filters['to_payroll'];
-        $rows = [];
-        $prevGross = null;
-
-        foreach ([$fromId, $toId] as $pid) {
-            if (!$pid) continue;
-            $pay = DB::table('payroll')->where('id', $pid)->where('resort_id', $this->resort->resort_id)->first();
-            if (!$pay) continue;
-            $t = $this->basePayslip($pid, $filters)->selectRaw('SUM(pr.total_earnings) gross, SUM(pr.net_salary) net')->first();
-            $gross = (float) ($t->gross ?? 0);
-            $diff  = $prevGross === null ? null : $gross - $prevGross;
-            $rows[] = [
-                'Payroll Period'    => $this->periodLabel($pay),
-                'Gross Salary'      => $this->n($gross),
-                'Net Salary'        => $this->n($t->net ?? 0),
-                'Payroll Difference'=> $diff === null ? '—' : $this->n($diff),
-                'Percentage Change' => $diff === null ? '—' : $this->pct($diff, $prevGross),
-            ];
-            $prevGross = $gross;
+        $payA = $filters['from_payroll'] ? DB::table('payroll')->where('id', $filters['from_payroll'])->where('resort_id', $this->resort->resort_id)->first() : null;
+        $payB = $filters['to_payroll'] ? DB::table('payroll')->where('id', $filters['to_payroll'])->where('resort_id', $this->resort->resort_id)->first() : null;
+        if (!$payA || !$payB) {
+            return ['columns' => ['Component', 'Month A', 'Month B', 'Difference', '% Change'],
+                'rows' => [['Component' => 'Select two payroll periods to compare.', 'Month A' => '', 'Month B' => '', 'Difference' => '', '% Change' => '']]];
         }
 
-        return [
-            'columns' => ['Payroll Period', 'Gross Salary', 'Net Salary', 'Payroll Difference', 'Percentage Change'],
-            'rows'    => $rows,
+        $totals = fn($id) => $this->basePayslip($id, $filters)
+            ->selectRaw('SUM(pr.total_earnings) gross, SUM(pr.total_deductions) ded, SUM(pr.net_salary) net')->first();
+        $a = $totals($payA->id);
+        $b = $totals($payB->id);
+        $labelA = $this->periodLabel($payA);
+        $labelB = $this->periodLabel($payB);
+
+        // One row per core component: A value, B value, absolute diff (+/-), % change (+/-).
+        $components = [
+            'Gross Salary'     => ['gross'],
+            'Total Deductions' => ['ded'],
+            'Net Salary'       => ['net'],
         ];
+        $rows = [];
+        foreach ($components as $label => [$key]) {
+            $va = (float) ($a->$key ?? 0);
+            $vb = (float) ($b->$key ?? 0);
+            $diff = $vb - $va;
+            $pctStr = $va == 0 ? '—' : ($diff >= 0 ? '+' : '') . round($diff / $va * 100, 1) . '%';
+            $rows[] = [
+                'Component' => $label,
+                $labelA     => $this->n($va),
+                $labelB     => $this->n($vb),
+                'Difference'=> ($diff >= 0 ? '+' : '-') . $this->n(abs($diff)),
+                '% Change'  => $pctStr,
+            ];
+        }
+
+        return ['columns' => ['Component', $labelA, $labelB, 'Difference', '% Change'], 'rows' => $rows];
     }
 
     /** #5 Payroll Cost by Department. */
@@ -693,13 +703,16 @@ class PayrollReportController extends Controller
     public function serviceChargeTrend(array $filters): array
     {
         $year = $filters['year'] ?: Carbon::now()->year;
+        // Payroll cycles run 26th→25th, so bucket by the period's END month
+        // (e.g. 26 Feb–25 Mar = March) — grouping by start month mislabels cycles
+        // and drops the month whose cycle starts in the previous month.
         $raw = DB::table('payroll_reviews as pr')
             ->join('payroll as pay', 'pay.id', '=', 'pr.payroll_id')
             ->where('pay.resort_id', $this->resort->resort_id)
-            ->whereRaw('YEAR(pay.start_date) = ?', [$year])
-            ->groupBy(DB::raw('MONTH(pay.start_date)'))
+            ->whereRaw('YEAR(pay.end_date) = ?', [$year])
+            ->groupBy(DB::raw('MONTH(pay.end_date)'))
             ->select(
-                DB::raw('MONTH(pay.start_date) as m'),
+                DB::raw('MONTH(pay.end_date) as m'),
                 DB::raw('SUM(pr.service_charge) as total'),
                 DB::raw('AVG(pr.service_charge) as avg'),
                 DB::raw('MAX(pr.service_charge) as high')
@@ -725,8 +738,8 @@ class PayrollReportController extends Controller
             ->join('employees as e', 'e.id', '=', 'pr.employee_id')
             ->leftJoin('resort_departments as d', 'd.id', '=', 'e.Dept_id')
             ->where('pay.resort_id', $this->resort->resort_id)
-            ->whereRaw('YEAR(pay.start_date) = ?', [$year])
-            ->when($filters['month'] ?? null, fn($q) => $q->whereRaw('MONTH(pay.start_date) = ?', [$filters['month']]))
+            ->whereRaw('YEAR(pay.end_date) = ?', [$year])
+            ->when($filters['month'] ?? null, fn($q) => $q->whereRaw('MONTH(pay.end_date) = ?', [$filters['month']]))
             ->when($scoped !== null, fn($q) => $q->whereIn('e.Dept_id', $scoped))
             ->when($filters['department'], fn($q) => $q->where('e.Dept_id', $filters['department']))
             ->groupBy('e.Dept_id', 'd.name')
@@ -1042,10 +1055,11 @@ class PayrollReportController extends Controller
                 $add($r, 'Paid with no attendance', 'Zero present days but net ' . $this->n($r->net_salary));
             }
             if (strtolower((string) $r->ewt_status) === 'yes' && (float) ($r->ewt ?? 0) == 0) {
-                $add($r, 'EWT expected but zero', 'EWT-eligible employee has no EWT deducted');
+                $add($r, 'EWT expected but zero', 'Employee is flagged EWT-eligible (withholding tax applies once gross exceeds the tax-free threshold), and this run\'s gross is ' . $this->n($r->total_earnings) . ', yet no EWT was withheld — verify the tax bracket mapping or a manual override for this payslip.');
             }
             if ((float) ($r->emp_pension ?? 0) > 0 && (float) ($r->ded_pension ?? 0) == 0) {
-                $add($r, 'Pension expected but zero', 'Pension-eligible employee has no pension deducted');
+                $expected = round(((float) $r->total_earnings) * 0.07, 2);
+                $add($r, 'Pension expected but zero', 'Employee is enrolled in the pension scheme (7% MPRF employee contribution), so ≈' . $this->n($expected) . ' was expected on a gross of ' . $this->n($r->total_earnings) . ', but 0 was deducted — verify pension enrolment status and that the contribution was processed for this cycle.');
             }
             if ((float) ($r->total_ot ?? 0) > self::OT_HOURS_THRESHOLD) {
                 $add($r, 'Abnormal overtime', $this->n($r->total_ot) . ' OT hours exceeds threshold of ' . self::OT_HOURS_THRESHOLD);
@@ -1164,20 +1178,64 @@ class PayrollReportController extends Controller
     public function upcomingProjection(array $filters): array
     {
         $pid = $this->resolvePayrollId($filters);
+        $runs = $this->payrollRuns($pid);
+        $rid = $this->resort->resort_id;
+        $periodStart = $runs->min('start_date');
+        $periodEnd   = $runs->max('end_date');
+        $year = $periodEnd ? (int) Carbon::parse($periodEnd)->year : Carbon::now()->year;
+
+        // Year-to-date average service charge per employee (completed months so far).
+        $ytdSc = DB::table('payroll_reviews as pr')->join('payroll as pay', 'pay.id', '=', 'pr.payroll_id')
+            ->where('pay.resort_id', $rid)->whereRaw('YEAR(pay.end_date) = ?', [$year])
+            ->groupBy('pr.employee_id')->selectRaw('pr.employee_id as eid, AVG(pr.service_charge) as sc')
+            ->pluck('sc', 'eid')->toArray();
+
+        // Third-party (Shopkeeper) purchases in the period → payroll deduction.
+        $shop = [];
+        if ($periodStart && $periodEnd) {
+            $shop = DB::table('payments')
+                ->whereBetween('purchased_date', [$periodStart, $periodEnd])
+                ->groupBy('emp_id')->selectRaw('emp_id, SUM(price * quantity) as amt')
+                ->pluck('amt', 'emp_id')->toArray();
+        }
+
         $rows = $this->basePayslip($pid, $filters)
+            ->leftJoin('payroll_time_and_attandance as ta', function ($j) {
+                $j->on('ta.payroll_id', '=', 'pr.payroll_id')->on('ta.employee_id', '=', 'pr.employee_id');
+            })
             ->orderBy('ra.first_name')
-            ->get(['e.Emp_id', $this->nameExpr(), 'p.position_title', 'pr.earnings_basic', 'pr.earnings_overtime', 'pr.regularOTPay', 'pr.holidayOTPay', 'pr.service_charge', 'pr.earnings_allowance', 'pr.total_deductions', 'pr.net_salary'])
-            ->map(fn($r) => [
-                'Employee ID'             => $r->Emp_id ?: 'N/A',
-                'Employee Name'           => $r->employee_name,
-                'Employee Position'       => $r->position_title ?? 'N/A',
-                'Estimated Basic Salary'  => $this->n($r->earnings_basic),
-                'Estimated OT'            => $this->n($r->earnings_overtime ?: ($r->regularOTPay + $r->holidayOTPay)),
-                'Estimated Service Charge'=> $this->n($r->service_charge),
-                'Estimated Allowances'    => $this->n($r->earnings_allowance),
-                'Estimated Deductions'    => $this->n($r->total_deductions),
-                'Estimated Net Salary'    => $this->n($r->net_salary),
-            ])->all();
+            ->get(['pr.employee_id as eid', 'e.Emp_id', $this->nameExpr(), 'p.position_title', 'e.basic_salary',
+                'pr.earnings_basic', 'pr.regularOTPay', 'pr.holidayOTPay', 'pr.service_charge', 'pr.earnings_allowance',
+                'ta.present_days', 'ta.absent_days'])
+            ->map(function ($r) use ($ytdSc, $shop) {
+                $present = (float) ($r->present_days ?? 0);
+                $absent  = (float) ($r->absent_days ?? 0);
+                $workDays = $present + $absent;
+                // Attendance factor: present share of the working days (default full when unknown).
+                $factor = $workDays > 0 ? $present / $workDays : 1.0;
+
+                $basicMonthly = (float) ($r->basic_salary ?: $r->earnings_basic);
+                $estBasic = round($basicMonthly * $factor, 2);
+                $estOt    = (float) ($r->regularOTPay + $r->holidayOTPay);         // from attendance OT
+                $estSc    = round((($ytdSc[$r->eid] ?? $r->service_charge) ?: 0) * $factor, 2);
+                $estAllow = round((float) $r->earnings_allowance * $factor, 2);
+                $absentDed = $workDays > 0 ? round($basicMonthly / $workDays * $absent, 2) : 0;
+                $shopDed   = round((float) ($shop[$r->eid] ?? 0), 2);
+                $estDed   = $absentDed + $shopDed;
+                $estNet   = $estBasic + $estOt + $estSc + $estAllow - $estDed;
+
+                return [
+                    'Employee ID'             => $r->Emp_id ?: 'N/A',
+                    'Employee Name'           => $r->employee_name,
+                    'Employee Position'       => $r->position_title ?? 'N/A',
+                    'Estimated Basic Salary'  => $this->n($estBasic),
+                    'Estimated OT'            => $this->n($estOt),
+                    'Estimated Service Charge'=> $this->n($estSc),
+                    'Estimated Allowances'    => $this->n($estAllow),
+                    'Estimated Deductions'    => $this->n($estDed),
+                    'Estimated Net Salary'    => $this->n($estNet),
+                ];
+            })->all();
 
         return [
             'columns' => ['Employee ID', 'Employee Name', 'Employee Position', 'Estimated Basic Salary', 'Estimated OT', 'Estimated Service Charge', 'Estimated Allowances', 'Estimated Deductions', 'Estimated Net Salary'],
@@ -1223,11 +1281,11 @@ class PayrollReportController extends Controller
                 $j->on('pr.payroll_id', '=', 'ta.payroll_id')->on('pr.employee_id', '=', 'ta.employee_id');
             })
             ->where('pay.resort_id', $this->resort->resort_id)
-            ->whereRaw('YEAR(pay.start_date) = ?', [$year])
-            ->when($filters['month'] ?? null, fn($q) => $q->whereRaw('MONTH(pay.start_date) = ?', [$filters['month']]))
-            ->groupBy(DB::raw('MONTH(pay.start_date)'))
+            ->whereRaw('YEAR(pay.end_date) = ?', [$year])
+            ->when($filters['month'] ?? null, fn($q) => $q->whereRaw('MONTH(pay.end_date) = ?', [$filters['month']]))
+            ->groupBy(DB::raw('MONTH(pay.end_date)'))
             ->select(
-                DB::raw('MONTH(pay.start_date) as m'),
+                DB::raw('MONTH(pay.end_date) as m'),
                 DB::raw('SUM(ta.regular_ot_hours) as normal_h'),
                 DB::raw('SUM(ta.holiday_ot_hours) as holiday_h'),
                 DB::raw('SUM(pr.regularOTPay + pr.holidayOTPay) as cost')
@@ -1278,12 +1336,12 @@ class PayrollReportController extends Controller
             ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
             ->leftJoin('resort_positions as p', 'p.id', '=', 'e.Position_id')
             ->where('pay.resort_id', $this->resort->resort_id)
-            ->whereRaw('YEAR(pay.start_date) = ?', [$year])
-            ->when($filters['month'] ?? null, fn($q) => $q->whereRaw('MONTH(pay.start_date) = ?', [$filters['month']]))
+            ->whereRaw('YEAR(pay.end_date) = ?', [$year])
+            ->when($filters['month'] ?? null, fn($q) => $q->whereRaw('MONTH(pay.end_date) = ?', [$filters['month']]))
             ->when($scoped !== null, fn($q) => $q->whereIn('e.Dept_id', $scoped))
-            ->groupBy('e.id', 'e.Emp_id', 'ra.first_name', 'ra.last_name', 'p.position_title', DB::raw('MONTH(pay.start_date)'))
+            ->groupBy('e.id', 'e.Emp_id', 'ra.first_name', 'ra.last_name', 'p.position_title', DB::raw('MONTH(pay.end_date)'))
             ->havingRaw('SUM(pd.pension) > 0')
-            ->select('e.Emp_id', $this->nameExpr(), 'p.position_title', DB::raw('MONTH(pay.start_date) as m'), DB::raw('SUM(pd.pension) emp'))
+            ->select('e.Emp_id', $this->nameExpr(), 'p.position_title', DB::raw('MONTH(pay.end_date) as m'), DB::raw('SUM(pd.pension) emp'))
             ->orderBy('ra.first_name')->orderBy('m')->get()
             ->map(fn($r) => [
                 'Month'                      => Carbon::create()->month((int) $r->m)->format('F'),
