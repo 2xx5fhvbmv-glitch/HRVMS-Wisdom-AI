@@ -115,13 +115,13 @@ class WorkforcePlanningReportController extends Controller
             'approval_status' => [
                 'name'        => 'Workforce Planning Approval Status',
                 'description' => 'Approval status of workforce plans submitted for review.',
-                'filters'     => ['year', 'status', 'duration'],
+                'filters'     => ['year', 'department', 'status', 'duration'],
                 'handler'     => 'approvalStatus',
             ],
             'revision_history' => [
                 'name'        => 'Workforce Planning Revision History',
                 'description' => 'Revisions made to workforce plans for audit and history.',
-                'filters'     => ['year', 'duration'],
+                'filters'     => ['year', 'department', 'duration'],
                 'handler'     => 'revisionHistory',
             ],
             'local_vs_expat' => [
@@ -139,7 +139,7 @@ class WorkforcePlanningReportController extends Controller
             'grade_wise_plan' => [
                 'name'        => 'Grade-wise Workforce Plan',
                 'description' => 'Planned headcount by job grade.',
-                'filters'     => ['department'],
+                'filters'     => ['department', 'grade'],
                 'handler'     => 'gradeWisePlan',
             ],
             'department_vacancy_summary' => [
@@ -206,10 +206,11 @@ class WorkforcePlanningReportController extends Controller
 
         // Status options span both vacancy requests and plan-approval statuses.
         $statuses = collect(['Active', 'Cancelled', 'Pending', 'Approved', 'Rejected', 'Completed', 'Genrated']);
+        $grades = config('settings.Position_Rank', []);
 
         return view('resorts.reports.workforce_planning', compact(
             'page_title', 'reports', 'departments', 'years', 'positions',
-            'months', 'employmentTypes', 'statuses'
+            'months', 'employmentTypes', 'statuses', 'grades'
         ));
     }
 
@@ -219,6 +220,7 @@ class WorkforcePlanningReportController extends Controller
             'year'            => $request->input('year') ?: null,
             'department'      => $request->input('department') ?: null,
             'position'        => $request->input('position') ?: null,
+            'grade'           => $request->input('grade') ?: null,
             'month'           => $request->input('month') ?: null,
             'status'          => $request->input('status') ?: null,
             'employment_type' => $request->input('employment_type') ?: null,
@@ -318,6 +320,7 @@ class WorkforcePlanningReportController extends Controller
             ->when($scoped !== null, fn($q) => $q->whereIn('mr.dept_id', $scoped))
             ->when($filters['department'], fn($q) => $q->where('mr.dept_id', $filters['department']))
             ->when($filters['position'], fn($q) => $q->where('pmd.position_id', $filters['position']))
+            ->when($filters['grade'] ?? null, fn($q) => $q->where('p.Rank', $filters['grade']))
             ->groupBy('pmd.position_id', 'p.position_title', 'p.Rank', 'mr.dept_id', 'd.name')
             ->select(
                 'pmd.position_id',
@@ -335,6 +338,18 @@ class WorkforcePlanningReportController extends Controller
     {
         if (!$denominator) return '0%';
         return round(($numerator / $denominator) * 100, 1) . '%';
+    }
+
+    /** Map a hiring-requisition / vacancy state to its workflow status. */
+    private function requisitionStatus($status): string
+    {
+        $s = strtolower(trim((string) $status));
+        return match (true) {
+            in_array($s, ['approved', 'active', 'open', 'published']) => 'Approved',
+            in_array($s, ['rejected', 'cancelled', 'canceled', 'declined']) => 'Rejected',
+            $s === '' => 'Pending',
+            default => 'Pending',
+        };
     }
 
     /** Map a position's Rank (grade id) to its grade name (EXCOM, HOD, MGR …). */
@@ -899,7 +914,8 @@ class WorkforcePlanningReportController extends Controller
                 'Department'         => $r->department ?? 'N/A',
                 'Position'           => $r->position_title ?? 'N/A',
                 'Requested Headcount'=> (int) ($r->Total_position_required ?: 1),
-                'Status'             => $r->status ?? 'N/A',
+                // Map the requisition workflow state to Approved / Pending / Rejected.
+                'Status'             => $this->requisitionStatus($r->status),
                 'Requested By'       => trim($r->requested_by) ?: 'N/A',
             ])->all();
 
@@ -912,32 +928,46 @@ class WorkforcePlanningReportController extends Controller
         $resortId = $this->resort->resort_id;
         $scoped   = Common::getScopedDepartmentIds();
 
-        $rows = DB::table('budget_statuses as bs')
+        // All in-scope departments (so we can show "Not Submitted" ones too).
+        $depts = DB::table('resort_departments')->where('resort_id', $resortId)
+            ->when($scoped !== null, fn($q) => $q->whereIn('id', $scoped))
+            ->when($filters['department'], fn($q) => $q->where('id', $filters['department']))
+            ->orderBy('name')->get(['id', 'name']);
+
+        // Latest submission per department for the year.
+        $subs = DB::table('budget_statuses as bs')
             ->join('manning_responses as mr', 'mr.id', '=', 'bs.Budget_id')
-            ->leftJoin('resort_departments as d', 'd.id', '=', 'bs.Department_id')
             ->leftJoin('resort_admins as sub', 'sub.id', '=', 'bs.created_by')
-            ->leftJoin('resort_admins as apv', 'apv.id', '=', 'bs.modified_by')
             ->where('bs.resort_id', $resortId)
             ->when($filters['year'], fn($q) => $q->where('mr.year', $filters['year']))
-            ->when($scoped !== null, fn($q) => $q->whereIn('bs.Department_id', $scoped))
-            ->when($filters['status'], fn($q) => $q->where('bs.status', $filters['status']))
-            ->when(true, fn($q) => $this->applyDuration($q, $filters, 'bs.created_at'))
             ->orderByDesc('bs.created_at')
             ->get([
-                'd.name as dept', 'mr.year', 'bs.status', 'bs.created_at', 'bs.updated_at',
+                'bs.Department_id', 'bs.status', 'bs.created_at', 'bs.updated_at',
                 DB::raw("TRIM(CONCAT(COALESCE(sub.first_name,''),' ',COALESCE(sub.last_name,''))) as submitted_by"),
-                DB::raw("TRIM(CONCAT(COALESCE(apv.first_name,''),' ',COALESCE(apv.last_name,''))) as approver"),
-            ])
-            ->map(fn($r) => [
-                'Plan Name'       => trim(($r->dept ?? 'Plan') . ' ' . $r->year),
-                'Submitted By'    => trim($r->submitted_by) ?: 'N/A',
-                'Submitted Date'  => $r->created_at ? Carbon::parse($r->created_at)->format('d M Y') : 'N/A',
-                'Approver'        => trim($r->approver) ?: 'N/A',
-                'Approval Status' => $r->status,
-                'Approval Date'   => $r->updated_at ? Carbon::parse($r->updated_at)->format('d M Y') : 'N/A',
-            ])->all();
+            ])->groupBy('Department_id');
 
-        return ['columns' => ['Plan Name', 'Submitted By', 'Submitted Date', 'Approver', 'Approval Status', 'Approval Date'], 'rows' => $rows];
+        $rows = [];
+        foreach ($depts as $d) {
+            $s = optional($subs->get($d->id))->first();
+            // NOTE: the 3-level HR→Finance→GM approval chain is not stored granularly;
+            // budget_statuses only records Genrated (approved) / Rejected. Approval
+            // Status is mapped from that; per-level pending is shown as "Pending".
+            $status = $s
+                ? (strtolower((string) $s->status) === 'rejected' ? 'Rejected' : (strtolower((string) $s->status) === 'genrated' ? 'Approved' : 'Pending'))
+                : 'Pending';
+            $row = [
+                'Department'        => $d->name,
+                'Submission Status' => $s ? 'Submitted' : 'Not Submitted',
+                'Submission Date'   => $s && $s->created_at ? Carbon::parse($s->created_at)->format('d M Y') : 'N/A',
+                'Submitted By'      => $s ? (trim($s->submitted_by) ?: 'N/A') : 'N/A',
+                'Approval Status'   => $status,
+                'Action Date'       => $s && $s->updated_at ? Carbon::parse($s->updated_at)->format('d M Y') : 'N/A',
+            ];
+            if ($filters['status'] && strcasecmp($row['Approval Status'], $filters['status']) !== 0) continue;
+            $rows[] = $row;
+        }
+
+        return ['columns' => ['Department', 'Submission Status', 'Submission Date', 'Submitted By', 'Approval Status', 'Action Date'], 'rows' => $rows];
     }
 
     /** #14 Workforce Planning Revision History. */
@@ -948,29 +978,37 @@ class WorkforcePlanningReportController extends Controller
 
         $records = DB::table('budget_statuses as bs')
             ->join('manning_responses as mr', 'mr.id', '=', 'bs.Budget_id')
-            ->leftJoin('resort_admins as ra', 'ra.id', '=', 'bs.modified_by')
+            ->leftJoin('resort_departments as d', 'd.id', '=', 'bs.Department_id')
+            ->leftJoin('resort_admins as ra', 'ra.id', '=', 'bs.created_by')
             ->where('bs.resort_id', $resortId)
             ->when($filters['year'], fn($q) => $q->where('mr.year', $filters['year']))
             ->when($scoped !== null, fn($q) => $q->whereIn('bs.Department_id', $scoped))
-            ->when(true, fn($q) => $this->applyDuration($q, $filters, 'bs.updated_at'))
-            ->orderBy('bs.created_at')
+            ->when($filters['department'], fn($q) => $q->where('bs.Department_id', $filters['department']))
+            ->when(true, fn($q) => $this->applyDuration($q, $filters, 'bs.created_at'))
+            ->orderBy('bs.Department_id')->orderBy('bs.created_at')
             ->get([
-                'bs.updated_at', 'bs.status', 'bs.comments', 'bs.OtherComments',
-                DB::raw("TRIM(CONCAT(COALESCE(ra.first_name,''),' ',COALESCE(ra.last_name,''))) as modified_by"),
+                'bs.Department_id', 'd.name as dept', 'bs.created_at', 'bs.status', 'bs.comments', 'bs.OtherComments',
+                DB::raw("TRIM(CONCAT(COALESCE(ra.first_name,''),' ',COALESCE(ra.last_name,''))) as requested_by"),
             ]);
 
+        // Revision number = the Nth revision of THAT department's budget.
+        $seq = [];
         $rows = [];
-        foreach ($records as $i => $r) {
-            $remark = trim((string) ($r->comments ?: $r->OtherComments)) ?: ('Status: ' . $r->status);
+        foreach ($records as $r) {
+            $did = (int) $r->Department_id;
+            $seq[$did] = ($seq[$did] ?? 0) + 1;
+            $remark = trim((string) ($r->comments ?: $r->OtherComments)) ?: 'N/A';
             $rows[] = [
-                'Revision No.'  => $i + 1,
-                'Revision Date' => $r->updated_at ? Carbon::parse($r->updated_at)->format('d M Y') : 'N/A',
-                'Modified By'   => trim($r->modified_by) ?: 'N/A',
-                'Remarks'       => $remark,
+                'Department'             => $r->dept ?? 'N/A',
+                'Revision No.'           => $seq[$did],
+                'Revision Requested Date'=> $r->created_at ? Carbon::parse($r->created_at)->format('d M Y') : 'N/A',
+                'Requested By'           => trim($r->requested_by) ?: 'N/A',
+                'Remark'                 => $remark,
+                'Status'                 => $r->status ?: 'N/A',
             ];
         }
 
-        return ['columns' => ['Revision No.', 'Revision Date', 'Modified By', 'Remarks'], 'rows' => $rows];
+        return ['columns' => ['Department', 'Revision No.', 'Revision Requested Date', 'Requested By', 'Remark', 'Status'], 'rows' => $rows];
     }
 
     /** #16 Employment Type Planning (actual headcount by employment category). */
