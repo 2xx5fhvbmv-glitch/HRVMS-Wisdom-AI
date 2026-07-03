@@ -103,6 +103,16 @@
                                 </select>
                             </div>
 
+                            <div class="col-sm-4 wfp-filter" data-filter="grade">
+                                <label class="form-label">Grade</label>
+                                <select class="form-select" id="wfpGrade">
+                                    <option value="">All grades</option>
+                                    @foreach($grades as $gid => $gname)
+                                        <option value="{{ $gid }}">{{ $gname }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+
                             <div class="col-sm-4 wfp-filter" data-filter="employment_type">
                                 <label class="form-label">Employment Type</label>
                                 <select class="form-select" id="wfpEmploymentType">
@@ -173,6 +183,7 @@
                 position: $('#wfpPosition').val(),
                 month: $('#wfpMonth').val(),
                 status: $('#wfpStatus').val(),
+                grade: $('#wfpGrade').val(),
                 employment_type: $('#wfpEmploymentType').val(),
                 from_date: $('#wfpFromDate').val(),
                 to_date: $('#wfpToDate').val()
