@@ -204,7 +204,7 @@ class GrievanceController extends Controller
 
             foreach($request->witness_id as $v)
             {
-                GrivanceSubmissionWitness::create(["Witness_id" => base64_decode($v),"G_S_Parent_id" => $GrivanceSubmission->id,'Wintness_Status'=>'Active']);
+                GrivanceSubmissionWitness::create(["Witness_id" => $v,"G_S_Parent_id" => $GrivanceSubmission->id,'Wintness_Status'=>'Active']);
             }
 
             // Send mobile notification to HR employee

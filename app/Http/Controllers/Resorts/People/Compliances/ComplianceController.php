@@ -755,9 +755,12 @@ class ComplianceController extends Controller
           $minWageMVR = 8021; // Minimum wage in MVR
           $minWageUSD = 520; // Minimum wage in MVR
           $notify_person = Employee::where('resort_id', $resort->resort_id)->where('rank','3')->first();
-          if (!$notify_person) 
+          if (!$notify_person)
           {
-               $notify_person = Employee::where('resort_id', $resort->resort_id)->where('rank','2')->first();
+               // Fall back to the HR department's HOD/EXCOM — NOT just any
+               // rank-2 HOD in the resort, which was leaking Compliance
+               // notifications to unrelated departments (e.g. Food & Beverage).
+               $notify_person = Common::FindResortHR($resort->resort_id);
           }
 
           
@@ -1704,9 +1707,10 @@ class ComplianceController extends Controller
                     $tin = $employee->tin ?? null;
 
                     $notify_person = Employee::where('resort_id', $this->resort->resort_id)->where('rank','3')->first();
-                    if (!$notify_person) 
+                    if (!$notify_person)
                     {
-                         $notify_person = Employee::where('resort_id',$this->resort->resort_id)->where('rank','2')->first();
+                         // Fall back to the HR department's HOD/EXCOM, not any rank-2 HOD resort-wide.
+                         $notify_person = Common::FindResortHR($this->resort->resort_id);
                     }
                     if($totalMonthlyEarningMvr >= 30000 && !$tin)
                     {

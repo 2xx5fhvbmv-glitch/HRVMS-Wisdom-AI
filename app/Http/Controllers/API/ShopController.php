@@ -63,16 +63,21 @@ class ShopController extends Controller
                                                                     ->get();
 
 
-            $pendingConsentList                             =   Payment::where('emp_id', $employeeId)
+            // Full pending-consent list for the "Received Consent Requests" section —
+            // previously only fetched a single row (->first()) and stashed it under
+            // the unrelated "scan_qr" key, so the itemized list never rendered.
+            $pendingConsentList                             =   Payment::with(['shopKeeper:id,name','product:id,name'])
+                                                                    ->where('emp_id', $employeeId)
                                                                     ->where('status','Pending Consent')
                                                                     ->orderBy("created_at", "DESC")
-                                                                    ->first();
+                                                                    ->get();
 
             $shopArr                                        =   [
                 'total_amount_spent'                        =>  (int)$totalSpentThisMonth,
                 'pending_consent_counts'                    =>  (int)$pendingConsentThisMonth,
                 'most_spent_products'                       =>  $mostSpentProducts,
-                'scan_qr'                                   =>  $pendingConsentList ?? '',
+                'pending_consent_requests'                  =>  $pendingConsentList,
+                'scan_qr'                                   =>  '',
             ];
 
             $response['status']                             =   true;
