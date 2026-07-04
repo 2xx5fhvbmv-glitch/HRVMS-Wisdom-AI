@@ -6419,12 +6419,23 @@ class Common
             $newFileName = $uniqueString . '.' . $finalExtension;
 
             if ($SubFolder != null && $SubFolder != '') {
-                $parentPath = FilemangementSystem::where('resort_id', $resort_id)
-                    ->where('UnderON', $File_structure->id)
-                    ->where('Folder_Name', $SubFolder)
-                    ->first();
-
-                if (!$parentPath) return ['status' => false, 'msg' => 'Parent folder missing'];
+                // Sub-folders (e.g. "EmployeesDocument", "RequestAttachments") are never
+                // seeded anywhere — only the root categorized folder is auto-created on
+                // employee insert. Auto-create the sub-folder here too, same as the root.
+                $parentPath = FilemangementSystem::firstOrCreate(
+                    [
+                        'resort_id'   => $resort_id,
+                        'UnderON'     => $File_structure->id,
+                        'Folder_Name' => $SubFolder,
+                    ],
+                    [
+                        'Folder_unique_id' => substr(md5(uniqid($SubFolder, true)), 0, 10),
+                        'Folder_Type'      => 'categorized',
+                    ]
+                );
+                if ($parentPath->wasRecentlyCreated) {
+                    StorageHelper::disk()->put($main_folder . '/public/categorized/' . $File_structure->Folder_unique_id . '/' . $parentPath->Folder_unique_id . '/.gitkeep', '');
+                }
 
                 $path = $main_folder . '/public/' . $File_structure->Folder_Type . '/' . $File_structure->Folder_unique_id . '/' . $parentPath->Folder_unique_id . '/' . $newFileName;
                 $NewFolder_id = $parentPath->id;

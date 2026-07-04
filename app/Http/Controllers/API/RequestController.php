@@ -86,7 +86,7 @@ class RequestController extends Controller
         $validator = Validator::make($request->all(), [
             'request_type'                              =>  'required',
             'guarantor_id'                              =>  'required|array',
-            'guarantor_id.*'                            =>  'required|integer',
+            'guarantor_id.*'                            =>  'required|integer|exists:employees,id',
             'request_amount'                            =>  'required',
             'priority'                                  =>  'required',
             'request_date'                              =>  'required',

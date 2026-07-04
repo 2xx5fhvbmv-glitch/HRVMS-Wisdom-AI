@@ -3,7 +3,6 @@ namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
 use App\Models\Employee; // Ensure you import your model
-use App\Models\ResortAdmin;
 use App\Models\ResortBenifitGrid;
 use App\Models\ResortBenifitGridChild;
 use App\Models\EmployeeLeave;
@@ -70,10 +69,12 @@ class EmployeeController extends Controller
                     'e.id as emp_id',
                     'e.resort_id',
                     'e.rank',
+                    'e.religion',
                     'e.joining_date',
                     'ra.first_name as employee_first_name',
                     'ra.last_name as employee_last_name',
                     'ra.profile_picture as employee_profile_picture',
+                    'ra.gender',
                     'rp.position_title as position',
                     'rd.name as department',
                 )->get();
@@ -81,17 +82,18 @@ class EmployeeController extends Controller
                 $leaveData = [];
                 foreach ($employeesAndLeaveData as $key => $value) {
 
-                    $profile = ResortAdmin::with([
-                        'GetEmployee',
-                      ])->find($value->id);
-
                     $value->employee_profile_picture = Common::getResortUserPicture($value->id);
 
-                    $employee = Employee::where('Admin_Parent_id',$value->id)->first();
-                    $emp_id = $employee->id;
+                    // Use fields already fetched in the join above — the previous
+                    // re-query by Admin_Parent_id could return null for an
+                    // orphaned/soft-deleted employee row and crash with
+                    // "Attempt to read property on null" (PHP warnings are
+                    // promoted to ErrorException here), producing the 500s
+                    // reported on /resort/employees/{resort_id}.
+                    $emp_id = $value->emp_id;
 
-                    $gender         = $profile->gender;
-                    $religion       = $employee->religion;
+                    $gender         = $value->gender;
+                    $religion       = $value->religion;
 
                     if($religion == "1"){
                         $religion = "muslim";

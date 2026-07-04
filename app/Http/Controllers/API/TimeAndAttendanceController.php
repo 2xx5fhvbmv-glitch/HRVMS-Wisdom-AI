@@ -2293,6 +2293,93 @@ class TimeAndAttendanceController extends Controller
     }
 
     /**
+     * Plain employee listing for the "View Duty Roster" screen — photo, name,
+     * position, Employee ID only (no attendance/roster filtering). Tapping a
+     * row still opens hodViewDutyRoster for that employee, unchanged.
+     * Scope: HR (or HR-dept HOD/EXCOM) sees the whole resort; other HODs see
+     * their own department; everyone else sees their subordinates + self.
+     */
+    public function dutyRosterEmployeeList(Request $request)
+    {
+        if (!Auth::guard('api')->check()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $user       = Auth::guard('api')->user();
+        $employee   = $user->GetEmployee;
+        $resort_id  = $user->resort_id;
+
+        $positionRankConfig = config('settings.Position_Rank', []);
+        $finalRankConfig    = config('settings.final_rank', []);
+        $available_rank     = $positionRankConfig[$employee->rank] ?? $finalRankConfig[$employee->rank]
+            ?? $positionRankConfig[$employee->main_rank] ?? $finalRankConfig[$employee->main_rank] ?? '';
+
+        $hrDeptId = ResortDepartment::where('resort_id', $resort_id)
+            ->where(function ($q) {
+                $q->where('name', 'Human Resources')->orWhere('name', 'like', '%Human Resources%');
+            })
+            ->value('id');
+        $isInHRDept = $hrDeptId && (int) $employee->Dept_id === (int) $hrDeptId;
+        $isHR       = ($available_rank === 'HR') || ($available_rank === 'GM') || $isInHRDept;
+        $isHOD      = !$isHR && in_array($available_rank, ['HOD', 'EXCOM'], true);
+
+        try {
+            $query = Employee::join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
+                ->join('resort_positions as t2', 't2.id', '=', 'employees.Position_id')
+                ->where('employees.resort_id', $resort_id)
+                ->where('employees.status', 'Active');
+
+            if ($isHOD) {
+                $query->where('employees.Dept_id', $employee->Dept_id);
+            } elseif (!$isHR) {
+                $subordinateIds = Common::getSubordinates($employee->id);
+                if (empty($subordinateIds)) {
+                    $subordinateIds = [$employee->id];
+                }
+                $query->whereIn('employees.id', $subordinateIds);
+            }
+
+            if ($request->filled('search')) {
+                $search = $request->search;
+                $query->where(function ($q) use ($search) {
+                    $q->where('t1.first_name', 'LIKE', "%$search%")
+                        ->orWhere('t1.last_name', 'LIKE', "%$search%")
+                        ->orWhere('employees.Emp_id', 'LIKE', "%$search%");
+                });
+            }
+
+            $employees = $query->select(
+                'employees.id as emp_id',
+                'employees.Emp_id as EmployeeId',
+                't1.id as Parentid',
+                't1.first_name',
+                't1.last_name',
+                't1.profile_picture',
+                't2.position_title'
+            )->orderBy('t1.first_name')->get()->map(function ($item) {
+                return [
+                    'emp_id'         => $item->emp_id,
+                    'employee_id'    => $item->EmployeeId,
+                    'employee_name'  => ucfirst($item->first_name . ' ' . $item->last_name),
+                    'position'       => ucfirst($item->position_title),
+                    'profile_image'  => Common::getResortUserPicture($item->Parentid),
+                ];
+            });
+
+            return response()->json([
+                'status'   => true,
+                'message'  => 'Duty roster employee list fetched successfully.',
+                'employees' => $employees,
+            ]);
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    /**
      * HOD mark attendance: employee list for marking.
      * - HR department (HR rank, or EXCOM/HOD from Human Resources dept): whole resort employees.
      * - Other departments (EXCOM/HOD): only their department employees.
@@ -2799,12 +2886,21 @@ class TimeAndAttendanceController extends Controller
         $reporting_to = $emp_id;
         $underEmp_id = Common::getSubordinates($reporting_to);
         $resort_id = $user->resort_id;
-        $Rank = $employee->rank;
         $positionRankConfig = config('settings.Position_Rank', []);
         $finalRankConfig = config('settings.final_rank', []);
-        $available_rank = $positionRankConfig[$Rank] ?? $finalRankConfig[$Rank] ?? '';
-        $isHR = ($available_rank === "HR");
-        $isHOD = ($available_rank === "HOD");
+        $Rank = $employee->rank;
+        // Employees carry two rank fields: `rank` (dept-level, e.g. HOD) and
+        // `main_rank` (overall role, e.g. HR). Fall back to main_rank so an
+        // "HR Manager" whose dept-level rank is HOD is still recognised as HR.
+        $available_rank = $positionRankConfig[$Rank] ?? $finalRankConfig[$Rank] ?? $positionRankConfig[$employee->main_rank] ?? $finalRankConfig[$employee->main_rank] ?? '';
+        $hrDeptId = ResortDepartment::where('resort_id', $resort_id)
+            ->where(function ($q) {
+                $q->where('name', 'Human Resources')->orWhere('name', 'like', '%Human Resources%');
+            })
+            ->value('id');
+        $isInHRDept = $hrDeptId && (int) $employee->Dept_id === (int) $hrDeptId;
+        $isHR = ($available_rank === "HR") || ($available_rank === "GM") || $isInHRDept;
+        $isHOD = !$isHR && ($available_rank === "HOD" || $available_rank === "EXCOM");
 
         try {
             // Get current day and month dates
@@ -2840,11 +2936,8 @@ class TimeAndAttendanceController extends Controller
                     $employeeQuery->where('employees.Dept_id', $request->department_id);
                 }
             } elseif ($isHOD) {
-                // HOD sees only their subordinates
-                if (empty($underEmp_id)) {
-                    $underEmp_id = [$emp_id];
-                }
-                $employeeQuery->whereIn('employees.id', $underEmp_id);
+                // HOD sees their whole department, not just their direct-report subtree
+                $employeeQuery->where('employees.Dept_id', $employee->Dept_id);
             } else {
                 // Other ranks see only their subordinates
                 if (empty($underEmp_id)) {
@@ -2927,6 +3020,27 @@ class TimeAndAttendanceController extends Controller
                     $leaveCount = 1;
                 }
 
+                // Real punch times + worked hours, computed from actual check-in/out (not hardcoded)
+                $checkInTime = $todayAttendance->CheckingTime ?? null;
+                $checkOutTime = $todayAttendance->CheckingOutTime ?? null;
+                $hasRealCheckIn = !empty($checkInTime) && !in_array(trim($checkInTime), ['00:00', '00:00:00']);
+                $hasRealCheckOut = !empty($checkOutTime) && !in_array(trim($checkOutTime), ['00:00', '00:00:00']);
+                $attendanceStatus = $leaveCount ? 'On Leave' : (($todayAttendance->Status ?? null) ?: 'Absent');
+
+                $totalWorkedHours = 0;
+                if ($hasRealCheckIn && $hasRealCheckOut) {
+                    try {
+                        $checkIn = Carbon::parse($currentDate . ' ' . $checkInTime);
+                        $checkOut = Carbon::parse($currentDate . ' ' . $checkOutTime);
+                        if ($checkOut->lt($checkIn)) {
+                            $checkOut->addDay(); // overnight shift
+                        }
+                        $totalWorkedHours = round($checkIn->diffInMinutes($checkOut) / 60, 2);
+                    } catch (\Exception $e) {
+                        $totalWorkedHours = 0;
+                    }
+                }
+
                 return [
                     'Parentid' => $item->Parentid,
                     'first_name' => $item->first_name,
@@ -2939,6 +3053,10 @@ class TimeAndAttendanceController extends Controller
                     'EmployeeName' => $item->EmployeeName,
                     'Position' => $item->Position,
                     'profileImg' => $item->profileImg,
+                    'attendance_status' => $attendanceStatus,
+                    'check_in_time' => $hasRealCheckIn ? $checkInTime : null,
+                    'check_out_time' => $hasRealCheckOut ? $checkOutTime : null,
+                    'total_hours' => $totalWorkedHours,
                     'present_count' => $presentCount,
                     'absent_count' => $absentCount,
                     'leave_count' => $leaveCount,
@@ -3151,6 +3269,8 @@ class TimeAndAttendanceController extends Controller
                     $dayData['start_time'] = $shiftData->StartTime ?? null;
                     $dayData['end_time'] = $shiftData->EndTime ?? null;
                     $dayData['day_wise_total_hours'] = $shiftData->DayWiseTotalHours ?? null;
+                    $dayData['check_in_location'] = $shiftData->InTime_Location ?? null;
+                    $dayData['check_out_location'] = $shiftData->OutTime_Location ?? null;
 
                     // Process leave data
                     $leaveInfo = null;
@@ -3194,6 +3314,8 @@ class TimeAndAttendanceController extends Controller
                     $dayData['start_time'] = null;
                     $dayData['end_time'] = null;
                     $dayData['day_wise_total_hours'] = null;
+                    $dayData['check_in_location'] = null;
+                    $dayData['check_out_location'] = null;
                     $dayData['leave_info'] = null;
                     $dayData['is_day_off'] = false;
                 }

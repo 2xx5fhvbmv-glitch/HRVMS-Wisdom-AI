@@ -118,6 +118,7 @@ use Illuminate\Support\Facades\Route;
 			Route::post('timeandattendance/hod-time-attendance', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'hodTimeAttendance']);
 			Route::post('timeandattendance/hod-view-duty-roster', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'hodViewDutyRoster']);
 			Route::get('timeandattendance/under-emp-hod', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'underEmpHOD']);
+			Route::get('timeandattendance/duty-roster-employee-list', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'dutyRosterEmployeeList']);
 			Route::get('timeandattendance/hod-mark-attendance', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'hodMarkAttendance']);
 			Route::post('timeandattendance/hod-mark-attendance', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'hodMarkAttendancePresent']);
 			Route::post('timeandattendance/hod-mark-attendance-present', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'hodMarkAttendancePresent']);
