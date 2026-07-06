@@ -64,7 +64,7 @@ use Carbon\Carbon;
 class WisdomTools
 {
     /** Tools that expose salary / payroll / compensation data (HR / FULL tier only). */
-    const PAYROLL_TOOLS = ['get_payroll_summary', 'get_employee_salary', 'get_workforce_budget', 'get_employee_cost'];
+    const PAYROLL_TOOLS = ['get_payroll_summary', 'get_employee_salary', 'get_workforce_budget', 'get_employee_cost', 'get_payroll_by_department', 'get_payroll_trend'];
 
     /**
      * OpenAI-compatible tool schema list, filtered by the caller's capabilities.
@@ -227,6 +227,8 @@ class WisdomTools
                 ]),
             self::fn('get_compliance_issues',
                 'Flagged compliance breaches from the compliance directory, prioritised by severity (Critical→High→Medium/Low), with counts by severity and by module and a top actionable list (issue, module, employee, suggested fix). Use for "what compliance issues should I resolve first", "compliance violations", "which non-compliant cases to address". Do NOT answer this with just localization %.', []),
+            self::fn('get_workforce_status_summary',
+                'A single "today\'s workforce status" snapshot: total active headcount, employees on leave today, employees on probation, open vacancies, and localization %. Use this whenever asked for a general workforce/HR summary, "summarize workforce status", "give me an HR overview" — call THIS instead of guessing numbers or combining other tools yourself.', []),
 
             // ---- Performance Management ----
             self::fn('get_performance_summary',
@@ -359,7 +361,12 @@ class WisdomTools
                     'category' => ['type' => 'string', 'description' => 'Optional incident category name filter.'],
                 ]),
             self::fn('get_incident_investigations',
-                'Incidents currently under investigation, with investigation start date, expected resolution date and findings. Use for "which incidents are under investigation", "show active investigations", "investigation status".', []),
+                'Incidents currently under investigation, with investigation start date, expected resolution date, findings and an "overdue" flag (past expected resolution date and still not resolved). Use for "which incidents are under investigation", "show active investigations", "investigation status", "overdue investigations" (pass overdue_only=true).',
+                [
+                    'overdue_only' => ['type' => 'boolean', 'description' => 'true → only investigations past their expected resolution date.'],
+                ]),
+            self::fn('get_committee_workload',
+                'Incident-investigation workload per committee member: how many cases have been delegated to each member (from investigations they were assigned), and how many are still open. Use for "committee workloads", "who has the most delegated incident cases", "investigation workload by committee member".', []),
             self::fn('get_employee_incidents',
                 'Incidents involving one employee by name (as reporter, victim or involved party): name, category, severity, status, date and their role. Use for "has Ahmed been involved in any incidents", "show employee incident history".',
                 [
@@ -446,6 +453,13 @@ class WisdomTools
                     'name' => ['type' => 'string', 'description' => 'Full or partial employee name, or employee ID.'],
                     'year' => ['type' => 'integer', 'description' => 'Four-digit year. Defaults to the current year.'],
                 ], ['name']);
+            $tools[] = self::fn('get_payroll_by_department',
+                'Current monthly payroll (sum of active employees\' basic salary) grouped by department, highest first. Use for "department payroll", "payroll by department", "which department costs the most in salary". Payroll-restricted.', []);
+            $tools[] = self::fn('get_payroll_trend',
+                'Payroll totals for the last several pay periods (period, status, total employees, total payroll), most recent first — for month-to-month comparison. Use for "payroll trend", "compare this month\'s payroll to last month", "monthly payroll comparison". Payroll-restricted.',
+                [
+                    'periods' => ['type' => 'integer', 'description' => 'How many recent pay periods to return. Default 6.'],
+                ]);
 
             // Escape hatch + schema discovery for questions the dedicated tools
             // don't cover. Full (HR) tier only — that tier may already see all
@@ -538,6 +552,7 @@ class WisdomTools
                     }
                     return self::getWorkforceCompliance($rid, $args);
                 case 'get_compliance_issues':    return self::getComplianceIssues($rid, $args);
+                case 'get_workforce_status_summary': return self::getWorkforceStatusSummary($rid);
                 case 'get_performance_summary':  return self::getPerformanceSummary($rid);
                 case 'get_pip_overview':         return self::getPlanOverview($rid, $args, 'pip');
                 case 'get_pdp_overview':         return self::getPlanOverview($rid, $args, 'pdp');
@@ -570,7 +585,8 @@ class WisdomTools
                 case 'get_employee_training':    return self::getEmployeeTraining($rid, $args);
                 case 'get_incident_summary':     return self::getIncidentSummary($rid);
                 case 'get_incidents':            return self::getIncidents($rid, $args);
-                case 'get_incident_investigations': return self::getIncidentInvestigations($rid);
+                case 'get_incident_investigations': return self::getIncidentInvestigations($rid, $args);
+                case 'get_committee_workload':   return self::getCommitteeWorkload($rid);
                 case 'get_employee_incidents':   return self::getEmployeeIncidents($rid, $args);
                 case 'get_survey_summary':       return self::getSurveySummary($rid);
                 case 'get_surveys':              return self::getSurveys($rid, $args);
@@ -587,6 +603,8 @@ class WisdomTools
                 case 'get_workforce_budget':     return self::getWorkforceBudget($rid, $args);
                 case 'get_employee_cost':        return self::getEmployeeCost($rid, $args);
                 case 'get_payroll_summary':      return self::getPayrollSummary($rid);
+                case 'get_payroll_by_department':return self::getPayrollByDepartment($rid);
+                case 'get_payroll_trend':         return self::getPayrollTrend($rid, $args);
                 case 'get_employee_salary':      return self::getEmployeeSalary($rid, $args);
                 case 'list_tables':              return self::listTables($args);
                 case 'describe_table':           return self::describeTable($args);
@@ -1379,6 +1397,25 @@ class WisdomTools
         ];
     }
 
+    /** Single "today's workforce status" snapshot, so the model never has to guess/aggregate. */
+    private static function getWorkforceStatusSummary(int $rid): array
+    {
+        $headcount   = self::getHeadcount($rid, []);
+        $onLeave     = self::getEmployeesOnLeave($rid, []);
+        $probation   = self::getProbationOverview($rid);
+        $vacancy     = self::getVacancyAnalysis($rid, ['group_by' => 'total']);
+        $localization = self::getWorkforceCompliance($rid, ['type' => 'localization']);
+
+        return [
+            'date'                => Carbon::today()->toDateString(),
+            'active_headcount'    => $headcount['active_headcount'],
+            'on_leave_today'      => $onLeave['count'] ?? 0,
+            'on_probation'        => $probation['on_probation'],
+            'open_vacancies'      => $vacancy['total_vacant'] ?? 0,
+            'localization_percent' => $localization['localization_percent'] ?? null,
+        ];
+    }
+
     private static function getPayrollSummary(int $rid): array
     {
         $p = Payroll::where('resort_id', $rid)->orderByDesc('id')->first();
@@ -1441,6 +1478,61 @@ class WisdomTools
             'conversion_rate' => '1 USD = ' . number_format($rate, 4) . ' MVR',
             'employees'       => $list,
         ];
+    }
+
+    /** Current monthly payroll (sum of active employees' basic salary) grouped by department. */
+    private static function getPayrollByDepartment(int $rid): array
+    {
+        $rate = self::dollarToMvr($rid);
+        $employees = Employee::where('resort_id', $rid)->where('status', 'Active')
+            ->whereNotNull('basic_salary')
+            ->with('department:id,name')
+            ->get(['id', 'Dept_id', 'basic_salary', 'basic_salary_currency']);
+
+        $byDept = [];
+        foreach ($employees as $e) {
+            $name = $e->department->name ?? 'Unassigned';
+            $usd  = strtoupper($e->basic_salary_currency ?: 'USD') === 'MVR'
+                ? ((float) $e->basic_salary) / $rate
+                : (float) $e->basic_salary;
+            $byDept[$name] = ($byDept[$name] ?? 0) + $usd;
+        }
+        arsort($byDept);
+
+        $breakdown = [];
+        $totalUsd = 0.0;
+        foreach ($byDept as $name => $usd) {
+            $totalUsd += $usd;
+            $breakdown[] = ['department' => $name] + self::dualMoney($usd, $rate, 'USD');
+        }
+
+        return [
+            'conversion_rate' => '1 USD = ' . number_format($rate, 4) . ' MVR',
+            'total'           => self::dualMoney($totalUsd, $rate, 'USD'),
+            'by_department'   => $breakdown,
+        ];
+    }
+
+    /** Payroll totals for the last N pay periods, most recent first. */
+    private static function getPayrollTrend(int $rid, array $args): array
+    {
+        $limit = max(1, min(24, (int) ($args['periods'] ?? 6)));
+        $rate = self::dollarToMvr($rid);
+
+        $rows = Payroll::where('resort_id', $rid)->orderByDesc('start_date')->limit($limit)->get();
+        if ($rows->isEmpty()) {
+            return ['message' => 'No payroll records found for this resort yet.'];
+        }
+
+        $list = $rows->map(fn ($p) => [
+            'period_start'    => $p->getRawOriginal('start_date'),
+            'period_end'      => $p->getRawOriginal('end_date'),
+            'status'          => $p->status,
+            'total_employees' => $p->total_employees,
+            'total_payroll'   => self::dualMoney((float) $p->total_payroll, $rate, $p->payroll_unit ?: 'USD'),
+        ])->values();
+
+        return ['conversion_rate' => '1 USD = ' . number_format($rate, 4) . ' MVR', 'periods' => $list];
     }
 
     /**
@@ -2493,26 +2585,60 @@ class WisdomTools
         ];
     }
 
-    private static function getIncidentInvestigations(int $rid): array
+    private static function getIncidentInvestigations(int $rid, array $args = []): array
     {
+        $overdueOnly = !empty($args['overdue_only']);
+        $today = Carbon::today();
+
         $incs = Incidents::where('resort_id', $rid)
             ->where('status', 'Investigation In Progress')
             ->with(['categoryName:id,category_name', 'Investigation:id,incident_id,start_date,expected_resolution_date,investigation_findings'])
             ->orderByDesc('id')->limit(50)->get();
 
-        $list = $incs->map(function ($i) {
+        $list = $incs->map(function ($i) use ($today) {
             $inv = $i->Investigation->first();
+            $expected = $inv ? $inv->getRawOriginal('expected_resolution_date') : null;
+            $overdue = $expected && Carbon::parse($expected)->lt($today);
             return [
                 'incident'            => $i->incident_name,
                 'category'            => optional($i->categoryName)->category_name,
                 'severity'            => $i->severity ?: 'Unspecified',
                 'started'             => $inv ? $inv->getRawOriginal('start_date') : null,
-                'expected_resolution' => $inv ? $inv->getRawOriginal('expected_resolution_date') : null,
+                'expected_resolution' => $expected,
+                'overdue'             => $overdue,
                 'has_findings'        => $inv ? ($inv->investigation_findings ? true : false) : false,
             ];
         })->values();
 
-        return ['count' => $list->count(), 'investigations' => $list];
+        if ($overdueOnly) {
+            $list = $list->filter(fn ($i) => $i['overdue'])->values();
+        }
+
+        return ['count' => $list->count(), 'overdue_count' => $list->where('overdue', true)->count(), 'investigations' => $list];
+    }
+
+    /** Investigation workload per committee member (cases they've been delegated). */
+    private static function getCommitteeWorkload(int $rid): array
+    {
+        $rows = DB::table('incidents_investigation as inv')
+            ->join('incidents as i', 'i.id', '=', 'inv.incident_id')
+            ->join('incident_committee_members as m', 'm.id', '=', 'inv.added_by_member_id')
+            ->join('incident_committee as c', 'c.id', '=', 'm.commitee_id')
+            ->where('i.resort_id', $rid)
+            ->select('m.member_id', 'c.commitee_name', DB::raw('COUNT(*) as case_count'),
+                DB::raw("SUM(CASE WHEN i.status != 'Resolved' THEN 1 ELSE 0 END) as open_count"))
+            ->groupBy('m.member_id', 'c.commitee_name')
+            ->get();
+
+        $names = self::resolveEmpNames($rid, $rows->pluck('member_id')->unique()->all());
+        $list = $rows->map(fn ($r) => [
+            'member'     => $names[$r->member_id] ?? ('Employee #' . $r->member_id),
+            'committee'  => $r->commitee_name,
+            'cases'      => (int) $r->case_count,
+            'open_cases' => (int) $r->open_count,
+        ])->sortByDesc('cases')->values();
+
+        return ['count' => $list->count(), 'workload' => $list];
     }
 
     private static function getEmployeeIncidents(int $rid, array $args): array

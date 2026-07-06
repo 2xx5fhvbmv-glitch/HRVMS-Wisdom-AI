@@ -6,6 +6,10 @@
     /* Keep the selected report's description readable on the active (blue) background. */
     .list-group-item.active, .list-group-item.active strong { color:#fff !important; }
     .list-group-item.active .text-muted, .list-group-item.active small { color:rgba(255,255,255,.85) !important; }
+    /* .row is display:flex, so this flex item grows to fit a wide table
+       instead of clipping it — min-width:0 lets .table-responsive inside
+       actually scroll instead of blowing out the whole page horizontally. */
+    .report-results-col { min-width: 0; }
 </style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
@@ -39,7 +43,7 @@
                 </div>
             </div>
 
-            <div class="col-lg-8">
+            <div class="col-lg-8 report-results-col">
                 <div class="card">
                     <div class="card-title"><h3 id="vsReportTitle">{{ $reports[0]['name'] ?? 'Report' }}</h3></div>
                     <div class="card-body">

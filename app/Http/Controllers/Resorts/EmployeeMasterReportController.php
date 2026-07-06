@@ -48,7 +48,7 @@ class EmployeeMasterReportController extends Controller
             'reporting_manager' => ['name' => 'Reporting Manager Report', 'description' => 'Employees grouped under their reporting managers.', 'filters' => ['duration', 'manager'], 'handler' => 'reportingManager'],
             'contact_directory' => ['name' => 'Employee Contact Directory', 'description' => 'Internal employee contact directory.', 'filters' => ['department', 'location'], 'handler' => 'contactDirectory'],
             'workforce_distribution' => ['name' => 'Workforce Distribution Report', 'description' => 'Distribution by department, gender, nationality, employment type and location.', 'filters' => ['duration'], 'handler' => 'workforceDistribution'],
-            'demographics'      => ['name' => 'Employee Demographics Report', 'description' => 'Demographic statistics of the workforce.', 'filters' => ['duration'], 'handler' => 'demographics'],
+            'demographics'      => ['name' => 'Employee Demographics Report', 'description' => 'Demographic statistics of the workforce.', 'filters' => ['duration', 'employment_status'], 'handler' => 'demographics'],
             'birthday'          => ['name' => 'Birthday Report', 'description' => 'Employees whose birthdays fall within the selected period.', 'filters' => ['duration'], 'handler' => 'birthday'],
             'work_anniversary'  => ['name' => 'Work Anniversary Report', 'description' => 'Employees celebrating work anniversaries in the period.', 'filters' => ['duration'], 'handler' => 'workAnniversary'],
             'length_of_service' => ['name' => 'Length of Service Report', 'description' => 'Employees by years of service.', 'filters' => ['duration'], 'handler' => 'lengthOfService'],
@@ -216,11 +216,10 @@ class EmployeeMasterReportController extends Controller
 
     public function master(array $f): array
     {
-        $columns = ['Employee ID', 'Employee Code', 'Full Name', 'Preferred Name', 'Gender', 'Nationality', 'Date of Birth', 'Department', 'Position', 'Employment Type', 'Employment Status', 'Location', 'Date Joined', 'Confirmation Date', 'Reporting Manager', 'Work Email', 'Mobile Number'];
+        $columns = ['Employee ID', 'Full Name', 'Preferred Name', 'Gender', 'Nationality', 'Date of Birth', 'Department', 'Position', 'Employment Type', 'Employment Status', 'Location', 'Date Joined', 'Confirmation Date', 'Reporting Manager', 'Work Email', 'Mobile Number'];
         $rows = $this->base($f)->when(true, fn($q) => $this->applyDuration($q, $f, 'e.joining_date'))->orderBy('ra.first_name')->get()
             ->map(fn($r) => [
-                'Employee ID'       => $r->id,
-                'Employee Code'     => $r->Emp_id ?: 'N/A',
+                'Employee ID'       => $r->Emp_id ?: 'N/A',
                 'Full Name'         => trim($r->employee_name) ?: 'N/A',
                 'Preferred Name'    => trim($r->preferred_name) ?: 'N/A',
                 'Gender'            => $r->gender ? ucfirst($r->gender) : 'N/A',

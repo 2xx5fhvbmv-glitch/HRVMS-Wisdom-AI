@@ -43,7 +43,7 @@ class WorkforcePlanningReportController extends Controller
             'annual_plan' => [
                 'name'        => 'Annual Workforce Plan',
                 'description' => 'Approved workforce plan for the year — headcount and budget across departments.',
-                'filters'     => ['year', 'month'],
+                'filters'     => ['year', 'duration'],
                 'handler'     => 'annualPlan',
             ],
             'monthly_plan' => [
@@ -234,6 +234,35 @@ class WorkforcePlanningReportController extends Controller
     {
         return $q->when($filters['from_date'] ?? null, fn($x) => $x->whereDate($col, '>=', $filters['from_date']))
                  ->when($filters['to_date'] ?? null, fn($x) => $x->whereDate($col, '<=', $filters['to_date']));
+    }
+
+    /** Distinct [year,month] calendar-month pairs spanned by a from/to date range (inclusive). */
+    private function yearMonthPairs(?string $from, ?string $to): array
+    {
+        if (!$from && !$to) return [];
+        $start = Carbon::parse($from ?: $to)->startOfMonth();
+        $end   = Carbon::parse($to ?: $from)->startOfMonth();
+        if ($end->lt($start)) { [$start, $end] = [$end, $start]; }
+        $pairs = [];
+        for ($cursor = $start->copy(); $cursor->lte($end); $cursor->addMonth()) {
+            $pairs[] = ['year' => $cursor->year, 'month' => $cursor->month];
+        }
+        return $pairs;
+    }
+
+    /** allowanceMap() summed across an arbitrary set of [year,month] pairs (can span years). */
+    private function allowanceMapForRange(string $by, array $pairs): array
+    {
+        $byYear = [];
+        foreach ($pairs as $p) { $byYear[$p['year']][] = $p['month']; }
+        $out = [];
+        foreach ($byYear as $yr => $months) {
+            foreach ($this->allowanceMap($by, $yr, $months) as $id => $v) {
+                $out[$id]['amt'] = ($out[$id]['amt'] ?? 0) + $v['amt'];
+                $out[$id]['cur'] = $out[$id]['cur'] ?? $v['cur'];
+            }
+        }
+        return $out;
     }
 
     /** Resolve a report key + filters to ['name','description','columns','rows'] or null. */
@@ -597,7 +626,7 @@ class WorkforcePlanningReportController extends Controller
     }
 
     /** Budgeted allowances/other costs grouped by position_id|department_id.
-     *  $month null = full-year (sum all months); otherwise a single month. */
+     *  $month null = full-year (sum all months); int = a single month; array = a set of months. */
     private function allowanceMap(string $by, $year, $month = null): array
     {
         $rid = $this->resort->resort_id;
@@ -606,7 +635,7 @@ class WorkforcePlanningReportController extends Controller
         foreach (['resort_employee_budget_cost_configurations', 'resort_vacant_budget_cost_configurations'] as $t) {
             foreach (DB::table($t)->where('resort_id', $rid)
                 ->when($year, fn($q) => $q->where('year', $year))
-                ->when($month, fn($q) => $q->where('month', $month))
+                ->when($month, fn($q) => is_array($month) ? $q->whereIn('month', $month) : $q->where('month', $month))
                 ->groupBy($groupCol, 'currency')
                 ->selectRaw("$groupCol as gid, currency, SUM(value) as tot")->get() as $r) {
                 $id = (int) $r->gid;
@@ -642,14 +671,20 @@ class WorkforcePlanningReportController extends Controller
     /** #1 Annual Workforce Plan. */
     public function annualPlan(array $filters): array
     {
+        // Optional From/To Date narrows the budget to those calendar months instead
+        // of the full year (e.g. "last 3 months") — headcount itself doesn't have a
+        // month dimension so it's unaffected either way.
+        $pairs      = $this->yearMonthPairs($filters['from_date'] ?? null, $filters['to_date'] ?? null);
+        $monthCount = $pairs ? count($pairs) : 12;
+
         $sal = $this->salaryMap('position', $filters['year']);
-        $alw = $this->allowanceMap('position', $filters['year']);
+        $alw = $pairs ? $this->allowanceMapForRange('position', $pairs) : $this->allowanceMap('position', $filters['year']);
         $rows = $this->seatQuery($filters)->orderBy('d.name')->orderBy('p.position_title')->get()
-            ->map(function ($r) use ($sal, $alw) {
+            ->map(function ($r) use ($sal, $alw, $monthCount) {
                 $pid = (int) $r->position_id;
                 $cur = $this->curFor($pid, $sal, $alw);
-                $salary = ($sal[$pid]['amt'] ?? 0) * 12;   // annual = monthly basic × 12
-                $allow  = $alw[$pid]['amt'] ?? 0;          // config values already span the year
+                $salary = ($sal[$pid]['amt'] ?? 0) * $monthCount; // monthly basic × selected months (12 = full year)
+                $allow  = $alw[$pid]['amt'] ?? 0;                 // already scoped to the selected months
                 return [
                     'Department'         => $r->department ?? 'N/A',
                     'Position'           => $r->position_title,
