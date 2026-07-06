@@ -244,9 +244,12 @@
                                                                         $vacantDifference = $vacantcount - $maxVacantCount;
                                                                         $vacantCostArray = Common::CheckVacantBudgetCost($vacantDifference);
                                                                         $vacantCost = $vacantCostArray['total_cost'] ?? 0;
+                                                                        // Was rendering the raw cost with no currency symbol
+                                                                        // or label ("Vacant (2) - 360"), which read like a
+                                                                        // negative/broken number instead of an estimated cost.
                                                                         echo "<td class='w-120 month-{$i}'>
                                                                             <input type='hidden' class='vacant' name='vacant[]' value='" . number_format($vacantCost, 2) . "'>
-                                                                            <span class='badge badge-success'>Vacant  ({$vacantcount}) - {$vacantCost}</span>
+                                                                            <span class='badge badge-success'>Vacant ({$vacantcount}) - Est. Cost " . Common::GetResortCurrencySymbol() . number_format($vacantCost, 2) . "</span>
                                                                         </td>";
 
                                                                         $maxVacantCount = $vacantcount;
