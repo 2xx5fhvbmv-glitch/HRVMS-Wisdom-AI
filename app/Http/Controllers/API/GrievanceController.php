@@ -178,8 +178,6 @@ class GrievanceController extends Controller
                 'resort_id'                                     =>  $this->resort_id,
             ]);
 
-            $Path                                           =   $path."/".$this->user->resort->resort_id."/".$GrivanceSubmission->Grivance_id;
-
             $imagePaths = [];
             if ($request->hasFile('Attachments')) {
 

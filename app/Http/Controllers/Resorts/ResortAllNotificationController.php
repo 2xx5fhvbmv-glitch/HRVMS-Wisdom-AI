@@ -51,12 +51,14 @@ class ResortAllNotificationController extends Controller
         // })
         // ->pluck('id') ->toArray();
 
-        // HODs (rank 2) — keyed by Dept_id so each department gets a child row
-        // even when no HOD is assigned. Previous logic looped over HODs only,
-        // so departments without a Rank=2 employee were silently dropped from
-        // the pending-response list (cause: 25 depts → only 6 child rows).
+        // HODs/EXCOM (rank 2/1) — keyed by Dept_id so each department gets a
+        // child row even when no HOD is assigned. Previous logic looped over
+        // HODs only, so departments without a Rank=2 employee were silently
+        // dropped from the pending-response list (cause: 25 depts → only 6
+        // child rows), and separately only rank 2 was ever queried at all —
+        // department heads with rank 1 (EXCOM) never got notified.
         $hodsByDept = Employee::where('resort_id', $resort_id)
-            ->where('Rank', 2)
+            ->whereIn('Rank', [1, 2])
             ->whereIn('Dept_id', $DepartmentIds)
             ->get(['Admin_Parent_id','id','Rank','Dept_id','Position_id'])
             ->groupBy('Dept_id');

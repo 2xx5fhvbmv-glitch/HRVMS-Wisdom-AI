@@ -1209,6 +1209,16 @@
             ]
         },
         options: {
+            // pointRadius is 0 on every dataset (clean line, no dots), so
+            // without this the default hover mode ('nearest'+intersect:true)
+            // only fires when the cursor lands on the exact line pixel —
+            // hover worked "sometimes" because that's a 1px-wide target.
+            // 'index'+intersect:false fires for any x-position, matching
+            // the point closest on that vertical line.
+            interaction: {
+                mode: 'index',
+                intersect: false
+            },
             plugins: {
                 legend: {
                     display: false

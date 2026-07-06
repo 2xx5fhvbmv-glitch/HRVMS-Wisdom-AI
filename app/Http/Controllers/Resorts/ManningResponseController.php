@@ -370,9 +370,16 @@ class ManningResponseController extends Controller
                 // to share the same Position_id, surfacing that resort's
                 // headcount as ours. (Reported live data-difference
                 // between the WP HR dashboard and this view.)
+                // Raw DB::table query — Eloquent's soft-delete scope and any
+                // status filter do NOT apply automatically here, so a
+                // terminated/inactive employee (deleted_at set or
+                // status != Active) still counted as "filling" the seat,
+                // showing e.g. 2 employee names against "No. of Position: 1".
                 ->leftJoin('employees as e', function ($j) use ($resortId) {
                     $j->on('p.id', '=', 'e.Position_id')
-                      ->where('e.resort_id', '=', $resortId);
+                      ->where('e.resort_id', '=', $resortId)
+                      ->where('e.status', '=', 'Active')
+                      ->whereNull('e.deleted_at');
                 })
                 ->leftJoin('position_monthly_data as pmd', 'p.id', '=', 'pmd.position_id')
                 // manning_responses also scoped to THIS resort. The
@@ -423,6 +430,8 @@ class ManningResponseController extends Controller
                             ->where('e.resort_id', $resortId)
                             ->where('position_id', $position->Position_id)
                             ->where('Dept_id', $position->dept_id)
+                            ->where('e.status', 'Active')
+                            ->whereNull('e.deleted_at')
                             ->get([
                                 'e.resort_id',
                                 'e.id as Empid',

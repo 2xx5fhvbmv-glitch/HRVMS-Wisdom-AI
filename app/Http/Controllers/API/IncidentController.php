@@ -44,6 +44,57 @@ class IncidentController extends Controller
         }
     }
 
+    /**
+     * Attachments are stored as [['Filename' => .., 'Child_id' => ..], ...]
+     * (a file-management reference, not a raw path). Resolve each Child_id to
+     * its stored path and sign a temporary URL, same pattern as the exit
+     * clearance attachment viewer. Skips anything that fails to resolve.
+     */
+    private function resolveAttachmentUrls($items): array
+    {
+        $urls = [];
+        foreach ((array) $items as $item) {
+            $childId = is_array($item) ? ($item['Child_id'] ?? null) : $item;
+            if (empty($childId)) {
+                continue;
+            }
+            try {
+                $cfm = \App\Models\ChildFileManagement::find($childId);
+                if ($cfm && !empty($cfm->File_Path)) {
+                    $aws = Common::GetApplicantAWSFile($cfm->File_Path);
+                    if (!empty($aws['success'])) {
+                        $urls[] = $aws['NewURLshow'];
+                    }
+                }
+            } catch (\Throwable $e) {
+                // Skip entries that fail to resolve rather than 500ing the whole request.
+            }
+        }
+        return $urls;
+    }
+
+    /**
+     * The mobile client sends multi-value id fields two different ways:
+     * a JSON-encoded string (e.g. "[182]") or PHP bracket-array form fields
+     * (witness_id[0]=177&witness_id[1]=180, which Laravel already parses into
+     * a real array). json_decode() on the latter crashes with a TypeError, so
+     * detect which shape arrived before decoding.
+     */
+    private function normalizeIdInput($value): array
+    {
+        if (is_array($value)) {
+            return array_values(array_filter($value, fn ($v) => $v !== null && $v !== ''));
+        }
+        if (is_string($value) && $value !== '') {
+            $decoded = json_decode($value, true);
+            if (is_array($decoded)) {
+                return $decoded;
+            }
+            return array_values(array_filter(explode(',', $value), fn ($v) => $v !== ''));
+        }
+        return [];
+    }
+
     public function incidentDashboard()
     {
         if (!Auth::guard('api')->check()) {
@@ -231,9 +282,9 @@ class IncidentController extends Controller
         }
 
         $request->merge([
-            'involved_emp_ids' => json_decode($request->input('involved_emp_ids'), true),
-            'victim_ids' => json_decode($request->input('victim_ids'), true),
-            'witness_id' => json_decode($request->input('witness_id'), true),
+            'involved_emp_ids' => $this->normalizeIdInput($request->input('involved_emp_ids')),
+            'victim_ids' => $this->normalizeIdInput($request->input('victim_ids')),
+            'witness_id' => $this->normalizeIdInput($request->input('witness_id')),
         ]);
 
         $validator = Validator::make($request->all(), [
@@ -429,11 +480,7 @@ class IncidentController extends Controller
 
             $attachments = json_decode($incident->attachements, true);
             if (!empty($attachments)) {
-                $attachmentUrls = [];
-                foreach ($attachments as $filePath) {
-                    $attachmentUrls[] = url($filePath);
-                }
-                $incidentData['findings']             =   $attachmentUrls;
+                $incidentData['findings']             =   $this->resolveAttachmentUrls($attachments);
             }
 
             $meeting=IncidentsMeeting::where('incident_id', $incidentId)->first();
@@ -455,14 +502,10 @@ class IncidentController extends Controller
                                             ->map(function ($group) {
                                                 $first = $group->first();
                                         
-                                                $meeting_attachmentUrls = []; 
-               
                                                 $meeting_attachments = json_decode($first->attachments, true);
-                                                if (!empty($meeting_attachments)) {
-                                                    foreach ($meeting_attachments as $filePath) {
-                                                        $meeting_attachmentUrls[] = url($filePath);
-                                                    }
-                                                }
+                                                $meeting_attachmentUrls = !empty($meeting_attachments)
+                                                    ? $this->resolveAttachmentUrls($meeting_attachments)
+                                                    : [];
 
                                                 return [
                                                     'id' => $first->meeting_id,
@@ -571,14 +614,10 @@ class IncidentController extends Controller
                             ->map(function ($group) {
                                 $first = $group->first();
 
-                                $meeting_attachmentUrls = []; 
-                        
                                 $meeting_attachments = json_decode($first->attachments, true);
-                                if (!empty($meeting_attachments)) {
-                                    foreach ($meeting_attachments as $filePath) {
-                                        $meeting_attachmentUrls[] = url($filePath);
-                                    }
-                                }
+                                $meeting_attachmentUrls = !empty($meeting_attachments)
+                                    ? $this->resolveAttachmentUrls($meeting_attachments)
+                                    : [];
 
                                 $status = 'scheduled';
                                 if (strtotime($first->meeting_date) < strtotime(date('Y-m-d'))) {

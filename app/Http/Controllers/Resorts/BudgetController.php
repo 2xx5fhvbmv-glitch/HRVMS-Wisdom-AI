@@ -781,7 +781,8 @@ class BudgetController extends Controller
         $employeeRankPosition = Common::getEmployeeRankPosition( $this->resort->getEmployee);
 
         if($this->resort->is_master_admin == 0){
-            if(($employeeRankPosition['position'] != "HR" && ($employeeRankPosition['rank'] != "HOD" || $employeeRankPosition['rank'] != "XCOM" )) && ($employeeRankPosition['position'] != "GM" && ($employeeRankPosition['rank'] != "HOD" || $employeeRankPosition['rank'] != "XCOM" )) && ($employeeRankPosition['position'] != "Finance" && ($employeeRankPosition['rank'] != "HOD" || $employeeRankPosition['rank'] != "XCOM" ))) {
+            $isHodOrXcom = in_array($employeeRankPosition['rank'], ['HOD', 'XCOM'], true);
+            if(!($isHodOrXcom && in_array($employeeRankPosition['position'], ['HR', 'GM', 'Finance'], true))) {
                 $rank_wise_departments = ResortDepartment::where('id', $this->resort->getEmployee->Dept_id)
                     ->where('resort_id', $resortId)
                     ->pluck('id')->toArray();
