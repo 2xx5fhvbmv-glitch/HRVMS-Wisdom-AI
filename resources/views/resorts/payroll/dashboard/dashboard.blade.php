@@ -233,7 +233,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-xl-3 col-md-6 @if(App\Helpers\Common::checkRouteWisePermission('payroll.run',config('settings.resort_permissions.view')) == false) d-none @endif">
+            <div class="col-xl-4 col-md-6 @if(App\Helpers\Common::checkRouteWisePermission('payroll.run',config('settings.resort_permissions.view')) == false) d-none @endif">
                 <div class="card card-wiINsightPayroll" id="card-wiINsightPayroll" >
                     @php $meta = $payrollInsights['_meta'] ?? null; @endphp
                     <div class=" card-title">
@@ -275,7 +275,7 @@
                 </div>
             </div>
 
-              <div class="col-xl-3 col-lg-3 @if(App\Helpers\Common::checkRouteWisePermission('payroll.run',config('settings.resort_permissions.view')) == false) d-none @endif">
+              <div class="col-xl-4 col-lg-6 @if(App\Helpers\Common::checkRouteWisePermission('payroll.run',config('settings.resort_permissions.view')) == false) d-none @endif">
                 <div class="card card-payrollDis">
                     <div class="card-title">
                         <h3>Payroll Distributions</h3>
@@ -301,7 +301,7 @@
             </div>
 
             {{-- Payroll Comparison — moved up to fill the space beside Payroll Distributions --}}
-            <div class="col-lg-6 @if(App\Helpers\Common::checkRouteWisePermission('payroll.run',config('settings.resort_permissions.view')) == false) d-none @endif">
+            <div class="col-xl-4 col-lg-6 @if(App\Helpers\Common::checkRouteWisePermission('payroll.run',config('settings.resort_permissions.view')) == false) d-none @endif">
                 <div class="comparison-wrapper">
                     @include('resorts.renderfiles.payroll_comparison_card', ['payrollData' => $payrollData])
                 </div>
