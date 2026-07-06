@@ -6,6 +6,10 @@
     /* Keep the selected report's description readable on the active (blue) background. */
     .list-group-item.active, .list-group-item.active strong { color:#fff !important; }
     .list-group-item.active .text-muted, .list-group-item.active small { color:rgba(255,255,255,.85) !important; }
+    /* .row is display:flex, so this flex item grows to fit a wide table
+       instead of clipping it — min-width:0 lets .table-responsive inside
+       actually scroll instead of blowing out the whole page horizontally. */
+    .report-results-col { min-width: 0; }
 </style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
@@ -30,7 +34,7 @@
                     <div class="card-title"><h3>Predefined Reports</h3></div>
                     <div class="card-body">
                         <input type="text" class="form-control form-control-sm mb-3" id="wfpReportSearch" placeholder="Search reports…" autocomplete="off">
-                        <div class="list-group" id="wfpReportList">
+                        <div class="list-group" id="wfpReportList" style="max-height:70vh;overflow:auto">
                             @foreach($reports as $i => $r)
                                 <button type="button"
                                         class="list-group-item list-group-item-action wfp-report-item @if($i===0) active @endif"
@@ -46,7 +50,7 @@
             </div>
 
             {{-- Filters + results --}}
-            <div class="col-lg-8">
+            <div class="col-lg-8 report-results-col">
                 <div class="card">
                     <div class="card-title"><h3 id="wfpReportTitle">{{ $reports[0]['name'] ?? 'Report' }}</h3></div>
                     <div class="card-body">

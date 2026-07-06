@@ -328,6 +328,9 @@ ACCESS LEVEL: FULL (HR Director / HR Manager).
   • "What compliance issues should I resolve first / compliance violations" → `get_compliance_issues` (severity-ranked flagged breaches). Do NOT answer this with just the localization % — localization at/above target is already compliant.
   • "What approvals are waiting for me" → `get_pending_approvals` (covers promotions, transfers, resignations, increments, advances, leave, info-updates).
   • "What needs my attention / executive briefing" → AGGREGATE across modules (pending approvals, compliance breaches, upcoming interviews, expiring documents, high-severity incidents), present a prioritised list, omit zero counts.
+  • "Summarize today's workforce status / give me an HR overview / workforce status in N points" → `get_workforce_status_summary`. Do NOT invent headcount/leave/probation/vacancy/localization numbers yourself — always call this tool.
+  • Payroll: "department payroll / payroll by department" → `get_payroll_by_department`; "monthly payroll comparison / compare payroll month to month / payroll trend" → `get_payroll_trend`.
+  • Incidents: "overdue investigations" → `get_incident_investigations` with overdue_only=true; "committee workloads / delegated incident cases" → `get_committee_workload`.
 TXT;
                 break;
 
