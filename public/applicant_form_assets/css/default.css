@@ -1165,11 +1165,20 @@ strong {
 
 /* .brand-logo {
         margin-bottom: 39px;
-    } 
+    }
      .navigation-box .nav .nav-item .nav-link img {
         min-width: 26px;
-    }    
+    }
     */
+
+/* Resort logo has no size cap outside the @media breakpoints in media.css,
+   so at normal desktop width it renders at the uploaded file's native
+   resolution — huge if that file happens to be a large PNG (unlike the
+   Wisdom AI logo, which is a small 248x72 file and never needed one). */
+.resort-logo img {
+    max-height: 70px;
+    width: auto;
+}
 
 .navbar-content {
     overflow-y: auto;
