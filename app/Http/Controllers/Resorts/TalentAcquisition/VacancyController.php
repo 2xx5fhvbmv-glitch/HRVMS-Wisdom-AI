@@ -412,7 +412,12 @@ class VacancyController extends Controller
                     ]);
 
 
-                     $FainalKey = Common::TaFinalApproval($resort_id) ;
+                     // Resorts that never configured this (FinalApproval null in
+                     // job_advertisements, e.g. resort 26) must default to the
+                     // FULL chain (HR->Finance->GM), not to zero stages —
+                     // "unconfigured" should mean "safest/most thorough",
+                     // never "skip everything".
+                     $FainalKey = Common::TaFinalApproval($resort_id) ?: 8;
                     $position_rank = config('settings.final_rank');
 
 
@@ -803,7 +808,9 @@ class VacancyController extends Controller
                 'V_id' => $vacancy->id,
             ]);
 
-            $FainalKey = Common::TaFinalApproval($resort_id);
+            // Default unconfigured resorts (FinalApproval null) to the full
+            // chain (HR->Finance->GM) — see matching comment above.
+            $FainalKey = Common::TaFinalApproval($resort_id) ?: 8;
             $position_rank = config('settings.final_rank');
             $CycleOfRequest = array_filter($position_rank, function ($value, $key) use ($FainalKey) {
                 return $key < $FainalKey;
