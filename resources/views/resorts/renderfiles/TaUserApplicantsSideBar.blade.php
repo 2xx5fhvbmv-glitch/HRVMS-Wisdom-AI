@@ -254,7 +254,7 @@
                                 <td><a  data-id="{{ base64_encode($Applicant_form_data->id) }}" data-flag="full_length_photo" href="javascript:void(0)" class="a-link DownloadFile">Download</a></td>
                             </tr>
                             @php
-                                $otherDocs = json_decode($Applicant_form_data->other_document, true);
+                                $otherDocs = json_decode($Applicant_form_data->other_document ?? '', true);
                             @endphp
                             @if(is_array($otherDocs) && count($otherDocs) > 0)
                                 @foreach($otherDocs as $docIdx => $docPath)
@@ -580,7 +580,7 @@
                                     <input type="hidden" value="{{ base64_encode($Applicant_form_data->ApplicantID) }}" id="Applicant_id" name="Applicant_id">
                                     <div class="textarea-icon mt-2 mb-3">
                                         @php
-                                            $notesData = json_decode($Applicant_form_data->notes, true);
+                                            $notesData = json_decode($Applicant_form_data->notes ?? '', true);
                                             $currentUserNote = is_array($notesData) ? ($notesData[$currentUserId] ?? '') : '';
                                         @endphp
                                         <textarea rows="9" name="ApplicantNote" class="form-control" placeholder="Type Here">{{ $currentUserNote }}</textarea>
@@ -727,7 +727,7 @@
                     @endforeach
                 @endif
                 @php
-                    $allNotes = json_decode($Applicant_form_data->notes, true);
+                    $allNotes = json_decode($Applicant_form_data->notes ?? '', true);
                     // Handle legacy plain text notes
                     if (!is_array($allNotes)) {
                         $allNotes = !empty($Applicant_form_data->notes) ? [$currentUserId => $Applicant_form_data->notes] : [];
