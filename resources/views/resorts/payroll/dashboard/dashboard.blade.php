@@ -8,6 +8,15 @@
 @endif
 
 @section('content')
+<style>
+    /* WAI Insight's + Payroll Distributions are height-matched to Payroll
+       Comparison via JS (equalizeHeights()) — the insights list can have
+       more content than fits, so it scrolls internally instead of
+       stretching the card past the reference height. */
+    #card-wiINsightPayroll { display: flex; flex-direction: column; }
+    #card-wiINsightPayroll .leaveUser-main { overflow-y: auto; flex: 1 1 auto; min-height: 0; }
+    #card-payrollDis { display: flex; flex-direction: column; overflow-y: auto; }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
         <div class="page-hedding">
@@ -276,7 +285,7 @@
             </div>
 
               <div class="col-xl-4 col-lg-6 @if(App\Helpers\Common::checkRouteWisePermission('payroll.run',config('settings.resort_permissions.view')) == false) d-none @endif">
-                <div class="card card-payrollDis">
+                <div class="card card-payrollDis" id="card-payrollDis">
                     <div class="card-title">
                         <h3>Payroll Distributions</h3>
                     </div>
@@ -720,15 +729,27 @@
 
         // Equal heights functionality
         function equalizeHeights() {
-            const block1 = document.getElementById('card-salaryCalc');
-            const block2_1 = document.getElementById('card-wiINsightPayroll');
-            const block2_2 = document.getElementById('card-activityLog');
+            // card-activityLog is HTML-commented-out below, so it's always
+            // null — the old `block1 && block2_1 && block2_2` guard was
+            // always false and this never ran. Payroll Comparison
+            // (card-salaryCalc) is the reference height; WAI Insight's and
+            // Payroll Distributions match it, with the insights list
+            // scrolling internally instead of stretching the card taller.
+            const reference = document.getElementById('card-salaryCalc');
+            const insights = document.getElementById('card-wiINsightPayroll');
+            const distribution = document.getElementById('card-payrollDis');
 
-            if (block1 && block2_1 && block2_2) {
-                const block1Height = block1.offsetHeight;
-                block2_1.style.height = block1Height + 'px';
-                block2_2.style.height = block1Height + 'px';
-            }
+            if (!reference) return;
+            // Heights were being force-applied via inline style above the
+            // CSS in .card-heigth .card { height: 100% }; reset first so
+            // offsetHeight below reads the reference card's own natural
+            // height, not a stale value from a previous equalize pass.
+            if (insights) insights.style.height = '';
+            if (distribution) distribution.style.height = '';
+
+            const targetHeight = reference.offsetHeight;
+            if (insights) insights.style.height = targetHeight + 'px';
+            if (distribution) distribution.style.height = targetHeight + 'px';
         }
 
         // Initialize equal heights
