@@ -13,6 +13,7 @@ use App\Models\Employee;
 use App\Models\Vacancies;
 use App\Models\ResortAdmin;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
 use App\Models\ResortSection;
 use App\Models\ResortDivision;
 use App\Models\ResortPosition;
@@ -558,10 +559,16 @@ class ApplicantsController extends Controller
                         t9.ApplicantInterviewtime,
                         t9.ResortInterviewtime,
                         t9.MeetingLink,
-                        t1.Comments
+                        t1.Comments,
+                        applicant_form_data.ai_analysis,
+                        applicant_form_data.ai_analysis_generated_at
                     ') // Removed the trailing comma here
                     ->where('t1.id', base64_decode($id))
                     ->first();
+
+            if (!$Applicant_form_data) {
+                return response()->json(['success' => false, 'message' => 'Applicant record not found.'], 404);
+            }
 
             $VideoQuestions = applicant_form_job_assessment::leftjoin("video_questions as t1","t1.id","=","applicant_form_job_assessment.question_id")
                                                             ->where("applicant_form_job_assessment.applicant_form_id",$Applicant_form_data->ApplicantID)
@@ -703,6 +710,85 @@ class ApplicantsController extends Controller
             'message' => 'Note saved successfully!',
         ]);
     }
+
+    /** Generate (or regenerate) the "Analyze Of AI" summary for an applicant,
+     *  from their interview notes + all status comments, via OpenRouter. */
+    public function GenerateApplicantAiAnalysis($id)
+    {
+        $applicantId = base64_decode($id);
+        $applicant = Applicant_form_data::find($applicantId);
+        if (!$applicant) {
+            return response()->json(['success' => false, 'message' => 'Applicant not found.'], 404);
+        }
+
+        $comments = ApplicantWiseStatus::where('Applicant_id', $applicantId)
+            ->whereNotNull('Comments')
+            ->where('Comments', '!=', '')
+            ->pluck('Comments')
+            ->flatMap(function ($raw) {
+                $decoded = json_decode($raw, true);
+                if (is_array($decoded)) {
+                    return collect($decoded)->pluck('comment')->filter();
+                }
+                return [$raw];
+            })
+            ->filter()
+            ->values();
+
+        $notes = $applicant->notes;
+
+        if (empty($notes) && $comments->isEmpty()) {
+            return response()->json(['success' => false, 'message' => 'No notes or comments yet to analyze.']);
+        }
+
+        $key = config('services.openrouter.key');
+        if (empty($key)) {
+            return response()->json(['success' => false, 'message' => 'AI service is not configured (missing OpenRouter API key).']);
+        }
+
+        $prompt = "You are an HR assistant. Based only on the interview notes and comments below for a job "
+            . "applicant, write a short (3-5 sentence) objective analysis covering the candidate's strengths, "
+            . "concerns, and an overall hiring recommendation. Do not invent facts not present in the text.\n\n"
+            . "Notes:\n" . ($notes ?: 'None') . "\n\n"
+            . "Comments:\n" . ($comments->isNotEmpty() ? $comments->map(fn($c, $i) => ($i + 1) . ". " . $c)->implode("\n") : 'None');
+
+        try {
+            $resp = Http::withToken($key)
+                ->withHeaders([
+                    'HTTP-Referer' => config('app.url', 'https://app.thewisdom.ai'),
+                    'X-Title'      => 'HRVMS Wisdom AI',
+                ])
+                ->timeout(30)
+                ->post(rtrim(config('services.openrouter.base_url'), '/') . '/chat/completions', [
+                    'model'       => config('services.openrouter.model'),
+                    'messages'    => [
+                        ['role' => 'system', 'content' => 'You are a concise, factual HR analyst.'],
+                        ['role' => 'user', 'content' => $prompt],
+                    ],
+                    'temperature' => 0.3,
+                    'max_tokens'  => 300,
+                ]);
+
+            if (!$resp->successful()) {
+                return response()->json(['success' => false, 'message' => 'AI service error (HTTP ' . $resp->status() . ').']);
+            }
+
+            $analysis = trim($resp->json('choices.0.message.content') ?? '');
+            if (empty($analysis)) {
+                return response()->json(['success' => false, 'message' => 'AI returned an empty response.']);
+            }
+
+            $applicant->ai_analysis = $analysis;
+            $applicant->ai_analysis_generated_at = now();
+            $applicant->save();
+
+            return response()->json(['success' => true, 'analysis' => $analysis]);
+        } catch (\Throwable $e) {
+            \Log::error('GenerateApplicantAiAnalysis failed: ' . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Failed to generate analysis.']);
+        }
+    }
+
     public function getApplicantWiseGridWise(Request $request)
     {
 

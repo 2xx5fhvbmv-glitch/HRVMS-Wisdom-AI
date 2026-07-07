@@ -780,11 +780,23 @@
                 </div>
                 @endif
 
-                <div class="intUserApp-block mt-3">
-                    <h6>Analyze Of AI:</h6>
-                    <p>Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum
-                        has been the industry's standard dummy text ever since the 1500s, when an unknown
-                        printer took a galley of type and scrambled it to make a type specimen book.</p>
+                <div class="intUserApp-block mt-3 ai-analysis-block" data-applicant-id="{{ base64_encode($Applicant_form_data->ApplicantID) }}">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">Analyze Of AI:</h6>
+                        <a href="javascript:void(0)" class="a-link generateAiAnalysis-btn" style="font-size:12px;">
+                            {{ $Applicant_form_data->ai_analysis ? 'Regenerate' : 'Generate' }}
+                        </a>
+                    </div>
+                    <div class="ai-analysis-text mt-2">
+                        @if($Applicant_form_data->ai_analysis)
+                            <p class="mb-1">{{ $Applicant_form_data->ai_analysis }}</p>
+                            @if($Applicant_form_data->ai_analysis_generated_at)
+                                <small class="text-muted">Generated {{ \Carbon\Carbon::parse($Applicant_form_data->ai_analysis_generated_at)->format('d M Y, h:i A') }}</small>
+                            @endif
+                        @else
+                            <p class="text-muted mb-0">No AI analysis yet. Based on interview notes and comments — click "Generate" once at least one note or comment exists.</p>
+                        @endif
+                    </div>
                 </div>
             </div>
             <div class="tab-pane fade" id="tabPane5" role="tabpanel" aria-labelledby="tabPane5" tabindex="0">

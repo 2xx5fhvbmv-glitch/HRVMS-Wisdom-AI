@@ -450,6 +450,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
 
     Route::post('/talent-acquisition/applicant-status', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','ApplicantWiseStatus'])->name('resort.ta.ApplicantWiseStatus');
     Route::get('/talent-acquisition/user/applicant-side-bar/{id}', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','TaUserApplicantsSideBar'])->name('resort.ta.TaUserApplicantsSideBar');
+    Route::post('/talent-acquisition/applicant/{id}/generate-ai-analysis', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','GenerateApplicantAiAnalysis'])->name('resort.ta.GenerateApplicantAiAnalysis');
     Route::post('/talent-acquisition/applicant-file-download', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','GetAwsFiles'])->name('resort.ta.DownloadFile');
     Route::post('/talent-acquisition/applicant-file-download-all', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','GetAllAwsFiles'])->name('resort.ta.DownloadAllFiles');
 
