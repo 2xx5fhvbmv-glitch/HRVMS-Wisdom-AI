@@ -45,7 +45,7 @@
                 <circle class="progress-background" cx="60" cy="60" r="54"></circle>
                 <circle class="progress" cx="60" cy="60" r="54"></circle>
             </svg>
-            <div class="img-obj cover"> <img src="{{ $getFileapplicant }}" alt="image"></div>
+            <div class="img-obj cover"> <img src="{{ $getFileapplicant ?: url(config('settings.default_picture')) }}" alt="image"></div>
         </div>
         <div>
 
