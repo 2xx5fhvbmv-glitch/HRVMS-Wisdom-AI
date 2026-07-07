@@ -821,12 +821,23 @@ class TalentAcquisitionDashboardController extends Controller
             }
             $Interviews = $InterviewsQuery->count();
 
-            // Apply effectiveRank pattern so HR-department HODs are treated as rank 3
+            // Apply effectiveRank pattern so HR-department HODs are treated as
+            // rank 3 and Finance/Accounting HODs/EXCOM as rank 7. The Finance
+            // override was missing here (present in hr_dashboard() but not
+            // this HOD/EXCOM dashboard), so a Finance EXCOM's effectiveRank
+            // stayed at their raw rank (1) — GetTheFreshVacancies for rank 1
+            // only shows items pending at HR level (Approved_By=3), never
+            // Finance (Approved_By=7), so "Pending Finance" items never
+            // showed in "Hire Requests Pending Your Approval" for Finance.
             $employee = $this->globalUser->GetEmployee ?? null;
             $effectiveRank = $userRank;
-            if ($employee) {
+            if ($employee && !in_array((int) $userRank, [3, 7, 8], true)) {
                 $userDeptName = ResortDepartment::where('id', $employee->Dept_id)->value('name') ?? '';
-                if (stripos($userDeptName, 'Human Resources') !== false) {
+                $userPositionTitle = $employee->position->position_title ?? '';
+                if (stripos($userDeptName, 'Accounting') !== false || stripos($userDeptName, 'Finance') !== false
+                    || stripos($userPositionTitle, 'Finance') !== false) {
+                    $effectiveRank = 7;
+                } elseif (stripos($userDeptName, 'Human Resources') !== false || stripos($userPositionTitle, 'Human Resources') !== false) {
                     $effectiveRank = 3;
                 }
             }
