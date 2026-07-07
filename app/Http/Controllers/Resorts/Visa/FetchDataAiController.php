@@ -336,15 +336,23 @@ class FetchDataAiController extends Controller
             // 1-year validity: prefer the document's FROM date, else end - 1 year.
             $insuranceStart = $this->aiDate($fields['Insurance Start Date'] ?? null)
                 ?? $insuranceExpiry->copy()->subYearNoOverflow()->addDay();
+            // insurance_company, insurance_policy_number and insurance_coverage
+            // are all NOT NULL columns. When the AI extraction doesn't find a
+            // field in the document (common — e.g. no company name printed on
+            // the page), this previously passed null straight through and
+            // crashed the whole sync with a SQL integrity error instead of
+            // saving the dates/premium we DID extract.
             EmployeeInsurance::create([
                 'resort_id'               => $resortId,
                 'employee_id'             => $employee->id,
-                'insurance_company'       => $fields['Insurance Company Name'] ?? null,
-                'insurance_policy_number' => $fields['Policy Number'] ?? null,
+                'insurance_company'       => $fields['Insurance Company Name'] ?? 'N/A',
+                'insurance_policy_number' => $fields['Policy Number'] ?? 'N/A',
+                'insurance_coverage'      => $fields['Insurance Coverage'] ?? 'N/A',
                 'Premium'                 => $medical_data['amount'] ?? 0.00,
                 'Currency'                => $medical_data['unit'] ?? null,
                 'insurance_start_date'    => $insuranceStart->format('Y-m-d'),
                 'insurance_end_date'      => $insuranceExpiry->format('Y-m-d'),
+                'Status'                  => 'Pending',
             ]);
             $insuranceAmt = $medical_data['amount'] ?? 0.00;
         }
