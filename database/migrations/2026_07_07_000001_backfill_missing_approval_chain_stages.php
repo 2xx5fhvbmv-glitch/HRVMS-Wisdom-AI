@@ -19,6 +19,13 @@ use Illuminate\Support\Facades\DB;
  * VacancyController fix). Deliberately narrow — does NOT touch parents that
  * are already Approved/Rejected/ForwardedToNext, so already-closed vacancies
  * are never reopened.
+ *
+ * Also requires the sibling HR (3) row to already be status='Approved' —
+ * first run of this migration (on 2026-07-07) omitted that check and
+ * inserted a Finance row for vacancies still genuinely awaiting HR review
+ * (e.g. Carpenter), wrongly surfacing them in Finance's queue before HR
+ * had acted. See 2026_07_08_000000_remove_premature_finance_backfill_rows
+ * for the corrective delete of those specific rows.
  */
 class BackfillMissingApprovalChainStages extends Migration
 {
@@ -41,13 +48,21 @@ class BackfillMissingApprovalChainStages extends Migration
                 continue;
             }
 
-            // Parents with an untouched GM row (the bug's tell-tale sign)
+            // Parents with an untouched GM row (the bug's tell-tale sign),
+            // HR already approved (otherwise Finance shouldn't see it yet),
             // and no Finance row at all.
+            $hrApprovedParentIds = DB::table('t_anotification_children')
+                ->whereIn('Parent_ta_id', $parentIds)
+                ->where('Approved_By', 3)
+                ->where('status', 'Approved')
+                ->pluck('Parent_ta_id');
+
             $affectedParentIds = DB::table('t_anotification_children')
                 ->whereIn('Parent_ta_id', $parentIds)
                 ->where('Approved_By', 8)
                 ->where('status', 'Active')
                 ->pluck('Parent_ta_id')
+                ->intersect($hrApprovedParentIds)
                 ->diff(
                     DB::table('t_anotification_children')
                         ->whereIn('Parent_ta_id', $parentIds)
