@@ -33,11 +33,6 @@ Route::prefix('resort')->namespace('Resort')->group(function () {
   Route::post('/applicant_temp/video-remove', ['App\Http\Controllers\Resorts\ApplicantController','applicant_tempVideoremove'])->name('resort.applicant_tempVideoremove');
 
   Route::post('/applicant_temp/video-store', ['App\Http\Controllers\Resorts\ApplicantController','applicant_tempVideoStore'])->name('resort.applicant_tempVideoStore');
-  Route::get('/talent-pool', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','TalentPool'])->name('resort.ta.TalentPool');
-
-  Route::post('/get/talent-pool/applicant', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','getTalentPoolGridApplicant'])->name('resort.ta.getTalentPoolApplicant');
-  Route::post('/revert-back', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','RevertBack'])->name('resort.ta.RevertBack');
-
   // Interview Invitation - Public (no auth)
   Route::get('/interview-invitation/{token}', ['App\Http\Controllers\Resorts\InterviewInvitationController','show'])->name('resort.interview.invitation.show');
   Route::post('/interview-invitation/{token}/accept', ['App\Http\Controllers\Resorts\InterviewInvitationController','accept'])->name('resort.interview.invitation.accept');
@@ -451,6 +446,14 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::post('/talent-acquisition/applicant-status', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','ApplicantWiseStatus'])->name('resort.ta.ApplicantWiseStatus');
     Route::get('/talent-acquisition/user/applicant-side-bar/{id}', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','TaUserApplicantsSideBar'])->name('resort.ta.TaUserApplicantsSideBar');
     Route::post('/talent-acquisition/applicant/{id}/generate-ai-analysis', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','GenerateApplicantAiAnalysis'])->name('resort.ta.GenerateApplicantAiAnalysis');
+    // Moved from the "no login" route group — this is an internal HR page
+    // (Talent Pool) that was reachable unauthenticated and crashed with
+    // "Attempt to read property 'type' on null" instead of redirecting to
+    // login, since the controller assumes Auth::guard('resort-admin')->user()
+    // is never null.
+    Route::get('/talent-pool', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','TalentPool'])->name('resort.ta.TalentPool');
+    Route::post('/get/talent-pool/applicant', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','getTalentPoolGridApplicant'])->name('resort.ta.getTalentPoolApplicant');
+    Route::post('/revert-back', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','RevertBack'])->name('resort.ta.RevertBack');
     Route::post('/talent-acquisition/applicant-file-download', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','GetAwsFiles'])->name('resort.ta.DownloadFile');
     Route::post('/talent-acquisition/applicant-file-download-all', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','GetAllAwsFiles'])->name('resort.ta.DownloadAllFiles');
 
