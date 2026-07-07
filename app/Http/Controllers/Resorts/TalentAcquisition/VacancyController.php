@@ -1838,6 +1838,17 @@ class VacancyController extends Controller
         })
         ->leftjoin("resort_positions as t5", "t5.id", "=", "vacancies.position")
         ->where('vacancies.Resort_id', $resort_id)
+        // HR and GM see every department's shortlisted applicants; a HOD/XCOM
+        // only heads one department and must not see other departments'
+        // vacancies. This was missing entirely — any HOD saw every OTHER
+        // HOD-approved shortlist resort-wide (e.g. Engineering HOD seeing a
+        // Waitress applicant approved by the F&B HOD).
+        ->where(function ($q) use ($effectiveRank, $rank, $employee) {
+            $hasFullAccess = ($effectiveRank == 3) || ((int) $rank === 8);
+            if (!$hasFullAccess) {
+                $q->where('t5.dept_id', $employee->Dept_id ?? 0);
+            }
+        })
         ->selectRaw('
             t1.id as Applicant_id,
             t1.Application_date,
