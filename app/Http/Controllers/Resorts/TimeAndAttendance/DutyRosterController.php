@@ -1481,8 +1481,11 @@ class DutyRosterController extends Controller
                                 ->orderBy('t3.created_at', 'desc')
                                 ->get();
 
-        // Determine if user can see all departments
-        // User can see all departments if: HR, HOD, EXCOM, or GM
+        // Determine if user can see all departments.
+        // Only HR and GM are resort-wide roles. HOD/EXCOM head a single
+        // department each — they were wrongly OR'd in here, so any
+        // department's HOD/EXCOM (e.g. F&B) saw every other department's
+        // duty roster (Accounting, etc.) instead of just their own.
         $canViewAllDepartments = false;
 
         if ($this->resort->is_master_admin == 1) {
@@ -1492,17 +1495,11 @@ class DutyRosterController extends Controller
             // Check if user is HR (by department or position)
             $isHR = $employeeRank['isHR'] || ($employeeRankPosition['position'] == 'HR');
 
-            // Check if user is HOD (by rank)
-            $isHOD = ($employeeRankPosition['rank'] == 'HOD');
-
-            // Check if user is EXCOM (by rank or position)
-            $isEXCOM = ($employeeRankPosition['rank'] == 'EXCOM') || ($employeeRankPosition['position'] == 'EXCOM');
-
-            // Check if user is GM (by rank or position) - GM sees same scope as HR/EXCOM
+            // Check if user is GM (by rank or position) - GM sees same scope as HR
             $isGMForView = ($employeeRankPosition['position'] == 'GM') || (($employeeRankPosition['rank'] ?? '') == 'GM');
 
-            // User can view all departments if they are HR, HOD, EXCOM, or GM
-            $canViewAllDepartments = $isHR || $isHOD || $isEXCOM || $isGMForView;
+            // Only HR or GM can view all departments; HOD/EXCOM stay scoped to their own.
+            $canViewAllDepartments = $isHR || $isGMForView;
         }
 
         // Group roster data by department and section
