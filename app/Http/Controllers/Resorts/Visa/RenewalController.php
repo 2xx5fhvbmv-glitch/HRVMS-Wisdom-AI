@@ -945,19 +945,23 @@ class RenewalController extends Controller
                     $hasAnyFlagData = false;
 
                     
-                        $visa = $employee->VisaRenewal;
+                        // Latest visa by expiry date (not the bare hasOne default) —
+                        // same "always show regardless of month" fix already applied
+                        // to Insurance below. Gating this on the current-month window
+                        // hid already-EXPIRED visas (like an end_date a month or more
+                        // in the past) from a page whose job is to catch exactly that.
+                        $visa = $employee->VisaRenewal()->where('employee_id', $employee->id)->where('resort_id', $this->resort->resort_id)->orderBy('end_date', 'desc')->orderBy('id', 'desc')->first();
 
-               
-                        if ($visa && Carbon::parse($visa->end_date)->between($filterStart, $filterEnd)) {
+                        if ($visa) {
                             $employee->VisaExpiryDate = $this->getFormattedExpiryStatus($visa->end_date);
                             $employee->VisaExpiryExpiryAmt = $visa->Amt;
                             $employee->VisaRecordId  = $visa->id;
                             $employee->VisaAmtRaw    = $visa->Amt;
                             $employee->VisaDateRaw   = Carbon::parse($visa->end_date)->format('Y-m-d');
                             $employee->VisaStatusRaw = $visa->Status ?? null;
-                            $hasAnyFlagData = true;
-                    
-                           
+                            if (Carbon::parse($visa->end_date)->between($filterStart, $filterEnd)) {
+                                $hasAnyFlagData = true;
+                            }
                         }
           
 
@@ -1030,14 +1034,16 @@ class RenewalController extends Controller
                         }
                   
                       
-                        $quotaEntries = $employee->QuotaSlotRenewal->sortByDesc('id')  ; // All entries sorted descending by ID
-
-                          $currentQuota = $employee->QuotaSlotRenewal
-                                        ->filter(fn($item) => Carbon::parse($item->Expiry_Date)->between($filterStart, $filterEnd))
-                                        ->where('Status', 'Unpaid')
-                                        ->first();
-                        $currentQuota = $quotaEntries
-                            ->filter(fn($item) => Carbon::parse($item->Expiry_Date)->between($filterStart, $filterEnd))
+                        // QuotaSlotRenewal rows never populate Expiry_Date (only
+                        // Due_Date) — Carbon::parse(null) silently returns "now",
+                        // so filtering on Expiry_Date->between(thisMonth) matched
+                        // every row and ->first() just returned whichever row
+                        // was inserted last (the earliest, already-paid month).
+                        // Mirror the Work Permit pattern above: the relevant
+                        // "current" row is the latest-due UNPAID one.
+                        $currentQuota = $employee->QuotaSlotRenewal
+                            ->where('Status', 'Unpaid')
+                            ->sortByDesc('Due_Date')
                             ->first();
                         $encodedId = base64_encode($employee->id);
                         if ($currentQuota)
