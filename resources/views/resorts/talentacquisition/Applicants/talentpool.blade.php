@@ -664,6 +664,38 @@
         });
     });
 
+    // Generate/regenerate the "Analyze Of AI" summary from notes + comments
+    $(document).on("click", ".generateAiAnalysis-btn", function () {
+        let $btn = $(this);
+        let $block = $btn.closest(".ai-analysis-block");
+        let applicantId = $block.data("applicant-id");
+        let $textBox = $block.find(".ai-analysis-text");
+        let originalLabel = $btn.text();
+        $btn.text("Generating...").addClass("disabled");
+        $.ajax({
+            url: "{{ url('resort/talent-acquisition/applicant') }}/" + applicantId + "/generate-ai-analysis",
+            type: "POST",
+            data: { _token: "{{ csrf_token() }}" },
+            success: function (response) {
+                if (response.success) {
+                    $textBox.html('<p class="mb-1"></p>');
+                    $textBox.find('p').text(response.analysis);
+                    $btn.text("Regenerate");
+                } else {
+                    toastr.error(response.message || "Could not generate analysis.", "Error", { positionClass: 'toast-bottom-right' });
+                    $btn.text(originalLabel);
+                }
+            },
+            error: function () {
+                toastr.error("Something went wrong. Please try again.", "Error", { positionClass: 'toast-bottom-right' });
+                $btn.text(originalLabel);
+            },
+            complete: function () {
+                $btn.removeClass("disabled");
+            }
+        });
+    });
+
     // Download All Files
     $(document).on("click", ".DownloadAllFiles", function () {
         let fileId = $(this).data("id");
