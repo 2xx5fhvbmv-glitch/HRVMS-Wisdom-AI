@@ -726,10 +726,18 @@
 
         var $banner = $('#ai-cv-banner');
         if ($banner.length === 0) {
-            $banner = $('<div id="ai-cv-banner" class="alert alert-info py-1 px-2 my-2" style="font-size:13px;"></div>')
-                .insertAfter('#fileInput').closest('.upload-area');
+            // .closest('.upload-area') here used to reassign $banner to the
+            // WHOLE dropzone container (the one holding the actual <input
+            // type="file">), not the small banner div just inserted. Every
+            // later $banner.text(...)/.html(...) call then overwrote the
+            // entire dropzone's content — including the file input itself —
+            // with just the banner message, silently deleting the applicant's
+            // already-selected CV from the DOM before the form was submitted.
+            $('<div id="ai-cv-banner" class="alert alert-info py-1 px-2 my-2" style="font-size:13px;"></div>')
+                .insertAfter('#fileInput');
+            $banner = $('#ai-cv-banner');
             // Fallback: insert near the CV input wrapper.
-            if ($('#ai-cv-banner').length === 0) {
+            if ($banner.length === 0) {
                 $('input[name="curriculum_file"]').closest('.upload-area').after('<div id="ai-cv-banner" class="alert alert-info py-1 px-2 my-2" style="font-size:13px;"></div>');
                 $banner = $('#ai-cv-banner');
             }
