@@ -416,13 +416,19 @@ class VacancyController extends Controller
                     $position_rank = config('settings.final_rank');
 
 
+                    // Build the FULL chain from HR up to and including this
+                    // resort's configured final-approval rank (3=HR, 7=Finance,
+                    // or 8=GM). The old `<` + hardcoded {"3":"HR","8":"GM"}
+                    // union always force-added a GM row and never added Finance
+                    // itself — so a resort configured with Finance(7) as final
+                    // approval got {HR, GM} instead of {HR, Finance}, silently
+                    // skipping the Finance approval stage entirely for every
+                    // vacancy (e.g. the Electrician request never got a
+                    // Finance notification row, so it never appeared in
+                    // Finance's "Hire Requests Pending Your Approval" queue).
                     $CycleOfRequest = array_filter($position_rank, function ($value, $key) use ($FainalKey) {
-                        return $key < $FainalKey;
+                        return (int) $key <= (int) $FainalKey;
                     }, ARRAY_FILTER_USE_BOTH);
-
-
-                    $newData = ["3" => "HR","8" => "GM"];
-                    $CycleOfRequest += $newData;
 
                     foreach ($CycleOfRequest as $key => $value) {
                         TAnotificationChild::create([
