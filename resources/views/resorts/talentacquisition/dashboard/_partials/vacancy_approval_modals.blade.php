@@ -96,10 +96,10 @@
 </div>
 
 <script>
-// This partial is only @include'd inline when there's at least one pending
+// This partial is only included inline when there's at least one pending
 // approval (see hoddashboard.blade.php), landing this <script> tag in the
 // page body BEFORE the jQuery <script src> tag, which loads near the
-// footer (resorts.layouts.js, included after @yield('content') in
+// footer (resorts.layouts.js, included after the main content section in
 // resorts.layouts.app). `$(document).ready(...)` itself needs `$` to
 // exist to be called at all, so referencing it here threw "$ is not
 // defined" immediately and the whole click handler below never got
