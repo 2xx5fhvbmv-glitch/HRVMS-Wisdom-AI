@@ -1119,6 +1119,13 @@
                 }
             });
         }
+        // Every filter change (including every keystroke in Search) fires
+        // its own AJAX call with no cancellation — a slow in-flight request
+        // (e.g. from typing) could resolve AFTER a later "Clear Filter"
+        // request and overwrite the table with its stale filtered results,
+        // making Clear Filter look like it silently did nothing. Abort any
+        // still-pending request before starting the next one.
+        var registerFilterXhr = null;
         function updateRegisterFilterWiseTable(page)
         {
             var search = $(".search").val();
@@ -1135,10 +1142,14 @@
                 ajaxData.page = page;
             }
 
+            if (registerFilterXhr && registerFilterXhr.readyState !== 4) {
+                registerFilterXhr.abort();
+            }
+
             // Show loading spinner
             $(".filtertaleData").html('<div class="text-center py-5"><div class="spinner-border text-primary" role="status"><span class="visually-hidden">Loading...</span></div><p class="mt-2 text-muted">Loading attendance data...</p></div>');
 
-            $.ajax({
+            registerFilterXhr = $.ajax({
                 url: "{{ route('resort.timeandattendance.ResigterRosterSearch') }}",
                 type: "get",
                 data: ajaxData,
@@ -1162,7 +1173,10 @@
                         });
                     }
                 },
-                error: function(response) {
+                error: function(response, textStatus) {
+                    if (textStatus === 'abort') {
+                        return; // superseded by a newer filter request, not a real error
+                    }
                     var errors = response.responseJSON;
                     var errs = '';
                     if (errors && errors.errors) {
