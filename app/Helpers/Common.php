@@ -2164,6 +2164,18 @@ class Common
                                                 }
 
                                             });
+
+                                            // HOD (2), EXCOM (1), and everyone below HR/Finance/GM in this
+                                            // branch only had the approval-workflow-stage filter above
+                                            // (Approved_By/status) — nothing scoped by department, so any
+                                            // HOD/EXCOM saw every OTHER department's pending hire requests
+                                            // too (e.g. F&B HOD seeing Engineering's carpenter request).
+                                            if (!in_array($rank, [3, 7, 8, 9], true)) {
+                                                $viewerDeptId = Auth::guard('resort-admin')->user()->GetEmployee->Dept_id ?? null;
+                                                if ($viewerDeptId) {
+                                                    $VacanciesQuery->where('vacancies.department', $viewerDeptId);
+                                                }
+                                            }
                                         }
                                     }
                                     if(empty($takeData))

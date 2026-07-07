@@ -20,7 +20,7 @@ class Applicant_form_data extends Model
         ,'NotiesPeriod','SalaryExpectation','TimeZone','Scoring','AIRanking','Applicant_Source',
         'consent_status','consent_expiry_date','consent_token','consent_responded_at',
         'availability_status','availability_token','availability_responded_at',
-        'notes_by'
+        'notes_by','ai_analysis','ai_analysis_generated_at'
     ];
     public function GetVacancies()
     {

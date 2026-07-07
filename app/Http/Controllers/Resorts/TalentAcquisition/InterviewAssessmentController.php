@@ -28,7 +28,7 @@ class InterviewAssessmentController extends Controller
         }
         $page_title="Interview Assessment";
         $positionsQuery = ResortPosition::where('status','active')->where('resort_id',$this->resort->resort_id);
-        if($this->rank == 2) {
+        if(in_array((int) $this->rank, [1, 2], true)) {
             $positionsQuery->where('dept_id', $this->resort->GetEmployee->Dept_id);
         }
         $positions = $positionsQuery->get();
@@ -49,7 +49,7 @@ class InterviewAssessmentController extends Controller
         ->join('resort_positions as t4', 't4.id', '=', 'interview_assessment_forms.position')
         ->where('interview_assessment_forms.resort_id', $this->resort->resort_id);
 
-        if($this->rank == 2) {
+        if(in_array((int) $this->rank, [1, 2], true)) {
             $forms->where('t4.dept_id', $this->resort->GetEmployee->Dept_id);
         }
 
