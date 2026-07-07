@@ -1719,9 +1719,11 @@ class VacancyController extends Controller
                     ->addColumn('Applicants', function ($row){
                         $userName = htmlspecialchars(ucfirst($row->first_name . ' ' . $row->last_name), ENT_QUOTES, 'UTF-8');
                         $photo = URL::asset($row->passport_photo);
+                        // Must match ApplicantStatus_id, not Applicant_id — TaUserApplicantsSideBar
+                        // filters by applicant_wise_statuses.id, same fix as shortlistedapplicantsShareLink.
                         $string = '<div class="tableUser-block">
                             <div class="img-circle"><img src="'.$photo.'" alt="user"></div>
-                            <span class="userApplicants-btn" data-id="' . base64_encode($row->Applicant_id) . '">' . $userName . '</span>
+                            <span class="userApplicants-btn" data-id="' . base64_encode($row->ApplicantStatus_id) . '">' . $userName . '</span>
                         </div>';
                     return $string;
                     })
@@ -1755,7 +1757,7 @@ class VacancyController extends Controller
                             </li>';
                         }
 
-                        $viewApplicant = '<li><a class="dropdown-item userApplicants-btn" data-id="' . base64_encode($row->Applicant_id) . '" href="javascript:void(0)">View Applicant</a></li>';
+                        $viewApplicant = '<li><a class="dropdown-item userApplicants-btn" data-id="' . base64_encode($row->ApplicantStatus_id) . '" href="javascript:void(0)">View Applicant</a></li>';
 
                         return '
                             <div class="dropdown table-dropdown">
@@ -1902,9 +1904,14 @@ class VacancyController extends Controller
                             {
                                 $getFileapplicant = null;
                             }
+                        // data-id must be ApplicantStatus_id (applicant_wise_statuses.id),
+                        // not Applicant_id (applicant_form_data.id) — TaUserApplicantsSideBar
+                        // filters by the former. This mismatch made clicking the applicant's
+                        // name here 404 ("Applicant record not found") while the eye-icon
+                        // in the Action column (which already used ApplicantStatus_id) worked.
                         $string = '<div class="tableUser-block">
                             <div class="img-circle"><img src="'.$getFileapplicant.'" alt="user"></div>
-                            <span class="userApplicants-btn" data-id="' . base64_encode($row->Applicant_id) . '">' . $userName . '</span>
+                            <span class="userApplicants-btn" data-id="' . base64_encode($row->ApplicantStatus_id) . '">' . $userName . '</span>
                         </div>';
                     return $string;
                     })
@@ -2045,7 +2052,7 @@ class VacancyController extends Controller
                     $photo = URL::asset($row->passport_photo);
                     $string = '<div class="tableUser-block">
                         <div class="img-circle"><img src="'.$photo.'" alt="user"></div>
-                        <span class="userApplicants-btn" data-id="' . base64_encode($row->Applicant_id) . '">' . $userName . '</span>
+                        <span class="userApplicants-btn" data-id="' . base64_encode($row->ApplicantStatus_id) . '">' . $userName . '</span>
                     </div>';
                 return $string;
                 })
@@ -2178,7 +2185,7 @@ class VacancyController extends Controller
                     $photo = URL::asset($row->passport_photo);
                     $string = '<div class="tableUser-block">
                         <div class="img-circle"><img src="'.  $photo.'" alt="user"></div>
-                        <span class="userApplicants-btn" data-id="' . base64_encode($row->Applicant_id) . '">' . $userName . '</span>
+                        <span class="userApplicants-btn" data-id="' . base64_encode($row->ApplicantStatus_id) . '">' . $userName . '</span>
                     </div>';
                 return $string;
                 })
