@@ -486,7 +486,7 @@ class ConfigController extends Controller
 
                 $sentto =  Employee::where('resort_id',$this->resort->resort_id)->where("rank",$newRank)->first();
 
-                if($sentto && env('NOTIFICATION_URL')) {
+                if($sentto) {
                     $msg = "New Vacancy has been Approved by ".$config[$effectiveRank]." and forwarded to ".$config[$newRank]." for further processing.";
                     event(new ResortNotificationEvent(Common::nofitication(
                                                                             $this->resort->resort_id,
