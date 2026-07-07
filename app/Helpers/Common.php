@@ -2271,11 +2271,18 @@ class Common
 
     public static function TaFinalApproval($resort_id)
     {
+        // Unconfigured resorts (no job_advertisements row, or FinalApproval
+        // never set) must default to the full HR->Finance->GM chain (8),
+        // same default already used in VacancyController's chain-creation
+        // logic. Returning null here made every `Approved_By = TaFinalApproval()`
+        // comparison in Common/TalentAcquisitionDashboardController/
+        // MasterDashboardController silently match zero rows in SQL
+        // (`x = NULL` is never true), so GM-approved vacancies never
+        // reached HR's To Do List / Vacancies widgets on any resort that
+        // hadn't explicitly configured FinalApproval.
         $final = JobAdvertisement::where("Resort_id",$resort_id)->first();
 
-		if($final)
-        	return $final->FinalApproval;
-
+        return $final->FinalApproval ?? 8;
     }
 
     public static function getInterviewRoundsForPosition($vacancyRank)
@@ -2391,7 +2398,7 @@ class Common
                 ->where('vacancies.Resort_id',$resort_id)
                 ->where('t3.status',"ForwardedToNext")
                 ->where('vacancies.status', '=', "Active")
-                ->where('t3.Approved_By', '=',Common::TaFinalApproval($resort_id))
+                ->where('t3.Approved_By', '=', Common::TaFinalApproval($resort_id))
                 ->where(function($q) {
                     // No link yet (needs job advertisement) OR has HR-shortlisted applicant OR accepted invitation without meeting link
                     $q->where(function($q2) {
