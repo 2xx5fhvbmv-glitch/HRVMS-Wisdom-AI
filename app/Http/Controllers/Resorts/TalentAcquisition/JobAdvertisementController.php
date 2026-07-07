@@ -8,7 +8,6 @@ use App\Models\JobAdvertisement;
 use Validator;
 use Auth;
 use App\Helpers\Common;
-use File;
 use DB;
 use App\Models\ApplicationLink;
 use App\Models\ResortDepartment;
@@ -93,8 +92,8 @@ class JobAdvertisementController extends Controller
             }
 
             $path = config('settings.Resort_JobAdvertisement').'/'.$jobAd->Resort_id.'/'.$jobAd->Jobadvimg;
-            if(File::exists(public_path($path))) {
-                File::delete(public_path($path));
+            if(\App\Helpers\StorageHelper::disk()->exists($path)) {
+                \App\Helpers\StorageHelper::disk()->delete($path);
             }
 
             $jobAd->delete();
@@ -138,13 +137,18 @@ class JobAdvertisementController extends Controller
 
                     $fileName  = $request->file('Jobadvimg')->getClientOriginalName();
 
-
-                        if(File::exists(public_path($path_profile_image.'/'.  $fileName)))
-                        {
-                            File::delete(public_path($path_profile_image.'/'.  $fileName));
-                        }
-
-                        Common::uploadFile($request->file('Jobadvimg'), $fileName, $path_profile_image);
+                        // Common::uploadFile() only moves the file to local
+                        // disk — on live (STORAGE_DRIVER=wasabi) that left
+                        // the actual bucket key never created, while
+                        // GetJobAdvertisementImage() (driver-aware) built a
+                        // presigned URL for that same key, producing
+                        // NoSuchKey on every preview. Write through the same
+                        // driver-aware disk the read side uses.
+                        \App\Helpers\StorageHelper::disk()->put(
+                            $path_profile_image.'/'.$fileName,
+                            file_get_contents($request->file('Jobadvimg')->getRealPath()),
+                            ['ContentType' => $request->file('Jobadvimg')->getMimeType()]
+                        );
 
                         JobAdvertisement::updateOrCreate([
                                 "Resort_id" => $resort_id,

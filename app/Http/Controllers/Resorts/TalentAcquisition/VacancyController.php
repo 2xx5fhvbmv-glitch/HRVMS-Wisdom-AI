@@ -444,7 +444,7 @@ class VacancyController extends Controller
                     $title = ' Hiring Request';
                     $ModuleName = "Talent Acquisition  ";
                     $hr = Common::FindResortHR($this->resort);
-                    if ($hr && env('NOTIFICATION_URL')) {
+                    if ($hr) {
                         $hr_id = $hr->id;
                         event(new ResortNotificationEvent(Common::nofitication(
                             $this->resort->resort_id,
@@ -826,7 +826,7 @@ class VacancyController extends Controller
                 $title = 'Hiring Request';
                 $ModuleName = "Talent Acquisition  ";
                 $hr = Common::FindResortHR($this->resort);
-                if ($hr && env('NOTIFICATION_URL')) {
+                if ($hr) {
                     $hr_id = $hr->id;
                     event(new ResortNotificationEvent(Common::nofitication(
                         $this->resort->resort_id, $this->type[6], 'Upcoming Investigation Meeting Reminder',
