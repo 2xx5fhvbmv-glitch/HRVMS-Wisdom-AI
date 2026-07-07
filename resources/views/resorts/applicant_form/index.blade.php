@@ -920,6 +920,15 @@
                         for (const [key, value] of Object.entries(response.data)) {
                             const input = previous_fs.find(`[name="${key}"]`);
 
+                            // File inputs are never part of the saved draft —
+                            // jQuery's .serialize() (used when saving a step)
+                            // silently drops file fields entirely, so their
+                            // draft value is always empty. Calling
+                            // input.val('') on a real <input type="file">
+                            // clears it — wiping out a CV the applicant had
+                            // already selected just by clicking Previous.
+                            if (input.is(':file')) { continue; }
+
                             if (input.length) {  // Ensure the input exists in the fieldset
                                 if (input.is(':checkbox')) {
                                     // For checkboxes, handle multiple selected options
