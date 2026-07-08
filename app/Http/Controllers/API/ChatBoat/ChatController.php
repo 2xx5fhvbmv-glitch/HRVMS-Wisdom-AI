@@ -374,4 +374,34 @@ class ChatController extends Controller
 
      }
 
+     /**
+      * FAQ content for the "Chat FAQ" placeholder screen — no bot service,
+      * just a static per-resort list.
+      */
+     public function faqList()
+     {
+          if (!$this->resort) {
+               return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+          }
+
+          try {
+               $faqs = \App\Models\Faq::where('resort_id', $this->resort->resort_id)
+                    ->where('status', 'Active')
+                    ->orderBy('sort_order', 'asc')
+                    ->get(['id', 'question', 'answer']);
+
+               return response()->json([
+                    'success' => true,
+                    'message' => 'FAQ list fetched successfully.',
+                    'data'    => $faqs,
+               ], 200);
+
+          } catch (\Exception $e) {
+               \Log::emergency("File: " . $e->getFile());
+               \Log::emergency("Line: " . $e->getLine());
+               \Log::error($e->getMessage());
+               return response()->json(['success' => false, 'message' => 'Server error'], 500);
+          }
+     }
+
 }

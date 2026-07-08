@@ -510,4 +510,108 @@ class ResignationController extends Controller
             return response()->json(['success' => false, 'message' => 'Server error'], 500);
         }
     }
+
+    /**
+     * Dynamic exit-interview questionnaire for the employee's active
+     * resignation. Reuses the existing ExitClearanceForm/Assignment
+     * infra (form type='exit_interview') rather than a new questions
+     * table — resignationDashboard() already returns ALL assigned
+     * exit-clearance forms (exit_interview + exit_clearance + handover
+     * mixed together); this narrows to just the exit_interview one and
+     * includes any already-submitted response (so the mobile app can
+     * resume a draft instead of resubmitting from scratch).
+     */
+    public function exitInterviewQuestions()
+    {
+        if (!Auth::guard('api')->check()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        try {
+            $resignation                                 =   EmployeeResignation::where('resort_id', $this->resort_id)
+                                                                ->where('status', '!=', 'Withdraw')
+                                                                ->where('employee_id', $this->user->GetEmployee->id)
+                                                                ->first();
+
+            if (!$resignation) {
+                return response()->json(['success' => false, 'message' => 'No active resignation found.'], 200);
+            }
+
+            $assignment                                  =   ExitClearanceFormAssignment::join('exit_clearance_form as exf', 'exf.id', '=', 'exit_clearance_form_assignments.form_id')
+                                                                ->where('exit_clearance_form_assignments.resort_id', $this->resort_id)
+                                                                ->where('exit_clearance_form_assignments.emp_resignation_id', $resignation->id)
+                                                                ->where('exit_clearance_form_assignments.assigned_to_type', 'employee')
+                                                                ->where('exf.type', 'exit_interview')
+                                                                ->select('exit_clearance_form_assignments.*', 'exf.form_name', 'exf.form_structure')
+                                                                ->first();
+
+            if (!$assignment) {
+                return response()->json(['success' => false, 'message' => 'No exit interview form assigned.'], 200);
+            }
+
+            $existingResponse                            =   ExitClearanceFormResponse::where('assignment_id', $assignment->id)
+                                                                ->orderBy('id', 'desc')
+                                                                ->first();
+
+            return response()->json([
+                'success'                               =>  true,
+                'message'                               =>  'Exit interview questions fetched successfully.',
+                'data'                                  =>  [
+                    'assignment_id'                      =>  $assignment->id,
+                    'form_name'                           =>  $assignment->form_name,
+                    'form_structure'                      =>  json_decode($assignment->form_structure, true),
+                    'status'                              =>  $assignment->status,
+                    'existing_response'                   =>  $existingResponse ? json_decode($existingResponse->response_data, true) : null,
+                ],
+            ], 200);
+
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    /**
+     * Rejection (and hold) details for the employee's resignation —
+     * rejected_reason/hold_reason already exist on employee_resignation
+     * and are already in EmployeeResignation::$fillable, just never
+     * exposed via a dedicated endpoint before now.
+     */
+    public function rejectionDetails()
+    {
+        if (!Auth::guard('api')->check()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        try {
+            $resignation                                 =   EmployeeResignation::where('resort_id', $this->resort_id)
+                                                                ->where('employee_id', $this->user->GetEmployee->id)
+                                                                ->orderBy('id', 'desc')
+                                                                ->first();
+
+            if (!$resignation) {
+                return response()->json(['success' => false, 'message' => 'No resignation found.'], 200);
+            }
+
+            return response()->json([
+                'success'                               =>  true,
+                'message'                               =>  'Resignation status details fetched successfully.',
+                'data'                                  =>  [
+                    'status'                              =>  $resignation->status,
+                    'hod_status'                          =>  $resignation->hod_status,
+                    'hr_status'                           =>  $resignation->hr_status,
+                    'rejected_reason'                     =>  $resignation->rejected_reason,
+                    'hold_reason'                         =>  $resignation->hold_reason,
+                ],
+            ], 200);
+
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
 }

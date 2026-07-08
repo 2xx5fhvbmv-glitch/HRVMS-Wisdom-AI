@@ -109,4 +109,70 @@ class AnnouncementController extends Controller
             return response()->json(['success' => false, 'message' => 'Server error'], 500);
         }
     }
+
+    /**
+     * Full detail for a single announcement — body, attachments,
+     * congratulators list. announcementListing() only returns the summary
+     * row for the dashboard grid; the mobile "Announcement Detail" screen
+     * needs the full body + attachments, which this adds.
+     */
+    public function announcementDetail($id)
+    {
+        if (!Auth::guard('api')->check()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $id                                              =   base64_decode($id);
+
+        try {
+            $announcement                                =   Announcement::join('employees as e', 'e.id', '=', 'announcement.employee_id')
+                                                                ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
+                                                                ->join('announcement_category as ac', 'ac.id', '=', 'announcement.title')
+                                                                ->join('resort_positions as rp', 'rp.id', '=', 'e.Position_id')
+                                                                ->where('announcement.resort_id', $this->resort_id)
+                                                                ->where('announcement.id', $id)
+                                                                ->select('announcement.*', 'e.Admin_Parent_id', 'ra.first_name', 'ra.last_name', 'ac.name as category_name', 'rp.position_title')
+                                                                ->first();
+
+            if (!$announcement) {
+                return response()->json(['success' => false, 'message' => 'Announcement not found.'], 200);
+            }
+
+            $announcement->profile_picture               =   Common::getResortUserPicture($announcement->Admin_Parent_id);
+
+            $announcement->attachments                   =   \App\Models\AnnouncementAttachment::where('announcement_id', $id)
+                                                                ->get()
+                                                                ->map(function ($attachment) {
+                                                                    $aws = Common::GetAWSFile($attachment->child_file_id, $this->resort_id);
+                                                                    return [
+                                                                        'id'  => $attachment->id,
+                                                                        'url' => $aws['success'] ? $aws['NewURLshow'] : null,
+                                                                    ];
+                                                                })
+                                                                ->filter(fn ($a) => !empty($a['url']))
+                                                                ->values();
+
+            $announcement->congratulators                =   AnnouncementNotification::join('employees as e', 'e.id', '=', 'announcement_notification.employee_id')
+                                                                ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
+                                                                ->where('announcement_id', $id)
+                                                                ->select('e.Admin_Parent_id', 'ra.first_name', 'ra.last_name')
+                                                                ->get()
+                                                                ->map(function ($congratulate) {
+                                                                    $congratulate->profile_picture = Common::getResortUserPicture($congratulate->Admin_Parent_id);
+                                                                    return $congratulate;
+                                                                });
+
+            return response()->json([
+                'success'                               =>  true,
+                'message'                               =>  'Announcement detail retrieved successfully.',
+                'data'                                  =>  $announcement,
+            ], 200);
+
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
 }
