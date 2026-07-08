@@ -347,6 +347,18 @@
             "url": { "raw": "{{base_url}}/boarding/boarding-hod-dashboard", "host": ["{{base_url}}"], "path": ["boarding", "boarding-hod-dashboard"] },
             "description": "Route already matches the audit doc's expected path exactly (this is also the P3 'HOD Exit Pass' item) - mobile-side wiring only."
           }
+        },
+        {
+          "name": "Manifest Schedule Lookup [NEW]",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/boarding/manifest-schedule?manifest_type=departure&transportation_mode=Seaplane&date=2025-11-23", "host": ["{{base_url}}"], "path": ["boarding", "manifest-schedule"], "query": [
+              { "key": "manifest_type", "value": "departure", "description": "arrival | departure" },
+              { "key": "transportation_mode", "value": "Seaplane", "description": "Must match the manifest's transportation_mode string exactly (Seaplane, Speedboat, Domestic Flight, International Flight)" },
+              { "key": "date", "value": "2025-11-23", "description": "Y-m-d" }
+            ] },
+            "description": "Apply Leave / Departure Pass screen: Departure Time and Arrival Time should NOT be freely editable - they must come from the manifest HR/Admin already scheduled (boarding/manifest-store). Call this after the employee picks transport mode + date, populate the time field(s) from the response, and disable manual entry. Returns an array since multiple manifests can exist for the same mode+date (e.g. two seaplane flights) - if more than one comes back, let the employee pick which one. No existing endpoint filtered by mode+date before this (manifestListing only filters by arrival/departure type, no mode/date)."
+          }
         }
       ]
     },
