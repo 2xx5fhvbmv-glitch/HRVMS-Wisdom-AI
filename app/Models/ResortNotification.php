@@ -15,7 +15,7 @@ class ResortNotification extends Model
     use HasFactory;
     protected $table = 'resort_notifications';
     protected $fillable = [
-        'resort_id','user_id','module','type','message','status','request_id'
+        'resort_id','user_id','module','page_id','type','message','status','request_id'
     ];
 
     public static function boot(){
