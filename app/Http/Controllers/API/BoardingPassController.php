@@ -914,6 +914,8 @@ class BoardingPassController extends Controller
                     'Boarding Pass',
                     [$employeeTravelPasses->employee_id],
                     null,
+                    false,
+                    'boarding-pass-' . strtolower($action),
                 );
 
             if ($action == 'Approved') {
@@ -1253,6 +1255,8 @@ class BoardingPassController extends Controller
                         'Boarding Pass',
                         $request->employee_ids,
                         null,
+                        false,
+                        'boarding-pass-detail',
                     );
                 }
             }
@@ -1419,6 +1423,8 @@ class BoardingPassController extends Controller
                     'Boarding Pass',
                     $request->employee_ids,
                     null,
+                    false,
+                    'security-officer-details',
                 );
             }
 

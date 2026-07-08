@@ -130,10 +130,17 @@ class LeaveController extends Controller
                 $firstCategory                          = $categories->first();
                 $secondCategory                         = $categories->last();
 
+                // leave_category is stored comma-separated (e.g. "58,61"),
+                // so a direct == against a single id here never matched real
+                // data — this combine check was always failing. Parse it
+                // the same way the web form's getCombineInfo() does.
+                $firstAllowed                           = array_map('intval', array_filter(array_map('trim', explode(',', $firstCategory->leave_category ?? ''))));
+                $secondAllowed                          = array_map('intval', array_filter(array_map('trim', explode(',', $secondCategory->leave_category ?? ''))));
+
                 // Validate that the categories can be combined
                 if (!(
-                    ($firstCategory->combine_with_other  == 1 && $firstCategory->leave_category  == $secondCategory->id) ||
-                    ($secondCategory->combine_with_other == 1 && $secondCategory->leave_category == $firstCategory->id)
+                    ($firstCategory->combine_with_other  == 1 && in_array((int) $secondCategory->id, $firstAllowed, true)) ||
+                    ($secondCategory->combine_with_other == 1 && in_array((int) $firstCategory->id, $secondAllowed, true))
                 )) {
                     return response()->json([
                         'success'                       => false,
@@ -638,7 +645,9 @@ class LeaveController extends Controller
                         'A request has been sent by ' . $user->first_name . ' ' . $user->last_name . '.',
                         'Leave',
                         [$approver->id],
-                        $leave->id
+                        $leave->id,
+                        false,
+                        'leave-pending-approval'
                     );
                 }
             }
@@ -803,29 +812,22 @@ class LeaveController extends Controller
             $resort_id                                  =   $user->resort_id;
             $gender                                     =   $user->gender;
 
-            $targetRanks                                =   [
-                array_search('HOD', config('settings.Position_Rank')),
-                array_search('MGR', config('settings.Position_Rank')),
-                array_search('GM',  config('settings.Position_Rank')),
-                array_search('HR',  config('settings.Position_Rank'))
-            ];
+            $hodRank                                     =   array_search('HOD', config('settings.Position_Rank'));
+            $mgrRank                                     =   array_search('MGR', config('settings.Position_Rank'));
+            $gmRank                                      =   array_search('GM',  config('settings.Position_Rank'));
+            $hrRank                                      =   array_search('HR',  config('settings.Position_Rank'));
+            $excomRank                                   =   array_search('EXCOM', config('settings.Position_Rank'));
+
+            $applicantRank                                =   (int) $employee->rank;
 
             if ($user->is_master_admin == 0) {
 
-                $reporting_to                           =   $employee->id;
-                $underEmp_id                            =   Common::getSubordinates($reporting_to);
-
-                $Dept_id                                =   $employee->Dept_id;
-                $delegations                            =   DB::table('employees')
+                if (in_array($applicantRank, [$excomRank, $gmRank], true)) {
+                    // XCOM / GM: all HODs + XCOM-level users, resort-wide.
+                    $delegations                        =   DB::table('employees')
                                                                 ->join('resort_admins', 'employees.Admin_Parent_id', '=', 'resort_admins.id')
                                                                 ->where('employees.resort_id', $resort_id)
-                                                                ->whereIn('employees.rank', $targetRanks)
-                                                                // ->whereIn('employees.id', $underEmp_id)
-                                                                ->where(function ($query) use ($Dept_id) {
-                                                                    $query->where('employees.rank', array_search('HOD', config('settings.Position_Rank')))
-                                                                        ->where('employees.Dept_id', $Dept_id)
-                                                                        ->orWhere('employees.rank', '<>', array_search('HOD', config('settings.Position_Rank')));
-                                                                })
+                                                                ->whereIn('employees.rank', [$hodRank, $excomRank])
                                                                 ->select(
                                                                     'employees.*',
                                                                     'resort_admins.first_name as first_name',
@@ -833,6 +835,25 @@ class LeaveController extends Controller
                                                                     'resort_admins.email as admin_email'
                                                                 )
                                                                 ->get();
+                } else {
+                    // Line Worker / Supervisor / Manager / HOD (and anyone else):
+                    // own department only. Was previously only dept-filtering
+                    // HOD-rank candidates — the "orWhere rank <> HOD" let
+                    // Managers/GM/HR from ANY department through unfiltered.
+                    $Dept_id                            =   $employee->Dept_id;
+                    $delegations                        =   DB::table('employees')
+                                                                ->join('resort_admins', 'employees.Admin_Parent_id', '=', 'resort_admins.id')
+                                                                ->where('employees.resort_id', $resort_id)
+                                                                ->where('employees.Dept_id', $Dept_id)
+                                                                ->whereIn('employees.rank', [$hodRank, $mgrRank, $gmRank, $hrRank])
+                                                                ->select(
+                                                                    'employees.*',
+                                                                    'resort_admins.first_name as first_name',
+                                                                    'resort_admins.last_name as last_name',
+                                                                    'resort_admins.email as admin_email'
+                                                                )
+                                                                ->get();
+                }
             } else {
 
                 $delegations                            =   DB::table('employees')
@@ -852,6 +873,73 @@ class LeaveController extends Controller
             }
 
             return response()->json(['success' => true, 'message' => 'Delegations Listing.', 'delegations' => $delegations], 200);
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    /**
+     * Pre-check for combining leave types — the web form calls the
+     * equivalent (Leave\LeaveController@getCombineInfo) as soon as a second
+     * leave type is picked, and blocks the "Add Another" UI if it fails.
+     * Mobile had no equivalent, so nothing stopped the user filling out a
+     * whole second leave-type block before hitting an error.
+     *
+     * leave_category is stored comma-separated (e.g. "58,61" — verified
+     * against live data), so this parses it the same way web's
+     * getCombineInfo() does. leaveStore()'s own combine check did a direct
+     * == against a single id, which can never match a comma string — fixed
+     * alongside this so submit-time enforcement actually works too.
+     */
+    public function checkCombineLeave(Request $request)
+    {
+        if (!Auth::guard('api')->check()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $validator                                       =   Validator::make($request->all(), [
+            'leave_category_id'                          =>  'required|array',
+            'leave_category_id.*'                        =>  'required|integer',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'message' => $validator->errors()->first()], 422);
+        }
+
+        $user                                            =   Auth::guard('api')->user();
+        $leaveCategoryIds                                =   array_values(array_unique($request->leave_category_id));
+
+        if (count($leaveCategoryIds) <= 1) {
+            return response()->json(['success' => true, 'message' => 'Valid selection.'], 200);
+        }
+
+        try {
+            $categories                                  =   LeaveCategory::whereIn('id', $leaveCategoryIds)
+                                                                ->where('resort_id', $user->resort_id)
+                                                                ->get();
+
+            $hasRelation                                 =   $categories->contains(function ($category) use ($leaveCategoryIds) {
+                                                                    if ((int) $category->combine_with_other !== 1) {
+                                                                        return false;
+                                                                    }
+                                                                    $allowed = array_filter(array_map('trim', explode(',', $category->leave_category ?? '')));
+                                                                    $allowed = array_map('intval', $allowed);
+                                                                    $others  = array_diff($leaveCategoryIds, [(int) $category->id]);
+                                                                    return count(array_intersect($others, $allowed)) > 0;
+                                                                });
+
+            if (!$hasRelation) {
+                return response()->json([
+                    'success'                            =>  false,
+                    'message'                            =>  'The selected leave categories are not combined with each other.',
+                ], 200);
+            }
+
+            return response()->json(['success' => true, 'message' => 'Valid selection.'], 200);
+
         } catch (\Exception $e) {
             \Log::emergency("File: " . $e->getFile());
             \Log::emergency("Line: " . $e->getLine());
@@ -2463,19 +2551,20 @@ class LeaveController extends Controller
 
     private function upcomingBirthdays($resort_id)
     {
-        $today              = Carbon::today()->format('d-m'); // Current day and month (d-m)
-        $tomorrow           = Carbon::tomorrow()->format('d-m'); // Tomorrow's day and month (d-m)
-        $dayAfterTomorrow   = Carbon::today()->addDays(2)->format('d-m'); // Day after tomorrow's day and month (d-m)
-
-        $upcomingBirthdays  = Employee::with(['resortAdmin', 'position']) // Eager load relationships
-            ->whereRaw('SUBSTRING(dob, 1, 5) IN (?, ?, ?)', [$today, $tomorrow, $dayAfterTomorrow]) // Compare day and month
-            ->orderByRaw("SUBSTRING(dob, 1, 5)")
-            ->get();
+        // dob is stored "YYYY-MM-DD" (verified against live data, e.g.
+        // "1992-02-25") — SUBSTRING(dob,1,5) pulled "1992-" (the year
+        // prefix), which can never equal a "d-m"/"m-d" string. This made
+        // the whole Upcoming Birthdays card empty for every resort, not
+        // just this one employee. Month-day lives at position 6 (SUBSTRING
+        // is 1-indexed): SUBSTRING('1992-02-25',6,5) = '02-25'.
+        $today              = Carbon::today()->format('m-d');
+        $tomorrow           = Carbon::tomorrow()->format('m-d');
+        $dayAfterTomorrow   = Carbon::today()->addDays(2)->format('m-d');
 
         $upcomingBirthdays = DB::table('employees as e')
             ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id') // Join with resort_admins
             ->join('resort_positions as rp', 'rp.id', '=', 'e.Position_id') // Join with positions
-            ->whereRaw('SUBSTRING(e.dob, 1, 5) IN (?, ?, ?)', [$today, $tomorrow, $dayAfterTomorrow]) // Compare day and month
+            ->whereRaw('SUBSTRING(e.dob, 6, 5) IN (?, ?, ?)', [$today, $tomorrow, $dayAfterTomorrow]) // Compare month and day
             ->where('ra.resort_id', $resort_id)
             ->select(
                 'e.id as employee_id',
@@ -2486,7 +2575,7 @@ class LeaveController extends Controller
                 'rp.position_title',
                 'e.dob',
             )
-            ->orderByRaw("SUBSTRING(e.dob, 1, 5)")
+            ->orderByRaw("SUBSTRING(e.dob, 6, 5)")
             ->get();
 
         // Map the profile picture for each employee
@@ -3194,50 +3283,56 @@ class LeaveController extends Controller
             $user       = Auth::guard('api')->user();
             $resortId   = $user->resort_id;
 
-            // Define date ranges
-            $today = Carbon::today()->format('d-m'); // Current day and month (d-m)
-            $tomorrow = Carbon::tomorrow()->format('d-m'); // Tomorrow's day and month (d-m)
-            $startMonthDay = Carbon::today()->format('m-d');
-            $endMonthDay = Carbon::today()->addMonths(11)->format('m-d');
+            // dob is stored "YYYY-MM-DD" (e.g. "1992-02-25"), not "d-m-Y" —
+            // the old SUBSTRING(dob,1,5) pulled the year prefix ("1992-"),
+            // and the regex/createFromFormat('d-m-Y', ...) below it expected
+            // a completely different string shape. Both silently matched
+            // nothing for every employee, on every date, at every resort —
+            // Carbon::parse() reads the actual stored format natively.
+            $today    = Carbon::today();
+            $tomorrow = Carbon::tomorrow();
 
-            $upcomingBirthdays = Employee::with(['resortAdmin', 'position']) // Eager load both relationships
-                ->whereRaw('SUBSTRING(dob, 1, 5) = ?', [$today]) // Compare day and month from the string
-                ->orWhereRaw('SUBSTRING(dob, 1, 5) = ?', [$tomorrow])
-                ->orWhereRaw('SUBSTRING(dob, 1, 5) >= ?', [$startMonthDay])
-                ->orWhereRaw('SUBSTRING(dob, 1, 5) <= ?', [$endMonthDay])
-                ->orderByRaw('SUBSTRING(dob, 4, 2) ASC')
-                ->get();
-
-            $upcomingBirthdays = $upcomingBirthdays->filter(function ($employee) {
-                // Ensure `dob` is not empty and matches `d-m-Y` format
-                return !empty($employee->dob) && preg_match('/^\d{2}-\d{2}-\d{4}$/', $employee->dob);
-            })->map(function ($employee) {
-                $employee->profile_picture = Common::getResortUserPicture($employee->Admin_Parent_id);
-                try {
-                    // Convert `d-m-Y` to Carbon instance, then extract month and day
-                    $dob = Carbon::createFromFormat('d-m-Y', $employee->dob);
-                    $dobMonthDay = $dob->format('m-d'); // Extract MM-DD
-                    $employee->formatted_dob = $dob->format('l M, d'); // Format as `Day Month, Date`
-                } catch (\Carbon\Exceptions\InvalidFormatException $e) {
-                    $employee->formatted_dob = 'Invalid Date';
-                }
-                return $employee;
-            });
+            $upcomingBirthdays = Employee::with(['resortAdmin', 'position'])
+                ->where('resort_id', $resortId)
+                ->whereNotNull('dob')
+                ->where('dob', '!=', '')
+                ->get()
+                ->filter(function ($employee) {
+                    return !empty($employee->dob) && preg_match('/^\d{4}-\d{2}-\d{2}$/', $employee->dob);
+                })
+                ->map(function ($employee) {
+                    $employee->profile_picture = Common::getResortUserPicture($employee->Admin_Parent_id);
+                    $dob = Carbon::parse($employee->dob);
+                    // Next occurrence of this birthday from today, so Dec->Jan
+                    // wraparound sorts correctly instead of "12" > "01" as strings.
+                    $nextOccurrence = Carbon::createFromDate(Carbon::today()->year, $dob->month, $dob->day);
+                    if ($nextOccurrence->lt(Carbon::today()->startOfDay())) {
+                        $nextOccurrence->addYear();
+                    }
+                    $employee->next_birthday   = $nextOccurrence->format('Y-m-d');
+                    $employee->formatted_dob   = $dob->format('l M, d');
+                    return $employee;
+                })
+                // Next 12 months only, matching the original window's intent.
+                ->filter(function ($employee) {
+                    return Carbon::parse($employee->next_birthday)->lte(Carbon::today()->addMonths(12));
+                })
+                ->sortBy('next_birthday')
+                ->values();
 
             // Separate today's and tomorrow's birthdays
             $todayBirthdays = $upcomingBirthdays->filter(function ($employee) use ($today) {
-                return substr($employee->dob, 0, 5) == $today;
+                return $employee->next_birthday === $today->format('Y-m-d');
             });
 
             $tomorrowBirthdays = $upcomingBirthdays->filter(function ($employee) use ($tomorrow) {
-                return substr($employee->dob, 0, 5) == $tomorrow;
+                return $employee->next_birthday === $tomorrow->format('Y-m-d');
             });
 
             // Filter out remaining upcoming birthdays
             $remainingBirthdays = $upcomingBirthdays->filter(function ($employee) use ($today, $tomorrow) {
-                $dobMonthDay = substr($employee->dob, 0, 5); // Extract 'mm-dd'
-
-                return $dobMonthDay !== $today && $dobMonthDay !== $tomorrow;
+                return $employee->next_birthday !== $today->format('Y-m-d')
+                    && $employee->next_birthday !== $tomorrow->format('Y-m-d');
             });
 
 
@@ -3670,6 +3765,8 @@ class LeaveController extends Controller
                         'Leave',
                         [$leave->emp_id],
                         NULL,
+                        false,
+                        'leave-' . strtolower($action),
                     );
 
 
@@ -3699,6 +3796,8 @@ class LeaveController extends Controller
                         'Leave',
                         [$leave->emp_id],
                         NULL,
+                        false,
+                        'leave-approved',
                     );
                 }
 
@@ -3726,6 +3825,8 @@ class LeaveController extends Controller
                     'Leave',
                     [$leave->emp_id],
                     NULL,
+                    false,
+                    'leave-rejected',
                 );
 
                 return response()->json([

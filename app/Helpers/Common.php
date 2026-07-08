@@ -5965,7 +5965,7 @@ class Common
         return $letters . $numbers;
     }
 
-    public static function sendMobileNotification($resortId,$type,$feedbackFormId,$trainingId,$title,$message,$module,$sendto,$request_id = null, $skipDbInsert = false)
+    public static function sendMobileNotification($resortId,$type,$feedbackFormId,$trainingId,$title,$message,$module,$sendto,$request_id = null, $skipDbInsert = false, $pageId = null)
     {
         // Initialised up-front so an unrecognised $type can't leave $payload
         // undefined and fatal-error at the Http::post() call below.
@@ -5983,6 +5983,7 @@ class Common
                     'type'              =>  $title,
                     'user_id'           =>  $send,
                     'module'            =>  $module,
+                    'page_id'           =>  $pageId,
                     'resort_id'         =>  $resortId,
                     'message'           =>  $message,
                     'status'            => 'unread',
@@ -6038,6 +6039,7 @@ class Common
                 'message'           =>  $message,
                 'status'            =>  $statusData,
                 'module'            =>  $module,
+                'page_id'           =>  $pageId,
                 'sendto'            =>  $sendto,
                 'created_at'        =>  $time
             ];

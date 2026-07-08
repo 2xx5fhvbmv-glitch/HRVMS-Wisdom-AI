@@ -53,8 +53,14 @@ class InAppNotificationController extends Controller
                                                                   'created_at'      => $notification->created_at,
                                                                   'updated_at'      => $notification->updated_at,
                                                                   'module'          => $notification->module ?? null,
+                                                                  'page_id'         => $notification->page_id ?? null,
                                                                   'type'            => $notification->type ?? null,
                                                                   'request_id'      => $notification->request_id ?? null,
+                                                                  // getCreatedAtAttribute() already formats this into the
+                                                                  // resort's display format (e.g. "29/06/2026 23:24") —
+                                                                  // re-parsing that with Carbon::parse() below crashed the
+                                                                  // whole endpoint for resorts using a d/m/Y-style setting.
+                                                                  '_sort_key'       => $notification->getRawOriginal('created_at'),
                                                                 ];
                                                               });
 
@@ -77,8 +83,10 @@ class InAppNotificationController extends Controller
                                                                   'created_at'      => $announcement->created_at,
                                                                   'updated_at'      => $announcement->updated_at,
                                                                   'module'          => 'Announcement Wish',
+                                                                  'page_id'         => 'announcement-detail',
                                                                   'type'            => 'You have a new message',
                                                                   'request_id'      => null,
+                                                                  '_sort_key'       => $announcement->getRawOriginal('created_at'),
                                                                 ];
                                                               });
 
@@ -86,8 +94,12 @@ class InAppNotificationController extends Controller
 
         $merged                                         = collect(array_merge($notifications->all(), $Announcement->all()))
                                                           ->sortByDesc(function ($item) {
-                                                          return \Carbon\Carbon::parse($item['created_at']);
-                                                          })->values();
+                                                          return \Carbon\Carbon::parse($item['_sort_key']);
+                                                          })->values()
+                                                          ->map(function ($item) {
+                                                            unset($item['_sort_key']);
+                                                            return $item;
+                                                          });
 
         if ($merged->isEmpty()) {
             return response()->json(['success' => false, 'message' => 'No notifications found'], 200);

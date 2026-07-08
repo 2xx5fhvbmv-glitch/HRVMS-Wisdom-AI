@@ -73,6 +73,7 @@ use Illuminate\Support\Facades\Route;
 
 		//Task Delegation
 		Route::get('resort/task-delegation', [App\Http\Controllers\API\LeaveController::class, 'taskDelegation']);
+		Route::post('leave/check-combine', [App\Http\Controllers\API\LeaveController::class, 'checkCombineLeave']);
 
 		//Transportations
 		Route::get('resort/transportations', [App\Http\Controllers\API\LeaveController::class, 'transportations']);
