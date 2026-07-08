@@ -59,12 +59,14 @@ class IncidentController extends Controller
                 continue;
             }
             try {
-                $cfm = \App\Models\ChildFileManagement::find($childId);
-                if ($cfm && !empty($cfm->File_Path)) {
-                    $aws = Common::GetApplicantAWSFile($cfm->File_Path);
-                    if (!empty($aws['success'])) {
-                        $urls[] = $aws['NewURLshow'];
-                    }
+                // GetApplicantAWSFile() never decrypts (its $isEncrypted check
+                // is hardcoded false) — findings are uploaded with is_secure=true
+                // (AES-256-CBC + .enc extension), so it served the raw ciphertext
+                // as if it were the real PDF. GetAWSFile() checks is_secure and
+                // actually decrypts before generating the link.
+                $aws = Common::GetAWSFile($childId, $this->resort_id);
+                if (!empty($aws['success'])) {
+                    $urls[] = $aws['NewURLshow'];
                 }
             } catch (\Throwable $e) {
                 // Skip entries that fail to resolve rather than 500ing the whole request.
