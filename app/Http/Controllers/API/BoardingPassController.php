@@ -1690,6 +1690,53 @@ class BoardingPassController extends Controller
         }
     }
 
+    /**
+     * Scheduled departure/arrival time for a given transport mode + date,
+     * looked up from the manifest HR/Admin already created — for the mobile
+     * "Apply Leave" / Departure Pass screen to auto-populate Departure Time
+     * / Arrival Time instead of letting the employee type an arbitrary
+     * value. manifestListing() returns every manifest for a type with no
+     * mode/date filter, so it isn't a precise fit for this.
+     */
+    public function manifestScheduleLookup(Request $request)
+    {
+        if (!Auth::guard('api')->check()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'manifest_type'                          => 'required|in:arrival,departure',
+            'transportation_mode'                    => 'required|string',
+            'date'                                    => 'required|date_format:Y-m-d',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
+        }
+
+        try {
+            $manifests                               =   Manifest::where('resort_id', $this->resort_id)
+                                                            ->where('manifest_type', $request->manifest_type)
+                                                            ->where('transportation_mode', $request->transportation_mode)
+                                                            ->whereDate('date', $request->date)
+                                                            ->where('status', 'saved')
+                                                            ->orderBy('time', 'asc')
+                                                            ->get(['id', 'transportation_mode', 'transportation_name', 'date', 'time']);
+
+            return response()->json([
+                'success'                            =>  true,
+                'message'                            =>  'Manifest schedule fetched successfully.',
+                'data'                               =>  $manifests,
+            ], 200);
+
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
     public function manifestListing(Request $request)
     {
 

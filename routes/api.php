@@ -96,6 +96,11 @@ use Illuminate\Support\Facades\Route;
 		Route::post('boarding/boarding-pass-update', [App\Http\Controllers\API\BoardingPassController::class, 'boardingPassUpdate']);
 		Route::post('boarding/boarding-pass-cancel', [App\Http\Controllers\API\BoardingPassController::class, 'boardingPassCancel']);
 		Route::post('boarding/manifest-listing', [App\Http\Controllers\API\BoardingPassController::class, 'manifestListing']);
+
+		// New: precise mode+date lookup so Apply Leave / Departure Pass can
+		// auto-populate departure/arrival time from the manifest instead of
+		// leaving it freely editable.
+		Route::get('boarding/manifest-schedule', [App\Http\Controllers\API\BoardingPassController::class, 'manifestScheduleLookup']);
 		Route::get('boarding/manifest-details/{manifest_id}', [App\Http\Controllers\API\BoardingPassController::class, 'manifestDetails']);
 		Route::get('boarding/manifest-details-pdf/{manifest_id}', [App\Http\Controllers\API\BoardingPassController::class, 'manifestDetailsPDFWithEmployees']);
 		Route::post('boarding/boarding-pass-status-update', [App\Http\Controllers\API\BoardingPassController::class, 'boardingPassStatusUpdate']);
