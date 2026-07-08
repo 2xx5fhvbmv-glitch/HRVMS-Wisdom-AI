@@ -1945,4 +1945,64 @@ class BoardingPassController extends Controller
             return response()->json(['success' => false, 'message' => 'Server error'], 500);
         }
     }
+
+    /**
+     * Single Security-Officer assignment detail — which travel pass this
+     * officer was assigned to escort/process, and who's travelling.
+     * SODashboard() only returns the officer's aggregate list; the mobile
+     * "Security Officer Details" screen needs one assignment in full.
+     */
+    public function SOAssignmentDetails($assignId)
+    {
+        if (!Auth::guard('api')->check()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $assignId                                   =   base64_decode($assignId);
+
+        try {
+            $assignment                              =   \App\Models\EmployeeTravelPassAssign::with([
+                                                                'employeeTravelPasses:id,status,departure_date,departure_time,arrival_date,arrival_time,employee_id,employee_departure_status,employee_arrival_status',
+                                                                'employeeTravelPasses.employee:id,Admin_Parent_id,Position_id',
+                                                                'employeeTravelPasses.employee.resortAdmin:id,first_name,last_name,profile_picture',
+                                                                'employeeTravelPasses.employee.position:id,position_title',
+                                                            ])
+                                                            ->where('resort_id', $this->resort_id)
+                                                            ->where('id', $assignId)
+                                                            ->first();
+
+            if (!$assignment) {
+                return response()->json(['success' => false, 'message' => 'Assignment not found.'], 200);
+            }
+
+            $officer                                 =   Employee::join('resort_admins as ra', 'ra.id', '=', 'employees.Admin_Parent_id')
+                                                            ->where('employees.id', $assignment->employee_id)
+                                                            ->select('employees.id', 'ra.id as Admin_Parent_id', 'ra.first_name', 'ra.last_name')
+                                                            ->first();
+
+            if ($officer) {
+                $officer->profile_picture = Common::getResortUserPicture($officer->Admin_Parent_id);
+            }
+
+            $pass = $assignment->employeeTravelPasses;
+            if ($pass && $pass->employee && $pass->employee->resortAdmin) {
+                $pass->employee->resortAdmin->profile_picture = Common::getResortUserPicture($pass->employee->Admin_Parent_id);
+            }
+
+            return response()->json([
+                'success'                           =>  true,
+                'message'                           =>  'Security officer assignment details fetched successfully.',
+                'data'                               =>  [
+                    'officer'                        =>  $officer,
+                    'travel_pass'                    =>  $pass,
+                ],
+            ], 200);
+
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
 }

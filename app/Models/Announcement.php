@@ -22,12 +22,18 @@ class Announcement extends Model
         parent::boot();
 
         self::saving(function ($model) {
-            if (!$model->exists) {
-                $model->created_by = Auth::guard('resort-admin')->user()->id;
-            }
+            // Mobile API requests authenticate via the 'api' guard, not
+            // 'resort-admin' — calling ->user()->id here unguarded threw
+            // "Attempt to read property 'id' on null" for any save from
+            // an API context (same class of bug fixed in FilemangementSystem/
+            // ChildFileManagement/AuditLogs).
+            $user = Auth::guard('resort-admin')->user() ?? Auth::guard('api')->user();
 
-            if(Auth::guard('resort-admin')->check()) {
-                $model->modified_by = Auth::guard('resort-admin')->user()->id;
+            if ($user) {
+                if (!$model->exists) {
+                    $model->created_by = $user->id;
+                }
+                $model->modified_by = $user->id;
             }
         });
     }

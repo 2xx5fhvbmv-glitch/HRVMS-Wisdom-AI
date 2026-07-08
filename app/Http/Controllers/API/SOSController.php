@@ -1074,4 +1074,235 @@ class SOSController extends Controller
         }
     }
 
+    /**
+     * All SOS response teams for the resort, each with its members
+     * (name/photo/role) — the mobile "Fire Team Members" screen.
+     * SOSTeamListing() only returns team name/description, not members.
+     */
+    public function fireTeamMembers()
+    {
+        if (!Auth::guard('api')->check()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        try {
+            $teams                                       =   SOSTeamManagementModel::where('resort_id', $this->resort_id)
+                                                                ->get()
+                                                                ->map(function ($team) {
+                                                                    $team->members = SOSTeamMemeberModel::join('resort_admins as ra', 'sos_team_members.emp_id', '=', 'ra.id')
+                                                                        ->leftJoin('sos_role_management as role', 'sos_team_members.role_id', '=', 'role.id')
+                                                                        ->where('sos_team_members.team_id', $team->id)
+                                                                        ->select(
+                                                                            'sos_team_members.id',
+                                                                            'ra.id as resort_admin_id',
+                                                                            'ra.first_name',
+                                                                            'ra.last_name',
+                                                                            'role.name as role_name'
+                                                                        )
+                                                                        ->get()
+                                                                        ->map(function ($member) {
+                                                                            $member->profile_picture = Common::getResortUserPicture($member->resort_admin_id);
+                                                                            return $member;
+                                                                        });
+                                                                    return $team;
+                                                                });
+
+            return response()->json([
+                'success'                               =>  true,
+                'message'                               =>  "Fire team members fetched successfully.",
+                'data'                                  =>  $teams,
+            ], 200);
+
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    /**
+     * Open/active SOS incidents for Security-staffed roles (position_title
+     * containing "Security" — there's no dedicated rank/role for this,
+     * confirmed against config('settings.Position_Rank')).
+     */
+    public function securityStaffDashboard()
+    {
+        if (!Auth::guard('api')->check()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        try {
+            $activeSos                                  =   SOSHistoryModel::join('sos_emergency_types as set', 'sos_history.emergency_id', '=', 'set.id')
+                                                                ->join('employees as e', 'sos_history.emp_initiated_by', '=', 'e.id')
+                                                                ->join('resort_admins as ra', 'e.Admin_Parent_id', '=', 'ra.id')
+                                                                ->where('sos_history.resort_id', $this->resort_id)
+                                                                ->whereIn('sos_history.status', ['Pending', 'Active', 'Real-Active', 'In-Progress'])
+                                                                ->orderBy('sos_history.created_at', 'desc')
+                                                                ->select(
+                                                                    'sos_history.*',
+                                                                    'set.name as emergency_name',
+                                                                    'ra.first_name',
+                                                                    'ra.last_name',
+                                                                    'e.Admin_Parent_id'
+                                                                )
+                                                                ->get()->map(function ($item) {
+                                                                    $item->profile_picture = Common::getResortUserPicture($item->Admin_Parent_id);
+                                                                    return $item;
+                                                                });
+
+            return response()->json([
+                'success'                               =>  true,
+                'message'                               =>  "Security staff dashboard fetched successfully.",
+                'data'                                  =>  [
+                    'active_sos_count'                  =>  $activeSos->count(),
+                    'active_sos'                         =>  $activeSos,
+                ],
+            ], 200);
+
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    /**
+     * Live dashboard for the Security Manager — pending SOS awaiting
+     * approve/reject/team-assignment (see SOSStore's rank=4 +
+     * position_title='Security Manager' routing) plus a count of
+     * currently-active incidents.
+     */
+    public function managerDashboard()
+    {
+        if (!Auth::guard('api')->check()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        try {
+            $pendingSos                                  =   SOSHistoryModel::join('sos_emergency_types as set', 'sos_history.emergency_id', '=', 'set.id')
+                                                                ->join('employees as e', 'sos_history.emp_initiated_by', '=', 'e.id')
+                                                                ->join('resort_admins as ra', 'e.Admin_Parent_id', '=', 'ra.id')
+                                                                ->where('sos_history.resort_id', $this->resort_id)
+                                                                ->where('sos_history.status', 'Pending')
+                                                                ->orderBy('sos_history.created_at', 'desc')
+                                                                ->select(
+                                                                    'sos_history.*',
+                                                                    'set.name as emergency_name',
+                                                                    'ra.first_name',
+                                                                    'ra.last_name',
+                                                                    'e.Admin_Parent_id'
+                                                                )
+                                                                ->get()->map(function ($item) {
+                                                                    $item->profile_picture = Common::getResortUserPicture($item->Admin_Parent_id);
+                                                                    return $item;
+                                                                });
+
+            $activeSosCount                              =   SOSHistoryModel::where('resort_id', $this->resort_id)
+                                                                ->whereIn('status', ['Active', 'Real-Active', 'In-Progress'])
+                                                                ->count();
+
+            return response()->json([
+                'success'                               =>  true,
+                'message'                               =>  "Manager dashboard fetched successfully.",
+                'data'                                  =>  [
+                    'pending_approval_count'             =>  $pendingSos->count(),
+                    'pending_approval'                   =>  $pendingSos,
+                    'active_sos_count'                   =>  $activeSosCount,
+                ],
+            ], 200);
+
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    /**
+     * Chat log for a single SOS incident. New dedicated table (see
+     * migration comment) — the shared `conversation` table's type enum is
+     * hard-limited to group/individual, so this stays isolated instead of
+     * widening shared chat infra.
+     */
+    public function sosChatLogs($sosId)
+    {
+        if (!Auth::guard('api')->check()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $sosId                                          =   base64_decode($sosId);
+        try {
+            $messages                                   =   \App\Models\SosChatMessage::join('resort_admins as ra', 'sos_chat_messages.sender_id', '=', 'ra.id')
+                                                                ->where('sos_chat_messages.resort_id', $this->resort_id)
+                                                                ->where('sos_chat_messages.sos_history_id', $sosId)
+                                                                ->orderBy('sos_chat_messages.created_at', 'asc')
+                                                                ->select(
+                                                                    'sos_chat_messages.*',
+                                                                    'ra.first_name',
+                                                                    'ra.last_name'
+                                                                )
+                                                                ->get()->map(function ($item) {
+                                                                    $item->profile_picture = Common::getResortUserPicture($item->sender_id);
+                                                                    return $item;
+                                                                });
+
+            return response()->json([
+                'success'                               =>  true,
+                'message'                               =>  "SOS chat log fetched successfully.",
+                'data'                                  =>  $messages,
+            ], 200);
+
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    /**
+     * Post a chat message during an active SOS. Not explicitly in the
+     * mobile spec (which only listed the GET log), but a log screen with
+     * no way to populate it isn't testable — thin, isolated addition.
+     */
+    public function sosSendChatMessage(Request $request)
+    {
+        if (!Auth::guard('api')->check()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $validator                                      =   Validator::make($request->all(), [
+            'sos_history_id'                            =>  'required',
+            'message'                                   =>  'required|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'message' => $validator->errors()->first()], 422);
+        }
+
+        try {
+            $chatMessage                                 =   \App\Models\SosChatMessage::create([
+                'resort_id'                              =>  $this->resort_id,
+                'sos_history_id'                          =>  $request->sos_history_id,
+                'sender_id'                               =>  $this->user->id,
+                'message'                                 =>  $request->message,
+            ]);
+
+            return response()->json([
+                'success'                               =>  true,
+                'message'                               =>  "Message sent successfully.",
+                'data'                                  =>  $chatMessage,
+            ], 200);
+
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
 }

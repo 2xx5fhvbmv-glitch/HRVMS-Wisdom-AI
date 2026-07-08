@@ -733,4 +733,70 @@ class OnBoardingController extends Controller
             return response()->json(['success' => false, 'message' => 'Server error'], 500);
         }
     }
+
+    /**
+     * Harassment Prevention policy content. Acknowledging it already works
+     * via the existing generic on-boarding/store-acknowledgement endpoint
+     * (acknowledgement_type is a free-text string) — this just supplies the
+     * text to show before that acknowledgement.
+     */
+    public function harassmentPreventionContent()
+    {
+        if (!Auth::guard('api')->check()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        try {
+            $content                                     =   \App\Models\OnboardingContent::where('resort_id', $this->resort_id)
+                                                                ->where('content_type', 'harassment_prevention')
+                                                                ->first();
+
+            return response()->json([
+                'success'                               =>  true,
+                'message'                               =>  'Harassment prevention content fetched successfully.',
+                'data'                                  =>  [
+                    'title'                              =>  $content->title ?? 'Harassment Prevention Policy',
+                    'content'                            =>  $content->content ?? '',
+                ],
+            ], 200);
+
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    /**
+     * Resort access / badge info shown on the onboarding "Access Details"
+     * screen. Same content-blob table as harassment-prevention-content.
+     */
+    public function accessDetails()
+    {
+        if (!Auth::guard('api')->check()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        try {
+            $content                                     =   \App\Models\OnboardingContent::where('resort_id', $this->resort_id)
+                                                                ->where('content_type', 'access_details')
+                                                                ->first();
+
+            return response()->json([
+                'success'                               =>  true,
+                'message'                               =>  'Access details fetched successfully.',
+                'data'                                  =>  [
+                    'title'                              =>  $content->title ?? 'Access Details',
+                    'content'                            =>  $content->content ?? '',
+                ],
+            ], 200);
+
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
 }

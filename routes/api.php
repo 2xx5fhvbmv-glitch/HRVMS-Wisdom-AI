@@ -82,6 +82,10 @@ use Illuminate\Support\Facades\Route;
 		Route::get('boarding/boarding-emp-dashboard', [App\Http\Controllers\API\BoardingPassController::class, 'boardingEmpDashboard']);
 		Route::get('resort/upcoming-birthday-list', [App\Http\Controllers\API\LeaveController::class, 'getUpcomingBirthdaysList']);
 		Route::get('boarding/boarding-pass-view/{pass_id}', [App\Http\Controllers\API\BoardingPassController::class, 'boardingPassView']);
+
+		// Mobile-audit P2: alias for the employee-side "Track Request Pass" screen —
+		// boardingPassView() already handles both plain int and base64 ids.
+		Route::get('boarding/track-pass/{pass_id}', [App\Http\Controllers\API\BoardingPassController::class, 'boardingPassView']);
 		Route::post('boarding/boarding-pass-approve-action', [App\Http\Controllers\API\BoardingPassController::class, 'boardingPassApprovedAction']);
 		Route::get('boarding/boarding-pass-approve-list', [App\Http\Controllers\API\BoardingPassController::class, 'bordingPassApprovedList']);
 		Route::post('boarding/emp-leaving-arriving', [App\Http\Controllers\API\BoardingPassController::class, 'employeeLeavingOrArriving']);
@@ -189,6 +193,10 @@ use Illuminate\Support\Facades\Route;
 			Route::post('boarding/so-confirm-arrival-dept', [App\Http\Controllers\API\BoardingPassController::class, 'SOConfirmArrivalDept']);
 		// });
 
+		// Mobile-audit P2: alias (GET, filter as query param) + new detail endpoint
+		Route::get('boarding/security-officer-dashboard', [App\Http\Controllers\API\BoardingPassController::class, 'SODashboard']);
+		Route::get('boarding/security-officer-details/{assign_id}', [App\Http\Controllers\API\BoardingPassController::class, 'SOAssignmentDetails']);
+
 
 		//Time and attendance Employee
 		Route::get('timeandattendance/time-attendance-dashboard', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'timeAttendanceDashboard']);
@@ -276,6 +284,10 @@ use Illuminate\Support\Facades\Route;
 		Route::get('learning/training-details/{schedule_id}', [App\Http\Controllers\API\LearningController::class, 'trainingDetails']);
 		Route::post('learning/employee-training-calendar', [App\Http\Controllers\API\LearningController::class, 'employeeTrainingCalendar']);
 		Route::get('learning/employee-learning-dashboard', [App\Http\Controllers\API\LearningController::class, 'employeeLearningDashbaord']);
+
+		// Mobile-audit P2: empLT (legacy) alias — training-calendar and
+		// training-details already match the spec's expected route names exactly.
+		Route::get('learning/emp-lt-dashboard', [App\Http\Controllers\API\LearningController::class, 'employeeLearningDashbaord']);
 		Route::get('learning/feedback-from-list', [App\Http\Controllers\API\LearningController::class, 'feedbackformListing']);
 		Route::post('learning/feedback-data-store', [App\Http\Controllers\API\LearningController::class, 'feedbackStore']);
 
@@ -375,6 +387,23 @@ use Illuminate\Support\Facades\Route;
 		Route::post('sos/drill-real-sos', [App\Http\Controllers\API\SOSController::class, 'drillRealSOS']);
 		Route::post('sos/complete-sos-update-status', [App\Http\Controllers\API\SOSController::class, 'completeSOSUpdateStatus']);
 
+		// Mobile-audit P1: new endpoints
+		Route::get('sos/fire-team-members', [App\Http\Controllers\API\SOSController::class, 'fireTeamMembers']);
+		Route::get('sos/security-staff-dashboard', [App\Http\Controllers\API\SOSController::class, 'securityStaffDashboard']);
+		Route::get('sos/manager-dashboard', [App\Http\Controllers\API\SOSController::class, 'managerDashboard']);
+		Route::get('sos/chat-logs/{sos_id}', [App\Http\Controllers\API\SOSController::class, 'sosChatLogs']);
+		Route::post('sos/send-chat-message', [App\Http\Controllers\API\SOSController::class, 'sosSendChatMessage']);
+
+		// Mobile-audit P1: aliases for already-implemented methods, under the
+		// route names the mobile team's audit doc expects — avoids duplicating
+		// logic that already exists under a different route name.
+		Route::post('sos/mark-safe', [App\Http\Controllers\API\SOSController::class, 'SOSSafeStatus']);
+		Route::get('sos/details/{sos_id}', [App\Http\Controllers\API\SOSController::class, 'SOSHistoryDetails']);
+		Route::get('sos/history-list', [App\Http\Controllers\API\SOSController::class, 'SOSHistoryListing']);
+		Route::get('sos/history-details/{sos_id}', [App\Http\Controllers\API\SOSController::class, 'SOSHistoryDetails']);
+		Route::get('sos/employee-location/{sos_id}', [App\Http\Controllers\API\SOSController::class, 'employeeAndTeamLocation']);
+		Route::get('sos/track/{sos_id}', [App\Http\Controllers\API\SOSController::class, 'employeeAndTeamLocation']);
+
 		//Resignation
 		Route::get('resignation/resignation-dashboard', [App\Http\Controllers\API\ResignationController::class, 'resignationDashboard']);
 		Route::post('resignation/resignation-store', [App\Http\Controllers\API\ResignationController::class, 'resignationStore']);
@@ -382,9 +411,22 @@ use Illuminate\Support\Facades\Route;
 		Route::post('resignation/form-submit', [App\Http\Controllers\API\ResignationController::class, 'formSubmit']);
 		Route::post('resignation/emp-confirm-meeting', [App\Http\Controllers\API\ResignationController::class, 'empConfirmMeeting']);
 
+		// Mobile-audit P1: new endpoints
+		Route::get('resignation/exit-interview-questions', [App\Http\Controllers\API\ResignationController::class, 'exitInterviewQuestions']);
+		Route::get('resignation/rejection-details', [App\Http\Controllers\API\ResignationController::class, 'rejectionDetails']);
+
+		// Mobile-audit P1: alias for the already-generic form submission —
+		// formSubmit() already accepts assignment_id + response_data and works
+		// for any exit_clearance_form type, exit_interview included.
+		Route::post('resignation/exit-interview-submit', [App\Http\Controllers\API\ResignationController::class, 'formSubmit']);
+
 		//On Boarding
 		Route::get('on-boarding/on-boarding-dashboard', [App\Http\Controllers\API\OnBoardingController::class, 'onBoardingDashboard']);
 		Route::get('on-boarding/assigned-staff-dashboard', [App\Http\Controllers\API\OnBoardingController::class, 'AssignedStaffDashboard']);
+
+		// Mobile-audit P2: new content endpoints
+		Route::get('on-boarding/harassment-prevention-content', [App\Http\Controllers\API\OnBoardingController::class, 'harassmentPreventionContent']);
+		Route::get('on-boarding/access-details', [App\Http\Controllers\API\OnBoardingController::class, 'accessDetails']);
 		Route::post('on-boarding/schedule-task-calendar', [App\Http\Controllers\API\OnBoardingController::class, 'scheduleTaskCalender']);
 		Route::post('on-boarding/send-selfie-image', [App\Http\Controllers\API\OnBoardingController::class, 'sendSelfiImage']);
 		Route::post('on-boarding/store-acknowledgement', [App\Http\Controllers\API\OnBoardingController::class, 'storeAcknowledgement']);
@@ -393,6 +435,13 @@ use Illuminate\Support\Facades\Route;
 		//Announcement
 		Route::get('announcement/announcement-list', [App\Http\Controllers\API\AnnouncementController::class, 'announcementListing']);
 		Route::get('announcement/send-congratulation/{announcementId}', [App\Http\Controllers\API\AnnouncementController::class, 'sendCongratulation']);
+
+		// Mobile-audit P1: new detail endpoint + alias for the existing list
+		// under the route name the mobile team's audit doc expects.
+		// announcement/list MUST be registered before announcement/{id} —
+		// otherwise the {id} wildcard swallows "list" as its parameter.
+		Route::get('announcement/list', [App\Http\Controllers\API\AnnouncementController::class, 'announcementListing']);
+		Route::get('announcement/{id}', [App\Http\Controllers\API\AnnouncementController::class, 'announcementDetail']);
 
 
 		//employeeInAppNotification
@@ -405,6 +454,10 @@ use Illuminate\Support\Facades\Route;
 		// Chat Module
 
 		Route::get('chat/list', [App\Http\Controllers\API\ChatBoat\ChatController::class, 'index']);
+
+		// Mobile-audit P3: FAQ content (not chat-service infra — Chat
+		// Group/Chat Boat/HR Chat are a separate backend per the audit doc)
+		Route::get('chat/faq-list', [App\Http\Controllers\API\ChatBoat\ChatController::class, 'faqList']);
 		Route::get('chat/start-new/chat', [App\Http\Controllers\API\ChatBoat\ChatController::class, 'newChat']);
 		Route::get('group/new-employee/list/{type_id}', [App\Http\Controllers\API\ChatBoat\ChatController::class, 'newEmployeeList']);
 		Route::post('create/group-chat', [App\Http\Controllers\API\ChatBoat\ChatController::class, 'createGroupChat']);
