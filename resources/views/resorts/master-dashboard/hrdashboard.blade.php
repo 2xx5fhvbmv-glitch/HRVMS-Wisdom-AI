@@ -1840,7 +1840,7 @@
                                                             </div>
                                                             <div>
                                                                 <h6>{{$leaveUser->employee->resortAdmin->full_name}}</h6>
-                                                                <p>{{$leaveUser->employee->department->name}} - {{$leaveUser->employee->position->position_title}}</p>
+                                                                <p>{{ $leaveUser->employee->department->name ?? 'N/A' }} - {{ $leaveUser->employee->position->position_title ?? 'N/A' }}</p>
                                                             </div>
                                                             <div><span class="badge badge-themeGray ">{{$leaveUser->reason}}</span>
                                                             </div>
@@ -1875,7 +1875,7 @@
                                                             </div>
                                                             <div>
                                                                 <h6>{{$leaveUser->employee->resortAdmin->full_name}}</h6>
-                                                                <p>{{$leaveUser->employee->department->name}} - {{$leaveUser->employee->position->position_title}}</p>
+                                                                <p>{{ $leaveUser->employee->department->name ?? 'N/A' }} - {{ $leaveUser->employee->position->position_title ?? 'N/A' }}</p>
                                                                 <span class="badge badge-themeNew1"><i
                                                                         class="fa-regular fa-calendar"></i> {{ Carbon\Carbon::parse($leaveUser->from_date)->format('d-M') }} To
                                                                     {{ Carbon\Carbon::parse($leaveUser->to_date)->format('d-M') }}</span>
@@ -1923,7 +1923,7 @@
                                                                 </div>
                                                                 <div>
                                                                     <h6>{{$birthdayEmployee->resortAdmin->full_name}}</h6>
-                                                                    <p>{{$birthdayEmployee->department->name}} - {{$birthdayEmployee->position->position_title}}</p>
+                                                                    <p>{{ $birthdayEmployee->department->name ?? 'N/A' }} - {{ $birthdayEmployee->position->position_title ?? 'N/A' }}</p>
                                                                     <div class="d-flex">
                                                                         <a href="#" class="a-linkTheme">Send Message</a>
                                                                         <a href="{{route('resort.recruitement.send.birthday-notification',$birthdayEmployee->id)}}" class="a-link">Notify All Employees</a>
@@ -1944,7 +1944,7 @@
                                                                 </div>
                                                                 <div>
                                                                     <h6>{{$birthdayEmployee->resortAdmin->full_name}}</h6>
-                                                                    <p>{{$birthdayEmployee->department->name}} - {{$birthdayEmployee->position->position_title}}</p>
+                                                                    <p>{{ $birthdayEmployee->department->name ?? 'N/A' }} - {{ $birthdayEmployee->position->position_title ?? 'N/A' }}</p>
                                                                     <span class="badge badge-themeNew1"><i class="fa-regular fa-cake-candles"></i> {{ Carbon\Carbon::parse($birthdayEmployee->dob)->format('d-M') }}</span>
                                                                 </div>
                                                             </div>
@@ -2321,7 +2321,7 @@
                                                                 <img src="{{$profilePicture}}" alt="user" class="img-fluid" />
                                                             </div>
                                                             <div>
-                                                                <h6 title="{{$emp_info->employee->resortAdmin->id}}">{{@$emp_info->employee->resortAdmin->full_name}} ({{$emp_info->employee->position->position_title}} - {{$emp_info->employee->department->name}}({{$emp_info->employee->department->code}}))</h6>
+                                                                <h6 title="{{$emp_info->employee->resortAdmin->id}}">{{@$emp_info->employee->resortAdmin->full_name}} ({{ $emp_info->employee->position->position_title ?? 'N/A' }} - {{ $emp_info->employee->department->name ?? 'N/A' }}({{ $emp_info->employee->department->code ?? 'N/A' }}))</h6>
                                                                 <p>{{$emp_info->title}}</p>
                                                             </div>
                                                             <div>
