@@ -150,6 +150,15 @@ class ContractResponseController extends Controller
 
         if (!$applicant || !$resort) return null;
 
+        // License cap — resorts.no_of_users set on the super-admin resort
+        // form. Contract acceptance must not create an employee past the cap;
+        // logged because this path has no user-facing error channel.
+        $limitError = Common::employeeLimitError($contract->resort_id);
+        if ($limitError) {
+            \Log::warning("Contract accept: employee not created for applicant {$contract->applicant_id} — {$limitError}");
+            return null;
+        }
+
         $vacancy = Vacancies::join('resort_positions as t1', 't1.id', '=', 'vacancies.position')
             ->leftJoin('resort_departments as t2', 't2.id', '=', 't1.dept_id')
             ->where('vacancies.id', $applicant->Parent_v_id)

@@ -1170,7 +1170,15 @@ class BoardingPassController extends Controller
             'transportation_name'               => 'required|string',
             'date'                              => 'required|date',
             'time'                              => 'required',
-            'employee_ids'                      => 'required|array',
+            // Mobile sends a fixed-size employee_ids[] with empty slots when
+            // no employee is picked for that row (e.g. a visitors-only
+            // manifest) — was 'required|array' with no per-element rule, so
+            // an empty string ("employee_ids[0]: ''") sailed through
+            // validation and crashed the FK constraint on manifest_employees
+            // (employee_id references employees.id) with a raw 500 instead
+            // of a clean validation error.
+            'employee_ids'                      => 'nullable|array',
+            'employee_ids.*'                    => 'nullable|integer|exists:employees,id',
             'visitors'                          => 'array',
             'visitors.*'                        => 'string',
         ]);
@@ -1237,28 +1245,38 @@ class BoardingPassController extends Controller
                 ]);
             }
 
-            // Attach employees
-            if ($request->has('employee_ids')) {
-                foreach ($request->employee_ids as $empId) {
-                    ManifestEmployee::create([
-                        'manifest_id'               =>  $manifest->id,
-                        'employee_id'               =>  $empId,
-                    ]);
+            // Attach employees — filter out empty slots (mobile sends a
+            // fixed-size employee_ids[] and leaves unpicked rows blank).
+            $validEmployeeIds = array_values(array_filter(
+                (array) $request->employee_ids,
+                fn ($id) => $id !== null && $id !== ''
+            ));
 
-                    Common::sendMobileNotification(
-                        $this->resort_id,
-                        2,
-                        null,
-                        null,
-                        $request->transportation_mode . ' ' . $request->manifest_type,
-                        $request->transportation_mode . ' '  . $request->date . ' at ' . $request->time . ' has been ' . $request->manifest_type . '.',
-                        'Boarding Pass',
-                        $request->employee_ids,
-                        null,
-                        false,
-                        'boarding-pass-detail',
-                    );
-                }
+            foreach ($validEmployeeIds as $empId) {
+                ManifestEmployee::create([
+                    'manifest_id'               =>  $manifest->id,
+                    'employee_id'               =>  $empId,
+                ]);
+            }
+
+            // Notify once per manifest, not once per employee (previous code
+            // fired this inside the loop with the full list as `sendto`
+            // every time — N employees meant N duplicate notifications to
+            // everyone).
+            if (!empty($validEmployeeIds)) {
+                Common::sendMobileNotification(
+                    $this->resort_id,
+                    2,
+                    null,
+                    null,
+                    $request->transportation_mode . ' ' . $request->manifest_type,
+                    $request->transportation_mode . ' '  . $request->date . ' at ' . $request->time . ' has been ' . $request->manifest_type . '.',
+                    'Boarding Pass',
+                    $validEmployeeIds,
+                    null,
+                    false,
+                    'boarding-pass-detail',
+                );
             }
 
             // Attach visitors

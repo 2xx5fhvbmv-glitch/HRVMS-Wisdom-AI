@@ -1684,7 +1684,13 @@ class ComplianceController extends Controller
           // People Module Start
           
           $ResortSiteSettings = ResortSiteSettings::where('resort_id', $this->resort->resort_id)->first();
+          // Missing resort scope — every other Employee::with(...) block in
+          // this file has ->where('resort_id', $this->resort->resort_id),
+          // this one didn't, so every resort's compliance run pulled EVERY
+          // employee in the whole database and sent its own HR TIN/salary
+          // notifications naming employees who belong to OTHER resorts.
           $employee = Employee::with(['resortAdmin','position','department','division','section','education','experiance','allowance','language','sosTeams','document','bankDetails'])
+               ->where('resort_id', $this->resort->resort_id)
                ->get()
                ->map(function ($employee) use ($ResortSiteSettings) 
                {
