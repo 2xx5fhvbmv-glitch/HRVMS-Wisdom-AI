@@ -108,6 +108,33 @@ class Common
         return $prefix . '-' . (((int) $maxNum) + 1);
     }
 
+    /**
+     * License-cap check before adding a new employee. The super-admin resort
+     * form carries an optional "No Of Users" cap (resorts.no_of_users);
+     * 0 / NULL means unlimited. Counts every non-Terminated / non-Inactive
+     * employee (Onboarding included — they occupy a seat).
+     *
+     * Returns NULL when one more employee may be added, or a human-readable
+     * error message when the cap is already reached.
+     */
+    public static function employeeLimitError($resortId): ?string
+    {
+        $limit = (int) Resort::where('id', $resortId)->value('no_of_users');
+        if ($limit <= 0) {
+            return null;
+        }
+
+        $active = Employee::where('resort_id', $resortId)
+            ->whereNotIn('status', ['Terminated', 'Inactive'])
+            ->count();
+
+        if ($active >= $limit) {
+            return "Employee limit reached ({$active} / {$limit}). Contact the administrator to increase the resort's user limit.";
+        }
+
+        return null;
+    }
+
     public static function isHrAdmin(): bool
 	{
 		

@@ -498,6 +498,16 @@ class EmployeeController extends Controller
                 }
             }
 
+            // License cap — resorts.no_of_users set on the super-admin
+            // resort form. Blocks the hire once the cap is reached.
+            $limitError = Common::employeeLimitError($this->resort->resort_id);
+            if ($limitError) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $limitError
+                ]);
+            }
+
            DB::beginTransaction();
             $resortAdmin = ResortAdmin::create([
                 'resort_id' => $this->resort->resort_id,

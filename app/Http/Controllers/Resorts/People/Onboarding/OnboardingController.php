@@ -280,6 +280,16 @@ class OnboardingController extends Controller
             }
         }
 
+        // License cap — resorts.no_of_users set on the super-admin resort
+        // form. Blocks the conversion once the cap is reached.
+        $limitError = \App\Helpers\Common::employeeLimitError($resort_id);
+        if ($limitError) {
+            return response()->json([
+                'success' => false,
+                'message' => $limitError,
+            ], 422);
+        }
+
         try {
             DB::beginTransaction();
 

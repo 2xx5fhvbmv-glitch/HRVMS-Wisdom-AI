@@ -128,6 +128,29 @@ class EmployeeImport implements ToModel, WithHeadingRow
             $parts = explode(' ', $this->resort->resort->resort_name);
             $initials = $this->resort->resort->resort_prefix;
             $existingResortAdmin = ResortAdmin::where('email', $row['email'])->first();
+
+            // License cap — resorts.no_of_users. Only rows that would CREATE
+            // a new employee count; re-imports updating an existing employee
+            // pass through. Checked before the ResortAdmin is created so no
+            // login record or welcome email leaks for a blocked row.
+            $hasEmployee = $existingResortAdmin
+                && Employee::where('Admin_Parent_id', $existingResortAdmin->id)->exists();
+            if (!$hasEmployee) {
+                $limitError = Common::employeeLimitError($this->resort->resort_id);
+                if ($limitError) {
+                    $errors[] = [
+                        'row' => $excelRowNumber,
+                        'name' => trim(($row['firstname'] ?? '') . ' ' . ($row['lastname'] ?? '')),
+                        'email' => $row['email'] ?? 'N/A',
+                        'department' => $row['department'] ?? 'N/A',
+                        'position' => $row['position'] ?? 'N/A',
+                        'error' => $limitError
+                    ];
+                    session(['import_errors' => $errors]);
+                    return null;
+                }
+            }
+
             $password = Common::generateUniquePassword(8);
             $hashedPassword = Hash::make($password);
 

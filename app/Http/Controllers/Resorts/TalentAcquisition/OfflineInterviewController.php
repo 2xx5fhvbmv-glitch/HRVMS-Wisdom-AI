@@ -805,6 +805,13 @@ class OfflineInterviewController extends Controller
             }
         }
 
+        // License cap — resorts.no_of_users set on the super-admin resort
+        // form. Blocks the conversion once the cap is reached.
+        $limitError = Common::employeeLimitError($resort_id);
+        if ($limitError) {
+            return ['success' => false, 'message' => $limitError, 'status' => 422];
+        }
+
         // Create ResortAdmin (login record).
         $resortAdmin = ResortAdmin::create([
             'resort_id'      => $resort_id,
