@@ -234,6 +234,11 @@
                                         type="button" role="tab" aria-controls="tabPane6" aria-selected="true">Roles &
                                         Permissions</button>
                                 </li> -->
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="tab7" data-bs-toggle="tab" data-bs-target="#tabPane7"
+                                        type="button" role="tab" aria-controls="tabPane7"
+                                        aria-selected="false">Travel Quota</button>
+                                </li>
                             </ul>
                             <div class="tab-content" id="myTabContent">
                                 <div class="tab-pane fade show active" id="tabPane1" role="tabpanel"
@@ -1716,6 +1721,41 @@
                                         </div>
                                     </div>
                                 </div>
+
+                                <div class="tab-pane fade" id="tabPane7" role="tabpanel" aria-labelledby="tab7" tabindex="0">
+                                    <div class="bg-themeGrayLight mb-md-4 mb-3">
+                                        <div class="card-title mb-0">
+                                            <div class="row g-md-2 g-1 align-items-center">
+                                                <div class="col">
+                                                    <h3 class="text-nowrap">Travel Quota</h3>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        @if($transportationOptions->isEmpty())
+                                            <p class="text-muted">No transportation options configured for this resort yet. Set them up under Leave Config &gt; Transportation Options.</p>
+                                        @else
+                                            <form id="travelQuotaForm">
+                                                @csrf
+                                                <input type="hidden" name="employee_id" value="{{ $employee->id }}">
+                                                <div class="row g-xxl-4 g-md-3 g-2">
+                                                    @foreach($transportationOptions as $option)
+                                                        @php
+                                                            $quota = $travelQuotas->get($option->id);
+                                                            $used = $travelUsage->get($option->id);
+                                                        @endphp
+                                                        <div class="col-md-3 col-6">
+                                                            <label class="form-label">{{ $option->transportation_option }}</label>
+                                                            <input type="hidden" name="transportation_ids[]" value="{{ $option->id }}">
+                                                            <input type="number" min="0" class="form-control" name="total_allowed[]" value="{{ $quota->total_allowed ?? 0 }}">
+                                                            <small class="text-muted">Used this year: {{ $used->used_count ?? 0 }}</small>
+                                                        </div>
+                                                    @endforeach
+                                                </div>
+                                                <button type="submit" class="btn btn-themeBlue btn-sm mt-3">Save Travel Quota</button>
+                                            </form>
+                                        @endif
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -2879,6 +2919,30 @@
                     if (response.success) {
                         toastr.success(response.message, "Success", { positionClass: 'toast-bottom-right' });
                         setTimeout(function () { location.reload(); }, 1000);
+                    } else {
+                        toastr.error(response.message, "Error", { positionClass: 'toast-bottom-right' });
+                    }
+                },
+                error: function (xhr) {
+                    let errorMsg = 'Something went wrong!';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMsg = xhr.responseJSON.message;
+                    }
+                    toastr.error(errorMsg, "Error", { positionClass: 'toast-bottom-right' });
+                    console.log(xhr.responseText);
+                }
+            });
+        });
+
+        $('#travelQuotaForm').on('submit', function (e) {
+            e.preventDefault();
+            $.ajax({
+                url: '{{ route("employee.update.travelQuota") }}',
+                method: 'POST',
+                data: $(this).serialize(),
+                success: function (response) {
+                    if (response.success) {
+                        toastr.success(response.message, "Success", { positionClass: 'toast-bottom-right' });
                     } else {
                         toastr.error(response.message, "Error", { positionClass: 'toast-bottom-right' });
                     }

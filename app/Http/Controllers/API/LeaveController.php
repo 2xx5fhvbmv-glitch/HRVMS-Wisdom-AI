@@ -17,6 +17,7 @@ use App\Models\ResortDepartment;
 use App\Models\ResortBenifitGrid;
 use App\Models\ResortBenifitGridChild;
 use App\Models\ResortTransportation;
+use App\Models\EmployeeTravelQuota;
 use App\Models\EmployeeTravelPass;
 use App\Models\EmployeeTravelPassStatus;
 use App\Models\EmployeesLeaveTransportation;
@@ -1303,6 +1304,37 @@ class LeaveController extends Controller
             }
 
             $leaveData['leave_history']                 =   $leaveHistory;
+
+            // Travel category stats (Seaplane/Domestic/International boxes on
+            // the mobile "My Leave" screen) — these were hardcoded client-side
+            // before; now sourced from real per-employee quotas + this year's
+            // approved travel-pass usage, same "Approved" + current-year-window
+            // recipe used above for leave-balance usage.
+            $travelQuotas                               =   EmployeeTravelQuota::where('employee_id', $emp_id)->get()->keyBy('transportation');
+            $travelYearStart                            =   Carbon::now()->startOfYear()->format('Y-m-d');
+            $travelYearEnd                               =   Carbon::now()->endOfYear()->format('Y-m-d');
+            $travelUsage                                =   DB::table('employee_travel_passes')
+                                                                ->select('transportation', DB::raw('COUNT(*) as used_count'))
+                                                                ->where('employee_id', $emp_id)
+                                                                ->where('status', 'Approved')
+                                                                ->where(function ($q) use ($travelYearStart, $travelYearEnd) {
+                                                                    $q->whereBetween('arrival_date', [$travelYearStart, $travelYearEnd])
+                                                                      ->orWhereBetween('departure_date', [$travelYearStart, $travelYearEnd]);
+                                                                })
+                                                                ->groupBy('transportation')
+                                                                ->get()
+                                                                ->keyBy('transportation');
+            $travelCategories                           =   ResortTransportation::where('resort_id', $resort_id)->get()->map(function ($option) use ($travelQuotas, $travelUsage) {
+                $quota                                   =   $travelQuotas->get($option->id);
+                $usage                                   =   $travelUsage->get($option->id);
+                return [
+                    'category' => $option->transportation_option,
+                    'used'     => $usage->used_count ?? 0,
+                    'total'    => $quota->total_allowed ?? 0,
+                ];
+            })->values();
+            $leaveData['travel_categories']             =   $travelCategories;
+
             $response['status']                         =   true;
             $response['message']                        =   'Leave Details';
             $response['leave_detail']                   =   $leaveData;
