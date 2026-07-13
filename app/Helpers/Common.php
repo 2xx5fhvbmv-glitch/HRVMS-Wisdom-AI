@@ -4117,6 +4117,75 @@ class Common
         return [(int) $emp->Dept_id];
     }
 
+    /**
+     * Great-circle distance between two lat/long points, in meters. Free —
+     * no external API call, just arithmetic. Used to check a punch-in/out
+     * location against a circle geofence's center+radius.
+     */
+    public static function haversineDistanceMeters(float $lat1, float $lng1, float $lat2, float $lng2): float
+    {
+        $earthRadiusMeters = 6371000;
+        $latDelta = deg2rad($lat2 - $lat1);
+        $lngDelta = deg2rad($lng2 - $lng1);
+        $a = sin($latDelta / 2) ** 2
+            + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($lngDelta / 2) ** 2;
+        $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+        return $earthRadiusMeters * $c;
+    }
+
+    /**
+     * Ray-casting point-in-polygon check — also free, no external API call.
+     * $point = ['lat' => .., 'lng' => ..]; $polygon = array of same-shaped points.
+     */
+    public static function pointInPolygon(array $point, array $polygon): bool
+    {
+        $inside = false;
+        $count = count($polygon);
+        for ($i = 0, $j = $count - 1; $i < $count; $j = $i++) {
+            $xi = (float) ($polygon[$i]['lng'] ?? $polygon[$i]['lat'] ?? 0);
+            $yi = (float) ($polygon[$i]['lat'] ?? 0);
+            $xj = (float) ($polygon[$j]['lng'] ?? $polygon[$j]['lat'] ?? 0);
+            $yj = (float) ($polygon[$j]['lat'] ?? 0);
+            $px = (float) ($point['lng'] ?? 0);
+            $py = (float) ($point['lat'] ?? 0);
+
+            $intersects = (($yi > $py) != ($yj > $py))
+                && ($px < ($xj - $xi) * ($py - $yi) / (($yj - $yi) ?: PHP_FLOAT_EPSILON) + $xi);
+            if ($intersects) {
+                $inside = !$inside;
+            }
+        }
+        return $inside;
+    }
+
+    /**
+     * Checks a punch lat/long against a resort_geofences row's stored
+     * coordinates (circle: {lat,lng,radius} in meters; polygon: array of
+     * {lat,lng} vertices). Returns null if the geofence/coordinates are
+     * missing/malformed (caller should treat null as "couldn't verify",
+     * not as "outside") rather than true/false.
+     */
+    public static function isWithinGeofence(float $lat, float $lng, $geofence): ?bool
+    {
+        if (!$geofence || empty($geofence->coordinates)) return null;
+
+        $coordinates = json_decode($geofence->coordinates, true);
+        if (!is_array($coordinates)) return null;
+
+        if (($geofence->shape_type ?? 'polygon') === 'circle') {
+            $centerLat = (float) ($coordinates['lat'] ?? 0);
+            $centerLng = (float) ($coordinates['lng'] ?? 0);
+            $radiusMeters = (float) ($coordinates['radius'] ?? 0);
+            if (!$centerLat || !$centerLng || !$radiusMeters) return null;
+            return self::haversineDistanceMeters($lat, $lng, $centerLat, $centerLng) <= $radiusMeters;
+        }
+
+        // polygon
+        $vertices = $coordinates['points'] ?? $coordinates;
+        if (!is_array($vertices) || count($vertices) < 3) return null;
+        return self::pointInPolygon(['lat' => $lat, 'lng' => $lng], $vertices);
+    }
+
     public static function getEmpGrade($rank){
         if($rank == 1 || $rank == 3 || $rank == 7 || $rank == 8){
             $emp_grade = "1";

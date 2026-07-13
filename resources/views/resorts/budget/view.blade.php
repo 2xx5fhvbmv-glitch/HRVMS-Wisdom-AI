@@ -85,9 +85,16 @@
                                          did nothing — that class isn't defined in this CSS.
                                          Inline min-width is the only reliable fix here since the
                                          table layout is auto and the column wouldn't otherwise
-                                         claim enough horizontal space for the full label. --}}
-                                    <th class="text-nowrap" style="min-width:170px;">Current Basic salary</th>
-                                    <th class="text-nowrap" style="min-width:200px;">Proposed Basic Salary {{$nextYear}}</th>
+                                         claim enough horizontal space for the full label.
+                                         text-nowrap forced these onto one line, and the rendered
+                                         text (~230-240px) was still wider than the min-width, so
+                                         it visually spilled into the adjacent Jan-{year} column —
+                                         which is hard-locked to 120px (w-120: width/min-width/
+                                         max-width all 120px, so it can't grow to absorb the
+                                         overflow). Letting the label wrap onto 2 lines within its
+                                         own cell instead of forcing 1 line fixes the overlap. --}}
+                                    <th style="min-width:170px; white-space:normal;">Current Basic salary</th>
+                                    <th style="min-width:170px; white-space:normal;">Proposed Basic Salary {{$nextYear}}</th>
                                     @for ($i = 1; $i <= 12; $i++)
                                         @php
                                             // Get the current year and increment it to get the next year

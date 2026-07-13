@@ -758,6 +758,19 @@
         // Adjust heights on window resize
         window.addEventListener('resize', equalizeHeights);
 
+        // The reference card's real height isn't known until its chart data
+        // arrives via AJAX (myDoughnutChartPayroll / getPayrollComparison,
+        // both load after this script runs) — the one-shot equalizeHeights()
+        // call above captured too-small a height before either chart grew
+        // the card, and nothing re-ran it afterwards (only 'resize' did),
+        // leaving Payroll Distributions/WAI Insight's stuck short with a
+        // visible empty gap. A ResizeObserver keeps them in sync regardless
+        // of when the reference card's content finishes loading.
+        const referenceCardEl = document.getElementById('card-salaryCalc');
+        if (referenceCardEl && window.ResizeObserver) {
+            new ResizeObserver(equalizeHeights).observe(referenceCardEl);
+        }
+
       
     });
 

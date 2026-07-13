@@ -2617,6 +2617,39 @@
                 }
             });
         });
+        // Basic Salary vs budgeted-salary cap can be entered in a different
+        // currency than the cap itself (Currency dropdown is independent of
+        // the vacancy's own budgeted-salary currency) — convert to the same
+        // currency before comparing. Only DollertoMVR is stored anywhere in
+        // this app; MVR->USD divides by it, USD->MVR multiplies by it, never
+        // the inverse.
+        function convertSalaryToCurrency(amount, fromCurrency, toCurrency, rate) {
+            if (!amount || fromCurrency === toCurrency) return amount;
+            if (fromCurrency === 'USD' && toCurrency === 'MVR') return amount * rate;
+            if (fromCurrency === 'MVR' && toCurrency === 'USD') return amount / rate;
+            return amount;
+        }
+
+        function checkSalaryOverBudget() {
+            var $form = $('#salaryAllocationForm');
+            var basicSalary = parseFloat($form.find('#salaryAllocationBasicSalary').val());
+            var maxSalary = parseFloat($form.find('#maxBudgetedSalary').val());
+            var maxCurrency = $form.find('#maxBudgetedSalaryCurrency').val();
+            var enteredCurrency = $form.find('#salaryAllocationCurrency').val();
+            var rate = parseFloat($form.find('#dollerToMvrRate').val()) || 15.42;
+
+            var basicSalaryInMaxCurrency = convertSalaryToCurrency(basicSalary, enteredCurrency, maxCurrency, rate);
+            var isOverBudget = maxSalary > 0 && basicSalaryInMaxCurrency > maxSalary;
+
+            $form.find('#salaryAllocationBasicSalary').toggleClass('is-invalid border-danger', isOverBudget);
+            $form.find('#salaryOverBudgetWarning').toggleClass('d-none', !isOverBudget);
+
+            return isOverBudget;
+        }
+
+        $(document).on('input', '#salaryAllocationBasicSalary', checkSalaryOverBudget);
+        $(document).on('change', '#salaryAllocationCurrency', checkSalaryOverBudget);
+
         // Save Salary Allocation
         $(document).on("click", ".saveSalaryAllocation", function() {
             var $btn = $(this);
@@ -2629,7 +2662,7 @@
                 return;
             }
 
-            if (maxSalary > 0 && basicSalary > maxSalary) {
+            if (checkSalaryOverBudget()) {
                 toastr.error("Basic salary cannot exceed budgeted salary of " + maxSalary.toFixed(2) + ".", "Error", { positionClass: 'toast-bottom-right' });
                 return;
             }

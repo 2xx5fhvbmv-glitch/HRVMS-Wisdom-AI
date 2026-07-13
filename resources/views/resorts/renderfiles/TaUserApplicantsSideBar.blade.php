@@ -924,17 +924,27 @@
                         $maxSalary = $Applicant_form_data->vacancy_budgeted_salary ?? 0;
                         $maxAllowance = $Applicant_form_data->vacancy_allowance ?? 0;
                         $vacancyCurrency = $Applicant_form_data->vacancy_currency ?? 'USD';
+                        // The Basic Salary input lets HR pick USD or MVR independently of
+                        // the vacancy's own budgeted-salary currency, but the over-budget
+                        // check compared the two raw numbers with no conversion (e.g. USD
+                        // 8000 vs a MVR 6,500 cap — apples to oranges). Same derive-don't-
+                        // invert FX rule used everywhere else in this app: only
+                        // DollertoMVR is stored; MVR->USD divides by it, USD->MVR
+                        // multiplies by it.
+                        $dollerToMvrRate = \App\Models\ResortSiteSettings::where('resort_id', $Applicant_form_data->resort_id)->value('DollertoMVR') ?: 15.42;
                     @endphp
                     <form id="salaryAllocationForm">
                         <input type="hidden" name="applicant_id" value="{{ base64_encode($Applicant_form_data->ApplicantID) }}">
                         <input type="hidden" id="maxBudgetedSalary" value="{{ $maxSalary }}">
+                        <input type="hidden" id="maxBudgetedSalaryCurrency" value="{{ $vacancyCurrency }}">
+                        <input type="hidden" id="dollerToMvrRate" value="{{ $dollerToMvrRate }}">
                         <div class="table-responsive">
                             <table class="table table-lable table-bordered mb-0">
                                 <tbody>
                                     <tr>
                                         <th>Currency</th>
                                         <td>
-                                            <select name="currency" class="form-control form-control-sm" {{ !$isHrDepartment ? 'disabled' : '' }}>
+                                            <select name="currency" id="salaryAllocationCurrency" class="form-control form-control-sm" {{ !$isHrDepartment ? 'disabled' : '' }}>
                                                 <option value="USD" {{ (isset($salaryAllocation) && $salaryAllocation && $salaryAllocation->currency == 'USD') ? 'selected' : '' }}>USD</option>
                                                 <option value="MVR" {{ (isset($salaryAllocation) && $salaryAllocation && $salaryAllocation->currency == 'MVR') ? 'selected' : '' }}>MVR</option>
                                             </select>
@@ -943,10 +953,11 @@
                                     <tr>
                                         <th>Basic Salary <span class="text-danger">*</span></th>
                                         <td>
-                                            <input type="number" step="0.01" min="0" max="{{ $maxSalary }}" name="basic_salary" class="form-control form-control-sm"
+                                            <input type="number" step="0.01" min="0" max="{{ $maxSalary }}" name="basic_salary" id="salaryAllocationBasicSalary" class="form-control form-control-sm"
                                                 value="{{ isset($salaryAllocation) && $salaryAllocation ? $salaryAllocation->basic_salary : '' }}"
                                                 placeholder="Enter basic salary" {{ !$isHrDepartment ? 'disabled' : '' }}>
                                             <small class="text-muted">Max: {{ $vacancyCurrency }} {{ number_format($maxSalary, 2) }}</small>
+                                            <small class="text-danger d-none" id="salaryOverBudgetWarning">This exceeds the budgeted salary of {{ $vacancyCurrency }} {{ number_format($maxSalary, 2) }}.</small>
                                         </td>
                                     </tr>
                                 </tbody>

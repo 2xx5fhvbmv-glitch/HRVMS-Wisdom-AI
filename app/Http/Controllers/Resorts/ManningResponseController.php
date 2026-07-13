@@ -355,6 +355,17 @@ class ManningResponseController extends Controller
         if (isset($data['dept_id']) && !empty($data))
         {
             $dept_id = $data['dept_id'];
+
+            // dept_id came straight from the client payload with no check —
+            // any HOD/XCOM could request another department's full
+            // budget/position/salary breakdown by passing an arbitrary
+            // dept_id (IDOR). Enforce the same department scope every other
+            // list in this app uses.
+            $scopedDeptIds = Common::getScopedDepartmentIds();
+            if (is_array($scopedDeptIds) && !in_array((int) $dept_id, $scopedDeptIds, true)) {
+                return response()->json(['success' => false, 'message' => 'You do not have access to this department.'], 403);
+            }
+
             $positionMonthlyDataIds = $data['position_monthly_data_id'];
             $Budget_id = $data['manning_response_id'];
             $Message_id = $data['Message_id'];

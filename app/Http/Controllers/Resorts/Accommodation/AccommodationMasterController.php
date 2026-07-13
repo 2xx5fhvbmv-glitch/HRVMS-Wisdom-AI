@@ -40,11 +40,18 @@ class AccommodationMasterController extends Controller
         $page_title ="Accommodation Master";
 
 
-        $BuildingModel = BuildingModel::join('bulidng_and_floor_and_rooms as t1', 't1.building_id', '=', 'building_models.id')
-        ->where("building_models.resort_id", $this->resort->resort_id)
-        ->groupBy('building_models.id','building_models.id')
-        ->get(['building_models.*',DB::RAW('Count(t1.building_id) as TotalRoom')])
+        $BuildingModel = BuildingModel::where("building_models.resort_id", $this->resort->resort_id)
+        ->get()
         ->map(function ($building) {
+            // TotalRoom must count actual room records (available_accommodation_models),
+            // not rows in bulidng_and_floor_and_rooms — that table is a floor/room
+            // layout-config list (can have stale/unused slots never turned into a
+            // real room), so it previously overcounted (e.g. showing 8 rooms for a
+            // building that only has 1 real room, which is what BedCapacity/Rooms
+            // Available/etc. below all correctly key off of).
+            $building->TotalRoom = AvailableAccommodationModel::where('resort_id', $this->resort->resort_id)
+                                        ->where('BuildingName', $building->id)
+                                        ->count();
 
 
 
@@ -637,11 +644,18 @@ class AccommodationMasterController extends Controller
         //                         return $i;
         //                 });
 
-        $BuildingModel = BuildingModel::join('bulidng_and_floor_and_rooms as t1', 't1.building_id', '=', 'building_models.id')
-        ->where("building_models.resort_id", $this->resort->resort_id)
-        ->groupBy('building_models.id','building_models.id')
-        ->get(['building_models.*',DB::RAW('Count(t1.building_id) as TotalRoom')])
+        $BuildingModel = BuildingModel::where("building_models.resort_id", $this->resort->resort_id)
+        ->get()
         ->map(function ($building) {
+            // TotalRoom must count actual room records (available_accommodation_models),
+            // not rows in bulidng_and_floor_and_rooms — that table is a floor/room
+            // layout-config list (can have stale/unused slots never turned into a
+            // real room), so it previously overcounted (e.g. showing 8 rooms for a
+            // building that only has 1 real room, which is what BedCapacity/Rooms
+            // Available/etc. below all correctly key off of).
+            $building->TotalRoom = AvailableAccommodationModel::where('resort_id', $this->resort->resort_id)
+                                        ->where('BuildingName', $building->id)
+                                        ->count();
 
 
 
@@ -768,7 +782,10 @@ class AccommodationMasterController extends Controller
                 })
                 ->editColumn('BedCapacity', fn($row) => e($row->Capacity ?? 0))
                 ->editColumn('Action', function ($row) use ($edit_class){
-                    if (($row->Capacity!= 0 && $row->Capacity !=$row->AssingAccommodationCount) == true)
+                    // AssingAccommodationCount is the FREE/unassigned bed count
+                    // (see comment above where it's computed) — only show Assign
+                    // when at least one bed is actually free.
+                    if ($row->Capacity != 0 && $row->AssingAccommodationCount > 0)
                     {
                      return'<a href="javascript:void(0)" class="btn btn-themeSkyblueLight AssingToRoom btn-small '.$edit_class.'" data-id="'.$row->available_a_id.'" data-RoomType="'.$row->RoomType_id.'">Assign</a>';
                     }
