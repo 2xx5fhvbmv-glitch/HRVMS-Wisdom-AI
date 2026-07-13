@@ -32,6 +32,8 @@ use App\Events\ResortNotificationEvent;
 use App\Models\ManningandbudgetingConfigfiles;
 use App\Models\EmployeeManningAndBudgeting;
 use App\Models\EmployeeManningAndBudgetingConfig;
+use App\Models\ResortTransportation;
+use App\Models\EmployeeTravelQuota;
 use Auth;
 use App\Models\ResortSiteSettings;
 use Hash;
@@ -1298,7 +1300,28 @@ class EmployeeController extends Controller
         // instead of only the manually-uploaded employees_documents rows.
         $xpatExpiries = $this->getXpatExpiries($employee->id, $resort_id);
 
-        return view('resorts.people.employee.detail',compact('page_title','conversionRate','teams','roles','resort_id','resort_divisions','employee','departments','positions','remianing_leaves','nationality','benefitGrids','sections','costs','emp_benigit_grid','resort_allowances','airports','recentActivities','xpatExpiries'));
+        // Travel Quota tab: per-employee total_allowed per transportation
+        // category the resort has enabled (resort_transportations), plus
+        // this year's approved usage — same "Approved" + current-year-window
+        // recipe leaveDashboard() uses for leave-balance usage, so the web
+        // tab and the mobile API agree on what "used" means.
+        $transportationOptions = ResortTransportation::where('resort_id', $resort_id)->get();
+        $travelQuotas = EmployeeTravelQuota::where('employee_id', $employee->id)->get()->keyBy('transportation');
+        $travelYearStart = Carbon::now()->startOfYear()->format('Y-m-d');
+        $travelYearEnd = Carbon::now()->endOfYear()->format('Y-m-d');
+        $travelUsage = DB::table('employee_travel_passes')
+            ->select('transportation', DB::raw('COUNT(*) as used_count'))
+            ->where('employee_id', $employee->id)
+            ->where('status', 'Approved')
+            ->where(function ($q) use ($travelYearStart, $travelYearEnd) {
+                $q->whereBetween('arrival_date', [$travelYearStart, $travelYearEnd])
+                  ->orWhereBetween('departure_date', [$travelYearStart, $travelYearEnd]);
+            })
+            ->groupBy('transportation')
+            ->get()
+            ->keyBy('transportation');
+
+        return view('resorts.people.employee.detail',compact('page_title','conversionRate','teams','roles','resort_id','resort_divisions','employee','departments','positions','remianing_leaves','nationality','benefitGrids','sections','costs','emp_benigit_grid','resort_allowances','airports','recentActivities','xpatExpiries','transportationOptions','travelQuotas','travelUsage'));
     }
 
     /**
@@ -2270,6 +2293,31 @@ class EmployeeController extends Controller
         }
 
         return response()->json(['success' => true, 'message' => 'Documents updated successfully.']);
+    }
+
+    public function updateTravelQuota(Request $request)
+    {
+        $employeeId = $request->employee_id;
+        $transportationIds = $request->transportation_ids;
+        if (empty($employeeId) || empty($transportationIds)) {
+            return response()->json(['success' => false, 'message' => 'No travel quota provided.'], 501);
+        }
+        $totalAllowed = $request->total_allowed;
+        $resortId = $this->resort->resort_id;
+
+        $employee = Employee::where('id', $employeeId)->where('resort_id', $resortId)->first();
+        if (!$employee) {
+            return response()->json(['success' => false, 'message' => 'Employee not found.'], 501);
+        }
+
+        foreach ($transportationIds as $index => $transportationId) {
+            EmployeeTravelQuota::updateOrCreate(
+                ['employee_id' => $employeeId, 'transportation' => $transportationId],
+                ['resort_id' => $resortId, 'total_allowed' => (int) ($totalAllowed[$index] ?? 0)]
+            );
+        }
+
+        return response()->json(['success' => true, 'message' => 'Travel quota updated successfully.']);
     }
 
 

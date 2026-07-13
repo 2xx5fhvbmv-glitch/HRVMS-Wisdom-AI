@@ -1515,6 +1515,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
        Route::post('/people/employee/update-experiance/{id}', 'People\Employee\EmployeeController@updateExperianceDetails')->name('employee.update.expDetails');
        Route::post('/people/employee/add-experiance', 'People\Employee\EmployeeController@addExperianceDetails')->name('employee.store.expDetails');
        Route::post('/people/employee/update-expiry-doc-details', 'People\Employee\EmployeeController@updateExpiryDocuments')->name('employee.update.expiryDocuments');
+       Route::post('/people/employee/update-travel-quota', 'People\Employee\EmployeeController@updateTravelQuota')->name('employee.update.travelQuota');
       Route::post('/people/employee/add-bank-details', 'People\Employee\EmployeeController@addBankDetails')->name('employee.store.bankDetails');
        Route::post('/people/employee/update-bank-details/{id}', 'People\Employee\EmployeeController@updateBankDetails')->name('employee.update.bankDetails');
    

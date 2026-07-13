@@ -71,7 +71,10 @@ class EmployeeDocumentController extends Controller
                     }
                 }
 
-                $employeesDoc->document_path = $filePath ? json_encode($filePath) : null; // Save relative file path
+                // Store the file-management reference (Child_id), not a raw path —
+                // getEmployeeDocument() resolves this to a signed URL via
+                // Common::GetAWSFile(), same pattern as IncidentController.
+                $employeesDoc->document_path = $filePath ? json_encode($filePath) : null;
             }
             // Save updated file paths
             $employeesDoc->save();
@@ -120,11 +123,26 @@ class EmployeeDocumentController extends Controller
                 return response()->json(['success' => false, 'message' => 'No documents found'], 200);
             }
 
-             // Append base URL to document_path
-            $baseUrl = url('/'); // Get the base URL of the application
-
+            // document_path stores a file-management reference
+            // ({"Filename":..,"Child_id":..}), not a raw path — resolve each
+            // to a real signed URL via Common::GetAWSFile(), same pattern as
+            // IncidentController::resolveAttachmentUrls(). Older rows that
+            // predate this format (plain text, e.g. stray HTML page titles)
+            // have no Child_id and resolve to null instead of crashing.
             foreach ($employeesDoc as $doc) {
-                $doc->document_path = $baseUrl . '/' . $doc->document_path;
+                $decoded = json_decode((string) $doc->document_path, true);
+                $childId = is_array($decoded) ? ($decoded['Child_id'] ?? null) : null;
+                $doc->document_path = null;
+                if (!empty($childId)) {
+                    try {
+                        $aws = Common::GetAWSFile($childId, $resortId);
+                        if (!empty($aws['success'])) {
+                            $doc->document_path = $aws['NewURLshow'];
+                        }
+                    } catch (\Throwable $e) {
+                        // Leave document_path null for entries that fail to resolve.
+                    }
+                }
             }
 
             // Return the documents

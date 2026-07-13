@@ -102,30 +102,36 @@ class SOSController extends Controller
                 'emergency_description'                 =>  $request->emergency_description,
             ]);
 
-            $smEmployee                                 =   Employee::join('resort_positions as rp', 'employees.Position_id', '=', 'rp.id')
+            $smEmployeeModel                            =   Employee::join('resort_positions as rp', 'employees.Position_id', '=', 'rp.id')
                                                                 ->where('employees.resort_id', $this->resort_id)
                                                                 ->where('employees.rank',4)
                                                                 ->where('employees.status', 'Active')
                                                                 ->where('rp.position_title', 'Security Manager')
                                                                 ->select('employees.id','employees.Admin_Parent_id','employees.Emp_id','employees.Position_id','employees.device_token')
-                                                                ->first()
-                                                                ->toArray();
+                                                                ->first();
+            $smEmployee                                 =   $smEmployeeModel ? $smEmployeeModel->toArray() : null;
 
-            $deviceToken                                =   $smEmployee['device_token'];
-            $title                                      =   "SOS Alert";
-            $body                                       =   "SOS Alert!\n"
-                                                            . "Name: " . $this->user->first_name . ' ' . $this->user->last_name . "\n"
-                                                            . "Date: " . Carbon::now()->format('d M Y') . "\n"
-                                                            . "Time: " . Carbon::now()->format('h:i A') . "\n"
-                                                            . "Location: " . $request->location . "\n"
-                                                            . "Please respond immediately!";
+            // No active Security Manager configured for this resort — the SOS
+            // record itself is still saved; just skip the push/notification
+            // step instead of crashing the whole request.
+            if ($smEmployee) {
+                $title                                      =   "SOS Alert";
+                $body                                       =   "SOS Alert!\n"
+                                                                . "Name: " . $this->user->first_name . ' ' . $this->user->last_name . "\n"
+                                                                . "Date: " . Carbon::now()->format('d M Y') . "\n"
+                                                                . "Time: " . Carbon::now()->format('h:i A') . "\n"
+                                                                . "Location: " . $request->location . "\n"
+                                                                . "Please respond immediately!";
 
-            $moduleName                                 =   'SOS';
-            $sound                                      =   'siren_sound';
-            $custom_sound_channel                       =   'custom_sound_channel';
-            $sosPushNotification                        =   Common::sendPushNotificationForMobile([$smEmployee['device_token']], $title, $body, $moduleName,'Pending',$sound,$custom_sound_channel,NULL);
+                $moduleName                                 =   'SOS';
+                $sound                                      =   'siren_sound';
+                $custom_sound_channel                       =   'custom_sound_channel';
+                $sosPushNotification                        =   Common::sendPushNotificationForMobile([$smEmployee['device_token']], $title, $body, $moduleName,'Pending',$sound,$custom_sound_channel,NULL);
 
-            $sosNotification                            =   Common::sendMobileNotification($this->resort_id,2,null,null,$title,$body,$moduleName,[$smEmployee['id']],null);
+                $sosNotification                            =   Common::sendMobileNotification($this->resort_id,2,null,null,$title,$body,$moduleName,[$smEmployee['id']],null);
+            } else {
+                \Log::warning("SOSStore: no active Security Manager found for resort_id {$this->resort_id} — SOS #{$SOSHistoryAdd->id} saved without push notification.");
+            }
 
             // DB::commit();
             if (!$SOSHistoryAdd) {
