@@ -318,13 +318,16 @@ class FetchDataAiController extends Controller
         $visaIssued = $this->aiDate($fields['Visa Issued Date'] ?? null);
         if ($visaIssued) {
             $visaExpiry = $this->aiDate($fields['Visa Expiry Date'] ?? null);
+            if (!$visaExpiry) {
+                return $fail('Could not read the Visa Expiry Date from the document. Please upload a clearer scan.');
+            }
             $visaAmtCost = $ResortBudgetCost['VISA FEE'] ?? null;
             VisaRenewal::create([
                 'resort_id'   => $resortId,
                 'employee_id' => $employee->id,
                 'WP_No'       => $fields['Work Permit Number'] ?? null,
                 'start_date'  => $visaIssued->format('Y-m-d'),
-                'end_date'    => $visaExpiry ? $visaExpiry->format('Y-m-d') : null,
+                'end_date'    => $visaExpiry->format('Y-m-d'),
                 'Amt'         => $visaAmtCost['amount'] ?? 0.00,
             ]);
             $visaAmt = $visaAmtCost['amount'] ?? 0.00;
