@@ -172,17 +172,17 @@ class XpactEmployeeController extends Controller
                    return $row->Emp_id;
                 })
                 ->editColumn('EmployeeName', function ($row) {
-                  return $row->resortAdmin->first_name . ' ' . $row->resortAdmin->last_name;
+                  return $row->resortAdmin ? $row->resortAdmin->first_name . ' ' . $row->resortAdmin->last_name : 'N/A';
                 })
                 ->addColumn('Nationality', function ($row) {
                     return $row->nationality ?: 'N/A';
                 })
                 ->editColumn('position', function ($row) {
-                     return $row->position->position_title ;
+                     return $row->position->position_title ?? 'N/A';
                 })
-                ->editColumn('department', function ($row) 
+                ->editColumn('department', function ($row)
                 {
-                    return $row->department->name;
+                    return $row->department->name ?? 'N/A';
                 })
                 ->editColumn('JoiningDate', function ($row) 
                 {
