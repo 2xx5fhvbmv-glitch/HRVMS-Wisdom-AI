@@ -130,6 +130,11 @@ class OpenRouterDocExtractor
             . '"Visa Expiry On", "Visa Issued On", "Issued On" or "Arrived On"; those are separate '
             . 'fields that are commonly confused with it. Read the value next to the literal "Expiry '
             . 'On" label only — do NOT just pick the latest date on the page. '
+            . 'IMPORTANT for "Visa Issued Date" and "Visa Expiry Date": many Expat System work-permit '
+            . 'cards have no separate visa section at all — just one "Issued On" and one "Expiry On" '
+            . 'for the whole permit. When there is no distinct visa section, use that SAME "Issued On" '
+            . 'date for "Visa Issued Date" and that SAME "Expiry On" date for "Visa Expiry Date" — do '
+            . 'not leave them "Unavailable" just because there is no separate visa label. '
             . 'Return every date exactly as printed on the document. Output ONLY the JSON object.';
     }
 

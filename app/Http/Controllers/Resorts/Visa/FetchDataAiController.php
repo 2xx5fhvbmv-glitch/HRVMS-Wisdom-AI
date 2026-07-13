@@ -317,7 +317,12 @@ class FetchDataAiController extends Controller
 
         $visaIssued = $this->aiDate($fields['Visa Issued Date'] ?? null);
         if ($visaIssued) {
-            $visaExpiry = $this->aiDate($fields['Visa Expiry Date'] ?? null);
+            // Many Expat System work-permit cards have no separate visa section —
+            // just one Issued On/Expiry On for the whole permit. When the AI
+            // couldn't find a distinct "Visa Expiry Date", fall back to the same
+            // Work Permit expiry the card actually shows, rather than failing.
+            $visaExpiry = $this->aiDate($fields['Visa Expiry Date'] ?? null)
+                ?? $this->aiDate($fields['Work Permit Expiry Date (Expiry On)'] ?? null);
             if (!$visaExpiry) {
                 return $fail('Could not read the Visa Expiry Date from the document. Please upload a clearer scan.');
             }
