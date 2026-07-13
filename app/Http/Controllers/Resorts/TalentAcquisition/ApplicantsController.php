@@ -8,6 +8,7 @@ use Auth;
 use Validator;
 use Carbon\Carbon;
 use App\Models\Resort;
+use App\Models\ResortSiteSettings;
 use App\Helpers\Common;
 use App\Models\Employee;
 use App\Models\Vacancies;
@@ -2220,6 +2221,17 @@ class ApplicantsController extends Controller
             ->where('applicant_form_data.resort_id', $resort_id)
             ->orderBy('applicant_form_data.id', 'desc');
 
+        // The department filter below (t5.dept_id) was entirely optional and
+        // client-supplied — a non-HR/GM user could just omit ResortDepartment
+        // (or the UI's hidden-input lock could be bypassed) and see every
+        // department's candidates. Enforce the same server-side department
+        // scope every other list in this app uses; the client filter still
+        // narrows further within whatever scope is allowed.
+        $scopedDeptIds = Common::getScopedDepartmentIds();
+        if (is_array($scopedDeptIds)) {
+            $Applicant_form_data1->whereIn('t5.dept_id', $scopedDeptIds);
+        }
+
         // Apply filters
         if (!empty($searchTerm)) {
             $Applicant_form_data1->where(function ($query) use ($searchTerm) {
@@ -2431,6 +2443,13 @@ class ApplicantsController extends Controller
         ->whereIn('t1.status', ['Rejected','Rejected By Wisdom AI'])
         ->where('applicant_form_data.resort_id', $resort_id)
         ->orderBy('applicant_form_data.id', 'desc');
+
+        // Same missing server-side scoping as TalentPool() above — this is the
+        // AJAX grid-refresh counterpart of that page and had the identical gap.
+        $scopedDeptIds = Common::getScopedDepartmentIds();
+        if (is_array($scopedDeptIds)) {
+            $Applicant_form_data1->whereIn('t5.dept_id', $scopedDeptIds);
+        }
 
         if (!empty($searchTerm)) {
             $Applicant_form_data1->where(function ($query) use ($searchTerm) {
@@ -3224,19 +3243,35 @@ class ApplicantsController extends Controller
         $applicant = Applicant_form_data::leftJoin('vacancies as v', 'v.id', '=', 'applicant_form_data.Parent_v_id')
             ->leftJoin('resort_positions as p', 'p.id', '=', 'v.position')
             ->where('applicant_form_data.id', $applicantId)
-            ->first(['applicant_form_data.id', 'p.id as position_id', 'p.dept_id', 'v.budgeted_salary', 'v.allowance as vacancy_allowance']);
+            ->first(['applicant_form_data.id', 'p.id as position_id', 'p.dept_id', 'v.budgeted_salary', 'v.allowance as vacancy_allowance', 'v.amount_unit as vacancy_currency']);
 
         if (!$applicant) {
             return response()->json(['success' => false, 'message' => 'Applicant not found.'], 404);
         }
 
-        // Validate salary does not exceed budgeted salary
+        // Validate salary does not exceed budgeted salary. The entered
+        // currency (request->currency) is independent of the vacancy's own
+        // budgeted-salary currency (vacancy_currency) — comparing the raw
+        // numbers without converting let e.g. a USD 8000 entry pass against
+        // a MVR 6,500 cap. Same derive-don't-invert FX rule as the rest of
+        // this app: only DollertoMVR is stored.
         $basicSalary = (float)($request->basic_salary ?? 0);
         if ($basicSalary < 0) {
             return response()->json(['success' => false, 'message' => 'Salary cannot be negative.'], 422);
         }
-        if ($applicant->budgeted_salary > 0 && $basicSalary > (float)$applicant->budgeted_salary) {
-            return response()->json(['success' => false, 'message' => 'Basic salary cannot exceed budgeted salary of ' . number_format($applicant->budgeted_salary, 2) . '.'], 422);
+        $enteredCurrency = $request->currency ?? 'USD';
+        $vacancyCurrency = $applicant->vacancy_currency ?? 'USD';
+        $basicSalaryInVacancyCurrency = $basicSalary;
+        if ($basicSalary > 0 && $enteredCurrency !== $vacancyCurrency) {
+            $dollerToMvrRate = ResortSiteSettings::where('resort_id', $resortId)->value('DollertoMVR') ?: 15.42;
+            if ($enteredCurrency === 'USD' && $vacancyCurrency === 'MVR') {
+                $basicSalaryInVacancyCurrency = $basicSalary * $dollerToMvrRate;
+            } elseif ($enteredCurrency === 'MVR' && $vacancyCurrency === 'USD') {
+                $basicSalaryInVacancyCurrency = $basicSalary / $dollerToMvrRate;
+            }
+        }
+        if ($applicant->budgeted_salary > 0 && $basicSalaryInVacancyCurrency > (float)$applicant->budgeted_salary) {
+            return response()->json(['success' => false, 'message' => 'Basic salary cannot exceed budgeted salary of ' . $vacancyCurrency . ' ' . number_format($applicant->budgeted_salary, 2) . '.'], 422);
         }
 
         $allowances = [];

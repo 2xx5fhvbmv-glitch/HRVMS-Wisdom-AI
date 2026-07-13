@@ -880,9 +880,14 @@ class VacancyController extends Controller
                 ->where('Resort_id', $this->resort->resort_id)
                 ->where('status', 'Active');
 
-            // HOD (rank 2): only their department; EXCOM (rank 1): all departments
-            if($rank == 2) {
-                $query->where('department', $this->resort->GetEmployee->Dept_id);
+            // EXCOM (rank 1) was unconditionally given all-department access
+            // here, but Common::hasFullDataAccess() only grants EXCOM that
+            // when they're in the HR department — an EXCOM in any other
+            // department (e.g. Engineering) should be scoped to their own
+            // department same as a HOD, which this let slip through.
+            $scopedDeptIds = Common::getScopedDepartmentIds();
+            if (is_array($scopedDeptIds)) {
+                $query->whereIn('department', $scopedDeptIds);
             }
 
             $Vacancies = $query->latest('created_at')

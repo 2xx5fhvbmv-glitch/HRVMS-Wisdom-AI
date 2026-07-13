@@ -27,7 +27,14 @@
                             <h6>{{ $employee->first_name }} {{ $employee->last_name }}</h6>
                         </div>
                     </td>
-                    <td>{{ $employee->rank }}</td>
+                    @php
+                        // Initial page load maps rank -> label (hoddashboard.blade.php),
+                        // but this AJAX-refreshed partial (year dropdown) never did,
+                        // so switching years showed raw numbers instead of HOD/XCOM/GM/etc.
+                        $RankLabels = config('settings.Position_Rank');
+                        $RankLabel = array_key_exists($employee->rank, $RankLabels) ? $RankLabels[$employee->rank] : $employee->rank;
+                    @endphp
+                    <td>{{ $RankLabel }}</td>
                     <td>{{ $employee->nationality }}</td>
                     <td></td>
                 </tr>

@@ -35,6 +35,42 @@ class TimeAndAttendanceController extends Controller
         $this->middleware('auth:api');
     }
 
+    /**
+     * Resolve a punch's GPS location against the duty roster's configured
+     * geofence zone (resort_geofences via duty_rosters.geofence_zone_id).
+     * Purely local math (Haversine / point-in-polygon), no external Maps
+     * API call. Returns null values (not a hard rejection) when there's no
+     * geofence configured for this roster, or the location payload isn't
+     * structured lat/lng — this doesn't block the punch, it just records
+     * whether it could be verified, for HR to review.
+     */
+    private function resolveGeofenceCheck($locationRaw, $rosterData): array
+    {
+        $result = ['lat' => null, 'lng' => null, 'accuracy' => null, 'within' => null];
+
+        $coords = is_array($locationRaw) ? $locationRaw : null;
+        if (!$coords) return $result;
+
+        $lat = $coords['latitude'] ?? $coords['lat'] ?? null;
+        $lng = $coords['longitude'] ?? $coords['lng'] ?? null;
+        if ($lat === null || $lng === null) return $result;
+
+        $result['lat'] = (float) $lat;
+        $result['lng'] = (float) $lng;
+        $result['accuracy'] = isset($coords['accuracy']) ? (float) $coords['accuracy'] : null;
+
+        $geofenceZoneId = $rosterData->geofence_zone_id ?? null;
+        if (!$geofenceZoneId) return $result;
+
+        $geofence = \App\Models\ResortGeofence::where('id', $geofenceZoneId)
+            ->where('status', 'active')
+            ->first();
+        if (!$geofence) return $result;
+
+        $result['within'] = Common::isWithinGeofence($result['lat'], $result['lng'], $geofence);
+        return $result;
+    }
+
     public function timeAttendanceDashboard()
     {
         if (!Auth::guard('api')->check()) {
@@ -1245,6 +1281,9 @@ class TimeAndAttendanceController extends Controller
         $inTimeLocationRaw                                  =   $request->in_time_location;
         $inTimeLocation                                     =   is_array($inTimeLocationRaw) ? json_encode($inTimeLocationRaw) : (string)$inTimeLocationRaw;
         $flag                                               =   $request->flag;
+        // Resolved below (once $rosterData is looked up) and merged into
+        // every ChildAttendace::create() branch in this method.
+        $inTimeGeofence                                     =   ['lat' => null, 'lng' => null, 'accuracy' => null, 'within' => null];
 
         try {
             DB::beginTransaction(); // Start transaction
@@ -1257,6 +1296,7 @@ class TimeAndAttendanceController extends Controller
             $isSupervisorOrLineWorker                       =   in_array($employeeRank, ['5', '6']); // '5' => 'SUP', '6' => 'LINE WORKERS'
 
             $rosterData                                      =  DutyRoster::where('resort_id', $user->resort_id)->where('Emp_id', $emp_id)->first();
+            $inTimeGeofence                                 =   $this->resolveGeofenceCheck($inTimeLocationRaw, $rosterData);
             $timeAttendance                                 =   [];
             $childAttendace = null;
 
@@ -1334,7 +1374,11 @@ class TimeAndAttendanceController extends Controller
                             'Parent_attd_id'                        =>  $ParentAttendance->id,
                             'InTime_out'                            =>  $checkInTime,
                             'OutTime_out'                           =>  '00:00', // Default for check-in
-                            'InTime_Location'                       =>  $inTimeLocation
+                            'InTime_Location'                       =>  $inTimeLocation,
+                            'InTime_Latitude'                       =>  $inTimeGeofence['lat'],
+                            'InTime_Longitude'                      =>  $inTimeGeofence['lng'],
+                            'InTime_Accuracy'                       =>  $inTimeGeofence['accuracy'],
+                            'InTime_WithinGeofence'                 =>  $inTimeGeofence['within'],
                         ]);
                     } else {
                         // This else block should not be needed, but keeping for safety
@@ -1612,6 +1656,9 @@ class TimeAndAttendanceController extends Controller
                 return response()->json(['success' => false, 'message' => 'Attendance record not found'], 404);
             }
 
+            $outRosterData = $ParentAttendance->roster_id ? DutyRoster::find($ParentAttendance->roster_id) : null;
+            $outTimeGeofence = $this->resolveGeofenceCheck($request->out_time_location, $outRosterData);
+
             $childAttendace                                 =   ChildAttendace::where('Parent_attd_id', $attendaceId)->whereNotNull('InTime_out')->first();
             $breakData                                      =   BreakAttendaces::where('Parent_attd_id', $attendaceId)->get();
             $timeAttendance                                 =   [];
@@ -1661,6 +1708,10 @@ class TimeAndAttendanceController extends Controller
                 if ($childAttendace) {
                     $childAttendace->OutTime_out            =   $request->current_time;
                     $childAttendace->OutTime_Location       =   $outTimeLocation;
+                    $childAttendace->OutTime_Latitude       =   $outTimeGeofence['lat'];
+                    $childAttendace->OutTime_Longitude      =   $outTimeGeofence['lng'];
+                    $childAttendace->OutTime_Accuracy       =   $outTimeGeofence['accuracy'];
+                    $childAttendace->OutTime_WithinGeofence =   $outTimeGeofence['within'];
                     $childAttendace->save();
                 }
 

@@ -4067,6 +4067,10 @@ border-color: #ddd; */
     height: 80px;
     min-width: 80px;
     margin-right: 20px;
+    /* Without this, a long name + status badge in the flex-wrapped
+       sibling <h4> can compress this photo on a narrow sidebar panel,
+       visually overlapping it with the text. */
+    flex-shrink: 0;
 }
 
 .userApplicants-title h4,

@@ -224,7 +224,43 @@ class ResortAllNotificationController extends Controller
                     'message_id'=>  $ManningPendingRequest->message_id,
                     'reminder_message_subject'=>$ManningReminderRequest,
                 ]);
-                event( new ResortNotificationEvent( Common::nofitication($resort_id,$this->type[2],$ManningPendingRequest->message_id)));
+                $notificationPayload = Common::nofitication($resort_id,$this->type[2],$ManningPendingRequest->message_id);
+                event( new ResortNotificationEvent( $notificationPayload));
+
+                // The broadcast above only reaches HODs who are actively on
+                // the page at this exact moment (Pusher real-time, no
+                // persistent row) — unlike the type==1 admin-notice path
+                // (Common::fanOutAdminNotice), so a HOD who wasn't online
+                // when this fired never saw the reminder at all. Write a
+                // persistent bell-list row per pending department's HOD too.
+                $pendingDeptIds = $notificationPayload['PendingDepartment_id'] ?? [];
+                if (!empty($pendingDeptIds)) {
+                    $hods = Employee::where('resort_id', $resort_id)
+                        ->where('status', 'Active')
+                        ->where('rank', 2)
+                        ->whereIn('Dept_id', $pendingDeptIds)
+                        ->pluck('id');
+
+                    foreach ($hods as $hodId) {
+                        $alreadyNotified = ResortNotification::where('request_id', $ManningPendingRequest->message_id)
+                            ->where('user_id', $hodId)
+                            ->where('module', 'Manning Reminder')
+                            ->exists();
+                        if ($alreadyNotified) continue;
+
+                        Common::sendMobileNotification(
+                            $resort_id,
+                            1,
+                            null,
+                            null,
+                            'Manning Request Reminder',
+                            $ManningReminderRequest,
+                            'Manning Reminder',
+                            [$hodId],
+                            $ManningPendingRequest->message_id
+                        );
+                    }
+                }
             }
             else
             {

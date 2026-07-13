@@ -125,16 +125,26 @@ $(document).ready(function () {
   });
   
   
-  $('.carosel-menu').slick({
-    variableWidth: true,
-    slidesToShow: 1,
-    infinite: true,
-    slidesToScroll: 3,
-    initialSlide: activeIndex >= 0 ? activeIndex : 0,
-    dots: false,
-    focusOnSelect: false,
-    swap:true
-  });
+  // The real nav menu HTML is injected later via AJAX (loadMenu() in
+  // js.blade.php), which then conditionally slick-inits it itself
+  // (emnurend(), only when slideCount > 3). This call ran unconditionally
+  // at document-ready — before the AJAX injection on a slow load, or
+  // racing/double-initializing on top of it on a fast one — corrupting
+  // Slick's internal click/arrow bindings, which is why the nav arrows
+  // only sometimes failed rather than always. Only init here if nothing
+  // has claimed this element yet.
+  if ($('.carosel-menu').length && !$('.carosel-menu').hasClass('slick-initialized')) {
+    $('.carosel-menu').slick({
+      variableWidth: true,
+      slidesToShow: 1,
+      infinite: true,
+      slidesToScroll: 3,
+      initialSlide: activeIndex >= 0 ? activeIndex : 0,
+      dots: false,
+      focusOnSelect: false,
+      swap:true
+    });
+  }
 
 // Handle active class toggle
 function updateActiveClasses() {

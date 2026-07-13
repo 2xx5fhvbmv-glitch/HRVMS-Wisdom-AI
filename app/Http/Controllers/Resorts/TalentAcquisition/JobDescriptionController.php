@@ -69,6 +69,14 @@ class JobDescriptionController extends Controller
             ->where('job_descriptions.Resort_id', $this->resort->resort_id)
             ->where("job_descriptions.compliance",$complianceStatus)
             ->orderBy('job_descriptions.id', 'DESC');
+            // No department scoping existed here at all — any TA user saw every
+            // department's job descriptions. Same pattern as everywhere else in
+            // this app: non-HR/GM/EXCOM-in-HR-dept users are restricted to their
+            // own department.
+            $scopedDeptIds = Common::getScopedDepartmentIds();
+            if (is_array($scopedDeptIds)) {
+                $JobDescription->whereIn('job_descriptions.Department_id', $scopedDeptIds);
+            }
             if ($searchTerm) {
                 $JobDescription->where(function($query) use ($searchTerm) {
                     $query->where('t2.name', 'like', "%$searchTerm%")
