@@ -49,8 +49,8 @@
                             </div>
                             <h6>{{$employee->resortAdmin->full_name}}</h6>
                             <span class="badge badge-white">#{{$employee->Emp_id}}</span>
-                            <p>{{$employee->position->position_title}}</p>
-                            <div class="position">{{$employee->department->name}}</div>
+                            <p>{{$employee->position->position_title ?? 'N/A'}}</p>
+                            <div class="position">{{$employee->department->name ?? 'N/A'}}</div>
                             {{-- Status badge.
                                  Previously a disabled <select>, which the
                                  browser rendered with a dropdown chevron even
