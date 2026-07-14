@@ -434,56 +434,73 @@ class IncidentController extends Controller
                 ], 200);
             }
 
-            $incidents =Incidents::where("resort_id", $this->resort_id)
+            // Was selecting only id/incident_id/incident_name/incident_date/
+            // status/priority — incident_time, location, category,
+            // subcategory, isWitness, description, attachements all exist on
+            // this same row (see AddIncident) but were never selected, so
+            // the mobile detail screen had nothing to display for them.
+            $incidents =Incidents::with(['categoryName','subcategoryName'])
+            ->where("resort_id", $this->resort_id)
             ->where('id',$incidentId)
             ->where('created_by',$this->user->id)
-            ->select(['id','incident_id','incident_name','incident_date','status','priority'])->get();
+            ->select(['id','incident_id','incident_name','incident_date','incident_time','location','category','subcategory','status','priority','isWitness'])
+            ->get()
+            ->map(function ($item) {
+                $item->category_name    = $item->categoryName->category_name ?? null;
+                $item->subcategory_name = $item->subcategoryName->subcategory_name ?? null;
+                unset($item->categoryName, $item->subcategoryName);
+                return $item;
+            });
 
-            $summary =Incidents::where('id',$incidentId)->where('created_by',$this->user->id)->select('description')->get();
+            // description came back as a Collection-of-one (`[{"description":".."}]`)
+            // instead of a plain string — that's the "formatting broken" complaint,
+            // it's not actually a text-formatting bug, it's a wrong data shape.
+            $summary = (string) ($incident->description ?? '');
 
-            $allEmployeeIds = [];
+            $victimIds    = parseIds($incident->victims);
+            $involvedIds  = parseIds($incident->involved_employees);
 
-                $victimIds= parseIds($incident->victims);
-                $involvedIds =  parseIds($incident->involved_employees);
-                $allEmployeeIds = array_merge($allEmployeeIds, $victimIds,$involvedIds);
+            // Witnesses and Involved Employees were merged into one flat id
+            // list with no role tag, then dumped under a single "participants"
+            // key — that's the mislabeled "Participants" section. Query and
+            // tag each group separately instead.
+            $witnessIds = [];
+            if ($incident->isWitness == 'Yes') {
+                // Was ->first() — silently dropped every witness past the
+                // first when an incident had more than one.
+                $witnessIds = IncidentsWitness::where('incident_id', $incidentId)
+                    ->pluck('witness_id')
+                    ->toArray();
+            }
 
-                if ($incident->isWitness == 'Yes') {
-                    $witnessId = Incidents::join('incidents_witness as iw','iw.incident_id','=','incidents.id')
-                                            ->where('resort_id',$this->resort_id)
-                                            ->where('incidents.id',$incidentId)
-                                            ->select('iw.witness_id')
-                                            ->first();
-                    $witnessId =  parseIds($witnessId);
-                    $allEmployeeIds = array_merge($allEmployeeIds, $witnessId);
-                }
-            
-            $allEmployeeIds = array_unique(array_filter($allEmployeeIds));
-
-            $participants=Employee::whereIn('employees.id', $allEmployeeIds)
-                        ->join('resort_admins as t1', "t1.id", "=", "employees.Admin_Parent_id")
-                        ->join('resort_positions as t2', "t2.id", "=", "employees.Position_id")
-                        ->select(['employees.id',
-                                    't1.first_name',
-                                    't1.last_name',
-                                    't2.code',
-                                    't2.position_title',
-                                    'employees.Admin_Parent_id as Parentid',
-                                ])
-                        ->get()
-                        ->map(function ($item) {
-                            $item->profile_picture = Common::getResortUserPicture($item->Parentid);
-                            unset($item->Parentid);
-                            return $item;
+            $employeeDetailsFor = function (array $ids) {
+                if (empty($ids)) return collect();
+                return Employee::whereIn('employees.id', $ids)
+                    ->join('resort_admins as t1', "t1.id", "=", "employees.Admin_Parent_id")
+                    ->join('resort_positions as t2', "t2.id", "=", "employees.Position_id")
+                    ->select(['employees.id',
+                                't1.first_name',
+                                't1.last_name',
+                                't2.code',
+                                't2.position_title',
+                                'employees.Admin_Parent_id as Parentid',
+                            ])
+                    ->get()
+                    ->map(function ($item) {
+                        $item->profile_picture = Common::getResortUserPicture($item->Parentid);
+                        unset($item->Parentid);
+                        return $item;
                     });
+            };
 
             $incidentData['incidents']             =   $incidents;
             $incidentData['summary']               =   $summary;
-            $incidentData['participants']          =   $participants;
+            $incidentData['victims']                =   $employeeDetailsFor($victimIds);
+            $incidentData['involved_employees']     =   $employeeDetailsFor($involvedIds);
+            $incidentData['witnesses']              =   $employeeDetailsFor($witnessIds);
 
             $attachments = json_decode($incident->attachements, true);
-            if (!empty($attachments)) {
-                $incidentData['findings']             =   $this->resolveAttachmentUrls($attachments);
-            }
+            $incidentData['attachments']           =   !empty($attachments) ? $this->resolveAttachmentUrls($attachments) : [];
 
             $meeting=IncidentsMeeting::where('incident_id', $incidentId)->first();
 

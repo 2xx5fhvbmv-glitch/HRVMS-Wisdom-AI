@@ -129,9 +129,6 @@ use Illuminate\Support\Facades\Route;
 			Route::post('timeandattendance/hod-view-duty-roster', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'hodViewDutyRoster']);
 			Route::get('timeandattendance/under-emp-hod', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'underEmpHOD']);
 			Route::get('timeandattendance/duty-roster-employee-list', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'dutyRosterEmployeeList']);
-			Route::get('timeandattendance/hod-mark-attendance', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'hodMarkAttendance']);
-			Route::post('timeandattendance/hod-mark-attendance', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'hodMarkAttendancePresent']);
-			Route::post('timeandattendance/hod-mark-attendance-present', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'hodMarkAttendancePresent']);
 			//Accommodation HOD
 			Route::post('accommodation/hod-housekeeping-dashboard', [App\Http\Controllers\API\AccommodationController::class, 'hodHouseKeepingDashboard']);
 			Route::post('accommodation/available-staff-underhod', [App\Http\Controllers\API\AccommodationController::class, 'availableStaffUnderHOD']);
@@ -147,6 +144,15 @@ use Illuminate\Support\Facades\Route;
 			//Boarding Pass
 			Route::get('boarding/boarding-hod-dashboard', [App\Http\Controllers\API\BoardingPassController::class, 'boardingHODDashboard']);
 
+		});
+
+		// Mark Attendance: GM needs the same access HOD already has here (GM
+		// wasn't in the HOD-only group above, so the app's GM login got
+		// "Forbidden: Insufficient rank" on every mark-attendance call).
+		Route::middleware(['auth:api', 'check.rank:HOD,EXCOM,GM'])->group(function () {
+			Route::get('timeandattendance/hod-mark-attendance', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'hodMarkAttendance']);
+			Route::post('timeandattendance/hod-mark-attendance', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'hodMarkAttendancePresent']);
+			Route::post('timeandattendance/hod-mark-attendance-present', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'hodMarkAttendancePresent']);
 		});
 
 
