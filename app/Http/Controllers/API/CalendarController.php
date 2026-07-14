@@ -254,23 +254,50 @@ class CalendarController extends Controller
                                                                         ->where('id', $emp_id)
                                                                         ->where('status', 'Active'),
 
-                'employee_visa_expiry'                          =>  Employee::with(['VisaRenewal.VisaChild'])
+                // VisaRenewal/EmployeeInsurance/WorkPermitMedicalRenewal are hasOne
+                // relations with no ordering — Eloquent just returned whatever row
+                // MySQL handed back first (often the oldest/most-recently-created,
+                // not the soonest future one), and could return an already-expired
+                // row when a newer future cycle existed. Constraining the eager
+                // load to "future-or-today, soonest first" makes the hasOne grab
+                // exactly the next upcoming occurrence.
+                'employee_visa_expiry'                          =>  Employee::with(['VisaRenewal' => function ($q) {
+                                                                        $q->where('end_date', '>=', now()->toDateString())
+                                                                          ->orderBy('end_date', 'asc');
+                                                                    }, 'VisaRenewal.VisaChild'])
                                                                     ->where("nationality", '!=', "Maldivian")
                                                                     ->where('id', $emp_id)
                                                                     ->where('resort_id', $this->resort_id),
 
-                'employee_xpat_insurance_expiry'                =>  Employee::with(['EmployeeInsurance.InsuranceChild'])
+                'employee_xpat_insurance_expiry'                =>  Employee::with(['EmployeeInsurance' => function ($q) {
+                                                                        $q->where('insurance_end_date', '>=', now()->toDateString())
+                                                                          ->orderBy('insurance_end_date', 'asc');
+                                                                    }, 'EmployeeInsurance.InsuranceChild'])
                                                                     ->where("nationality", '!=', "Maldivian")
                                                                     ->where('id', $emp_id)
                                                                     ->where('resort_id', $this->resort_id),
 
-                'work_permit_medical_expiry'                    =>  Employee::with(['WorkPermitMedicalRenewal.WorkPermitMedicalRenewalChild'])
+                'work_permit_medical_expiry'                    =>  Employee::with(['WorkPermitMedicalRenewal' => function ($q) {
+                                                                        $q->where('end_date', '>=', now()->toDateString())
+                                                                          ->orderBy('end_date', 'asc');
+                                                                    }, 'WorkPermitMedicalRenewal.WorkPermitMedicalRenewalChild'])
                                                                     ->where("nationality", '!=', "Maldivian")
                                                                     ->where('id', $emp_id)
                                                                     ->where('resort_id', $this->resort_id),
 
-                                                                    
-                'work_permit_expiry'                            =>  Employee::with(['WorkPermit'])
+
+                // WorkPermit is hasMany (multiple monthly-fee rows can exist at
+                // once, e.g. Jul-Dec, all Status='Unpaid' until paid). Order by
+                // Due_Date ascending and take the earliest Unpaid one — NOT
+                // constrained to today-or-later, since an overdue-but-still-
+                // unpaid due date is the most urgent one to surface, not
+                // something to skip past in favor of next month's. The event
+                // builder below takes only the first of these per employee
+                // instead of flatMap-ing every row.
+                'work_permit_expiry'                            =>  Employee::with(['WorkPermit' => function ($q) {
+                                                                        $q->where('Status', 'Unpaid')
+                                                                          ->orderBy('Due_Date', 'asc');
+                                                                    }])
                                                                     ->where("nationality", '!=', "Maldivian")
                                                                     ->where('id', $emp_id)
                                                                     ->where('resort_id', $this->resort_id)
@@ -735,14 +762,17 @@ class CalendarController extends Controller
                     });
             }),
             ...$employment_contract_date->map(fn($item)                => $this->employeeMapdata('My Event','Employment contract Expiry','', $item->contract_end_date, '', '')),
-            ...$employee_visa_expiry->map(fn($emp)              => $this->employeeMapdata('My Event','Visa Expiry','', $emp->VisaRenewal->end_date,'','')),
-            ...$employee_xpat_insurance_expiry->map(fn($emp)    => $this->employeeMapdata('My Event','Xpat Insurance expiry date','',$emp->EmployeeInsurance->insurance_end_date,'','')),
-            ...$work_permit_medical_expiry->map(fn($emp)        => $this->employeeMapdata('My Event','Work Permit Medical expiry date ','',$emp->WorkPermitMedicalRenewal->end_date,'','')),
-            ...$work_permit_expiry->flatMap(function ($emp) {
-                    return collect($emp->WorkPermit)->map(function ($permit) use ($emp) {
-                        return $this->employeeMapdata('My Event','Work Permit expiry date','',$permit->Due_Date,'','');
-                    });
-                }),
+            ...$employee_visa_expiry->filter(fn($emp) => $emp->VisaRenewal)->map(fn($emp)              => $this->employeeMapdata('My Event','Visa Expiry','', $emp->VisaRenewal->end_date,'','')),
+            ...$employee_xpat_insurance_expiry->filter(fn($emp) => $emp->EmployeeInsurance)->map(fn($emp)    => $this->employeeMapdata('My Event','Xpat Insurance expiry date','',$emp->EmployeeInsurance->insurance_end_date,'','')),
+            ...$work_permit_medical_expiry->filter(fn($emp) => $emp->WorkPermitMedicalRenewal)->map(fn($emp)        => $this->employeeMapdata('My Event','Work Permit Medical expiry date ','',$emp->WorkPermitMedicalRenewal->end_date,'','')),
+            ...$work_permit_expiry->map(function ($emp) {
+                    // WorkPermit query above is already constrained to
+                    // future-or-today rows ordered soonest-first — take
+                    // only that one, not every remaining monthly-fee row.
+                    $permit = $emp->WorkPermit->first();
+                    if (!$permit) return null;
+                    return $this->employeeMapdata('My Event','Work Permit expiry date','',$permit->Due_Date,'','');
+                })->filter(),
 
             ...$quota_slot_expiry->flatMap(function ($emp) {
                     return collect($emp->QuotaSlotRenewal)->map(function ($slot) use ($emp) {
@@ -908,20 +938,32 @@ class CalendarController extends Controller
                                                                         ->where('aivd.InterViewDate', '>', now()->format('Y-m-d'))
                                                                         ->where('aivd.status', 'Slot Booked'),
 
-                'employee_visa_expiry'                          =>  Employee::with(['VisaRenewal.VisaChild'])
+                'employee_visa_expiry'                          =>  Employee::with(['VisaRenewal' => function ($q) {
+                                                                        $q->where('end_date', '>=', now()->toDateString())
+                                                                          ->orderBy('end_date', 'asc');
+                                                                    }, 'VisaRenewal.VisaChild'])
                                                                         ->where("nationality", '!=', "Maldivian")
                                                                         ->where('resort_id', $this->resort_id),
 
-                'employee_xpat_insurance_expiry'                =>  Employee::with(['EmployeeInsurance.InsuranceChild'])
+                'employee_xpat_insurance_expiry'                =>  Employee::with(['EmployeeInsurance' => function ($q) {
+                                                                        $q->where('insurance_end_date', '>=', now()->toDateString())
+                                                                          ->orderBy('insurance_end_date', 'asc');
+                                                                    }, 'EmployeeInsurance.InsuranceChild'])
                                                                         ->where("nationality", '!=', "Maldivian")
                                                                         ->where('resort_id', $this->resort_id),
 
-                'work_permit_medical_expiry'                    =>  Employee::with(['WorkPermitMedicalRenewal.WorkPermitMedicalRenewalChild'])
+                'work_permit_medical_expiry'                    =>  Employee::with(['WorkPermitMedicalRenewal' => function ($q) {
+                                                                        $q->where('end_date', '>=', now()->toDateString())
+                                                                          ->orderBy('end_date', 'asc');
+                                                                    }, 'WorkPermitMedicalRenewal.WorkPermitMedicalRenewalChild'])
                                                                         ->where("nationality", '!=', "Maldivian")
                                                                         ->where('resort_id', $this->resort_id),
 
-                                                                    
-                'work_permit_expiry'                            =>  Employee::with(['WorkPermit'])
+
+                'work_permit_expiry'                            =>  Employee::with(['WorkPermit' => function ($q) {
+                                                                        $q->where('Status', 'Unpaid')
+                                                                          ->orderBy('Due_Date', 'asc');
+                                                                    }])
                                                                         ->where("nationality", '!=', "Maldivian")
                                                                         ->where('resort_id', $this->resort_id)
                                                                         ->whereHas('WorkPermit', function ($q) {
@@ -1337,14 +1379,14 @@ class CalendarController extends Controller
             ...$performance_meeting_expiry->map(fn($item)       =>  $this->mapdata('', 'Performance Meeting Expiry', '', $item->date, $item->start_time, $item->end_time)),
             ...$request_kept_on_hold->map(fn($item)             =>  $this->mapdata($this->employeeDetails($item->employee_id), $item->request_type.' Request Kept on Hold', '', $item->request_date, '', '')),
             ...$payroll_processing->map(fn($item)               =>  $this->mapdata('', $item->request_type.' Payroll Processing', '', $item->start_date, '', '')),
-            ...$employee_visa_expiry->map(fn($emp)              => $this->mapdata($this->employeeDetails($emp->id),'Visa Expiry','', $emp->VisaRenewal->end_date,'','')),
-            ...$employee_xpat_insurance_expiry->map(fn($emp)    => $this->mapdata($this->employeeDetails($emp->id),'Xpat Insurance expiry date','',$emp->EmployeeInsurance->insurance_end_date,'','')),
-            ...$work_permit_medical_expiry->map(fn($emp)        => $this->mapdata($this->employeeDetails($emp->id),'Work Permit Medical expiry date ','',$emp->WorkPermitMedicalRenewal->end_date,'','')),
-            ...$work_permit_expiry->flatMap(function ($emp) {
-                return collect($emp->WorkPermit)->map(function ($permit) use ($emp) {
-                    return $this->mapdata($this->employeeDetails($emp->id),'Work Permit expiry date','',$permit->Due_Date,'','');
-                });
-            }),
+            ...$employee_visa_expiry->filter(fn($emp) => $emp->VisaRenewal)->map(fn($emp)              => $this->mapdata($this->employeeDetails($emp->id),'Visa Expiry','', $emp->VisaRenewal->end_date,'','')),
+            ...$employee_xpat_insurance_expiry->filter(fn($emp) => $emp->EmployeeInsurance)->map(fn($emp)    => $this->mapdata($this->employeeDetails($emp->id),'Xpat Insurance expiry date','',$emp->EmployeeInsurance->insurance_end_date,'','')),
+            ...$work_permit_medical_expiry->filter(fn($emp) => $emp->WorkPermitMedicalRenewal)->map(fn($emp)        => $this->mapdata($this->employeeDetails($emp->id),'Work Permit Medical expiry date ','',$emp->WorkPermitMedicalRenewal->end_date,'','')),
+            ...$work_permit_expiry->map(function ($emp) {
+                $permit = $emp->WorkPermit->first();
+                if (!$permit) return null;
+                return $this->mapdata($this->employeeDetails($emp->id),'Work Permit expiry date','',$permit->Due_Date,'','');
+            })->filter(),
             
             ...$quota_slot_expiry->flatMap(function ($emp) {
                 return collect($emp->QuotaSlotRenewal)->map(function ($slot) use ($emp) {

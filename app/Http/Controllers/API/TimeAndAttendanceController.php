@@ -48,16 +48,29 @@ class TimeAndAttendanceController extends Controller
     {
         $result = ['lat' => null, 'lng' => null, 'accuracy' => null, 'within' => null];
 
-        $coords = is_array($locationRaw) ? $locationRaw : null;
-        if (!$coords) return $result;
+        if (is_array($locationRaw)) {
+            $lat = $locationRaw['latitude'] ?? $locationRaw['lat'] ?? null;
+            $lng = $locationRaw['longitude'] ?? $locationRaw['lng'] ?? null;
+            $accuracy = $locationRaw['accuracy'] ?? null;
+        } elseif (is_string($locationRaw) && preg_match('/[?&]center=(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/', $locationRaw, $matches)) {
+            // The mobile app actually sends a full Google Maps Embed "view"
+            // URL (e.g. ".../embed/v1/view?...&center=4.1759,73.5156&zoom=12")
+            // rather than a plain {lat,lng} object — the exact coordinates
+            // were always in there, just unparsed, so InTime/OutTime
+            // Latitude/Longitude stayed null and geofence checking silently
+            // never ran for any real punch.
+            $lat = $matches[1];
+            $lng = $matches[2];
+            $accuracy = null;
+        } else {
+            return $result;
+        }
 
-        $lat = $coords['latitude'] ?? $coords['lat'] ?? null;
-        $lng = $coords['longitude'] ?? $coords['lng'] ?? null;
         if ($lat === null || $lng === null) return $result;
 
         $result['lat'] = (float) $lat;
         $result['lng'] = (float) $lng;
-        $result['accuracy'] = isset($coords['accuracy']) ? (float) $coords['accuracy'] : null;
+        $result['accuracy'] = $accuracy !== null ? (float) $accuracy : null;
 
         $geofenceZoneId = $rosterData->geofence_zone_id ?? null;
         if (!$geofenceZoneId) return $result;

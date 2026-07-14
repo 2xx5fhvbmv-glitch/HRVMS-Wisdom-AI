@@ -1548,6 +1548,7 @@ class LeaveController extends Controller
                                                                 'els.status as leave_status',
                                                                 'els.approver_rank',
                                                                 'els.approver_id',
+                                                                'els.comments',
                                                             )->get();
 
 
@@ -1568,6 +1569,10 @@ class LeaveController extends Controller
                         'approver_id'                   =>  $item->approver_id,
                         'status'                        =>  $item->leave_status,
                         'rank_type'                     =>  $role,
+                        // Was saved on employees_leaves_status but never
+                        // returned anywhere — the mobile "my leaves" screen
+                        // had no way to show why a leave was rejected.
+                        'comments'                      =>  $item->comments,
                     ];
                 })->unique()->values();
 
@@ -1730,6 +1735,9 @@ class LeaveController extends Controller
                                                                             'approver_id'       => $empAppr->approver_id,
                                                                             'status'            => $empAppr->status,
                                                                             'rank_type'         => $role,
+                                                                            // Was saved but never returned — no way for
+                                                                            // the employee to see why a leave was rejected.
+                                                                            'comments'          => $empAppr->comments,
                                                                         ];
                                                                     })->values();
 
