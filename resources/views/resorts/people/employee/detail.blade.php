@@ -277,8 +277,14 @@
                                                             <tr>
                                                                 <th>Name:</th>
                                                                 <td>
-                                                                    <span class="view-mode">{{$employee->resortAdmin->full_name}}</span>
+                                                                    {{-- full_name (used in 100+ other places) drops
+                                                                         middle_name entirely, so an approved Info Update
+                                                                         Request changing it had nowhere to ever show up
+                                                                         on this page. Build the display name locally
+                                                                         here instead of via that shared accessor. --}}
+                                                                    <span class="view-mode">{{ ucwords(trim($employee->resortAdmin->first_name.' '.$employee->resortAdmin->middle_name.' '.$employee->resortAdmin->last_name)) }}</span>
                                                                     <input type="text" name="first_name" class="form-control edit-mode d-none" value="{{$employee->resortAdmin->first_name}}" required minlength="2" maxlength="50" pattern="^[A-Za-z\s\-']+$" placeholder="First Name">
+                                                                    <input type="text" name="middle_name" class="form-control edit-mode d-none" value="{{$employee->resortAdmin->middle_name}}" maxlength="50" pattern="^[A-Za-z\s\-']*$" placeholder="Middle Name">
                                                                     <input type="text" name="last_name" class="form-control edit-mode d-none" value="{{$employee->resortAdmin->last_name}}" required minlength="2" maxlength="50" pattern="^[A-Za-z\s\-']+$" placeholder="Last Name">
                                                                 </td>
                                                             </tr>
@@ -2521,6 +2527,7 @@
                 employee_id: '{{ $employee->id }}',
                 title: $('[name="title"]').val(),
                 first_name: $('[name="first_name"]').val(),
+                middle_name: $('[name="middle_name"]').val(),
                 last_name: $('[name="last_name"]').val(),
                 gender: $('[name="gender"]').val(),
                 dob: $('[name="dob"]').val(),

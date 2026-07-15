@@ -1635,6 +1635,7 @@ class EmployeeController extends Controller
 
         // Update name and gender in resortAdmin
         $employee->resortAdmin->first_name = $request->first_name;
+        $employee->resortAdmin->middle_name = $request->middle_name;
         $employee->resortAdmin->last_name = $request->last_name;
         $employee->resortAdmin->gender = $request->gender;
         $employee->resortAdmin->save();
