@@ -11,6 +11,7 @@ use App\Models\ResortSection;
 use App\Models\ResortPosition;
 use App\Models\TicketAgent;
 use App\Models\HiringSource;
+use App\Models\ServiceProvider;
 use App\Models\TAnotificationChild;
 use App\Models\TAnotificationParent;
 use App\Models\JobAdvertisement;
@@ -243,6 +244,75 @@ class ConfigController extends Controller
 
         }
 
+    }
+
+    public function AddServiceProvider(Request $request)
+    {
+        DB::beginTransaction();
+        try
+        {
+            ServiceProvider::create(['name'=> $request->name,'resort_id' => $this->resort->resort_id]);
+            DB::commit();
+             return response()->json(['success' => true, 'msg' => 'Service Provider added successfully.'], 200);
+
+        }
+        catch( \Exception $e )
+        {
+            DB::rollBack();
+            \Log::emergency("File: ".$e->getFile());
+            \Log::emergency("Line: ".$e->getLine());
+            \Log::emergency("Message: ".$e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Failed to add Service Provider.'], 500);
+
+        }
+    }
+
+    public function GetServiceProvider()
+    {
+        try {
+            $service_providers = ServiceProvider::where('resort_id', $this->resort->resort_id)
+                ->orderBy('id', 'desc')
+                ->get();
+
+            return datatables()->of($service_providers)
+                ->addColumn('action', function ($row) {
+                    $deleteUrl = asset('resorts_assets/images/trash-red.svg');
+
+                    return '
+                        <div class="d-flex align-items-center">
+                            <a href="#" class="btn-lg-icon icon-bg-red delete-provider-btn" data-provider-id="' . htmlspecialchars($row->id, ENT_QUOTES, 'UTF-8') . '">
+                                <img src="' . $deleteUrl . '" alt="Delete" class="img-fluid" />
+                            </a>
+                        </div>';
+                })
+                ->rawColumns(['name', 'action'])
+                ->make(true);
+        } catch (\Exception $e) {
+            \Log::error('DataTables error: ' . $e->getMessage());
+
+            return response()->json([
+                'error' => 'An error occurred while processing your request',
+                'details' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function DestroyServiceProvider($id)
+    {
+        DB::beginTransaction();
+        try{
+            ServiceProvider::find($id)->delete();
+            DB::commit();
+            return response()->json(['success' => true, 'msg' => 'Service Provider Deleted successfully.'], 200);
+        }
+        catch( \Exception $e )
+        {
+            DB::rollBack();
+            \Log::emergency("File: ".$e->getFile());
+            \Log::emergency("Line: ".$e->getLine());
+            \Log::emergency("Message: ".$e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Failed to delete Service Provider.'], 500);
+        }
     }
 
     public function AddHiringSource(Request $request)

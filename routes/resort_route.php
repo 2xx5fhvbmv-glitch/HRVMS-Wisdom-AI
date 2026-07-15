@@ -406,6 +406,11 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get( 'talent-acquisition/get-hiring-source/', ['App\Http\Controllers\Resorts\TalentAcquisition\ConfigController','GetHiringSource'])->name('resort.ta.get.source');
     Route::delete('talent-acquisition/delete-hiring-source/{id}', ['App\Http\Controllers\Resorts\TalentAcquisition\ConfigController','DestroyHiringSource'])->name('resort.ta.delete.source');
 
+    //Service provider
+    Route::post('talent-acquisition/add-service-provider/', ['App\Http\Controllers\Resorts\TalentAcquisition\ConfigController','AddServiceProvider'])->name('resort.ta.add.provider');
+    Route::get( 'talent-acquisition/get-service-provider/', ['App\Http\Controllers\Resorts\TalentAcquisition\ConfigController','GetServiceProvider'])->name('resort.ta.get.provider');
+    Route::delete('talent-acquisition/delete-service-provider/{id}', ['App\Http\Controllers\Resorts\TalentAcquisition\ConfigController','DestroyServiceProvider'])->name('resort.ta.delete.provider');
+
     Route::post('talent-acquisition/terms-and-conditions/store', ['App\Http\Controllers\Resorts\TalentAcquisition\ConfigController','storeOrUpdateTC'])->name('resort.ta.termscondition.storeOrUpdate');
 
     // Extra Fields Configuration
