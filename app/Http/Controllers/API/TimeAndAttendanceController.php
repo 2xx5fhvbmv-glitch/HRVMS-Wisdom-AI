@@ -1288,7 +1288,13 @@ class TimeAndAttendanceController extends Controller
         $user                                               =   Auth::guard('api')->user();
         $employee                                           =   $user->GetEmployee;
         $emp_id                                             =   $employee->id;
-        $checkInTime                                        =   $request->current_time;
+        // The client's `current_time` was stored verbatim — if the device
+        // formats it with a 12-hour pattern and no AM/PM marker, 10:23 PM
+        // and 10:23 AM arrive as the identical string "10:23:00", so
+        // whichever showed up first silently became "AM" downstream.
+        // Server time is unambiguous 24-hour and isn't subject to the
+        // client's clock/format, so use it as the source of truth.
+        $checkInTime                                        =   Carbon::now()->format('H:i:s');
         $date                                               =   $request->current_date;
         // Ensure in_time_location is a string (handle array case like GPS coordinates)
         $inTimeLocationRaw                                  =   $request->in_time_location;
@@ -1654,7 +1660,9 @@ class TimeAndAttendanceController extends Controller
         $user                                               =   Auth::guard('api')->user();
         $employee                                           =   $user->GetEmployee;
         $emp_id                                             =   $employee->id;
-        $checkOutTime                                       =   $request->current_time;
+        // Same AM/PM ambiguity as manualCheckIn — use server time, not the
+        // client's raw current_time string.
+        $checkOutTime                                       =   Carbon::now()->format('H:i:s');
         $date                                               =   $request->current_date;
         $outTimeLocation                                    =   $request->out_time_location;
         $attendaceId                                        =   $request->attendace_id;
@@ -1676,9 +1684,11 @@ class TimeAndAttendanceController extends Controller
             $breakData                                      =   BreakAttendaces::where('Parent_attd_id', $attendaceId)->get();
             $timeAttendance                                 =   [];
 
-            // Parse check-in and check-out times
-            $checkOutTimeCarbon                             =   Carbon::createFromFormat('H:i', $checkOutTime);
-            $checkInTimeCarbon                              =   Carbon::createFromFormat('H:i', $ParentAttendance->CheckingTime);
+            // Parse check-in and check-out times. CheckingTime on older
+            // records may still be "H:i" (no seconds) from before check-in
+            // time became server-authoritative, so accept both.
+            $checkOutTimeCarbon                             =   Carbon::createFromFormat(strlen($checkOutTime) > 5 ? 'H:i:s' : 'H:i', $checkOutTime);
+            $checkInTimeCarbon                              =   Carbon::createFromFormat(strlen($ParentAttendance->CheckingTime) > 5 ? 'H:i:s' : 'H:i', $ParentAttendance->CheckingTime);
 
             // Calculate actual worked time (check-out - check-in)
             // Handle case where checkout is next day (overnight shift)
@@ -1714,12 +1724,12 @@ class TimeAndAttendanceController extends Controller
 
             if ($ParentAttendance->CheckingOutTime == NULL || $ParentAttendance->CheckingOutTime == '') {
                 // If record exists, update it
-                $ParentAttendance->CheckingOutTime          =   $request->current_time;
+                $ParentAttendance->CheckingOutTime          =   $checkOutTime;
                 $ParentAttendance->DayWiseTotalHours        =   $finalWorkTime;
                 $ParentAttendance->save();
 
                 if ($childAttendace) {
-                    $childAttendace->OutTime_out            =   $request->current_time;
+                    $childAttendace->OutTime_out            =   $checkOutTime;
                     $childAttendace->OutTime_Location       =   $outTimeLocation;
                     $childAttendace->OutTime_Latitude       =   $outTimeGeofence['lat'];
                     $childAttendace->OutTime_Longitude      =   $outTimeGeofence['lng'];
