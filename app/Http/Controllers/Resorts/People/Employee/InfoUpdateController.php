@@ -116,40 +116,72 @@ class InfoUpdateController extends Controller
      public function statusChange(Request $request){
           if($request->status == 'approve'){
                $employeeinfoUpdateRequest = EmployeeInfoUpdateRequest::where('id',$request->id)->first();
+
+               // Was dereferencing info_payload on a possibly-null result
+               // with no guard — an unmatched/already-processed id fatals
+               // with "Attempt to read property on null" instead of a
+               // clean error response.
+               if (!$employeeinfoUpdateRequest) {
+                    return response()->json([
+                         'success' => false,
+                         'message' => 'Request not found.',
+                    ], 404);
+               }
+
                $payload = $employeeinfoUpdateRequest->info_payload;
+               $employees = Employee::where('id',$employeeinfoUpdateRequest->employee_id)->first();
 
-               foreach($payload as $key => $newValue){
-                         $employees = Employee::where('id',$employeeinfoUpdateRequest->employee_id)->first();
+               // This whole approve action previously ran with no
+               // transaction and no exception handling — every other
+               // mutating action in this app wraps in DB::beginTransaction/
+               // commit/rollBack. If any single field in the payload failed
+               // to save (bad value, DB constraint), the loop would fatal
+               // partway through with some fields already written and
+               // others not, the status update to 'Approved' never
+               // running, and the HR user seeing a generic AJAX error with
+               // no record of what actually happened.
+               DB::beginTransaction();
+               try {
+                    foreach($payload as $key => $newValue){
+                         if(in_array($key, ['first_name', 'middle_name', 'last_name', 'personal_phone'])){ //need Changes when App Integration is Complete only check if request data is correct or not
 
-                    if(in_array($key, ['first_name', 'middle_name', 'last_name', 'personal_phone'])){ //need Changes when App Integration is Complete only check if request data is correct or not 
-
-                         $resort_admin = ResortAdmin::where('id',$employees->Admin_Parent_id)->first();
-                         if($resort_admin){
-                              $resort_admin->update([
-                                   $key => $newValue,
-                              ]);
+                              $resort_admin = $employees ? ResortAdmin::where('id',$employees->Admin_Parent_id)->first() : null;
+                              if($resort_admin){
+                                   $resort_admin->update([
+                                        $key => $newValue,
+                                   ]);
+                              }
+                         }else{
+                              if($employees){
+                                   $employees->update([
+                                        $key => $newValue,
+                                   ]);
+                              }
                          }
-                    }else{
-                         if($employees){
-                              $employees->update([
-                                   $key => $newValue,
-                              ]);
-                         }
+
                     }
-                    
-               } 
 
-               $employeeinfoUpdateRequest->update([
-                    'status' => 'Approved',
-                    'modified_by' => auth()->id(),
-               ]);
+                    $employeeinfoUpdateRequest->update([
+                         'status' => 'Approved',
+                         'modified_by' => auth()->id(),
+                    ]);
 
+                    DB::commit();
+               } catch (\Exception $e) {
+                    DB::rollBack();
+                    \Log::emergency("File: ".$e->getFile());
+                    \Log::emergency("Line: ".$e->getLine());
+                    \Log::emergency("Message: ".$e->getMessage());
+                    return response()->json([
+                         'success' => false,
+                         'message' => 'Failed to update employee record.',
+                    ], 500);
+               }
           }
           return response()->json([
                'success' => 'true',
                'message' => 'Record Updated Successfully',
           ]);
-          return redirect()->route('people.info-update.index')->with('success','Record Update Successfully');
 
      }
 
