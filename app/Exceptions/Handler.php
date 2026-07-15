@@ -2,6 +2,7 @@
 
 namespace App\Exceptions;
 
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 use Throwable;
@@ -40,5 +41,18 @@ class Handler extends ExceptionHandler
         });
     }
 
-   
+    /**
+     * Mobile clients don't send an Accept: application/json header, so
+     * expectsJson() is false and the default handler redirects to the HTML
+     * login page — the app's HTTP client follows the redirect and gets a
+     * 200 full of login-page markup instead of a 401 it can detect.
+     */
+    protected function unauthenticated($request, AuthenticationException $exception)
+    {
+        if ($request->is('api/*') || $request->expectsJson()) {
+            return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
+        }
+
+        return redirect()->guard($exception->guards())->to($this->redirectTo($request) ?? route('login'));
+    }
 }
