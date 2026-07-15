@@ -230,19 +230,28 @@
             startDate: 'today',
         });
 
+        // Was firing a full grid-HTML AJAX reload on every keystroke — typing
+        // a name re-requested and re-rendered the entire grid per character,
+        // which is what made "Grid view takes too much time to load" (each
+        // keystroke restarts the wait, and a slow keystroke's response can
+        // land after a later one's, showing stale results briefly). Debounce
+        // so it only fires once typing pauses.
+        let searchDebounce;
         $('.search').on('keyup', function() {
+            clearTimeout(searchDebounce);
+            searchDebounce = setTimeout(function() {
+                let girdview = $(".btn-grid").hasClass('active');
 
-            let girdview = $(".btn-grid").hasClass('active');
+                if(girdview)
+                {
+                    DatatableGrid();
 
-            if(girdview)
-            {
-                DatatableGrid();
-
-            }
-            else
-            {
-                DatatableList();
-            }
+                }
+                else
+                {
+                    DatatableList();
+                }
+            }, 350);
         });
         if($("#ResortDepartment").is("select")) {
             $("#ResortDepartment").select2({"Placeholder":"Select Department"});
@@ -562,6 +571,36 @@
 
 
     }
+
+    // Animates the circular AI Ranking/Scoring meters rendered in the grid
+    // partial (gridviwe.blade.php's .progress-container). Was called here
+    // without ever being defined in this file (copy-pasted from
+    // Applicants/index.blade.php, which does define it) — every grid
+    // reload threw "ApplicantProgress is not defined" in the console and
+    // the circles never animated.
+    function ApplicantProgress() {
+        const radius = 54;
+        const circumference = 2 * Math.PI * radius;
+
+        const progressContainers = document.querySelectorAll('.progress-container');
+        progressContainers.forEach(container => {
+            const progressCircle = container.querySelector('.progress');
+            const progressValue = container.getAttribute('data-progress');
+            const offset = circumference - (progressValue / 100 * circumference);
+            if (progressCircle)
+            {
+                progressCircle.style.transition = 'none';
+                progressCircle.style.strokeDasharray = circumference;
+                progressCircle.style.strokeDashoffset = circumference;
+                progressCircle.offsetHeight;
+                setTimeout(() => {
+                    progressCircle.style.transition = 'stroke-dashoffset 0.75s ease-in-out';
+                    progressCircle.style.strokeDashoffset = offset;
+                }, 100);
+            }
+        });
+    }
+
     function DatatableGrid()
     {
 
