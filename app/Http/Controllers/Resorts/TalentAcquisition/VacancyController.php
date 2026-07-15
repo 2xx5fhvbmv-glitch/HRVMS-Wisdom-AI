@@ -123,7 +123,9 @@ class VacancyController extends Controller
                 ->orderBy('resort_admins.first_name')
                 ->get();
 
-            $serviceProviders = ServiceProvider::orderBy('name')->get();
+            // Was unscoped — every resort's service providers showed up in
+            // every other resort's Add Vacancy dropdown.
+            $serviceProviders = ServiceProvider::where('resort_id', $resort_id)->orderBy('name')->get();
             // Define the rank values for SUP, HOD, MGR, EXCOM, GM from settings config
             $targetRanks = [
                 array_search('SUP', config('settings.Position_Rank')),
@@ -541,7 +543,9 @@ class VacancyController extends Controller
                 ->orderBy('resort_admins.first_name')
                 ->get();
 
-            $serviceProviders = ServiceProvider::orderBy('name')->get();
+            // Was unscoped — every resort's service providers showed up in
+            // every other resort's Add Vacancy dropdown.
+            $serviceProviders = ServiceProvider::where('resort_id', $resort_id)->orderBy('name')->get();
 
             $targetRanks = [
                 array_search('HOD', config('settings.Position_Rank')),

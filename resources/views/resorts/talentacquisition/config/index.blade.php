@@ -377,6 +377,46 @@
                                     </div>
                                 </div>
                             </div>
+                            <div class="col-12 ">
+                                <div class="card">
+                                    <div class="card-title">
+                                        <div class="row g-3 align-items-center justify-content-between">
+                                            <div class="col-auto">
+                                                <div class="d-flex justify-content-start align-items-center">
+                                                    <h3>Service Providers</h3>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <form id="ServiceProviderForm">
+                                        @csrf
+                                        <div class="row align-items-top  g-3 mb-3">
+                                            <div class="col-lg-8">
+                                                <label class="form-label">Provider Name</label>
+                                                <div class="serviceprovider-form">
+                                                    <input type="text" name="name" class="form-control" placeholder="Add Service Provider Name" />
+                                                </div>
+                                            </div>
+                                            <div class="col-lg-4">
+                                                <button class="btn btn-themeSkyblue AddProvider mt-3">Submit</button>
+                                            </div>
+                                        </div>
+                                    </form>
+                                    <div class="row g-1 serviceprovider-list">
+                                        <div class="col-12">
+                                            <table class="table table-sm serviceprovider"  id="serviceprovider">
+                                                <thead>
+                                                    <tr>
+                                                        <th scope="col">Provider Name</th>
+                                                        <th scope="col">Action</th>
+                                                    </tr>
+                                                </thead>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
 
                             {{-- Organization Details for Templates — commented out per HR
                                  request; the section duplicates resort settings and is not
@@ -566,6 +606,7 @@ $(document).ready(function()
 {
     AgentTicket();
     HiringSourceTable();
+    ServiceProviderTable();
         CKEDITOR.replace('terms_and_condition');
         $('#jobDesEdit-modal').on('shown.bs.modal', function () {
             if (CKEDITOR.instances['editor']) {
@@ -980,6 +1021,121 @@ $(document).ready(function()
             ]
         });
     }
+
+    function ServiceProviderTable()
+    {
+        if ($.fn.DataTable.isDataTable('#serviceprovider'))
+        {
+            $('#serviceprovider').DataTable().clear().destroy();
+        }
+        $('#serviceprovider tbody').empty();
+        $('#serviceprovider').DataTable({
+            searching: false,
+            bLengthChange: false,
+            bFilter: true,
+            bInfo: true,
+            bAutoWidth: false,
+            scrollX: true,
+            iDisplayLength: 6,
+            processing: true,
+            serverSide: true,
+            ajax: {
+                url: '{{ route("resort.ta.get.provider") }}',
+                type: 'GET',
+            },
+            columns: [
+                { data: 'name', name: 'name', className: 'text-nowrap' },
+                { data: 'action', name: 'action', orderable: false, searchable: false }
+            ]
+        });
+    }
+
+    $('#ServiceProviderForm').validate({
+        rules: {
+            name: { required: true, maxlength: 150 }
+        },
+        messages: {
+            name: { required: "Please enter provider name." }
+        },
+        submitHandler: function(form) {
+            var $btn = $(form).find('button');
+            if($btn.prop('disabled')) return false;
+            $btn.prop('disabled', true).text('Saving...');
+
+            var formData = new FormData(form);
+            $.ajax({
+                url: "{{ route('resort.ta.add.provider') }}",
+                type: "POST",
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    if(response.success) {
+                        toastr.success(response.msg, "Success", {
+                            positionClass: 'toast-bottom-right'
+                        });
+                        form.reset();
+                        ServiceProviderTable();
+                    } else {
+                        toastr.error(response.msg || response.message || "Failed to add.", "Error", {
+                            positionClass: 'toast-bottom-right'
+                        });
+                    }
+                },
+                error: function(xhr) {
+                    var errs = '';
+                    if(xhr.status === 422 && xhr.responseJSON && xhr.responseJSON.errors) {
+                        $.each(xhr.responseJSON.errors, function(key, value) {
+                            errs += value[0] + '<br>';
+                        });
+                    } else {
+                        errs = 'An unexpected error occurred.';
+                    }
+                    toastr.error(errs, "Error", {
+                        positionClass: 'toast-bottom-right'
+                    });
+                },
+                complete: function() {
+                    $btn.prop('disabled', false).text('Submit');
+                }
+            });
+        }
+    });
+
+    $(document).on('click', '.delete-provider-btn', function (e) {
+        e.preventDefault();
+        var main_id = $(this).data('provider-id');
+
+        Swal.fire({
+            title: 'Sure want to delete?',
+            text: 'This cannot be undone',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Yes',
+            cancelButtonText: 'No',
+            confirmButtonColor: "#DD6B55"
+        }).then((result) => {
+            if (result.isConfirmed)
+            {
+                $.ajax({
+                    type: "delete",
+                    url: "{{ route('resort.ta.delete.provider','') }}/"+main_id,
+                    dataType: "json",
+                }).done(function(result) {
+                    if (result.success == true) {
+                        toastr.success(result.msg, "Success", {
+                            positionClass: 'toast-bottom-right'
+                        });
+                        ServiceProviderTable();
+                    } else {
+                        toastr.error(result.message, "Error", {
+                            positionClass: 'toast-bottom-right'
+                        });
+                    }
+                });
+            }
+        });
+    });
 
     $('#HiringSource').validate({
         rules: {

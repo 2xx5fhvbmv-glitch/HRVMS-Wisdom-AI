@@ -330,6 +330,11 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get( 'resort-ta/get-hiring-source/', ['App\Http\Controllers\Resorts\TalentAcquisition\ConfigController','GetHiringSource'])->name('resort.ta.get.source');
     Route::delete('resort-ta/delete-hiring-source/{id}', ['App\Http\Controllers\Resorts\TalentAcquisition\ConfigController','DestroyHiringSource'])->name('resort.ta.delete.source');
 
+    //Service provider
+    Route::post('resort-ta/add-service-provider/', ['App\Http\Controllers\Resorts\TalentAcquisition\ConfigController','AddServiceProvider'])->name('resort.ta.add.provider');
+    Route::get( 'resort-ta/get-service-provider/', ['App\Http\Controllers\Resorts\TalentAcquisition\ConfigController','GetServiceProvider'])->name('resort.ta.get.provider');
+    Route::delete('resort-ta/delete-service-provider/{id}', ['App\Http\Controllers\Resorts\TalentAcquisition\ConfigController','DestroyServiceProvider'])->name('resort.ta.delete.provider');
+
     Route::post('resort-ta/terms-and-conditions/store', ['App\Http\Controllers\Resorts\TalentAcquisition\ConfigController','storeOrUpdateTC'])->name('resort.ta.termscondition.storeOrUpdate');
 
     Route::post('/ta/jobdescription', ['App\Http\Controllers\Resorts\TalentAcquisition\JobDescriptionController','store'])->name('resort.ta.jobdescription.store');
