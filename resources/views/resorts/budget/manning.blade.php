@@ -161,7 +161,12 @@
                                                             @if($pos->employees && count($pos->employees) > 0)
                                                                 @foreach($pos->employees as $employee)
                                                                     <tr>
-                                                                        <td>{{ $employee->first_name }} {{ $employee->last_name }}</td>
+                                                                        <td>
+                                                                            {{ $employee->first_name }} {{ $employee->last_name }}
+                                                                            @if(!empty($employee->out_of_budget))
+                                                                                <span class="badge badge-danger" title="More employees are assigned to this position than the budgeted headcount allows">Out of Budget</span>
+                                                                            @endif
+                                                                        </td>
                                                                         <td class="w-120">
                                                                             @php $Rank = config( 'settings.Position_Rank');
                                                                                 $AvilableRank = array_key_exists($employee->rank, $Rank) ? $Rank[$employee->rank] : '';

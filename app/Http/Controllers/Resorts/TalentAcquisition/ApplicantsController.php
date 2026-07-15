@@ -2229,7 +2229,18 @@ class ApplicantsController extends Controller
         // narrows further within whatever scope is allowed.
         $scopedDeptIds = Common::getScopedDepartmentIds();
         if (is_array($scopedDeptIds)) {
-            $Applicant_form_data1->whereIn('t5.dept_id', $scopedDeptIds);
+            // t5 (resort_positions) is reached via a LEFT JOIN chain from
+            // applicant_form_data -> vacancies -> resort_positions, so an
+            // applicant record never linked to a vacancy (Parent_v_id = 0,
+            // e.g. legacy/manually-added rows) has t5.dept_id = NULL — a
+            // plain whereIn() never matches NULL, so those legitimately-
+            // unscoped rows silently vanished for every non-full-access
+            // user, not just the cross-department ones this was meant to
+            // block. orWhereNull keeps the security fix while still
+            // showing applicants nobody's actually scoped away from anyone.
+            $Applicant_form_data1->where(function ($q) use ($scopedDeptIds) {
+                $q->whereIn('t5.dept_id', $scopedDeptIds)->orWhereNull('t5.dept_id');
+            });
         }
 
         // Apply filters
@@ -2288,8 +2299,15 @@ class ApplicantsController extends Controller
                 $applicant->ConsentExpiryDate = \Carbon\Carbon::parse($applicant->consent_expiry_date)->format('d M Y');
             } elseif ($applicant->consent_expiry_date && $applicant->consent_status === 'pending') {
                 $applicant->ConsentExpiryDate = \Carbon\Carbon::parse($applicant->consent_expiry_date)->format('d M Y') . ' (Pending)';
+            } elseif ($applicant->consent_expiry_date) {
+                // Was falling through to a broken literal concatenation
+                // ($data_retention_month . 'M/' . $data_retention_year . 'Y',
+                // e.g. "2M/Y" when the retention year was empty) for any
+                // status other than approved/pending — rejected applicants
+                // still have a real consent_expiry_date, just show it.
+                $applicant->ConsentExpiryDate = \Carbon\Carbon::parse($applicant->consent_expiry_date)->format('d M Y') . ' (' . ucfirst($applicant->consent_status ?? 'Rejected') . ')';
             } else {
-                $applicant->ConsentExpiryDate = $applicant->data_retention_month . 'M/' . $applicant->data_retention_year . 'Y';
+                $applicant->ConsentExpiryDate = 'N/A';
             }
 
             return $applicant;
@@ -2360,6 +2378,8 @@ class ApplicantsController extends Controller
                     return '<span class="badge bg-danger">Not Available</span>';
                 } elseif ($row->availability_status === 'pending') {
                     return '<span class="badge bg-warning text-dark">Pending Response</span>';
+                } elseif ($row->availability_status === 'consent_rejected') {
+                    return '<span class="badge bg-danger">Consent Rejected</span>';
                 }
                 return '<span class="badge bg-secondary">Not Checked</span>';
             })
@@ -2448,7 +2468,18 @@ class ApplicantsController extends Controller
         // AJAX grid-refresh counterpart of that page and had the identical gap.
         $scopedDeptIds = Common::getScopedDepartmentIds();
         if (is_array($scopedDeptIds)) {
-            $Applicant_form_data1->whereIn('t5.dept_id', $scopedDeptIds);
+            // t5 (resort_positions) is reached via a LEFT JOIN chain from
+            // applicant_form_data -> vacancies -> resort_positions, so an
+            // applicant record never linked to a vacancy (Parent_v_id = 0,
+            // e.g. legacy/manually-added rows) has t5.dept_id = NULL — a
+            // plain whereIn() never matches NULL, so those legitimately-
+            // unscoped rows silently vanished for every non-full-access
+            // user, not just the cross-department ones this was meant to
+            // block. orWhereNull keeps the security fix while still
+            // showing applicants nobody's actually scoped away from anyone.
+            $Applicant_form_data1->where(function ($q) use ($scopedDeptIds) {
+                $q->whereIn('t5.dept_id', $scopedDeptIds)->orWhereNull('t5.dept_id');
+            });
         }
 
         if (!empty($searchTerm)) {

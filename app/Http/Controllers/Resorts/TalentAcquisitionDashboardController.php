@@ -936,7 +936,13 @@ class TalentAcquisitionDashboardController extends Controller
                 'resort_positions',
                 'hiring_request',
                 'vacancies','TotalApplicants','Interviews','Hired','UpcomingApplicants','drafts',
-                'Vacancies'
+                'Vacancies',
+                // "Hire Requests Pending Your Approval" is only meaningful for
+                // the actual approvers (HR HOD/XCOM, Finance HOD/XCOM, GM) —
+                // $Vacancies is now always empty for anyone else, but the card
+                // itself still needs hiding, not just left empty, per request.
+                'canSeeAllDepts',
+                'effectiveRank'
 
             ));
         } catch (\Exception $e) {
@@ -952,6 +958,8 @@ class TalentAcquisitionDashboardController extends Controller
             $TotalApplicants = 0;
             $Interviews = 0;
             $Hired = 0;
+            $canSeeAllDepts = false;
+            $effectiveRank = null;
 
             return view('resorts.talentacquisition.dashboard.hoddashboard', compact(
                 'page_header',
@@ -966,7 +974,9 @@ class TalentAcquisitionDashboardController extends Controller
                 'Hired',
                 'UpcomingApplicants',
                 'drafts',
-                'Vacancies'
+                'Vacancies',
+                'canSeeAllDepts',
+                'effectiveRank'
             ));
         }
     }

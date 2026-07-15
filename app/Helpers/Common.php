@@ -2178,31 +2178,25 @@ class Common
                                                     $query->where('t3.Approved_By', 7)
                                                     ->where('t3.status', $status);
                                                 }
-												elseif($rank == 2)
+												else
                                                 {
-                                                    $query->where('t3.Approved_By',3)
-                                                    ->where('t3.status',$status);
-                                                }
-                                                else
-                                                {
-                                                    // EXCOM and other ranks: show items pending at HR level
-                                                    $query->where('t3.Approved_By', '=', 3)
-                                                    ->where('t3.status', $status);
+                                                    // "Hire Requests Pending Your Approval" is only meaningful
+                                                    // for the actual approvers in this workflow — HR HOD/XCOM,
+                                                    // Finance HOD/XCOM, and GM. The caller already promotes a
+                                                    // genuine HR/Finance HOD/XCOM to $rank 3/7 before calling
+                                                    // this (effectiveRank), so anyone still arriving here as a
+                                                    // plain rank (2=HOD, 1=EXCOM, etc. of any OTHER department —
+                                                    // F&B, Engineering, Accounting-non-Finance-titled, ...) is
+                                                    // a REQUESTER, not an approver, and must see nothing here.
+                                                    // Previously this branch showed them every "pending HR
+                                                    // approval" item in their own department, which is why an
+                                                    // F&B HOD saw their own department's hire request under a
+                                                    // "Pending YOUR Approval" heading despite having no approval
+                                                    // role over it at all.
+                                                    $query->whereRaw('1 = 0');
                                                 }
 
                                             });
-
-                                            // HOD (2), EXCOM (1), and everyone below HR/Finance/GM in this
-                                            // branch only had the approval-workflow-stage filter above
-                                            // (Approved_By/status) — nothing scoped by department, so any
-                                            // HOD/EXCOM saw every OTHER department's pending hire requests
-                                            // too (e.g. F&B HOD seeing Engineering's carpenter request).
-                                            if (!in_array($rank, [3, 7, 8, 9], true)) {
-                                                $viewerDeptId = Auth::guard('resort-admin')->user()->GetEmployee->Dept_id ?? null;
-                                                if ($viewerDeptId) {
-                                                    $VacanciesQuery->where('vacancies.department', $viewerDeptId);
-                                                }
-                                            }
                                         }
                                     }
                                     if(empty($takeData))

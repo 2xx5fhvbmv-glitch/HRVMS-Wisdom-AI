@@ -75,6 +75,14 @@ class ConsentResponseController extends Controller
         $applicant->update([
             'consent_status' => 'rejected',
             'consent_responded_at' => Carbon::now(),
+            // availability_status was never touched by this method — a
+            // rejected applicant kept showing whatever stale value was
+            // there before (e.g. "Available to Reach"), which misleadingly
+            // suggested they were still fine to contact/retain after they'd
+            // explicitly withdrawn consent. Distinct value (not reusing
+            // 'unavailable') since "temporarily can't reach them" and
+            // "withdrew data-retention consent" are different things.
+            'availability_status' => 'consent_rejected',
         ]);
 
         $this->notifyHrOfConsentResponse($applicant, 'rejected');

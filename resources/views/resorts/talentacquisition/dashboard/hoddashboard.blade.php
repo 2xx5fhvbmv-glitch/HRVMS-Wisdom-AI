@@ -174,11 +174,16 @@
                          on THEIR approval (rank-filtered server-side by
                          Common::GetTheFreshVacancies), so the permission
                          check is both redundant and wrong. --}}
-                    {{-- Always render the card (with an empty state) so Finance
-                         HOD / EXCOM see it consistently with the HR dashboard.
-                         Previously the whole card was wrapped in @if($Vacancies->count() > 0)
-                         with no @else, so it vanished entirely when the user had
-                         nothing pending — which read as "the card is missing". --}}
+                    {{-- Render the card (with an empty state, not vanishing
+                         when there's nothing pending) for the roles who are
+                         actually approvers in this workflow — HR HOD/XCOM,
+                         Finance HOD/XCOM, GM. $Vacancies is now always empty
+                         for anyone else (Common::GetTheFreshVacancies), but
+                         the card itself was still showing for e.g. an F&B
+                         HOD with an empty state — misleading, since a plain
+                         department HOD has no approval role here at all and
+                         shouldn't see this section exist in the first place. --}}
+                    @if($canSeeAllDepts || $effectiveRank == 7)
                     <div class="col-lg-12">
                         <div class="card h-auto">
                             <div class="card-title">
@@ -224,6 +229,7 @@
                             </div>
                         </div>
                     </div>
+                    @endif
 
                     <div class="col-lg-12 @if(App\Helpers\Common::checkRouteWisePermission('resort.vacancies.FreshApplicant',config('settings.resort_permissions.view')) == false) d-none @endif">
                         <div class="card h-auto" id="card-vac">

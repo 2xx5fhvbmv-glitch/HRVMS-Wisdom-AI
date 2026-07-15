@@ -267,6 +267,17 @@ class ResortAllNotificationController extends Controller
                 $getNotifications =  (object)[];
                 $HODpendingResponse = 0;
             }
+
+            // DB::beginTransaction() above was never followed by a commit on
+            // the success path — every write in this method (the original
+            // HrReminderRequestManning::create() row AND the persistent
+            // per-HOD ResortNotification rows added above) silently rolled
+            // back when the request ended instead of actually persisting.
+            // This is the real reason the reminder "still wasn't fixed" —
+            // the notification logic itself was correct, nothing was ever
+            // being saved to begin with.
+            DB::commit();
+
             $response['success'] = true;
             $response['html']= '' ;
             $response['msg'] = __('Message sent successfully');
