@@ -178,6 +178,7 @@ class BudgetController extends Controller
                 'e.Dept_id',
                 'e.nationality',
                 'e.basic_salary',
+                'e.joining_date',
             ])->groupBy('position_id');
 
         // 2) BudgetStatus rows keyed by Budget_id.
@@ -233,6 +234,28 @@ class BudgetController extends Controller
                 $headcount = (int) ($position->headcount ?? 0);
                 $filled    = $position->employees->count();
                 $position->vacantcount = max(0, $headcount - $filled);
+
+                // When more Active employees are assigned to this position
+                // than the manning budget allows (a real overstaffing
+                // situation, e.g. two people assigned against a 1-headcount
+                // budget), flag whoever's beyond the budgeted count so HR
+                // can see who's the discrepancy without cross-checking
+                // numbers by eye. Earliest joiners are treated as the
+                // originally-budgeted seats; whoever joined that position
+                // LATEST is the one flagged as over-budget.
+                if ($filled > $headcount) {
+                    $position->employees = $position->employees
+                        ->sortBy('joining_date')
+                        ->values()
+                        ->map(function ($employee, $index) use ($headcount) {
+                            $employee->out_of_budget = $index >= $headcount;
+                            return $employee;
+                        });
+                } else {
+                    $position->employees->each(function ($employee) {
+                        $employee->out_of_budget = false;
+                    });
+                }
 
                 // Initialise vacant position properties.
                 $position->proper_vacant_count = 0;
@@ -1087,9 +1110,21 @@ class BudgetController extends Controller
             }
         }
 
-        // Get divisions with departments for hierarchical view
+        // Get divisions with departments for hierarchical view. The nested
+        // `departments` eager-load below was already correctly scoped to
+        // $rank_wise_departments — a division outside the user's scope
+        // ended up with an empty departments collection — but the division
+        // ROW ITSELF was never filtered out, so a scoped F&B HOD still saw
+        // every OTHER division's card/name (with $0.00, since it had no
+        // visible departments underneath, but still visibly present).
+        // whereHas enforces the same scope on the division query itself.
         $divisions = ResortDivision::where('resort_id', $resortId)
             ->where('status', 'active')
+            ->whereHas('departments', function($query) use ($rank_wise_departments, $resortId) {
+                $query->where('resort_id', $resortId)
+                    ->whereIn('id', $rank_wise_departments)
+                    ->where('status', 'active');
+            })
             ->with(['departments' => function($query) use ($rank_wise_departments, $resortId, $year) {
                 $query->where('resort_id', $resortId)
                     ->whereIn('id', $rank_wise_departments)
