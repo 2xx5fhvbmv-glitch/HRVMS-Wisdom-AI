@@ -130,19 +130,25 @@
 <script>
     $(document).ready(function () {
 
+        // Debounced — was firing a full grid-HTML AJAX reload on every
+        // keystroke (see main Applicants/talentpool.blade.php for the same
+        // fix and why).
+        let searchDebounce;
         $('.search').on('keyup', function() {
+            clearTimeout(searchDebounce);
+            searchDebounce = setTimeout(function() {
+                let girdview = $(".btn-grid").hasClass('active');
 
-            let girdview = $(".btn-grid").hasClass('active');
+                if(girdview)
+                {
+                    DatatableGrid();
 
-            if(girdview)
-            {
-                DatatableGrid();
-
-            }
-            else
-            {
-                DatatableList();
-            }
+                }
+                else
+                {
+                    DatatableList();
+                }
+            }, 350);
         });
         $("#ResortDepartment").select2({"Placeholder":"Select Department"});
         $(".Positions").select2({"Placeholder":"Select Positions"});
@@ -439,6 +445,34 @@
 
 
     }
+
+    // Animates the circular AI Ranking/Scoring meters in the grid partial
+    // (gridviwe.blade.php's .progress-container) — was called without a
+    // definition in this file (copy-pasted from Applicants/index.blade.php),
+    // throwing "ApplicantProgress is not defined" on every grid reload.
+    function ApplicantProgress() {
+        const radius = 54;
+        const circumference = 2 * Math.PI * radius;
+
+        const progressContainers = document.querySelectorAll('.progress-container');
+        progressContainers.forEach(container => {
+            const progressCircle = container.querySelector('.progress');
+            const progressValue = container.getAttribute('data-progress');
+            const offset = circumference - (progressValue / 100 * circumference);
+            if (progressCircle)
+            {
+                progressCircle.style.transition = 'none';
+                progressCircle.style.strokeDasharray = circumference;
+                progressCircle.style.strokeDashoffset = circumference;
+                progressCircle.offsetHeight;
+                setTimeout(() => {
+                    progressCircle.style.transition = 'stroke-dashoffset 0.75s ease-in-out';
+                    progressCircle.style.strokeDashoffset = offset;
+                }, 100);
+            }
+        });
+    }
+
     function DatatableGrid()
     {
 

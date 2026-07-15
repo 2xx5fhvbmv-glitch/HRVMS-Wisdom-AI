@@ -267,7 +267,12 @@
                 $(".btn-list").removeClass("active");
                 $(".list-main").addClass("d-none");
                 $(".list-main").removeClass("d-block");
-                DatatableGrid()
+                // Was calling DatatableGrid(), which is never defined on
+                // this page (copy-pasted from the Applicants page) — grid
+                // view never loaded/refreshed its data on click, throwing
+                // "DatatableGrid is not defined" instead. EmployeeGrid()
+                // is this page's actual grid-loading function.
+                EmployeeGrid()
             });
             $(".btn-list").click(function () {
                 $(this).addClass("active");
@@ -277,7 +282,10 @@
                 $(".grid-main").addClass("d-none");
                 $(".grid-main").addClass("d-block");
                 $('.table-ta-employeeslist').DataTable().ajax.reload();
-                ApplicantProgress();
+                // ApplicantProgress() was also copy-pasted in here with no
+                // matching .progress-container markup anywhere on this
+                // page (that's an Applicants-grid-only concept) — dead
+                // call that only ever threw a console error.
             });
     $(document).on('input', '.Search', function () {
         EmployeeGrid();
