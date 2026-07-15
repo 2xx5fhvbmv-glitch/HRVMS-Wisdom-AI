@@ -75,6 +75,24 @@ class ProfileController extends Controller
 
           // Assign rank_type to the get_employee array
           $profileArray['get_employee']['rank_type'] = $rankType;
+
+          // Mobile's GetEmployee.fromJson casts `education`/`experiance` as
+          // String? — sending the raw relation array (even an empty [])
+          // crashes the whole Profile screen, since a List is never
+          // assignable to String?. Collapse each relation down to one
+          // human-readable summary string (or null) instead of the array.
+          $educationRows = $profileArray['get_employee']['education'] ?? [];
+          $profileArray['get_employee']['education'] = collect($educationRows)->map(function ($e) {
+              $title = $e['degree'] ?: ($e['education_level'] ?? '');
+              $summary = trim($title . (!empty($e['institution_name']) ? ' - ' . $e['institution_name'] : ''));
+              return $summary . (!empty($e['attendance_period']) ? ' (' . $e['attendance_period'] . ')' : '');
+          })->filter()->implode('; ') ?: null;
+
+          $experianceRows = $profileArray['get_employee']['experiance'] ?? [];
+          $profileArray['get_employee']['experiance'] = collect($experianceRows)->map(function ($e) {
+              $summary = trim(($e['job_title'] ?? '') . (!empty($e['company_name']) ? ' at ' . $e['company_name'] : ''));
+              return $summary . (!empty($e['duration']) ? ' (' . $e['duration'] . ')' : '');
+          })->filter()->implode('; ') ?: null;
         }
 
         return response()->json(['success' => true, 'profile' => $profileArray,]);
