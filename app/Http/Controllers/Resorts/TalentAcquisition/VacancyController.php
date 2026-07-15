@@ -457,6 +457,22 @@ class VacancyController extends Controller
                             $hr_id,
                             $ModuleName
                         )));
+
+                        // ResortNotificationEvent above only broadcasts over
+                        // Pusher for the web bell icon (ShouldBroadcast, no
+                        // persistence, no push) — it never reached the
+                        // mobile app. This is the actual mobile push HR was
+                        // missing when a HOD submits a new hiring request.
+                        Common::sendMobileNotification(
+                            $this->resort->resort_id,
+                            1,
+                            null,
+                            null,
+                            $title,
+                            $msg,
+                            'Talent Acquisition (Hiring Request)',
+                            [$hr_id]
+                        );
                     }
                 } catch (\Exception $e) {
                     \Log::warning('Vacancy notification failed: ' . $e->getMessage());
@@ -807,14 +823,20 @@ class VacancyController extends Controller
                 'V_id' => $vacancy->id,
             ]);
 
+            // Same fix as store(): build the FULL chain from HR up to and
+            // including this resort's configured final-approval rank
+            // (3=HR, 7=Finance, or 8=GM). The old `<` + hardcoded
+            // {"3":"HR","8":"GM"} union always force-added a GM row and
+            // never added Finance itself, so a resort configured with
+            // Finance(7) as final approval had Finance silently skipped
+            // from the chain every time a vacancy was edited/resubmitted
+            // via this method (store() got this fix already; update() did
+            // not).
             $FainalKey = Common::TaFinalApproval($resort_id);
             $position_rank = config('settings.final_rank');
             $CycleOfRequest = array_filter($position_rank, function ($value, $key) use ($FainalKey) {
-                return $key < $FainalKey;
+                return (int) $key <= (int) $FainalKey;
             }, ARRAY_FILTER_USE_BOTH);
-
-            $newData = ["3" => "HR", "8" => "GM"];
-            $CycleOfRequest += $newData;
 
             foreach ($CycleOfRequest as $key => $value) {
                 TAnotificationChild::create([
@@ -836,6 +858,19 @@ class VacancyController extends Controller
                         $this->resort->resort_id, $this->type[6], 'Upcoming Investigation Meeting Reminder',
                         $msg, 0, $hr_id, $ModuleName
                     )));
+
+                    // Same gap as store(): the event above only broadcasts
+                    // to the web bell icon, never reaches the mobile app.
+                    Common::sendMobileNotification(
+                        $this->resort->resort_id,
+                        1,
+                        null,
+                        null,
+                        $title,
+                        $msg,
+                        'Talent Acquisition (Hiring Request)',
+                        [$hr_id]
+                    );
                 }
             } catch (\Exception $e) {
                 \Log::warning('Vacancy notification failed: ' . $e->getMessage());

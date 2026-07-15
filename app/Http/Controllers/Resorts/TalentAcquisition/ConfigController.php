@@ -567,6 +567,21 @@ class ConfigController extends Controller
                                                                             $sentto->id,
                                                                             'Talent Acquisition'
                                                                         )));
+
+                    // ResortNotificationEvent only broadcasts to the web
+                    // bell icon — the next approver in the chain (Finance/
+                    // GM) never got a mobile push telling them a vacancy
+                    // was waiting in "Hire Requests Pending Your Approval".
+                    Common::sendMobileNotification(
+                        $this->resort->resort_id,
+                        1,
+                        null,
+                        null,
+                        'Hiring Request',
+                        $msg,
+                        'Talent Acquisition (Hiring Request)',
+                        [$sentto->id]
+                    );
                 }
 
 
