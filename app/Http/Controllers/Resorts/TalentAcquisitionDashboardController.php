@@ -262,11 +262,18 @@ class TalentAcquisitionDashboardController extends Controller
                                 $v->ExpiryDate = Carbon::parse($v->link_Expiry_date)->format('d M Y');
                                 $v->ApplicationId= $v->application_id;
                             }
+            // INNER JOIN to vacancies silently drops any applicant whose
+            // Parent_v_id is null/0 (legacy/manually-added rows never
+            // linked to a vacancy) — same defect already fixed in
+            // ApplicantsController::TalentPool(). leftJoin + orWhereNull
+            // keeps those rows visible without breaking the department scope.
             $talentPoolQuery = Applicant_form_data::join('applicant_wise_statuses as t1', 't1.Applicant_id', '=', 'applicant_form_data.id')
-                            ->join('vacancies as v', 'v.id', '=', 'applicant_form_data.Parent_v_id')
+                            ->leftJoin('vacancies as v', 'v.id', '=', 'applicant_form_data.Parent_v_id')
                             ->whereIn("t1.status", ["Rejected","Rejected By Wisdom AI"]);
             if (!$canSeeAllDepts && $userDeptId) {
-                $talentPoolQuery->where('v.department', $userDeptId);
+                $talentPoolQuery->where(function ($q) use ($userDeptId) {
+                    $q->where('v.department', $userDeptId)->orWhereNull('v.department');
+                });
             }
             $talentPool = $talentPoolQuery->latest('t1.created_at')
                             ->take('10')
@@ -276,11 +283,13 @@ class TalentAcquisitionDashboardController extends Controller
             $currentMonthEnd = Carbon::now()->endOfMonth();
 
             $totalApplicantsQuery = Applicant_form_data::join('applicant_wise_statuses as t1', 't1.Applicant_id', '=', 'applicant_form_data.id')
-                        ->join('vacancies as v', 'v.id', '=', 'applicant_form_data.Parent_v_id')
+                        ->leftJoin('vacancies as v', 'v.id', '=', 'applicant_form_data.Parent_v_id')
                         ->where('t1.status', "!=",'Selected')
                         ->where('applicant_form_data.resort_id', $resort_id);
             if (!$canSeeAllDepts && $userDeptId) {
-                $totalApplicantsQuery->where('v.department', $userDeptId);
+                $totalApplicantsQuery->where(function ($q) use ($userDeptId) {
+                    $q->where('v.department', $userDeptId)->orWhereNull('v.department');
+                });
             }
             $TotalApplicants = $totalApplicantsQuery->select(DB::raw('COUNT(DISTINCT t1.Applicant_id) as total_applicants'))
                         ->groupBy('t1.Applicant_id')
@@ -295,20 +304,24 @@ class TalentAcquisitionDashboardController extends Controller
 
             $interviewsQuery = DB::table('applicant_inter_view_details as aid')
                 ->join('applicant_form_data as afd', 'afd.id', '=', 'aid.Applicant_id')
-                ->join('vacancies as v', 'v.id', '=', 'afd.Parent_v_id')
+                ->leftJoin('vacancies as v', 'v.id', '=', 'afd.Parent_v_id')
                 ->where('aid.resort_id', $resort_id);
             if (!$canSeeAllDepts && $userDeptId) {
-                $interviewsQuery->where('v.department', $userDeptId);
+                $interviewsQuery->where(function ($q) use ($userDeptId) {
+                    $q->where('v.department', $userDeptId)->orWhereNull('v.department');
+                });
             }
             $Interviews = $interviewsQuery->count();
 
             $hiredQuery = DB::table('applicant_wise_statuses as t1')
                     ->join('applicant_form_data as t2', 't2.id', '=', 't1.Applicant_id')
-                    ->join('vacancies as v', 'v.id', '=', 't2.Parent_v_id')
+                    ->leftJoin('vacancies as v', 'v.id', '=', 't2.Parent_v_id')
                     ->where('t2.resort_id', $resort_id)
                     ->where("t1.status","Contract Accepted");
             if (!$canSeeAllDepts && $userDeptId) {
-                $hiredQuery->where('v.department', $userDeptId);
+                $hiredQuery->where(function ($q) use ($userDeptId) {
+                    $q->where('v.department', $userDeptId)->orWhereNull('v.department');
+                });
             }
             $Hired = $hiredQuery->groupBy('t1.Applicant_id')
                     ->get()
@@ -321,10 +334,12 @@ class TalentAcquisitionDashboardController extends Controller
             // Top Countries - applicants grouped by country
             $topCountriesQuery = DB::table('applicant_form_data')
                 ->join('countries', 'countries.id', '=', 'applicant_form_data.country')
-                ->join('vacancies', 'vacancies.id', '=', 'applicant_form_data.Parent_v_id')
-                ->where('vacancies.Resort_id', $resort_id);
+                ->leftJoin('vacancies', 'vacancies.id', '=', 'applicant_form_data.Parent_v_id')
+                ->where('applicant_form_data.resort_id', $resort_id);
             if (!$canSeeAllDepts && $userDeptId) {
-                $topCountriesQuery->where('vacancies.department', $userDeptId);
+                $topCountriesQuery->where(function ($q) use ($userDeptId) {
+                    $q->where('vacancies.department', $userDeptId)->orWhereNull('vacancies.department');
+                });
             }
             $topCountries = $topCountriesQuery->selectRaw('countries.name as country, countries.flag_url, countries.shortname as country_code, COUNT(applicant_form_data.id) as total_count')
                 ->groupBy('countries.name', 'countries.flag_url', 'countries.shortname')
@@ -801,11 +816,13 @@ class TalentAcquisitionDashboardController extends Controller
             // dd($vacancies);
 
             $TotalApplicantsQuery = Applicant_form_data::join('applicant_wise_statuses as t1', 't1.Applicant_id', '=', 'applicant_form_data.id')
-                ->join('vacancies as t2', 't2.id', '=', 'applicant_form_data.Parent_v_id')
+                ->leftJoin('vacancies as t2', 't2.id', '=', 'applicant_form_data.Parent_v_id')
                 ->where('t1.status', '!=', 'Selected')
                 ->where('applicant_form_data.resort_id', $resort_id);
             if (!$showAllDepts) {
-                $TotalApplicantsQuery->where('t2.department', $Dept_id);
+                $TotalApplicantsQuery->where(function ($q) use ($Dept_id) {
+                    $q->where('t2.department', $Dept_id)->orWhereNull('t2.department');
+                });
             }
             $TotalApplicants = $TotalApplicantsQuery->select(DB::raw('COUNT(DISTINCT t1.Applicant_id) as total_applicants'))
                 ->first();
@@ -814,10 +831,12 @@ class TalentAcquisitionDashboardController extends Controller
 
             $InterviewsQuery = DB::table('applicant_inter_view_details as t1')
                 ->join('applicant_form_data as t2', 't2.id', '=', 't1.Applicant_id') // Linking to applicant_form_data
-                ->join('vacancies as t3', 't3.id', '=', 't2.Parent_v_id') // Linking to vacancies for department
+                ->leftJoin('vacancies as t3', 't3.id', '=', 't2.Parent_v_id') // Linking to vacancies for department
                 ->where('t2.resort_id', $resort_id);
             if (!$showAllDepts) {
-                $InterviewsQuery->where('t3.department', $Dept_id);
+                $InterviewsQuery->where(function ($q) use ($Dept_id) {
+                    $q->where('t3.department', $Dept_id)->orWhereNull('t3.department');
+                });
             }
             $Interviews = $InterviewsQuery->count();
 
@@ -844,11 +863,13 @@ class TalentAcquisitionDashboardController extends Controller
 
             $HiredQuery = DB::table('applicant_wise_statuses as t1')
                 ->join('applicant_form_data as t2', 't2.id', '=', 't1.Applicant_id')
-                ->join('vacancies as t3', 't3.id', '=', 't2.Parent_v_id')
+                ->leftJoin('vacancies as t3', 't3.id', '=', 't2.Parent_v_id')
                 ->where('t2.resort_id', $resort_id)
                 ->where('t1.status', 'Contract Accepted');
             if (!$showAllDepts && $effectiveRank != 3) {
-                $HiredQuery->where('t3.department', $Dept_id);
+                $HiredQuery->where(function ($q) use ($Dept_id) {
+                    $q->where('t3.department', $Dept_id)->orWhereNull('t3.department');
+                });
             }
             $Hired = $HiredQuery->groupBy('t1.Applicant_id')
                 ->get()
