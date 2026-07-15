@@ -254,18 +254,27 @@ class BoardingPassController extends Controller
                         'status'                        =>  'Pending',
                     ]);
 
-                    // Common::sendMobileNotification(
-                    //     $this->resort_id,
-                    //     2,
-                    //     null,
-                    //     null,
-                    //     'Boarding Pass Request',
-                    //     'A boarding pass request has been submitted by ' . $this->user->first_name . ' ' . $this->user->last_name . '.',
-                    //     'Boarding Pass',
-                    //     [$approver->id],
-                    //     null,
-                    // );
-
+                    // Was commented out — approvers (SM/HR/HOD) never got a
+                    // mobile push when a new boarding pass request was
+                    // submitted, so nobody knew to open the app and act on
+                    // it. Since the web list at /leaves/boarding-pass-requests
+                    // only shows a pass once the HOD's approval row is
+                    // already Approved, a silent HOD (never notified, never
+                    // opened the app) meant the request could never progress
+                    // far enough to appear on the web page either.
+                    Common::sendMobileNotification(
+                        $this->resort_id,
+                        2,
+                        null,
+                        null,
+                        'Boarding Pass Request',
+                        'A boarding pass request has been submitted by ' . $this->user->first_name . ' ' . $this->user->last_name . '.',
+                        'Boarding Pass',
+                        [$approver->id],
+                        null,
+                        false,
+                        'boarding-pass-request'
+                    );
                 });
 
                 DB::commit();
