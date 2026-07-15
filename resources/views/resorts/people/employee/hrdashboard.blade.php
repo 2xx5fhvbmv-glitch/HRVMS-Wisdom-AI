@@ -478,7 +478,7 @@
                                             <img src="{{$profilePicture}}" alt="user" class="img-fluid" />
                                         </div>
                                         <div>
-                                            <h6 title="{{$emp_info->employee->resortAdmin->id ?? ''}}">{{@$emp_info->employee->resortAdmin->full_name}} ({{$emp_info->employee->position->position_title ?? 'N/A'}} - {{$emp_info->employee->department->name ?? 'N/A'}}({{$emp_info->employee->department->code ?? ''}}))</h6>
+                                            <h6 title="{{$emp_info->employee->resortAdmin->id ?? ''}}">{{@$emp_info->employee->resortAdmin->full_name}}</h6>
                                             <p>{{$emp_info->title}}</p>
                                         </div>
                                         <div>
