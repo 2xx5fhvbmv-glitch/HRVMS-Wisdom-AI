@@ -3316,6 +3316,10 @@ class TimeAndAttendanceController extends Controller
                     'date' => $dateString,
                     'day' => str_pad($day, 2, '0', STR_PAD_LEFT),
                     'day_name' => $dayName,
+                    // For UI layouts that show the day number and month name
+                    // stacked (date on top, month below) instead of a single
+                    // combined date string.
+                    'month_short' => $date->format('M'),
                     'is_weekend' => $isWeekend,
                 ];
 
@@ -3327,7 +3331,9 @@ class TimeAndAttendanceController extends Controller
                     if (!empty($shiftData->CheckingTime)) {
                         try {
                             $checkInTimeParsed = Carbon::parse($shiftData->CheckingTime);
-                            $dayData['checking_time'] = $checkInTimeParsed->format('H:i:s');
+                            // No seconds — the register only ever needs
+                            // hours and minutes.
+                            $dayData['checking_time'] = $checkInTimeParsed->format('H:i');
                             $dayData['checking_time_formatted'] = $checkInTimeParsed->format('h:i A');
                         } catch (\Exception $e) {
                             $dayData['checking_time'] = null;
@@ -3341,7 +3347,7 @@ class TimeAndAttendanceController extends Controller
                     if (!empty($shiftData->CheckingOutTime)) {
                         try {
                             $checkOutTimeParsed = Carbon::parse($shiftData->CheckingOutTime);
-                            $dayData['checking_out_time'] = $checkOutTimeParsed->format('H:i:s');
+                            $dayData['checking_out_time'] = $checkOutTimeParsed->format('H:i');
                             $dayData['checking_out_time_formatted'] = $checkOutTimeParsed->format('h:i A');
                         } catch (\Exception $e) {
                             $dayData['checking_out_time'] = null;
@@ -3360,6 +3366,14 @@ class TimeAndAttendanceController extends Controller
                     $dayData['day_wise_total_hours'] = $shiftData->DayWiseTotalHours ?? null;
                     $dayData['check_in_location'] = $shiftData->InTime_Location ?? null;
                     $dayData['check_out_location'] = $shiftData->OutTime_Location ?? null;
+                    // Numeric coordinates — the location string above is a
+                    // Google-Maps-embed URL or raw JSON depending on app
+                    // version and can't be plotted directly; these are what
+                    // the location icon on the register actually needs.
+                    $dayData['check_in_latitude'] = $shiftData->InTime_Latitude ?? null;
+                    $dayData['check_in_longitude'] = $shiftData->InTime_Longitude ?? null;
+                    $dayData['check_out_latitude'] = $shiftData->OutTime_Latitude ?? null;
+                    $dayData['check_out_longitude'] = $shiftData->OutTime_Longitude ?? null;
 
                     // Process leave data
                     $leaveInfo = null;
@@ -3405,6 +3419,10 @@ class TimeAndAttendanceController extends Controller
                     $dayData['day_wise_total_hours'] = null;
                     $dayData['check_in_location'] = null;
                     $dayData['check_out_location'] = null;
+                    $dayData['check_in_latitude'] = null;
+                    $dayData['check_in_longitude'] = null;
+                    $dayData['check_out_latitude'] = null;
+                    $dayData['check_out_longitude'] = null;
                     $dayData['leave_info'] = null;
                     $dayData['is_day_off'] = false;
                 }
