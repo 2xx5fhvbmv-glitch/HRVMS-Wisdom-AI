@@ -2510,18 +2510,24 @@ class TimeAndAttendanceController extends Controller
         try {
 
             $currentDate                                    =   Carbon::today()->format('Y-m-d');
-            // Return only employees who are marked present for today (Status Present/On-Time/Late and real check-in in DB; no future)
-            $query                                           =   ParentAttendace::from('parent_attendaces as t3')
-                                                                    ->where('t3.resort_id', $resort_id)
-                                                                    ->whereRaw('DATE(t3.date) = ?', [$currentDate])
-                                                                    ->whereRaw('t3.date <= ?', [$currentDate])
-                                                                    ->whereIn('t3.Status', ['Present', 'On-Time', 'Late'])
-                                                                    ->whereNotNull('t3.CheckingTime')
-                                                                    ->whereRaw("TRIM(COALESCE(t3.CheckingTime,'')) NOT IN ('','0','00:00','00:00:00')")
-                                                                    ->join('employees', 'employees.id', '=', 't3.Emp_id')
+            // This must return the HOD/HR's whole scoped roster so they can
+            // mark anyone who hasn't self-checked-in — not just employees
+            // who already have a Present attendance row. The old query
+            // started FROM parent_attendaces filtered to Status
+            // Present/On-Time/Late, so on any day nobody had checked in
+            // yet (or for employees who always need manual marking) the
+            // list came back completely empty. Start FROM employees
+            // instead and LEFT JOIN today's attendance so it's optional.
+            $query                                           =   Employee::from('employees')
                                                                     ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
                                                                     ->join('resort_positions as rp', 'rp.id', '=', 'employees.Position_id')
+                                                                    ->leftJoin('parent_attendaces as t3', function ($join) use ($currentDate) {
+                                                                        $join->on('t3.Emp_id', '=', 'employees.id')
+                                                                             ->whereRaw('DATE(t3.date) = ?', [$currentDate]);
+                                                                    })
                                                                     ->where('t1.resort_id', $resort_id)
+                                                                    ->where('employees.resort_id', $resort_id)
+                                                                    ->where('employees.status', 'Active')
                                                                     ->select(
                                                                         't3.id as id',
                                                                         't1.id as admin_id',
@@ -2533,7 +2539,6 @@ class TimeAndAttendanceController extends Controller
                                                                         't3.Status',
                                                                         't3.CheckingTime',
                                                                         't3.CheckingOutTime',
-                                                                        't3.date as date',
                                                                         't3.CheckInCheckOut_Type'
                                                                     );
 
@@ -2543,12 +2548,22 @@ class TimeAndAttendanceController extends Controller
 
             $employeeAttendance                             =   $query->get();
 
-            $employeeAttendance                             =   $employeeAttendance->map(function ($item) {
+            $employeeAttendance                             =   $employeeAttendance->map(function ($item) use ($currentDate) {
                 if (empty($item->profile_picture) || $item->profile_picture == '0') {
                     $item->profile_picture = Common::getResortUserPicture($item->admin_id);
                 }
-                $item->attendance_display_status             =   'Present';
-                $item->can_mark_present                     =   false;
+                $item->date                                  =   $currentDate;
+                $hasRealCheckIn                              =   !empty($item->CheckingTime) && !in_array(trim($item->CheckingTime), ['0', '00:00', '00:00:00']);
+                if ($hasRealCheckIn && in_array($item->Status, ['Present', 'On-Time', 'Late'], true)) {
+                    $item->attendance_display_status         =   'Present';
+                    $item->can_mark_present                  =   false;
+                } elseif ($item->Status === 'Absent') {
+                    $item->attendance_display_status         =   'Absent';
+                    $item->can_mark_present                  =   true;
+                } else {
+                    $item->attendance_display_status         =   'Not Marked';
+                    $item->can_mark_present                  =   true;
+                }
                 return $item;
             })->toArray();
 
