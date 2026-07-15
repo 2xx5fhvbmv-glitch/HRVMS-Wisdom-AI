@@ -195,7 +195,16 @@
                              Payable Leaves table; the daily_salary multiplier
                              also runs through $toDisplay. --}}
                     @php
-                        $workedDays = (int) ($calculated['worked_days'] ?? 0);
+                        // Prefer the frozen value (set at store()/submit() time)
+                        // over a live recompute — attendance data can change
+                        // after a settlement is saved, and re-deriving the day
+                        // count on every page load could show a different
+                        // number than what the frozen dollar amount below was
+                        // actually based on. Older rows predating this column
+                        // fall back to the live figure.
+                        $workedDays = $finalSettlement->worked_days !== null
+                            ? (int) $finalSettlement->worked_days
+                            : (int) ($calculated['worked_days'] ?? 0);
 
                         // Earned Salary (Basic Salary For N Days). Prefer the
                         // HR-submitted value (final_settlements.total_earnings —
@@ -392,6 +401,7 @@
                                         <td>Gross Earnings</td>
                                         <td class="fw-600 text-end" id="grossEarnings">{!! Common::formatCurrency($totalEarnings, $payCurrency) !!}</td>
                                         <input type="hidden" name="total_earnings" id="totalEarningsInput" value="{{ number_format($totalEarnings, 2, '.', '') }}">
+                                        <input type="hidden" name="worked_days" id="workedDaysInput" value="{{ $workedDays }}">
                                     </tr>
                                     <tr>
                                         <td>Total Deductions</td>
@@ -541,7 +551,14 @@
             data: {
                 _token: "{{ csrf_token() }}",
                 final_settlement_id: $("#final_settlement_id").val(),
-               
+                // Freeze what's actually on screen right now — this is
+                // what previously got computed here but silently dropped,
+                // leaving the list page showing a stale total_earnings/
+                // net_pay from whenever the draft was first saved.
+                total_earnings: $("#totalEarningsInput").val(),
+                total_deductions: $("#totalDeductionsInput").val(),
+                net_pay: $("#netPayInput").val(),
+                worked_days: $("#workedDaysInput").val(),
             },
             success: function(response) {
                 console.log(response);

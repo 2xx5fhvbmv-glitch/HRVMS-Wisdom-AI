@@ -625,6 +625,12 @@ class PayslipController extends Controller
                     'leave_encashment' => $validated['leave_encashment'],
                     'loan_payment' => $validated['loan_payment'],
                     'basic_salary' => $validated['basic_salary'],
+                    // Freeze the day count that justified earned_salary at
+                    // this exact moment — the review page previously showed
+                    // this recomputed live from current attendance, which
+                    // could drift from the frozen dollar amount after the
+                    // fact (e.g. "0 days" next to a non-zero paid amount).
+                    'worked_days' => $calc['worked_days'] ?? null,
                     // total_earnings is the FULL gross (earned + service +
                     // leave encashment + custom), not just the basic-for-N-
                     // days slice. Was misleading before: list page showed
@@ -820,11 +826,26 @@ class PayslipController extends Controller
 
         \DB::beginTransaction();
         try {
-            $finalSettlement->update([
+            // The review page recomputes Total Earnings/Deductions/Net Pay
+            // live (leave breakdown, custom earnings/deductions rows, etc.)
+            // and posts the final numbers here via hidden fields — this
+            // was previously being silently dropped and the row stayed on
+            // whatever total_earnings/net_pay had been saved at store()
+            // time, which drifts once leave breakdown or attendance-backed
+            // figures change. Persist whatever the page showed HR right
+            // before they clicked Submit, so the list page can never show
+            // a different number than what was actually finalized.
+            $updateData = [
                 'status'       => 'finalized',
                 'finalized_at' => now(),
                 'finalized_by' => Auth::guard('resort-admin')->user()->id ?? null,
-            ]);
+            ];
+            foreach (['total_earnings', 'total_deductions', 'net_pay', 'worked_days'] as $field) {
+                if ($request->filled($field) && is_numeric($request->input($field))) {
+                    $updateData[$field] = $request->input($field);
+                }
+            }
+            $finalSettlement->update($updateData);
 
             // ─── Mark outstanding loan / salary-advance installments as
             // Recovered so the next payroll run doesn't double-deduct
