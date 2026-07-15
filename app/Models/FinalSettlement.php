@@ -14,7 +14,7 @@ class FinalSettlement extends Model
 
     protected $fillable = [
         'employee_id','pension','tax','leave_balance','leave_encashment',
-        'loan_payment','basic_salary','service_charge','total_earnings',
+        'loan_payment','basic_salary','worked_days','service_charge','total_earnings',
         'total_deductions','net_pay','payment_mode','last_working_date',
         'doc_date','reference_no','status'
     ];
