@@ -57,6 +57,16 @@ use Illuminate\Support\Facades\Route;
 		Route::post('resort/employees-docs', [App\Http\Controllers\API\EmployeeDocumentController::class, 'employeeDocument']);
 		Route::post('resort/get-employees-docs', [App\Http\Controllers\API\EmployeeDocumentController::class, 'getEmployeeDocument']);
 
+		//File Management (mobile parity for the web File Management module)
+		Route::get('resort/filemanagement/my-folder', [App\Http\Controllers\API\FileManagementController::class, 'myFolder']);
+		Route::get('resort/filemanagement/shared-with-me', [App\Http\Controllers\API\FileManagementController::class, 'sharedWithMe']);
+		Route::get('resort/filemanagement/folder/{unique_id}', [App\Http\Controllers\API\FileManagementController::class, 'folderContents']);
+		Route::post('resort/filemanagement/create-folder', [App\Http\Controllers\API\FileManagementController::class, 'createFolder']);
+		Route::post('resort/filemanagement/upload', [App\Http\Controllers\API\FileManagementController::class, 'upload']);
+		Route::post('resort/filemanagement/rename', [App\Http\Controllers\API\FileManagementController::class, 'rename']);
+		Route::post('resort/filemanagement/delete-file', [App\Http\Controllers\API\FileManagementController::class, 'deleteFile']);
+		Route::get('resort/filemanagement/file/{unique_id}/download', [App\Http\Controllers\API\FileManagementController::class, 'downloadFile']);
+
 		//Leave
 		Route::get('resort/leave-dashboard', [App\Http\Controllers\API\LeaveController::class, 'leaveDashboard']);
 		Route::post('resort/leave-add', [App\Http\Controllers\API\LeaveController::class, 'leaveAdd']);
