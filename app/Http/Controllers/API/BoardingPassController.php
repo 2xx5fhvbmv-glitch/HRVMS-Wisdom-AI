@@ -178,8 +178,13 @@ class BoardingPassController extends Controller
             $departureDate                          =   !empty($data['dept_date']) ? Carbon::createFromFormat('Y-m-d', $data['dept_date'])->format('Y-m-d') : null;
             $departureMode                          =   $data['dept_transportation'] ?? null;
 
-            // Check for duplicate arrival or departure entry
+            // Check for duplicate arrival or departure entry. Was matching
+            // against every past pass regardless of status, so a Rejected
+            // or Cancel(led) pass on some unrelated date could still block
+            // a brand-new request — only Pending/Approved passes represent
+            // a genuine standing conflict.
             $existingPass                           =   EmployeeTravelPass::where('employee_id', $employee->id)
+                                                            ->whereIn('status', ['Pending', 'Approved'])
                                                             ->where(function ($q) use ($arrivalDate, $arrivalMode, $departureDate, $departureMode) {
                                                                 $q->where(function ($q1) use ($arrivalDate, $arrivalMode) {
                                                                     $q1->whereDate('arrival_date', $arrivalDate)

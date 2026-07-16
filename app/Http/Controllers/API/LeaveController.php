@@ -838,15 +838,22 @@ class LeaveController extends Controller
                                                                 ->get();
                 } else {
                     // Line Worker / Supervisor / Manager / HOD (and anyone else):
-                    // own department only. Was previously only dept-filtering
-                    // HOD-rank candidates — the "orWhere rank <> HOD" let
-                    // Managers/GM/HR from ANY department through unfiltered.
+                    // own department, any rank — task delegation means
+                    // "who can cover my shift while I'm on leave", which is
+                    // normally a peer, not necessarily a manager. Was
+                    // restricted to whereIn('rank', [HOD,MGR,GM,HR]) only,
+                    // so Line Workers/Supervisors in the same department
+                    // (the most common delegate) never showed up at all —
+                    // and neither did soft-deleted/non-Active employees get
+                    // excluded.
                     $Dept_id                            =   $employee->Dept_id;
                     $delegations                        =   DB::table('employees')
                                                                 ->join('resort_admins', 'employees.Admin_Parent_id', '=', 'resort_admins.id')
                                                                 ->where('employees.resort_id', $resort_id)
                                                                 ->where('employees.Dept_id', $Dept_id)
-                                                                ->whereIn('employees.rank', [$hodRank, $mgrRank, $gmRank, $hrRank])
+                                                                ->where('employees.status', 'Active')
+                                                                ->whereNull('employees.deleted_at')
+                                                                ->where('employees.id', '!=', $emp_id)
                                                                 ->select(
                                                                     'employees.*',
                                                                     'resort_admins.first_name as first_name',
