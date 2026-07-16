@@ -136,6 +136,7 @@ use Illuminate\Support\Facades\Route;
 			Route::post('timeandattendance/hod-view-duty-roster', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'hodViewDutyRoster']);
 			Route::get('timeandattendance/under-emp-hod', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'underEmpHOD']);
 			Route::get('timeandattendance/duty-roster-employee-list', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'dutyRosterEmployeeList']);
+			Route::get('timeandattendance/todo-list', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'mobileTodoList']);
 			//Accommodation HOD
 			Route::post('accommodation/hod-housekeeping-dashboard', [App\Http\Controllers\API\AccommodationController::class, 'hodHouseKeepingDashboard']);
 			Route::post('accommodation/available-staff-underhod', [App\Http\Controllers\API\AccommodationController::class, 'availableStaffUnderHOD']);
