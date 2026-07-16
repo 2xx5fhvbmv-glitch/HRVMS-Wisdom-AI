@@ -424,7 +424,13 @@ class BoardingPassController extends Controller
                                                                     $query->orderBy('id', 'desc');
                                                                 },
                                                             'employee:id,Admin_Parent_id',
-                                                            'employee.resortAdmin:id,first_name,last_name,profile_picture'
+                                                            'employee.resortAdmin:id,first_name,last_name,profile_picture',
+                                                            // Was never loaded here (other methods in this file do
+                                                            // load it) — the card had no way to show the selected
+                                                            // transportation, and arrival_mode/departure_mode went
+                                                            // out as raw numeric ids with no name attached.
+                                                            'DepartureResortTransportation:id,resort_id,transportation_option',
+                                                            'ArrivalResortTransportation:id,resort_id,transportation_option',
                                                             ])
                                                             ->whereIn('employee_id', $this->underEmp_id)
                                                             ->where('resort_id', $this->resort_id)
@@ -443,6 +449,14 @@ class BoardingPassController extends Controller
                     $role                           =   ucfirst(strtolower($item->approver_rank ?? ''));
                     $item->rank_type                =   $rankConfig[$role] ?? '';
                 }
+                // 'transportation' column on the pass itself is never set
+                // (boardingPassAdd only stores arrival_mode/departure_mode
+                // ids) — resolve the actual selected transportation name
+                // from whichever leg is applicable so the card has
+                // something real to show instead of null.
+                $pass->transportation              =   $pass->DepartureResortTransportation->transportation_option
+                                                        ?? $pass->ArrivalResortTransportation->transportation_option
+                                                        ?? null;
             }
 
             // Replace profile_picture with url
@@ -551,7 +565,13 @@ class BoardingPassController extends Controller
                                                                     $query->orderBy('id', 'desc');
                                                                 },
                                                             'employee:id,Admin_Parent_id',
-                                                            'employee.resortAdmin:id,first_name,last_name,profile_picture'
+                                                            'employee.resortAdmin:id,first_name,last_name,profile_picture',
+                                                            // Was never loaded here (other methods in this file do
+                                                            // load it) — the card had no way to show the selected
+                                                            // transportation, and arrival_mode/departure_mode went
+                                                            // out as raw numeric ids with no name attached.
+                                                            'DepartureResortTransportation:id,resort_id,transportation_option',
+                                                            'ArrivalResortTransportation:id,resort_id,transportation_option',
                                                             ])
                                                             ->where('status', 'Pending')
                                                             ->whereHas('employeeTravelPassStatusData', function($q) use ($currentRank) {
@@ -569,6 +589,14 @@ class BoardingPassController extends Controller
                     $role                           =   ucfirst(strtolower($item->approver_rank ?? ''));
                     $item->rank_type                =   $rankConfig[$role] ?? '';
                 }
+                // 'transportation' column on the pass itself is never set
+                // (boardingPassAdd only stores arrival_mode/departure_mode
+                // ids) — resolve the actual selected transportation name
+                // from whichever leg is applicable so the card has
+                // something real to show instead of null.
+                $pass->transportation              =   $pass->DepartureResortTransportation->transportation_option
+                                                        ?? $pass->ArrivalResortTransportation->transportation_option
+                                                        ?? null;
             }
 
             // Replace profile_picture with url
@@ -659,7 +687,13 @@ class BoardingPassController extends Controller
                                                                     $query->orderBy('id', 'desc');
                                                                 },
                                                             'employee:id,Admin_Parent_id',
-                                                            'employee.resortAdmin:id,first_name,last_name,profile_picture'
+                                                            'employee.resortAdmin:id,first_name,last_name,profile_picture',
+                                                            // Was never loaded here (other methods in this file do
+                                                            // load it) — the card had no way to show the selected
+                                                            // transportation, and arrival_mode/departure_mode went
+                                                            // out as raw numeric ids with no name attached.
+                                                            'DepartureResortTransportation:id,resort_id,transportation_option',
+                                                            'ArrivalResortTransportation:id,resort_id,transportation_option',
                                                             ])
                                                             ->where('status', 'Pending')
                                                             ->where('resort_id', $this->resort_id)
@@ -677,6 +711,14 @@ class BoardingPassController extends Controller
                     $role                           =   ucfirst(strtolower($item->approver_rank ?? ''));
                     $item->rank_type                =   $rankConfig[$role] ?? '';
                 }
+                // 'transportation' column on the pass itself is never set
+                // (boardingPassAdd only stores arrival_mode/departure_mode
+                // ids) — resolve the actual selected transportation name
+                // from whichever leg is applicable so the card has
+                // something real to show instead of null.
+                $pass->transportation              =   $pass->DepartureResortTransportation->transportation_option
+                                                        ?? $pass->ArrivalResortTransportation->transportation_option
+                                                        ?? null;
             }
 
             // Replace profile_picture with url
