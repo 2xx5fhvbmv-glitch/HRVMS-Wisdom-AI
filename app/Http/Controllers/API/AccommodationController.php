@@ -1341,7 +1341,9 @@ class AccommodationController extends Controller
                 'Housekeeping request has been assigned to you by ' . $this->user->first_name . ' ' . $this->user->last_name,
                 'Accommodation',
                 [$request->hod_id],
-                null
+                null,
+                false,
+                'housekeeping-request-assigned'
             );
 
             DB::commit();
@@ -1892,6 +1894,8 @@ class AccommodationController extends Controller
                     'Maintenance',
                     [$engineeringDepHOD->id],
                     null,
+                    false,
+                    'maintenance-request-assigned',
                 );
 
                 return response()->json([
@@ -2169,6 +2173,8 @@ class AccommodationController extends Controller
                 'Maintenance',
                 [$assingEmployeeId],
                 null,
+                false,
+                'maintenance-request-assigned',
             );
 
             DB::commit(); // Commit Transaction
@@ -2451,6 +2457,8 @@ class AccommodationController extends Controller
                         'Maintenance',
                         [$findEDHODChildRequest->ApprovedBy],
                        null,
+                        false,
+                        'maintenance-request-completed',
                         );
                 }
                 
@@ -2544,6 +2552,8 @@ class AccommodationController extends Controller
                         'Maintenance',
                         [$findHRChildRequest->ApprovedBy],
                         null,
+                        false,
+                        'maintenance-request-completed',
                     );
                 }
 
@@ -2628,6 +2638,8 @@ class AccommodationController extends Controller
                     'Maintenance',
                     [$maintanance->Raised_By],
                     $maintanance->id,
+                    false,
+                    'maintenance-request-completed',
                 );
 
                 // If no records were updated, return an error

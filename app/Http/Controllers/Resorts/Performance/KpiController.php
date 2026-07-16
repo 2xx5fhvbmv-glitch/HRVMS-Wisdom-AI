@@ -431,7 +431,7 @@ class KpiController extends Controller
                 $module  = 'Performance';
                 event(new ResortNotificationEvent(Common::nofitication($this->resort->resort_id, 10, $title, $msg, $kpi->id, $kpi->responded_by, $module)));
                 // skipDbInsert=true — nofitication() above already wrote the row.
-                Common::sendMobileNotification($this->resort->resort_id, 2, null, null, $title, $msg, $module, [$kpi->responded_by], $kpi->id, true);
+                Common::sendMobileNotification($this->resort->resort_id, 2, null, null, $title, $msg, $module, [$kpi->responded_by], $kpi->id, true, 'kpi-approved');
             }
         } catch (\Exception $ne) {
             \Log::warning("KPI approve notification failed: " . $ne->getMessage());
@@ -470,7 +470,7 @@ class KpiController extends Controller
                 $msg     = 'Your response to KPI "'.$kpi->property_goal.'" has been rejected by GM. Reason: '.$request->remarks;
                 $module  = 'Performance';
                 event(new ResortNotificationEvent(Common::nofitication($this->resort->resort_id, 10, $title, $msg, $kpi->id, $kpi->responded_by, $module)));
-                Common::sendMobileNotification($this->resort->resort_id, 2, null, null, $title, $msg, $module, [$kpi->responded_by], $kpi->id, true);
+                Common::sendMobileNotification($this->resort->resort_id, 2, null, null, $title, $msg, $module, [$kpi->responded_by], $kpi->id, true, 'kpi-rejected');
             }
         } catch (\Exception $ne) {
             \Log::warning("KPI reject notification failed: " . $ne->getMessage());
@@ -692,7 +692,7 @@ class KpiController extends Controller
         if (!empty($employees)) {
             try {
                 // skipDbInsert=true — nofitication() in the loop above already wrote rows.
-                Common::sendMobileNotification($resort_id, 2, null, null, $title, $msg, $module, $employees, $kpi->id, true);
+                Common::sendMobileNotification($resort_id, 2, null, null, $title, $msg, $module, $employees, $kpi->id, true, 'kpi-notify-employee');
             } catch (\Exception $e) {
                 \Log::warning('KPI mobile push failed: '.$e->getMessage());
             }
@@ -725,7 +725,7 @@ class KpiController extends Controller
 
         if (!empty($gms)) {
             try {
-                Common::sendMobileNotification($resort_id, 2, null, null, $title, $msg, $module, $gms, $kpi->id, true);
+                Common::sendMobileNotification($resort_id, 2, null, null, $title, $msg, $module, $gms, $kpi->id, true, 'kpi-notify-gm');
             } catch (\Exception $e) {
                 \Log::warning('KPI GM mobile push failed: '.$e->getMessage());
             }

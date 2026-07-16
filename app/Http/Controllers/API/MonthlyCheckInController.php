@@ -270,7 +270,7 @@ class MonthlyCheckInController extends Controller
             $msg                                =   'Meeting scheduled by HR for Monthly Check-In. Subject: ' . ($request->Area_of_Improvement ?? $request->Area_of_Discussion);
             $title                              =   'Monthly check-in Meeting Scheduled';
             $ModuleName                         =   'Performance';
-            $sendMobileNotification             =   Common::sendMobileNotification($this->resort_id,2,null,null,$title,$msg,$ModuleName,[$request->emp_id],null);
+            $sendMobileNotification             =   Common::sendMobileNotification($this->resort_id,2,null,null,$title,$msg,$ModuleName,[$request->emp_id],null,false,'monthly-checkin-created');
             // event(new ResortNotificationEvent(Common::nofitication($this->resort_id, 10,$title,$msg,0,$request->emp_id,$ModuleName)));
             DB::commit();
             $response['status']                             =   true;
@@ -328,7 +328,7 @@ class MonthlyCheckInController extends Controller
             $msg                                =   'Meeting Rescheduled by HR for Monthly Check-In Date '.$request->date_discussion;
             $title                              =   'Monthly check-in Meeting Rescheduled';
             $ModuleName                         =   'Performance';
-            $sendMobileNotification             =   Common::sendMobileNotification($this->resort_id,null,null,$title,$msg,$ModuleName,[$meeting->emp_id],null);
+            $sendMobileNotification             =   Common::sendMobileNotification($this->resort_id,null,null,$title,$msg,$ModuleName,[$meeting->emp_id],null,false,'monthly-checkin-reschedule');
 
             DB::commit();
             $response['status']                             =   true;
@@ -502,6 +502,8 @@ class MonthlyCheckInController extends Controller
                                                                     $ModuleName,
                                                                     [$createdByEmployeeId->id],
                                                                     null,
+                                                                    false,
+                                                                    'monthly-checkin-created',
                                                                 );
                                                                 
             event(new ResortNotificationEvent(Common::nofitication($this->resort_id, 10,$title,$msg,0,$createdByEmployeeId->id,$ModuleName)));

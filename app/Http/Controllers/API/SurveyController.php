@@ -334,6 +334,8 @@ class SurveyController extends Controller
                     'Survey',
                     [$hrEmployee->id],
                     null,
+                    false,
+                    'survey-completed',
                 );
             }
 

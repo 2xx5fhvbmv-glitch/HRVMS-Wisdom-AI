@@ -139,7 +139,7 @@ class CalendarController extends Controller
                     'resort_id'                                 =>  $this->resort_id,
                     'employee_id'                               =>  $value,
                 ]);
-                Common::sendMobileNotification($this->resort_id,2,null,null,$data['title'] .' Event','A new event has been created by ' . $this->user->first_name . ' ' . $this->user->last_name . ' on ' . $data['date'] .  ' at ' . $data['time'] . '.','Calendar',[$value],null);
+                Common::sendMobileNotification($this->resort_id,2,null,null,$data['title'] .' Event','A new event has been created by ' . $this->user->first_name . ' ' . $this->user->last_name . ' on ' . $data['date'] .  ' at ' . $data['time'] . '.','Calendar',[$value],null,false,'calendar-event-created');
             }
 
             DB::commit();

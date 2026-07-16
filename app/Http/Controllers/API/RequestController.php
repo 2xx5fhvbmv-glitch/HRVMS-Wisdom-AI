@@ -153,6 +153,8 @@ class RequestController extends Controller
                         'Request',
                         [$hrEmployee->id],
                         null,
+                        false,
+                        'general-request-hr',
                     );
                 }
 
@@ -259,7 +261,7 @@ class RequestController extends Controller
             $guarantorRequests->status                =   $request->status;
             $guarantorRequests->save();
             
-            Common::sendMobileNotification($this->resort_id,2,null,null,"Guarantor Request {$request->status}","Your Guarantor Request {$request->status}","Request",[$PayrollAdvance->employee_id],null);
+            Common::sendMobileNotification($this->resort_id,2,null,null,"Guarantor Request {$request->status}","Your Guarantor Request {$request->status}","Request",[$PayrollAdvance->employee_id],null,false,'guarantor-request-status');
 
             DB::commit();
             return response()->json([

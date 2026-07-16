@@ -304,6 +304,8 @@ class StaffAccommodationController extends Controller
                         'Maintenance',
                         [$hrEmployee->id],
                         null,
+                        false,
+                        'maintenance-request-created',
                     );
                 }
             }

@@ -269,6 +269,8 @@ class ResignationController extends Controller
                     'Resignation',
                     [$hodEmployee->id],
                     null,
+                    false,
+                    'resignation-request-hod',
                 );
                 // Bell notification for the web dashboard (matches the
                 // pattern used by EmployeeResignationController when HOD
@@ -302,6 +304,8 @@ class ResignationController extends Controller
                     'Resignation',
                     [$hrEmployee->id],
                     null,
+                    false,
+                    'resignation-request-hr',
                 );
             }
 

@@ -160,6 +160,8 @@ class DisciplinaryController extends Controller
                     'Employee Disciplinary',
                     [$hrEmployee->id],
                     null,
+                    false,
+                    'disciplinary-acknowledgment',
                 );
             }
             $response['status']                                 =   true;

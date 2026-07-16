@@ -636,7 +636,8 @@ class IncidentController extends Controller
                 $ModuleName,
                 [$user],
                 null,
-                true
+                true,
+                'incident-notification'
             );
         }    
         return response()->json(['message' => 'Statement request sent to involved employees and witnesses.']);
