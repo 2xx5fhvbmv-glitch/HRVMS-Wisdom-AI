@@ -3252,6 +3252,7 @@ class Common
                         // lat/lng columns added for geofencing are what the icon needs.
                         't3.InTime_Latitude', 't3.InTime_Longitude', 't3.InTime_Accuracy',
                         't3.OutTime_Latitude', 't3.OutTime_Longitude', 't3.OutTime_Accuracy',
+                        't3.InTime_GeofenceName', 't3.OutTime_GeofenceName',
                         't2.CheckingOutTime', 't2.CheckingTime', 't2.Status', 't2.id as Attd_id', 't2.Emp_id', 't2.date',
                         't2.Shift_id', 'duty_rosters.DayOfDate', 't1.ShiftName', 'OverTime', 't1.StartTime', 't1.EndTime',
                         't2.DayWiseTotalHours', 't2.note'

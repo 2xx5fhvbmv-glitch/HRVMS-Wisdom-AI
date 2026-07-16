@@ -46,7 +46,7 @@ class TimeAndAttendanceController extends Controller
      */
     private function resolveGeofenceCheck($locationRaw, $rosterData): array
     {
-        $result = ['lat' => null, 'lng' => null, 'accuracy' => null, 'within' => null];
+        $result = ['lat' => null, 'lng' => null, 'accuracy' => null, 'within' => null, 'name' => null];
 
         if (is_array($locationRaw)) {
             $lat = $locationRaw['latitude'] ?? $locationRaw['lat'] ?? null;
@@ -81,6 +81,10 @@ class TimeAndAttendanceController extends Controller
         if (!$geofence) return $result;
 
         $result['within'] = Common::isWithinGeofence($result['lat'], $result['lng'], $geofence);
+        // Was already fetching this row for the within-bounds check but
+        // only ever returning the boolean — the app had no real location
+        // name to show and fell back to a hardcoded "Office" label.
+        $result['name'] = $geofence->name;
         return $result;
     }
 
@@ -1398,6 +1402,7 @@ class TimeAndAttendanceController extends Controller
                             'InTime_Longitude'                      =>  $inTimeGeofence['lng'],
                             'InTime_Accuracy'                       =>  $inTimeGeofence['accuracy'],
                             'InTime_WithinGeofence'                 =>  $inTimeGeofence['within'],
+                            'InTime_GeofenceName'                   =>  $inTimeGeofence['name'],
                         ]);
                     } else {
                         // This else block should not be needed, but keeping for safety
@@ -1448,7 +1453,16 @@ class TimeAndAttendanceController extends Controller
                                 'Parent_attd_id'                        =>  $ParentAttendance->id,
                                 'InTime_out'                            =>  $checkInTime,
                                 'OutTime_out'                           =>  '00:00', // Default for check-in
-                                'InTime_Location'                       =>  $inTimeLocation
+                                'InTime_Location'                       =>  $inTimeLocation,
+                                // This branch never captured geofence data
+                                // at all (not just the name) — same
+                                // $inTimeGeofence computed once earlier in
+                                // this method, just never written here.
+                                'InTime_Latitude'                       =>  $inTimeGeofence['lat'],
+                                'InTime_Longitude'                      =>  $inTimeGeofence['lng'],
+                                'InTime_Accuracy'                       =>  $inTimeGeofence['accuracy'],
+                                'InTime_WithinGeofence'                 =>  $inTimeGeofence['within'],
+                                'InTime_GeofenceName'                   =>  $inTimeGeofence['name'],
                             ]);
                         }
                     }
@@ -1498,7 +1512,12 @@ class TimeAndAttendanceController extends Controller
                         'Parent_attd_id'                        =>  $ParentAttendance->id,
                         'InTime_out'                            =>  $checkInTime,
                         'OutTime_out'                           =>  '00:00', // Default for check-in
-                        'InTime_Location'                       =>  $inTimeLocation
+                        'InTime_Location'                       =>  $inTimeLocation,
+                        'InTime_Latitude'                       =>  $inTimeGeofence['lat'],
+                        'InTime_Longitude'                      =>  $inTimeGeofence['lng'],
+                        'InTime_Accuracy'                       =>  $inTimeGeofence['accuracy'],
+                        'InTime_WithinGeofence'                 =>  $inTimeGeofence['within'],
+                        'InTime_GeofenceName'                   =>  $inTimeGeofence['name'],
                     ]);
                 }
             }
@@ -1735,6 +1754,7 @@ class TimeAndAttendanceController extends Controller
                     $childAttendace->OutTime_Longitude      =   $outTimeGeofence['lng'];
                     $childAttendace->OutTime_Accuracy       =   $outTimeGeofence['accuracy'];
                     $childAttendace->OutTime_WithinGeofence =   $outTimeGeofence['within'];
+                    $childAttendace->OutTime_GeofenceName   =   $outTimeGeofence['name'];
                     $childAttendace->save();
                 }
 
@@ -3397,6 +3417,12 @@ class TimeAndAttendanceController extends Controller
                     $dayData['check_in_longitude'] = $shiftData->InTime_Longitude ?? null;
                     $dayData['check_out_latitude'] = $shiftData->OutTime_Latitude ?? null;
                     $dayData['check_out_longitude'] = $shiftData->OutTime_Longitude ?? null;
+                    // Real geofence name matched at punch time (e.g. "Main
+                    // Office Geofence") instead of a hardcoded "Office"
+                    // label — null if no geofence was assigned/matched for
+                    // that punch.
+                    $dayData['check_in_geofence_name'] = $shiftData->InTime_GeofenceName ?? null;
+                    $dayData['check_out_geofence_name'] = $shiftData->OutTime_GeofenceName ?? null;
 
                     // Process leave data
                     $leaveInfo = null;
@@ -3447,6 +3473,8 @@ class TimeAndAttendanceController extends Controller
                     $dayData['check_in_longitude'] = null;
                     $dayData['check_out_latitude'] = null;
                     $dayData['check_out_longitude'] = null;
+                    $dayData['check_in_geofence_name'] = null;
+                    $dayData['check_out_geofence_name'] = null;
                     $dayData['leave_info'] = null;
                     $dayData['is_day_off'] = false;
                 }
