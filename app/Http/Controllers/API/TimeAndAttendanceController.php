@@ -3134,7 +3134,16 @@ class TimeAndAttendanceController extends Controller
                     'Parentid' => $item->Parentid,
                     'first_name' => $item->first_name,
                     'last_name' => $item->last_name,
-                    'profile_picture' => $item->profile_picture,
+                    // profile_picture here used to be the raw DB column
+                    // ("0" for no-photo, or an unsigned Wasabi path) — not
+                    // a usable image URL. profileImg was the correctly-
+                    // resolved one, but sent under a different key name
+                    // than every other endpoint in this file uses
+                    // (profile_picture), which is why the listing screen
+                    // showed no photos while the individual profile view
+                    // (which only sends the resolved value, correctly
+                    // named) worked. Both keys now carry the resolved URL.
+                    'profile_picture' => $item->profileImg,
                     'emp_id' => $item->emp_id,
                     'EmployeeId' => $item->EmployeeId,
                     'position_title' => $item->position_title,
@@ -3201,7 +3210,16 @@ class TimeAndAttendanceController extends Controller
                     'Parentid' => $item->Parentid,
                     'first_name' => $item->first_name,
                     'last_name' => $item->last_name,
-                    'profile_picture' => $item->profile_picture,
+                    // profile_picture here used to be the raw DB column
+                    // ("0" for no-photo, or an unsigned Wasabi path) — not
+                    // a usable image URL. profileImg was the correctly-
+                    // resolved one, but sent under a different key name
+                    // than every other endpoint in this file uses
+                    // (profile_picture), which is why the listing screen
+                    // showed no photos while the individual profile view
+                    // (which only sends the resolved value, correctly
+                    // named) worked. Both keys now carry the resolved URL.
+                    'profile_picture' => $item->profileImg,
                     'emp_id' => $item->emp_id,
                     'EmployeeId' => $item->EmployeeId,
                     'position_title' => $item->position_title,
@@ -3361,6 +3379,11 @@ class TimeAndAttendanceController extends Controller
                     $dayData['status'] = $shiftData->Status ?? null;
                     $dayData['overtime'] = $shiftData->OverTime ?? null;
                     $dayData['shift_name'] = $shiftData->ShiftName ?? null;
+                    // CSS class from the same createDuty-* indicator system
+                    // the web duty roster page uses (blue=Morning,
+                    // yellow=Afternoon, skyBlue=Evening, purple=Night) —
+                    // lets the calendar show which shift an employee is on.
+                    $dayData['shift_color'] = $shiftData->ShiftNameColor ?? '';
                     $dayData['start_time'] = $shiftData->StartTime ?? null;
                     $dayData['end_time'] = $shiftData->EndTime ?? null;
                     $dayData['day_wise_total_hours'] = $shiftData->DayWiseTotalHours ?? null;
@@ -3414,6 +3437,7 @@ class TimeAndAttendanceController extends Controller
                     $dayData['status'] = null;
                     $dayData['overtime'] = null;
                     $dayData['shift_name'] = null;
+                    $dayData['shift_color'] = '';
                     $dayData['start_time'] = null;
                     $dayData['end_time'] = null;
                     $dayData['day_wise_total_hours'] = null;
