@@ -257,7 +257,9 @@ class ResortAllNotificationController extends Controller
                             $ManningReminderRequest,
                             'Manning Reminder',
                             [$hodId],
-                            $ManningPendingRequest->message_id
+                            $ManningPendingRequest->message_id,
+                            false,
+                            'manning-request-reminder'
                         );
                     }
                 }

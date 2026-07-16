@@ -580,7 +580,10 @@ class ConfigController extends Controller
                         'Hiring Request',
                         $msg,
                         'Talent Acquisition (Hiring Request)',
-                        [$sentto->id]
+                        [$sentto->id],
+                        null,
+                        false,
+                        'talent-acquisition-hiring-request'
                     );
                 }
 

@@ -565,7 +565,7 @@ class MonthlyCheckingController extends Controller
             ));
             // skipDbInsert=true — nofitication() above already wrote the row.
             Common::sendMobileNotification(
-                $this->resort->resort_id, 2, null, null, $title, $msg, $ModuleName, [$e->id], $checkin->id, true
+                $this->resort->resort_id, 2, null, null, $title, $msg, $ModuleName, [$e->id], $checkin->id, true, 'monthly-checkin-scheduled'
             );
         } catch (\Exception $ne) {
             \Log::warning('Monthly check-in schedule notification failed: '.$ne->getMessage());
@@ -647,7 +647,7 @@ class MonthlyCheckingController extends Controller
             Common::nofitication($this->resort->resort_id, 10, $title, $msg, $checkin->id, $checkin->created_by, $ModuleName)
         ));
         Common::sendMobileNotification(
-            $this->resort->resort_id, 2, null, null, $title, $msg, $ModuleName, [$checkin->created_by], $checkin->id, true
+            $this->resort->resort_id, 2, null, null, $title, $msg, $ModuleName, [$checkin->created_by], $checkin->id, true, 'monthly-checkin-approved'
         );
 
         return response()->json(['success' => true, 'message' => 'Check-in approved']);
@@ -694,7 +694,7 @@ class MonthlyCheckingController extends Controller
             Common::nofitication($this->resort->resort_id, 10, $title, $msg, $checkin->id, $checkin->created_by, $ModuleName)
         ));
         Common::sendMobileNotification(
-            $this->resort->resort_id, 2, null, null, $title, $msg, $ModuleName, [$checkin->created_by], $checkin->id, true
+            $this->resort->resort_id, 2, null, null, $title, $msg, $ModuleName, [$checkin->created_by], $checkin->id, true, 'monthly-checkin-rejected'
         );
 
         return response()->json(['success' => true, 'message' => 'Check-in rejected']);
@@ -765,7 +765,7 @@ class MonthlyCheckingController extends Controller
                 Common::nofitication($this->resort->resort_id, 10, $title, $msg, $checkin->id, $checkin->emp_id, $ModuleName)
             ));
             Common::sendMobileNotification(
-                $this->resort->resort_id, 2, null, null, $title, $msg, $ModuleName, [$checkin->emp_id], $checkin->id, true
+                $this->resort->resort_id, 2, null, null, $title, $msg, $ModuleName, [$checkin->emp_id], $checkin->id, true, 'monthly-checkin-finalized'
             );
 
             DB::commit();

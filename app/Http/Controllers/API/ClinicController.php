@@ -221,7 +221,9 @@ class ClinicController extends Controller
                 'An appointment request has been sent by ' . $this->user->first_name . ' ' . $this->user->last_name . '.',
                 'Clinic',
                 [$fetchDoctorId->id],
-                null
+                null,
+                false,
+                'clinic-appointment-request'
             );
 
             DB::commit();
@@ -639,7 +641,9 @@ class ClinicController extends Controller
             'Your appointment request is' . $newStatus,
             'Clinic',
             [$appointment->employee_id],
-            null
+            null,
+            false,
+            'clinic-appointment-status'
         );
 
             return response()->json([
@@ -1108,7 +1112,9 @@ class ClinicController extends Controller
                         $empIdFetch->Emp_id . ' Medical Certificate has been issued by ' . $this->user->first_name . ' ' . $this->user->last_name,
                         'Clinic',
                         $leaveApprvEmpIds,
-                        null
+                        null,
+                        false,
+                        'clinic-medical-certificate'
                     );
             }
 
@@ -1286,7 +1292,9 @@ class ClinicController extends Controller
                         'Your Leave request has been ' . $status . ' by ' . $this->user->first_name . ' ' . $this->user->last_name,
                         'Leave',
                         [$leave->emp_id],
-                        null
+                        null,
+                        false,
+                        'leave-' . strtolower($status)
                     );
                 } else {
 
@@ -1308,7 +1316,9 @@ class ClinicController extends Controller
                         $empIdFetch->Emp_id . ' Leave request has been ' . $status . ' by ' . $this->user->first_name . ' ' . $this->user->last_name,
                         'Leave',
                         $leaveApprvEmpIds,
-                        null
+                        null,
+                        false,
+                        'leave-' . strtolower($status)
                     );
                 }
                 

@@ -471,7 +471,10 @@ class VacancyController extends Controller
                             $title,
                             $msg,
                             'Talent Acquisition (Hiring Request)',
-                            [$hr_id]
+                            [$hr_id],
+                            null,
+                            false,
+                            'talent-acquisition-hiring-request'
                         );
                     }
                 } catch (\Exception $e) {
@@ -869,7 +872,10 @@ class VacancyController extends Controller
                         $title,
                         $msg,
                         'Talent Acquisition (Hiring Request)',
-                        [$hr_id]
+                        [$hr_id],
+                        null,
+                        false,
+                        'talent-acquisition-hiring-request'
                     );
                 }
             } catch (\Exception $e) {

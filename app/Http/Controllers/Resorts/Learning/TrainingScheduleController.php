@@ -794,6 +794,7 @@ class TrainingScheduleController extends Controller
                         //Send mobile notification
                         $sendMobileNotification             =   Common::sendMobileNotification(
                                                                     $resort_id,
+                                                                    2,
                                                                     $feedbackFormId,
                                                                     $value->training_schedule_id,
                                                                     $notificationTitle,
@@ -801,6 +802,8 @@ class TrainingScheduleController extends Controller
                                                                     $moduleName,
                                                                     [$value->employee_id],
                                                                     null,
+                                                                    false,
+                                                                    'training-feedback-form-assigned',
                                                                 );
                     }
                 }

@@ -218,6 +218,8 @@ class GrievanceController extends Controller
                         'Employee Grievance',
                         [$hrEmployee->id],
                         null,
+                        false,
+                        'grievance-submission',
                     );
                 }
 
