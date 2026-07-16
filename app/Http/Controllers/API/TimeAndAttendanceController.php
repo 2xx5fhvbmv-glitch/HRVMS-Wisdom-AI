@@ -3711,4 +3711,155 @@ class TimeAndAttendanceController extends Controller
         $t = trim((string) ($attendance->CheckingOutTime ?? ''));
         return $t !== '' && $t !== '00:00' && $t !== '00:00:00' && $t !== '0000-00-00 00:00:00';
     }
+
+    /**
+     * Pre-Planned OT / Actual OT for a given date, for the mobile HOD/
+     * EXCOM/HR Time & Attendance dashboard. No direct web equivalent
+     * existed for this exact per-date/per-employee shape (the closest
+     * web methods — DutyRosterController's cutoff-period OT search,
+     * MonthOverTimeChart's 4-month chart — are month-wide, not
+     * single-date), so this is built fresh from the ticket's own stated
+     * logic:
+     *   - Pre-Planned OT: OverTime allocated on the duty_roster_entries
+     *     row for that date (the plan set when the roster was built).
+     *   - Actual OT: OverTime recorded on the parent_attendaces row for
+     *     that date (set at checkout, once the shift is actually worked).
+     * Same visibility scoping as mobileTodoList().
+     */
+    public function mobilePrePlannedOT(Request $request)
+    {
+        if (!Auth::guard('api')->check()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'date' => 'required|date_format:Y-m-d',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
+        }
+
+        try {
+            $user      = Auth::guard('api')->user();
+            $employee  = $user->GetEmployee;
+            $resort_id = $user->resort_id;
+            $rank      = $employee->rank ?? null;
+            $deptId    = $employee->Dept_id ?? null;
+            $date      = $request->input('date');
+
+            $department = $deptId
+                ? ResortDepartment::where('id', $deptId)->where('resort_id', $resort_id)->first(['name', 'code'])
+                : null;
+            $deptName = strtolower(trim($department->name ?? ''));
+            $deptCode = $department->code ?? '';
+            $isHRDept = in_array($deptName, ['human resources', 'hr']);
+            $isEODept = ($deptCode === 'EO_1') || (strpos($deptName, 'executive office') !== false);
+
+            $rankPosition = Common::getEmployeeRankPosition($employee);
+            $positionName = $rankPosition['position'] ?? '';
+            $rankName     = $rankPosition['rank'] ?? '';
+            $isGM    = ($positionName === 'GM') || ($rankName === 'GM');
+            $isEXCOM = ($positionName === 'EXCOM') || ($rankName === 'EXCOM') || $rank == 1 || $rank === '1';
+            $isHOD   = ($rank == 2 || $rank === '2');
+            $canViewAll = ($isHRDept || $isEODept) && ($isGM || $isEXCOM || $isHOD);
+
+            $underEmpId = Common::getSubordinates($employee->id);
+
+            // Pre-Planned OT: what the duty roster allocated for this date.
+            $plannedQuery = DB::table('duty_roster_entries as t2')
+                ->join('employees', 'employees.id', '=', 't2.Emp_id')
+                ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
+                ->where('t1.resort_id', $resort_id)
+                ->where('employees.status', 'Active')
+                ->where('t2.date', $date)
+                ->whereNotNull('t2.OverTime')
+                ->where('t2.OverTime', '!=', '00:00')
+                ->where('t2.OverTime', '!=', '');
+
+            if (!$canViewAll) {
+                $plannedQuery->whereIn('employees.id', $underEmpId);
+                if ($deptId) {
+                    $plannedQuery->where('employees.Dept_id', $deptId);
+                }
+            }
+
+            $plannedRows = $plannedQuery->select([
+                'employees.id as employee_id', 'employees.Emp_id as Emp_code',
+                't1.first_name', 't1.last_name', 't1.id as Parentid',
+                't2.OverTime',
+            ])->get();
+
+            // Actual OT: what was actually recorded on checkout for this date.
+            $actualQuery = DB::table('parent_attendaces as t3')
+                ->join('duty_rosters as t2', 't2.id', '=', 't3.roster_id')
+                ->join('employees', 'employees.id', '=', 't2.Emp_id')
+                ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
+                ->where('t1.resort_id', $resort_id)
+                ->where('employees.status', 'Active')
+                ->where('t3.date', $date)
+                ->whereNotNull('t3.OverTime')
+                ->where('t3.OverTime', '!=', '00:00')
+                ->where('t3.OverTime', '!=', '');
+
+            if (!$canViewAll) {
+                $actualQuery->whereIn('employees.id', $underEmpId);
+                if ($deptId) {
+                    $actualQuery->where('employees.Dept_id', $deptId);
+                }
+            }
+
+            $actualRows = $actualQuery->select([
+                'employees.id as employee_id', 'employees.Emp_id as Emp_code',
+                't1.first_name', 't1.last_name', 't1.id as Parentid',
+                't3.OverTime', 't3.OTStatus',
+            ])->get();
+
+            $toDecimalHours = function ($hm) {
+                $parts = explode(':', (string) $hm);
+                $h = (int) ($parts[0] ?? 0);
+                $m = (int) ($parts[1] ?? 0);
+                return round($h + ($m / 60), 2);
+            };
+
+            $plannedBreakdown = $plannedRows->map(function ($row) use ($toDecimalHours) {
+                return [
+                    'employee_id'     => $row->employee_id,
+                    'Emp_id'          => $row->Emp_code,
+                    'EmployeeName'    => ucfirst($row->first_name . ' ' . $row->last_name),
+                    'profile_picture' => Common::getResortUserPicture($row->Parentid),
+                    'overtime_hm'     => $row->OverTime,
+                    'overtime_hours'  => $toDecimalHours($row->OverTime),
+                ];
+            })->values();
+
+            $actualBreakdown = $actualRows->map(function ($row) use ($toDecimalHours) {
+                return [
+                    'employee_id'     => $row->employee_id,
+                    'Emp_id'          => $row->Emp_code,
+                    'EmployeeName'    => ucfirst($row->first_name . ' ' . $row->last_name),
+                    'profile_picture' => Common::getResortUserPicture($row->Parentid),
+                    'overtime_hm'     => $row->OverTime,
+                    'overtime_hours'  => $toDecimalHours($row->OverTime),
+                    'ot_status'       => $row->OTStatus,
+                ];
+            })->values();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Overtime summary fetched successfully.',
+                'date'    => $date,
+                'data'    => [
+                    'pre_planned_ot_total_hours' => round($plannedBreakdown->sum('overtime_hours'), 2),
+                    'actual_ot_total_hours'      => round($actualBreakdown->sum('overtime_hours'), 2),
+                    'pre_planned_ot'             => $plannedBreakdown,
+                    'actual_ot'                  => $actualBreakdown,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
 }
