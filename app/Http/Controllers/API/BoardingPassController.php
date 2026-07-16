@@ -1132,6 +1132,23 @@ class BoardingPassController extends Controller
                 $employeeTravelPasses->status           =   $action;
                 $employeeTravelPasses->save();
 
+                // Employee only ever got the approval notification, never
+                // one when an already-approved pass was cancelled — they'd
+                // have no idea until they happened to check the app.
+                Common::sendMobileNotification(
+                    $this->resort_id,
+                    2,
+                    null,
+                    null,
+                    'Boarding Pass Cancelled',
+                    'Your approved boarding pass has been cancelled by ' . $employee->resortAdmin->first_name . ' ' . $employee->resortAdmin->last_name . ($comments ? (': ' . $comments) : '.'),
+                    'Boarding Pass',
+                    [$employeeTravelPasses->employee_id],
+                    null,
+                    false,
+                    'boarding-pass-cancelled'
+                );
+
                 return response()->json([
                     'success'                           =>  true,
                     'message'                           =>  'Cancelled the Employee boarding pass.',
