@@ -3510,4 +3510,205 @@ class TimeAndAttendanceController extends Controller
         }
         return sprintf('%02d:%02d', $hours, $minutes);
     }
+
+    /**
+     * Mobile To-Do list for HOD/EXCOM/HR — same exception logic as the
+     * web dashboard's TimeandAttendanceDashboardController::Tododata()
+     * (missing check-in past grace period, missing check-out past grace
+     * period, OT recorded but not yet Approved/Rejected), exposed as
+     * JSON for the mobile Time & Attendance dashboard. Scoping mirrors
+     * that method's canViewAllDepartments()/isDepartmentHOD() rules:
+     * HR/Executive-Office senior roles see the whole resort, a
+     * department HOD (not HR) sees their whole department, everyone
+     * else sees only their own subordinates.
+     */
+    public function mobileTodoList()
+    {
+        if (!Auth::guard('api')->check()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        try {
+            $user       = Auth::guard('api')->user();
+            $employee   = $user->GetEmployee;
+            $resort_id  = $user->resort_id;
+            $rank       = $employee->rank ?? null;
+            $deptId     = $employee->Dept_id ?? null;
+
+            $department = $deptId
+                ? ResortDepartment::where('id', $deptId)->where('resort_id', $resort_id)->first(['name', 'code'])
+                : null;
+            $deptName   = strtolower(trim($department->name ?? ''));
+            $deptCode   = $department->code ?? '';
+            $isHRDept   = in_array($deptName, ['human resources', 'hr']);
+            $isEODept   = ($deptCode === 'EO_1') || (strpos($deptName, 'executive office') !== false);
+
+            $rankPosition = Common::getEmployeeRankPosition($employee);
+            $positionName = $rankPosition['position'] ?? '';
+            $rankName     = $rankPosition['rank'] ?? '';
+            $isGM     = ($positionName === 'GM') || ($rankName === 'GM');
+            $isEXCOM  = ($positionName === 'EXCOM') || ($rankName === 'EXCOM') || $rank == 1 || $rank === '1';
+            $isHOD    = ($rank == 2 || $rank === '2');
+
+            $canViewAll = ($isHRDept || $isEODept) && ($isGM || $isEXCOM || $isHOD);
+            $isDeptHOD  = false;
+            if ($rank == 2 && $deptId && $department && !$isHRDept) {
+                $isDeptHOD = true;
+            }
+
+            $underEmpId = Common::getSubordinates($employee->id);
+
+            $today              = Carbon::today();
+            $currentTime        = Carbon::now();
+            $gracePeriodMinutes = 10;
+            $todoList           = collect();
+
+            $sevenDaysAgo   = $today->copy()->subDays(7);
+            $dutyRosterQuery = DB::table('duty_roster_entries as t2')
+                ->join('employees', 'employees.id', '=', 't2.Emp_id')
+                ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
+                ->join('shift_settings as t4', 't4.id', '=', 't2.Shift_id')
+                ->where('t1.resort_id', $resort_id)
+                ->where('employees.status', 'Active')
+                ->whereBetween('t2.date', [$sevenDaysAgo->format('Y-m-d'), $today->format('Y-m-d')])
+                ->whereNotIn('t2.Status', ['DayOff', 'FullDayLeave']);
+
+            if (!$canViewAll && !$isDeptHOD) {
+                $dutyRosterQuery->whereIn('employees.id', $underEmpId);
+            }
+            if (!$canViewAll && $deptId) {
+                $dutyRosterQuery->where('employees.Dept_id', $deptId);
+            }
+
+            $dutyRosters = $dutyRosterQuery->select([
+                't2.roster_id', 't2.Emp_id', 't2.Shift_id',
+                't1.first_name', 't1.last_name', 't1.id as Parentid',
+                't4.StartTime', 't4.EndTime', 't4.ShiftName',
+                'employees.id as employee_id', 'employees.Emp_id as Emp_code',
+                't2.date', 't2.OverTime', 't2.Status as roster_status',
+            ])->get();
+
+            foreach ($dutyRosters as $roster) {
+                $rosterDate = Carbon::parse($roster->date);
+
+                $shiftStartTime = Carbon::parse($rosterDate->format('Y-m-d') . ' ' . date('H:i:s', strtotime($roster->StartTime)));
+                $shiftEndTime   = Carbon::parse($rosterDate->format('Y-m-d') . ' ' . date('H:i:s', strtotime($roster->EndTime)));
+                if ($shiftEndTime->lessThan($shiftStartTime)) {
+                    $shiftEndTime->addDay();
+                }
+
+                $expectedEndTime = $shiftEndTime->copy();
+                if (!empty($roster->OverTime) && $roster->OverTime != '00:00') {
+                    [$otHours, $otMinutes] = explode(':', $roster->OverTime);
+                    $expectedEndTime->addHours((int) $otHours)->addMinutes((int) $otMinutes);
+                }
+
+                $checkInDeadline  = $shiftStartTime->copy()->addMinutes($gracePeriodMinutes);
+                $checkOutDeadline = $expectedEndTime->copy()->addMinutes($gracePeriodMinutes);
+
+                $attendance = ParentAttendace::where('roster_id', $roster->roster_id)
+                    ->where('date', $rosterDate->format('Y-m-d'))
+                    ->first();
+                if (!$attendance) {
+                    $attendance = ParentAttendace::where('Emp_id', $roster->employee_id)
+                        ->where('date', $rosterDate->format('Y-m-d'))
+                        ->orderByDesc('updated_at')
+                        ->first();
+                }
+
+                $hasCheckIn  = $this->mobileTodoHasCheckIn($attendance);
+                $hasCheckOut = $this->mobileTodoHasCheckOut($attendance);
+
+                $actionType = null;
+                $message    = '';
+
+                if (!$hasCheckIn) {
+                    if ($currentTime->greaterThan($checkInDeadline)) {
+                        $actionType = 'check_in';
+                        $message    = 'Pending Check-In';
+                    }
+                } elseif ($hasCheckIn && !$hasCheckOut) {
+                    if ($currentTime->greaterThan($checkOutDeadline)) {
+                        $actionType = 'check_out';
+                        $message    = 'Pending Check-Out';
+                    }
+                } elseif ($hasCheckIn && $hasCheckOut) {
+                    $otStatus   = $attendance->OTStatus ?? null;
+                    $overTime   = trim((string) ($attendance->OverTime ?? ''));
+                    $hasOT      = $overTime !== '' && !in_array($overTime, ['0', '00:00', '00:00:00', '0:00'], true);
+                    $isApproved = in_array($otStatus, ['Approved', 'approved'], true);
+                    $isRejected = in_array($otStatus, ['Rejected', 'rejected'], true);
+                    if ($hasOT && !$isApproved && !$isRejected) {
+                        $actionType = 'overtime_pending';
+                        $message    = 'Pending OT Approval';
+                    }
+                }
+
+                if ($actionType === null) {
+                    continue;
+                }
+
+                $differenceInHoursFormatted = '0 hours and 0 minutes';
+                if ($actionType === 'check_out') {
+                    $differenceInMinutes        = $currentTime->diffInMinutes($expectedEndTime);
+                    $differenceInHoursFormatted = intval($differenceInMinutes / 60) . ' hours and ' . ($differenceInMinutes % 60) . ' minutes';
+                }
+
+                $todoList->push([
+                    'roster_id'         => $roster->roster_id,
+                    'attendance_id'     => $attendance->id ?? null,
+                    'employee_id'       => $roster->employee_id,
+                    'Emp_id'            => $roster->Emp_code,
+                    'first_name'        => $roster->first_name,
+                    'last_name'         => $roster->last_name,
+                    'Parentid'          => $roster->Parentid,
+                    'EmployeeName'      => ucfirst($roster->first_name . ' ' . $roster->last_name),
+                    'profile_picture'   => Common::getResortUserPicture($roster->Parentid),
+                    'ShiftName'         => $roster->ShiftName,
+                    'StartTime'         => $shiftStartTime->format('h:i A'),
+                    'EndTime'           => $shiftEndTime->format('h:i A'),
+                    'ExpectedEndTime'   => $expectedEndTime->format('h:i A'),
+                    'OverTime'          => $roster->OverTime ?? '00:00',
+                    'differenceInHours' => $differenceInHoursFormatted,
+                    'flag'              => $rosterDate->isToday() ? 'today' : 'past',
+                    'action_type'       => $actionType,
+                    'message'           => $message,
+                    'Shift_id'          => $roster->Shift_id,
+                    'date'              => $rosterDate->format('Y-m-d'),
+                    'CheckingTime'      => $attendance->CheckingTime ?? null,
+                    'CheckingOutTime'   => $attendance->CheckingOutTime ?? null,
+                    'OTStatus'          => $attendance->OTStatus ?? null,
+                ]);
+            }
+
+            return response()->json([
+                'success'   => true,
+                'message'   => 'Time & Attendance to-do list fetched successfully.',
+                'todo_list' => $todoList->values(),
+            ]);
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    private function mobileTodoHasCheckIn($attendance)
+    {
+        if (!$attendance) {
+            return false;
+        }
+        $t = trim((string) ($attendance->CheckingTime ?? ''));
+        return $t !== '' && $t !== '00:00' && $t !== '00:00:00' && $t !== '0000-00-00 00:00:00';
+    }
+
+    private function mobileTodoHasCheckOut($attendance)
+    {
+        if (!$attendance) {
+            return false;
+        }
+        $t = trim((string) ($attendance->CheckingOutTime ?? ''));
+        return $t !== '' && $t !== '00:00' && $t !== '00:00:00' && $t !== '0000-00-00 00:00:00';
+    }
 }
