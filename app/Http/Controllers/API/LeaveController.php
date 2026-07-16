@@ -3234,9 +3234,16 @@ class LeaveController extends Controller
                 if ($leaveDetail) {
                     // Fetch total leave allocation for the employee
                     $emp_grade      = Common::getEmpGrade($leaveDetail->rank);
+                    // Was missing a resort_id scope entirely — summed
+                    // every resort's benefit grid at this emp_grade, not
+                    // just this resort's, massively inflating the total
+                    // (verified: 378 unscoped vs 139 scoped to resort 26
+                    // for this exact employee/grade — 378 is the literal
+                    // value this bug reported).
                     $benefit_grid   = DB::table('resort_benifit_grid as rbg')
                         ->join('resort_benefit_grid_child as rbgc', 'rbg.id', '=', 'rbgc.benefit_grid_id')
                         ->where('rbg.emp_grade', $emp_grade)
+                        ->where('rbg.resort_id', $resortId)
                         ->get();
 
                     // Calculate total leaves taken by the employee for the current year
@@ -3261,7 +3268,19 @@ class LeaveController extends Controller
 
                     // Update profile picture dynamically
                     $leaveDetail->employee_profile_picture  = Common::getResortUserPicture($leaveDetail->employee_id);
-                    $leaveDetail->transportation_details    = json_decode($leaveDetail->transportation_details, true);
+                    // JSON_ARRAYAGG over the LEFT JOIN to employee_travel_passes
+                    // still produces one array entry even when there's no
+                    // matching travel pass (e.g. a plain Sick Leave with no
+                    // island pass) — every field in that entry is just
+                    // null, but a non-empty array made the app think there
+                    // was real island-pass data to show. Collapse it to a
+                    // genuinely empty array when the sole entry has no
+                    // real travel pass id.
+                    $transportationDetails                  = json_decode($leaveDetail->transportation_details, true) ?? [];
+                    if (count($transportationDetails) === 1 && empty($transportationDetails[0]['id'])) {
+                        $transportationDetails = [];
+                    }
+                    $leaveDetail->transportation_details    = $transportationDetails;
                     // $leaveDetail->island_pass               = json_decode($leaveDetail->island_pass, true);
                     $baseUrl                                = url('/');
                     $leaveDetail->attachments               = $leaveDetail->attachments ? $baseUrl . '/' . $leaveDetail->attachments : '';
