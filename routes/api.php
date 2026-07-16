@@ -110,15 +110,22 @@ use Illuminate\Support\Facades\Route;
 		Route::get('timeandattendance/time-attendance-hr-dashboard', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'timeAttendanceHRDashboard']);
 		Route::post('timeandattendance/time-attendance-hr-dashboard', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'timeAttendanceHRDashboard']);
 
-		//HOD Middleware
-		Route::middleware(['auth:api', 'check.rank:HOD,EXCOM'])->group(function () {
-
-			//Leave for HOD
+		// GM needs the same "Leave for HOD" dashboard visibility as HOD/EXCOM
+		// (GM getting a plain 403 "Insufficient rank" on their own Leave
+		// dashboard). Split into its own group rather than adding GM to the
+		// whole HOD Middleware group below, which also covers Accommodation/
+		// Employee Management/Boarding Pass — none of which were part of
+		// this report, so widening GM's access there wasn't asked for.
+		Route::middleware(['auth:api', 'check.rank:HOD,EXCOM,GM'])->group(function () {
 			Route::get('resort/leave-dashboard-hod', [App\Http\Controllers\API\LeaveController::class, 'leaveDashboardHOD']);
 			Route::get('resort/island-pass-view-hod', [App\Http\Controllers\API\LeaveController::class, 'islandPassViewHOD']);
 			Route::get('resort/islandpass-requestview/{pass_id}', [App\Http\Controllers\API\LeaveController::class, 'islandPassRequestViewHODAndHR']);
 			Route::post('resort/hod-upcoming-employee-leave-list', [App\Http\Controllers\API\LeaveController::class, 'hodUpcomingEmployeeLeaveList']);
 			Route::get('resort/hod-who-is-on-leave', [App\Http\Controllers\API\LeaveController::class, 'hodWhoIsOnLeave']);
+		});
+
+		//HOD Middleware
+		Route::middleware(['auth:api', 'check.rank:HOD,EXCOM'])->group(function () {
 
 			//Time and Attendance HOD
 			Route::get('timeandattendance/employee-attendance-summary', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'employeeAttendanceSummary']);
