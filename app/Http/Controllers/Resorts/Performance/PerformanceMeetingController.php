@@ -433,7 +433,13 @@ class PerformanceMeetingController extends Controller
             'description'    => $request->description,
             'location'       => $request->location ?? $request->conference_link,
             'reminder_days'  => 0,
-            'events_for'     => 'Performance Meeting',
+            // events_for is an audience-scope enum (organization/department/
+            // employee), not a display label — 'Performance Meeting' isn't a
+            // valid member and would silently store as ''. This meeting is
+            // assigned to specific invitees, so 'employee' is the correct
+            // scope; the actual display label lives in 'category' below.
+            'events_for'     => 'employee',
+            'category'       => 'Performance Meeting',
             'status'         => 'accept',
         ]);
 

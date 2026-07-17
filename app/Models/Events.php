@@ -14,7 +14,7 @@ class Events extends Model
 
     protected $table='events';
 
-    protected $fillable=['resort_id','title','date','time','description','location','reminder_days','events_for','status','created_by','modified_by'];
+    protected $fillable=['resort_id','title','date','time','description','location','reminder_days','events_for','category','status','created_by','modified_by'];
 
     public static function boot(){
         parent::boot();
