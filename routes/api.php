@@ -371,6 +371,8 @@ use Illuminate\Support\Facades\Route;
 		Route::get('grievance/get-grievance-cat', [App\Http\Controllers\API\GrievanceController::class, 'GetGrievanceCat']);
 		Route::post('grievance/get-grievance-sub-cat', [App\Http\Controllers\API\GrievanceController::class, 'GetGrievanceSubCat']);
 		Route::post('grievance/grievance-store', [App\Http\Controllers\API\GrievanceController::class, 'GrievanceStore']);
+		Route::get('grievance/my-grievances', [App\Http\Controllers\API\GrievanceController::class, 'myGrievances']);
+		Route::get('grievance/{id}', [App\Http\Controllers\API\GrievanceController::class, 'grievanceDetail']);
 
 
 		//Disciplinary
