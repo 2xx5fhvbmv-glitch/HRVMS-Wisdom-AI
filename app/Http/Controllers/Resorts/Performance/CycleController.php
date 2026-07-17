@@ -478,7 +478,8 @@ class CycleController extends Controller
                         'New Performance Review Assigned',
                         'You have been added to the "' . $cycle_name . '" cycle. Please complete your self review.',
                         'Performance',
-                        $p_id->id
+                        $p_id->id,
+                        'appraisal-self-review-assigned'
                     );
                     Common::notifyEmployees(
                         $resortId,
@@ -486,7 +487,8 @@ class CycleController extends Controller
                         'Team Performance Review Assigned',
                         'One of your team members has been added to the "' . $cycle_name . '" cycle. A manager review will be required after they complete their self review.',
                         'Performance',
-                        $p_id->id
+                        $p_id->id,
+                        'appraisal-team-review-assigned'
                     );
                 } catch (\Exception $ne) {
                     \Log::warning('Cycle create notifications failed: ' . $ne->getMessage());

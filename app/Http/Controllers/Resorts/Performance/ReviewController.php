@@ -224,7 +224,8 @@ class ReviewController extends Controller
                     'Self Review Completed',
                     $empName . ' has completed their self review for "' . $childCycle->Cycle_Name . '". Please complete the manager review.',
                     'Performance',
-                    $realChild->id
+                    $realChild->id,
+                    'appraisal-manager-review-assigned'
                 );
             }
 
@@ -240,7 +241,8 @@ class ReviewController extends Controller
                     'Self Review Submitted',
                     $empName . ' has submitted their self review for "' . $childCycle->Cycle_Name . '".',
                     'Performance',
-                    $realChild->id
+                    $realChild->id,
+                    'appraisal-self-review-submitted'
                 );
             }
         } catch (\Exception $ne) {
@@ -407,7 +409,8 @@ class ReviewController extends Controller
                     'Manager Review Completed',
                     'Your manager has completed the review for "' . $childCycle->Cycle_Name . '". You can view the feedback in My Reviews.',
                     'Performance',
-                    $realChild->id
+                    $realChild->id,
+                    'appraisal-manager-review-completed'
                 );
             }
 
@@ -429,7 +432,8 @@ class ReviewController extends Controller
                     'Team Review Submitted',
                     $managerName . ' has submitted a team review for "' . $childCycle->Cycle_Name . '".',
                     'Performance',
-                    $realChild->id
+                    $realChild->id,
+                    'appraisal-team-review-submitted'
                 );
             }
         } catch (\Exception $ne) {

@@ -346,7 +346,8 @@ class PipPdpController extends Controller
                 optional(optional($plan->employee)->resortAdmin)->full_name
                     . ' has submitted their ' . strtoupper($kind) . ' form.',
                 'Performance',
-                $plan->id
+                $plan->id,
+                'pip-pdp-submitted'
             );
         } catch (\Exception $ne) {
             \Log::warning(strtoupper($kind) . ' submit notification failed: ' . $ne->getMessage());
@@ -468,7 +469,8 @@ class PipPdpController extends Controller
                 strtoupper($kind) . ' Assigned',
                 'A ' . strtoupper($kind) . ' plan has been assigned. Please review and complete the form.',
                 'Performance',
-                $plan->id
+                $plan->id,
+                'pip-pdp-assigned'
             );
         } catch (\Exception $ne) {
             \Log::warning(strtoupper($kind) . ' assign notification failed: ' . $ne->getMessage());

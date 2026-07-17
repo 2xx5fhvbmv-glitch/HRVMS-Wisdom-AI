@@ -17,6 +17,8 @@ use Illuminate\Support\Facades\Mail;
 use App\Http\Controllers\Controller;
 use App\Models\PerformanceMeetingContent;
 use App\Models\PerformanceMeetingParticipant;
+use App\Models\Events;
+use App\Models\ChildEvents;
 use App\Models\Resort;
 use Illuminate\Support\Str;
 class PerformanceMeetingController extends Controller
@@ -419,6 +421,22 @@ class PerformanceMeetingController extends Controller
 
         $resort_details = Resort::find($this->resort->resort_id);
 
+        // One calendar Event shared by every invitee, same shape
+        // CalendarController::createEvent() builds, so the mobile Calendar
+        // module (which reads Events/ChildEvents) picks this meeting up on
+        // every view without any extra query on its side.
+        $calendarEvent = Events::create([
+            'resort_id'      => $this->resort->resort_id,
+            'title'          => $request->title,
+            'date'           => Carbon::parse($request->date)->format('Y-m-d'),
+            'time'           => $request->start_time,
+            'description'    => $request->description,
+            'location'       => $request->location ?? $request->conference_link,
+            'reminder_days'  => 0,
+            'events_for'     => 'Performance Meeting',
+            'status'         => 'accept',
+        ]);
+
         foreach ($request->Emp_id as $encodedId) {
             $employee = Employee::with(['resortAdmin', 'position'])->find(base64_decode($encodedId));
 
@@ -433,6 +451,23 @@ class PerformanceMeetingController extends Controller
                 'status' => 'pending',
                 'token' => $token,
             ]);
+
+            ChildEvents::create([
+                'event_id'    => $calendarEvent->id,
+                'resort_id'   => $this->resort->resort_id,
+                'employee_id' => $employee->id,
+            ]);
+
+            Common::sendMobileNotification(
+                $this->resort->resort_id, 2, null, null,
+                'Performance Meeting Scheduled',
+                'You have been invited to "' . $request->title . '" on ' . Carbon::parse($request->date)->format('d M Y') . ' at ' . $request->start_time . '.',
+                'Performance',
+                [$employee->id],
+                $meeting->id,
+                false,
+                'performance-meeting-scheduled'
+            );
 
             $EmployeeName = $employee->resortAdmin->first_name . ' ' . $employee->resortAdmin->last_name;
             $respondUrl = route('meeting.respond', ['token' => $token]);
@@ -820,7 +855,8 @@ class PerformanceMeetingController extends Controller
                 $title,
                 $msg,
                 'Performance',
-                $meeting->id
+                $meeting->id,
+                'performance-meeting-response'
             );
         } catch (\Exception $e) {
             \Log::warning('Meeting response notification failed: ' . $e->getMessage());

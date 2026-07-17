@@ -597,7 +597,7 @@ class DashboardController extends Controller
                     $recipients[] = (int) $emp->reporting_to;
                 }
 
-                Common::notifyEmployees($resortId, $recipients, $title, $msg, 'Learning', $p->program_id);
+                Common::notifyEmployees($resortId, $recipients, $title, $msg, 'Learning', $p->program_id, 'learning-probationary-reminder');
             } catch (\Exception $e) {
                 \Log::warning('Probationary reminder send failed: ' . $e->getMessage());
             }
