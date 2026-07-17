@@ -2596,7 +2596,7 @@ class LeaveController extends Controller
         return $getEmployeesOnLeaveToday;
     }
 
-    private function upcomingBirthdays($resort_id)
+    private function upcomingBirthdays($resort_id, $deptId = null)
     {
         // dob is stored "YYYY-MM-DD" (verified against live data, e.g.
         // "1992-02-25") — SUBSTRING(dob,1,5) pulled "1992-" (the year
@@ -2608,12 +2608,19 @@ class LeaveController extends Controller
         $tomorrow           = Carbon::tomorrow()->format('m-d');
         $dayAfterTomorrow   = Carbon::today()->addDays(2)->format('m-d');
 
-        $upcomingBirthdays = DB::table('employees as e')
+        $query = DB::table('employees as e')
             ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id') // Join with resort_admins
             ->join('resort_positions as rp', 'rp.id', '=', 'e.Position_id') // Join with positions
             ->whereRaw('SUBSTRING(e.dob, 6, 5) IN (?, ?, ?)', [$today, $tomorrow, $dayAfterTomorrow]) // Compare month and day
-            ->where('ra.resort_id', $resort_id)
-            ->select(
+            ->where('ra.resort_id', $resort_id);
+
+        // HOD callers only see their own department's birthdays — matches
+        // the same dept-scoping every other HOD dashboard section uses.
+        if ($deptId) {
+            $query->where('e.Dept_id', $deptId);
+        }
+
+        $upcomingBirthdays = $query->select(
                 'e.id as employee_id',
                 'e.Admin_Parent_id as Admin_Parent_id',
                 'e.dob',
@@ -3462,6 +3469,7 @@ class LeaveController extends Controller
             $upcomingHolidays       = $this->getUpcomingHolidays($resort_id);
             $islandPassHOD          = $this->islandPassHOD($resort_id, $employee);
             $employeesOnLeaveToday  = $this->getEmployeesOnLeaveToday($resort_id, $isHOD, $employee->Dept_id);
+            $upcomingBirthdays      = $this->upcomingBirthdays($resort_id, $isHOD ? $employee->Dept_id : null);
             $leaveData = [
                 'total_applied_leaves'      => $leaveCounts['totalApplied'],
                 'total_approved_leaves'     => $leaveCounts['totalApproved'],
@@ -3472,6 +3480,7 @@ class LeaveController extends Controller
                 'leave_request'             => $leaveRequest,
                 'island_pass'               => $islandPassHOD,
                 'upcoming_holidays'         => $upcomingHolidays,
+                'upcoming_birthdays'        => $upcomingBirthdays,
             ];
 
             return response()->json([
