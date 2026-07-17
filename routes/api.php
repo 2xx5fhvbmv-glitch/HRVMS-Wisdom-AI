@@ -346,6 +346,7 @@ use Illuminate\Support\Facades\Route;
 		});
 
 		Route::post('calendar/event-calender', [App\Http\Controllers\API\CalendarController::class, 'eventsCalender']);
+		Route::get('calendar/event/{id}', [App\Http\Controllers\API\CalendarController::class, 'eventDetails']);
 
 		// 3rd party shop (Employee)
 		Route::get('shop/employee-dashboard', [App\Http\Controllers\API\ShopController::class, 'employeeDashboard']);

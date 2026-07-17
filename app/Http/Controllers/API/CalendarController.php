@@ -108,7 +108,12 @@ class CalendarController extends Controller
             'description'                                       =>  'nullable',
             'location'                                          =>  'nullable',
             'reminder_days'                                     =>  'required',
-            'events_for'                                        =>  'required',
+            // Audience scope, not a display category — was previously
+            // 'required' with no allowed-value check, so an arbitrary string
+            // (e.g. a UI category label) silently stored as an empty string
+            // instead of failing validation.
+            'events_for'                                        =>  'required|in:organization,department,employee',
+            'category'                                          =>  'nullable|string|max:100',
             'employees'                                         =>  'required|array',
             'employees.*'                                       =>  'exists:employees,id',
         ]);
@@ -130,6 +135,7 @@ class CalendarController extends Controller
                 'location'                                      =>  $data['location'] ?? null,
                 'reminder_days'                                 =>  $data['reminder_days'],
                 'events_for'                                    =>  $data['events_for'],
+                'category'                                      =>  $data['category'] ?? null,
                 'status'                                        =>  'accept'
             ]);
 
@@ -214,7 +220,8 @@ class CalendarController extends Controller
                 'events'                                        =>  Events::join('child_events as ce', 'ce.event_id', '=', 'events.id')
                                                                     ->where('events.status', '=', 'accept')
                                                                     ->where('events.resort_id', $this->resort_id)
-                                                                    ->where('ce.employee_id', $emp_id),
+                                                                    ->where('ce.employee_id', $emp_id)
+                                                                    ->select('events.*'),
 
                 'employee_probation'                            =>  Employee::query()->where('resort_id', $this->resort_id)
                                                                     ->where('employment_type','Probationary')
@@ -733,7 +740,7 @@ class CalendarController extends Controller
                     return $this->employeeMapdata('My Event','Island Pass Arrival','', $item->arrival_date, '', $item->arrival_time);
                 }
             })->filter(),
-            ...$events->map(fn($item)                           => $this->employeeMapdata('Organization Event',$item->title, $item->location, $item->date, $item->time, '')),
+            ...$events->map(fn($item)                           => $this->employeeMapdata('Organization Event',$item->title, $item->location, $item->date, $item->time, '', $item->id, $item->description, $item->category)),
             ...$disciplinary->map(fn($item)                     => $this->employeeMapdata('My Event','Disciplinary Expiry', '', $item->Expiry_date, '', '')),
             ...$learning->map(fn($item)                         => $this->employeeMapdata('My Event',$item->name, '', $item->end_date, '', '')),
             ...$survey->map(fn($item)                           => $this->employeeMapdata('My Event',$item->Surevey_title, '', $item->End_date, '', '')),
@@ -1465,11 +1472,61 @@ class CalendarController extends Controller
 
     }
 
-    private function employeeMapdata($type,$title, $location,$date,$start_time,$end_time)
+    /**
+     * GET calendar/event/{id}
+     * Full event details (description, category, participants) — the
+     * calendar list only carries enough to render a card; this is what the
+     * app calls when the user opens an event.
+     */
+    public function eventDetails(Request $request, $id)
+    {
+        if (!Auth::guard('api')->check()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $event = Events::where('resort_id', $this->resort_id)->where('id', $id)->first();
+        if (!$event) {
+            return response()->json(['success' => false, 'message' => 'Event not found.'], 404);
+        }
+
+        $isInvited = ChildEvents::where('event_id', $event->id)->where('employee_id', $this->reporting_to)->exists();
+        if (!$isInvited) {
+            return response()->json(['success' => false, 'message' => 'You do not have access to this event.'], 403);
+        }
+
+        $participants = ChildEvents::where('event_id', $event->id)
+            ->join('employees as e', 'e.id', '=', 'child_events.employee_id')
+            ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
+            ->select('e.id as employee_id', 'ra.first_name', 'ra.last_name')
+            ->get()
+            ->map(function ($p) {
+                $p->profile_picture = Common::getResortUserPicture($p->employee_id);
+                return $p;
+            });
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'id'           => $event->id,
+                'title'        => $event->title,
+                'category'     => $event->category,
+                'description'  => $event->description,
+                'location'     => $event->location,
+                'date'         => $event->date,
+                'time'         => $event->time,
+                'participants' => $participants,
+            ],
+        ], 200);
+    }
+
+    private function employeeMapdata($type,$title, $location,$date,$start_time,$end_time,$id=null,$description=null,$category=null)
     {
       return [
+            'id'                                    =>  $id,
             'type'                                  =>  $type,
+            'category'                              =>  $category ?? '',
             'title'                                 =>  $title?? '',
+            'description'                           =>  $description ?? '',
             'location'                              =>  $location ?? '',
             'date'                                  =>  $date ?? '',
             'start_time'                            =>  $start_time ?? '',
