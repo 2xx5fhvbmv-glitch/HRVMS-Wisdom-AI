@@ -43,6 +43,19 @@ class Handler extends ExceptionHandler
 
     /**
      * Mobile clients don't send an Accept: application/json header, so
+     * expectsJson() is false and Laravel's default exception rendering
+     * (auth failures, validation failures, 404s, everything) falls back to
+     * an HTML redirect — the app's HTTP client follows it and lands on the
+     * login page with a 200 instead of a JSON error it can detect. Force
+     * JSON for every api/* request regardless of Accept header.
+     */
+    protected function shouldReturnJson($request, Throwable $e)
+    {
+        return $request->is('api/*') || parent::shouldReturnJson($request, $e);
+    }
+
+    /**
+     * Mobile clients don't send an Accept: application/json header, so
      * expectsJson() is false and the default handler redirects to the HTML
      * login page — the app's HTTP client follows the redirect and gets a
      * 200 full of login-page markup instead of a 401 it can detect.
