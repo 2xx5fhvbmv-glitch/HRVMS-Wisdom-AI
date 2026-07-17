@@ -1319,7 +1319,7 @@ class Common
         return \Storage::disk($driver)->url($relPath);
     }
 
-    public static function nofitication($resortid,$type,$Msgid= 0,$Budget_id=0,$other='',$sendto='',$moduleName="")
+    public static function nofitication($resortid,$type,$Msgid= 0,$Budget_id=0,$other='',$sendto='',$moduleName="",$pageId=null)
     {
         if($type==1)
         {
@@ -1414,7 +1414,7 @@ class Common
             $message = $Budget_id;
             $request_id = $other ?? null;
             //   dd($sendto,$name,$moduleName,$resortid,$Msgid,$Budget_id,$other);
-            $message1 = ResortNotification::create([ 'type' =>  $name,'user_id'=>$sendto,'module'=>$moduleName, 'resort_id' => $resortid, 'message' => $message ,'request_id' => $request_id]);
+            $message1 = ResortNotification::create([ 'type' =>  $name,'user_id'=>$sendto,'module'=>$moduleName, 'resort_id' => $resortid, 'message' => $message ,'request_id' => $request_id, 'page_id' => $pageId]);
             $view = view('resorts.renderfiles.birthday_notification',compact('name','message','other','message1'))->render();
             $response['sendto'] =$sendto;
         }
@@ -3730,7 +3730,7 @@ class Common
      * single mobile push to the whole list. Each DB write is isolated so one failure doesn't
      * block the rest. `$requestId` is the entity id (cycle id, KPI id, etc.) for deep-linking.
      */
-    public static function notifyEmployees($resortId, array $empIds, $title, $message, $module = 'Performance', $requestId = null)
+    public static function notifyEmployees($resortId, array $empIds, $title, $message, $module = 'Performance', $requestId = null, $pageId = null)
     {
         $empIds = array_values(array_unique(array_filter($empIds)));
         if (empty($empIds)) return;
@@ -3738,7 +3738,7 @@ class Common
         foreach ($empIds as $empId) {
             try {
                 event(new \App\Events\ResortNotificationEvent(
-                    self::nofitication($resortId, 10, $title, $message, $requestId, $empId, $module)
+                    self::nofitication($resortId, 10, $title, $message, $requestId, $empId, $module, $pageId)
                 ));
             } catch (\Exception $e) {
                 \Log::warning("notifyEmployees emp {$empId} failed: " . $e->getMessage());
@@ -3748,7 +3748,7 @@ class Common
         try {
             // Pass skipDbInsert=true — Common::nofitication() above already wrote one
             // row per recipient; sendMobileNotification would otherwise duplicate them.
-            self::sendMobileNotification($resortId, 2, null, null, $title, $message, $module, $empIds, $requestId, true);
+            self::sendMobileNotification($resortId, 2, null, null, $title, $message, $module, $empIds, $requestId, true, $pageId);
         } catch (\Exception $e) {
             \Log::warning('notifyEmployees mobile push failed: ' . $e->getMessage());
         }

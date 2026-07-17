@@ -57,6 +57,11 @@ use Illuminate\Support\Facades\Route;
 		Route::post('resort/employees-docs', [App\Http\Controllers\API\EmployeeDocumentController::class, 'employeeDocument']);
 		Route::post('resort/get-employees-docs', [App\Http\Controllers\API\EmployeeDocumentController::class, 'getEmployeeDocument']);
 
+		//Performance Review / Appraisal Forms
+		Route::get('performance/my-reviews', [App\Http\Controllers\API\PerformanceReviewController::class, 'myReviews']);
+		Route::get('performance/review/{id}', [App\Http\Controllers\API\PerformanceReviewController::class, 'reviewDetail']);
+		Route::post('performance/review/{id}/submit', [App\Http\Controllers\API\PerformanceReviewController::class, 'submitReview']);
+
 		//File Management (mobile parity for the web File Management module)
 		Route::get('resort/filemanagement/my-folder', [App\Http\Controllers\API\FileManagementController::class, 'myFolder']);
 		Route::get('resort/filemanagement/shared-with-me', [App\Http\Controllers\API\FileManagementController::class, 'sharedWithMe']);

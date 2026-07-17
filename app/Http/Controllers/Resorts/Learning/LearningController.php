@@ -185,7 +185,8 @@ class LearningController extends Controller
                 $title,
                 $message,
                 'Learning',
-                $learningRequest->id
+                $learningRequest->id,
+                'learning-request'
             );
         } catch (\Exception $ne) {
             \Log::warning('Learning request notification failed: ' . $ne->getMessage());
