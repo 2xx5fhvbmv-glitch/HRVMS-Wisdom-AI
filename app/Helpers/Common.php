@@ -2237,9 +2237,21 @@ class Common
                     $vacancy->rank_name = $config[$vacancy->rank] ?? 'Unknown Rank';
                     $vacancy->creator_rank_name = $config[$vacancy->creator_rank] ?? '';
                     $vacancy->ReportingTo =  $vacancy->first_name.'  ' .$vacancy->last_name;
-                    // Compute approval status from notification children
-                    $statusMap = ['Active' => 'Pending HR', 'Approved' => 'In Progress', 'ForwardedToNext' => 'Forwarded', 'Rejected' => 'Rejected', 'Hold' => 'On Hold'];
-                    $vacancy->approval_status = $statusMap[$vacancy->status] ?? $vacancy->status;
+                    // Compute approval status from notification children.
+                    // 'Active' means "awaiting action at Approved_By's rank" —
+                    // which stage that actually is depends on Approved_By
+                    // (3=HR, 7=Finance, 8=GM), not a single fixed label. This
+                    // previously always showed "Pending HR" even for items
+                    // genuinely awaiting Finance or GM, which is what made a
+                    // Finance approver's own queue look like it wasn't their
+                    // turn yet.
+                    if ($vacancy->status === 'Active') {
+                        $pendingLabels = [3 => 'Pending HR', 7 => 'Pending Finance', 8 => 'Pending GM'];
+                        $vacancy->approval_status = $pendingLabels[(int) $vacancy->Approved_By] ?? 'Pending HR';
+                    } else {
+                        $statusMap = ['Approved' => 'In Progress', 'ForwardedToNext' => 'Forwarded', 'Rejected' => 'Rejected', 'Hold' => 'On Hold'];
+                        $vacancy->approval_status = $statusMap[$vacancy->status] ?? $vacancy->status;
+                    }
                     return $vacancy;
                 });
 
