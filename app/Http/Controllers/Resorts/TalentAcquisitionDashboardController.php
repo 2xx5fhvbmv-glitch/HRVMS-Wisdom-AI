@@ -758,6 +758,10 @@ class TalentAcquisitionDashboardController extends Controller
                     $showAllDepts = true;
                 }
             }
+            // The view expects $canSeeAllDepts (hoddashboard.blade.php:186) —
+            // compact('canSeeAllDepts') below was passing an undefined
+            // variable to the view since only $showAllDepts was ever set.
+            $canSeeAllDepts = $showAllDepts;
 
             // Fetch draft vacancies for the Drafts section
             $drafts = Vacancies::with(['Getdepartment', 'Getposition'])
