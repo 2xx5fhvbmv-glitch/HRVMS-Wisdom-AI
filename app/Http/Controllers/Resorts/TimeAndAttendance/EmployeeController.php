@@ -55,12 +55,39 @@ class EmployeeController extends Controller
                 ) as PresentCount
             "),
             DB::raw("
-                (SELECT COUNT(DISTINCT pa.date)
-                FROM parent_attendaces pa
-                WHERE pa.Emp_id = employees.id
-                AND pa.resort_id = {$resortId}
-                AND pa.Status = 'Absent'
-                AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
+                -- Absent was previously '(SELECT ... WHERE pa.Status = \"Absent\")' —
+                -- but no code path anywhere ever writes a parent_attendaces row
+                -- with Status='Absent' (every ChildAttendace/ParentAttendace
+                -- create() hardcodes Status='Present' on real check-in), so this
+                -- always returned 0 and the real \"Absent\" figure shown to HR was
+                -- computed elsewhere as elapsedDays - Present - DayOff - Leave —
+                -- which silently folded every un-recorded day-off (see DayOffCount
+                -- below, same root problem) into \"Absent\". duty_roster_entries is
+                -- the actual per-day SCHEDULE (Status='DayOff' for planned rest
+                -- days) — a real absence is a scheduled work day with no matching
+                -- Present attendance row and no approved leave covering it.
+                (SELECT COUNT(DISTINCT dre.date)
+                FROM duty_roster_entries dre
+                WHERE dre.Emp_id = employees.id
+                AND dre.resort_id = {$resortId}
+                AND dre.Shift_id IS NOT NULL
+                AND (dre.Status IS NULL OR dre.Status != 'DayOff')
+                AND dre.date BETWEEN GREATEST('{$monthStartingDate}', IFNULL(employees.joining_date, '{$monthStartingDate}')) AND LEAST('{$monthEndingDate}', CURDATE())
+                AND NOT EXISTS (
+                    SELECT 1 FROM parent_attendaces pa2
+                    WHERE pa2.Emp_id = employees.id
+                    AND pa2.resort_id = {$resortId}
+                    AND pa2.date = dre.date
+                    AND pa2.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
+                    AND pa2.CheckingTime IS NOT NULL AND TRIM(IFNULL(pa2.CheckingTime,'')) NOT IN ('', '00:00', '00:00:00')
+                )
+                AND NOT EXISTS (
+                    SELECT 1 FROM employees_leaves el2
+                    WHERE el2.emp_id = employees.id
+                    AND el2.resort_id = {$resortId}
+                    AND el2.status = 'Approved'
+                    AND dre.date BETWEEN el2.from_date AND el2.to_date
+                )
                 ) as AbsentCount
             "),
             DB::raw("
@@ -144,11 +171,15 @@ class EmployeeController extends Controller
                 ) as TotalOverTime
             "),
             DB::raw("
-                (SELECT COUNT(DISTINCT pa.date) FROM parent_attendaces pa
-                WHERE pa.Emp_id = employees.id
-                AND pa.resort_id = {$resortId}
-                AND pa.Status = 'DayOff'
-                AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
+                -- Day-offs are scheduled in duty_roster_entries (Status='DayOff'),
+                -- never mirrored into parent_attendaces (which only ever records
+                -- Status='Present' rows), so this always returned 0 regardless of
+                -- how many rest days the employee actually had that period.
+                (SELECT COUNT(DISTINCT dre.date) FROM duty_roster_entries dre
+                WHERE dre.Emp_id = employees.id
+                AND dre.resort_id = {$resortId}
+                AND dre.Status = 'DayOff'
+                AND dre.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
                 ) as DayOffCount
             "),
             DB::raw("
@@ -188,11 +219,31 @@ class EmployeeController extends Controller
                 ) as LeaveCount
             "),
             DB::raw("
-                (SELECT COUNT(DISTINCT pa.date) FROM parent_attendaces pa
-                WHERE pa.Emp_id = employees.id
-                AND pa.resort_id = {$resortId}
-                AND pa.Status = 'Absent'
-                AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
+                -- Same fix as getDetailSelectColumns()'s AbsentCount — real
+                -- schedule lives in duty_roster_entries, parent_attendaces never
+                -- gets a Status='Absent' row written by any code path.
+                (SELECT COUNT(DISTINCT dre.date)
+                FROM duty_roster_entries dre
+                WHERE dre.Emp_id = employees.id
+                AND dre.resort_id = {$resortId}
+                AND dre.Shift_id IS NOT NULL
+                AND (dre.Status IS NULL OR dre.Status != 'DayOff')
+                AND dre.date BETWEEN GREATEST('{$monthStartingDate}', IFNULL(employees.joining_date, '{$monthStartingDate}')) AND LEAST('{$monthEndingDate}', CURDATE())
+                AND NOT EXISTS (
+                    SELECT 1 FROM parent_attendaces pa2
+                    WHERE pa2.Emp_id = employees.id
+                    AND pa2.resort_id = {$resortId}
+                    AND pa2.date = dre.date
+                    AND pa2.Status IN ('Present', 'HalfDay', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave')
+                    AND pa2.CheckingTime IS NOT NULL AND TRIM(IFNULL(pa2.CheckingTime,'')) NOT IN ('', '00:00', '00:00:00')
+                )
+                AND NOT EXISTS (
+                    SELECT 1 FROM employees_leaves el2
+                    WHERE el2.emp_id = employees.id
+                    AND el2.resort_id = {$resortId}
+                    AND el2.status = 'Approved'
+                    AND dre.date BETWEEN el2.from_date AND el2.to_date
+                )
                 ) as AbsentCount
             "),
             DB::raw("
@@ -206,11 +257,12 @@ class EmployeeController extends Controller
                 ) as PresentCount
             "),
             DB::raw("
-                (SELECT COUNT(DISTINCT pa.date) FROM parent_attendaces pa
-                WHERE pa.Emp_id = employees.id
-                AND pa.resort_id = {$resortId}
-                AND pa.Status = 'DayOff'
-                AND pa.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
+                -- Same fix as getDetailSelectColumns()'s DayOffCount.
+                (SELECT COUNT(DISTINCT dre.date) FROM duty_roster_entries dre
+                WHERE dre.Emp_id = employees.id
+                AND dre.resort_id = {$resortId}
+                AND dre.Status = 'DayOff'
+                AND dre.date BETWEEN '{$monthStartingDate}' AND '{$monthEndingDate}'
                 ) as DayOffCount
             "),
             DB::raw("
@@ -276,7 +328,15 @@ class EmployeeController extends Controller
                 $employee->Present = $employee->PresentCount;
                 $employee->Dayoff = $employee->DayOffCount;
                 $elapsedDays = Carbon::parse($monthStartingDate)->diffInDays(Carbon::parse(min($today, $monthEndingDate))) + 1;
-                $employee->Absent = max(0, $elapsedDays - $employee->PresentCount - $employee->DayOffCount - ($employee->LeaveCount ?? 0));
+                // Was elapsedDays - Present - DayOff - Leave (a residual/
+                // subtraction), which silently folded every un-recorded
+                // day-off and any pre-joining gap into "Absent" since
+                // neither DayOff nor Absent rows are ever actually written
+                // to parent_attendaces. AbsentCount is now a real count from
+                // duty_roster_entries (see getDetailSelectColumns/
+                // getAttendanceSelectColumns) — scheduled work days with no
+                // matching Present attendance and no approved leave.
+                $employee->Absent = $employee->AbsentCount ?? 0;
                 $employee->CompletedWorkingDays = $employee->PresentCount;
                 $employee->TotalDayoff = Common::getWeekCountInMonth($monthStartingDate, $monthEndingDate);
                 $employee->CompletedDayoff = $employee->DayOffCount;
@@ -468,7 +528,15 @@ class EmployeeController extends Controller
                 $employee->Present = $employee->PresentCount;
                 $employee->Dayoff = $employee->DayOffCount;
                 $elapsedDays = Carbon::parse($monthStartingDate)->diffInDays(Carbon::parse(min($today, $monthEndingDate))) + 1;
-                $employee->Absent = max(0, $elapsedDays - $employee->PresentCount - $employee->DayOffCount - ($employee->LeaveCount ?? 0));
+                // Was elapsedDays - Present - DayOff - Leave (a residual/
+                // subtraction), which silently folded every un-recorded
+                // day-off and any pre-joining gap into "Absent" since
+                // neither DayOff nor Absent rows are ever actually written
+                // to parent_attendaces. AbsentCount is now a real count from
+                // duty_roster_entries (see getDetailSelectColumns/
+                // getAttendanceSelectColumns) — scheduled work days with no
+                // matching Present attendance and no approved leave.
+                $employee->Absent = $employee->AbsentCount ?? 0;
                 $employee->CompletedWorkingDays = $employee->PresentCount;
                 $employee->TotalDayoff = Common::getWeekCountInMonth($monthStartingDate, $monthEndingDate);
                 $employee->CompletedDayoff = $employee->DayOffCount;
@@ -576,7 +644,15 @@ class EmployeeController extends Controller
                 $employee->Dayoff = $employee->DayOffCount;
                 $today = Carbon::today()->format('Y-m-d');
                 $elapsedDays = Carbon::parse($monthStartingDate)->diffInDays(Carbon::parse(min($today, $monthEndingDate))) + 1;
-                $employee->Absent = max(0, $elapsedDays - $employee->PresentCount - $employee->DayOffCount - ($employee->LeaveCount ?? 0));
+                // Was elapsedDays - Present - DayOff - Leave (a residual/
+                // subtraction), which silently folded every un-recorded
+                // day-off and any pre-joining gap into "Absent" since
+                // neither DayOff nor Absent rows are ever actually written
+                // to parent_attendaces. AbsentCount is now a real count from
+                // duty_roster_entries (see getDetailSelectColumns/
+                // getAttendanceSelectColumns) — scheduled work days with no
+                // matching Present attendance and no approved leave.
+                $employee->Absent = $employee->AbsentCount ?? 0;
                 $employee->CompletedWorkingDays = $employee->PresentCount;
                 $employee->TotalHoursWorked = $employee->TotalHoursWorked ?? '00:00';
                 $employee->TotalOverTime = $employee->TotalOverTime ?? '00:00';
@@ -1008,7 +1084,15 @@ class EmployeeController extends Controller
                     $employee->Dayoff = $employee->DayOffCount;
                     $today = Carbon::today()->format('Y-m-d');
                     $elapsedDays = Carbon::parse($monthStartingDate)->diffInDays(Carbon::parse(min($today, $monthEndingDate))) + 1;
-                    $employee->Absent = max(0, $elapsedDays - $employee->PresentCount - $employee->DayOffCount - ($employee->LeaveCount ?? 0));
+                    // Was elapsedDays - Present - DayOff - Leave (a residual/
+                // subtraction), which silently folded every un-recorded
+                // day-off and any pre-joining gap into "Absent" since
+                // neither DayOff nor Absent rows are ever actually written
+                // to parent_attendaces. AbsentCount is now a real count from
+                // duty_roster_entries (see getDetailSelectColumns/
+                // getAttendanceSelectColumns) — scheduled work days with no
+                // matching Present attendance and no approved leave.
+                $employee->Absent = $employee->AbsentCount ?? 0;
                     $employee->CompletedWorkingDays = $employee->PresentCount;
                     $employee->TotalHoursWorked = $employee->TotalHoursWorked ?? '00:00';
                     $employee->TotalOverTime = $employee->TotalOverTime ?? '00:00';
@@ -1525,7 +1609,15 @@ class EmployeeController extends Controller
                 $employee->Dayoff = $employee->DayOffCount;
                 $today = Carbon::today()->format('Y-m-d');
                 $elapsedDays = Carbon::parse($monthStartingDate)->diffInDays(Carbon::parse(min($today, $monthEndingDate))) + 1;
-                $employee->Absent = max(0, $elapsedDays - $employee->PresentCount - $employee->DayOffCount - ($employee->LeaveCount ?? 0));
+                // Was elapsedDays - Present - DayOff - Leave (a residual/
+                // subtraction), which silently folded every un-recorded
+                // day-off and any pre-joining gap into "Absent" since
+                // neither DayOff nor Absent rows are ever actually written
+                // to parent_attendaces. AbsentCount is now a real count from
+                // duty_roster_entries (see getDetailSelectColumns/
+                // getAttendanceSelectColumns) — scheduled work days with no
+                // matching Present attendance and no approved leave.
+                $employee->Absent = $employee->AbsentCount ?? 0;
                 $employee->CompletedWorkingDays = $employee->PresentCount;
                 $employee->TotalHoursWorked = $employee->TotalHoursWorked ?? '00:00';
                 $employee->TotalOverTime = $employee->TotalOverTime ?? '00:00';
