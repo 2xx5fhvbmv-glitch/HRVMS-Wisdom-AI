@@ -937,7 +937,26 @@ class VacancyController extends Controller
     {
 
         $config = config('settings.Position_Rank');
-        $rank = $this->resort->GetEmployee->rank;
+        $employee = $this->resort->GetEmployee;
+        $rank = $employee->rank;
+        // A Finance/HR-department HOD or EXCOM (raw rank 1/2) is a real
+        // approver in this workflow, not a plain department HOD — same
+        // effectiveRank promotion hr_dashboard()/hod_dashboard() already
+        // apply. Without it, this View All page always took the
+        // own-department-only branch below for them, hiding every other
+        // department's pending-Finance/HR request (the actual thing a
+        // Finance/HR approver needs to see and act on here).
+        $rank = (int) $rank;
+        if (!in_array($rank, [3, 7, 8], true)) {
+            $userDeptName = ResortDepartment::where('id', $employee->Dept_id)->value('name') ?? '';
+            $userPositionTitle = $employee->position->position_title ?? '';
+            if (stripos($userDeptName, 'Accounting') !== false || stripos($userDeptName, 'Finance') !== false
+                || stripos($userPositionTitle, 'Finance') !== false) {
+                $rank = 7;
+            } elseif (stripos($userDeptName, 'Human Resources') !== false || stripos($userPositionTitle, 'Human Resources') !== false) {
+                $rank = 3;
+            }
+        }
         if(in_array($rank, [1, 2]))
         {
             $query = Vacancies::with(['Getdepartment','Getposition',

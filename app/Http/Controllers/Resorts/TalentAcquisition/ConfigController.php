@@ -554,19 +554,32 @@ class ConfigController extends Controller
             }
 
 
-                $sentto =  Employee::where('resort_id',$this->resort->resort_id)->where("rank",$newRank)->first();
+                // Raw rank=$newRank excluded any resort whose real HR/Finance
+                // employee isn't literally rank 3/7 (e.g. our Finance Manager
+                // here is rank 2) — the "forward to next approver" step
+                // silently found nobody to notify. GM stays a raw rank=8
+                // lookup since GM isn't department-promoted like HR/Finance.
+                if ($newRank == 3) {
+                    $senttoIds = Common::getResortHrEmployeeIds($this->resort->resort_id);
+                } elseif ($newRank == 7) {
+                    $senttoIds = Common::getResortFinanceEmployeeIds($this->resort->resort_id);
+                } else {
+                    $senttoIds = Employee::where('resort_id',$this->resort->resort_id)->where('rank',$newRank)->pluck('id')->all();
+                }
 
-                if($sentto) {
+                if (!empty($senttoIds)) {
                     $msg = "New Vacancy has been Approved by ".$config[$effectiveRank]." and forwarded to ".$config[$newRank]." for further processing.";
-                    event(new ResortNotificationEvent(Common::nofitication(
-                                                                            $this->resort->resort_id,
-                                                                            10,
-                                                                            'Upcoming Investigation Meeting Reminder',
-                                                                            $msg,
-                                                                            0,
-                                                                            $sentto->id,
-                                                                            'Talent Acquisition'
-                                                                        )));
+                    foreach ($senttoIds as $sentto_id) {
+                        event(new ResortNotificationEvent(Common::nofitication(
+                                                                                $this->resort->resort_id,
+                                                                                10,
+                                                                                'Upcoming Investigation Meeting Reminder',
+                                                                                $msg,
+                                                                                0,
+                                                                                $sentto_id,
+                                                                                'Talent Acquisition'
+                                                                            )));
+                    }
 
                     // ResortNotificationEvent only broadcasts to the web
                     // bell icon — the next approver in the chain (Finance/
@@ -580,7 +593,7 @@ class ConfigController extends Controller
                         'Hiring Request',
                         $msg,
                         'Talent Acquisition (Hiring Request)',
-                        [$sentto->id],
+                        $senttoIds,
                         null,
                         false,
                         'talent-acquisition-hiring-request'
