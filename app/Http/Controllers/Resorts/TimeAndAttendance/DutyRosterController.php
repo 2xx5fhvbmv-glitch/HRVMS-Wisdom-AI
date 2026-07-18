@@ -887,7 +887,13 @@ class DutyRosterController extends Controller
 
         // Now populate employees into departments and sections
         foreach ($Rosterdata as $roster) {
-            $deptId = $roster->Dept_id ?? 'no_dept';
+            // `?? 'no_dept'` only catches a literal null — a Dept_id of 0/'0'/''
+            // slipped through as itself, landing in a second, separately-keyed
+            // "No Department" bucket (dept_name falls back to the same label
+            // when the left-joined department row doesn't exist) instead of
+            // the one already initialized above. Match the falsy check used
+            // by the $noDeptRoster filter so both agree on what "no dept" is.
+            $deptId = !$roster->Dept_id ? 'no_dept' : $roster->Dept_id;
             $rawSectionId = $roster->Section_id;
             $sectionName = $roster->section_name ?? null;
 
@@ -1565,7 +1571,13 @@ class DutyRosterController extends Controller
 
         // Now populate employees into departments and sections
         foreach ($Rosterdata as $roster) {
-            $deptId = $roster->Dept_id ?? 'no_dept';
+            // `?? 'no_dept'` only catches a literal null — a Dept_id of 0/'0'/''
+            // slipped through as itself, landing in a second, separately-keyed
+            // "No Department" bucket (dept_name falls back to the same label
+            // when the left-joined department row doesn't exist) instead of
+            // the one already initialized above. Match the falsy check used
+            // by the $noDeptRoster filter so both agree on what "no dept" is.
+            $deptId = !$roster->Dept_id ? 'no_dept' : $roster->Dept_id;
             $rawSectionId = $roster->Section_id;
             $sectionName = $roster->section_name ?? null;
 
