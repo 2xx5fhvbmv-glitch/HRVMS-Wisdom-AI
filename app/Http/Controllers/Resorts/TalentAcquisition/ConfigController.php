@@ -598,7 +598,9 @@ class ConfigController extends Controller
                         event(new ResortNotificationEvent(Common::nofitication(
                                                                                 $this->resort->resort_id,
                                                                                 10,
-                                                                                'Upcoming Investigation Meeting Reminder',
+                                                                                // Copy-pasted from an unrelated
+                                                                                // Investigation Meeting template.
+                                                                                $isFinalApproval ? 'Hiring Request Approved' : 'Hiring Request',
                                                                                 $msg,
                                                                                 0,
                                                                                 $sentto_id,
