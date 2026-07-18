@@ -182,6 +182,11 @@
                     </div>
                 </div>
             </div>
+            {{-- Appeals Section hidden per request — not producing useful data
+                 yet (0 appeals filed on real resorts so far). Uncomment to
+                 bring it back; $appealsSubmitted/$hearingsPending/
+                 $hearingsResolved/$appealsByCategoryLabels/Data are still
+                 computed and passed by the controller.
             <div class="col-xl-6 d-flex">
                 <div class="card card-appealsSection h-100 w-100">
                     <div class="card-title">
@@ -225,6 +230,7 @@
                     </div>
                 </div>
             </div>
+            --}}
             <div class="col-xl-3 col-sm-6 d-flex @if(Common::checkRouteWisePermission('GrievanceAndDisciplinery.grivance.GrivanceIndex',config('settings.resort_permissions.view')) == false) d-none @endif">
                 <div class="card card-grievanceCategoryBreakdown h-100 w-100">
                     <div class="card-title">
