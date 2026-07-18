@@ -50,6 +50,15 @@ class ConsentResponseController extends Controller
         $applicant->update([
             'consent_status' => 'approved',
             'consent_responded_at' => Carbon::now(),
+            // The Talent Pool listing's Availability badge reads
+            // availability_status, not consent_status — reject() sets it to
+            // 'consent_rejected' as a distinct signal, but approve() never
+            // cleared it back, so an applicant who rejected then later
+            // approved (a new consent link, or changing their mind) kept
+            // showing "Consent Rejected" forever even though consent_status
+            // was genuinely 'approved'. Reset to null ("Not Checked") so
+            // the normal Check Availability flow can run again.
+            'availability_status' => $applicant->availability_status === 'consent_rejected' ? null : $applicant->availability_status,
         ]);
 
         $this->notifyHrOfConsentResponse($applicant, 'approved');
