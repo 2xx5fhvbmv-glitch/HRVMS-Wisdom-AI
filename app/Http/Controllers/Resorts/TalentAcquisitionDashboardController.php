@@ -748,8 +748,14 @@ class TalentAcquisitionDashboardController extends Controller
             $currentMonthEnd = Carbon::now()->endOfMonth();
             $config = config('settings.Position_Rank');
 
-            // EXCOM (rank 1), GM (rank 8), and Finance/Accounting users see all departments
-            $showAllDepts = in_array($userRank, [1, 8]);
+            // GM (rank 8) always sees all departments; EXCOM/HOD (rank 1/2)
+            // only when they're actually in the HR department — same rule
+            // Common::hasFullDataAccess() uses. This previously granted
+            // "see all departments" to ANY EXCOM (rank 1) regardless of
+            // department, so an Engineering EXCOM (e.g. Roshan Faruk) saw
+            // every other department's hire requests/vacancies on their own
+            // dashboard, not just Engineering's.
+            $showAllDepts = ($userRank == 8) || (in_array($userRank, [1, 2], true) && Common::isHRDepartment($Dept_id));
             if (!$showAllDepts) {
                 $userDeptName = ResortDepartment::where('id', $Dept_id)->value('name');
                 $userPositionTitle = $this->globalUser->GetEmployee->position->position_title ?? '';
