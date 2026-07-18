@@ -938,9 +938,11 @@ class ComplianceController extends Controller
                     // Senior HR and Management start
                     $total_employees = Employee::where('resort_id', $resort->resort_id)->where('status', 'Active')->get();
                     $total_employees_count = $total_employees->count();
-                    if($total_employees_count > 50) 
+                    if($total_employees_count > 50)
                     {
-                         $seniorHR = Employee::where('resort_id', $resort->resort_id)->where('rank', '3')->first();
+                         // Raw rank=3 excluded HR employees whose actual rank
+                         // isn't literally 3 (e.g. HR-department HOD/EXCOM).
+                         $seniorHR = Employee::whereIn('id', Common::getResortHrEmployeeIds($resort->resort_id))->first();
                         
                          if ($seniorHR && $seniorHR->nationality != 'Maldivian') {
                               $row = $this->createComplianceOncePerDay([

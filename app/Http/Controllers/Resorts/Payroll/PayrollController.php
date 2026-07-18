@@ -748,14 +748,11 @@ class PayrollController extends Controller
             }
         
             DB::commit(); // ✅ Commit transaction
-            // Pick an HR (rank 3) recipient; fall back to an HOD (rank 2).
-            // Status='Active' guard added so we don't notify a terminated
-            // manager whose account no longer logs in.
-            $notify_person = Employee::where('resort_id', $this->resort->resort_id)->where('rank','3')->where('status','Active')->first();
-            if(!$notify_person)
-            {
-                $notify_person = Employee::where('resort_id', $this->resort->resort_id)->where('rank','2')->where('status','Active')->first();
-            }
+            // Pick an HR recipient. Raw rank=3 (with a resort-wide,
+            // department-blind rank=2 fallback) excluded this resort's real
+            // HR employee. Status='Active' guard kept so we don't notify a
+            // terminated manager whose account no longer logs in.
+            $notify_person = Employee::whereIn('id', Common::getResortHrEmployeeIds($this->resort->resort_id))->where('status','Active')->first();
                 $payroll_service_charges = PayrollServiceCharge::where("employee_id",$emp_detail->id)->where('payroll_id',$request->payroll_id)->get();
                 foreach ($payroll_service_charges as $payroll) 
                 {
@@ -847,12 +844,10 @@ class PayrollController extends Controller
                 );
                 if($emp_detail->nationality == 'Maldivian' &&  in_array($deduction['pension'] , ["MVR 0.00" , "0.00"]))
                 {
-                    $notify_person = Employee::where('resort_id', $this->resort->resort_id)->where('rank','3')->first();
-                    if (!$notify_person) 
-                    {
-                         $notify_person = Employee::where('resort_id',$this->resort->resort_id)->where('rank','2')->first();
-                    }
-                    
+                    // Raw rank=3 (with a resort-wide, department-blind
+                    // rank=2 fallback) excluded this resort's real HR employee.
+                    $notify_person = Employee::whereIn('id', Common::getResortHrEmployeeIds($this->resort->resort_id))->first();
+
                     $newemployee = Employee::with(['resortAdmin','position','department'])->where('resort_id', $this->resort->resort_id)->where('id',$emp_detail->id)->first();
                       try {
                           event(new ResortNotificationEvent(Common::nofitication(
@@ -2773,10 +2768,9 @@ class PayrollController extends Controller
 
             if($employee->ewt_status =="Yes" && $taxableIncomeMVR > 60000)
             {
-                $notify_person = Employee::where('resort_id', $this->resort->resort_id)->where('rank','3')->first();
-                if (!$notify_person) {
-                    $notify_person = Employee::where('resort_id', $this->resort->resort_id)->where('rank','2')->first();
-                }
+                // Raw rank=3 (with a resort-wide, department-blind rank=2
+                // fallback) excluded this resort's real HR employee.
+                $notify_person = Employee::whereIn('id', Common::getResortHrEmployeeIds($this->resort->resort_id))->first();
                 if($ewtMVR === 0)
                 {
                     try {

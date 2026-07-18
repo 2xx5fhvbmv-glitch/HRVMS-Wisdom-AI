@@ -368,11 +368,15 @@ class AdvanceSalaryController extends Controller
                     'message' => 'Guarantor approval is pending.',
                     ]);
                 }
-                // HR rank is 3 — check direct or via delegation
-                $hr = Employee::where('resort_id',$this->resort->resort_id)->where('rank',3)->where('id',$this->resort->GetEmployee->id)->first();
+                // HR check — check direct or via delegation. Raw rank=3
+                // excluded any resort whose real HR employee isn't literally
+                // rank 3 (e.g. HR-department HOD/EXCOM), incorrectly denying
+                // the actual HR approver access to their own approval step.
+                $hrEmployeeIds = Common::getResortHrEmployeeIds($this->resort->resort_id);
+                $hr = in_array($this->resort->GetEmployee->id, $hrEmployeeIds, true) ? $this->resort->GetEmployee : null;
                 if (!$hr) {
                     // Check if current user is a delegate for any HR employee on leave
-                    $hrEmployees = Employee::where('resort_id',$this->resort->resort_id)->where('rank',3)->pluck('id')->toArray();
+                    $hrEmployees = $hrEmployeeIds;
                     foreach ($hrEmployees as $hrEmpId) {
                         if (\App\Helpers\Common::hasDelegationAuthority($this->resort->GetEmployee->id, $hrEmpId, $this->resort->resort_id)) {
                             $hr = Employee::find($hrEmpId);

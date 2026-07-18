@@ -806,10 +806,11 @@ class EmployeeController extends Controller
 
             // Check salary  Compliance
 
-            $notify_person = Employee::where('resort_id', $this->resort->resort_id)->where('rank','3')->first();
-            if (!$notify_person) {
-                $notify_person = Employee::where('resort_id', $this->resort->resort_id)->where('rank','2')->first();
-            }
+            // Raw rank=3 (with a resort-wide, department-blind rank=2
+            // fallback that could match any HOD, not necessarily HR)
+            // excluded this resort's real HR employee. getResortHrEmployeeIds()
+            // matches rank=3 anywhere or HR-department rank 1/2 correctly.
+            $notify_person = Employee::whereIn('id', Common::getResortHrEmployeeIds($this->resort->resort_id))->first();
 
             $minWageMVR = 8021; // Minimum wage in MVR
             $minWageUSD = 520; // Minimum wage in USD
@@ -1074,11 +1075,9 @@ class EmployeeController extends Controller
             $totalMonthlyEarningMvr = $basicMvr + $totalAllowanceMvr;
             $tin = $employee->tin ?? null;
 
-            $notify_person = Employee::where('resort_id', $resort_id)->where('rank','3')->first();
-            if (!$notify_person)
-            {
-                $notify_person = Employee::where('resort_id', $resort_id)->where('rank','2')->first();
-            }
+            // Raw rank=3 (with a resort-wide, department-blind rank=2
+            // fallback) excluded this resort's real HR employee.
+            $notify_person = Employee::whereIn('id', Common::getResortHrEmployeeIds($resort_id))->first();
             if($totalMonthlyEarningMvr >= 30000 && !$tin)
             {
                 // event(new ResortNotificationEvent(Common::nofitication(
@@ -1982,10 +1981,9 @@ class EmployeeController extends Controller
             $employee->save();
 
 
-            $notify_person = Employee::where('resort_id', $this->resort->resort_id)->where('rank','3')->first();
-            if (!$notify_person) {
-                $notify_person = Employee::where('resort_id', $this->resort->resort_id)->where('rank','2')->first();
-            }
+            // Raw rank=3 (with a resort-wide, department-blind rank=2
+            // fallback) excluded this resort's real HR employee.
+            $notify_person = Employee::whereIn('id', Common::getResortHrEmployeeIds($this->resort->resort_id))->first();
 
 
 
