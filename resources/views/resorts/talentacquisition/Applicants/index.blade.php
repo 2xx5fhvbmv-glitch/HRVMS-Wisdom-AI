@@ -1259,6 +1259,14 @@
                                 if (response.success)
                                 {
                                     $(".userApplicants-wrapper").html(response.view);
+                                    // The over-budget check only ran on user input/change —
+                                    // an applicant whose salary allocation was already saved
+                                    // over budget showed no warning at all until someone
+                                    // retyped the value. Run it once as soon as the form
+                                    // (with its already-saved basic_salary) is in the DOM.
+                                    if ($("#salaryAllocationForm").length && typeof checkSalaryOverBudget === 'function') {
+                                        checkSalaryOverBudget();
+                                    }
                                 }
                         },
                             error: function(response) {
