@@ -347,7 +347,13 @@ class VacancyController extends Controller
             if (!$isDraft) {
                 $minWageMVR = 8021; // Minimum wage in MVR
                 $minWageUSD = 520;
-                $notify_person = Employee::where('resort_id', $this->resort->resort_id)->where('rank','3')->first();
+                // Raw rank='3' excludes any resort whose actual HR employee(s)
+                // aren't literally rank 3 (e.g. an HR-department employee
+                // ranked HOD/EXCOM) — same bug class as the hiring-request
+                // notification below. getResortHrEmployeeIds() matches both
+                // rank=3 and HR-department rank 1/2, same as the dashboard.
+                $notifyPersonId = Common::getResortHrEmployeeIds($this->resort->resort_id)[0] ?? null;
+                $notify_person = $notifyPersonId ? Employee::find($notifyPersonId) : null;
 
                 if($notify_person && ($vacancy->propsed_salary < $minWageMVR && $vacancy->amount_unit == 'MVR' || $vacancy->propsed_salary < $minWageUSD && $vacancy->amount_unit == 'USD')) {
                         event(new ResortNotificationEvent(Common::nofitication(
@@ -445,9 +451,14 @@ class VacancyController extends Controller
                     $msg = 'HOD Created new hiring request';
                     $title = ' Hiring Request';
                     $ModuleName = "Talent Acquisition  ";
-                    $hr = Common::FindResortHR($this->resort);
-                    if ($hr) {
-                        $hr_id = $hr->id;
+                    // FindResortHR() only matches HR-dept employees ranked 1/2 —
+                    // this resort's dashboard (TalentAcquisitionDashboardController::
+                    // hr_dashboard()) treats rank=3 OR HR-department as "HR" for
+                    // exactly this hiring-request queue, so FindResortHR() silently
+                    // excluded rank-3 HR employees and this notification never fired
+                    // for them. getResortHrEmployeeIds() matches both.
+                    $hrIds = Common::getResortHrEmployeeIds($this->resort->resort_id);
+                    foreach ($hrIds as $hr_id) {
                         event(new ResortNotificationEvent(Common::nofitication(
                             $this->resort->resort_id,
                             $this->type[6],
@@ -457,7 +468,9 @@ class VacancyController extends Controller
                             $hr_id,
                             $ModuleName
                         )));
+                    }
 
+                    if (!empty($hrIds)) {
                         // ResortNotificationEvent above only broadcasts over
                         // Pusher for the web bell icon (ShouldBroadcast, no
                         // persistence, no push) — it never reached the
@@ -471,7 +484,7 @@ class VacancyController extends Controller
                             $title,
                             $msg,
                             'Talent Acquisition (Hiring Request)',
-                            [$hr_id],
+                            $hrIds,
                             null,
                             false,
                             'talent-acquisition-hiring-request'
@@ -778,7 +791,10 @@ class VacancyController extends Controller
 
             $minWageMVR = 8021;
             $minWageUSD = 520;
-            $notify_person = Employee::where('resort_id', $this->resort->resort_id)->where('rank', '3')->first();
+            // Same fix as store(): raw rank='3' excludes HR employees whose
+            // actual rank isn't literally 3.
+            $notifyPersonId = Common::getResortHrEmployeeIds($this->resort->resort_id)[0] ?? null;
+            $notify_person = $notifyPersonId ? Employee::find($notifyPersonId) : null;
 
             if ($notify_person && ($vacancy->propsed_salary < $minWageMVR && $vacancy->amount_unit == 'MVR' || $vacancy->propsed_salary < $minWageUSD && $vacancy->amount_unit == 'USD')) {
                 event(new ResortNotificationEvent(Common::nofitication(
@@ -854,14 +870,18 @@ class VacancyController extends Controller
                 $msg = 'HOD Created new hiring request';
                 $title = 'Hiring Request';
                 $ModuleName = "Talent Acquisition  ";
-                $hr = Common::FindResortHR($this->resort);
-                if ($hr) {
-                    $hr_id = $hr->id;
+                // Same fix as store(): FindResortHR() excludes rank-3 HR
+                // employees, which is exactly who this resort's dashboard
+                // treats as "HR" for this hiring-request queue.
+                $hrIds = Common::getResortHrEmployeeIds($this->resort->resort_id);
+                foreach ($hrIds as $hr_id) {
                     event(new ResortNotificationEvent(Common::nofitication(
                         $this->resort->resort_id, $this->type[6], 'Upcoming Investigation Meeting Reminder',
                         $msg, 0, $hr_id, $ModuleName
                     )));
+                }
 
+                if (!empty($hrIds)) {
                     // Same gap as store(): the event above only broadcasts
                     // to the web bell icon, never reaches the mobile app.
                     Common::sendMobileNotification(
@@ -872,7 +892,7 @@ class VacancyController extends Controller
                         $title,
                         $msg,
                         'Talent Acquisition (Hiring Request)',
-                        [$hr_id],
+                        $hrIds,
                         null,
                         false,
                         'talent-acquisition-hiring-request'
