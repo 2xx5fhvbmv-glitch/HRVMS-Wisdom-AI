@@ -435,6 +435,7 @@ class FileManageController extends Controller
                             'File_Size' => $fileSizeMB,
                             'File_Path' => $path,
                             'File_Extension' => $extension,
+                            'is_secure' => 1,
                         ]);
         
                         if ($existingFile && $File_structure->Folder_Type == "uncategorized") {
