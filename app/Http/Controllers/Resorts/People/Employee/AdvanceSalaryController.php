@@ -96,13 +96,13 @@ class AdvanceSalaryController extends Controller
                     return $payroll_data->employee->Emp_id;
                 })
                 ->addColumn('employee_name', function ($payroll_data) {
-                    return $payroll_data->employee->resortAdmin->full_name;
+                    return $payroll_data->employee->resortAdmin->full_name ?? 'N/A';
                 })
                 ->addColumn('position', function ($payroll_data) {
-                    return $payroll_data->employee->position->position_title;
+                    return $payroll_data->employee->position->position_title ?? 'N/A';
                 })
                 ->addColumn('department', function ($payroll_data) {
-                    return $payroll_data->employee->department->name;
+                    return $payroll_data->employee->department->name ?? 'N/A';
                 })
                 ->editColumn('request_date', function ($payroll_data) {
                     return $payroll_data->request_date ? Carbon::parse($payroll_data->request_date)->format('d M Y') : '';
