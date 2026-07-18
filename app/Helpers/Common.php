@@ -6700,8 +6700,11 @@ class Common
 
         $filePath = $ChildFiles->File_Path;
 
-        // Check if file should be decrypted
-        if ($ChildFiles->is_secure == 1 || !empty($is_secure) && $is_secure != null) {
+        // Check if file should be decrypted. `.enc` suffix is the actual
+        // on-disk proof of encryption — some upload paths (web portal
+        // StoreFolderFiles) always encrypt but never set is_secure=1, so
+        // trusting only the flag left those files handed back raw/encrypted.
+        if ($ChildFiles->is_secure == 1 || (!empty($is_secure) && $is_secure != null) || substr($filePath, -4) === '.enc') {
 
 
             $key = hash('sha256', env('ENCRYPTION_KEY'), true);
