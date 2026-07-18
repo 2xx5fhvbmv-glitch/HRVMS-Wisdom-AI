@@ -517,6 +517,7 @@ class ApplicantsController extends Controller
                     })
                     ->selectRaw('
                         applicant_form_data.id,
+                        applicant_form_data.resort_id,
                         applicant_form_data.Application_date,
                         applicant_form_data.first_name,
                         applicant_form_data.last_name,
