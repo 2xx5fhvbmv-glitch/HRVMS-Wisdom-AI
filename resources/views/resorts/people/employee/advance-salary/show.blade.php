@@ -47,11 +47,11 @@
                                         </tr>
                                         <tr>
                                             <th>Department:</th>
-                                            <td>{{$advance_salary->employee->department->name}}</td>
+                                            <td>{{$advance_salary->employee->department->name ?? 'N/A'}}</td>
                                         </tr>
                                         <tr>
                                             <th>Position:</th>
-                                            <td>{{$advance_salary->employee->position->position_title}}</td>
+                                            <td>{{$advance_salary->employee->position->position_title ?? 'N/A'}}</td>
                                         </tr>
                                         <tr>
                                             <th>Monthly Salary:</th>
@@ -129,7 +129,7 @@
                                              </tr>
                                              <tr>
                                                   <th>Position:</th>
-                                                  <td>{{$guarantor->employee->position->position_title}}</td>
+                                                  <td>{{$guarantor->employee->position->position_title ?? 'N/A'}}</td>
                                              </tr>
                                              <tr>
                                                   <th>Guarantor Status:</th>
