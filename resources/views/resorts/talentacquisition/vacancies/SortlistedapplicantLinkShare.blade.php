@@ -296,6 +296,14 @@ $(document).ready(function() {
                         if (response.success)
                         {
                             $(".userApplicants-wrapper").html(response.view);
+                            // The over-budget check only ran on user input/change —
+                            // an applicant whose salary allocation was already saved
+                            // over budget showed no warning at all until someone
+                            // retyped the value. Run it once as soon as the form
+                            // (with its already-saved basic_salary) is in the DOM.
+                            if ($("#salaryAllocationForm").length && typeof checkSalaryOverBudget === 'function') {
+                                checkSalaryOverBudget();
+                            }
                         }
                 },
                     error: function(response) {
@@ -311,6 +319,101 @@ $(document).ready(function() {
                     }
             });
         $userApplicantsWrapper.toggleClass("end-0");
+    });
+
+    // Basic Salary vs budgeted-salary cap can be entered in a different
+    // currency than the cap itself (Currency dropdown is independent of
+    // the vacancy's own budgeted-salary currency) — convert to the same
+    // currency before comparing. Only DollertoMVR is stored anywhere in
+    // this app; MVR->USD divides by it, USD->MVR multiplies by it, never
+    // the inverse. This page (Shortlisted Applicants To Share Link) loads
+    // the same sidebar partial as the Talent Pool page but never had this
+    // validation JS ported over — the red warning and the Save button
+    // were both non-functional here.
+    function convertSalaryToCurrency(amount, fromCurrency, toCurrency, rate) {
+        if (!amount || fromCurrency === toCurrency) return amount;
+        if (fromCurrency === 'USD' && toCurrency === 'MVR') return amount * rate;
+        if (fromCurrency === 'MVR' && toCurrency === 'USD') return amount / rate;
+        return amount;
+    }
+
+    function checkSalaryOverBudget() {
+        var $form = $('#salaryAllocationForm');
+        var basicSalary = parseFloat($form.find('#salaryAllocationBasicSalary').val());
+        var maxSalary = parseFloat($form.find('#maxBudgetedSalary').val());
+        var maxCurrency = $form.find('#maxBudgetedSalaryCurrency').val();
+        var enteredCurrency = $form.find('#salaryAllocationCurrency').val();
+        var rate = parseFloat($form.find('#dollerToMvrRate').val()) || 15.42;
+
+        var basicSalaryInMaxCurrency = convertSalaryToCurrency(basicSalary, enteredCurrency, maxCurrency, rate);
+        var isOverBudget = maxSalary > 0 && basicSalaryInMaxCurrency > maxSalary;
+
+        $form.find('#salaryAllocationBasicSalary').toggleClass('is-invalid border-danger', isOverBudget);
+        $form.find('#salaryOverBudgetWarning').toggleClass('d-none', !isOverBudget);
+
+        return isOverBudget;
+    }
+
+    $(document).on('input', '#salaryAllocationBasicSalary', checkSalaryOverBudget);
+    $(document).on('change', '#salaryAllocationCurrency', checkSalaryOverBudget);
+
+    // Save Salary Allocation — this button rendered on this page (via the
+    // shared sidebar partial) but had no click handler bound at all.
+    $(document).on("click", ".saveSalaryAllocation", function() {
+        var $btn = $(this);
+        var $form = $('#salaryAllocationForm');
+        var basicSalary = parseFloat($form.find('input[name="basic_salary"]').val());
+        var maxSalary = parseFloat($form.find('#maxBudgetedSalary').val());
+
+        if (!basicSalary || basicSalary <= 0) {
+            toastr.error("Please enter a valid basic salary.", "Error", { positionClass: 'toast-bottom-right' });
+            return;
+        }
+
+        if (checkSalaryOverBudget()) {
+            toastr.error("Basic salary cannot exceed budgeted salary of " + maxSalary.toFixed(2) + ".", "Error", { positionClass: 'toast-bottom-right' });
+            return;
+        }
+
+        var hasError = false;
+        $form.find('.allowance-input').each(function() {
+            var val = parseFloat($(this).val());
+            var max = parseFloat($(this).data('max'));
+            var name = $(this).data('name');
+            if (val && max > 0 && val > max) {
+                toastr.error(name + " cannot exceed budget amount of " + max.toFixed(2) + ".", "Error", { positionClass: 'toast-bottom-right' });
+                hasError = true;
+                return false;
+            }
+        });
+        if (hasError) return;
+
+        $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin me-1"></i>Saving...');
+
+        $.ajax({
+            url: "{{ route('resort.ta.saveSalaryAllocation') }}",
+            type: "POST",
+            data: $form.serialize() + '&_token={{ csrf_token() }}',
+            success: function(response) {
+                if (response.success) {
+                    toastr.success(response.message, "Success", { positionClass: 'toast-bottom-right' });
+                    $btn.text('Update Salary Allocation');
+                } else {
+                    toastr.error(response.message || "Something went wrong.", "Error", { positionClass: 'toast-bottom-right' });
+                }
+            },
+            error: function(xhr) {
+                var msg = 'Something went wrong.';
+                if (xhr.responseJSON && xhr.responseJSON.message) msg = xhr.responseJSON.message;
+                toastr.error(msg, "Error", { positionClass: 'toast-bottom-right' });
+            },
+            complete: function() {
+                $btn.prop('disabled', false);
+                if ($btn.find('.fa-spinner').length) {
+                    $btn.html('Update Salary Allocation');
+                }
+            }
+        });
     });
 
     $(document).on("click", ".ApprovedOrSortListed", function () {
