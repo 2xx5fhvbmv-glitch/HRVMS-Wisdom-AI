@@ -462,7 +462,10 @@ class VacancyController extends Controller
                         event(new ResortNotificationEvent(Common::nofitication(
                             $this->resort->resort_id,
                             $this->type[6],
-                            'Upcoming Investigation Meeting Reminder',
+                            // Copy-pasted from an unrelated Investigation
+                            // Meeting notification template — this is a
+                            // hiring-request alert, the title should say so.
+                            'Hiring Request',
                             $msg,
                             0,
                             $hr_id,
@@ -876,7 +879,7 @@ class VacancyController extends Controller
                 $hrIds = Common::getResortHrEmployeeIds($this->resort->resort_id);
                 foreach ($hrIds as $hr_id) {
                     event(new ResortNotificationEvent(Common::nofitication(
-                        $this->resort->resort_id, $this->type[6], 'Upcoming Investigation Meeting Reminder',
+                        $this->resort->resort_id, $this->type[6], 'Hiring Request',
                         $msg, 0, $hr_id, $ModuleName
                     )));
                 }
