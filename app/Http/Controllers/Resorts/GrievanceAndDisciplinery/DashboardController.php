@@ -92,10 +92,14 @@ class DashboardController extends Controller
         // this resort (covers policy submissions filed by employees).
         $retaliationReports = GrievanceNonRetaliation::where('resort_id', $resort_id)->count();
 
-        // Confidential cases split — uses the Request_Identity_Disclosure
-        // field on the submission. 'No' means the employee asked to stay
-        // anonymous → counted as a confidential case.
-        $confidentialCases   = $cases->where('Request_Identity_Disclosure', 'No');
+        // Confidential cases split — Grivance_Submission_Type is set at
+        // submission time from the Confidential/Anonymous checkboxes ('Yes'
+        // = Confidential, 'No' = Anonymous, 'NotApplicable' = openly
+        // submitted). Request_Identity_Disclosure is a separate field only
+        // ever set later by the HR-initiated RequestIdentity action, so it
+        // never reflects the submitter's own choice — this widget always
+        // read 0 confidential cases as a result.
+        $confidentialCases   = $cases->whereIn('Grivance_Submission_Type', ['Yes', 'No']);
         $confidentialTotal   = $confidentialCases->count();
         $confidentialResol   = $confidentialCases->where('status', 'resolved')->count();
         $confidentialResolvedPct   = $confidentialTotal > 0 ? round(($confidentialResol / $confidentialTotal) * 100) : 0;
@@ -321,7 +325,8 @@ class DashboardController extends Controller
             ->when($deptId, fn($q) => $q->where('Dept_id', $deptId))
             ->count();
 
-        $confidentialCases   = $cases->where('Request_Identity_Disclosure', 'No');
+        // See the HR_Dashobard() confidential-cases comment above — same fix.
+        $confidentialCases   = $cases->whereIn('Grivance_Submission_Type', ['Yes', 'No']);
         $confidentialTotal   = $confidentialCases->count();
         $confidentialResol   = $confidentialCases->where('status', 'resolved')->count();
         $confidentialResolvedPct   = $confidentialTotal > 0 ? round(($confidentialResol / $confidentialTotal) * 100) : 0;
