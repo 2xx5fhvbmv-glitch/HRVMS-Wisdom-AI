@@ -114,6 +114,13 @@ class ProfileController extends Controller
 
     $validator = Validator::make($request->all(), [
       'first_name'                                  => 'required|string|max:255',
+      // middle_name isn't collected by the mobile app's Personal Info
+      // screen today — the approval flow (InfoUpdateController) already
+      // supports it end-to-end (routes it to ResortAdmin, shows it in the
+      // Request Approval diff) if it's ever present in the payload, so
+      // accepting it here (once the app starts sending it) needs no
+      // further backend change.
+      'middle_name'                                  => 'nullable|string|max:255',
       'last_name'                                   => 'required|string|max:255',
       'personal_phone'                              => 'required',
     ]);
@@ -131,19 +138,40 @@ class ProfileController extends Controller
         'info_payload'                                => $request->all()
       ]);
 
-      // Send mobile notification to HR employee
-      $hrEmployee = Common::FindResortHR($this->user);
-    //   Common::sendMobileNotification(
-    //         $this->resort_id,
-    //         2,
-    //         null,
-    //         null,
-    //         'Profile Update Request',
-    //         'A profile update request has been submitted by ' . $this->user->first_name . ' ' . $this->user->last_name . '.',
-    //         'People',
-    //         [$hrEmployee->id],
-    //         null,
-    //     );
+      // Was fully commented out — HR never found out a mobile user had
+      // submitted a profile update request at all, and only found one by
+      // manually opening the Info Update Requests list. FindResortHR()
+      // also only matched HR-department rank 1/2, missing any resort
+      // whose HR employee is literally rank 3 — getResortHrEmployeeIds()
+      // covers both and notifies every HR employee, not just one.
+      $empName = trim(($this->user->first_name ?? '') . ' ' . ($this->user->last_name ?? ''));
+      $hrIds = Common::getResortHrEmployeeIds($this->resort_id);
+      if (!empty($hrIds)) {
+        foreach ($hrIds as $hrId) {
+          event(new \App\Events\ResortNotificationEvent(Common::nofitication(
+            $this->resort_id,
+            10,
+            'Profile Update Request',
+            $empName . ' has submitted a profile update request.',
+            0,
+            $hrId,
+            'People'
+          )));
+        }
+        Common::sendMobileNotification(
+          $this->resort_id,
+          2,
+          null,
+          null,
+          'Profile Update Request',
+          $empName . ' has submitted a profile update request.',
+          'People',
+          $hrIds,
+          null,
+          false,
+          'info-update-request'
+        );
+      }
 
       $response['status']      = true;
       $response['message']     = 'Profile Updated Request Sent to HR Successfully';

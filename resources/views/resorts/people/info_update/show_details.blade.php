@@ -19,7 +19,13 @@
           @php $changedCount = 0; @endphp
           @foreach ($payload as $key => $newValue)
           @php
-               if(in_array($key, ['first_name', 'middle_name', 'last_name', 'personal_phone'])){
+               // Permanent Address (address_line_1/2) lives on ResortAdmin —
+               // those columns were dropped from the employees table
+               // entirely, so looking them up via Employee::value() below
+               // would throw an "Unknown column" SQL error and crash this
+               // whole page for any pending request that happens to include
+               // an address field.
+               if(in_array($key, ['first_name', 'middle_name', 'last_name', 'personal_phone', 'address_line_1', 'address_line_2'])){
                     $data = App\Models\ResortAdmin::where('id',$emp_info->employee->Admin_Parent_id)->value($key);
 
                }else{
@@ -28,11 +34,25 @@
                          $data = $emp_info->employee->resortAdmin->$key ?? '';
                     }
                }
+
+               // dob can be stored/submitted in different formats
+               // ("1992-09-16" vs "16-Sep-1992") for the same date — compare
+               // the normalized form so it isn't shown as "changed" when it
+               // isn't. Falls back to the raw string compare below if either
+               // side isn't a parseable date.
+               $isSameValue = trim((string) $data) === trim((string) $newValue);
+               if (!$isSameValue && $key === 'dob' && !empty($data) && !empty($newValue)) {
+                    try {
+                         $isSameValue = \Carbon\Carbon::parse($data)->format('Y-m-d') === \Carbon\Carbon::parse($newValue)->format('Y-m-d');
+                    } catch (\Exception $e) {
+                         // Not both parseable dates — keep the raw string comparison result.
+                    }
+               }
           @endphp
 
           {{-- Show only the fields the employee actually changed — the
                payload often carries the whole profile, not just edits. --}}
-          @continue(trim((string) $data) === trim((string) $newValue))
+          @continue($isSameValue)
           @php $changedCount++; @endphp
 
           {{-- Two-column comparison — current value on the left, the value
