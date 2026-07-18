@@ -25,6 +25,7 @@ use Illuminate\Http\Request;
 use Validator;
 use DB;
 use App\Models\Employee;
+use App\Models\Vacancies;
 use App\Models\TaTemplateExtraField;
 
 class ConfigController extends Controller
@@ -554,21 +555,36 @@ class ConfigController extends Controller
             }
 
 
-                // Raw rank=$newRank excluded any resort whose real HR/Finance
-                // employee isn't literally rank 3/7 (e.g. our Finance Manager
-                // here is rank 2) — the "forward to next approver" step
-                // silently found nobody to notify. GM stays a raw rank=8
-                // lookup since GM isn't department-promoted like HR/Finance.
-                if ($newRank == 3) {
-                    $senttoIds = Common::getResortHrEmployeeIds($this->resort->resort_id);
-                } elseif ($newRank == 7) {
-                    $senttoIds = Common::getResortFinanceEmployeeIds($this->resort->resort_id);
-                } else {
-                    $senttoIds = Employee::where('resort_id',$this->resort->resort_id)->where('rank',$newRank)->pluck('id')->all();
+                // Previously only the NEXT approver got notified at each
+                // step — HR requesting -> Finance never heard about it once
+                // approved, Finance approving -> HR and the original
+                // requester never heard about it, GM's final approval ->
+                // nobody (HR/Finance/requester) heard about it at all, since
+                // there's no "next" rank after GM. Every stakeholder in the
+                // chain (the original requester, HR, Finance, GM) should
+                // know about every step, not just the single next approver.
+                $isFinalApproval = $effectiveRank == Common::TaFinalApproval($this->resort->resort_id);
+
+                $parentVacancy = $parentNotification ? Vacancies::find($parentNotification->V_id) : null;
+                $requesterId = null;
+                if ($parentVacancy && $parentVacancy->created_by) {
+                    $requesterId = Employee::where('Admin_Parent_id', $parentVacancy->created_by)->value('id');
                 }
 
+                $hrIds = Common::getResortHrEmployeeIds($this->resort->resort_id);
+                $financeIds = Common::getResortFinanceEmployeeIds($this->resort->resort_id);
+                $gmIds = Employee::where('resort_id',$this->resort->resort_id)->where('rank',8)->pluck('id')->all();
+
+                $allStakeholderIds = array_values(array_unique(array_filter(
+                    array_merge([$requesterId], $hrIds, $financeIds, $gmIds)
+                )));
+                // Don't notify whoever just took this action.
+                $senttoIds = array_values(array_diff($allStakeholderIds, [(int) $this->resort->GetEmployee->id]));
+
                 if (!empty($senttoIds)) {
-                    $msg = "New Vacancy has been Approved by ".$config[$effectiveRank]." and forwarded to ".$config[$newRank]." for further processing.";
+                    $msg = $isFinalApproval
+                        ? "Hiring request for ".($parentVacancy && $parentVacancy->Getposition ? $parentVacancy->Getposition->position_title : 'the position')." has been fully approved by ".$config[$effectiveRank].'.'
+                        : "New Vacancy has been Approved by ".$config[$effectiveRank]." and forwarded to ".$config[$newRank]." for further processing.";
                     foreach ($senttoIds as $sentto_id) {
                         event(new ResortNotificationEvent(Common::nofitication(
                                                                                 $this->resort->resort_id,
@@ -582,9 +598,10 @@ class ConfigController extends Controller
                     }
 
                     // ResortNotificationEvent only broadcasts to the web
-                    // bell icon — the next approver in the chain (Finance/
-                    // GM) never got a mobile push telling them a vacancy
-                    // was waiting in "Hire Requests Pending Your Approval".
+                    // bell icon — every stakeholder in the chain (Finance/
+                    // GM/HR/the original requester) never got a mobile push
+                    // telling them a vacancy moved forward or was fully
+                    // approved.
                     Common::sendMobileNotification(
                         $this->resort->resort_id,
                         1,

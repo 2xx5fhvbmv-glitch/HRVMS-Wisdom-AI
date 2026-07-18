@@ -220,6 +220,24 @@ class Common
 		return $data;
 	}
 
+	/**
+	 * Canonical "d M Y" display format (e.g. "29 May 2026") for any date
+	 * value — DB raw string, Carbon instance, or null. Use this instead of
+	 * printing a date column directly, which shows the raw stored format
+	 * (e.g. "2026-08-25") unformatted.
+	 */
+	public static function formatDate($date, $default = 'N/A')
+	{
+		if (empty($date)) {
+			return $default;
+		}
+		try {
+			return Carbon::parse($date)->format('d M Y');
+		} catch (\Exception $e) {
+			return $default;
+		}
+	}
+
 	public static function getDateFormateFromSettings()
 	{
 		$settings = Settings::first();
@@ -2237,6 +2255,7 @@ class Common
                     $vacancy->rank_name = $config[$vacancy->rank] ?? 'Unknown Rank';
                     $vacancy->creator_rank_name = $config[$vacancy->creator_rank] ?? '';
                     $vacancy->ReportingTo =  $vacancy->first_name.'  ' .$vacancy->last_name;
+                    $vacancy->Required = self::formatDate($vacancy->Required);
                     // Compute approval status from notification children.
                     // 'Active' means "awaiting action at Approved_By's rank" —
                     // which stage that actually is depends on Approved_By

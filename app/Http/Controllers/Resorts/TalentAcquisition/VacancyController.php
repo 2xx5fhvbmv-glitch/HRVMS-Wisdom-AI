@@ -980,7 +980,7 @@ class VacancyController extends Controller
                     $vacancy->Position = $vacancy->Getposition->position_title ?? '';
                     $vacancy->Department = $vacancy->Getdepartment->name ?? '';
                     $vacancy->NoOfVacnacy = $vacancy->Total_position_required;
-                    $vacancy->Required = $vacancy->required_starting_date;
+                    $vacancy->Required = Common::formatDate($vacancy->required_starting_date);
                     $vacancy->Budget = $vacancy->budgeted;
                     $vacancy->EmployeeType = $vacancy->employee_type;
                     $reportTo = \App\Models\Employee::find($vacancy->reporting_to);
