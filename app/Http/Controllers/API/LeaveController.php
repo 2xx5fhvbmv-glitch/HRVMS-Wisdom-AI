@@ -477,8 +477,11 @@ class LeaveController extends Controller
                     $passApprovalFlow->push($SMApprover); // Fourth approver: Security Officer
                 }
 
-                // Add HR to the approval flow (rank 3)
-                $hrApprover                             =   Employee::select('id', 'rank')->where('resort_id',$user->resort_id)->where('rank', 3)->first();
+                // Add HR to the approval flow. Raw rank=3 excluded any resort
+                // whose real HR employee isn't literally rank 3 (e.g. an
+                // HR-department employee ranked HOD/EXCOM), silently dropping
+                // HR from the whole approval chain.
+                $hrApprover                             =   Employee::select('id', 'rank')->whereIn('id', Common::getResortHrEmployeeIds($user->resort_id))->first();
                 if ($hrApprover) {
                     $passApprovalFlow->push($hrApprover); // Third approver: HR
                 }
@@ -574,7 +577,9 @@ class LeaveController extends Controller
                                                             };
 
                 $getHR                                  =   function($resortId) {
-                                                                return Employee::select('id', 'rank')->where('rank', 3)->where('resort_id',$resortId)->first();
+                                                                // Raw rank=3 excluded HR employees whose actual rank
+                                                                // isn't literally 3 (e.g. HR-department HOD/EXCOM).
+                                                                return Employee::select('id', 'rank')->whereIn('id', Common::getResortHrEmployeeIds($resortId))->first();
                                                             };
 
                 $getGM                                  =   function($resortId) {

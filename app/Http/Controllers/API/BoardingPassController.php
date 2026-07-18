@@ -238,8 +238,11 @@ class BoardingPassController extends Controller
                     $passApprovalFlow->push($SMApprover); // Fourth approver: Security Officer
                 }
 
-                // Add HR to the approval flow (rank 3)
-                $hrApprover                             =   Employee::select('id', 'rank')->where('resort_id',$this->resort_id)->where('rank', 3)->first();
+                // Add HR to the approval flow. Raw rank=3 excluded any
+                // resort whose real HR employee isn't literally rank 3
+                // (e.g. an HR-department employee ranked HOD/EXCOM),
+                // silently dropping HR from the whole approval chain.
+                $hrApprover                             =   Employee::select('id', 'rank')->whereIn('id', Common::getResortHrEmployeeIds($this->resort_id))->first();
                 if ($hrApprover) {
                     $passApprovalFlow->push($hrApprover); // Third approver: HR
                 }
