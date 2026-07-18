@@ -140,19 +140,39 @@ class InfoUpdateController extends Controller
                // others not, the status update to 'Approved' never
                // running, and the HR user seeing a generic AJAX error with
                // no record of what actually happened.
+               // Permanent Address (address_line_1/2) lives on ResortAdmin,
+               // not Employee — those columns were dropped from the
+               // employees table entirely, so routing them to $employees
+               // below either silently no-ops or throws an "Unknown column"
+               // SQL error that poisons the whole approval transaction.
+               $resortAdminFields = ['first_name', 'middle_name', 'last_name', 'personal_phone', 'address_line_1', 'address_line_2'];
+
                DB::beginTransaction();
                try {
                     foreach($payload as $key => $newValue){
-                         if(in_array($key, ['first_name', 'middle_name', 'last_name', 'personal_phone'])){ //need Changes when App Integration is Complete only check if request data is correct or not
+                         // dob is stored on Employee as Y-m-d, but mobile can
+                         // submit other formats (e.g. "16-Sep-1992") — write
+                         // the same canonical format updatePersonal() uses,
+                         // otherwise every other feature reading Employee.dob
+                         // (age calc, exports, reports) breaks silently.
+                         if ($key === 'dob' && !empty($newValue)) {
+                              try {
+                                   $newValue = \Carbon\Carbon::parse($newValue)->format('Y-m-d');
+                              } catch (\Exception $e) {
+                                   // Leave as-is; validation should have caught a truly invalid date.
+                              }
+                         }
+
+                         if(in_array($key, $resortAdminFields, true)){ //need Changes when App Integration is Complete only check if request data is correct or not
 
                               $resort_admin = $employees ? ResortAdmin::where('id',$employees->Admin_Parent_id)->first() : null;
-                              if($resort_admin){
+                              if($resort_admin && in_array($key, $resort_admin->getFillable(), true)){
                                    $resort_admin->update([
                                         $key => $newValue,
                                    ]);
                               }
                          }else{
-                              if($employees){
+                              if($employees && in_array($key, $employees->getFillable(), true)){
                                    $employees->update([
                                         $key => $newValue,
                                    ]);
@@ -167,6 +187,27 @@ class InfoUpdateController extends Controller
                     ]);
 
                     DB::commit();
+
+                    // Neither approve nor reject notified the employee at
+                    // all — they had no way to know their request had been
+                    // actioned without manually checking back.
+                    try {
+                         Common::sendMobileNotification(
+                              $this->resort->resort_id,
+                              2,
+                              null,
+                              null,
+                              'Profile Update Approved',
+                              'Your profile update request has been approved.',
+                              'People',
+                              [$employeeinfoUpdateRequest->employee_id],
+                              null,
+                              false,
+                              'info-update-approved'
+                         );
+                    } catch (\Exception $ne) {
+                         \Log::warning('Info update approval notification failed: ' . $ne->getMessage());
+                    }
                } catch (\Exception $e) {
                     DB::rollBack();
                     \Log::emergency("File: ".$e->getFile());
@@ -189,11 +230,35 @@ class InfoUpdateController extends Controller
      // Reject Request
      public function rejectRequest(Request $request){
           $employeeinfoUpdateRequest = EmployeeInfoUpdateRequest::where('id',$request->id)->first();
+          if (!$employeeinfoUpdateRequest) {
+               return redirect()->route('people.info-update.index')->with('error','Request not found.');
+          }
+
           $employeeinfoUpdateRequest->update([
                'status' => 'Rejected',
                'reject_reason' => $request->reject_reason,
                'modified_by' => auth()->id(),
           ]);
+
+          // Same gap as approve — the employee never found out their
+          // request was rejected (or why) without manually checking back.
+          try {
+               Common::sendMobileNotification(
+                    $this->resort->resort_id,
+                    2,
+                    null,
+                    null,
+                    'Profile Update Rejected',
+                    'Your profile update request was rejected.' . ($request->reject_reason ? ' Reason: ' . $request->reject_reason : ''),
+                    'People',
+                    [$employeeinfoUpdateRequest->employee_id],
+                    null,
+                    false,
+                    'info-update-rejected'
+               );
+          } catch (\Exception $ne) {
+               \Log::warning('Info update rejection notification failed: ' . $ne->getMessage());
+          }
 
           return redirect()->route('people.info-update.index')->with('success','Record Update Successfully');
 

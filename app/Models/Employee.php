@@ -38,8 +38,12 @@ class Employee extends Model
         'password',
         'remember_token',
         'is_employee',
-        'address_line_1',
-        'address_line_2',
+        // address_line_1/address_line_2 were dropped from the employees
+        // table (2024_09_26_110903_add_employeefields.php) — the real
+        // Permanent Address columns live on ResortAdmin. Leaving these in
+        // $fillable let Employee::update() silently no-op on them (or
+        // throw an "Unknown column" SQL error, depending on write path)
+        // whenever an info-update-request payload targeted the wrong model.
         'city',
         'state',
         'zip',
