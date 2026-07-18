@@ -567,8 +567,17 @@ class ConfigController extends Controller
 
                 $parentVacancy = $parentNotification ? Vacancies::find($parentNotification->V_id) : null;
                 $requesterId = null;
-                if ($parentVacancy && $parentVacancy->created_by) {
-                    $requesterId = Employee::where('Admin_Parent_id', $parentVacancy->created_by)->value('id');
+                if ($parentVacancy) {
+                    // Vacancies::created_by has a getCreatedByAttribute()
+                    // accessor that returns a formatted "First Last" display
+                    // name, not the raw ResortAdmin id — reading it directly
+                    // here would compare that name string against
+                    // Employee.Admin_Parent_id (an integer column) and never
+                    // match. getRawOriginal() bypasses the accessor.
+                    $createdByAdminId = $parentVacancy->getRawOriginal('created_by');
+                    if ($createdByAdminId) {
+                        $requesterId = Employee::where('Admin_Parent_id', $createdByAdminId)->value('id');
+                    }
                 }
 
                 $hrIds = Common::getResortHrEmployeeIds($this->resort->resort_id);
