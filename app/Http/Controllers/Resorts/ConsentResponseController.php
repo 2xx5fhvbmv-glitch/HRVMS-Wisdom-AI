@@ -99,7 +99,12 @@ class ConsentResponseController extends Controller
      */
     private function notifyHrOfConsentResponse(Applicant_form_data $applicant, string $status): void
     {
-        $hr = Employee::where('resort_id', $applicant->resort_id)->where('rank', '3')->first();
+        // rank=3 doesn't reliably mean "HR" — this resort's actual HR
+        // department employees are rank 1/2, not 3, so the lookup always
+        // found nobody and this notification silently never fired.
+        // Common::FindResortHR() is the established department-based
+        // lookup used everywhere else in the app for this exact purpose.
+        $hr = Common::FindResortHR($applicant->resort_id);
         if (!$hr) {
             return;
         }
