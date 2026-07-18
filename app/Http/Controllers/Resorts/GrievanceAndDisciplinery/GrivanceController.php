@@ -47,8 +47,17 @@ class GrivanceController extends Controller
         $assinged_id = isset($this->resort->GetEmployee) ? $this->resort->GetEmployee->id:0;
         $current_rank = isset($this->resort->GetEmployee->rank) ? $this->resort->GetEmployee->rank: 3 ;
         $Rank = config('settings.Position_Rank');
-    
-        if (isset($Rank[$current_rank])) 
+
+        // HR-department HOD/EXCOM (rank 1/2) map to "HOD"/"EXCOM" by raw
+        // rank alone, which routes them into the committee-membership+
+        // investigation-record join below and hides every unassigned
+        // grievance from real HR staff. Promote to "HR" the same way other
+        // modules resolve an effective rank from department.
+        if (!in_array($current_rank, [3, 8]) && Common::isHRDepartment($this->resort->GetEmployee->Dept_id ?? null)) {
+            $current_rank = 3;
+        }
+
+        if (isset($Rank[$current_rank]))
         {
             $rankKey = $Rank[ $current_rank];
         }

@@ -141,8 +141,8 @@
                     </div>
                 </div>
             </div>
-            <div class="col-xl-3 col-sm-6">
-                <div class="row g-3 g-xxl-4">
+            <div class="col-xl-3 col-sm-6 d-flex flex-column">
+                <div class="row g-3 g-xxl-4 flex-grow-1">
                     <div class="col-12">
                         <div class="card peopleRelation-boxcard">
                             <div class="d-flex align-items-center justify-content-between">
@@ -159,8 +159,8 @@
                             </div>
                         </div>
                     </div>
-                    <div class="col-12">
-                        <div class="card card-confiCases">
+                    <div class="col-12 flex-grow-1">
+                        <div class="card card-confiCases h-100">
                             <div class="card-title mb-lg-3">
                                 <h3>Confidential Cases:</h3>
                             </div>
@@ -182,8 +182,8 @@
                     </div>
                 </div>
             </div>
-            <div class="col-xl-6">
-                <div class="card card-appealsSection">
+            <div class="col-xl-6 d-flex">
+                <div class="card card-appealsSection h-100 w-100">
                     <div class="card-title">
                         <h3>Appeals Section</h3>
                     </div>
@@ -225,8 +225,8 @@
                     </div>
                 </div>
             </div>
-            <div class="col-xl-3 col-sm-6 @if(Common::checkRouteWisePermission('GrievanceAndDisciplinery.grivance.GrivanceIndex',config('settings.resort_permissions.view')) == false) d-none @endif">
-                <div class="card">
+            <div class="col-xl-3 col-sm-6 d-flex @if(Common::checkRouteWisePermission('GrievanceAndDisciplinery.grivance.GrivanceIndex',config('settings.resort_permissions.view')) == false) d-none @endif">
+                <div class="card card-grievanceCategoryBreakdown h-100 w-100">
                     <div class="card-title">
                         <div class="row justify-content-between align-items-center g-md-3 g-1">
                             <div class="col">
@@ -235,13 +235,14 @@
                             <div class="col-auto"><a href="#" class="a-link">View All</a> </div>
                         </div>
                     </div>
+                    <div class="card-grievanceCategoryBreakdown-list">
                     @foreach($grivanceCategoryWiseCount as $k=>$category)
                     <div class="d-flex justify-content-between mb-2 border-bottom pb-2">
                         <p class="mb-0">{{$k}}</p>
                         <p>{{$category}}</p>
                     </div>
                     @endforeach
-                   
+                    </div>
                 </div>
             </div>
              <div class="col-xl-3 col-sm-6 order-sm-1 order-xl-0">
@@ -549,6 +550,24 @@
     .card-wiINsightGriev .leaveUser-main {
         flex: 1 1 auto;
         min-height: 0;
+        overflow-y: auto;
+    }
+
+    /* Confidential Cases / Appeals Section / Grievances breakdown row —
+       these three columns sit side by side but had unequal card heights
+       since a plain .card hugs its own content instead of stretching to
+       match its tallest sibling. Cards fill their (already row-stretched)
+       column, and the one list that can grow unbounded scrolls internally
+       instead of pushing the row taller. */
+    .card-appealsSection,
+    .card-grievanceCategoryBreakdown {
+        display: flex;
+        flex-direction: column;
+    }
+    .card-grievanceCategoryBreakdown-list {
+        flex: 1 1 auto;
+        min-height: 0;
+        max-height: 380px;
         overflow-y: auto;
     }
 </style>
