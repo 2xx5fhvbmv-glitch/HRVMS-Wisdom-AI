@@ -140,9 +140,12 @@ class RequestController extends Controller
 
                     }
                 }
-                // Send mobile notification to HR employee
-                $hrEmployee = Common::FindResortHR($this->user);
-                if ($hrEmployee) {
+                // Send mobile notification to every HR employee — FindResortHR()
+                // only ever returns the first HR match, so a resort with more
+                // than one real HR employee silently left the others with no
+                // notification at all.
+                $hrEmployeeIds = Common::getResortHrEmployeeIds($this->resort_id);
+                if (!empty($hrEmployeeIds)) {
                     Common::sendMobileNotification(
                         $this->resort_id,
                         2,
@@ -151,7 +154,7 @@ class RequestController extends Controller
                         'Request',
                         'A request has been sent by ' . $this->user->first_name . ' ' . $this->user->last_name . '.',
                         'Request',
-                        [$hrEmployee->id],
+                        $hrEmployeeIds,
                         null,
                         false,
                         'general-request-hr',
@@ -260,8 +263,30 @@ class RequestController extends Controller
 
             $guarantorRequests->status                =   $request->status;
             $guarantorRequests->save();
-            
+
             Common::sendMobileNotification($this->resort_id,2,null,null,"Guarantor Request {$request->status}","Your Guarantor Request {$request->status}","Request",[$PayrollAdvance->employee_id],null,false,'guarantor-request-status');
+
+            // HR's own Approve action is gated on the guarantor status (see
+            // AdvanceSalaryController::updateStatus's "Guarantor approval is
+            // pending" check), but HR was never told when a guarantor
+            // actually responded — the request just sat there with no
+            // signal that it had become actionable.
+            $hrEmployeeIds = Common::getResortHrEmployeeIds($this->resort_id);
+            if (!empty($hrEmployeeIds)) {
+                Common::sendMobileNotification(
+                    $this->resort_id,
+                    2,
+                    null,
+                    null,
+                    'Guarantor Request ' . $request->status,
+                    'Guarantor request for ' . ($PayrollAdvance->request_type ?? 'a request') . ' has been ' . strtolower($request->status) . '.',
+                    'Request',
+                    $hrEmployeeIds,
+                    null,
+                    false,
+                    'guarantor-request-status-hr',
+                );
+            }
 
             DB::commit();
             return response()->json([

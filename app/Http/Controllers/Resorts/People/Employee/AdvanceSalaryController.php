@@ -45,8 +45,22 @@ class AdvanceSalaryController extends Controller
             $resort_id = $this->resort->resort_id;
             $rank = config('settings.Position_Rank');
             $current_rank = $this->resort->getEmployee->rank ?? null;
+            $Dept_id = $this->resort->getEmployee->Dept_id ?? null;
+
+            // HR/Finance-department HOD/EXCOM (raw rank 1/2) mapped to
+            // "HOD"/"EXCOM" here instead of "HR"/"Finance", so real HR/
+            // Finance staff (rarely literal rank 3/7) never got the
+            // stage-scoped query below. Promote the same way other
+            // modules derive an effective rank from department.
+            if (!in_array($current_rank, [3, 7, 8], true)) {
+                if (Common::isHRDepartment($Dept_id)) {
+                    $current_rank = 3;
+                } elseif (Common::isFinanceDepartment($Dept_id)) {
+                    $current_rank = 7;
+                }
+            }
             $available_rank = $rank[$current_rank] ?? '';
-  
+
             $isHR = ($available_rank === "HR");
             $isFinance = ($available_rank === "Finance");
             $isGM = ($available_rank === "GM");
@@ -100,6 +114,9 @@ class AdvanceSalaryController extends Controller
                 })
                 ->addColumn('position', function ($payroll_data) {
                     return $payroll_data->employee->position->position_title ?? 'N/A';
+                })
+                ->editColumn('request_amount', function ($payroll_data) {
+                    return Common::formatCurrency($payroll_data->request_amount, 'USD');
                 })
                 ->addColumn('department', function ($payroll_data) {
                     return $payroll_data->employee->department->name ?? 'N/A';
@@ -155,8 +172,20 @@ class AdvanceSalaryController extends Controller
         
         $rank = config('settings.Position_Rank');
         $current_rank = $this->resort->getEmployee->rank ?? null;
+        $Dept_id = $this->resort->getEmployee->Dept_id ?? null;
+
+        // Same effective-rank promotion as list() above — without it, no
+        // real HR/Finance employee at this resort (raw rank rarely
+        // literally 3/7) ever saw the Approve/Reject/Hold buttons below.
+        if (!in_array($current_rank, [3, 7, 8], true)) {
+            if (Common::isHRDepartment($Dept_id)) {
+                $current_rank = 3;
+            } elseif (Common::isFinanceDepartment($Dept_id)) {
+                $current_rank = 7;
+            }
+        }
         $available_rank = $rank[$current_rank] ?? '';
-    
+
         $isHR = ($available_rank === "HR");
         $isFinance = ($available_rank === "Finance");
         $isGM = ($available_rank === "GM");
