@@ -19,6 +19,9 @@
         </div>
         <div>
             <span class="badge badge-brown mb-2">{{ $leave->leave_type }}</span>
+            @if(($leave->leave_status ?? null) === 'Pending')
+                <span class="badge badge-themeWarning mb-2">Pending Approval</span>
+            @endif
             <p>{{ $leave->from_date == $leave->to_date ? date("d/m/Y", strtotime($leave->from_date)) : date("d/m/Y", strtotime($leave->from_date)) .' to '.date("d/m/Y", strtotime($leave->to_date)) }}   {{ $leave->reason }}</p>
         </div>
     </div>

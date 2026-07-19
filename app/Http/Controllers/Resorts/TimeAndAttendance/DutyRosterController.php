@@ -212,12 +212,19 @@ class DutyRosterController extends Controller
                         ->join('leave_categories as t1', 't1.id', '=', 't2.leave_category_id')
                         ->where('t1.resort_id', $this->resort->resort_id)
                         ->where('t2.emp_id', $id)
-                        ->where('t2.status', "Approved")
+                        // A leave still awaiting approval is just as relevant to a
+                        // scheduler as an approved one — it was previously filtered
+                        // to Approved only, so an employee's already-submitted but
+                        // not-yet-approved leave request silently showed "No Leave
+                        // Applied" here despite genuinely overlapping the roster
+                        // period being planned.
+                        ->whereIn('t2.status', ['Approved', 'Pending'])
                         ->where(function ($query) use ($currentDay,$currentMonthEnd) {
                             $query->where('t2.from_date', '>=', $currentDay) // Leave started on or before the current day
                                 ->orWhere('t2.to_date', '>=', $currentDay); // Leave ends on or after the current day
                             // ->where('t2.to_date', '>=', $currentMonthEnd); // Leave ends on or after the current day
                         })
+                        ->select('employees.*', 't2.from_date', 't2.to_date', 't2.reason', 't2.status as leave_status', 't1.leave_type')
                         ->get();
             $view =  view('resorts.renderfiles.dutyrosterandLeave',compact('employees','EmployeeLeave'))->render();
 
