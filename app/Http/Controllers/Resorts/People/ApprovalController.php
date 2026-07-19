@@ -104,7 +104,15 @@ class ApprovalController extends Controller
                             'position' => $infoUpdateRequest->employee->position->position_title ?? null,
                             'status' => $infoUpdateRequest->status,
                             'request_type' => 'Info Update Request',
-                            'created_at' => Carbon::parse($infoUpdateRequest->created_at)->format('d M Y h:i A'),
+                            // getRawOriginal(), not the plain attribute: at
+                            // least EmployeeLeave and PayrollAdvance override
+                            // getCreatedAtAttribute() to return an
+                            // already-resort-formatted 'd/m/Y H:i' string,
+                            // which Carbon::parse() can't read at all —
+                            // crashed this whole merged inbox with an
+                            // InvalidFormatException the moment either type
+                            // had a pending row.
+                            'created_at' => Carbon::parse($infoUpdateRequest->getRawOriginal('created_at'))->format('d M Y h:i A'),
                             'action' => 'info-update',
                         ];
                     });
@@ -154,7 +162,7 @@ class ApprovalController extends Controller
                         'position' => $promotion->employee->position->position_title ?? null,
                         'status' => $promotion->approvals->first()->status ?? 'Pending',
                         'request_type' => 'Promotion Request',
-                        'created_at' => Carbon::parse($promotion->created_at)->format('d M Y h:i A'),
+                        'created_at' => Carbon::parse($promotion->getRawOriginal('created_at'))->format('d M Y h:i A'),
                         'action' => 'promotion',
                     ];
                 });
@@ -208,7 +216,7 @@ class ApprovalController extends Controller
                         'position' => $payroll->employee->position->position_title ?? null,
                         'status' => $status ?? 'Pending',
                         'request_type' => 'Payroll Advance',
-                        'created_at' => Carbon::parse($payroll->created_at)->format('d M Y h:i A'),
+                        'created_at' => Carbon::parse($payroll->getRawOriginal('created_at'))->format('d M Y h:i A'),
                         'action' => 'advance_payroll',
                     ];
                 });
@@ -276,7 +284,7 @@ class ApprovalController extends Controller
                         'position' => $resignation->employee->position->position_title ?? null,
                         'status' => $resignation->status,
                         'request_type' => 'Resignation Request',
-                        'created_at' => Carbon::parse($resignation->created_at)->format('d M Y h:i A'),
+                        'created_at' => Carbon::parse($resignation->getRawOriginal('created_at'))->format('d M Y h:i A'),
                         'action' => 'resignation',
                     ];
                 });
@@ -324,7 +332,7 @@ class ApprovalController extends Controller
                         'position' => $leave->employee->position->position_title ?? null,
                         'status' => $leave->leaveStatus->status ?? 'Pending',
                         'request_type' => 'Leave Request',
-                        'created_at' => Carbon::parse($leave->created_at)->format('d M Y h:i A'),
+                        'created_at' => Carbon::parse($leave->getRawOriginal('created_at'))->format('d M Y h:i A'),
                         'action' => 'leave',
                     ];
                 });
@@ -474,7 +482,7 @@ class ApprovalController extends Controller
                         'position'     => optional(optional($transfer->employee)->position)->position_title,
                         'status'       => optional($transfer->approvals->first())->status ?? 'Pending',
                         'request_type' => 'Transfer Request',
-                        'created_at'   => Carbon::parse($transfer->created_at)->format('d M Y h:i A'),
+                        'created_at'   => Carbon::parse($transfer->getRawOriginal('created_at'))->format('d M Y h:i A'),
                         'action'       => 'transfer',
                     ];
                 });
