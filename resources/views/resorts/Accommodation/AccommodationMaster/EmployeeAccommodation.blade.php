@@ -48,13 +48,13 @@
                         </select>
                     </div>
                     <div class="col-auto ms-auto">
-                        <a href="#" class="btn btn-list active "><img src="{{ URL::asset('resorts_assets/images/list.svg') }}" alt="icon"></a>
-                        <a href="#" class="btn btn-grid "><img src="{{ URL::asset('resorts_assets/images/grid.svg') }}" alt="icon"></a>
+                        <a href="#" class="btn btn-list"><img src="{{ URL::asset('resorts_assets/images/list.svg') }}" alt="icon"></a>
+                        <a href="#" class="btn btn-grid active"><img src="{{ URL::asset('resorts_assets/images/grid.svg') }}" alt="icon"></a>
 
                     </div>
                 </div>
             </div>
-            <div class="list-main d-block">
+            <div class="list-main d-none">
                 <div class="table-responsive">
                     <table class="table table-ta-employeesAccommodationlist " width="100%">
                         <thead>
@@ -76,7 +76,7 @@
                     </table>
                 </div>
             </div>
-            <div class="grid-main  d-none ">
+            <div class="grid-main">
                 <div class="row g-md-4 g-3 mb-4 grid-mainlist">
                     @if($data->isNotEmpty())
                         @foreach ($data as $d)
@@ -174,7 +174,7 @@
         });
         const urlParams = new URLSearchParams(window.location.search);
 
-        const currentView = urlParams.get('view')  // Default to 'list'
+        const currentView = urlParams.get('view') || 'grid'; // Grid is the default view
         // Initialize the view on page load
         setView(currentView);
         datatablelist();
