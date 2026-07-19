@@ -54,7 +54,7 @@ class LeaveController extends Controller
             'to_date'                   => 'required|array',
             'to_date.*'                 => 'required|date_format:Y-m-d',
             'reason'                    => 'required|string',
-            'task_delegation'           => 'required|integer',
+            'task_delegation'           => 'nullable|integer',
 
             // Conditional validation for transportation
             'transportation'            => 'nullable|array',
@@ -235,18 +235,15 @@ class LeaveController extends Controller
                         }
                     }
                 } else {
-                    // Local Storage
+                    // Local Storage — must land under public/ (like
+                    // leaveUpdate() already does); Storage::storeAs() put it
+                    // in storage/app which the web server can't serve, so
+                    // every attachment URL 404'd.
                     $leave_attachment                       =   config('settings.leave_attachments');
                     $dynamic_path                           =   $leave_attachment . '/' . $emp_id;
 
-                    // Create the directory if it doesn't exist
-                    if (!Storage::exists($dynamic_path)) {
-                        Storage::makeDirectory($dynamic_path);
-                    }
-
-                    // Store the file locally
                     $filename                               =   time() . '_' . $file->getClientOriginalName();
-                    $file->storeAs($dynamic_path, $filename);
+                    $file->move(public_path($dynamic_path), $filename);
                     $filePath                               =   $dynamic_path . '/' . $filename;
                 }
             }
@@ -430,7 +427,12 @@ class LeaveController extends Controller
                     'reason'                            =>  $request->reason,
                     'task_delegation'                   =>  $request->task_delegation,
                     'destination'                       =>  $request->destination,
-                    'attachments'                       =>  $filePath ? json_encode($filePath) : null,
+                    // Local uploads produce a plain path string —
+                    // json_encode()ing it wrapped the path in literal quotes
+                    // ("uploads\/...") which then got concatenated into the
+                    // download URL and 404'd. Only the S3 array shape
+                    // (Filename/Child_id) needs JSON.
+                    'attachments'                       =>  $filePath ? (is_array($filePath) ? json_encode($filePath) : $filePath) : null,
                     'status'                            =>  "Pending",
                 ]);
 
@@ -805,7 +807,7 @@ class LeaveController extends Controller
         }
     }
 
-    public function taskDelegation()
+    public function taskDelegation(Request $request)
     {
         if (!Auth::guard('api')->check()) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
@@ -869,16 +871,32 @@ class LeaveController extends Controller
                 }
             } else {
 
+                // Master admin: no department of their own — show every
+                // active employee in the resort. ($targetRanks was
+                // referenced here but never defined, which 500'd every
+                // master-admin call.)
                 $delegations                            =   DB::table('employees')
                                                                 ->join('resort_admins', 'employees.Admin_Parent_id', '=', 'resort_admins.id')
                                                                 ->where('employees.resort_id', $resort_id)
-                                                                ->whereIn('employees.rank', $targetRanks)
+                                                                ->where('employees.status', 'Active')
+                                                                ->whereNull('employees.deleted_at')
                                                                 ->select(
                                                                     'employees.*',
                                                                     'resort_admins.first_name as first_name',
                                                                     'resort_admins.last_name as last_name',
                                                                     'resort_admins.email as admin_email'
                                                                 )->get();
+            }
+
+            // Optional server-side search so the app dropdown can filter as
+            // the user types (?search=...) — matches name or email.
+            $search                                     =   trim((string) $request->query('search', ''));
+            if ($search !== '') {
+                $needle                                 =   mb_strtolower($search);
+                $delegations                            =   $delegations->filter(function ($row) use ($needle) {
+                    $haystack                           =   mb_strtolower(trim(($row->first_name ?? '') . ' ' . ($row->last_name ?? '') . ' ' . ($row->admin_email ?? '')));
+                    return strpos($haystack, $needle) !== false;
+                })->values();
             }
 
             if ($delegations->isEmpty()) {
@@ -1002,8 +1020,8 @@ class LeaveController extends Controller
                                                             ->join('employees_leaves_status as els', 'els.leave_request_id', '=', 'el.id')
                                                             ->join('employees as e', 'e.id', '=', 'el.emp_id') // Main employee
                                                             ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id') // Main employee admin details
-                                                            ->join('employees as delegated_emp', 'delegated_emp.id', '=', 'el.task_delegation') // Delegated employee
-                                                            ->join('resort_admins as ra_td', 'ra_td.id', '=', 'delegated_emp.Admin_Parent_id') // Task delegation admin details
+                                                            ->leftJoin('employees as delegated_emp', 'delegated_emp.id', '=', 'el.task_delegation') // Delegated employee
+                                                            ->leftJoin('resort_admins as ra_td', 'ra_td.id', '=', 'delegated_emp.Admin_Parent_id') // Task delegation admin details
                                                             ->join('resort_positions as rp', 'rp.id', '=', 'e.Position_id')
                                                             ->join('resort_departments as rd', 'rd.id', '=', 'e.Dept_id')
                                                             ->join('leave_categories as lc', 'lc.id', '=', 'el.leave_category_id')
@@ -1385,8 +1403,8 @@ class LeaveController extends Controller
                                                                 ->join('employees_leaves_status as els', 'els.leave_request_id', '=', 'el.id')
                                                                 ->join('employees as e', 'e.id', '=', 'el.emp_id') // Main employee
                                                                 ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id') // Main employee admin details
-                                                                ->join('employees as delegated_emp', 'delegated_emp.id', '=', 'el.task_delegation') // Delegated employee
-                                                                ->join('resort_admins as ra_td', 'ra_td.id', '=', 'delegated_emp.Admin_Parent_id') // Task delegation admin details
+                                                                ->leftJoin('employees as delegated_emp', 'delegated_emp.id', '=', 'el.task_delegation') // Delegated employee
+                                                                ->leftJoin('resort_admins as ra_td', 'ra_td.id', '=', 'delegated_emp.Admin_Parent_id') // Task delegation admin details
                                                                 ->join('resort_positions as rp', 'rp.id', '=', 'e.Position_id')
                                                                 ->join('resort_departments as rd', 'rd.id', '=', 'e.Dept_id')
                                                                 ->join('leave_categories as lc', 'lc.id', '=', 'el.leave_category_id')
@@ -1460,7 +1478,7 @@ class LeaveController extends Controller
                     $leaveDetail->transportation_details    =   json_decode($leaveDetail->transportation_details, true);
 
                     $baseUrl = url('/');
-                    $leaveDetail->attachments               =   $leaveDetail->attachments ? $baseUrl . '/' . $leaveDetail->attachments : '';
+                    $leaveDetail->attachments               =   self::resolveLeaveAttachmentUrl($leaveDetail->attachments);
                 }
 
                 if (!$leaveDetail) {
@@ -1670,8 +1688,8 @@ class LeaveController extends Controller
                                                 })
                                                 ->join('employees as e', 'e.id', '=', 'el.emp_id') // Main employee
                                                 ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id') // Main employee admin details
-                                                ->join('employees as delegated_emp', 'delegated_emp.id', '=', 'el.task_delegation') // Delegated employee
-                                                ->join('resort_admins as ra_td', 'ra_td.id', '=', 'delegated_emp.Admin_Parent_id') // Task delegation admin details
+                                                ->leftJoin('employees as delegated_emp', 'delegated_emp.id', '=', 'el.task_delegation') // Delegated employee
+                                                ->leftJoin('resort_admins as ra_td', 'ra_td.id', '=', 'delegated_emp.Admin_Parent_id') // Task delegation admin details
                                                 ->join('resort_positions as rp', 'rp.id', '=', 'e.Position_id')
                                                 ->join('resort_departments as rd', 'rd.id', '=', 'e.Dept_id')
                                                 ->join('leave_categories as lc', 'lc.id', '=', 'el.leave_category_id')
@@ -1776,13 +1794,13 @@ class LeaveController extends Controller
                         if ($leaveDetail->leave_data) {
                             foreach ($leaveDetail->leave_data as $leaveData) {
                                 $leaveData->employee_profile_picture    = Common::getResortUserPicture($leaveData->employee_id);
-                                $leaveData->attachments                 = $leaveData->attachments ? $baseUrl . '/' . $leaveData->attachments : '';
+                                $leaveData->attachments                 = self::resolveLeaveAttachmentUrl($leaveData->attachments);
                             }
                         }
 
                         // Update profile picture dynamically
                         $leaveDetail->employee_profile_picture  = Common::getResortUserPicture($leaveDetail->employee_id);
-                        $leaveDetail->attachments               = $leaveDetail->attachments ? $baseUrl . '/' . $leaveDetail->attachments : '';
+                        $leaveDetail->attachments               = self::resolveLeaveAttachmentUrl($leaveDetail->attachments);
                     }
                 }
 
@@ -1852,8 +1870,8 @@ class LeaveController extends Controller
                     ->join('employees_leaves_status as els', 'els.leave_request_id', '=', 'el.id')
                     ->join('employees as e', 'e.id', '=', 'el.emp_id') // Main employee
                     ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id') // Main employee admin details
-                    ->join('employees as delegated_emp', 'delegated_emp.id', '=', 'el.task_delegation') // Delegated employee
-                    ->join('resort_admins as ra_td', 'ra_td.id', '=', 'delegated_emp.Admin_Parent_id') // Task delegation admin details
+                    ->leftJoin('employees as delegated_emp', 'delegated_emp.id', '=', 'el.task_delegation') // Delegated employee
+                    ->leftJoin('resort_admins as ra_td', 'ra_td.id', '=', 'delegated_emp.Admin_Parent_id') // Task delegation admin details
                     ->join('resort_positions as rp', 'rp.id', '=', 'e.Position_id')
                     ->join('resort_departments as rd', 'rd.id', '=', 'e.Dept_id')
                     ->join('leave_categories as lc', 'lc.id', '=', 'el.leave_category_id')
@@ -1942,7 +1960,7 @@ class LeaveController extends Controller
                 $response['message']                = 'Leave Details';
                 $response['leave_request']          = $combineLeaveDetails;
                 $response['total_leave']            = $totalLeave;
-                $response['attachments']            = $combineLeaveDetails[0]->attachments ? $baseUrl . '/' . $combineLeaveDetails[0]->attachments : '';
+                $response['attachments']            = self::resolveLeaveAttachmentUrl($combineLeaveDetails[0]->attachments);
 
                 return response()->json($response);
             }
@@ -3022,8 +3040,8 @@ class LeaveController extends Controller
                                             ->join('employees_leaves_status as els', 'els.leave_request_id', '=', 'el.id')
                                             ->join('employees as e', 'e.id', '=', 'el.emp_id') // Main employee
                                             ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id') // Main employee admin details
-                                            ->join('employees as delegated_emp', 'delegated_emp.id', '=', 'el.task_delegation') // Delegated employee
-                                            ->join('resort_admins as ra_td', 'ra_td.id', '=', 'delegated_emp.Admin_Parent_id') // Task delegation admin details
+                                            ->leftJoin('employees as delegated_emp', 'delegated_emp.id', '=', 'el.task_delegation') // Delegated employee
+                                            ->leftJoin('resort_admins as ra_td', 'ra_td.id', '=', 'delegated_emp.Admin_Parent_id') // Task delegation admin details
                                             ->join('resort_positions as rp', 'rp.id', '=', 'e.Position_id')
                                             ->join('resort_departments as rd', 'rd.id', '=', 'e.Dept_id')
                                             ->join('leave_categories as lc', 'lc.id', '=', 'el.leave_category_id')
@@ -3092,7 +3110,7 @@ class LeaveController extends Controller
                     // Add approve_data to the base record
                     $base->approve_data                 = $approveData;
                     $base->employee_profile_picture     = Common::getResortUserPicture($base->employee_id);
-                    $base->attachments                  = $base->attachments ? $baseUrl . '/' . $base->attachments : '';
+                    $base->attachments                  = self::resolveLeaveAttachmentUrl($base->attachments);
                     // Clear duplicate fields in the base record
                     unset($base->approver_rank, $base->approver_id);
 
@@ -3167,8 +3185,8 @@ class LeaveController extends Controller
                     // ->join('employees_leaves_status as els', 'els.leave_request_id', '=', 'el.id')
                     ->join('employees as e', 'e.id', '=', 'el.emp_id') // Main employee
                     ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id') // Main employee admin details
-                    ->join('employees as delegated_emp', 'delegated_emp.id', '=', 'el.task_delegation') // Delegated employee
-                    ->join('resort_admins as ra_td', 'ra_td.id', '=', 'delegated_emp.Admin_Parent_id') // Task delegation admin details
+                    ->leftJoin('employees as delegated_emp', 'delegated_emp.id', '=', 'el.task_delegation') // Delegated employee
+                    ->leftJoin('resort_admins as ra_td', 'ra_td.id', '=', 'delegated_emp.Admin_Parent_id') // Task delegation admin details
                     ->join('resort_positions as rp', 'rp.id', '=', 'e.Position_id')
                     ->join('resort_departments as rd', 'rd.id', '=', 'e.Dept_id')
                     ->join('leave_categories as lc', 'lc.id', '=', 'el.leave_category_id')
@@ -3295,7 +3313,7 @@ class LeaveController extends Controller
                     $leaveDetail->transportation_details    = $transportationDetails;
                     // $leaveDetail->island_pass               = json_decode($leaveDetail->island_pass, true);
                     $baseUrl                                = url('/');
-                    $leaveDetail->attachments               = $leaveDetail->attachments ? $baseUrl . '/' . $leaveDetail->attachments : '';
+                    $leaveDetail->attachments               = self::resolveLeaveAttachmentUrl($leaveDetail->attachments);
                     // $role                                   = ucfirst(strtolower($leaveDetail->approver_rank ?? ''));
                     // $rank                                   = config('settings.Position_Rank');
                     // $role                                   = $rank[$role] ?? '';
@@ -3997,5 +4015,50 @@ class LeaveController extends Controller
             \Log::error("Error in processLeaveWithHolidayCheck: " . $e->getMessage());
             return null;
         }
+    }
+
+    /**
+     * Turn whatever is stored in employees_leaves.attachments into a URL the
+     * app can open. Historical rows hold three shapes: a plain relative path,
+     * a json_encode()d path string (with literal quotes that used to corrupt
+     * the URL), or the S3 shape {"Filename":...,"Child_id":...}.
+     */
+    public static function resolveLeaveAttachmentUrl($raw)
+    {
+        if (empty($raw)) {
+            return '';
+        }
+
+        $value   = trim((string) $raw);
+        $decoded = json_decode($value, true);
+        if (json_last_error() === JSON_ERROR_NONE) {
+            if (is_string($decoded)) {
+                $value = $decoded;
+            } elseif (is_array($decoded)) {
+                $childId = $decoded['Child_id'] ?? null;
+                if ($childId) {
+                    $fileRecord = \App\Models\ChildFileManagement::find($childId);
+                    if ($fileRecord && $fileRecord->File_Path) {
+                        try {
+                            return \App\Helpers\StorageHelper::temporaryUrl($fileRecord->File_Path);
+                        } catch (\Exception $e) {
+                            \Log::error('resolveLeaveAttachmentUrl: ' . $e->getMessage());
+                        }
+                    }
+                }
+                return '';
+            }
+        }
+
+        // Defensive: strip any stray quotes left by older double-encoded rows.
+        $value = trim($value, "\"' \t");
+        if ($value === '') {
+            return '';
+        }
+        if (preg_match('#^https?://#i', $value)) {
+            return $value;
+        }
+
+        return url('/') . '/' . ltrim($value, '/');
     }
 }

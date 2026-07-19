@@ -102,7 +102,6 @@ class BoardingPassController extends Controller
                                                                     });
                                                             })
                                                             ->orderBy('created_at', 'desc')
-                                                            ->take(2)
                                                             ->get();
 
             $rankConfig                             =   config('settings.Position_Rank');
@@ -933,10 +932,27 @@ class BoardingPassController extends Controller
 
             $actionname                             =   ($action == "Rejected") ? "reject" : "approve";
 
+            // If the logged-in approver already actioned their own step,
+            // say so instead of the misleading "must first be approved by
+            // the X" message (the pending row at this point belongs to the
+            // NEXT approver in the chain, not a missing earlier one).
+            $ownStatusRow                           =   EmployeeTravelPassStatus::where('travel_pass_id', $passId)
+                                                            ->where('approver_id', $currentApproverId)
+                                                            ->orderBy('id', 'desc')
+                                                            ->first();
+            if ($ownStatusRow && $ownStatusRow->status !== 'Pending') {
+                return response()->json([
+                    'status'                        =>  false,
+                    'already_actioned'              =>  true,
+                    'pass_status'                   =>  $employeeTravelPasses->status,
+                    'message'                       =>  'You have already ' . strtolower($ownStatusRow->status) . ' this request. It is now awaiting action from the ' . $lastApproverRank . '.',
+                ], 200);
+            }
+
             if ($employeeTravelPassStatus && $employeeTravelPassStatus->approver_id != $currentApproverId) {
                 return response()->json([
                     'status'                        =>  false,
-                    'message'                       =>  "You cannot $actionname this request. The request must first be approved by the $lastApproverRank.",
+                    'message'                       =>  "You cannot $actionname this request. It is currently awaiting action from the $lastApproverRank.",
                 ], 200);
             }
 
@@ -983,9 +999,33 @@ class BoardingPassController extends Controller
                     $employeeTravelPasses->status   =   "Approved";
                     $employeeTravelPasses->save();
                 }
+
+                // Tell the next approver in the chain their action is now due.
+                $nextPendingStatus                  =   EmployeeTravelPassStatus::where('travel_pass_id', $employeeTravelPasses->id)
+                                                            ->where('status', 'Pending')
+                                                            ->orderBy('id', 'desc')
+                                                            ->first();
+                if ($nextPendingStatus && $nextPendingStatus->approver_id) {
+                    Common::sendMobileNotification(
+                        $this->resort_id,
+                        2,
+                        null,
+                        null,
+                        'Boarding Pass Approval Required',
+                        'A boarding pass request is awaiting your approval.',
+                        'Boarding Pass',
+                        [$nextPendingStatus->approver_id],
+                        null,
+                        false,
+                        'boarding-pass-approval-required',
+                    );
+                }
+
                 return response()->json([
                     'status'                        =>  true,
                     'isAssigned'                    =>  true,
+                    'pass_status'                   =>  $employeeTravelPasses->fresh()->status,
+                    'all_approved'                  =>  (bool) $allApproved,
                     'message'                       =>  'Boarding pass approved successfully.',
                 ]);
             } elseif ($action === 'Rejected') {
