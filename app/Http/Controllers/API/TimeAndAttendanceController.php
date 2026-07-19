@@ -2548,6 +2548,16 @@ class TimeAndAttendanceController extends Controller
                                                                     ->where('t1.resort_id', $resort_id)
                                                                     ->where('employees.resort_id', $resort_id)
                                                                     ->where('employees.status', 'Active')
+                                                                    // Only employees with a duty roster entry for today can
+                                                                    // be marked (hodMarkAttendancePresent creates the
+                                                                    // attendance row from the roster entry), so hide the
+                                                                    // rest instead of letting the mark silently fail.
+                                                                    ->whereExists(function ($q) use ($currentDate) {
+                                                                        $q->select(DB::raw(1))
+                                                                          ->from('duty_roster_entries as dre')
+                                                                          ->whereColumn('dre.Emp_id', 'employees.id')
+                                                                          ->whereRaw('DATE(dre.date) = ?', [$currentDate]);
+                                                                    })
                                                                     ->select(
                                                                         't3.id as id',
                                                                         't1.id as admin_id',
@@ -3818,9 +3828,11 @@ class TimeAndAttendanceController extends Controller
             ])->get();
 
             // Actual OT: what was actually recorded on checkout for this date.
+            // Join the employee straight off the attendance row — going via
+            // duty_rosters silently dropped attendance rows whose roster_id
+            // is null (manually marked / ad-hoc attendance).
             $actualQuery = DB::table('parent_attendaces as t3')
-                ->join('duty_rosters as t2', 't2.id', '=', 't3.roster_id')
-                ->join('employees', 'employees.id', '=', 't2.Emp_id')
+                ->join('employees', 'employees.id', '=', 't3.Emp_id')
                 ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
                 ->where('t1.resort_id', $resort_id)
                 ->where('employees.status', 'Active')

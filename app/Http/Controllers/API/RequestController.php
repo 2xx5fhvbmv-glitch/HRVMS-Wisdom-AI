@@ -83,11 +83,15 @@ class RequestController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
         
+        // Guarantors and an amount only apply to monetary requests (Payroll
+        // Advance); letter-type requests such as Employment Verification
+        // Letter carry neither.
         $validator = Validator::make($request->all(), [
             'request_type'                              =>  'required',
-            'guarantor_id'                              =>  'required|array',
-            'guarantor_id.*'                            =>  'required|integer|exists:employees,id',
-            'request_amount'                            =>  'required',
+            'guarantor_id'                              =>  'required_if:request_type,Payroll Advance|array',
+            'guarantor_id.*'                            =>  'integer|exists:employees,id',
+            'request_amount'                            =>  'required_if:request_type,Payroll Advance',
+            'currency'                                  =>  'nullable|in:MVR,USD',
             'priority'                                  =>  'required',
             'request_date'                              =>  'required',
             'purpose'                                   =>  'required',
@@ -104,12 +108,13 @@ class RequestController extends Controller
                 'resort_id'                             =>  $this->resort_id,
                 'employee_id'                           =>  $employee_id,
                 'request_type'                          =>  $request->request_type,
-                'request_amount'                        =>  $request->request_amount,
+                'request_amount'                        =>  $request->filled('request_amount') ? $request->request_amount : null,
+                'currency'                              =>  $request->filled('currency') ? $request->currency : null,
                 'priority'                              =>  $request->priority,
                 'request_date'                          =>  $request->request_date,
                 'pourpose'                              =>  $request->purpose,
             ]);
-            foreach($request->guarantor_id as $guaid) {
+            foreach($request->guarantor_id ?? [] as $guaid) {
                 PayrollAdvanceGuarantor::create([
                     'payroll_advance_id'                    =>  $PayrollAdvance->id,
                     'guarantor_id'                          =>  $guaid,
@@ -117,9 +122,12 @@ class RequestController extends Controller
                 ]);
             }
 
-            if($request->hasFile('attechments')) {
+            // Mobile app posts the files as "attachments"; older builds used
+            // the misspelled "attechments" key, so accept either.
+            $attachmentFiles = $request->file('attachments') ?? $request->file('attechments');
+            if($attachmentFiles) {
                      $imagePaths = [];
-                    foreach ($request->file('attechments') as $file) {
+                    foreach ($attachmentFiles as $file) {
                         $SubFolder="RequestAttachments";
                         $status =   Common::AWSEmployeeFileUpload($this->resort_id,$file, $this->user->GetEmployee->Emp_id,$SubFolder,true);
 
@@ -131,13 +139,14 @@ class RequestController extends Controller
                                 $imagePaths[] = ['Filename' => $filename, 'Child_id' => $status['Chil_file_id']];
                             }
                         }
+                    }
 
+                    if ($imagePaths) {
                         PayrollAdvanceAttachments::create([
                             'resort_id'             =>  $this->resort_id,
                             'payroll_advance_id'    =>  $PayrollAdvance->id,
-                            'attachments'           =>  $imagePaths ? json_encode($imagePaths) : null
+                            'attachments'           =>  json_encode($imagePaths)
                         ]);
-
                     }
                 }
                 // Send mobile notification to every HR employee — FindResortHR()
