@@ -353,6 +353,26 @@ class FileManagementController extends Controller
         }
 
         $fileRecord = ChildFileManagement::find($status['Chil_file_id']);
+
+        // Notify HR — no code path notified anyone when an employee
+        // uploaded a file, from either mobile or web.
+        $hrEmployeeIds = array_values(array_diff(Common::getResortHrEmployeeIds($resortId), [$emp->id]));
+        if (!empty($hrEmployeeIds)) {
+            Common::sendMobileNotification(
+                $resortId,
+                2,
+                null,
+                null,
+                'File Uploaded',
+                ($emp->resortAdmin->full_name ?? $emp->Emp_id) . ' uploaded a file: ' . $request->file('file')->getClientOriginalName(),
+                'File Management',
+                $hrEmployeeIds,
+                null,
+                false,
+                'file-management-upload',
+            );
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'File uploaded successfully.',
