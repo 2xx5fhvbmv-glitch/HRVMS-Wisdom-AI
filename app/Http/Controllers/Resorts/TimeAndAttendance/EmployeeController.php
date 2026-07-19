@@ -446,15 +446,23 @@ class EmployeeController extends Controller
             return $employee;
         });
 
-        if(!$request->get('page'))
+        if($request->ajax())
         {
+            // Branching on "was a page param sent" (rather than ajax-ness)
+            // meant clicking a grid pagination link — a real anchor tag
+            // pointing at ?page=2&view=grid, no AJAX involved — did a full
+            // browser navigation into the ELSE branch below, whose
+            // subsequent document-ready JS immediately re-fetched the grid
+            // via EmployeeGrid() with no page param, snapping straight back
+            // to page 1. AJAX calls (including paginated ones, once the
+            // frontend intercepts pagination clicks) now always get JSON.
             $view =  view('resorts.renderfiles.timeandattendanceEmployeeGrid', compact('employees'))->render();
 
             return response()->json(['success'=>true,'view' => $view]);
         }
         else
         {
-            $p_details = explode("?" ,$request->get('page'));
+            $p_details = explode("?" , $request->get('page', ''));
             $pageNo = $p_details[0];
             // $pageView = $p_details[1];
 

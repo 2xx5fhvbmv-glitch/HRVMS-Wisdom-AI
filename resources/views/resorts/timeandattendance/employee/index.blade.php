@@ -56,12 +56,12 @@
                         </div>
 
                         <div class="col-auto ms-auto">
-                            <a href="javascript::void(0)" class="btn btn-grid "><img src=" {{ URL::asset('resorts_assets/images/grid.svg')}}" alt="icon"></a>
-                            <a href="javascript::void(0)" class="btn btn-list active"><img src=" {{ URL::asset('resorts_assets/images/list.svg')}}" alt="icon"></a>
+                            <a href="javascript::void(0)" class="btn btn-grid active"><img src=" {{ URL::asset('resorts_assets/images/grid.svg')}}" alt="icon"></a>
+                            <a href="javascript::void(0)" class="btn btn-list"><img src=" {{ URL::asset('resorts_assets/images/list.svg')}}" alt="icon"></a>
                         </div>
                     </div>
                 </div>
-                <div class="list-main d-block">
+                <div class="list-main d-none">
                     <div class="table-responsive">
                         <table class="table table-collapseNew table-ta-employeeslist">
                             <thead>
@@ -83,7 +83,7 @@
                         </table>
                     </div>
                 </div>
-                <div class="grid-main d-none ">
+                <div class="grid-main d-block">
                     <div class="row g-md-4 g-3 mb-4">
                         @if($employees->isNotEmpty())
                         @php
@@ -243,16 +243,28 @@
         datatablelist()
         const urlParams = new URLSearchParams(window.location.search);
 
-        const currentView = urlParams.get('view')  // Default to 'list'
+        const currentView = urlParams.get('view') || 'grid'; // Grid is the default view
+        const initialPage = urlParams.get('page');
         // Initialize the view on page load
-        setView(currentView);
+        setView(currentView, initialPage);
     });
 
-    function setView(view)
+    function showGridView(page)
+    {
+        $(".btn-grid").addClass("active");
+        $(".grid-main").addClass("d-block");
+        $(".grid-main").removeClass("d-none");
+        $(".btn-list").removeClass("active");
+        $(".list-main").addClass("d-none");
+        $(".list-main").removeClass("d-block");
+        EmployeeGrid(page);
+    }
+
+    function setView(view, page)
     {
         if(view=="grid")
         {
-            $(".btn-grid").trigger("click");
+            showGridView(page);
         }
         if(view=="list")
         {
@@ -261,18 +273,12 @@
     }
 
             $(".btn-grid").click(function () {
-                $(this).addClass("active");
-                $(".grid-main").addClass("d-block");
-                $(".grid-main").removeClass("d-none");
-                $(".btn-list").removeClass("active");
-                $(".list-main").addClass("d-none");
-                $(".list-main").removeClass("d-block");
                 // Was calling DatatableGrid(), which is never defined on
                 // this page (copy-pasted from the Applicants page) — grid
                 // view never loaded/refreshed its data on click, throwing
-                // "DatatableGrid is not defined" instead. EmployeeGrid()
-                // is this page's actual grid-loading function.
-                EmployeeGrid()
+                // "DatatableGrid is not defined" instead. showGridView()
+                // does the actual view-toggle + EmployeeGrid() load.
+                showGridView();
             });
             $(".btn-list").click(function () {
                 $(this).addClass("active");
@@ -301,21 +307,37 @@
         EmployeeGrid();
         datatablelist()
     });
-    function EmployeeGrid()
+    function EmployeeGrid(page)
     {
         var search = $(".Search").val();
         var position = $("#position").val();
         var department = $("#department").val();
+        var data = {"_token":"{{ csrf_token() }}","search":search,"position":position,"department":department};
+        if (page) {
+            data.page = page;
+        }
         $.ajax({
                 url: "{{ route('resort.timeandattendance.SearchEmployeegird') }}",
                 type: "get",
-                data: {"_token":"{{ csrf_token() }}","search":search,"position":position,"department":department},
+                data: data,
                 success: function (response) {
 
                     if (response.success)
                     {
 
                         $(".grid-main").html(response.view);
+
+                        // Keep the URL bookmarkable/refreshable at the page
+                        // the user is actually looking at, without a full
+                        // navigation (pagination links are intercepted below).
+                        var params = new URLSearchParams(window.location.search);
+                        params.set('view', 'grid');
+                        if (page) {
+                            params.set('page', page);
+                        } else {
+                            params.delete('page');
+                        }
+                        history.replaceState(null, '', window.location.pathname + '?' + params.toString());
 
                     } else {
                         toastr.error(response.message, "Error", {
@@ -381,6 +403,24 @@
         $("#position").val('').trigger('change');
         EmployeeGrid();
         datatablelist();
+    });
+
+    // Grid pagination links are plain <a href="?page=2&view=grid"> from
+    // Laravel's paginator — clicking one did a full browser navigation
+    // instead of an AJAX fetch, which is what actually caused "always
+    // back to page 1": the full-page reload runs this same document-ready
+    // block again, and it re-fetched the grid with no page param. Content
+    // is replaced on every EmployeeGrid() call, so this has to be delegated.
+    $(document).on('click', '.grid-main .pagination-custom a', function (e) {
+        var href = $(this).attr('href');
+        if (!href) {
+            return;
+        }
+        e.preventDefault();
+        var page = new URL(href, window.location.origin).searchParams.get('page');
+        if (page) {
+            EmployeeGrid(page);
+        }
     });
     </script>
     @endsection
