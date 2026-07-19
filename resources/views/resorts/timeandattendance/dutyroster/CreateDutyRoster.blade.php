@@ -868,6 +868,17 @@
             }
             $("#hiddenInput").daterangepicker({
                 autoApply: true,
+                // The library's own updateElement() unconditionally does
+                // this.endDate.format(...) whenever autoUpdateInput is true
+                // (the default) — but clickDate() explicitly nulls endDate
+                // right before calling setStartDate() every time a fresh
+                // range selection starts (i.e. clicking a date again after
+                // a complete range was already picked), which crashes on
+                // that null .format() and freezes the calendar. We already
+                // sync the visible text ourselves via updateDateText()
+                // below, so the library never needs to touch #hiddenInput's
+                // value at all.
+                autoUpdateInput: false,
                 startDate: startDate,
                 endDate: endDate,
                 minDate: today,
