@@ -31,11 +31,17 @@ class EmployeeController extends Controller
     public function __construct()
     {
         $this->resort = $resortId = auth()->guard('resort-admin')->user();
+        // Laravel instantiates the controller once to gather any
+        // controller-defined middleware BEFORE auth:resort-admin ever runs,
+        // so an unauthenticated/expired-session hit reaches here with
+        // $this->resort null. Unguarded ->id crashed with a raw
+        // ErrorException instead of the clean login redirect auth
+        // middleware produces once this constructor stops fataling.
         if(isset($this->resort->GetEmployee))
         {
             $reporting_to = $this->resort->GetEmployee->id;
         }else{
-            $reporting_to = $this->resort->id;
+            $reporting_to = $this->resort->id ?? null;
         }
         $this->underEmp_id = Common::getSubordinates($reporting_to);
     }
