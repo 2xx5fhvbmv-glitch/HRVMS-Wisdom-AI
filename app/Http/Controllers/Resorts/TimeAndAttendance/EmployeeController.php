@@ -311,11 +311,22 @@ class EmployeeController extends Controller
             ->where('t1.resort_id', $this->resort->resort_id);
 
             $employeeRankPosition = Common::getEmployeeRankPosition($this->resort->getEmployee);
-            $canViewAll = in_array($employeeRankPosition['position'], ['HR', 'EXCOM', 'GM']);
+            // getEmployeeRankPosition()'s 'position' key is only ever set to
+            // HR/Finance/GM (matched by department name); HOD/MGR/EXCOM live
+            // in the 'rank' key instead (mapped from raw rank via
+            // config('settings.eligibilty')). Checking 'position' alone for
+            // EXCOM/HOD/MGR was always false, so this fell through to the
+            // subordinate-scoped else branch for every real HOD — which
+            // scopes by the reporting_to chain, not current department, so
+            // an employee who transferred department but still formally
+            // reports to their old HOD (reporting_to unchanged) kept
+            // showing up in the old department's attendance list.
+            $canViewAll = in_array($employeeRankPosition['position'], ['HR', 'EXCOM', 'GM'])
+                || in_array($employeeRankPosition['rank'], ['HR', 'EXCOM', 'GM']);
 
             if (!$canViewAll) {
                 $Dept_id = $this->resort->GetEmployee->Dept_id ?? '';
-                if ($employeeRankPosition['position'] == 'HOD' || $employeeRankPosition['position'] == 'MGR') {
+                if (in_array($employeeRankPosition['rank'], ['HOD', 'MGR']) || in_array($employeeRankPosition['position'], ['HOD', 'MGR'])) {
                     // HOD/MGR see their own department
                     $employeesQuery->where('employees.Dept_id', $Dept_id);
                 } else {
@@ -400,7 +411,7 @@ class EmployeeController extends Controller
         $canViewAll = in_array($employeeRankPosition['position'], ['HR', 'EXCOM', 'GM']);
 
         if (!$canViewAll) {
-            if ($employeeRankPosition['position'] == 'HOD' || $employeeRankPosition['position'] == 'MGR') {
+            if (in_array($employeeRankPosition['rank'], ['HOD', 'MGR']) || in_array($employeeRankPosition['position'], ['HOD', 'MGR'])) {
                 $employees->where('employees.Dept_id', $Dept_id);
             } else {
                 $employees->whereIn('employees.id', $this->underEmp_id);
@@ -508,8 +519,23 @@ class EmployeeController extends Controller
             ->join('resort_positions as t2', 't2.id', '=', 'employees.Position_id')
             ->where('t1.resort_id', $this->resort->resort_id);
 
-            if($Rank != '3'){
-                $employees->whereIn('employees.id', $this->underEmp_id);
+            // Raw rank=3 assumed HR/full-access and everyone else got
+            // subordinate-chain-only scoping, with no department-scoped
+            // branch for a real HOD/MGR at all. That's why a HOD's list
+            // view showed employees who transferred to a different
+            // department but still formally report to them
+            // (reporting_to unchanged) — the underEmp_id chain doesn't
+            // track current department, only who reports to whom.
+            $employeeRankPosition = Common::getEmployeeRankPosition($this->resort->getEmployee);
+            $canViewAllList = in_array($employeeRankPosition['position'], ['HR', 'EXCOM', 'GM'])
+                || in_array($employeeRankPosition['rank'], ['HR', 'EXCOM', 'GM']);
+
+            if (!$canViewAllList) {
+                if (in_array($employeeRankPosition['rank'], ['HOD', 'MGR']) || in_array($employeeRankPosition['position'], ['HOD', 'MGR'])) {
+                    $employees->where('employees.Dept_id', $Dept_id);
+                } else {
+                    $employees->whereIn('employees.id', $this->underEmp_id);
+                }
             }
             // Apply filters based on search and position
             if ($search) {
