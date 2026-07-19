@@ -1413,6 +1413,23 @@ class DutyRosterController extends Controller
             }
         });
 
+        // View Duty Roster's per-day "OT: X hr" label reads
+        // duty_roster_entries.OverTime, not the employee_overtimes table —
+        // this form only ever wrote the latter, so OT defined here never
+        // showed up on the roster calendar even though it saved fine.
+        // Keep both in sync: total planned minutes across every entry
+        // still on this date.
+        $totalMinutes = EmployeeOvertime::where('Emp_id', $Emp_id)
+            ->where('resort_id', $resort_id)
+            ->whereDate('date', $dateCarbon)
+            ->get()
+            ->sum(function ($entry) {
+                [$h, $m] = array_pad(explode(':', $entry->total_time ?? '0:0'), 2, 0);
+                return ((int) $h * 60) + (int) $m;
+            });
+        $DutyRosterEntry->OverTime = sprintf('%02d:%02d', intdiv($totalMinutes, 60), $totalMinutes % 60);
+        $DutyRosterEntry->save();
+
         return response()->json(['success' => true, 'message' => 'Overtime saved successfully.']);
     }
 
