@@ -926,11 +926,21 @@
             entryHtml += '</div>';
             entryHtml += '<div class="col-md-4">';
             entryHtml += '<label class="form-label">Status</label>';
-            entryHtml += '<select class="form-select overtime-status">';
-            entryHtml += '<option value="pending"' + (entry && entry.status === 'pending' ? ' selected' : '') + '>Pending</option>';
-            entryHtml += '<option value="approved"' + (entry && entry.status === 'approved' ? ' selected' : '') + '>Approved</option>';
-            entryHtml += '<option value="rejected"' + (entry && entry.status === 'rejected' ? ' selected' : '') + '>Rejected</option>';
-            entryHtml += '</select>';
+            if (entry) {
+                // Reviewing/editing an entry that already exists — full control.
+                entryHtml += '<select class="form-select overtime-status">';
+                entryHtml += '<option value="pending"' + (entry.status === 'pending' ? ' selected' : '') + '>Pending</option>';
+                entryHtml += '<option value="approved"' + (entry.status === 'approved' ? ' selected' : '') + '>Approved</option>';
+                entryHtml += '<option value="rejected"' + (entry.status === 'rejected' ? ' selected' : '') + '>Rejected</option>';
+                entryHtml += '</select>';
+            } else {
+                // Brand-new pre-planned OT can't be Approved before the
+                // work happens — the backend forces this to Pending
+                // regardless, so don't offer a choice that won't stick.
+                entryHtml += '<select class="form-select overtime-status" disabled>';
+                entryHtml += '<option value="pending" selected>Pending</option>';
+                entryHtml += '</select>';
+            }
             entryHtml += '</div>';
             entryHtml += '</div>';
             entryHtml += '</div>';
