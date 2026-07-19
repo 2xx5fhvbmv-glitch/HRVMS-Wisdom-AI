@@ -171,6 +171,14 @@
                                                                                                                 {
                                                                                                                     $startTime = \Carbon\Carbon::parse($shiftData->StartTime);
                                                                                                                     $endTime = \Carbon\Carbon::parse($shiftData->EndTime);
+                                                                                                                    // Overnight shifts (e.g. 08:00 PM-04:00 AM) have an
+                                                                                                                    // EndTime that's numerically earlier than StartTime —
+                                                                                                                    // diffInHours() on two same-day Carbon times took the
+                                                                                                                    // "long way round" (16h instead of the real 8h) unless
+                                                                                                                    // EndTime is rolled onto the next day first.
+                                                                                                                    if ($endTime->lte($startTime)) {
+                                                                                                                        $endTime->addDay();
+                                                                                                                    }
                                                                                                                     $hours_abc = $startTime->diffInHours($endTime);
                                                                                                                     $toatalHoursForDay = $hours_abc;
                                                                                                                     $totalHoursMonth += $toatalHoursForDay;
@@ -429,6 +437,10 @@
                                                                                         {
                                                                                             $startTime = \Carbon\Carbon::parse($shiftData->StartTime);
                                                                                             $endTime = \Carbon\Carbon::parse($shiftData->EndTime);
+                                                                                            // Overnight shift — see the identical fix above.
+                                                                                            if ($endTime->lte($startTime)) {
+                                                                                                $endTime->addDay();
+                                                                                            }
                                                                                             $hours_abc = $startTime->diffInHours($endTime);
                                                                                             $toatalHoursForDay = $hours_abc;
                                                                                             $totalHoursMonth += $toatalHoursForDay;
