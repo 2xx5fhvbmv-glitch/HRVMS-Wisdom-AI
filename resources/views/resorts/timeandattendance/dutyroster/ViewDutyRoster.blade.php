@@ -836,20 +836,23 @@
     .table-createDutymonthly .createDuty-tableBlock .badge { font-size: 9px; padding: 2px 4px; }
     /* The edit pencil was disappearing from every shift cell because its
        wrapper (.ot-details) was display:none in the compact monthly grid.
-       Three-pronged fix:
-       1. Force .ot-details visible (overrides any leftover display:none).
-       2. Hide just the OT text <p> inside it, keep the button <p>.
-       3. Pin the button absolute-top-right of each cell so even if some
-          parent flex/overflow rule clipped it, it still renders. */
+       Fix: force .ot-details visible and pin the button absolute-bottom-right
+       of each cell so it always renders regardless of the OT text's width.
+       An earlier version of this fix also hid the "OT: Xhr" text entirely
+       to make room for the button — no longer needed now that the button
+       is taken out of flow via absolute positioning, and hiding it meant
+       real planned OT was invisible on the calendar. Left-align the OT
+       text and reserve space on the right so it doesn't run under the
+       pinned button. */
     .table-createDutymonthly .day-cell { position: relative !important; }
     .table-createDutymonthly .ot-details {
         display: flex !important;
-        justify-content: flex-end;
+        justify-content: flex-start;
         align-items: center;
         margin: 0;
         padding: 0;
+        padding-right: 18px;
     }
-    .table-createDutymonthly .ot-details > p:not(:last-child) { display: none !important; }
     .table-createDutymonthly .ot-details > p:last-child { margin: 0; }
     .table-createDutymonthly .editIcon-btn {
         position: absolute !important;
