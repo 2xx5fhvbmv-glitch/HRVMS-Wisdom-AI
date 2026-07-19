@@ -279,7 +279,9 @@
                         <div class="d-flex flex-wrap align-items-center gap-2">
                             <button class="btn btn-themeBlue btn-sm approve-btn @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.edit')) == false) d-none @endif" data-leave-id="{{$leaveDetail->id}}">Approve</button>
                             <button class="btn btn-danger btn-sm reject-btn @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.edit')) == false) d-none @endif" data-leave-id="{{$leaveDetail->id}}">Reject</button>
+                            {{-- Commented out per request — not needed for now.
                             <a href="#" class="btn btn-link btn-sm text-decoration-none" id="recommendDateBtn" data-leave-id="{{$leaveDetail->id}}">Recommend alternative date</a>
+                            --}}
                             @if($available_rank == "HR")
                                 <button type="button" data-leave-id="{{$leaveDetail->id}}" id="sentEmailToTravelPartner" class="btn btn-themeSkyblue btn-sm ms-auto">Send Email To Travel Partner</button>
                             @endif
