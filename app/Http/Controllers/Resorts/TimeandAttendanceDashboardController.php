@@ -1168,7 +1168,16 @@ class TimeandAttendanceDashboardController extends Controller
             $EmployeesCountQuery->where('employees.Dept_id', $Dept_id);
         }
 
-        if (!$canViewAll) {
+        // A real department HOD/EXCOM's "Total Employees" should be the
+        // whole department (Dept_id above already scopes that correctly).
+        // underEmp_id is a subordinate/reporting-chain list that doesn't
+        // include the HOD themselves, so restricting to it on top of the
+        // department filter silently dropped the HOD (and any peer-level
+        // staff who don't formally report to them) from their own dept's
+        // headcount. Matches the Absent query below, which already had
+        // this guard. Only apply the extra restriction for a viewer who
+        // is neither a full-access role nor a real dept HOD.
+        if (!$canViewAll && !$isDeptHOD) {
             $EmployeesCountQuery->whereIn('employees.id', $this->underEmp_id);
         }
 
@@ -1187,7 +1196,7 @@ class TimeandAttendanceDashboardController extends Controller
                                             ->where("t1.resort_id", $this->resort->resort_id)
                                             ->where('employees.status', 'Active');
 
-        if (!$canViewAll) {
+        if (!$canViewAll && !$isDeptHOD) {
             $totalPresentEmployeeQuery->whereIn('employees.id', $this->underEmp_id);
         }
         if (!$canViewAll && $Dept_id) {
@@ -1206,7 +1215,7 @@ class TimeandAttendanceDashboardController extends Controller
                                             ->where("t1.resort_id", $this->resort->resort_id)
                                             ->where('employees.status', 'Active');
 
-        if (!$canViewAll) {
+        if (!$canViewAll && !$isDeptHOD) {
             $totalLeaveEmployeeQuery->whereIn('employees.id', $this->underEmp_id);
         }
         if (!$canViewAll && $Dept_id) {
@@ -1265,10 +1274,16 @@ class TimeandAttendanceDashboardController extends Controller
         if (!$canViewAll && $Dept_id) {
             $EmployeesCountQuery->where("employees.Dept_id", $Dept_id);
         }
-        if (!$canViewAll && $hod) {
+        // This explicitly excluded the HOD themselves from their own
+        // department's headcount — never correct for a real dept HOD.
+        if (!$canViewAll && $hod && !$isDeptHOD) {
             $EmployeesCountQuery->where("employees.id", "!=", $hod);
         }
-        if (!$canViewAll) {
+        // See the matching comment in hod_dashboard() above: underEmp_id
+        // is a reporting-chain list that excludes the HOD themselves, so
+        // it shouldn't additionally restrict a real dept HOD's own
+        // department-wide headcount.
+        if (!$canViewAll && !$isDeptHOD) {
             $EmployeesCountQuery->whereIn('employees.id', $this->underEmp_id);
         }
 
@@ -1287,7 +1302,7 @@ class TimeandAttendanceDashboardController extends Controller
                                             ->where("t1.resort_id", $this->resort->resort_id)
                                             ->where('employees.status', 'Active');
 
-        if (!$canViewAll) {
+        if (!$canViewAll && !$isDeptHOD) {
             $totalPresentEmployeeQuery->whereIn('employees.id', $this->underEmp_id);
         }
         if (!$canViewAll && $Dept_id) {
@@ -1306,7 +1321,7 @@ class TimeandAttendanceDashboardController extends Controller
                                             ->where("t1.resort_id", $this->resort->resort_id)
                                             ->where('employees.status', 'Active');
 
-        if (!$canViewAll) {
+        if (!$canViewAll && !$isDeptHOD) {
             $totalLeaveEmployeeQuery->whereIn('employees.id', $this->underEmp_id);
         }
         if (!$canViewAll && $Dept_id) {
