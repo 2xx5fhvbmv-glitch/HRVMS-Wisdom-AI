@@ -461,9 +461,32 @@ class FileManageController extends Controller
         
                   
                 }
-        
+
+                // Notify HR — no code path notified anyone when an employee
+                // uploaded a file, from either web or mobile.
+                $uploaderEmpId = $this->resort->GetEmployee->id ?? null;
+                $hrEmployeeIds = array_values(array_diff(
+                    Common::getResortHrEmployeeIds($this->resort->resort_id),
+                    [$uploaderEmpId]
+                ));
+                if (!empty($hrEmployeeIds)) {
+                    Common::sendMobileNotification(
+                        $this->resort->resort_id,
+                        2,
+                        null,
+                        null,
+                        'File Uploaded',
+                        ($this->resort->GetEmployee->resortAdmin->full_name ?? $this->resort->full_name ?? 'An employee') . ' uploaded a file.',
+                        'File Management',
+                        $hrEmployeeIds,
+                        null,
+                        false,
+                        'file-management-upload',
+                    );
+                }
+
                 return response()->json(['success' => true, 'message' => 'File Uploaded successfully'], 200);
-           
+
         }
         
         public function FolderList(Request $request)
