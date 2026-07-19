@@ -227,6 +227,10 @@ $(document).ready(function() {
                 $(".btn-grid").removeClass("active");
                 $(".grid-main").addClass("d-none");
                 $(".grid-main").addClass("d-block");
+                // Grid is now the default view, so #VacanciesApplcation is
+                // never initialized on page load — without this, switching
+                // to list showed a blank, never-initialized DataTable.
+                datatablelist();
             });
 
 
