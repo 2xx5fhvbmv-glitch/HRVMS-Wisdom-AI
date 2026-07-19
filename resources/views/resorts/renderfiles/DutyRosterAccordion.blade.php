@@ -106,6 +106,10 @@
                                                                                     {
                                                                                         $startTime = \Carbon\Carbon::parse($shiftData->StartTime);
                                                                                         $endTime = \Carbon\Carbon::parse($shiftData->EndTime);
+                                                                                        // Overnight shift — see the identical fix in ViewDutyRoster.blade.php.
+                                                                                        if ($endTime->lte($startTime)) {
+                                                                                            $endTime->addDay();
+                                                                                        }
                                                                                         $hours_abc = $startTime->diffInHours($endTime);
                                                                                         $toatalHoursForDay = $hours_abc;
                                                                                         $totalHoursMonth += $toatalHoursForDay;
@@ -293,6 +297,10 @@
                                                             {
                                                                 $startTime = \Carbon\Carbon::parse($shiftData->StartTime);
                                                                 $endTime = \Carbon\Carbon::parse($shiftData->EndTime);
+                                                                // Overnight shift — see the identical fix in ViewDutyRoster.blade.php.
+                                                                if ($endTime->lte($startTime)) {
+                                                                    $endTime->addDay();
+                                                                }
                                                                 $hours_abc = $startTime->diffInHours($endTime);
                                                                 $toatalHoursForDay = $hours_abc;
                                                                 $totalHoursMonth += $toatalHoursForDay;
