@@ -1352,8 +1352,18 @@ class DutyRosterController extends Controller
         foreach ($entries as $entry) {
             $startTime = $entry['start_time'] ?? null;
             $endTime = $entry['end_time'] ?? null;
-            $status = $entry['status'] ?? 'pending';
             $entryId = $entry['id'] ?? null;
+            $isExistingEntry = $entryId && $existingEntries->has($entryId);
+
+            // Pre-planned OT is defined ahead of the actual shift — real
+            // check-in/out later determines whether the employee genuinely
+            // worked it (see Common::calculateOvertimeEntries at checkout,
+            // which is the only other place OT entries get created, always
+            // as 'pending'). Letting the creator hand-pick "Approved" here
+            // approved hours before any work happened. New entries always
+            // start pending; only an existing entry being reviewed/edited
+            // can have its status changed.
+            $status = $isExistingEntry ? ($entry['status'] ?? 'pending') : 'pending';
 
             if (!$startTime || !$endTime) {
                 continue;
@@ -1385,7 +1395,7 @@ class DutyRosterController extends Controller
                 'status' => $status,
             ];
 
-            if ($entryId && $existingEntries->has($entryId)) {
+            if ($isExistingEntry) {
                 // Update existing entry
                 EmployeeOvertime::where('id', $entryId)->update($overtimeData);
                 $entryIds[] = $entryId;
