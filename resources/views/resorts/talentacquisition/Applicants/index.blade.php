@@ -42,12 +42,12 @@
                             </div>
                         </div>
                         <div class="col-auto ms-auto">
-                            <a href="#" class="btn btn-grid"><img src="{{URL::asset('resorts_assets/images/grid.svg')}}" alt="icon"></a>
-                            <a href="#" class="btn btn-list active"><img src="{{ URL::asset('resorts_assets/images/list.svg')}}" alt="icon"></a>
+                            <a href="#" class="btn btn-grid active"><img src="{{URL::asset('resorts_assets/images/grid.svg')}}" alt="icon"></a>
+                            <a href="#" class="btn btn-list"><img src="{{ URL::asset('resorts_assets/images/list.svg')}}" alt="icon"></a>
                         </div>
                     </div>
                 </div>
-                <div class="list-main ">
+                <div class="list-main d-none">
                     <div class="table-responsive">
                         <table class="table table-collapseNew table-applicants">
                             <thead>
@@ -73,7 +73,7 @@
                         </table>
                     </div>
                 </div>
-                <div class="grid-main d-none  ">
+                <div class="grid-main">
                     <div class="row g-md-4 g-3 mb-4" id="grid_main_view">
 
                     </div>
@@ -614,6 +614,11 @@
         var isHrDepartment = @json($isHrDepartment);
         $(document).ready(function() {
             datatablelist();
+            // Grid is the default visible view now — #grid_main_view is
+            // server-rendered empty and only ever populated by DatatableGrid(),
+            // previously fired only on a manual .btn-grid click, so the grid
+            // showed blank on load until the user toggled away and back.
+            DatatableGrid();
             $('.table-applicants tbody').empty();
 
             // WAI Insights — score this applicant's CV against the position's Job Description.
