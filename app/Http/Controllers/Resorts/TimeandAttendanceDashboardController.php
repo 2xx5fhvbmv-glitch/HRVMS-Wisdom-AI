@@ -111,12 +111,17 @@ class TimeandAttendanceDashboardController extends Controller
         $rank = $employee->rank ?? null;
         $dept_id = $employee->Dept_id ?? null;
 
-        // Check if user is rank 2 (HOD) but not in HR department
-        if ($rank == 2 && $dept_id) {
+        // Rank 2 (HOD) or rank 1 (EXCOM) heading a non-HR department both
+        // own their whole department, not just their direct-report chain.
+        // This only checked rank 2, so a non-HR-department EXCOM (e.g.
+        // Engineering, F&B) still fell through to every underEmp_id-scoped
+        // callsite below and undercounted their own department by exactly
+        // the same pattern already fixed for HOD.
+        if (($rank == 1 || $rank == 2) && $dept_id) {
             $department = ResortDepartment::find($dept_id);
             if ($department) {
                 $deptName = strtolower(trim($department->name));
-                // If not HR department, then it's a department HOD
+                // If not HR department, then it's a department head (HOD/EXCOM)
                 if (!in_array($deptName, ['human resources', 'hr'])) {
                     return true;
                 }
