@@ -90,24 +90,26 @@ class DutyRosterController extends Controller
             if($employeeRank['isHR'] != true)
             {
                 $employees = Employee::join('resort_admins as t1',"t1.id","=","employees.Admin_Parent_id")
-
+                                ->leftJoin('resort_positions as t2',"t2.id","=","employees.Position_id")
                                 ->where("t1.resort_id",$this->resort->resort_id)
                                 // ->whereIn('employees.id', $this->underEmp_id)
                                  ->where("employees.Dept_id",$Dept_id)
                                 ->where("employees.status","Active")
-                                ->get(['t1.first_name','t1.last_name','t1.profile_picture','employees.*']);
+                                ->get(['t1.first_name','t1.last_name','t1.profile_picture','t2.position_title','employees.*']);
             }else{
                 $employees = Employee::join('resort_admins as t1',"t1.id","=","employees.Admin_Parent_id")
+                                ->leftJoin('resort_positions as t2',"t2.id","=","employees.Position_id")
                                 ->where("t1.resort_id",$this->resort->resort_id)
                                 // ->where("employees.Dept_id",$Dept_id)
                                 ->where("employees.status","Active")
-                                ->get(['t1.first_name','t1.last_name','t1.profile_picture','employees.*']);
+                                ->get(['t1.first_name','t1.last_name','t1.profile_picture','t2.position_title','employees.*']);
             }
         }else{
             $employees = Employee::join('resort_admins as t1',"t1.id","=","employees.Admin_Parent_id")
+                                ->leftJoin('resort_positions as t2',"t2.id","=","employees.Position_id")
                                 ->where("t1.resort_id",$this->resort->resort_id)
                                 ->where("employees.status","Active")
-                                ->get(['t1.first_name','t1.last_name','t1.profile_picture','employees.*']);
+                                ->get(['t1.first_name','t1.last_name','t1.profile_picture','t2.position_title','employees.*']);
         }
         $ResortPosition = ResortPosition::where("dept_id", $Dept_id)
                                         ->where("resort_id",$this->resort->resort_id)->get();
@@ -177,7 +179,7 @@ class DutyRosterController extends Controller
             "FullDayLeave"=>0,
 
         ];
-        $ShiftSettings = ShiftSettings::where("resort_id", $this->resort->resort_id)->get(['id','ShiftName','TotalHours']);
+        $ShiftSettings = ShiftSettings::where("resort_id", $this->resort->resort_id)->get(['id','ShiftName','TotalHours','StartTime','EndTime']);
 
         // Get public holidays (including Fridays) - use month range to include all Fridays in the month
         $publicHolidays = $this->getPublicHolidays($resort_id, $startOfMonth->format('Y-m-d'), $endOfMonth->format('Y-m-d'));
@@ -228,7 +230,11 @@ class DutyRosterController extends Controller
                         ->get();
             $view =  view('resorts.renderfiles.dutyrosterandLeave',compact('employees','EmployeeLeave'))->render();
 
-            return response()->json(['success' => true, 'view' => $view,"BenfitGirdOvertime"=>$employees ? $employees->overtime : null], 200);
+            $leaveDates = $EmployeeLeave->map(function ($l) {
+                return ['from' => $l->from_date, 'to' => $l->to_date, 'status' => $l->leave_status];
+            })->values();
+
+            return response()->json(['success' => true, 'view' => $view,"BenfitGirdOvertime"=>$employees ? $employees->overtime : null, 'leaveDates' => $leaveDates], 200);
         // } catch (\Exception $e) {
         //     return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         // }
