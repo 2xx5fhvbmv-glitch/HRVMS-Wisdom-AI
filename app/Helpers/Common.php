@@ -4215,8 +4215,15 @@ class Common
         if (!is_array($coordinates)) return null;
 
         if (($geofence->shape_type ?? 'polygon') === 'circle') {
-            $centerLat = (float) ($coordinates['lat'] ?? 0);
-            $centerLng = (float) ($coordinates['lng'] ?? 0);
+            // The stored shape is {"center":{"lat":...,"lng":...},"radius":...}
+            // (see Geofence Zone Manager's save payload) — reading 'lat'/'lng'
+            // at the top level always missed, so centerLat/centerLng were
+            // always 0 and this returned null for every circle zone,
+            // regardless of the actual point. Every circle geofence — the
+            // only shape type in real use — was effectively unusable.
+            $center = $coordinates['center'] ?? $coordinates;
+            $centerLat = (float) ($center['lat'] ?? 0);
+            $centerLng = (float) ($center['lng'] ?? 0);
             $radiusMeters = (float) ($coordinates['radius'] ?? 0);
             if (!$centerLat || !$centerLng || !$radiusMeters) return null;
             return self::haversineDistanceMeters($lat, $lng, $centerLat, $centerLng) <= $radiusMeters;
@@ -8542,6 +8549,17 @@ class Common
 
         $overtimeEntries = [];
 
+        // CheckingTime/checkout/shift values are sometimes 'H:i:s' (with
+        // seconds) and sometimes 'H:i' depending on caller — every
+        // createFromFormat below hardcodes 'H:i', so an 'H:i:s' value
+        // (e.g. "14:23:05") throws Carbon's "Trailing data" error. Strip
+        // to HH:MM up front so the rest of this function can rely on a
+        // single consistent format.
+        $checkInTime = substr($checkInTime, 0, 5);
+        $checkOutTime = substr($checkOutTime, 0, 5);
+        $shiftStartTime = substr($shiftStartTime, 0, 5);
+        $shiftEndTime = substr($shiftEndTime, 0, 5);
+
         // Parse times to Carbon instances
         $checkInCarbon = Carbon::createFromFormat('H:i', $checkInTime);
         $checkOutCarbon = Carbon::createFromFormat('H:i', $checkOutTime);
@@ -8580,8 +8598,10 @@ class Common
         if (!empty($breakData)) {
             foreach ($breakData as $break) {
                 if (!empty($break->Break_OutTime) && !empty($break->Break_InTime)) {
-                    $breakOut = Carbon::createFromFormat('Y-m-d H:i', $date . ' ' . $break->Break_OutTime);
-                    $breakIn = Carbon::createFromFormat('Y-m-d H:i', $date . ' ' . $break->Break_InTime);
+                    $breakOutTime = substr($break->Break_OutTime, 0, 5);
+                    $breakInTime = substr($break->Break_InTime, 0, 5);
+                    $breakOut = Carbon::createFromFormat('Y-m-d H:i', $date . ' ' . $breakOutTime);
+                    $breakIn = Carbon::createFromFormat('Y-m-d H:i', $date . ' ' . $breakInTime);
 
                     // Handle break spanning to next day
                     if ($breakIn->lt($breakOut)) {

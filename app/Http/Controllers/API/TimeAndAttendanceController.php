@@ -1947,6 +1947,102 @@ class TimeAndAttendanceController extends Controller
         }
     }
 
+    /**
+     * Fully-automatic punch in/out, driven by the app's own background
+     * geofence monitoring (native OS geofencing — CLLocationManager /
+     * Android Geofencing API) firing an enter/exit event, not a manual
+     * button tap. Deliberately reuses manualCheckIn()/manualCheckOut() by
+     * constructing a compatible synthetic Request and calling them
+     * directly, rather than duplicating their duty-roster resolution,
+     * shift lookup, and overtime logic — "automatic" and "manual" punches
+     * go through the exact same validated path, they just differ in what
+     * triggered them (flag = 'Geofence-Auto' marks that on check-in).
+     * Auth::guard('api')->user() inside those methods resolves from the
+     * real authenticated request (auth:api middleware already ran for
+     * *this* request) — it doesn't depend on which Request object gets
+     * passed as a plain method argument, so this is safe.
+     */
+    public function geofenceEvent(Request $request)
+    {
+        if (!Auth::guard('api')->check()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'event'     => 'required|in:enter,exit',
+            'latitude'  => 'required|numeric',
+            'longitude' => 'required|numeric',
+            'accuracy'  => 'nullable|numeric',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
+        }
+
+        $user = Auth::guard('api')->user();
+        $employee = $user->GetEmployee;
+        if (!$employee) {
+            return response()->json(['success' => false, 'message' => 'Employee record not found.'], 404);
+        }
+
+        $now = Carbon::now();
+        $locationPayload = [
+            'latitude'  => (float) $request->latitude,
+            'longitude' => (float) $request->longitude,
+            'accuracy'  => $request->filled('accuracy') ? (float) $request->accuracy : null,
+        ];
+
+        if ($request->event === 'enter') {
+            // Confirm the reported point is genuinely inside the zone
+            // assigned to today's roster before triggering a punch —
+            // the app's own geofence trigger should already guarantee
+            // this, but GPS drift near a zone boundary can fire a false
+            // "enter" just outside it, and the server is the one source
+            // of truth manual check-in also relies on (resolveGeofenceCheck).
+            $rosterData = DutyRoster::where('resort_id', $user->resort_id)
+                ->where('Emp_id', $employee->id)
+                ->first();
+            $geofenceCheck = $this->resolveGeofenceCheck($locationPayload, $rosterData);
+            if ($geofenceCheck['within'] !== true) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Reported location is not within the assigned geofence zone; no auto check-in.',
+                ], 422);
+            }
+
+            $syntheticRequest = Request::create('', 'POST', [
+                'current_time'     => $now->format('H:i:s'),
+                'current_date'     => $now->format('Y-m-d'),
+                'in_time_location' => $locationPayload,
+                'flag'             => 'Geofence-Auto',
+            ]);
+            return $this->manualCheckIn($syntheticRequest);
+        }
+
+        // event === 'exit'
+        $parentAttendance = ParentAttendace::where('resort_id', $user->resort_id)
+            ->where('Emp_id', $employee->id)
+            ->where('date', $now->format('Y-m-d'))
+            ->first();
+        $hasCheckedOut = $parentAttendance
+            && !empty($parentAttendance->CheckingOutTime)
+            && $parentAttendance->CheckingOutTime != '00:00';
+
+        if (!$parentAttendance || $hasCheckedOut) {
+            // No open check-in to close — an exit fired with nothing
+            // punched in yet (or already punched out) isn't an error,
+            // just nothing for this event to do.
+            return response()->json(['success' => true, 'message' => 'No active check-in to close out.']);
+        }
+
+        $syntheticRequest = Request::create('', 'POST', [
+            'attendace_id'      => $parentAttendance->id,
+            'current_time'      => $now->format('H:i:s'),
+            'current_date'      => $now->format('Y-m-d'),
+            'out_time_location' => $locationPayload,
+        ]);
+        return $this->manualCheckOut($syntheticRequest);
+    }
+
     public function hrTimeAttendance(Request $request)
     {
         if (!Auth::guard('api')->check()) {

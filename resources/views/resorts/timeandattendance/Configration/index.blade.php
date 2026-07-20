@@ -1398,7 +1398,10 @@
 
             function getcheckit() {
                 if ($('.flexSwitchCheckDefaultCheck').is(':checked')) {
-                    $(".AddGeoFancing").show();
+                    // Add Geo-Fencing (the single-marker/polygon modal) kept
+                    // confusing users alongside Manage Zones (which covers
+                    // the same job — multiple named zones) — hidden per
+                    // request, Manage Zones is now the only entry point.
                     $("#openGeofenceManager").show();
                     $("#geofence-zones-preview").show();
                 } else {

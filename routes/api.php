@@ -241,6 +241,9 @@ use Illuminate\Support\Facades\Route;
 		Route::post('timeandattendance/manual-check-in', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'manualCheckIn']);
 		Route::post('timeandattendance/break-check-in-out', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'breakCheckInCheckOut']);
 		Route::post('timeandattendance/manual-check-out', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'manualCheckOut']);
+		// Called by the app's background geofence monitoring on zone
+		// enter/exit (native OS geofencing, not a manual button tap).
+		Route::post('timeandattendance/geofence-event', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'geofenceEvent']);
 		Route::get('timeandattendance/emp-checkinout-time/{date}', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'employeeCheckinCheckoutTime']);
 		Route::get('timeandattendance/time-attendance-employee-leave', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'timeAttendanceEmployeeLeave']);
 		Route::post('timeandattendance/approve-reject-ot', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'approveRejectOT']);
