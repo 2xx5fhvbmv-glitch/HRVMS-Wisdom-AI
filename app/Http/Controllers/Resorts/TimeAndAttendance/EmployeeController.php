@@ -321,12 +321,22 @@ class EmployeeController extends Controller
             // an employee who transferred department but still formally
             // reports to their old HOD (reporting_to unchanged) kept
             // showing up in the old department's attendance list.
-            $canViewAll = in_array($employeeRankPosition['position'], ['HR', 'EXCOM', 'GM'])
-                || in_array($employeeRankPosition['rank'], ['HR', 'EXCOM', 'GM']);
+            //
+            // 'EXCOM'/'HOD' out of getEmployeeRankPosition()'s 'rank' key is
+            // a department-agnostic seniority label (rank 1/2 regardless of
+            // WHICH department) — treating it as automatic full access let
+            // ANY department's EXCOM/HOD (Engineering, F&B, ...) see every
+            // other department's employees too. Only HR/GM get full access
+            // unconditionally; EXCOM/HOD only do when they actually head
+            // the HR department.
+            $isHRDeptForAccess = Common::isHRDepartment($this->resort->GetEmployee->Dept_id ?? null);
+            $canViewAll = in_array($employeeRankPosition['position'], ['HR', 'GM'])
+                || in_array($employeeRankPosition['rank'], ['HR', 'GM'])
+                || ($isHRDeptForAccess && (in_array($employeeRankPosition['rank'], ['EXCOM', 'HOD']) || in_array($employeeRankPosition['position'], ['EXCOM', 'HOD'])));
 
             if (!$canViewAll) {
                 $Dept_id = $this->resort->GetEmployee->Dept_id ?? '';
-                if (in_array($employeeRankPosition['rank'], ['HOD', 'MGR']) || in_array($employeeRankPosition['position'], ['HOD', 'MGR'])) {
+                if (in_array($employeeRankPosition['rank'], ['HOD', 'MGR', 'EXCOM']) || in_array($employeeRankPosition['position'], ['HOD', 'MGR', 'EXCOM'])) {
                     // HOD/MGR see their own department
                     $employeesQuery->where('employees.Dept_id', $Dept_id);
                 } else {
@@ -408,7 +418,13 @@ class EmployeeController extends Controller
         ->where('t1.resort_id', $this->resort->resort_id);
 
         $employeeRankPosition = Common::getEmployeeRankPosition($this->resort->getEmployee);
-        $canViewAll = in_array($employeeRankPosition['position'], ['HR', 'EXCOM', 'GM']);
+        // See the identical fix/comment in index() above — bare
+        // EXCOM/HOD rank labels are department-agnostic, so only HR/GM get
+        // unconditional full access; EXCOM/HOD only when they head HR.
+        $isHRDeptForAccess = Common::isHRDepartment($this->resort->GetEmployee->Dept_id ?? null);
+        $canViewAll = in_array($employeeRankPosition['position'], ['HR', 'GM'])
+            || in_array($employeeRankPosition['rank'], ['HR', 'GM'])
+            || ($isHRDeptForAccess && (in_array($employeeRankPosition['rank'], ['EXCOM', 'HOD']) || in_array($employeeRankPosition['position'], ['EXCOM', 'HOD'])));
 
         if (!$canViewAll) {
             if (in_array($employeeRankPosition['rank'], ['HOD', 'MGR']) || in_array($employeeRankPosition['position'], ['HOD', 'MGR'])) {
@@ -527,11 +543,16 @@ class EmployeeController extends Controller
             // (reporting_to unchanged) — the underEmp_id chain doesn't
             // track current department, only who reports to whom.
             $employeeRankPosition = Common::getEmployeeRankPosition($this->resort->getEmployee);
-            $canViewAllList = in_array($employeeRankPosition['position'], ['HR', 'EXCOM', 'GM'])
-                || in_array($employeeRankPosition['rank'], ['HR', 'EXCOM', 'GM']);
+            // See the identical fix/comment in index() above — bare
+            // EXCOM/HOD rank labels are department-agnostic, so only HR/GM
+            // get unconditional full access; EXCOM/HOD only when they head HR.
+            $isHRDeptForAccess = Common::isHRDepartment($this->resort->GetEmployee->Dept_id ?? null);
+            $canViewAllList = in_array($employeeRankPosition['position'], ['HR', 'GM'])
+                || in_array($employeeRankPosition['rank'], ['HR', 'GM'])
+                || ($isHRDeptForAccess && (in_array($employeeRankPosition['rank'], ['EXCOM', 'HOD']) || in_array($employeeRankPosition['position'], ['EXCOM', 'HOD'])));
 
             if (!$canViewAllList) {
-                if (in_array($employeeRankPosition['rank'], ['HOD', 'MGR']) || in_array($employeeRankPosition['position'], ['HOD', 'MGR'])) {
+                if (in_array($employeeRankPosition['rank'], ['HOD', 'MGR', 'EXCOM']) || in_array($employeeRankPosition['position'], ['HOD', 'MGR', 'EXCOM'])) {
                     $employees->where('employees.Dept_id', $Dept_id);
                 } else {
                     $employees->whereIn('employees.id', $this->underEmp_id);
