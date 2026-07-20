@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Validator;
 use App\Helpers\Common;
 use App\Exports\ResortShopkeeperPaymentsExport;
 use Maatwebsite\Excel\Facades\Excel;
+use Carbon\Carbon;
 use Auth;
 use Config;
 use DB;
@@ -237,8 +238,18 @@ class ShopkeeperController extends Controller
         $shopkeeper = Shopkeeper::where('id', $id)->where('resort_id', $resort_id)->firstOrFail();
 
         $searchTerm = $request->searchTerm;
-        $startDate = $request->start_date;
-        $endDate = $request->end_date;
+        // Month filter (current year only, per the dropdown) replaces the old
+        // date-range picker, which defaulted to the current month and
+        // silently hid every payment outside it — e.g. a shopkeeper with
+        // 14 real Consented/Paid payments across the last several months
+        // only ever saw the 1 that happened to land in the current month.
+        $startDate = null;
+        $endDate = null;
+        if ($request->filled('month')) {
+            $monthDate = Carbon::createFromDate(now()->year, (int) $request->month, 1);
+            $startDate = $monthDate->copy()->startOfMonth()->format('Y-m-d');
+            $endDate = $monthDate->copy()->endOfMonth()->format('Y-m-d');
+        }
 
         // Only approved consent: Consented, Paid, Partial Paid (exclude Pending Consent, Rejected, Pending)
         $tableData = Payment::join('employees as e', 'e.id', '=', 'payments.emp_id')
@@ -327,8 +338,13 @@ class ShopkeeperController extends Controller
         $resort_id = $this->resort->resort_id;
         $shopkeeper = Shopkeeper::where('id', $id)->where('resort_id', $resort_id)->firstOrFail();
 
-        $startDate = $request->query('start_date');
-        $endDate = $request->query('end_date');
+        $startDate = null;
+        $endDate = null;
+        if ($request->filled('month')) {
+            $monthDate = Carbon::createFromDate(now()->year, (int) $request->query('month'), 1);
+            $startDate = $monthDate->copy()->startOfMonth()->format('Y-m-d');
+            $endDate = $monthDate->copy()->endOfMonth()->format('Y-m-d');
+        }
         $searchTerm = $request->query('search_term');
 
         $export = new ResortShopkeeperPaymentsExport($shopkeeper->id, $startDate, $endDate, $searchTerm);
