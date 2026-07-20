@@ -21,8 +21,47 @@
                 </div>
             </div>
 
+            <div class="row g-3 g-xxl-4 mb-3 mb-xxl-4">
+                <div class="col-md-3 col-6">
+                    <div class="card dashboard-boxcard timeAttend-boxcard mb-0 h-100">
+                        <p class="fw-600 mb-0">Total Receivable Amount</p>
+                        <strong id="total-receivable-amount">{{ Common::GetResortCurrencySymbol() }} 0.00</strong>
+                    </div>
+                </div>
+                <div class="col-md-3 col-6">
+                    <div class="card dashboard-boxcard timeAttend-boxcard mb-0 h-100">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <p class="fw-600 mb-0">Configuration</P>
+                            <a href="{{route('shopkeeper.configuration')}}">
+                                <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg')}}" alt="" class="img-fluid">
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-6">
+                    <div class="card dashboard-boxcard timeAttend-boxcard mb-0 h-100">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <p class="fw-600 mb-0">Payment History</P>
+                            <a href="{{route('shopkeeper.payment.history')}}">
+                                <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg')}}" alt="" class="img-fluid">
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-6">
+                    <div class="card dashboard-boxcard timeAttend-boxcard mb-0 h-100">
+                        <div class="d-flex align-items-center justify-content-between">
+                            <p class="fw-600 mb-0">Products</P>
+                            <a href="{{route('shopkeeper.products')}}">
+                                <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg')}}" alt="" class="img-fluid">
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <div class="row g-3 g-xxl-4">
-                <div class="col-xl-9 col-lg-8">
+                <div class="col-12">
                     <div class="card card-serviceCharges">
                         <div class=" card-title">
                             <div class="row justify-content-between align-items-center g-md-3 g-1">
@@ -32,28 +71,20 @@
                                 <div class="col-auto">
                                     <div class="form-group">
                                         <select class="form-select" id="month-filter">
-                                            <option value="" selected>Select Month</option>
-                                            <option value="01">January</option>
-                                            <option value="02">February</option>
-                                            <option value="03">March</option>
-                                            <option value="04">April</option>
-                                            <option value="05">May</option>
-                                            <option value="06">June</option>
-                                            <option value="07">July</option>
-                                            <option value="08">August</option>
-                                            <option value="09">September</option>
-                                            <option value="10">October</option>
-                                            <option value="11">November</option>
-                                            <option value="12">December</option>
+                                            <option value="">Select Month</option>
+                                            @php $months = ['01'=>'January','02'=>'February','03'=>'March','04'=>'April','05'=>'May','06'=>'June','07'=>'July','08'=>'August','09'=>'September','10'=>'October','11'=>'November','12'=>'December']; @endphp
+                                            @foreach ($months as $value => $label)
+                                                <option value="{{ $value }}" @selected($value === date('m'))>{{ $label }}</option>
+                                            @endforeach
                                         </select>
                                     </div>
                                 </div>
                                 <div class="col-auto">
                                     <div class="form-group">
                                         <select class="form-select" id="year-filter">
-                                            <option value="" selected>Select Year</option>
+                                            <option value="">Select Year</option>
                                             @for ($i = date('Y'); $i >= date('Y') - 5; $i--)
-                                                <option value="{{ $i }}">{{ $i }}</option>
+                                                <option value="{{ $i }}" @selected($i == date('Y'))>{{ $i }}</option>
                                             @endfor
                                         </select>
                                     </div>
@@ -80,36 +111,6 @@
                                 </tr>
                             </thead>
                         </table>
-                    </div>
-                </div>
-                <div class="col-xl-3 col-lg-4 col-md-6">
-                    <div class="card dashboard-boxcard timeAttend-boxcard mb-30">
-                        <p class="fw-600 mb-0">Total Receivable Amount</p>
-                        <strong id="total-receivable-amount">{{ Common::GetResortCurrencySymbol() }} 0.00</strong>
-                    </div>
-                    <div class="card dashboard-boxcard timeAttend-boxcard  mb-30">
-                        <div class="d-flex align-items-center justify-content-between">
-                            <p class="fw-600 mb-0">Configuration</P>
-                            <a href="{{route('shopkeeper.configuration')}}">
-                                <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg')}}" alt="" class="img-fluid">
-                            </a>
-                        </div>
-                    </div>
-                    <div class="card dashboard-boxcard timeAttend-boxcard  mb-30">
-                        <div class="d-flex align-items-center justify-content-between">
-                            <p class="fw-600 mb-0">Payment History</P>
-                            <a href="{{route('shopkeeper.payment.history')}}">
-                                <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg')}}" alt="" class="img-fluid">
-                            </a>
-                        </div>
-                    </div>
-                    <div class="card dashboard-boxcard timeAttend-boxcard  mb-30">
-                        <div class="d-flex align-items-center justify-content-between">
-                            <p class="fw-600 mb-0">Products</P>
-                            <a href="{{route('shopkeeper.products')}}">
-                                <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg')}}" alt="" class="img-fluid">
-                            </a>
-                        </div>
                     </div>
                 </div>
             </div>

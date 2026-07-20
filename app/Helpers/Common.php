@@ -1555,7 +1555,11 @@ class Common
             // Ignore when route is not available
         }
         $prefixMatch = $routePrefix === 'resort' || $routePrefix === '/resort';
-        $isResortContext = (Auth::guard('resort-admin')->check() && $prefixMatch) || Auth::guard('api')->check();
+        // Shopkeeper-guard pages (e.g. the payments dashboard) render
+        // employee photos via this same helper — neither resort-admin nor
+        // api guard is ever authenticated there, so it always fell through
+        // to the default picture regardless of which id was passed.
+        $isResortContext = (Auth::guard('resort-admin')->check() && $prefixMatch) || Auth::guard('api')->check() || Auth::guard('shopkeeper')->check();
 
         if (!$isResortContext) {
             return $defaultPicture;
