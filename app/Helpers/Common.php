@@ -4460,6 +4460,12 @@ class Common
             $existingDates = $DutyRoster->pluck('date')->toArray();
             foreach ($datesInWeek as $date) {
                 if (!in_array($date, $existingDates)) {
+                    // Days with no duty_roster_entries row (e.g. an employee
+                    // on long leave who was never given a shift for that
+                    // day) used to hardcode LeaveType/LeaveFirstName to
+                    // null/"-" here, so an approved Maternity/Annual leave
+                    // never showed on exactly the days it was needed most.
+                    $placeholderLeave              = static::lookupApprovedLeaveForDate($resort_id, $Employee, $date);
                     $DutyRoster->push((object)[
                         'Status'            => null,
                         'Attd_id'           => null,
@@ -4472,12 +4478,12 @@ class Common
                         'StartTime'         => null,
                         'EndTime'           => null,
                         'DayWiseTotalHours' => null,
-                        'LeaveType'         => null,
-                        'LeaveDays'         => null,
-                        'LeaveFromDate'     => null,
-                        'LeaveToDate'       => null,
-                        'LeaveColor'        => "",
-                        'LeaveFirstName'    => "-",
+                        'LeaveType'         => $placeholderLeave->leave_type ?? null,
+                        'LeaveDays'         => $placeholderLeave->total_days ?? null,
+                        'LeaveFromDate'     => $placeholderLeave->from_date ?? null,
+                        'LeaveToDate'       => $placeholderLeave->to_date ?? null,
+                        'LeaveColor'        => $placeholderLeave->color ?? "",
+                        'LeaveFirstName'    => isset($placeholderLeave->leave_type) ? substr($placeholderLeave->leave_type, 0, 1) : "-",
                     ]);
                 }
             }
@@ -4613,6 +4619,10 @@ class Common
             $existingDates = $DutyRoster->pluck('date')->toArray();
             foreach ($datesInMonth as $date) {
                 if (!in_array($date, $existingDates)) {
+                    // Same gap as the weekly branch above — a day with no
+                    // duty_roster_entries row (mid-Maternity-Leave, no shift
+                    // ever assigned) must still report the approved leave.
+                    $placeholderLeave              = static::lookupApprovedLeaveForDate($resort_id, $Employee, $date);
                     $DutyRoster->push((object)[
                         'Status'            => null,
                         'Attd_id'           => null,
@@ -4625,18 +4635,35 @@ class Common
                         'StartTime'         => null,
                         'EndTime'           => null,
                         'DayWiseTotalHours' => null,
-                        'LeaveType'         => null,
-                        'LeaveDays'         => null,
-                        'LeaveFromDate'     => null,
-                        'LeaveToDate'       => null,
-                        'LeaveColor'        => "",
-                        'LeaveFirstName'    => "-",
+                        'LeaveType'         => $placeholderLeave->leave_type ?? null,
+                        'LeaveDays'         => $placeholderLeave->total_days ?? null,
+                        'LeaveFromDate'     => $placeholderLeave->from_date ?? null,
+                        'LeaveToDate'       => $placeholderLeave->to_date ?? null,
+                        'LeaveColor'        => $placeholderLeave->color ?? "",
+                        'LeaveFirstName'    => isset($placeholderLeave->leave_type) ? substr($placeholderLeave->leave_type, 0, 1) : "-",
                     ]);
                 }
             }
             $DutyRoster = $DutyRoster->sortBy('date')->values();
         }
         return $DutyRoster;
+    }
+
+    /**
+     * Approved leave (if any) covering $date for $empId — used to fill in
+     * LeaveType/LeaveColor on duty-roster/register days that have no
+     * duty_roster_entries row at all (the common case for multi-day leave
+     * such as Maternity Leave, where no shift is ever assigned).
+     */
+    private static function lookupApprovedLeaveForDate($resort_id, $empId, $date)
+    {
+        return EmployeeLeave::join('leave_categories as t4', 't4.id', '=', 'employees_leaves.leave_category_id')
+            ->where('employees_leaves.Emp_id', $empId)
+            ->where('employees_leaves.status', 'Approved')
+            ->where('t4.resort_id', $resort_id)
+            ->whereDate('employees_leaves.from_date', '<=', $date)
+            ->whereDate('employees_leaves.to_date', '>=', $date)
+            ->first(['t4.color', 't4.leave_type', 'employees_leaves.total_days', 'employees_leaves.from_date', 'employees_leaves.to_date']);
     }
 
     private static function calculateTotalTime($overTime, $checkingTime, $checkingOutTime)

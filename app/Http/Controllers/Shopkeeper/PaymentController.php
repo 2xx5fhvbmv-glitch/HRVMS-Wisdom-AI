@@ -23,6 +23,7 @@ use App\Models\Product;
 use App\Models\ResortNotification;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\PaymentsExport;
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
 class PaymentController extends Controller
 {
     public $shopkeeper;
@@ -185,7 +186,13 @@ class PaymentController extends Controller
         $order_id = 'ORD-' . strtoupper(Str::random(8));
 
         try {
-            // Create payment record with the base64 QR code
+            // Create payment record. The client-submitted qr_code is only a
+            // live preview generated before the row (and its id) existed —
+            // it encodes the raw form fields as JSON, not a lookup key. The
+            // mobile scan flow (consent-request-view/{id}) expects the QR
+            // to decode to this row's own numeric id, so it's regenerated
+            // server-side right after the id is known and overwrites the
+            // preview value below.
             $payment = Payment::create([
                 'shopkeeper_id' => $shopkeeper->id,
                 'order_id' => $order_id,
@@ -198,6 +205,16 @@ class PaymentController extends Controller
                 'qr_code' => $request->qr_code,  // Store QR code base64 string
             ]);
 
+            // 'png' needs the imagick extension, which isn't installed on
+            // this server (only GD is) — 'svg' renders identically as a
+            // scannable QR once displayed in an <img> tag or printed, with
+            // no extra extension dependency.
+            $qrCodeBase64 = 'data:image/svg+xml;base64,' . base64_encode(
+                QrCode::format('svg')->size(256)->generate(base64_encode((string) $payment->id))
+            );
+            $payment->qr_code = $qrCodeBase64;
+            $payment->save();
+
             // Send consent notification (optional)
             if($payment) {
                 // $payment->sendConsentProductPurchaseNotification($payment, $shopkeeper);
@@ -208,7 +225,7 @@ class PaymentController extends Controller
                 'message' => 'Payment added successfully',
                 'redirect_url' => route('shopkeeper.dashboard'),
                 'order_id' => $payment->order_id,
-                'qr_code_base64' => $request->qr_code,  // Optionally return the base64 QR code to frontend
+                'qr_code_base64' => $qrCodeBase64,  // Optionally return the base64 QR code to frontend
             ]);
         } catch (\Exception $e) {
             // Handle error gracefully
@@ -229,16 +246,17 @@ class PaymentController extends Controller
             abort(404);
         }
 
-        $qr = $payment->qr_code;
-        if (is_string($qr) && strpos($qr, 'data:') === 0) {
-            $qr = preg_replace('#^data:image/\w+;base64,#i', '', $qr);
-            $qr = base64_decode($qr);
+        $qr          = $payment->qr_code;
+        $contentType = 'image/png';
+        if (is_string($qr) && preg_match('#^data:(image/[\w.+-]+);base64,#i', $qr, $m)) {
+            $contentType = $m[1];
+            $qr          = base64_decode(substr($qr, strlen($m[0])));
         }
         if (empty($qr)) {
             abort(404);
         }
 
-        return response($qr, 200, ['Content-Type' => 'image/png']);
+        return response($qr, 200, ['Content-Type' => $contentType]);
     }
 
     public function getProductPrice(Request $request)
