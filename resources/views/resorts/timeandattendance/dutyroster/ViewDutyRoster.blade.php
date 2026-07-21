@@ -28,12 +28,81 @@
                                     // toolbar was removed in favour of a
                                     // single full-month calendar layout.
                                     $monthLabel = !empty($startOfMonth) ? \Carbon\Carbon::parse($startOfMonth)->format('F Y') : '';
+                                    // Grid column (1 = Sun ... 7 = Sat) that day 1 of the
+                                    // month falls on, so the CSS grid can offset the first
+                                    // day-cell and every date lines up under its real
+                                    // weekday instead of always starting in column 1.
+                                    $firstDayOfMonthColumn = !empty($monthwiseheaders) ? (\Carbon\Carbon::parse($monthwiseheaders[0]['date'])->dayOfWeek + 1) : 1;
+
+                                    // Sun–Sat calendar grid for Department View: groups every
+                                    // date of the month into [week index => [0=>Sun date, ...,
+                                    // 6=>Sat date]] so a single week's columns can be paged
+                                    // through client-side (prev/next) without another server
+                                    // round-trip — the controller already fetches the whole
+                                    // month, this just re-groups it by real calendar week.
+                                    // Built once here, not per employee, since it's identical
+                                    // for everyone in the same month.
+                                    $calendarWeeks = [];
+                                    foreach ($monthwiseheaders as $h) {
+                                        $dow = \Carbon\Carbon::parse($h['date'])->dayOfWeek;
+                                        $dayNum = (int) date('j', strtotime($h['date']));
+                                        $weekIdx = (int) intdiv(($firstDayOfMonthColumn - 1) + ($dayNum - 1), 7);
+                                        $calendarWeeks[$weekIdx][$dow] = $h;
+                                    }
+                                    // One label per week (e.g. "Week 2 · 6 – 12 Jul"), built from
+                                    // whichever dates actually exist in that week for this month
+                                    // (a leading/trailing partial week shows its real short
+                                    // range, not a full Sun–Sat span) — read by JS on week
+                                    // change instead of recomputing date math client-side.
+                                    $weekLabels = [];
+                                    $initialWeek = 0;
+                                    $todayStr = now()->toDateString();
+                                    foreach ($calendarWeeks as $wIdx => $week) {
+                                        $validDates = array_filter($week, fn($d) => $d !== null);
+                                        if (empty($validDates)) {
+                                            continue;
+                                        }
+                                        $firstD = \Carbon\Carbon::parse(reset($validDates)['date']);
+                                        $lastD = \Carbon\Carbon::parse(end($validDates)['date']);
+                                        $weekLabels[$wIdx] = 'Week ' . ($wIdx + 1) . ' · ' . $firstD->format('j M') . ' – ' . $lastD->format('j M');
+                                        foreach ($validDates as $d) {
+                                            if ($d['date'] === $todayStr) {
+                                                $initialWeek = $wIdx;
+                                            }
+                                        }
+                                    }
                                 @endphp
                                 @if($monthLabel)
-                                    <div class="d-flex align-items-center gap-2 mb-3 px-2 pt-2">
+                                    <div class="d-flex align-items-center gap-2 mb-3 px-2 pt-2 flex-wrap">
                                         <strong class="me-2">{{ $monthLabel }}</strong>
+                                        <div class="duty-roster-view-toggle ms-auto" role="group" aria-label="Duty roster view">
+                                            <button type="button" class="duty-roster-view-btn active" data-duty-view="individual">Individual view</button>
+                                            <button type="button" class="duty-roster-view-btn" data-duty-view="department">Department view</button>
+                                        </div>
+                                    </div>
+                                    <div class="duty-roster-week-nav d-none"
+                                         id="dutyRosterWeekNav"
+                                         data-week-labels="{{ json_encode($weekLabels) }}"
+                                         data-week-count="{{ !empty($calendarWeeks) ? (max(array_keys($calendarWeeks)) + 1) : 1 }}"
+                                         data-initial-week="{{ $initialWeek }}">
+                                        <button type="button" class="duty-roster-week-arrow" id="dutyRosterWeekPrev" aria-label="Previous week">&#8249;</button>
+                                        <span class="duty-roster-week-label" id="dutyRosterWeekLabel"></span>
+                                        <button type="button" class="duty-roster-week-arrow" id="dutyRosterWeekNext" aria-label="Next week">&#8250;</button>
                                     </div>
                                 @endif
+                                {{-- Legend: same shift-color mapping as Common::shiftNameColor()
+                                     and the same cell states used below, so this key stays accurate
+                                     without needing to be kept in sync by hand elsewhere. --}}
+                                <div class="duty-roster-legend">
+                                    <span><span class="dot dot-blue"></span>Morning</span>
+                                    <span><span class="dot dot-yellow"></span>Afternoon</span>
+                                    <span><span class="dot dot-skyblue"></span>Evening</span>
+                                    <span><span class="dot dot-purple"></span>Night</span>
+                                    <span><span class="dot dot-off"></span>Day off</span>
+                                    <span><span class="dot dot-unassigned"></span>Unassigned</span>
+                                    <span><span class="dot dot-holiday"></span>Off-day / public holiday worked</span>
+                                    <span><span class="dot dot-today"></span>Today</span>
+                                </div>
                                 {{-- Accordion Structure for Department and Section --}}
                                 <div class="viewBudget-accordion" id="accordionDutyRoster">
                                     @if(!empty($groupedRosterData))
@@ -45,9 +114,9 @@
                                                     <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
                                                             data-bs-target="#collapseDept{{ $deptIteration }}" aria-expanded="false"
                                                             aria-controls="collapseDept{{ $deptIteration }}">
-                                                        <i class="fas fa-building me-2"></i>
+                                                        <span class="duty-roster-accordion-icon"><i class="fas fa-building"></i></span>
                                                         <h3>{{ $deptData['dept_name'] }}</h3>
-                                                        <span class="badge badge-dark ms-2 small">
+                                                        <span class="badge badge-themeBlue ms-2 small">
                                                             Employees: {{ count($deptData['employees']) + array_sum(array_map(function($section) { return count($section['employees']); }, $deptData['sections'])) }}
                                                         </span>
                                                     </button>
@@ -70,9 +139,9 @@
                                                                             <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
                                                                                     data-bs-target="#collapseSec{{ $deptIteration }}_{{ $sectionIteration }}"
                                                                                     aria-expanded="false" aria-controls="collapseSec{{ $deptIteration }}_{{ $sectionIteration }}">
-                                                                                <i class="fas fa-layer-group me-2"></i>
-                                                                                <span>{{ $sectionData['section_name'] }}</span>
-                                                                                <span class="badge badge-dark ms-2 small">Employees: {{ count($sectionData['employees']) }}</span>
+                                                                                <span class="duty-roster-accordion-icon duty-roster-accordion-icon-sky"><i class="fas fa-layer-group"></i></span>
+                                                                                <span class="duty-roster-section-name">{{ $sectionData['section_name'] }}</span>
+                                                                                <span class="badge badge-themeSkyblue ms-2 small">Employees: {{ count($sectionData['employees']) }}</span>
                                                                             </button>
                                                                         </h2>
                                                                         <div id="collapseSec{{ $deptIteration }}_{{ $sectionIteration }}"
@@ -81,7 +150,7 @@
                                                                              data-bs-parent="#accordionSec{{ $deptIteration }}_{{ $sectionIteration }}">
                                                                             <div class="accordion-body p-2">
                                                                                 {{-- Employee Roster Table for Section --}}
-                                                                                <div class="table-responsive mb-4">
+                                                                                <div class="table-responsive mb-4 duty-roster-individual-view">
                                                                                     <table class="table table-bordered table-createDutymonthly mb-1">
                                                                                         <thead>
                                                                                             <tr>
@@ -100,9 +169,15 @@
                                                                                             </tr>
                                                                                         </thead>
                                                                                         <tbody>
+                                                                                            @php
+                                                                                                // Collected alongside the existing per-day loop below (reusing
+                                                                                                // the same already-fetched $RosterInternalDataMonth per employee)
+                                                                                                // so Department View doesn't need its own GetRosterdata() call.
+                                                                                                $departmentViewEmployees = [];
+                                                                                            @endphp
                                                                                             @if(!empty($sectionData['employees']))
                                                                                                 @foreach ($sectionData['employees'] as $r)
-                                                                                                    <tr>
+                                                                                                    <tr id="duty-roster-emp-{{ $r->emp_id }}">
                                                                                                         <td>
                                                                                                             <div class="createDuty-user d-flex justify-content-between align-items-center">
                                                                                                                 <div class="d-flex align-items-center">
@@ -138,17 +213,26 @@
                                                                                                                     <i class="fa-solid fa-chevron-down"></i>
                                                                                                                 </button>
                                                                                                             </div>
+                                                                                                            {{-- Weekday key for the calendar grid below — dates align
+                                                                                                                 under these via $firstDayOfMonthColumn, so this needs
+                                                                                                                 to be shown once per employee, not per day-cell. --}}
+                                                                                                            <div class="duty-roster-dow-header">
+                                                                                                                <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+                                                                                                            </div>
                                                                                                         </td>
 
                                                                                                         @php
                                                                                                             $RosterInternalDataMonth = Common::GetRosterdata($resort_id, $r->duty_roster_id, $r->emp_id, $WeekstartDate, $WeekendDate, $startOfMonth, $endOfMonth, "Monthwise");
                                                                                                             $totalHoursMonth = 0;
+                                                                                                            $totalOTMinutesMonth = 0;
+                                                                                                            $deptViewDays = [];
                                                                                                         @endphp
 
                                                                                                         @foreach ($monthwiseheaders as $h)
                                                                                                         @php
                                                                                                             $formattedDate = \Carbon\Carbon::parse($h['date'])->format('Y-m-d');
                                                                                                             $isPublicHoliday = isset($publicHolidays) && in_array($formattedDate, $publicHolidays);
+                                                                                                            $isToday = $formattedDate === now()->toDateString();
                                                                                                             $entriesForDate = $RosterInternalDataMonth->where('date', $formattedDate);
                                                                                                             $shiftData = $entriesForDate->first(fn($e) => isset($e->roster_id) && (int)$e->roster_id === (int)$r->duty_roster_id)
                                                                                                                 ?? $entriesForDate->first(fn($e) => !empty(trim((string)($e->OverTime ?? ''))) && !in_array(trim($e->OverTime ?? ''), ['00:00', '0:00', '0'], true))
@@ -193,10 +277,11 @@
                                                                                                             }
                                                                                                         @endphp
 
-                                                                                                            <td data-week="{{ (int) ceil(((int) date('d', strtotime($formattedDate))) / 7) }}" class="day-cell {{ $isPublicHoliday ? 'public-holiday-cell' : '' }}">
+                                                                                                            <td data-week="{{ (int) ceil(((int) date('d', strtotime($formattedDate))) / 7) }}" class="day-cell {{ $isPublicHoliday ? 'public-holiday-cell' : '' }} {{ $isToday ? 'today-cell' : '' }}" @if($loop->first) style="grid-column-start: {{ $firstDayOfMonthColumn }};" @endif>
                                                                                                                 <div class="day-cell-date">
                                                                                                                     <span class="day-num">{{ (int) date('d', strtotime($formattedDate)) }}</span>
                                                                                                                     <span class="day-name">{{ date('D', strtotime($formattedDate)) }}</span>
+                                                                                                                    @if($isToday)<span class="today-tag">Today</span>@endif
                                                                                                                 </div>
                                                                                                                 @if($employeeLeave)
                                                                                                                     {{-- Display Leave --}}
@@ -231,7 +316,7 @@
                                                                                                                         </div>
                                                                                                                     @else
                                                                                                                     {{-- Display Roster Entry --}}
-                                                                                                                    <div class="createDuty-tableBlock {{ $shiftData->ShiftNameColor ?? '' }}">
+                                                                                                                    <div class="createDuty-tableBlock {{ $shiftData->ShiftNameColor ?? '' }} {{ $isPublicHoliday ? 'holiday-worked' : '' }}">
                                                                                                                         <div class="d-flex">
                                                                                                                             <div>
                                                                                                                                 @php
@@ -282,15 +367,16 @@
                                                                                                                                     $otParts = explode(':', $displayOverTime);
                                                                                                                                     $otHours = isset($otParts[0]) ? (int)$otParts[0] : 0;
                                                                                                                                     $otMinutes = isset($otParts[1]) ? (int)$otParts[1] : 0;
+                                                                                                                                    $totalOTMinutesMonth += ($otHours * 60) + $otMinutes;
                                                                                                                                     $otDisplay = $otHours > 0 ? $otHours . ' hr' : '';
                                                                                                                                     if ($otMinutes > 0) {
                                                                                                                                         $otDisplay .= ($otDisplay ? ' ' : '') . $otMinutes . ' min';
                                                                                                                                     }
                                                                                                                                     $otDisplay = $otDisplay ?: '0 hr';
                                                                                                                                 @endphp
-                                                                                                                                <p>OT: {{ $otDisplay }}</p>
+                                                                                                                                <p class="ot-chip">OT: {{ $otDisplay }}</p>
                                                                                                                             @else
-                                                                                                                                <p>OT: 0 hr</p>
+                                                                                                                                <p class="ot-none">OT: 0 hr</p>
                                                                                                                             @endif
                                                                                                                             <p>
                                                                                                                                 <button class="editIcon-btn editdutyRoster"
@@ -311,7 +397,7 @@
                                                                                                                          carries emp_id + roster_id so the create-on-edit
                                                                                                                          flow knows which employee this empty cell
                                                                                                                          belongs to. --}}
-                                                                                                                    <div class="createDuty-tableBlock">
+                                                                                                                    <div class="createDuty-tableBlock createDuty-unassigned">
                                                                                                                         <div class="createDuty-empty">No Shift Assigned</div>
                                                                                                                         <p class="text-end mb-0 mt-1">
                                                                                                                             <button class="editIcon-btn editdutyRoster"
@@ -329,19 +415,126 @@
                                                                                                                     </div>
                                                                                                                 @endif
                                                                                                             </td>
+                                                                                                            @php
+                                                                                                                // Compact per-day state for Department View's cell — built from
+                                                                                                                // only the variables above that are unconditionally reset every
+                                                                                                                // iteration (never left stale from a previous day).
+                                                                                                                $deptViewOTRaw = trim((string) ($shiftData->OverTime ?? ''));
+                                                                                                                $deptViewDays[$formattedDate] = [
+                                                                                                                    'isToday' => $isToday,
+                                                                                                                    'isHoliday' => $isPublicHoliday,
+                                                                                                                    'leave' => $employeeLeave ? [
+                                                                                                                        'type' => $employeeLeave->leave_type ?? 'Leave',
+                                                                                                                        'color' => $employeeLeave->color ?? '#ccc',
+                                                                                                                    ] : null,
+                                                                                                                    'isDayOff' => (bool) ($shiftData && !$employeeLeave && $shiftData->Status == 'DayOff'),
+                                                                                                                    'shift' => ($shiftData && !$employeeLeave && $shiftData->Status != 'DayOff') ? [
+                                                                                                                        'name' => $shiftData->ShiftName ?? '',
+                                                                                                                        'color' => $shiftData->ShiftNameColor ?? '',
+                                                                                                                        'start' => $startTime,
+                                                                                                                        'end' => $endTime,
+                                                                                                                        'hours' => $toatalHoursForDay,
+                                                                                                                    ] : null,
+                                                                                                                    'hasOT' => $shiftData && $deptViewOTRaw !== '' && !in_array($deptViewOTRaw, ['00:00','0:00','0','00:0'], true),
+                                                                                                                ];
+                                                                                                            @endphp
                                                                                                         @endforeach
 
-                                                                                                        <td>Total Hrs: <span>{{ $totalHoursMonth }}</span></td>
+                                                                                                        @php
+                                                                                                            $totalOTHoursMonth = intdiv($totalOTMinutesMonth, 60);
+                                                                                                            $totalOTMinsRemainderMonth = $totalOTMinutesMonth % 60;
+                                                                                                            $totalOTDisplayMonth = $totalOTHoursMonth . ' hr' . ($totalOTMinsRemainderMonth > 0 ? ' ' . $totalOTMinsRemainderMonth . ' min' : '');
+                                                                                                        @endphp
+                                                                                                        <td class="month-summary-cell">
+                                                                                                            <div>Total Hrs: <span>{{ $totalHoursMonth }}</span></div>
+                                                                                                            <div>Total OT: <span>{{ $totalOTDisplayMonth }}</span></div>
+                                                                                                        </td>
+                                                                                                        @php
+                                                                                                            $departmentViewEmployees[] = [
+                                                                                                                'r' => $r,
+                                                                                                                'days' => $deptViewDays,
+                                                                                                            ];
+                                                                                                        @endphp
                                                                                                     </tr>
                                                                                                 @endforeach
                                                                                             @else
                                                                                                 <tr>
-                                                                                                    <td colspan="{{ count($monthwiseheaders) + 2 }}" style="text-align: center">No Records Found..</td>
+                                                                                                    <td colspan="{{ count($monthwiseheaders) + 2 }}" style="text-align: center">No Records Found.</td>
                                                                                                 </tr>
                                                                                             @endif
                                                                                         </tbody>
                                                                                     </table>
                                                                             </div>
+                                                                                {{-- Department View: one row per employee, one column per weekday, --}}
+                                                                                {{-- one week at a time (paged client-side via data-cal-week + --}}
+                                                                                {{-- #accordionDutyRoster[data-active-week]) — reuses $departmentViewEmployees --}}
+                                                                                {{-- collected above, no extra GetRosterdata() calls. --}}
+                                                                                <div class="table-responsive mb-4 duty-roster-department-view d-none">
+                                                                                    <table class="table table-bordered duty-roster-dept-table mb-1">
+                                                                                        <thead>
+                                                                                            @foreach ($calendarWeeks as $wIdx => $week)
+                                                                                                <tr data-cal-week="{{ $wIdx }}">
+                                                                                                    <th class="dept-emp-col">Employee</th>
+                                                                                                    @for ($dow = 0; $dow < 7; $dow++)
+                                                                                                        @php
+                                                                                                            $dowCell = $week[$dow] ?? null;
+                                                                                                        @endphp
+                                                                                                        <th class="{{ ($dowCell && $dowCell["date"] === now()->toDateString()) ? "today-col" : "" }}">
+                                                                                                            {{ ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][$dow] }}
+                                                                                                            @if($dowCell)<span class="dnum">{{ (int) $dowCell['day'] }}</span>@endif
+                                                                                                        </th>
+                                                                                                    @endfor
+                                                                                                </tr>
+                                                                                            @endforeach
+                                                                                        </thead>
+                                                                                        <tbody>
+                                                                                            @forelse ($departmentViewEmployees as $de)
+                                                                                                <tr>
+                                                                                                    <td class="dept-emp-col duty-roster-dept-emp-link" data-jump-emp="{{ $de['r']->emp_id }}" role="button" tabindex="0">
+                                                                                                        <div class="createDuty-user d-flex align-items-center">
+                                                                                                            <div class="img-circle">
+                                                                                                                <img src="{{ Common::getResortUserPicture($de['r']->Parentid) }}" alt="user">
+                                                                                                            </div>
+                                                                                                            <div class="ms-2">
+                                                                                                                <p class="mb-0"><span class="fw-600">{{ ucfirst($de['r']->first_name .' '. $de['r']->last_name) }}</span></p>
+                                                                                                                <span>{{ ucfirst($de['r']->position_title) }}</span>
+                                                                                                            </div>
+                                                                                                        </div>
+                                                                                                    </td>
+                                                                                                    @foreach ($calendarWeeks as $wIdx => $week)
+                                                                                                        @for ($dow = 0; $dow < 7; $dow++)
+                                                                                                            @php
+                                                                                                                $dCell = $week[$dow] ?? null;
+                                                                                                                $dState = $dCell ? ($de['days'][$dCell['date']] ?? null) : null;
+                                                                                                            @endphp
+                                                                                                            <td class="duty-roster-dept-cell {{ ($dState && $dState['isToday']) ? 'today-cell' : '' }} {{ ($dState && $dState['isHoliday']) ? 'public-holiday-cell' : '' }}" data-cal-week="{{ $wIdx }}">
+                                                                                                                @if ($dState && $dState['leave'])
+                                                                                                                    <div class="dept-cell-inner dept-cell-leave" style="border-color: {{ $dState['leave']['color'] }};" title="{{ $dState['leave']['type'] }}">
+                                                                                                                        <span>{{ \Illuminate\Support\Str::limit($dState['leave']['type'], 8) }}</span>
+                                                                                                                    </div>
+                                                                                                                @elseif ($dState && $dState['isDayOff'])
+                                                                                                                    <div class="dept-cell-inner dept-cell-off">Off</div>
+                                                                                                                @elseif ($dState && $dState['shift'])
+                                                                                                                    <div class="dept-cell-inner {{ $dState['shift']['color'] }} {{ $dState['isHoliday'] ? 'holiday-worked' : '' }}">
+                                                                                                                        <span class="dept-cell-type">{{ $dState['shift']['name'] }}</span>
+                                                                                                                        @if($dState['shift']['start'] && $dState['shift']['end'])
+                                                                                                                            <span class="dept-cell-time">{{ $dState['shift']['start']->format('g:iA') }}&ndash;{{ $dState['shift']['end']->format('g:iA') }}</span>
+                                                                                                                        @endif
+                                                                                                                        @if($dState['hasOT'])<span class="dept-cell-ot-dot" title="Overtime"></span>@endif
+                                                                                                                    </div>
+                                                                                                                @elseif ($dCell)
+                                                                                                                    <div class="dept-cell-inner dept-cell-unassigned">&mdash;</div>
+                                                                                                                @endif
+                                                                                                            </td>
+                                                                                                        @endfor
+                                                                                                    @endforeach
+                                                                                                </tr>
+                                                                                            @empty
+                                                                                                <tr><td colspan="8" style="text-align:center">No Records Found.</td></tr>
+                                                                                            @endforelse
+                                                                                        </tbody>
+                                                                                    </table>
+                                                                                </div>
                                                                         </div>
                                                                     </div>
                                                                 </div>
@@ -351,7 +544,7 @@
 
                                                         {{-- Direct Employees under Department (no section) --}}
                                                         @if(!empty($deptData['employees']))
-                                                            <div class="table-responsive mb-4">
+                                                            <div class="table-responsive mb-4 duty-roster-individual-view">
                                                                 <table class="table table-bordered table-createDutymonthly mb-1">
                                                                     <thead>
                                                                         <tr>
@@ -370,8 +563,14 @@
                                                                         </tr>
                                                                     </thead>
                                                                     <tbody>
+                                                                    @php
+                                                                        // Collected alongside the existing per-day loop below (reusing
+                                                                        // the same already-fetched $RosterInternalDataMonth per employee)
+                                                                        // so Department View doesn't need its own GetRosterdata() call.
+                                                                        $departmentViewEmployees = [];
+                                                                    @endphp
                                                                         @foreach ($deptData['employees'] as $r)
-                                                                            <tr>
+                                                                            <tr id="duty-roster-emp-{{ $r->emp_id }}">
                                                                                 <td>
                                                                                     <div class="createDuty-user d-flex justify-content-between align-items-center">
                                                                                         <div class="d-flex align-items-center">
@@ -404,17 +603,26 @@
                                                                                             <i class="fa-solid fa-chevron-down"></i>
                                                                                         </button>
                                                                                     </div>
+                                                                                    {{-- Weekday key for the calendar grid below — dates align
+                                                                                         under these via $firstDayOfMonthColumn, so this needs to
+                                                                                         be shown once per employee, not per day-cell. --}}
+                                                                                    <div class="duty-roster-dow-header">
+                                                                                        <span>Sun</span><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span>
+                                                                                    </div>
                                                                                 </td>
 
                                                                                 @php
                                                                                     $RosterInternalDataMonth = Common::GetRosterdata($resort_id, $r->duty_roster_id, $r->emp_id, $WeekstartDate, $WeekendDate, $startOfMonth, $endOfMonth, "Monthwise");
                                                                                     $totalHoursMonth = 0;
+                                                                                    $totalOTMinutesMonth = 0;
+                                                                                    $deptViewDays = [];
                                                                                 @endphp
 
                                                                                 @foreach ($monthwiseheaders as $h)
                                                                                 @php
                                                                                     $formattedDate = \Carbon\Carbon::parse($h['date'])->format('Y-m-d');
                                                                                     $isPublicHoliday = isset($publicHolidays) && in_array($formattedDate, $publicHolidays);
+                                                                                    $isToday = $formattedDate === now()->toDateString();
                                                                                     $entriesForDate = $RosterInternalDataMonth->where('date', $formattedDate);
                                                                                     $shiftData = $entriesForDate->first(fn($e) => isset($e->roster_id) && (int)$e->roster_id === (int)$r->duty_roster_id)
                                                                                         ?? $entriesForDate->first(fn($e) => !empty(trim((string)($e->OverTime ?? ''))) && !in_array(trim($e->OverTime ?? ''), ['00:00', '0:00', '0'], true))
@@ -455,10 +663,11 @@
                                                                                     }
                                                                                 @endphp
 
-                                                                                    <td data-week="{{ (int) ceil(((int) date('d', strtotime($formattedDate))) / 7) }}" class="day-cell {{ $isPublicHoliday ? 'public-holiday-cell' : '' }}">
+                                                                                    <td data-week="{{ (int) ceil(((int) date('d', strtotime($formattedDate))) / 7) }}" class="day-cell {{ $isPublicHoliday ? 'public-holiday-cell' : '' }} {{ $isToday ? 'today-cell' : '' }}" @if($loop->first) style="grid-column-start: {{ $firstDayOfMonthColumn }};" @endif>
                                                                                         <div class="day-cell-date">
                                                                                             <span class="day-num">{{ (int) date('d', strtotime($formattedDate)) }}</span>
                                                                                             <span class="day-name">{{ date('D', strtotime($formattedDate)) }}</span>
+                                                                                            @if($isToday)<span class="today-tag">Today</span>@endif
                                                                                         </div>
                                                                                         @if($employeeLeave)
                                                                                             {{-- Display Leave --}}
@@ -480,7 +689,7 @@
                                                                                                 </div>
                                                                                             @else
                                                                                             {{-- Display Roster Entry --}}
-                                                                                            <div class="createDuty-tableBlock {{ $shiftData->ShiftNameColor ?? '' }}">
+                                                                                            <div class="createDuty-tableBlock {{ $shiftData->ShiftNameColor ?? '' }} {{ $isPublicHoliday ? 'holiday-worked' : '' }}">
                                                                                                 <div class="d-flex">
                                                                                                     <div>
                                                                                                         @php
@@ -527,15 +736,16 @@
                                                                                                             $otParts = explode(':', $displayOverTime2);
                                                                                                             $otHours = isset($otParts[0]) ? (int)$otParts[0] : 0;
                                                                                                             $otMinutes = isset($otParts[1]) ? (int)$otParts[1] : 0;
+                                                                                                            $totalOTMinutesMonth += ($otHours * 60) + $otMinutes;
                                                                                                             $otDisplay = $otHours > 0 ? $otHours . ' hr' : '';
                                                                                                             if ($otMinutes > 0) {
                                                                                                                 $otDisplay .= ($otDisplay ? ' ' : '') . $otMinutes . ' min';
                                                                                                             }
                                                                                                             $otDisplay = $otDisplay ?: '0 hr';
                                                                                                         @endphp
-                                                                                                        <p>OT: {{ $otDisplay }}</p>
+                                                                                                        <p class="ot-chip">OT: {{ $otDisplay }}</p>
                                                                                                     @else
-                                                                                                        <p>OT: 0 hr</p>
+                                                                                                        <p class="ot-none">OT: 0 hr</p>
                                                                                                     @endif
                                                                                                     <p>
                                                                                                         <button class="editIcon-btn editdutyRoster"
@@ -555,7 +765,7 @@
                                                                                             {{-- No Leave and No Roster Entry — edit pencil carries
                                                                                                  emp_id + roster_id so create-on-edit knows which
                                                                                                  employee this empty cell belongs to. --}}
-                                                                                            <div class="createDuty-tableBlock">
+                                                                                            <div class="createDuty-tableBlock createDuty-unassigned">
                                                                                                 <div class="createDuty-empty">No Shift Assigned</div>
                                                                                                 <p class="text-end mb-0 mt-1">
                                                                                                     <button class="editIcon-btn editdutyRoster"
@@ -573,11 +783,118 @@
                                                                                             </div>
                                                                                         @endif
                                                                                     </td>
+                                                                                    @php
+                                                                                        // Compact per-day state for Department View's cell — built from
+                                                                                        // only the variables above that are unconditionally reset every
+                                                                                        // iteration (never left stale from a previous day).
+                                                                                        $deptViewOTRaw = trim((string) ($shiftData->OverTime ?? ''));
+                                                                                        $deptViewDays[$formattedDate] = [
+                                                                                            'isToday' => $isToday,
+                                                                                            'isHoliday' => $isPublicHoliday,
+                                                                                            'leave' => $employeeLeave ? [
+                                                                                                'type' => $employeeLeave->leave_type ?? 'Leave',
+                                                                                                'color' => $employeeLeave->color ?? '#ccc',
+                                                                                            ] : null,
+                                                                                            'isDayOff' => (bool) ($shiftData && !$employeeLeave && $shiftData->Status == 'DayOff'),
+                                                                                            'shift' => ($shiftData && !$employeeLeave && $shiftData->Status != 'DayOff') ? [
+                                                                                                'name' => $shiftData->ShiftName ?? '',
+                                                                                                'color' => $shiftData->ShiftNameColor ?? '',
+                                                                                                'start' => $startTime,
+                                                                                                'end' => $endTime,
+                                                                                                'hours' => $toatalHoursForDay,
+                                                                                            ] : null,
+                                                                                            'hasOT' => $shiftData && $deptViewOTRaw !== '' && !in_array($deptViewOTRaw, ['00:00','0:00','0','00:0'], true),
+                                                                                        ];
+                                                                                    @endphp
                                                                                 @endforeach
 
-                                                                                <td>Total Hrs: <span>{{ $totalHoursMonth }}</span></td>
+                                                                                @php
+                                                                                    $totalOTHoursMonth = intdiv($totalOTMinutesMonth, 60);
+                                                                                    $totalOTMinsRemainderMonth = $totalOTMinutesMonth % 60;
+                                                                                    $totalOTDisplayMonth = $totalOTHoursMonth . ' hr' . ($totalOTMinsRemainderMonth > 0 ? ' ' . $totalOTMinsRemainderMonth . ' min' : '');
+                                                                                @endphp
+                                                                                <td class="month-summary-cell">
+                                                                                    <div>Total Hrs: <span>{{ $totalHoursMonth }}</span></div>
+                                                                                    <div>Total OT: <span>{{ $totalOTDisplayMonth }}</span></div>
+                                                                                </td>
+                                                                                @php
+                                                                                    $departmentViewEmployees[] = [
+                                                                                        'r' => $r,
+                                                                                        'days' => $deptViewDays,
+                                                                                    ];
+                                                                                @endphp
                                                                             </tr>
                                                                         @endforeach
+                                                                    </tbody>
+                                                                </table>
+                                                            </div>
+                                                            {{-- Department View: one row per employee, one column per weekday, --}}
+                                                            {{-- one week at a time (paged client-side via data-cal-week + --}}
+                                                            {{-- #accordionDutyRoster[data-active-week]) — reuses $departmentViewEmployees --}}
+                                                            {{-- collected above, no extra GetRosterdata() calls. --}}
+                                                            <div class="table-responsive mb-4 duty-roster-department-view d-none">
+                                                                <table class="table table-bordered duty-roster-dept-table mb-1">
+                                                                    <thead>
+                                                                        @foreach ($calendarWeeks as $wIdx => $week)
+                                                                            <tr data-cal-week="{{ $wIdx }}">
+                                                                                <th class="dept-emp-col">Employee</th>
+                                                                                @for ($dow = 0; $dow < 7; $dow++)
+                                                                                    @php
+                                                                                        $dowCell = $week[$dow] ?? null;
+                                                                                    @endphp
+                                                                                    <th class="{{ ($dowCell && $dowCell["date"] === now()->toDateString()) ? "today-col" : "" }}">
+                                                                                        {{ ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][$dow] }}
+                                                                                        @if($dowCell)<span class="dnum">{{ (int) $dowCell['day'] }}</span>@endif
+                                                                                    </th>
+                                                                                @endfor
+                                                                            </tr>
+                                                                        @endforeach
+                                                                    </thead>
+                                                                    <tbody>
+                                                                        @forelse ($departmentViewEmployees as $de)
+                                                                            <tr>
+                                                                                <td class="dept-emp-col duty-roster-dept-emp-link" data-jump-emp="{{ $de['r']->emp_id }}" role="button" tabindex="0">
+                                                                                    <div class="createDuty-user d-flex align-items-center">
+                                                                                        <div class="img-circle">
+                                                                                            <img src="{{ Common::getResortUserPicture($de['r']->Parentid) }}" alt="user">
+                                                                                        </div>
+                                                                                        <div class="ms-2">
+                                                                                            <p class="mb-0"><span class="fw-600">{{ ucfirst($de['r']->first_name .' '. $de['r']->last_name) }}</span></p>
+                                                                                            <span>{{ ucfirst($de['r']->position_title) }}</span>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </td>
+                                                                                @foreach ($calendarWeeks as $wIdx => $week)
+                                                                                    @for ($dow = 0; $dow < 7; $dow++)
+                                                                                        @php
+                                                                                            $dCell = $week[$dow] ?? null;
+                                                                                            $dState = $dCell ? ($de['days'][$dCell['date']] ?? null) : null;
+                                                                                        @endphp
+                                                                                        <td class="duty-roster-dept-cell {{ ($dState && $dState['isToday']) ? 'today-cell' : '' }} {{ ($dState && $dState['isHoliday']) ? 'public-holiday-cell' : '' }}" data-cal-week="{{ $wIdx }}">
+                                                                                            @if ($dState && $dState['leave'])
+                                                                                                <div class="dept-cell-inner dept-cell-leave" style="border-color: {{ $dState['leave']['color'] }};" title="{{ $dState['leave']['type'] }}">
+                                                                                                    <span>{{ \Illuminate\Support\Str::limit($dState['leave']['type'], 8) }}</span>
+                                                                                                </div>
+                                                                                            @elseif ($dState && $dState['isDayOff'])
+                                                                                                <div class="dept-cell-inner dept-cell-off">Off</div>
+                                                                                            @elseif ($dState && $dState['shift'])
+                                                                                                <div class="dept-cell-inner {{ $dState['shift']['color'] }} {{ $dState['isHoliday'] ? 'holiday-worked' : '' }}">
+                                                                                                    <span class="dept-cell-type">{{ $dState['shift']['name'] }}</span>
+                                                                                                    @if($dState['shift']['start'] && $dState['shift']['end'])
+                                                                                                        <span class="dept-cell-time">{{ $dState['shift']['start']->format('g:iA') }}&ndash;{{ $dState['shift']['end']->format('g:iA') }}</span>
+                                                                                                    @endif
+                                                                                                    @if($dState['hasOT'])<span class="dept-cell-ot-dot" title="Overtime"></span>@endif
+                                                                                                </div>
+                                                                                            @elseif ($dCell)
+                                                                                                <div class="dept-cell-inner dept-cell-unassigned">&mdash;</div>
+                                                                                            @endif
+                                                                                        </td>
+                                                                                    @endfor
+                                                                                @endforeach
+                                                                            </tr>
+                                                                        @empty
+                                                                            <tr><td colspan="8" style="text-align:center">No Records Found.</td></tr>
+                                                                        @endforelse
                                                                     </tbody>
                                                                 </table>
                                                             </div>
@@ -795,7 +1112,7 @@
     .table-createDutymonthly tbody tr {
         display: grid;
         grid-template-columns: repeat(7, minmax(0, 1fr));
-        gap: 6px;
+        gap: 8px;
         margin-bottom: 18px;
         padding: 8px;
         border: 1px solid #e6e6e6;
@@ -804,10 +1121,10 @@
     }
     .table-createDutymonthly tbody tr > td {
         display: block;
-        border: 1px solid #f0f0f0;
-        border-radius: 6px;
-        padding: 6px;
-        min-height: 56px;
+        border: 1px solid #ebedf0;
+        border-radius: 10px;
+        padding: 9px 8px;
+        min-height: 90px;
         font-size: 11px;
         background: #fafbfc;
         overflow: hidden;
@@ -828,12 +1145,60 @@
         font-weight: 600;
         text-align: right;
     }
+    /* Total Hrs + Total OT, one consistent size — a shared default.css
+       rule (`.table-createDutymonthly td:last-child span { font-size:
+       18px; }`) previously made the number much bigger than its label,
+       which read as two different sizes on the same line. !important
+       here guarantees this page's own sizing wins regardless of
+       stylesheet load order. */
+    .table-createDutymonthly .month-summary-cell {
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        gap: 20px;
+    }
+    .table-createDutymonthly .month-summary-cell div,
+    .table-createDutymonthly .month-summary-cell span {
+        font-size: 13px !important;
+        font-weight: 600;
+    }
+    /* The day-cell itself carries the shift-type tint/border now (see the
+       :has()-based rules below), so the inner card is flattened to blend
+       into it — one unified colored square per day, not a card nested
+       inside a card. */
     .table-createDutymonthly .createDuty-tableBlock {
         font-size: 10px;
         line-height: 1.25;
+        background: transparent;
+        border: none;
+        padding: 0;
+        width: auto;
+        height: auto;
     }
     .table-createDutymonthly .createDuty-tableBlock p { margin: 0; font-size: 10px; }
-    .table-createDutymonthly .createDuty-tableBlock .badge { font-size: 9px; padding: 2px 4px; }
+    .table-createDutymonthly .createDuty-tableBlock .badge {
+        font-size: 9px;
+        padding: 2px 5px;
+        background: color-mix(in srgb, var(--createDuty) 22%, transparent);
+        color: var(--createDuty);
+    }
+    /* Shift type name first (bold, colored) then time below (muted) —
+       flip the DOM order (time <p> then name <span>) purely visually so
+       the template loop doesn't need to change. */
+    .table-createDutymonthly .createDuty-tableBlock .d-flex:first-child > div:first-child {
+        display: flex;
+        flex-direction: column-reverse;
+    }
+    .table-createDutymonthly .createDuty-tableBlock .d-flex:first-child > div:first-child span {
+        font-style: normal;
+        font-size: 11px;
+        font-weight: 700;
+    }
+    .table-createDutymonthly .createDuty-tableBlock .d-flex:first-child > div:first-child p {
+        color: #6c757d;
+        font-size: 9.5px;
+        margin-top: 1px;
+    }
     /* The edit pencil was disappearing from every shift cell because its
        wrapper (.ot-details) was display:none in the compact monthly grid.
        Fix: force .ot-details visible and pin the button absolute-bottom-right
@@ -893,11 +1258,23 @@
         font-size: 13px;
         color: #014653;
     }
+    /* Redundant now that dates align under a Sun–Sat header row per
+       employee (see .duty-roster-dow-header below) — column position
+       already says which weekday this is. */
     .table-createDutymonthly .day-cell-date .day-name {
-        font-size: 9px;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        color: #6c757d;
+        display: none;
+    }
+    /* Overrides a site-wide rule (resorts/layouts/css.blade.php:
+       `.public-holiday-header, .public-holiday-cell { background-color:
+       rgba(255,90,87,.45) !important; }`, shared by several other duty
+       roster pages) that otherwise washes every holiday-date cell in a
+       loud solid red regardless of whether anyone actually worked that
+       day. Scoped to this page only — a red border on the shift card is
+       the "worked on a holiday" signal (see .holiday-worked below,
+       matching the reference mockup); merely being a holiday date isn't
+       itself notable, so it only gets this quiet header accent. */
+    .table-createDutymonthly .day-cell.public-holiday-cell {
+        background-color: transparent !important;
     }
     .table-createDutymonthly .public-holiday-cell .day-cell-date {
         border-bottom-color: #f1aeb5;
@@ -921,6 +1298,465 @@
     /* "No Records Found" cell that spanned 33 cols originally — let it
        span full grid so it doesn't squish into one column. */
     .table-createDutymonthly tbody tr > td[colspan] { grid-column: 1 / -1; min-height: auto; text-align: center; }
+
+    /* ---- Weekday header (Sun–Sat), once per employee, above their day
+       grid — paired with grid-column-start on each grid's first day-cell
+       (set from $firstDayOfMonthColumn in the template) so day 1 lands
+       under its real weekday and every date stays in that same column
+       for the rest of the month, instead of the grid always starting
+       day 1 in column 1 regardless of what weekday it falls on. ---- */
+    .table-createDutymonthly .duty-roster-dow-header {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        gap: 8px;
+        margin-top: 8px;
+        padding-top: 6px;
+        border-top: 1px dashed #e6e6e6;
+    }
+    .table-createDutymonthly .duty-roster-dow-header span {
+        text-align: center;
+        font-size: 9px;
+        font-weight: 600;
+        letter-spacing: 0.05em;
+        text-transform: uppercase;
+        color: #6c757d;
+    }
+
+    /* ---- Legend: one static key above the accordion, shared by every
+       department/section table below it rather than repeated per-table. ---- */
+    .duty-roster-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 18px;
+        font-size: 11px;
+        color: #6c757d;
+        padding: 2px 4px 16px;
+    }
+    .duty-roster-legend .dot {
+        display: inline-block;
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        margin-right: 5px;
+        vertical-align: -1px;
+    }
+    .duty-roster-legend .dot-blue { background: #014653; }
+    .duty-roster-legend .dot-yellow { background: #FED049; }
+    .duty-roster-legend .dot-skyblue { background: #2EACB3; }
+    .duty-roster-legend .dot-purple { background: #9E5CF7; }
+    .duty-roster-legend .dot-off { background: #495057; }
+    .duty-roster-legend .dot-unassigned { background: transparent; border: 1.5px dashed #adb5bd; }
+    .duty-roster-legend .dot-holiday { background: transparent; border: 1.5px solid #dc3545; }
+    .duty-roster-legend .dot-today { background: transparent; border: 1.5px solid #014653; }
+
+    /* ==================================================================
+       Department / Section accordion — scoped to #accordionDutyRoster
+       (the page's own instance) rather than editing the shared
+       .viewBudget-accordion rules in default.css, which several other
+       pages also use. Reuses the app's existing badge-themeBlue /
+       badge-themeSkyblue utility classes instead of introducing new
+       color tokens. ================================================== */
+    #accordionDutyRoster .department-accordion {
+        border: 1px solid #e9ecef;
+        border-radius: 12px;
+        overflow: hidden;
+        box-shadow: 0 1px 2px rgba(16, 24, 40, 0.04);
+    }
+    #accordionDutyRoster .department-accordion .accordion-button {
+        background: #fff;
+        padding: 14px 16px;
+        gap: 4px;
+    }
+    #accordionDutyRoster .department-accordion .accordion-button:hover {
+        background: #f8fafa;
+    }
+    #accordionDutyRoster .department-accordion .accordion-button:not(.collapsed) {
+        background: #f5f9f9;
+        border-bottom: 1px solid #e9ecef;
+    }
+    #accordionDutyRoster .department-accordion .accordion-button h3 {
+        font-size: 15px;
+        font-weight: 600;
+        line-height: 1.3;
+        margin: 0;
+        color: #1a1a1a;
+    }
+    /* Bootstrap's chevron is disabled on the open state by the shared
+       .viewBudget-accordion rule (background-image:none) — re-enabled
+       here so an expanded department still shows a (flipped) chevron
+       instead of no indicator at all. */
+    #accordionDutyRoster .accordion-button:not(.collapsed)::after {
+        background-image: var(--bs-accordion-btn-active-icon, var(--bs-accordion-btn-icon));
+        transform: rotate(-180deg);
+    }
+    #accordionDutyRoster .accordion-body {
+        background: #fcfcfd;
+        padding: 14px !important;
+    }
+
+    /* Circular icon badge in front of the department/section name —
+       brand teal for departments, skyblue for the nested section level
+       so the hierarchy reads at a glance. */
+    .duty-roster-accordion-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        min-width: 32px;
+        border-radius: 50%;
+        background: #01465314;
+        color: #014653;
+        font-size: 13px;
+        margin-right: 10px;
+    }
+    .duty-roster-accordion-icon-sky {
+        background: #2EACB31A;
+        color: #2EACB3;
+    }
+
+    /* Section level (nested inside a department) — same card language,
+       one size down, indented via the existing ms-3 utility already on
+       the wrapper. */
+    #accordionDutyRoster .section-accordion .accordion-item {
+        border: 1px solid #edf0f2;
+        border-radius: 10px;
+        overflow: hidden;
+        background: #fff;
+    }
+    #accordionDutyRoster .section-accordion .accordion-button {
+        background: #fff;
+        padding: 10px 14px;
+    }
+    #accordionDutyRoster .section-accordion .accordion-button:hover {
+        background: #f8fafa;
+    }
+    #accordionDutyRoster .section-accordion .accordion-button:not(.collapsed) {
+        background: #f5fafa;
+        border-bottom: 1px solid #edf0f2;
+    }
+    #accordionDutyRoster .duty-roster-section-name {
+        font-size: 13.5px;
+        font-weight: 600;
+        color: #1a1a1a;
+    }
+    #accordionDutyRoster .section-accordion .accordion-body {
+        background: #fff;
+        padding: 10px !important;
+    }
+
+    /* ==================================================================
+       Unify each day-cell with its shift card into ONE colored square —
+       matching the reference mockup's single flat `.cell`, rather than a
+       white card nested inside a separate outer cell. Uses :has() so the
+       PHP loop stays untouched: the color classes already sit on the
+       inner .createDuty-tableBlock (from Common::shiftNameColor()); we
+       just also react to their presence on the ancestor day-cell.
+       ================================================================== */
+    /* border-bottom-color !important below: a pre-existing global rule
+       (`.table td { border-bottom: 1px solid #e7e7e7 !important; }`,
+       for DataTables styling elsewhere) otherwise pins every cell's
+       bottom edge to gray regardless of what's set here. */
+    /* background: ... !important below: needs to win over the
+       .public-holiday-cell transparent override above (equal
+       specificity, so it's a source-order tie-break) so a colored work
+       shift keeps its own tint even when it also falls on a holiday —
+       the holiday-worked ring layers on top separately. */
+    .table-createDutymonthly .day-cell:has(.createDuty-blue) {
+        background: color-mix(in srgb, #014653 16%, #fff) !important;
+        border-color: color-mix(in srgb, #014653 40%, transparent);
+        border-bottom-color: color-mix(in srgb, #014653 40%, transparent) !important;
+    }
+    .table-createDutymonthly .day-cell:has(.createDuty-yellow) {
+        background: color-mix(in srgb, #FED049 28%, #fff) !important;
+        border-color: color-mix(in srgb, #FED049 55%, transparent);
+        border-bottom-color: color-mix(in srgb, #FED049 55%, transparent) !important;
+    }
+    .table-createDutymonthly .day-cell:has(.createDuty-skyBlue) {
+        background: color-mix(in srgb, #2EACB3 20%, #fff) !important;
+        border-color: color-mix(in srgb, #2EACB3 45%, transparent);
+        border-bottom-color: color-mix(in srgb, #2EACB3 45%, transparent) !important;
+    }
+    .table-createDutymonthly .day-cell:has(.createDuty-purple) {
+        background: color-mix(in srgb, #9E5CF7 16%, #fff) !important;
+        border-color: color-mix(in srgb, #9E5CF7 45%, transparent);
+        border-bottom-color: color-mix(in srgb, #9E5CF7 45%, transparent) !important;
+    }
+
+    /* ---- Day Off — must read as louder/more solid than a work shift,
+       not muted gray text on an empty card (that was the prior flawed
+       design). The whole day square goes solid-filled, like the mockup's
+       Day Off block, not just an inner card. ---- */
+    .table-createDutymonthly .day-cell:has(.dayoff-cell) {
+        background: #495057 !important;
+        border-color: #495057;
+        border-bottom-color: #495057 !important;
+    }
+    .table-createDutymonthly .day-cell:has(.dayoff-cell) .day-num,
+    .table-createDutymonthly .day-cell:has(.dayoff-cell) .day-name {
+        color: #fff;
+    }
+    .table-createDutymonthly .day-cell:has(.dayoff-cell) .day-cell-date {
+        border-bottom-color: rgba(255,255,255,0.3);
+    }
+    .table-createDutymonthly .createDuty-dayoff { color: #fff; font-weight: 600; }
+    .table-createDutymonthly .day-cell:has(.dayoff-cell) .editIcon-btn { color: #fff; }
+
+    /* ---- Unassigned — distinct from Day Off: dashed border, no fill, so
+       a scheduling gap never reads as "planned rest." ---- */
+    .table-createDutymonthly .day-cell:has(.createDuty-unassigned) {
+        background: transparent;
+        border-style: dashed;
+        border-color: #ced4da;
+        border-bottom: 1px dashed #ced4da !important;
+    }
+
+    /* ---- Off-day/holiday worked — a shift landing on a gazetted public
+       holiday is an exception worth surfacing. Layered as a ring on top
+       of whichever shift-type tint/background is already present
+       (including the site-wide public-holiday-cell tint on the date
+       header), not replacing it. ---- */
+    .table-createDutymonthly .day-cell:has(.holiday-worked) {
+        box-shadow: 0 0 0 1.5px #dc3545 inset;
+    }
+
+    /* ---- Today — ring + tag, entirely missing from the original design.
+       White gap + brand-color ring mirrors the mockup's dark-theme
+       double-ring translated to a light background. ---- */
+    .table-createDutymonthly .today-cell {
+        box-shadow: 0 0 0 2px #fff, 0 0 0 4px #014653;
+    }
+    /* Inline, not a corner overlay — the header row already fills both
+       top corners with day-num (left) and day-name (right), so an
+       absolute badge here would sit on top of that text. */
+    .table-createDutymonthly .today-tag {
+        font-size: 7px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        color: #fff;
+        background: #014653;
+        padding: 1.5px 5px;
+        border-radius: 3px;
+    }
+
+    /* ---- Shift time must never wrap to two lines (prior regression);
+       truncate instead if the cell is too narrow. ---- */
+    .table-createDutymonthly .createDuty-tableBlock .d-flex p {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    /* ---- OT chip — floating corner badge like the mockup, only for the
+       branch with actual planned overtime (> 0). The "0 hr" branch is
+       hidden entirely rather than shown as plain text, so an ordinary
+       shift with no OT doesn't carry a redundant "OT: 0 hr" line the
+       mockup never had. ---- */
+    /* Inline pill in its existing row (below the shift type/time), not a
+       corner overlay — the day-cell's top-right corner is already the
+       day-name text from the header row above. */
+    .table-createDutymonthly .ot-chip {
+        display: inline-block;
+        background: #FED049;
+        color: #4a3b09;
+        font-weight: 700;
+        font-size: 9px;
+        padding: 1.5px 6px;
+        border-radius: 5px;
+    }
+    .table-createDutymonthly .ot-none { display: none; }
+
+    /* ==================================================================
+       Individual / Department view toggle + Department View table.
+       Client-side only — no new routes/controller calls. The controller
+       already fetches the whole month; Department View just re-displays
+       the same $departmentViewEmployees data (collected alongside the
+       existing per-day loop above) as one compact row per employee,
+       paged one calendar week at a time via #accordionDutyRoster's
+       data-active-week attribute. ================================== */
+    .duty-roster-view-toggle {
+        display: flex;
+        background: #f1f3f5;
+        border-radius: 10px;
+        padding: 3px;
+        gap: 2px;
+    }
+    .duty-roster-view-btn {
+        border: none;
+        background: transparent;
+        color: #6c757d;
+        font-size: 12.5px;
+        font-weight: 600;
+        padding: 7px 16px;
+        border-radius: 8px;
+        cursor: pointer;
+        font-family: inherit;
+    }
+    .duty-roster-view-btn.active {
+        background: #fff;
+        color: #014653;
+        box-shadow: 0 1px 2px rgba(16, 24, 40, 0.08);
+    }
+    .duty-roster-week-nav {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 10px;
+        padding: 0 4px 14px;
+        color: #1a1a1a;
+        font-size: 13px;
+        font-weight: 600;
+    }
+    .duty-roster-week-arrow {
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        border: 1px solid #e9ecef;
+        background: #fff;
+        color: #495057;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        font-size: 15px;
+        line-height: 1;
+    }
+    .duty-roster-week-arrow:hover { background: #f8fafa; }
+    .duty-roster-week-arrow:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    /* ---- Department table shell ---- */
+    .duty-roster-dept-table { table-layout: fixed; width: 100%; }
+    .duty-roster-dept-table thead tr[data-cal-week] { display: none; }
+    .duty-roster-dept-table tbody td[data-cal-week] { display: none; }
+    /* One pair of rules per possible calendar week (0–5 covers every
+       month regardless of which weekday it starts on) — toggled by
+       setting data-active-week on the shared #accordionDutyRoster
+       ancestor, so every department/section table on the page pages
+       together from one control. */
+    #accordionDutyRoster[data-active-week="0"] .duty-roster-dept-table thead tr[data-cal-week="0"] { display: table-row; }
+    #accordionDutyRoster[data-active-week="0"] .duty-roster-dept-table tbody td[data-cal-week="0"] { display: table-cell; }
+    #accordionDutyRoster[data-active-week="1"] .duty-roster-dept-table thead tr[data-cal-week="1"] { display: table-row; }
+    #accordionDutyRoster[data-active-week="1"] .duty-roster-dept-table tbody td[data-cal-week="1"] { display: table-cell; }
+    #accordionDutyRoster[data-active-week="2"] .duty-roster-dept-table thead tr[data-cal-week="2"] { display: table-row; }
+    #accordionDutyRoster[data-active-week="2"] .duty-roster-dept-table tbody td[data-cal-week="2"] { display: table-cell; }
+    #accordionDutyRoster[data-active-week="3"] .duty-roster-dept-table thead tr[data-cal-week="3"] { display: table-row; }
+    #accordionDutyRoster[data-active-week="3"] .duty-roster-dept-table tbody td[data-cal-week="3"] { display: table-cell; }
+    #accordionDutyRoster[data-active-week="4"] .duty-roster-dept-table thead tr[data-cal-week="4"] { display: table-row; }
+    #accordionDutyRoster[data-active-week="4"] .duty-roster-dept-table tbody td[data-cal-week="4"] { display: table-cell; }
+    #accordionDutyRoster[data-active-week="5"] .duty-roster-dept-table thead tr[data-cal-week="5"] { display: table-row; }
+    #accordionDutyRoster[data-active-week="5"] .duty-roster-dept-table tbody td[data-cal-week="5"] { display: table-cell; }
+
+    .duty-roster-dept-table th,
+    .duty-roster-dept-table td { vertical-align: middle; }
+    .duty-roster-dept-table thead th {
+        background: #f5f8f8;
+        font-size: 10.5px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #6c757d;
+        font-weight: 600;
+        text-align: center;
+        padding: 16px 6px;
+    }
+    .duty-roster-dept-table thead th .dnum {
+        display: block;
+        font-size: 13px;
+        text-transform: none;
+        letter-spacing: 0;
+        color: #1a1a1a;
+        margin-top: 2px;
+    }
+    .duty-roster-dept-table thead th.today-col { background: #e9f4f4; }
+    .duty-roster-dept-table thead th.today-col .dnum { color: #014653; }
+
+    /* Sticky employee column, per the reference spec ("first column is
+       sticky/frozen ... so it stays visible when scrolling horizontally"). */
+    .duty-roster-dept-table .dept-emp-col {
+        position: sticky;
+        left: 0;
+        z-index: 2;
+        background: #fff;
+        min-width: 220px;
+        text-align: left;
+        /* Matches .duty-roster-dept-cell's padding (the gap between the
+           table border and a shift-color box, e.g. the Afternoon Shift
+           card) so the employee column reads as part of the same row
+           rhythm as every day cell next to it. */
+        padding: 4px;
+    }
+    .duty-roster-dept-table thead .dept-emp-col { z-index: 3; background: #f5f8f8; }
+    .duty-roster-dept-table .dept-emp-col .img-circle {
+        width: 32px;
+        height: 32px;
+        min-width: 32px;
+        margin-right: 8px;
+    }
+    .duty-roster-dept-table .dept-emp-col p { margin-bottom: 1px; }
+    .duty-roster-dept-table .dept-emp-col span { font-size: 11px; }
+    .duty-roster-dept-emp-link { cursor: pointer; }
+    .duty-roster-dept-emp-link:hover { background: #f8fafa; }
+
+    /* ---- Compact day cell — smaller, denser version of the same
+       states used in Individual View (colors/off/unassigned/leave),
+       appropriate for scanning many rows at once. ---- */
+    .duty-roster-dept-cell { padding: 4px; min-width: 108px; }
+    .duty-roster-dept-cell.today-cell { box-shadow: 0 0 0 1.5px #014653 inset; }
+    .duty-roster-dept-cell.public-holiday-cell { background: #ff5a5712; }
+    .dept-cell-inner {
+        border-radius: 6px;
+        padding: 5px 6px;
+        min-height: 40px;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        text-align: center;
+        font-size: 10px;
+        border: 1px solid transparent;
+    }
+    .dept-cell-inner.createDuty-blue { background: color-mix(in srgb, #014653 14%, #fff); border-color: color-mix(in srgb, #014653 35%, transparent); }
+    .dept-cell-inner.createDuty-yellow { background: color-mix(in srgb, #FED049 26%, #fff); border-color: color-mix(in srgb, #FED049 50%, transparent); }
+    .dept-cell-inner.createDuty-skyBlue { background: color-mix(in srgb, #2EACB3 18%, #fff); border-color: color-mix(in srgb, #2EACB3 40%, transparent); }
+    .dept-cell-inner.createDuty-purple { background: color-mix(in srgb, #9E5CF7 14%, #fff); border-color: color-mix(in srgb, #9E5CF7 40%, transparent); }
+    .dept-cell-inner.holiday-worked { box-shadow: 0 0 0 1.5px #dc3545 inset; }
+    .dept-cell-type { font-weight: 700; font-size: 10px; }
+    .dept-cell-time { font-size: 9px; color: #6c757d; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .dept-cell-ot-dot {
+        display: inline-block;
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: #FED049;
+        border: 1px solid #4a3b09;
+        margin-top: 2px;
+    }
+    .dept-cell-off {
+        background: #495057;
+        color: #fff;
+        font-weight: 600;
+        font-size: 10px;
+    }
+    .dept-cell-unassigned {
+        border: 1px dashed #ced4da;
+        color: #adb5bd;
+        font-style: italic;
+    }
+    .dept-cell-leave {
+        background: #fff;
+        border-width: 1.5px;
+        font-weight: 600;
+        color: #495057;
+    }
+
+    /* Brief highlight when Department View's employee name jumps the
+       page to that person's Individual View card. */
+    .duty-roster-jump-highlight {
+        animation: dutyRosterJumpFlash 1.6s ease-out;
+    }
+    @keyframes dutyRosterJumpFlash {
+        0% { box-shadow: 0 0 0 3px #014653; }
+        100% { box-shadow: 0 0 0 0 transparent; }
+    }
 </style>
 @endsection
 
@@ -1303,6 +2139,103 @@
         }
     }
 
+</script>
+
+<script>
+(function () {
+    'use strict';
+
+    var accordion = document.getElementById('accordionDutyRoster');
+    var weekNav = document.getElementById('dutyRosterWeekNav');
+    var weekLabelEl = document.getElementById('dutyRosterWeekLabel');
+    var weekPrevBtn = document.getElementById('dutyRosterWeekPrev');
+    var weekNextBtn = document.getElementById('dutyRosterWeekNext');
+    if (!accordion || !weekNav) { return; }
+
+    var weekLabels = {};
+    try { weekLabels = JSON.parse(weekNav.dataset.weekLabels || '{}'); } catch (e) { weekLabels = {}; }
+    var weekCount = parseInt(weekNav.dataset.weekCount, 10) || 1;
+    var currentWeek = parseInt(weekNav.dataset.initialWeek, 10) || 0;
+
+    function renderWeekNav() {
+        accordion.setAttribute('data-active-week', String(currentWeek));
+        weekLabelEl.textContent = weekLabels[String(currentWeek)] || ('Week ' + (currentWeek + 1));
+        weekPrevBtn.disabled = currentWeek <= 0;
+        weekNextBtn.disabled = currentWeek >= weekCount - 1;
+    }
+
+    weekPrevBtn.addEventListener('click', function () {
+        if (currentWeek > 0) { currentWeek--; renderWeekNav(); }
+    });
+    weekNextBtn.addEventListener('click', function () {
+        if (currentWeek < weekCount - 1) { currentWeek++; renderWeekNav(); }
+    });
+
+    // Individual view / Department view toggle — purely client-side,
+    // swaps which already-rendered tables are visible. No new requests.
+    var viewButtons = document.querySelectorAll('.duty-roster-view-btn');
+    function setView(view) {
+        viewButtons.forEach(function (btn) {
+            btn.classList.toggle('active', btn.getAttribute('data-duty-view') === view);
+        });
+        document.querySelectorAll('.duty-roster-individual-view').forEach(function (el) {
+            el.classList.toggle('d-none', view === 'department');
+        });
+        document.querySelectorAll('.duty-roster-department-view').forEach(function (el) {
+            el.classList.toggle('d-none', view !== 'department');
+        });
+        weekNav.classList.toggle('d-none', view !== 'department');
+    }
+    viewButtons.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+            setView(btn.getAttribute('data-duty-view'));
+        });
+    });
+
+    // Department View employee name -> jump to that person's Individual
+    // View card: switch view, expand every ancestor accordion, scroll,
+    // briefly highlight. Per the reference spec, this is the primary way
+    // a manager moves from "scanning the week" to "investigating one
+    // person's month" after spotting something.
+    function jumpToEmployee(empId) {
+        setView('individual');
+        var target = document.getElementById('duty-roster-emp-' + empId);
+        if (!target) { return; }
+
+        var ancestors = [];
+        var el = target.closest('.collapse');
+        while (el) {
+            ancestors.push(el);
+            var parent = el.parentElement;
+            el = parent ? parent.closest('.collapse') : null;
+        }
+        ancestors.forEach(function (collapseEl) {
+            if (!collapseEl.classList.contains('show') && window.bootstrap && window.bootstrap.Collapse) {
+                window.bootstrap.Collapse.getOrCreateInstance(collapseEl, { toggle: false }).show();
+            }
+        });
+
+        setTimeout(function () {
+            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            target.classList.add('duty-roster-jump-highlight');
+            setTimeout(function () { target.classList.remove('duty-roster-jump-highlight'); }, 1700);
+        }, ancestors.length ? 350 : 0);
+    }
+
+    document.querySelectorAll('.duty-roster-dept-emp-link').forEach(function (el) {
+        el.addEventListener('click', function () {
+            jumpToEmployee(el.getAttribute('data-jump-emp'));
+        });
+        el.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                jumpToEmployee(el.getAttribute('data-jump-emp'));
+            }
+        });
+    });
+
+    renderWeekNav();
+})();
 </script>
 @endsection
 

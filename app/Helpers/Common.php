@@ -2862,23 +2862,10 @@ class Common
                     ])
                     ->map(function ($roster)    use ($LeaveCategory,$resort_id) {
 
-                        // Add ShiftNameColor like in weekly format
-                        if($roster->ShiftName =="First Shift")
-                        {
-                            $roster->ShiftNameColor = "createDuty-green";
-                        }
-                        if($roster->ShiftName =="Second Shift")
-                        {
-                            $roster->ShiftNameColor = "createDuty-yellow";
-                        }
-                        if($roster->ShiftName =="General Shift")
-                        {
-                            $roster->ShiftNameColor = "createDuty-skyBlue";
-                        }
-                        if($roster->ShiftName =="Night Shift")
-                        {
-                            $roster->ShiftNameColor = "createDuty-purple";
-                        }
+                        // Matches real shift names (e.g. "Morning Shift") via
+                        // keyword lookup instead of exact-matching only the
+                        // old "First/Second/General/Night Shift" naming.
+                        $roster->ShiftNameColor = self::shiftNameColor($roster->ShiftName);
 
                         $statusCount = [ ];
 
