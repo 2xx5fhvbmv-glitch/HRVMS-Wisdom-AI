@@ -2174,8 +2174,6 @@
                 if (typeof window.updateFooterSummary === 'function') { window.updateFooterSummary(); }
                 updateSubmitButtonState();
 
-                console.log('Date range changed:', startDate, 'to', endDate);
-
                 // Drop any previously-marked day-off dates that no longer
                 // fall inside the newly selected range, then refresh the
                 // calendar's day-off highlighting and the chips list.
@@ -2218,41 +2216,9 @@
         });
 
         // Initialize day off picker for modal
-        function initializeDayOffPickerModel() {
-            // Clear the input value
-            $("#DayOffDatesModel").val('');
-
-            // Destroy existing picker if any
-            if(dayOffPickerModel) {
-                dayOffPickerModel.destroy();
-            }
-
-            // Initialize flatpickr with multiple date selection
-            dayOffPickerModel = flatpickr("#DayOffDatesModel", {
-                mode: "multiple",
-                dateFormat: "Y-m-d",
-                inline: false,
-                clickOpens: true,
-                allowInput: false,
-                conjunction: ", ",
-                onChange: function(selectedDates, dateStr, instance) {
-                    console.log('Day off dates selected (modal):', selectedDates);
-                },
-                onOpen: function(selectedDates, dateStr, instance) {
-                    $('#DayOffDatesModel').addClass('active');
-                },
-                onClose: function(selectedDates, dateStr, instance) {
-                    $('#DayOffDatesModel').removeClass('active');
-                },
-                onReady: function(selectedDates, dateStr, instance) {
-                    instance.calendarContainer.style.zIndex = 10000;
-                    instance.redraw();
-                },
-                locale: {
-                    firstDayOfWeek: 1
-                }
-            });
-        }
+        </script>
+        @include('resorts.renderfiles.dutyRosterSharedScripts')
+        <script type="text/javascript">
 
         // Initialize model picker on load (main picker is initialized in updateDateText)
         initializeDayOffPickerModel();
@@ -2315,10 +2281,6 @@
                 // Add final total hours
                 formData.append('FinalTotalHours', $('#FinalTotalHoursInput').val());
 
-                // Debug: Log the data being sent
-                console.log('Overtime Data:', overtimeDataToSend);
-                console.log('Final Total Hours:', $('#FinalTotalHoursInput').val());
-
                 $.ajax({
                     url: "{{ route('resort.timeandattendance.StoreDutyRoster') }}", // Ensure route is correct
                     type: "POST",
@@ -2351,11 +2313,7 @@
                             var responseData = xhr.responseJSON || {};
                             var errors = responseData.errors || {};
                             var errs = '';
-                            
-                            // Debug: Log the response to console
-                            console.log('Validation Error Response:', responseData);
-                            console.log('Errors object:', errors);
-                            
+
                             if (typeof errors === 'object' && Object.keys(errors).length > 0) {
                                 $.each(errors, function (field, messages) {
                                     if (Array.isArray(messages)) {
@@ -2508,10 +2466,8 @@
                         error: function(response) {
                             var errors = response.responseJSON;
                             var errs = '';
-                            console.log(errors.errors);
                             $.each(errors.errors, function(key, error)
                             {
-                                console.log(error);
                                 errs += error + '<br>';
                             });
                             toastr.error(errs, { positionClass: 'toast-bottom-right'});
@@ -3125,20 +3081,13 @@
                     let dayOffValue = $('#DayOffDates').val();
                     if(dayOffValue) {
                         dayOffDates = dayOffValue.split(',').map(d => d.trim()).filter(d => d);
-                        console.log('Got dates from input value:', dayOffDates);
                     }
-                } else {
-                    console.log('No day off dates found - picker may not be initialized or no dates selected');
                 }
             } catch(e) {
                 console.error('Error getting day off dates:', e);
                 // If there's an error, just use empty array
                 dayOffDates = [];
             }
-
-            console.log('Final day off dates array:', dayOffDates);
-            console.log('Day off dates count:', dayOffDates.length);
-            console.log('Employee count:', employeeCount, 'Days in range:', daysDiff);
 
             // Calculate GROSS shift total hours for all employees and all days (BEFORE deduction)
             let grossShiftTotalMinutes = (shiftHours * 60 + shiftMinutes) * employeeCount * daysDiff;
@@ -3149,10 +3098,6 @@
 
             // Calculate NET shift hours (AFTER day off deduction)
             let netShiftTotalMinutes = grossShiftTotalMinutes - dayOffDeductionMinutes;
-
-            console.log('Gross shift minutes:', grossShiftTotalMinutes);
-            console.log('Day off count:', dayOffCount, 'Deduction minutes:', dayOffDeductionMinutes);
-            console.log('Net shift minutes:', netShiftTotalMinutes);
 
             // Calculate overtime total from hoursByDate (per-date OT); exclude day-off dates
             let overtimeTotalMinutes = 0;
@@ -3198,14 +3143,6 @@
             $('#DayOffDeduction').html(dayOffDeduction);
             $('#FinalTotalHours').html(finalTotal);
             $('#FinalTotalHoursInput').val(finalTotal);
-
-            console.log('Calculation complete:', {
-                grossShiftTotal: formatTimeFromMinutes(grossShiftTotalMinutes),
-                dayOffDeduction,
-                netShiftTotal: shiftTotal,
-                overtimeTotal,
-                finalTotal
-            });
         } catch(error) {
             console.error('Error in calculateAllTotals:', error);
             // Show user-friendly error
@@ -3223,91 +3160,8 @@
         return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
     }
 
-    // Keep the old function for modal (edit duty roster)
-    function calculateTotalTime(overtime,DayWiseTotalHours,flag="")
-    {
-        if(overtime == "" || overtime==0)
-        {
-            overtime = "00:00";
-        }
-        if (!/^([0-9]{1,2}):([0-9]{2})$/.test(overtime)) {
-            toastr.error("Please enter a valid overtime value in HH:MM format.", "Error", {
-                positionClass: 'toast-bottom-right'
-            });
-            return;
-        }
-
-        // Split the overtime input into hours and minutes
-        let [hours, minutes] = overtime.split(':');
-        hours = parseInt(hours);
-        minutes = parseInt(minutes);
-
-        let totalHrs = "";
-
-        if (DayWiseTotalHours !== "")
-        {
-            // Use provided DayWiseTotalHours (from DB or selected shift)
-            totalHrs = DayWiseTotalHours;
-        }
-        else
-        {
-            // Fallback: read TotalHours from the correct shift dropdown
-            if (flag === "Modal") {
-                totalHrs = $("#Shiftpopup").find(":selected").data('totalhrs') || "00:00";
-            } else {
-                totalHrs = $("#Shift").find(":selected").data('totalhrs') || "00:00";
-            }
-        }
-
-        // Ensure totalHrs is in HH:MM format (normalize cases like "8" to "08:00")
-        if (!/^([0-9]{1,2}):([0-9]{2})$/.test(totalHrs)) {
-            let numericHours = parseInt(totalHrs) || 0;
-            totalHrs = numericHours.toString().padStart(2, '0') + ':00';
-        }
-
-        let [shiftHours, shiftMinutes] = totalHrs.split(':');
-        shiftHours = parseInt(shiftHours);
-        shiftMinutes = parseInt(shiftMinutes);
-        let shiftTotalHrs = shiftHours + (shiftMinutes / 60);
-        if ($.isNumeric(hours) && $.isNumeric(minutes) && $.isNumeric(shiftTotalHrs))
-        {
-            let totalHours = Math.floor(shiftTotalHrs); // Get the hour part
-            let totalMinutes = (shiftTotalHrs - totalHours) * 60; // Convert decimal minutes back to actual minutes
-
-
-            totalHours += hours;
-            totalMinutes += minutes;
-
-            // Adjust for overflow of minutes (60 minutes = 1 hour)
-            // Round totalMinutes to avoid floating-point precision issues
-            totalMinutes = Math.round(totalMinutes);
-
-            if (totalMinutes >= 60) {
-                totalHours += Math.floor(totalMinutes / 60);
-                totalMinutes = totalMinutes % 60; // Remaining minutes after converting to hours
-            }
-            console.log(totalHours, totalMinutes);
-            // Format the result as "HH:MM"
-            let updatedTotalHrs = `${totalHours.toString().padStart(2, '0')}:${totalMinutes.toString().padStart(2, '0')}`;
-            // Display the updated total hours
-            if(flag == "Modal")
-            {
-                $("#TotalHoursModelInput").val(updatedTotalHrs);
-                $("#TotalHoursModel").html(updatedTotalHrs);
-            }
-            else
-            {
-                $("#TotalHoursInput").val(updatedTotalHrs);
-                $("#TotalHours").html(updatedTotalHrs);
-            }
-        }
-        else
-        {
-            toastr.error("Please enter a valid overtime value.", "Error", {
-                positionClass: 'toast-bottom-right'
-            });
-        }
-    }
+    // calculateTotalTime() (used by the modal / edit duty roster flow) now
+    // comes from the shared dutyRosterSharedScripts partial included above.
 
     $(document).on('keyup', '.search', function() {
         updateFilterWiseTable();
