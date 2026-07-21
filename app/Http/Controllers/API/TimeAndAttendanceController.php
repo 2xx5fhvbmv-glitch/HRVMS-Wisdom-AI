@@ -1271,6 +1271,57 @@ class TimeAndAttendanceController extends Controller
         }
     }
 
+    /**
+     * Resolve which employee a manual check-in/out acts on. Defaults to the
+     * caller's own employee (self check-in/out, the original behaviour).
+     * The Time & Attendance To-Do List sends other employees' pending
+     * items to HOD/HR/EXCOM to resolve — without this, manualCheckIn/
+     * manualCheckOut always looked up the attendance row under the
+     * caller's own Emp_id, so resolving a subordinate's item 404'd with
+     * "Attendance record not found" even though the row exists.
+     *
+     * Returns [$targetEmployee, null] on success, or [null, $errorResponse]
+     * if the caller isn't allowed to act on the requested employee.
+     */
+    private function resolveTargetEmployeeForManualAction(Request $request, $user, $employee)
+    {
+        $requestedEmployeeId = $request->input('employee_id');
+        if (empty($requestedEmployeeId) || (int) $requestedEmployeeId === (int) $employee->id) {
+            return [$employee, null];
+        }
+
+        $targetEmployee = Employee::where('id', $requestedEmployeeId)->where('resort_id', $user->resort_id)->first();
+        if (!$targetEmployee) {
+            return [null, response()->json(['success' => false, 'message' => 'Employee not found'], 404)];
+        }
+
+        $rank       = $employee->rank ?? null;
+        $deptId     = $employee->Dept_id ?? null;
+        $department = $deptId ? ResortDepartment::where('id', $deptId)->where('resort_id', $user->resort_id)->first(['name', 'code']) : null;
+        $deptName   = strtolower(trim($department->name ?? ''));
+        $deptCode   = $department->code ?? '';
+        $isHRDept   = in_array($deptName, ['human resources', 'hr']);
+        $isEODept   = ($deptCode === 'EO_1') || (strpos($deptName, 'executive office') !== false);
+
+        $rankPosition = Common::getEmployeeRankPosition($employee);
+        $isGM    = ($rankPosition['position'] ?? '') === 'GM' || ($rankPosition['rank'] ?? '') === 'GM';
+        $isEXCOM = ($rankPosition['position'] ?? '') === 'EXCOM' || ($rankPosition['rank'] ?? '') === 'EXCOM' || $rank == 1 || $rank === '1';
+        $isHOD   = ($rank == 2 || $rank === '2');
+
+        $canViewAll = ($isHRDept || $isEODept) && ($isGM || $isEXCOM || $isHOD);
+        $isDeptHOD  = ($rank == 2 && $deptId && $department && !$isHRDept);
+
+        $isAllowed = $canViewAll
+            || ($isDeptHOD && (int) $targetEmployee->Dept_id === (int) $deptId)
+            || in_array((int) $targetEmployee->id, Common::getSubordinates($employee->id), true);
+
+        if (!$isAllowed) {
+            return [null, response()->json(['success' => false, 'message' => 'You do not have permission to act on this employee\'s attendance.'], 403)];
+        }
+
+        return [$targetEmployee, null];
+    }
+
     public function manualCheckIn(Request $request)
     {
         if (!Auth::guard('api')->check()) {
@@ -1291,7 +1342,12 @@ class TimeAndAttendanceController extends Controller
 
         $user                                               =   Auth::guard('api')->user();
         $employee                                           =   $user->GetEmployee;
-        $emp_id                                             =   $employee->id;
+
+        [$targetEmployee, $permissionError]                 =   $this->resolveTargetEmployeeForManualAction($request, $user, $employee);
+        if ($permissionError) {
+            return $permissionError;
+        }
+        $emp_id                                             =   $targetEmployee->id;
         // The client's `current_time` was stored verbatim — if the device
         // formats it with a 12-hour pattern and no AM/PM marker, 10:23 PM
         // and 10:23 AM arrive as the identical string "10:23:00", so
@@ -1314,7 +1370,9 @@ class TimeAndAttendanceController extends Controller
             $ParentAttendance                               =   ParentAttendace::where('resort_id', $user->resort_id)->where('date', $date)->where('Emp_id', $emp_id)->first();
 
             // Get employee rank to determine if roster check is required
-            $employeeRank                                    =   $employee->rank ?? null;
+            // (the employee whose attendance this is — not necessarily the
+            // caller, when a HOD/HR/EXCOM is resolving it on their behalf).
+            $employeeRank                                    =   $targetEmployee->rank ?? null;
             $positionRankConfig                             =   config('settings.Position_Rank', []);
             $isSupervisorOrLineWorker                       =   in_array($employeeRank, ['5', '6']); // '5' => 'SUP', '6' => 'LINE WORKERS'
 
@@ -1633,20 +1691,6 @@ class TimeAndAttendanceController extends Controller
 
     public function manualCheckOut(Request $request)
     {
-        // #region agent log
-        $logFile = 'c:\wamp64\www\Wisdom-Ai\HRVMS-Wisdom-AI\.cursor\debug.log';
-        $logEntry = json_encode([
-            'sessionId' => 'debug-session',
-            'runId' => 'run1',
-            'hypothesisId' => 'ENTRY',
-            'location' => 'TimeAndAttendanceController.php:manualCheckOut:START',
-            'message' => 'manualCheckOut method called',
-            'data' => ['request_data' => $request->all()],
-            'timestamp' => round(microtime(true) * 1000)
-        ]) . "\n";
-        @file_put_contents($logFile, $logEntry, FILE_APPEND);
-        // #endregion
-
         if (!Auth::guard('api')->check()) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
@@ -1660,25 +1704,17 @@ class TimeAndAttendanceController extends Controller
         ]);
 
         if ($validator->fails()) {
-            // #region agent log
-            $logEntry = json_encode([
-                'sessionId' => 'debug-session',
-                'runId' => 'run1',
-                'hypothesisId' => 'VALIDATION',
-                'location' => 'TimeAndAttendanceController.php:manualCheckOut:VALIDATION_FAILED',
-                'message' => 'Validation failed',
-                'data' => ['errors' => $validator->errors()->toArray()],
-                'timestamp' => round(microtime(true) * 1000)
-            ]) . "\n";
-            @file_put_contents($logFile, $logEntry, FILE_APPEND);
-            // #endregion
-
             return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
         }
 
         $user                                               =   Auth::guard('api')->user();
         $employee                                           =   $user->GetEmployee;
-        $emp_id                                             =   $employee->id;
+
+        [$targetEmployee, $permissionError]                 =   $this->resolveTargetEmployeeForManualAction($request, $user, $employee);
+        if ($permissionError) {
+            return $permissionError;
+        }
+        $emp_id                                             =   $targetEmployee->id;
         // Same AM/PM ambiguity as manualCheckIn — use server time, not the
         // client's raw current_time string.
         $checkOutTime                                       =   Carbon::now()->format('H:i:s');

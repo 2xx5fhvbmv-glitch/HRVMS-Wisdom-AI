@@ -1055,6 +1055,11 @@ class LeaveController extends Controller
             $leaveData['leave_balances']                =   null;
             $leaveData['total_allocated_days']          =   null;
             $leaveData['total_available_days']          =   null;
+            // Employee's saved default destination (set via web portal
+            // Employee Details > Additional Information) — the mobile Apply
+            // Leave screen should prefill its editable Destination field
+            // with this instead of leaving it blank.
+            $leaveData['default_destination']           =   $employee->leave_destination;
 
             $emp_grade                                  =   Common::getEmpGrade($user->GetEmployee->rank);
 
@@ -1853,9 +1858,13 @@ class LeaveController extends Controller
             }
 
             if ($resortId) {
+                // Was excluding Pending leaves entirely, so tapping a
+                // still-pending leave in the mobile "My Leave" list (any
+                // newly-applied leave, before HOD/HR acts on it) 404'd with
+                // "Leave ID not found" — this is a single-record detail
+                // view, it should show a leave regardless of status.
                 $leaveDetails = DB::table('employees_leaves')
                     ->where('id', $decodedId)
-                    ->whereNotIn('status', ['Pending'])
                     ->first();
 
                 if (!$leaveDetails) {
@@ -1880,8 +1889,6 @@ class LeaveController extends Controller
                         $query->where('el.flag', $leaveCategoryId) // Matches flag with leave_category_id
                             ->orWhere('el.id', $decodedId); // Include the original record
                     })
-                    ->whereNotIn('el.status', ['Pending'])
-                    ->whereNotIn('els.status', ['Pending'])
                     ->where('el.emp_id', $empId);
 
                 $combineLeaveDetails = $combineLeaveDetails->select(
