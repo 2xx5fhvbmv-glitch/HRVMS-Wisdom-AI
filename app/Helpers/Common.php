@@ -3111,6 +3111,86 @@ class Common
 
     private static $attendanceCache = [];
 
+    /**
+     * No code path ever writes a parent_attendaces row with Status='Absent'
+     * (every real check-in hardcodes 'Present'), so the register's
+     * DutyRoster::join('parent_attendaces') queries above only ever return
+     * punched days — a scheduled work day with no punch simply has no row,
+     * so the cell renders blank instead of "Absent" (the blade already has
+     * an Absent-status branch, it just never receives one). Synthesize an
+     * Absent entry for every scheduled work day in range with no matching
+     * punch and no approved leave, using the same rule as AbsentCount in
+     * TimeAndAttendance/EmployeeController — so this stays consistent with
+     * the Absent counts shown on the employee list/detail pages.
+     */
+    private static function getAbsentRegisterEntries($resortId, $empId, $startDate, $endDate)
+    {
+        $rows = DB::select("
+            SELECT dre.date, dre.Shift_id, ss.ShiftName, ss.StartTime, ss.EndTime
+            FROM duty_roster_entries dre
+            JOIN shift_settings ss ON ss.id = dre.Shift_id
+            WHERE dre.Emp_id = ?
+            AND dre.resort_id = ?
+            AND dre.Shift_id IS NOT NULL
+            AND (dre.Status IS NULL OR dre.Status != 'DayOff')
+            AND dre.date BETWEEN GREATEST(?, IFNULL((SELECT joining_date FROM employees WHERE id = ?), ?)) AND LEAST(?, CURDATE())
+            AND NOT EXISTS (
+                SELECT 1 FROM parent_attendaces pa2
+                WHERE pa2.Emp_id = ? AND pa2.resort_id = ? AND pa2.date = dre.date
+                AND pa2.Status IN ('Present','HalfDay','On-Time','Late','ShortLeave','HalfDayLeave')
+                AND pa2.CheckingTime IS NOT NULL AND TRIM(IFNULL(pa2.CheckingTime,'')) NOT IN ('','00:00','00:00:00')
+            )
+            AND NOT EXISTS (
+                SELECT 1 FROM employees_leaves el2
+                WHERE el2.emp_id = ? AND el2.resort_id = ? AND el2.status = 'Approved'
+                AND dre.date BETWEEN el2.from_date AND el2.to_date
+            )
+        ", [$empId, $resortId, $startDate, $empId, $startDate, $endDate, $empId, $resortId, $empId, $resortId]);
+
+        return collect($rows)->map(function ($row) use ($empId) {
+            return (object) [
+                'date' => $row->date,
+                'Status' => 'Absent',
+                'Emp_id' => $empId,
+                'Shift_id' => $row->Shift_id,
+                'ShiftName' => $row->ShiftName,
+                'StartTime' => $row->StartTime,
+                'EndTime' => $row->EndTime,
+                'StartTimeShow' => null,
+                'EndTimeShow' => null,
+                'CheckingTime' => null,
+                'CheckingOutTime' => null,
+                'CheckInTime' => null,
+                'CheckOutTime' => null,
+                'OverTime' => null,
+                'DayWiseTotalHours' => null,
+                'note' => null,
+                'DayOfDate' => null,
+                'InternalStatus' => null,
+                'InTime_Location' => null,
+                'OutTime_Location' => null,
+                'InTime_Latitude' => null,
+                'InTime_Longitude' => null,
+                'InTime_Accuracy' => null,
+                'OutTime_Latitude' => null,
+                'OutTime_Longitude' => null,
+                'OutTime_Accuracy' => null,
+                'InTime_GeofenceName' => null,
+                'OutTime_GeofenceName' => null,
+                'Attd_id' => null,
+                'OTStatus' => null,
+                'OTstatus' => null,
+                'OTApproved_By' => null,
+                'ApprovedName' => '',
+                'differenceInHours' => null,
+                'msg' => null,
+                'LeaveData' => [],
+                'LeaveFirstName' => null,
+                'LeaveColor' => null,
+            ];
+        });
+    }
+
     public static function GetAttandanceRegister($resort_id,$duty_roster_id,$Employee,$WeekstartDate, $WeekendDate,$startOfMonth,$endOfMonth,$flag)
     {
         // Cache key to avoid duplicate queries for same employee/flag
@@ -3248,6 +3328,8 @@ class Common
                 return $roster;
             });
 
+            $absentEntries = self::getAbsentRegisterEntries($resort_id, $Employee, $WeekstartDate, $WeekendDate);
+            $DutyRoster = $DutyRoster->concat($absentEntries)->sortBy('date')->values();
         }
 
         if($flag =="Monthwise")
@@ -3399,7 +3481,8 @@ class Common
                         return $roster;
                     });
 
-
+            $absentEntries = self::getAbsentRegisterEntries($resort_id, $Employee, $startOfMonth->format('Y-m-d'), $endOfMonth->format('Y-m-d'));
+            $DutyRoster = $DutyRoster->concat($absentEntries)->sortBy('date')->values();
         }
         self::$attendanceCache[$cacheKey] = $DutyRoster;
         return $DutyRoster;

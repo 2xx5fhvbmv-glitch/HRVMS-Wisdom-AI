@@ -454,8 +454,7 @@ class EmployeeController extends Controller
         $employees = $employees->paginate(10); // Adjust pagination per your needs
 
         // Apply the transform to the paginated results
-        $today = Carbon::today()->format('Y-m-d');
-        $employees->getCollection()->transform(function ($employee) use ($currentMonthDays, $monthStartingDate, $monthEndingDate, $today) {
+        $employees->getCollection()->transform(function ($employee) use ($currentMonthDays, $monthStartingDate, $monthEndingDate) {
             // Add computed fields
             $employee->name = ucfirst($employee->first_name . ' ' . $employee->last_name);
             $employee->profile_picture = Common::getResortUserPicture($employee->Parentid);
@@ -465,8 +464,12 @@ class EmployeeController extends Controller
             $employee->Leave = isset($employee->LeaveCount) ? $employee->LeaveCount : 0 ;
             $employee->Present = $employee->PresentCount;
             $employee->Dayoff = $employee->DayOffCount;
-            $elapsedDays = Carbon::parse($monthStartingDate)->diffInDays(Carbon::parse(min($today, $monthEndingDate))) + 1;
-            $employee->Absent = max(0, $elapsedDays - $employee->PresentCount - $employee->DayOffCount - ($employee->LeaveCount ?? 0));
+            // Same fix as index()/EmployeeDetails()/etc — this call site was
+            // missed when AbsentCount (real, duty_roster_entries-derived)
+            // replaced the elapsedDays residual, so the grid view kept
+            // showing a much larger, made-up Absent number than every other
+            // page (detail page, list view) for the same employee.
+            $employee->Absent = $employee->AbsentCount ?? 0;
             $employee->CompletedWorkingDays = $employee->PresentCount;
             $employee->TotalDayoff = Common::getWeekCountInMonth($monthStartingDate, $monthEndingDate);
             $employee->CompletedDayoff = $employee->DayOffCount;
@@ -800,7 +803,7 @@ class EmployeeController extends Controller
                             return $i;
             });
             $leave_categories = $this->addLeaveAvailableWithCarryForward($leave_categories, $id);
-            $AttendanceHistroy = ParentAttendace::join('shift_settings as ss', 'ss.id', '=', 'parent_attendaces.Shift_id')
+            $realAttendance = ParentAttendace::join('shift_settings as ss', 'ss.id', '=', 'parent_attendaces.Shift_id')
                 ->join('employees as t1', 't1.id', '=', 'parent_attendaces.Emp_id')
                 ->leftjoin('child_attendaces as t2', 't2.Parent_attd_id', '=', 'parent_attendaces.id')
                 ->whereIn('parent_attendaces.Status', ['On-Time','Present','Late','DayOff','Absent','ShortLeave','HalfDayLeave'])
@@ -808,8 +811,7 @@ class EmployeeController extends Controller
                 ->where('parent_attendaces.resort_id', $resortId)
                 ->whereBetween('parent_attendaces.date', [$monthStartingDate, $monthEndingDate])
                 ->groupBy('parent_attendaces.id')
-                ->orderBy('parent_attendaces.date', 'ASC')
-                ->paginate(10, [
+                ->get([
                     't2.InTime_Location',
                     't2.OutTime_Location',
                     'parent_attendaces.note',
@@ -824,6 +826,65 @@ class EmployeeController extends Controller
                     'parent_attendaces.Status',
                     'parent_attendaces.DayWiseTotalHours'
                 ]);
+
+            // No code path ever writes a parent_attendaces row with
+            // Status='Absent' (every real check-in hardcodes 'Present'), so
+            // the history list above only ever contains punched days.
+            // Synthesize an Absent entry for every scheduled work day in
+            // range with no matching punch and no approved leave — the same
+            // rule AbsentCount uses (see getDetailSelectColumns) — so this
+            // list actually reflects the Absent count shown on this page
+            // instead of silently skipping those days.
+            $absentRows = DB::select("
+                SELECT dre.date, ss.ShiftName, ss.StartTime
+                FROM duty_roster_entries dre
+                JOIN shift_settings ss ON ss.id = dre.Shift_id
+                WHERE dre.Emp_id = ?
+                AND dre.resort_id = ?
+                AND dre.Shift_id IS NOT NULL
+                AND (dre.Status IS NULL OR dre.Status != 'DayOff')
+                AND dre.date BETWEEN GREATEST(?, IFNULL((SELECT joining_date FROM employees WHERE id = ?), ?)) AND LEAST(?, CURDATE())
+                AND NOT EXISTS (
+                    SELECT 1 FROM parent_attendaces pa2
+                    WHERE pa2.Emp_id = ? AND pa2.resort_id = ? AND pa2.date = dre.date
+                    AND pa2.Status IN ('Present','HalfDay','On-Time','Late','ShortLeave','HalfDayLeave')
+                    AND pa2.CheckingTime IS NOT NULL AND TRIM(IFNULL(pa2.CheckingTime,'')) NOT IN ('','00:00','00:00:00')
+                )
+                AND NOT EXISTS (
+                    SELECT 1 FROM employees_leaves el2
+                    WHERE el2.emp_id = ? AND el2.resort_id = ? AND el2.status = 'Approved'
+                    AND dre.date BETWEEN el2.from_date AND el2.to_date
+                )
+            ", [$id, $resortId, $monthStartingDate, $id, $monthStartingDate, $monthEndingDate, $id, $resortId, $id, $resortId]);
+
+            $absentItems = collect($absentRows)->map(function ($row) {
+                return (object) [
+                    'date' => $row->date,
+                    'ShiftName' => $row->ShiftName,
+                    'StartTime' => $row->StartTime,
+                    'CheckingTime' => null,
+                    'CheckingOutTime' => null,
+                    'OverTime' => null,
+                    'DayWiseTotalHours' => null,
+                    'note' => null,
+                    'InTime_Location' => null,
+                    'OutTime_Location' => null,
+                    'Child_id' => null,
+                    'ParentAttd_id' => null,
+                    'Status' => 'Absent',
+                ];
+            });
+
+            $mergedAttendance = $realAttendance->concat($absentItems)->sortBy('date')->values();
+            $historyPage = (int) request('page', 1);
+            $historyPerPage = 10;
+            $AttendanceHistroy = new \Illuminate\Pagination\LengthAwarePaginator(
+                $mergedAttendance->forPage($historyPage, $historyPerPage)->values(),
+                $mergedAttendance->count(),
+                $historyPerPage,
+                $historyPage,
+                ['path' => request()->url(), 'query' => request()->query()]
+            );
 
             // Transform the data after pagination
             $AttendanceHistroy->setCollection(
