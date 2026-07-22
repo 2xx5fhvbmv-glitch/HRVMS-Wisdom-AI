@@ -2216,6 +2216,7 @@
         });
 
         // Initialize day off picker for modal
+    });
         </script>
         @include('resorts.renderfiles.dutyRosterSharedScripts')
         <script type="text/javascript">
@@ -2475,7 +2476,6 @@
                     });
                 }
         });
-    });
     // Overtime by date: { empId: { hoursByDate: { 'Y-m-d': 'HH:MM', ... } } }
     let employeeOvertimeData = {};
     let availableDates = []; // Store available dates from date range

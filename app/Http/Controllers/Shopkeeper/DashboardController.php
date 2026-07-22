@@ -201,7 +201,9 @@ class DashboardController extends Controller
             'deduction_amt'  => 'required|numeric|min:0',
         ]);
 
-        $payment = Payment::findOrFail($request->paymentID);
+        $payment = Payment::where('id', $request->paymentID)
+            ->where('shopkeeper_id', $this->shopkeeper->id)
+            ->firstOrFail();
         $cutoff_day = PayrollConfig::where('resort_id', $this->shopkeeper->resort_id)->value('cutoff_day');
         $current_day = now()->day; // Get current day (1-31)
 

@@ -52,6 +52,11 @@ class PaymentController extends Controller
             $tableData = Payment::join('employees as e', 'e.id', '=', 'payments.emp_id')
                 ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
                 ->join('products as p', 'p.id', '=', 'payments.product_id')
+                ->whereExists(function ($query) {
+                    $query->select(DB::raw(1))
+                        ->from('payroll_employees')
+                        ->whereColumn('payroll_employees.employee_id', 'e.id');
+                })
                 ->where('payments.shopkeeper_id', $shopkeeper_id)
                 ->whereIn('payments.status', ['Paid', 'Partial Paid', 'Pending', 'Pending Consent', 'Consented', 'Rejected']);
 
@@ -295,7 +300,9 @@ class PaymentController extends Controller
             'paymentID' => 'required|exists:payments,id',
         ]);
 
-        $payment = Payment::with('shopKeeper', 'product')->findOrFail($request->paymentID);
+        $payment = Payment::with('shopKeeper', 'product')
+            ->where('shopkeeper_id', $this->shopkeeper->id)
+            ->findOrFail($request->paymentID);
         $shopkeeper = $this->shopkeeper;
 
         $resortId = $payment->shopKeeper->resort_id ?? null;
