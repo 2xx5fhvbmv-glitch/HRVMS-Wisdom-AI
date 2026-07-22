@@ -320,12 +320,16 @@
                 { data: 'purchased_date', name: 'purchased_date', className: 'text-nowrap' },
                 { data: 'product', name: 'product', className: 'text-nowrap' },
                 { data: 'quantity', name: 'quantity', className: 'text-nowrap' },
-                { data: 'price', name: 'price', className: 'text-nowrap' },
+                { data: 'price', name: 'price', className: 'text-nowrap', render: function(data, type, row) {
+                    if (type !== 'display') return data;
+                    var symbol = (row.currency_type === 'MVR') ? 'Rf ' : '$';
+                    return symbol + parseFloat(data || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                } },
                 { data: 'currency_type', name: 'currency_type', className: 'text-nowrap' },
                 { data: 'status', name: 'status', render: function(data, type, row) { if (type === 'display' && data) { var $wrap = $('<div>').html(data); return $wrap[0]; } return data || '—'; } },
                 { data: 'qr_code', name: 'qr_code', orderable: false, searchable: false, className: 'text-center' },
                 { data: 'action', name: 'action', orderable: false, searchable: false },
-                { data: 'created_at', visible: false, searchable: false },
+                { data: 'created_at', name: 'payments.created_at', visible: false, searchable: false },
             ]
         });
     }

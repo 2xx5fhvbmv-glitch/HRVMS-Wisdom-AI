@@ -272,7 +272,17 @@ class ShopkeeperController extends Controller
             $tableData->whereBetween('payments.purchased_date', [$startDate, $endDate]);
         }
 
-        $totalAmount = (clone $tableData)->sum('payments.price');
+        // payments.price is stored in the product's own currency (MVR or
+        // USD) — a blind SUM() mixes the two. Normalize each row to USD
+        // before summing so the frontend's formatAmount($total, 'USD') call
+        // isn't fed a raw MVR value it then mislabels as USD.
+        $usdToMvrRate = Common::getUsdToMvrRate();
+        $totalAmount = (clone $tableData)
+            ->select('payments.price', 'p.currency_type')
+            ->get()
+            ->sum(function ($row) use ($usdToMvrRate) {
+                return $row->currency_type === 'MVR' ? ($row->price / $usdToMvrRate) : $row->price;
+            });
 
         $tableData = $tableData->orderBy('payments.updated_at', 'DESC')
             ->select([
@@ -316,6 +326,9 @@ class ShopkeeperController extends Controller
             })
             ->addColumn('product', function ($row) {
                 return $row->product_name;
+            })
+            ->editColumn('purchased_date', function ($row) {
+                return $row->purchased_date ? \Carbon\Carbon::parse($row->purchased_date)->format('d M Y') : '—';
             })
             ->addColumn('status', function ($row) {
                 $statusClasses = [
