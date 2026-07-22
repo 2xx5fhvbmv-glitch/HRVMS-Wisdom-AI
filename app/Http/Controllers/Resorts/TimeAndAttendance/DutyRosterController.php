@@ -697,7 +697,7 @@ class DutyRosterController extends Controller
                                     'start_time' => $shiftEndTime,
                                     'end_time' => $overtimeEndCarbon->format('H:i'),
                                     'total_time' => sprintf('%02d:%02d', $overtimeHours, $overtimeMinutes),
-                                    'status' => 'approved',
+                                    'status' => 'pending',
                                     'overtime_type' => 'after_shift',
                                 ]);
                             }

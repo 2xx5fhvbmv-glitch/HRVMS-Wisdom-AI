@@ -260,7 +260,8 @@ class AttandanceRegisterController extends Controller
 
 
                             // ->whereIn('employees.id', $this->underEmp_id)
-                            ->where('t1.resort_id', $this->resort->resort_id);
+                            ->where('t1.resort_id', $this->resort->resort_id)
+                            ->where('employees.status', 'Active');
 
                             $employeeRankPosition = Common::getEmployeeRankPosition($this->resort->getEmployee);
                             $userDeptId = $this->resort->GetEmployee->Dept_id ?? '';
