@@ -369,6 +369,7 @@ class TalentAcquisitionDashboardController extends Controller
                     'tc.reason',
                     DB::raw("CONCAT(ra.first_name, ' ', ra.last_name) as action_by"),
                     DB::raw('tc.updated_at as action_date'),
+                    'v.id as vacancy_id',
                     'rp.position_title',
                     'rd.name as department_name',
                     'v.Total_position_required'
@@ -398,6 +399,99 @@ class TalentAcquisitionDashboardController extends Controller
                     return $item;
                 });
 
+            // Full HR -> Finance -> GM chain (every rank stage, including the
+            // ones still "Active"/pending) for whichever requisitions appear
+            // above, so the dashboard can show a complete chain per position
+            // instead of only whichever stages happened to have recent
+            // activity. Same tables/joins as $approvalHistory above — just
+            // without the status filter or the "10 most recent" limit, and
+            // scoped to the small set of vacancy ids already selected.
+            $approvalHistoryVacancyIds = $approvalHistory->pluck('vacancy_id')->unique()->values();
+            $approvalHistoryChains = collect();
+            if ($approvalHistoryVacancyIds->isNotEmpty()) {
+                $approvalHistoryChains = DB::table('t_anotification_children as tc')
+                    ->join('t_anotification_parents as tp', 'tp.id', '=', 'tc.Parent_ta_id')
+                    ->join('vacancies as v', 'v.id', '=', 'tp.V_id')
+                    ->join('resort_positions as rp', 'rp.id', '=', 'v.position')
+                    ->join('resort_departments as rd', 'rd.id', '=', 'v.department')
+                    ->leftJoin('resort_admins as ra', 'ra.id', '=', 'tc.modified_by')
+                    ->where('tp.Resort_id', $resort_id)
+                    ->whereIn('v.id', $approvalHistoryVacancyIds)
+                    ->select(
+                        'tc.id as child_id',
+                        'tc.status as action_status',
+                        'tc.Approved_By',
+                        'tc.reason',
+                        DB::raw("CONCAT(ra.first_name, ' ', ra.last_name) as action_by"),
+                        DB::raw('tc.updated_at as action_date'),
+                        'v.id as vacancy_id',
+                        'rp.position_title',
+                        'rd.name as department_name'
+                    )
+                    ->orderBy('tc.Approved_By')
+                    ->get()
+                    ->map(function ($item) use ($config) {
+                        $item->rank_name = $config[$item->Approved_By] ?? 'Unknown';
+                        if ($item->action_status === 'ForwardedToNext' || $item->action_status === 'Approved') {
+                            $item->action_label = 'Approved';
+                            $item->badge_class = 'bg-success';
+                        } elseif ($item->action_status === 'Rejected') {
+                            $item->action_label = 'Rejected';
+                            $item->badge_class = 'bg-danger';
+                        } elseif ($item->action_status === 'Hold') {
+                            $item->action_label = 'On Hold';
+                            $item->badge_class = 'bg-warning';
+                        } else {
+                            // "Active" (not yet acted on) = pending. Don't
+                            // trust action_by/modified_by here — for a row
+                            // nobody has acted on yet it's just left over
+                            // from whoever/whatever created the row, not a
+                            // real approver.
+                            $item->action_label = 'Pending';
+                            $item->badge_class = 'bg-pending';
+                            $item->action_by = null;
+                        }
+                        $item->is_missing = false;
+                        return $item;
+                    });
+
+                // Every requisition is supposed to go through all three
+                // stages (HR -> Finance -> GM), but some requisitions in
+                // this data genuinely have NO t_anotification_children row
+                // at all for one of those ranks (e.g. no Finance row ever
+                // created) — a real gap in the workflow, not a normal
+                // "queued, not yet actioned" pending stage. Surface that gap
+                // instead of silently omitting the stage, so it reads as
+                // "needs attention" rather than looking like it never
+                // existed.
+                $standardRanks = [3, 7, 8]; // HR -> Finance -> GM
+                $approvalHistoryChains = $approvalHistoryChains
+                    ->groupBy('vacancy_id')
+                    ->map(function ($rows) use ($standardRanks, $config) {
+                        $existingRanks = $rows->pluck('Approved_By')->all();
+                        $first = $rows->first();
+                        foreach ($standardRanks as $rank) {
+                            if (in_array($rank, $existingRanks)) continue;
+                            $rows->push((object) [
+                                'action_status' => null,
+                                'Approved_By' => $rank,
+                                'reason' => null,
+                                'action_by' => null,
+                                'action_date' => null,
+                                'vacancy_id' => $first->vacancy_id,
+                                'position_title' => $first->position_title,
+                                'department_name' => $first->department_name,
+                                'rank_name' => $config[$rank] ?? 'Unknown',
+                                'action_label' => 'Pending',
+                                'badge_class' => 'bg-pending',
+                                'is_missing' => true,
+                            ]);
+                        }
+                        return $rows->sortBy('Approved_By')->values();
+                    })
+                    ->flatten(1);
+            }
+
             $taInsights = $this->getCachedTaInsights($resort_id);
 
             return view('resorts.talentacquisition.dashboard.hrdashboard',
@@ -421,7 +515,8 @@ class TalentAcquisitionDashboardController extends Controller
                     'topCountries',
                     'HiringSource',
                     'EmailTamplete',
-                    'approvalHistory'
+                    'approvalHistory',
+                    'approvalHistoryChains'
                 )
             );
         // } catch( \Exception $e ) {
@@ -1070,24 +1165,41 @@ class TalentAcquisitionDashboardController extends Controller
     {
         $currentYear =$request->YearWiseTopSource;
         $resort_id = $this->globalUser->resort_id;
+        $vacancyId = $request->input('vacancy_id');
 
         // Get all months for the current year in "M Y" format
         $months = collect(range(1, 12))->map(function ($month) use ($currentYear) {
             return date('M Y', mktime(0, 0, 0, $month, 1));
         });
 
-        // Fetch applicant data with month and year
-        $applicantData = DB::table('applicant_form_data')
-            ->join('hiring_sources', 'applicant_form_data.Applicant_Source', '=', 'hiring_sources.id')
+        // Fetch applicant data with month and year. leftJoin (not join) —
+        // an inner join here was silently dropping every applicant whose
+        // Applicant_Source was never set, so the widget only ever showed
+        // the handful of applicants who happened to have a source recorded
+        // and undercounted the true applicant total. COALESCE labels those
+        // as "Not specified" instead of hiding them, so the gap in source
+        // tracking is visible rather than invisible.
+        $applicantDataQuery = DB::table('applicant_form_data')
+            ->leftJoin('hiring_sources', 'applicant_form_data.Applicant_Source', '=', 'hiring_sources.id')
             ->where('applicant_form_data.resort_id', $resort_id)
+            ->whereYear('applicant_form_data.created_at', $currentYear);
+
+        // Optional vacancy scope for the "Vacancy" filter — same join
+        // pattern already used by getTopCountriesPositionData() above
+        // (applicant_form_data.Parent_v_id -> vacancies.id). Response shape
+        // is unchanged; this only narrows which applicant rows are counted.
+        if (!empty($vacancyId)) {
+            $applicantDataQuery->where('applicant_form_data.Parent_v_id', $vacancyId);
+        }
+
+        $applicantData = $applicantDataQuery
             ->selectRaw('
                 DATE_FORMAT(applicant_form_data.created_at, "%b %Y") as month_year,
-                hiring_sources.source_name as source_name,
+                COALESCE(hiring_sources.source_name, "Not specified") as source_name,
                 COUNT(applicant_form_data.id) as count,
-                hiring_sources.colour as color
+                COALESCE(hiring_sources.colour, "#93A4A9") as color
             ')
-            ->whereYear('applicant_form_data.created_at', $currentYear)
-            ->groupBy('month_year', 'source_name', 'colour')
+            ->groupBy('month_year', 'source_name', 'color')
             ->orderByRaw('DATE_FORMAT(applicant_form_data.created_at, "%Y-%m")')
             ->get();
             // Extract unique sources

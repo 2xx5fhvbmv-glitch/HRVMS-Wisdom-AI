@@ -149,14 +149,14 @@
                     : 0;
             @endphp
 
-            {{-- WAI Insight's — AI-narrated survey metrics (took the Participation Rate slot) --}}
+            {{-- WAI Insights — AI-narrated survey metrics (took the Participation Rate slot) --}}
             <div class="col-xl-3 col-sm-6 @if(Common::checkRouteWisePermission('Survey.Surveylist',config('settings.resort_permissions.view')) == false) d-none @endif">
                 <div class="card card-wiINsight card-wiINsightSurvey h-100" id="card-wiINsightSurvey">
                     @php $sMeta = $surveyInsights['_meta'] ?? null; @endphp
                     <div class="card-title">
                         <div class="row justify-content-between align-items-center g-md-3 g-1">
                             <div class="col">
-                                <h3 class="text-nowrap">WAI Insight's</h3>
+                                <h3 class="text-nowrap">WAI Insights</h3>
                             </div>
                             <div class="col-auto text-end" style="font-size:12px;line-height:1.3;">
                                 @if($sMeta)
@@ -489,7 +489,7 @@
 
 @section('import-css')
 <style>
-    /* WAI Insight's — survey card in the Participation Rate slot. Fixed height
+    /* WAI Insights — survey card in the Participation Rate slot. Fixed height
        with the insight list scrolling inside the narrow column. */
     .card-wiINsightSurvey {
         height: 100% !important;

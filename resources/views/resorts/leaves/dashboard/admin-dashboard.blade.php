@@ -200,7 +200,7 @@
             <div class="col-xl-6">
                 <div class="card card-wiINsight">
                     <div class="card-title d-flex justify-content-between align-items-start">
-                        <h3>WAI Insight's</h3>
+                        <h3>WAI Insights</h3>
                         @php $meta = $leaveInsights['_meta'] ?? null; @endphp
                         @if($meta)
                             <div class="text-end" style="font-size:12px;line-height:1.4;">

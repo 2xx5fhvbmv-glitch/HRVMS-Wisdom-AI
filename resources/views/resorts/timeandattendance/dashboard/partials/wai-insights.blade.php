@@ -9,15 +9,15 @@
 @endphp
 
 <style>
-    /* Match the leave module's WAI Insight's card: fixed shell, scrolling list. */
+    /* Match the leave module's WAI Insights card: fixed shell, scrolling list. */
     .card-wiINsight { display: flex; flex-direction: column; }
     .card-wiINsight .leaveUser-main { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
     .card-wiINsight .wai-count { font-size: 20px; font-weight: 600; line-height: 1; }
 </style>
 
-<div class="card card-wiINsight">
+<div class="card card-wiINsight" @if(!empty($cardId)) id="{{ $cardId }}" @endif>
     <div class="card-title d-flex justify-content-between align-items-start">
-        <h3>WAI Insight's</h3>
+        <h3>WAI Insights</h3>
     </div>
     <div class="leaveUser-main">
         @foreach ($waiRows as $row)
@@ -43,12 +43,12 @@
     </div>
 </div>
 
-{{-- WAI Insight's details modal --}}
+{{-- WAI Insights details modal --}}
 <div class="modal fade" id="waiInsightModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="waiInsightModalTitle">WAI Insight's</h5>
+                <h5 class="modal-title" id="waiInsightModalTitle">WAI Insights</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">

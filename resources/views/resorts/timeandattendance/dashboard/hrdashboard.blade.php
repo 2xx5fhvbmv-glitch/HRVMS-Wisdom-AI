@@ -32,6 +32,74 @@
             max-width: 20%;
         }
     }
+
+    /* This row's default Bootstrap flex behaviour (align-items: stretch)
+       was stretching Attendance's column to match To Do List's own natural
+       (often much taller, many-item) content height BEFORE the JS below
+       ever ran — so the JS was then measuring an already-inflated
+       Attendance height and copying that same inflated number back onto
+       To Do List, leaving a large empty gap under Attendance's chart.
+       align-self: flex-start opts both columns out of that stretch so each
+       sizes to its own real content again; the JS then does the actual
+       exact-match cleanly on top of that. */
+    .ta-attendance-col,
+    .ta-todo-col {
+        align-self: flex-start;
+    }
+
+    /* To Do List — sits alongside Attendance (both col-xl-6). The actual
+       exact-match to Attendance's height is done by JS below (measures
+       Attendance's real rendered height and applies it here), since a
+       fixed guess here would rarely line up pixel-for-pixel. This
+       max-height is only a safety net for before that JS runs (or if it
+       can't run at all) — generous enough that it should never actually
+       constrain the JS-set height in normal use, just stop the list from
+       growing truly unbounded. */
+    .ta-todo-card-v2 {
+        display: flex;
+        flex-direction: column;
+        max-height: 800px;
+    }
+    .ta-todo-card-v2 .ta-todo-list-v2 {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+    }
+    /* Moves the Check-In/Check-Out button to the right of the text instead
+       of stacked underneath it. */
+    .ta-todo-card-v2 .todoList-block {
+        align-items: center;
+    }
+    .ta-todo-card-v2 .ta-todo-action {
+        flex-shrink: 0;
+        margin-left: 12px;
+    }
+    /* Check-In/Check-Out otherwise size to their own text ("Check-Out" is
+       longer than "Check-In"), so the two buttons ended up visibly
+       different widths across rows. 116px wasn't actually wide enough to
+       be the binding constraint on the longer "Check-Out" button (its own
+       content already exceeded that), so it had no visible effect —
+       150px clears both, and both are forced to render at that same
+       explicit width instead of just a floor either one could exceed.
+       Scoped to .ta-todo-action rather than the shared .manual-check-action
+       class itself, since that class is also used by todolist.blade.php
+       and the HOD dashboard. */
+    .ta-todo-card-v2 .ta-todo-action .manual-check-action {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 150px;
+    }
+    .ta-todo-card-v2 .ta-todo-initials {
+        width: 100%;
+        height: 100%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        font-weight: 600;
+        font-size: 13px;
+    }
 </style>
         <div class="row g-3 g-xxl-4 card-heigth">
              <!-- Total Employees -->
@@ -108,8 +176,8 @@
                         </div>
                     </div>
                 </div>
-            <div class="col-xl-6 @if(App\Helpers\Common::checkRouteWisePermission('resort.timeandattendance.AttandanceRegister',config('settings.resort_permissions.view')) == false) d-none @endif">
-                <div class="card">
+            <div class="col-xl-6 ta-attendance-col @if(App\Helpers\Common::checkRouteWisePermission('resort.timeandattendance.AttandanceRegister',config('settings.resort_permissions.view')) == false) d-none @endif">
+                <div class="card" id="card-attendance">
                     <div class="card-title">
                         <div class="row justify-content-between align-items-center g-md-3 g-1">
                             <div class="col">
@@ -124,7 +192,7 @@
                                             $current = date("Y");
                                         @endphp
                                             <option value="{{ $year }}" @if($year == $current) selected @endif>
-                                                Jan {{ $year }} - Dec {{ $year }}
+                                                {{ $year }}
                                             </option>
                                         @endfor
                                     </select>
@@ -135,9 +203,6 @@
                     <canvas id="myAttendance"></canvas>
                 </div>
             </div>
-            <div class="col-xl-3 col-lg-6 col-md-6">
-                @include('resorts.timeandattendance.dashboard.partials.wai-insights', ['waiInsights' => $waiInsights ?? []])
-            </div>
             <!-- <div class="col-xl-3 col-lg-6 col-md-6">
                 <div class="card">
                     <div class="card-title d-flex justify-content-between">
@@ -145,18 +210,49 @@
                     </div>
                 </div>
             </div> -->
-            <div class="col-xl-3 col-lg-6 col-md-6 @if(App\Helpers\Common::checkRouteWisePermission('resort.timeandattendance.todolist',config('settings.resort_permissions.view')) == false) d-none @endif" id="hrdashboard-todo-section">
-                <div class="card " style="height: 440px;">
+            <div class="col-xl-6 col-lg-6 col-md-6 ta-todo-col @if(App\Helpers\Common::checkRouteWisePermission('resort.timeandattendance.todolist',config('settings.resort_permissions.view')) == false) d-none @endif" id="hrdashboard-todo-section">
+                <div class="card ta-todo-card-v2" id="card-todoListTA">
                     <div class="card-title d-flex justify-content-between">
                         <h3>To Do List</h3>
                         <a href="{{ route('resort.timeandattendance.todolist') }}" class="a-link">View all</a>
                     </div>
 
-                    <div class="todoList-main" style="max-height: 400px; overflow-y: auto;">
+                    <div class="todoList-main ta-todo-list-v2">
+                        @php
+                            $todoDefaultPhoto = url(config('settings.default_picture'));
+                            $todoPalette = ['#014653', '#0E8A9E', '#2EACB3', '#4A5F8A', '#5D6F75'];
+                            $todoInitials = function ($name) {
+                                $parts = preg_split('/\s+/', trim((string) $name));
+                                $initials = '';
+                                foreach (array_slice($parts, 0, 2) as $part) {
+                                    $initials .= mb_strtoupper(mb_substr($part, 0, 1));
+                                }
+                                return $initials !== '' ? $initials : '?';
+                            };
+                            $todoAvatarColor = function ($name) use ($todoPalette) {
+                                $hash = 0;
+                                foreach (str_split((string) $name) as $ch) {
+                                    // Bounded modulo every step — without this, a long
+                                    // enough name overflows PHP's int range into a
+                                    // float, and abs()/% on that float can produce a
+                                    // negative or out-of-range result (crashed with
+                                    // "Undefined array key -4" on a real employee name).
+                                    $hash = (ord($ch) + (($hash << 5) - $hash)) % 1000000007;
+                                }
+                                return $todoPalette[abs($hash) % count($todoPalette)];
+                            };
+                        @endphp
                         @forelse ($attendanceDataTodoList as $todo)
+                            @php
+                                $todoHasPhoto = !empty($todo->profileImg) && $todo->profileImg !== $todoDefaultPhoto;
+                            @endphp
                             <div class="todoList-block">
                                 <div class="img-circle">
-                                    <img src="{{ $todo->profileImg }}" alt="image">
+                                    @if($todoHasPhoto)
+                                        <img src="{{ $todo->profileImg }}" alt="image">
+                                    @else
+                                        <span class="ta-todo-initials" style="background:{{ $todoAvatarColor($todo->EmployeeName) }};">{{ $todoInitials($todo->EmployeeName) }}</span>
+                                    @endif
                                 </div>
                                 <div class="flex-grow-1">
                                     <p class="mb-1">
@@ -164,7 +260,7 @@
     {{ 'Action missing' }}
 @endif                                        <strong>{{ $todo->message }}</strong>
                                     </p>
-                                    <p class="mb-2 small">
+                                    <p class="mb-0 small">
                                         {{ $todo->EmployeeName }} - {{ $todo->ShiftName }}<br>
                                         @if($todo->action_type == 'check_in')
                                             Shift: {{ $todo->StartTime }} - {{ $todo->ExpectedEndTime ?? $todo->EndTime }}
@@ -173,8 +269,10 @@
                                         @endif
                                         for date {{ $todo->shift_date}}
                                     </p>
-                                    <button type="button" 
-                                        class="btn btn-sm {{ $todo->action_type == 'check_in' ? 'btn-danger' : 'btn-success' }} manual-check-action" 
+                                </div>
+                                <div class="ta-todo-action">
+                                    <button type="button"
+                                        class="btn btn-sm {{ $todo->action_type == 'check_in' ? 'btn-danger' : 'btn-success' }} manual-check-action"
                                         data-roster-id="{{ $todo->roster_id }}"
                                         data-action="{{ $todo->action_type }}"
                                         data-date="{{ $todo->shift_date }}"
@@ -228,7 +326,7 @@
                 </div>
             </div>
             <div class="col-xl-3 @if(App\Helpers\Common::checkRouteWisePermission('resort.timeandattendance.OverTime',config('settings.resort_permissions.view')) == false) d-none @endif">
-                <div class="card">
+                <div class="card" id="card-otHours">
                     <div class="card-title d-flex justify-content-between">
                         <h3>OT Hours</h3>
                     </div>
@@ -251,6 +349,9 @@
                         </div>
                     </div>
                 </div>
+            </div>
+            <div class="col-xl-3">
+                @include('resorts.timeandattendance.dashboard.partials.wai-insights', ['waiInsights' => $waiInsights ?? [], 'cardId' => 'card-waiInsightsOT'])
             </div>
 
         </div>
@@ -555,19 +656,6 @@ if (!ctx) {
 
     }
 
-    function equalizeHeights()
-    {
-        const block1 = document.getElementById('card-duty');
-        const block2 = document.getElementById('card-todoList');
-        if (block1 && block2) {
-            const block1Height = block1.offsetHeight;
-            block2.style.height = block1Height + 'px';
-        }
-    }
-
-    window.onload = equalizeHeights;
-    window.onresize = equalizeHeights;
-
     $(document).ready(function () {
         // Load initial dashboard counts
         let date = new Date().toISOString().split('T')[0];
@@ -679,18 +767,55 @@ if (!ctx) {
             });
     }
 
-    function equalizeHeights()
-    {
-        const block1 = document.getElementById('card-duty');
-        const block2 = document.getElementById('card-todoList');
-        if (block1 && block2) {
-            const block1Height = block1.offsetHeight;
-            block2.style.height = block1Height + 'px';
+    // WAI Insights (now placed beside OT Hours) should match OT Hours'
+    // own height rather than stretching to Duty Roster's height, which is
+    // usually much taller (a full attendance table). addEventListener
+    // (not window.onload = ...) so this can't silently clobber — or get
+    // clobbered by — the window.onload assignment above; ResizeObserver
+    // keeps it in sync if OT Hours' chart/legend content changes size later.
+    function equalizeOtHoursInsightHeight() {
+        var otCard = document.getElementById('card-otHours');
+        var insightCard = document.getElementById('card-waiInsightsOT');
+        if (!otCard || !insightCard) return;
+        var otHeight = otCard.offsetHeight;
+        if (!otHeight) return;
+        insightCard.style.setProperty('height', otHeight + 'px', 'important');
+    }
+    document.addEventListener('DOMContentLoaded', equalizeOtHoursInsightHeight);
+    window.addEventListener('load', equalizeOtHoursInsightHeight);
+    window.addEventListener('resize', equalizeOtHoursInsightHeight);
+    setTimeout(equalizeOtHoursInsightHeight, 500);
+    if (window.ResizeObserver) {
+        var otCardEl = document.getElementById('card-otHours');
+        if (otCardEl) {
+            new ResizeObserver(equalizeOtHoursInsightHeight).observe(otCardEl);
         }
     }
 
-    window.onload = equalizeHeights;
-    window.onresize = equalizeHeights;
+    // To Do List should match Attendance's own height exactly (Attendance's
+    // canvas-based height is stable regardless of how many To Do items
+    // exist, so it's the one being matched, not the other way around).
+    // The card's own max-height:450px CSS fallback still applies before
+    // this runs and stays as a safety cap if Attendance is ever taller
+    // than that, keeping the list scrollable rather than unbounded.
+    function equalizeAttendanceTodoHeight() {
+        var attendanceCard = document.getElementById('card-attendance');
+        var todoCard = document.getElementById('card-todoListTA');
+        if (!attendanceCard || !todoCard) return;
+        var attendanceHeight = attendanceCard.offsetHeight;
+        if (!attendanceHeight) return;
+        todoCard.style.setProperty('height', attendanceHeight + 'px', 'important');
+    }
+    document.addEventListener('DOMContentLoaded', equalizeAttendanceTodoHeight);
+    window.addEventListener('load', equalizeAttendanceTodoHeight);
+    window.addEventListener('resize', equalizeAttendanceTodoHeight);
+    setTimeout(equalizeAttendanceTodoHeight, 500);
+    if (window.ResizeObserver) {
+        var attendanceCardEl = document.getElementById('card-attendance');
+        if (attendanceCardEl) {
+            new ResizeObserver(equalizeAttendanceTodoHeight).observe(attendanceCardEl);
+        }
+    }
 
     // Handle manual check-in/check-out actions
     $(document).on("click", ".manual-check-action", function() {

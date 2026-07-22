@@ -197,7 +197,7 @@
                     <div class="card-title">
                         <div class="row justify-content-between align-items-start g-md-3 g-1">
                             <div class="col">
-                                <h3 class="text-nowrap">WAI Insight's</h3>
+                                <h3 class="text-nowrap">WAI Insights</h3>
                             </div>
                             @if($piMeta)
                                 <div class="col-auto text-end" style="font-size:12px;line-height:1.4;">

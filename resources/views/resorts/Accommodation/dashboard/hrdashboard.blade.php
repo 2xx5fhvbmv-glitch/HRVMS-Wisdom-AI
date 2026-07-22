@@ -251,14 +251,14 @@
                 </div>
             </div>
 
-            {{-- WAI Insight's — AI-narrated accommodation metrics, beside Summary & Bed Statistics --}}
+            {{-- WAI Insights — AI-narrated accommodation metrics, beside Summary & Bed Statistics --}}
             <div class="col-xl-4 col-md-12">
                 <div class="card card-wiINsight card-wiINsightAccom h-100" id="card-wiINsightAccom">
                     @php $aMeta = $accommodationInsights['_meta'] ?? null; @endphp
                     <div class="card-title">
                         <div class="row justify-content-between align-items-center g-md-3 g-1">
                             <div class="col">
-                                <h3 class="text-nowrap">WAI Insight's</h3>
+                                <h3 class="text-nowrap">WAI Insights</h3>
                             </div>
                             <div class="col-auto text-end" style="font-size:12px;line-height:1.3;">
                                 @if($aMeta)
@@ -667,7 +667,7 @@
 
 @section('import-css')
 <style>
-    /* WAI Insight's — accommodation card beside Summary & Bed Statistics.
+    /* WAI Insights — accommodation card beside Summary & Bed Statistics.
        Fixed height with a 2-up grid of insight mini-cards that scroll inside. */
     .card-wiINsightAccom {
         height: 415px !important;

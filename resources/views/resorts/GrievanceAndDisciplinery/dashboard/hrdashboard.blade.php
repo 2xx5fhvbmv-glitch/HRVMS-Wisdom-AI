@@ -99,14 +99,14 @@
                     </div>
                 </div>
             </div>
-            {{-- WAI Insight's — AI-narrated grievance & disciplinary metrics (took the Resolution Rate slot) --}}
+            {{-- WAI Insights — AI-narrated grievance & disciplinary metrics (took the Resolution Rate slot) --}}
             <div class="col-xl-3 col-sm-6">
                 <div class="card card-wiINsight card-wiINsightGriev h-100" id="card-wiINsightGriev">
                     @php $grMeta = $grievanceInsights['_meta'] ?? null; @endphp
                     <div class="card-title">
                         <div class="row justify-content-between align-items-center g-md-3 g-1">
                             <div class="col">
-                                <h3 class="text-nowrap">WAI Insight's</h3>
+                                <h3 class="text-nowrap">WAI Insights</h3>
                             </div>
                             <div class="col-auto text-end" style="font-size:12px;line-height:1.3;">
                                 @if($grMeta)
@@ -512,7 +512,7 @@
                 </div>
             </div> -->
 
-            {{-- Resolution Rate — moved here from the top row (gave its slot to WAI Insight's) --}}
+            {{-- Resolution Rate — moved here from the top row (gave its slot to WAI Insights) --}}
             <div class="col-xl-3 col-sm-6">
                 <div class="card card-resolutionRate h-100">
                     <div class="card-title mb-lg-4">
@@ -545,7 +545,7 @@
 
 @section('import-css')
 <style>
-    /* WAI Insight's — grievance card in the Resolution Rate slot. Fixed height
+    /* WAI Insights — grievance card in the Resolution Rate slot. Fixed height
        with the insight list scrolling inside the narrow column. */
     .card-wiINsightGriev {
         height: 100% !important;

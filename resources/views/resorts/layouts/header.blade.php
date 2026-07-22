@@ -1,3 +1,190 @@
+<style>
+    /* Menu button height matched to the search bar it sits beside (40px) —
+       was ~52px, taller than the search bar next to it. .menu-box only
+       exists in this file (the vertical-menu header), not in
+       header1.blade.php, so this is safe to apply unscoped. */
+    .menu-box .btn {
+        padding: 4px 30px;
+    }
+
+    /* Search placeholder toned down — it was full-opacity white, the same
+       visual weight as real typed text, reading as loud/unpolished next to
+       the rest of the bar. .search-bar-nav / .search-input are likewise
+       unique to this file. */
+    .search-bar-nav .search-input::placeholder {
+        color: rgba(255, 255, 255, 0.55);
+        font-weight: 400;
+    }
+
+    /* Same placeholder treatment for the expandable search box that opens
+       under the horizontal menu bar (also present, as its own separate
+       copy, in header1.blade.php) — it was still showing the old
+       full-opacity white placeholder since it doesn't share the
+       .search-bar-nav wrapper the fix above targets. */
+    .serch-box input::placeholder {
+        color: rgba(255, 255, 255, 0.55);
+        font-weight: 400;
+    }
+
+    /* Notification count badge polish: a fixed 10x10px circle with
+       asymmetric padding (padding-right only) and an 11.2px font that
+       barely fit — enlarged slightly, evenly centered, with a subtle ring
+       so it reads clearly instead of looking like a stray clipped dot.
+       .notification-nav is also used by header1.blade.php's bell icon;
+       unlike .top-navbar's background (which meant something different in
+       each file), a cleaner badge is equally correct in both, so this one
+       is left unscoped on purpose. */
+    .notification-nav span {
+        top: -4px;
+        right: 2px;
+        width: 17px;
+        height: 17px;
+        padding-right: 0;
+        font-size: 10px;
+        font-weight: 600;
+        border: 2px solid #01414d;
+        box-sizing: content-box;
+    }
+
+    /* Global search results dropdown (resources/views/resorts/search/index.blade.php)
+       — redesigned into a grouped, internally-scrollable results list with
+       a fixed header/footer. Some rules need !important to beat
+       "#suggesstion-box .serchresult li a span" and other pre-existing
+       rules in developer.min.css, which are ID-scoped / apply broadly and
+       would otherwise win over these plain classes. */
+    #suggesstion-box .serchresult {
+        border-radius: 25px !important;
+        padding: 0 !important;
+        display: flex;
+        flex-direction: column;
+        max-height: 420px !important;
+        overflow: hidden !important;
+    }
+    .sr-heading-row {
+        padding: 14px 18px 10px;
+        flex-shrink: 0;
+    }
+    .sr-heading {
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: .03em;
+        color: #93A4A9;
+    }
+    .sr-scroll {
+        flex: 1;
+        overflow-y: auto;
+        max-height: 320px;
+        padding: 0 10px;
+    }
+    .sr-group + .sr-group { margin-top: 6px; }
+    .sr-group-heading {
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: .03em;
+        color: #93A4A9;
+        padding: 6px 8px;
+    }
+    .serchresult ul.sr-group-list { margin: 0; padding: 0; list-style: none; }
+    .serchresult ul.sr-group-list li { margin-bottom: 2px !important; }
+    .serchresult ul li a.sr-item {
+        display: flex !important;
+        align-items: flex-start;
+        gap: 10px;
+        padding: 8px;
+        border-radius: 10px;
+        transition: background .15s ease;
+    }
+    .serchresult ul li:hover a.sr-item,
+    .search-result ul li.active-li a.sr-item {
+        background: rgba(1, 70, 83, 0.08) !important;
+        text-decoration: none !important;
+    }
+    .sr-avatar {
+        width: 32px !important;
+        height: 32px !important;
+        border-radius: 50% !important;
+        flex-shrink: 0;
+        object-fit: cover;
+    }
+    .sr-avatar-initials {
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
+        color: #fff;
+        font-size: 12px !important;
+        font-weight: 600;
+        padding: 0 !important;
+    }
+    .sr-icon-tile {
+        width: 32px !important;
+        height: 32px !important;
+        border-radius: 9px !important;
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        font-size: 13px !important;
+        padding: 0 !important;
+    }
+    .sr-icon-tile-announcement { background: #FFF6E5 !important; color: #D98A00; }
+    .sr-icon-tile-document { background: #EEF2FF !important; color: #4A5F8A; }
+    .sr-icon-tile-muted { background: #F1F3F4 !important; color: #5D6F75; }
+    .sr-body { min-width: 0; flex: 1; background: none !important; padding: 0 !important; }
+    .sr-row-top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; background: none !important; padding: 0 !important; }
+    .sr-row-top strong { font-weight: 600 !important; font-size: 14px !important; color: #14232A; }
+    .sr-highlight { background: rgba(224, 255, 2, 0.55); color: inherit; border-radius: 2px; padding: 0 1px; }
+    .sr-badge {
+        font-size: 10px !important;
+        font-weight: 600;
+        padding: 2px 8px !important;
+        border-radius: 9px !important;
+        white-space: nowrap;
+    }
+    .sr-badge-employee { background: #E6F0F1 !important; color: #014653; }
+    .sr-badge-announcement { background: #FFF6E5 !important; color: #D98A00; }
+    .sr-badge-document { background: #EEF2FF !important; color: #4A5F8A; }
+    .sr-badge-muted { background: #F1F3F4 !important; color: #5D6F75; }
+    .sr-meta {
+        display: block;
+        font-size: 12px !important;
+        color: #5D6F75;
+        margin-top: 2px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        background: none !important;
+        padding: 0 !important;
+        font-weight: 400 !important;
+    }
+    .sr-empty { padding: 20px 18px; text-align: center; color: #93A4A9; font-size: 13px; }
+    .sr-footer {
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 10px 18px;
+        border-top: 1px solid #E7E7E7;
+        font-size: 11px;
+        color: #93A4A9;
+    }
+    .sr-footer-keys { white-space: nowrap; }
+    .sr-footer kbd {
+        display: inline-block;
+        padding: 1px 5px;
+        border-radius: 4px;
+        background: #F1F3F4;
+        color: #5D6F75;
+        font-size: 10px;
+        font-family: inherit;
+    }
+    @media (max-width: 576px) {
+        #suggesstion-box .serchresult { max-width: 100%; }
+        .sr-meta { white-space: normal; }
+    }
+</style>
 <header>
     <!-- As a link -->
     <nav class="bg-body-tertiary">
