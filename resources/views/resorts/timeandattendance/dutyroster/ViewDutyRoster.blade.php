@@ -1816,6 +1816,7 @@
         });
 
         // Initialize day off picker for modal
+    });
         </script>
         @include('resorts.renderfiles.dutyRosterSharedScripts')
         <script type="text/javascript">
@@ -2005,7 +2006,6 @@
                     });
                 }
         });
-    });
     $(document).on("change", "#ShiftOverTime", function() {
         let overtime = $(this).val(); // Get the overtime time (HH:MM)
         let DayWiseTotalHours=$(this).attr('data-DayWiseTotalHours');
