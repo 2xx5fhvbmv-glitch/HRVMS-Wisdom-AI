@@ -2059,6 +2059,24 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
     Route::post('report/employee/export', 'EmployeeMasterReportController@export')->name('resort.report.employee.export');
     Route::post('report/employee/insights', 'EmployeeMasterReportController@insights')->name('resort.report.employee.insights');
 
+    // Predefined People Management – Announcement reports (Option B).
+    Route::get('report/announcement', 'AnnouncementReportController@index')->name('resort.report.announcement.index');
+    Route::post('report/announcement/run', 'AnnouncementReportController@run')->name('resort.report.announcement.run');
+    Route::post('report/announcement/export', 'AnnouncementReportController@export')->name('resort.report.announcement.export');
+    Route::post('report/announcement/insights', 'AnnouncementReportController@insights')->name('resort.report.announcement.insights');
+
+    // Predefined People Management – Probation reports (Option B).
+    Route::get('report/probation', 'ProbationReportController@index')->name('resort.report.probation.index');
+    Route::post('report/probation/run', 'ProbationReportController@run')->name('resort.report.probation.run');
+    Route::post('report/probation/export', 'ProbationReportController@export')->name('resort.report.probation.export');
+    Route::post('report/probation/insights', 'ProbationReportController@insights')->name('resort.report.probation.insights');
+
+    // Predefined People Management – Promotion reports (Option B).
+    Route::get('report/promotion', 'PromotionReportController@index')->name('resort.report.promotion.index');
+    Route::post('report/promotion/run', 'PromotionReportController@run')->name('resort.report.promotion.run');
+    Route::post('report/promotion/export', 'PromotionReportController@export')->name('resort.report.promotion.export');
+    Route::post('report/promotion/insights', 'PromotionReportController@insights')->name('resort.report.promotion.insights');
+
 
     Route::delete('report/{id}', 'ReportController@destroy')->name('reports.destroy');
 
