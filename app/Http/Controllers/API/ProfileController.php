@@ -76,6 +76,14 @@ class ProfileController extends Controller
           // Assign rank_type to the get_employee array
           $profileArray['get_employee']['rank_type'] = $rankType;
 
+          // religion is stored as "0"/"1" (see the web Employee create form's
+          // <select id="religion">) — mobile only gets the raw code, so add
+          // a human-readable companion field the same way rank_type is added
+          // for rank above, rather than changing the raw `religion` value
+          // and risking breaking whatever already reads it.
+          $empReligion = $profileArray['get_employee']['religion'] ?? null;
+          $profileArray['get_employee']['religion_type'] = ((string) $empReligion === '1') ? 'Muslim' : 'Non-Muslim';
+
           // Mobile's GetEmployee.fromJson casts `education`/`experiance` as
           // String? — sending the raw relation array (even an empty [])
           // crashes the whole Profile screen, since a List is never
