@@ -25,6 +25,22 @@
                 <div class="row g-4">
                     <div class="col-xxl-9 col-lg-8 ">
                         <form id="leave-apply" name="leave-apply" method="post" enctype="multipart/form-data">
+                            @if(!empty($canApplyForOthers) && $canApplyForOthers)
+                            <div class="card mb-3">
+                                <div class="row align-items-end g-md-4 g-3">
+                                    <div class="col-xl-6 col-sm-8">
+                                        <label for="applyForEmployee" class="form-label">APPLYING LEAVE FOR</label>
+                                        <select class="form-select" id="applyForEmployee">
+                                            @foreach($applicableEmployees as $emp)
+                                                <option value="{{ $emp->id }}" @selected((int) $selectedEmployeeId === (int) $emp->id)>{{ ucfirst($emp->first_name . ' ' . $emp->last_name) }} ({{ $emp->Emp_id }})</option>
+                                            @endforeach
+                                        </select>
+                                        <small class="text-muted">Leave categories, balances, and approvals below reflect whoever is selected here.</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <input type="hidden" name="apply_for_employee_id" id="apply_for_employee_id" value="{{ $selectedEmployeeId }}">
+                            @endif
                             <div class="card">
                                 <div class="append-main">
                                     <div class="append-block mb-4">
@@ -394,8 +410,18 @@
 </style>
 @endsection
 
-@section('import-scripts')    
+@section('import-scripts')
 <script> var functioncallyes = 0;  var cat_ids =[];</script>
+<script type="text/javascript">
+    // Leave categories/balances/eligibility are all computed server-side
+    // for whichever employee is selected — reload with the new employee
+    // so those stay correct, instead of trying to patch them client-side.
+    $(document).on('change', '#applyForEmployee', function () {
+        var url = new URL(window.location.href);
+        url.searchParams.set('apply_for_employee_id', $(this).val());
+        window.location.href = url.toString();
+    });
+</script>
 <script type="text/javascript">
     var leaveFormValidation = @json($leaveFormValidation ?? []);
     function applyLeaveCategoryValidation() {
