@@ -1580,6 +1580,19 @@
                 element.scrollIntoView({ behavior: "smooth", block: "nearest" });
             }
         }
+
+        // Escape closes the search results dropdown — additive only, does
+        // not touch the existing ArrowUp/ArrowDown/Enter handler above.
+        // Also clears the search input: the existing keyup handler on
+        // .search-input doesn't exclude Escape, so it fires right after
+        // this (same keypress) and re-shows the dropdown if the input
+        // still holds a 3+ character value — clearing it first stops that.
+        $(document).on("keydown", function (e) {
+            if (e.key === "Escape" && !$(".search-result").hasClass("d-none")) {
+                $(".search-result").addClass("d-none");
+                $(".search-input").val("");
+            }
+        });
     });
   
 </script>

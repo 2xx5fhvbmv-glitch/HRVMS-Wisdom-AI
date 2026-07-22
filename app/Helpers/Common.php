@@ -1785,11 +1785,51 @@ class Common
 
 	}
 
+    /**
+     * Request-scoped cache of resort_site_settings, keyed by resort_id.
+     * Several call sites (currency display, MVR-rate conversion in the
+     * budget aggregators) each independently re-queried this same
+     * never-changing-within-a-request row — on Consolidated Budget alone
+     * that was 500+ duplicate queries for one page load. Caching the
+     * fetch changes WHEN it runs (once per resort per request), never
+     * WHAT it returns — same Eloquent row, same columns, same values.
+     */
+    private static array $resortSettingsCache = [];
+
+    private static function getCachedResortSettings($resortId)
+    {
+        if (!$resortId) return null;
+        if (!array_key_exists($resortId, self::$resortSettingsCache)) {
+            self::$resortSettingsCache[$resortId] = ResortSiteSettings::where('resort_id', $resortId)->first();
+        }
+        return self::$resortSettingsCache[$resortId];
+    }
+
+    /**
+     * Request-scoped cache of the active resort_budget_costs list, keyed
+     * by resort_id — annualBudgetForEmployee() previously re-fetched this
+     * identical ~23-row list once per employee (26 identical queries on
+     * Consolidated Budget alone). Same rationale as getCachedResortSettings().
+     */
+    private static array $activeResortCostsCache = [];
+
+    public static function getCachedActiveResortCosts($resortId)
+    {
+        if (!$resortId) return collect();
+        if (!array_key_exists($resortId, self::$activeResortCostsCache)) {
+            self::$activeResortCostsCache[$resortId] = \DB::table('resort_budget_costs')
+                ->where('resort_id', $resortId)
+                ->where('status', 'active')
+                ->get(['id', 'particulars', 'cost_title', 'amount', 'amount_unit', 'cost_type', 'frequency', 'details']);
+        }
+        return self::$activeResortCostsCache[$resortId];
+    }
+
     public static function GetResortCurrentCurrency()
     {
         $resortid = optional(Auth::guard('resort-admin')->user())->resort_id;
         if(!$resortid) return config('settings.currency.MVR');
-        $resortexist =  ResortSiteSettings::where('resort_id', $resortid)->first(['currency']);
+        $resortexist =  self::getCachedResortSettings($resortid);
         if(isset($resortexist))
         {
             $resortexist = $resortexist->currency;
@@ -2247,6 +2287,7 @@ class Common
                     'vacancies.created_at',
                     DB::raw("CONCAT(creator.first_name, ' ', creator.last_name) as created_by_name"),
                     'creator_emp.rank as creator_rank',
+                    'creator.id as creator_admin_id',
 
                 ])
                 ->unique('V_id')
@@ -4719,7 +4760,7 @@ class Common
         $resortId = auth()->guard('resort-admin')->user()->resort_id ?? null;
         if (!$resortId) return $amount;
 
-        $settings = \App\Models\ResortSiteSettings::where('resort_id', $resortId)->first();
+        $settings = self::getCachedResortSettings($resortId);
         if (!$settings) return $amount;
 
         $displayCurrency = $settings->currency; // 'MVR' or 'Dollar'
@@ -4947,11 +4988,6 @@ class Common
      */
     public static function annualCostForEmployee($resortId, int $year, $cost, $employee): float
     {
-        $isLocal  = strtolower(trim((string) ($employee->nationality ?? ''))) === 'maldivian';
-        $isMuslim = strtolower(trim((string) ($employee->religion    ?? ''))) === 'muslim';
-        $basicForPercent = (float) ($employee->basic_salary ?? 0);
-        $benefitGridLevel = isset($employee->benefit_grid_level) ? (int) $employee->benefit_grid_level : null;
-
         $savedByMonth = \DB::table('resort_employee_budget_cost_configurations')
             ->where('employee_id', $employee->id)
             ->where('resort_id', $resortId)
@@ -4968,12 +5004,28 @@ class Common
         $isMvrTemplate = strtoupper(trim((string) ($cost->amount_unit ?? 'USD'))) === 'MVR';
         $mvrToUsdRate  = 1.0;
         if ($isMvrTemplate) {
-            $dollarToMvr = (float) (\DB::table('resort_site_settings')
-                ->where('resort_id', $resortId)
-                ->value('DollertoMVR') ?: 15.42);
+            $dollarToMvr = (float) (optional(self::getCachedResortSettings($resortId))->DollertoMVR ?: 15.42);
             if ($dollarToMvr <= 0) $dollarToMvr = 15.42;
             $mvrToUsdRate = 1.0 / $dollarToMvr;
         }
+
+        return self::computeAnnualCostFromData($year, $cost, $employee, $savedByMonth->toArray(), $mvrToUsdRate);
+    }
+
+    /**
+     * Pure (no DB) tail of annualCostForEmployee() — extracted so a
+     * batched caller that has already pre-fetched $savedByMonth for many
+     * employees at once (see BudgetController::getAllBudgetTotals) can
+     * reuse the exact same arithmetic without re-querying per employee.
+     * $savedByMonth is [month => value] for this one employee+cost pair.
+     */
+    public static function computeAnnualCostFromData(int $year, $cost, $employee, array $savedByMonth, float $mvrToUsdRate = 1.0): float
+    {
+        $isLocal  = strtolower(trim((string) ($employee->nationality ?? ''))) === 'maldivian';
+        $isMuslim = strtolower(trim((string) ($employee->religion    ?? ''))) === 'muslim';
+        $basicForPercent = (float) ($employee->basic_salary ?? 0);
+        $benefitGridLevel = isset($employee->benefit_grid_level) ? (int) $employee->benefit_grid_level : null;
+        $isMvrTemplate = strtoupper(trim((string) ($cost->amount_unit ?? 'USD'))) === 'MVR';
 
         $total = 0.0;
         for ($m = 1; $m <= 12; $m++) {
@@ -5106,9 +5158,7 @@ class Common
 
         // Used by the allowance leg below. The cost-template leg gets its
         // own MVR→USD conversion internally via annualCostForEmployee().
-        $dollarToMvr = (float) (\DB::table('resort_site_settings')
-            ->where('resort_id', $resortId)
-            ->value('DollertoMVR') ?: 15.42);
+        $dollarToMvr = (float) (optional(self::getCachedResortSettings($resortId))->DollertoMVR ?: 15.42);
         if ($dollarToMvr <= 0) $dollarToMvr = 15.42;
 
         // -- 1. Salary leg ---------------------------------------------------
@@ -5123,25 +5173,13 @@ class Common
             ->get(['month', 'current_salary', 'proposed_salary'])
             ->keyBy('month');
 
-        $salaryTotal = 0.0;
-        for ($m = 1; $m <= 12; $m++) {
-            $row = $monthlySalaries->get($m);
-            if ($row) {
-                $salaryTotal += (float) (($row->proposed_salary ?? 0) > 0
-                    ? $row->proposed_salary
-                    : (($row->current_salary ?? 0) > 0
-                        ? $row->current_salary
-                        : $sharedFallback));
-            } else {
-                $salaryTotal += $sharedFallback;
-            }
-        }
+        $salaryTotal = self::computeAnnualSalaryFromMonthlyOverrides($monthlySalaries->toArray(), $sharedFallback);
 
         // -- 2. Cost-template leg --------------------------------------------
-        $resortCosts = \DB::table('resort_budget_costs')
-            ->where('resort_id', $resortId)
-            ->where('status', 'active')
-            ->get(['id', 'particulars', 'cost_title', 'amount', 'amount_unit', 'cost_type', 'frequency', 'details']);
+        // Same active-template list for every employee in this resort —
+        // cached the same way as resort_site_settings above rather than
+        // re-querying it once per employee.
+        $resortCosts = self::getCachedActiveResortCosts($resortId);
 
         $costTotal = 0.0;
         foreach ($resortCosts as $cost) {
@@ -5196,19 +5234,7 @@ class Common
             ->get(['month', 'current_salary', 'proposed_salary'])
             ->keyBy('month');
 
-        $salaryTotal = 0.0;
-        for ($m = 1; $m <= 12; $m++) {
-            $row = $monthlySalaries->get($m);
-            if ($row) {
-                $salaryTotal += (float) (($row->proposed_salary ?? 0) > 0
-                    ? $row->proposed_salary
-                    : (($row->current_salary ?? 0) > 0
-                        ? $row->current_salary
-                        : $sharedFallback));
-            } else {
-                $salaryTotal += $sharedFallback;
-            }
-        }
+        $salaryTotal = self::computeAnnualSalaryFromMonthlyOverrides($monthlySalaries->toArray(), $sharedFallback);
 
         // -- 2. Cost-template leg --------------------------------------------
         // Vacant cost configs are SAVED rows only — there's no live-template
@@ -5222,6 +5248,41 @@ class Common
             ->sum('value');
 
         return $salaryTotal + $costTotal;
+    }
+
+    /**
+     * Pure (no DB) salary-leg loop shared by annualBudgetForEmployee() and
+     * annualBudgetForVacantSlot() — previously duplicated identically in
+     * both. Extracted so (a) there's only one copy to maintain, and (b) a
+     * batched caller that has already pre-fetched $monthlySalariesByMonth
+     * for many employees/vacants at once (see
+     * BudgetController::getAllBudgetTotals) can reuse the exact same
+     * arithmetic without re-querying per employee/vacant.
+     *
+     * $monthlySalariesByMonth is [month => row] where row has
+     * ->proposed_salary / ->current_salary (or is absent for that month).
+     * $sharedFallback is the value to use for any month with no override —
+     * callers compute this from their own proposed/current-salary
+     * precedence (employee: proposed_salary ?? basic_salary; vacant:
+     * current_salary ?? basic_salary — see each caller for the exact
+     * legacy column mapping).
+     */
+    public static function computeAnnualSalaryFromMonthlyOverrides(array $monthlySalariesByMonth, float $sharedFallback): float
+    {
+        $total = 0.0;
+        for ($m = 1; $m <= 12; $m++) {
+            $row = $monthlySalariesByMonth[$m] ?? null;
+            if ($row) {
+                $total += (float) (($row->proposed_salary ?? 0) > 0
+                    ? $row->proposed_salary
+                    : (($row->current_salary ?? 0) > 0
+                        ? $row->current_salary
+                        : $sharedFallback));
+            } else {
+                $total += $sharedFallback;
+            }
+        }
+        return $total;
     }
 
     public static function computeYearlyBudgetTotal($resortId, int $year): float
