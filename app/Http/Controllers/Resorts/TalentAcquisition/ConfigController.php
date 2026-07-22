@@ -531,7 +531,16 @@ class ConfigController extends Controller
                 $taupdaet = $childstatus;
             }
 
-            $childstatus->update(["status"=>"ForwardedToNext"]);
+            // Child_ta_id is whatever row Common::GetTheFreshVacancies() joined
+            // into the acting rank's queue — for the final-approval rank
+            // (e.g. GM) that's the PRIOR rank's already-approved row (e.g.
+            // Finance's), shown for review, not the acting rank's own row.
+            // Only stamp/forward it here if it truly belongs to the acting
+            // rank; otherwise this save would overwrite the actual approver's
+            // modified_by with the current (different-rank) user's identity.
+            if ($childstatus->Approved_By == $effectiveRank) {
+                $childstatus->update(["status"=>"ForwardedToNext"]);
+            }
             if( $effectiveRank == Common::TaFinalApproval($this->resort->resort_id))
             {
                 $taupdaet->update(["status"=>"ForwardedToNext"]);
