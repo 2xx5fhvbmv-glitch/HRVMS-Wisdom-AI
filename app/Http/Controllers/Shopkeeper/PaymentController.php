@@ -172,7 +172,11 @@ class PaymentController extends Controller
             'id' => $employee->id,
             'emp_id' => $employee->Emp_id,
             'name' => $employee->resortAdmin->first_name . ' ' . $employee->resortAdmin->last_name,
-            'profile_picture' => Common::getResortUserPicture($employee->Emp_id)
+            // getResortUserPicture() looks up by resort_admins.id, not the
+            // Emp_id code (e.g. "DR-1") — passing Emp_id always failed the
+            // ResortAdmin::find() lookup and silently fell back to the
+            // default picture for every employee.
+            'profile_picture' => Common::getResortUserPicture($employee->Admin_Parent_id)
         ]);
     }
 
