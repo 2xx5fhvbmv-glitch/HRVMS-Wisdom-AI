@@ -640,8 +640,8 @@ header nav {
 
 .navcarosel-box .slick-prev,
 .navcarosel-box .slick-next {
-    width: 16px;
-    height: 16px;
+    width: 24px;
+    height: 24px;
     border-radius: 100px;
     /* Slick's base theme sets background:transparent on these — the
        border-radius implied an intended filled circle button, but with
@@ -656,7 +656,7 @@ header nav {
 
 .navcarosel-box .slick-prev:before,
 .navcarosel-box .slick-next:before {
-    font-size: 12px;
+    font-size: 14px;
 }
 
 .navcarosel-box .slick-next:before {
