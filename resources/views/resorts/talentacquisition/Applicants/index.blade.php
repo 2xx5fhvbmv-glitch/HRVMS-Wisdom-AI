@@ -612,6 +612,7 @@
 @section('import-scripts')
     <script>
         var isHrDepartment = @json($isHrDepartment);
+        var defaultApplicantPicture = "{{ url(config('settings.default_picture')) }}";
         $(document).ready(function() {
             datatablelist();
             // Grid is the default visible view now — #grid_main_view is
@@ -2039,7 +2040,7 @@
                     columns: [
                         { data: 'first_name', name: 'first_name', render: function (data, type, row) {
                             return `<div class="tableUser-block">
-                                <div class="img-circle"><img src="${row.profileImg}" alt="user"></div>
+                                <div class="img-circle"><img src="${row.profileImg || defaultApplicantPicture}" alt="user"></div>
                                 <span class="userApplicants-btn" data-id="${row.applicant_id}">${row.name}</span>
                             </div>`;
                         }},

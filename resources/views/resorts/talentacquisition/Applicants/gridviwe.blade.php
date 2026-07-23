@@ -53,7 +53,7 @@
                         <circle class="progress-background" cx="60" cy="60" r="54"></circle>
                         <circle class="progress" cx="60" cy="60" r="54"></circle>
                     </svg>
-                    <div class="img-obj cover"> <img src="{{ $a->profileImg }}" alt="image"></div>
+                    <div class="img-obj cover"> <img src="{{ $a->profileImg ?: url(config('settings.default_picture')) }}" alt="image"></div>
                 </div>
                 <h6>{{ ucfirst($a->first_name) }} {{ ucfirst($a->last_name) }}</h6>
                 <p>{{ ucfirst($a->position_title) }} </p>
