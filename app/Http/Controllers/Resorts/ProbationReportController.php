@@ -169,6 +169,21 @@ class ProbationReportController extends Controller
         return (int) Carbon::today()->diffInDays(Carbon::parse($endDate), false);
     }
 
+    /**
+     * employees.probation_end_date is stored/derived as an end-EXCLUSIVE
+     * boundary (joining_date + 3 months, e.g. Jun 1 -> Sep 1 — Sep 1 is the
+     * first day AFTER probation, not the last day of it). People\Probation\
+     * ProbationController's details() and list pages both subtract a day
+     * for display; this report was showing the raw exclusive boundary,
+     * one day later than the live module. daysRemaining()/whereDate
+     * filtering above stay on the raw column — only the display label
+     * needs the adjustment.
+     */
+    private function probationEndDateLabel($endDate): string
+    {
+        return $endDate ? Carbon::parse($endDate)->subDay()->format('d M Y') : 'N/A';
+    }
+
     /** Same bucket logic as People\Probation\ProbationController::resolveOnboardingTraining(). */
     private function onboardingTrainingStatus(int $resortId, int $employeeId): string
     {
@@ -236,7 +251,7 @@ class ProbationReportController extends Controller
                     'Position'                   => $r->position_title ?? 'N/A',
                     'Joining Date'               => $r->joining_date ? Carbon::parse($r->joining_date)->format('d M Y') : 'N/A',
                     'Probation Start Date'       => $r->joining_date ? Carbon::parse($r->joining_date)->format('d M Y') : 'N/A',
-                    'Probation End Date'         => $r->probation_end_date ? Carbon::parse($r->probation_end_date)->format('d M Y') : 'N/A',
+                    'Probation End Date'         => $this->probationEndDateLabel($r->probation_end_date),
                     'Days Remaining'             => $days !== null ? $days : 'N/A',
                     'Reporting Manager'          => trim($r->manager_name) ?: 'N/A',
                     'Onboarding Training Status' => $this->onboardingTrainingStatus($rid, $r->id),
@@ -279,7 +294,7 @@ class ProbationReportController extends Controller
                 'Department'              => $r->dept ?? 'N/A',
                 'Position'                => $r->position_title ?? 'N/A',
                 'Joining Date'            => $r->joining_date ? Carbon::parse($r->joining_date)->format('d M Y') : 'N/A',
-                'Probation End Date'      => $r->probation_end_date ? Carbon::parse($r->probation_end_date)->format('d M Y') : 'N/A',
+                'Probation End Date'      => $this->probationEndDateLabel($r->probation_end_date),
                 'Days Remaining'          => $this->daysRemaining($r->probation_end_date) ?? 'N/A',
                 'Reporting Manager'       => trim($r->manager_name) ?: 'N/A',
                 'Probation Review Status' => $r->probation_status ?: 'N/A',
@@ -358,7 +373,7 @@ class ProbationReportController extends Controller
                     'Employee Name'      => trim($r->employee_name) ?: 'N/A',
                     'Department'         => $r->dept ?? 'N/A',
                     'Position'           => $r->position_title ?? 'N/A',
-                    'Probation End Date' => $r->probation_end_date ? Carbon::parse($r->probation_end_date)->format('d M Y') : 'N/A',
+                    'Probation End Date' => $this->probationEndDateLabel($r->probation_end_date),
                     'Days Remaining'     => $days !== null ? $days : 'N/A',
                     'Reporting Manager'  => trim($r->manager_name) ?: 'N/A',
                     'Review Status'      => $reviewStatus,
@@ -395,7 +410,7 @@ class ProbationReportController extends Controller
                 'Department'         => $r->dept ?? 'N/A',
                 'Position'           => $r->position_title ?? 'N/A',
                 'Joining Date'       => $r->joining_date ? Carbon::parse($r->joining_date)->format('d M Y') : 'N/A',
-                'Probation End Date' => $r->probation_end_date ? Carbon::parse($r->probation_end_date)->format('d M Y') : 'N/A',
+                'Probation End Date' => $this->probationEndDateLabel($r->probation_end_date),
                 'Review Date'        => $r->probation_review_date ? Carbon::parse($r->probation_review_date)->format('d M Y') : 'N/A',
                 'Probation Outcome'  => $outcomeLabel[$r->probation_status] ?? ($r->probation_status ?: 'N/A'),
                 'Remarks'            => $r->probation_remarks ?: 'N/A',
