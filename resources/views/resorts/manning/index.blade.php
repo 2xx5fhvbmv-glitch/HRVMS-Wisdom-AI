@@ -38,7 +38,7 @@
                                 </div>
                                 <div class="col-auto">
                                     <div class="d-flex justify-content-sm-end align-items-center">
-                                        <a href="#" class="btn btn-sm btn-theme @if(App\Helpers\Common::checkRouteWisePermission('resort.budget.manning',config('settings.resort_permissions.create')) == false) d-none @endif " data-bs-toggle="modal"
+                                        <a href="#" class="btn btn-sm wfp-btn-primary @if(App\Helpers\Common::checkRouteWisePermission('resort.budget.manning',config('settings.resort_permissions.create')) == false) d-none @endif " data-bs-toggle="modal"
                                             data-bs-target="#add-divisionmodal">
                                             <i class="fa-solid fa-plus me-2"></i>Add New
                                         </a>
@@ -72,7 +72,7 @@
                                 </div>
                                 <div class="col-auto">
                                     <div class="d-flex justify-content-sm-end align-items-center">
-                                        <a href="#departments-modal" class="btn btn-sm btn-theme @if(App\Helpers\Common::checkRouteWisePermission('resort.budget.manning',config('settings.resort_permissions.create')) == false) d-none @endif"
+                                        <a href="#departments-modal" class="btn btn-sm wfp-btn-primary @if(App\Helpers\Common::checkRouteWisePermission('resort.budget.manning',config('settings.resort_permissions.create')) == false) d-none @endif"
                                             data-bs-toggle="modal" data-bs-target="#departments-modal">
                                             <i class="fa-solid fa-plus me-2"></i>Add New
                                         </a>
@@ -104,7 +104,7 @@
                                 </div>
                                 <div class="col-auto">
                                     <div class="d-flex justify-content-sm-end align-items-center">
-                                        <a href="#" class="btn btn-sm btn-theme @if(App\Helpers\Common::checkRouteWisePermission('resort.budget.manning',config('settings.resort_permissions.create')) == false) d-none @endif" data-bs-toggle="modal"
+                                        <a href="#" class="btn btn-sm wfp-btn-primary @if(App\Helpers\Common::checkRouteWisePermission('resort.budget.manning',config('settings.resort_permissions.create')) == false) d-none @endif" data-bs-toggle="modal"
                                             data-bs-target="#sections-modal">
                                             <i class="fa-solid fa-plus me-2"></i>Add New
                                         </a>
@@ -144,7 +144,7 @@
                                                 <img src="{{ URL::asset('resorts_assets/images/search-green.svg')}}" alt="" class="img-fluid" />
                                             </a>
                                         </div> --}}
-                                        <a href="#" class="btn btn-sm btn-theme @if(App\Helpers\Common::checkRouteWisePermission('resort.budget.manning',config('settings.resort_permissions.create')) == false) d-none @endif" data-bs-toggle="modal"
+                                        <a href="#" class="btn btn-sm wfp-btn-primary @if(App\Helpers\Common::checkRouteWisePermission('resort.budget.manning',config('settings.resort_permissions.create')) == false) d-none @endif" data-bs-toggle="modal"
                                             data-bs-target="#positions-modal">
                                             <i class="fa-solid fa-plus me-2"></i>Add New
                                         </a>
@@ -222,8 +222,8 @@
                     </div>
 
                     <div class="modal-footer justify-content-end">
-                        <button type="button" class="btn btn-sm btn-themeGray me-2" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-sm btn-theme">Submit</button>
+                        <button type="button" class="btn btn-sm wfp-btn-secondary me-2" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-sm wfp-btn-primary">Submit</button>
                     </div>
                 </form>
             </div>
@@ -296,8 +296,8 @@
 
                 <!-- Buttons -->
                 <div class="modal-footer justify-content-end">
-                    <button type="button" class="btn btn-sm btn-themeGray me-2" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-sm btn-theme">Submit</button>
+                    <button type="button" class="btn btn-sm wfp-btn-secondary me-2" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-sm wfp-btn-primary">Submit</button>
                 </div>
             </form>
 
@@ -365,8 +365,8 @@
                     </div>
 
                     <div class="modal-footer justify-content-end">
-                        <button type="button" class="btn btn-sm btn-themeGray me-2" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-sm btn-theme">Submit</button>
+                        <button type="button" class="btn btn-sm wfp-btn-secondary me-2" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-sm wfp-btn-primary">Submit</button>
                     </div>
                 </form>
 
@@ -441,8 +441,8 @@
                         </select>
                     </div>
                     <div class="modal-footer justify-content-end">
-                        <button type="button" class="btn btn-sm btn-themeGray me-2" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-sm btn-theme">Submit</button>
+                        <button type="button" class="btn btn-sm wfp-btn-secondary me-2" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-sm wfp-btn-primary">Submit</button>
                     </div>
                 </form>
 
@@ -454,6 +454,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts.workforce_planning._wfp_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')
@@ -1045,7 +1046,7 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
                 </div>
             </td>
             <td class="py-1">
-                <a href="#" class="btn btn-theme update-row-btn" data-division-id="${divisionId}">Submit</a>
+                <a href="#" class="btn wfp-btn-primary update-row-btn" data-division-id="${divisionId}">Submit</a>
             </td>
         `;
         // Replace row content with editable form
@@ -1292,7 +1293,7 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
                 </div>
             </td>
             <td class="py-1">
-                <a href="#" class="btn btn-theme update-row-btn" data-dept-id="${deptId}">Submit</a>
+                <a href="#" class="btn wfp-btn-primary update-row-btn" data-dept-id="${deptId}">Submit</a>
             </td>
         `;
 
@@ -1563,7 +1564,7 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
                 </div>
             </td>
             <td class="py-1">
-                <a href="#" class="btn btn-theme update-row-btn" data-section-id="${sectionId}">Submit</a>
+                <a href="#" class="btn wfp-btn-primary update-row-btn" data-section-id="${sectionId}">Submit</a>
             </td>
         `;
 
@@ -1900,7 +1901,7 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
                 </div>
             </td>
             <td class="py-1">
-                <a href="#" class="btn btn-theme update-row-btn" data-position-id="${positionId}">Submit</a>
+                <a href="#" class="btn wfp-btn-primary update-row-btn" data-position-id="${positionId}">Submit</a>
             </td>
         `;
 

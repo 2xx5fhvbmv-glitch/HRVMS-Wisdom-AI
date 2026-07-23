@@ -91,7 +91,7 @@
                                 </label>
                                 <div class="uploadFile-block">
                                     <div class="uploadFile-btn">
-                                        <a href="#" class="btn btn-themeBlue btn-sm">Upload File</a>
+                                        <a href="#" class="btn wfp-btn-primary btn-sm">Upload File</a>
                                         <input type="file" name="profile_picture" id="profile_picture" >
                                     </div>
                                     <div class="uploadFile-text">
@@ -104,7 +104,7 @@
                                 <label class="form-label" for="header_img">Select Authorized Signature Image </label>
                                 <div class="uploadFile-block">
                                     <div class="uploadFile-btn">
-                                        <a href="#" class="btn btn-themeBlue btn-sm">Upload File</a>
+                                        <a href="#" class="btn wfp-btn-primary btn-sm">Upload File</a>
                                         <input type="file" name="signature_img" id="signature_img"  >
                                     </div>
                                     <div class="uploadFile-text">
@@ -150,8 +150,8 @@
 
                 <div class="d-none d-xl-block" style="height: 126px;"></div>
                 <div class="card-footer text-end">
-                    <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
-                    <a class="btn btn-sm btn-themeGray me-2" href="{{url()->previous()}}"  class="btn btn-default resetForm">Back</a>
+                    <button type="submit" class="btn wfp-btn-primary btn-sm">Submit</button>
+                    <a class="btn btn-sm wfp-btn-secondary me-2" href="{{url()->previous()}}">Back</a>
                 </div>
             </div>
         </form>
@@ -202,8 +202,8 @@
                 </div>
                 <div class="d-none d-xl-block" style="height: 126px;"></div>
                 <div class="card-footer text-end">  
-                    <button type="submit" class="btn btn-themeBlue btn-sm">Change Password</button>
-                    <a class="btn btn-sm btn-themeGray me-2" href="{{url()->previous()}}"  class="btn btn-default resetForm">Back</a>               
+                    <button type="submit" class="btn wfp-btn-primary btn-sm">Change Password</button>
+                    <a class="btn btn-sm wfp-btn-secondary me-2" href="{{url()->previous()}}">Back</a>
                 </div>
             </div>
         </form>
@@ -227,8 +227,8 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal" id="cropperCancelBtn2">Cancel</button>
-                <button type="button" class="btn btn-themeBlue btn-sm" id="cropperApplyBtn">Save crop</button>
+                <button type="button" class="btn wfp-btn-secondary btn-sm" data-bs-dismiss="modal" id="cropperCancelBtn2">Cancel</button>
+                <button type="button" class="btn wfp-btn-primary btn-sm" id="cropperApplyBtn">Save Crop</button>
             </div>
         </div>
     </div>
@@ -236,6 +236,7 @@
 @endSection
 
 @section('import-css')
+@include('resorts.workforce_planning._wfp_buttons_v2_styles')
 {{-- Cropper.js — lets the user trim a tall/wide image to a square avatar
      before upload. Without this, large portraits broke the page layout. --}}
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.6.2/cropper.min.css" integrity="sha512-UtLOu9C7NuThQhuXXrGwx9Jb/z9zPQJctuAgNUBK3Z6kkSYT9wJ+2+dh6klS+TDBCV9kNPBbAxbVD+vCcfGPaA==" crossorigin="anonymous" referrerpolicy="no-referrer" />

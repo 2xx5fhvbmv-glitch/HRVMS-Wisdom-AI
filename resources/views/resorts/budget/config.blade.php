@@ -52,7 +52,7 @@
                                             <label for="uploadCon" class="form-label">UPLOAD PAST YEAR's CONSOLIDATED BUDGET</label>
                                         </div>
                                         <div class="col-auto">
-                                            <a href="{{ route('resort.budget.GetConsolidateFile') }}" class="btn btn-theme btn-small consolidatedBudget">Download Template</a>                                        </div>
+                                            <a href="{{ route('resort.budget.GetConsolidateFile') }}" class="btn wfp-btn-secondary btn-small consolidatedBudget">Download Template</a>                                        </div>
                                         </div>
                                     <div class="row g-1 mb-3 justify-content-between align-items-center">
                                         <select class="form-control" name="consolidatdebudget_Year" id="year">
@@ -61,7 +61,7 @@
                                     </div>
                                     <div class="uploadFile-block @if(App\Helpers\Common::checkRouteWisePermission('resort.budget.config',config('settings.resort_permissions.create')) == false) d-none @endif">
                                         <div class="uploadFile-btn">
-                                            <a href="#" class="btn btn-themeBlue btn-sm">Upload File</a>
+                                            <a href="#" class="btn wfp-btn-primary btn-sm">Upload File</a>
                                             <input type="file" name="consolidatedbudget" id="consolidatedbudget"
                                                 accept=".xls,.xlsx">
                                         </div>
@@ -71,7 +71,7 @@
                             </div>
                             <div class="card-footer text-end">
                                 <button type="submit" form="BudgetConfigFiles"
-                                    class="btn btn-theme btn-sm ConsolidateBudget @if(App\Helpers\Common::checkRouteWisePermission('resort.budget.config',config('settings.resort_permissions.create')) == false) d-none @endif">Submit</button>
+                                    class="btn wfp-btn-primary btn-sm ConsolidateBudget @if(App\Helpers\Common::checkRouteWisePermission('resort.budget.config',config('settings.resort_permissions.create')) == false) d-none @endif">Submit</button>
                             </div>
                         </form>
                     </div>
@@ -114,6 +114,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts.workforce_planning._wfp_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')

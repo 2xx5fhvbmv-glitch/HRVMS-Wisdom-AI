@@ -199,7 +199,7 @@
                                 </div>
                                 <div class="col-auto">
                                     <div class="d-flex justify-content-sm-end align-items-center">
-                                        <button type="button"  id="addCustomLeave" class="btn btn-sm btn-theme">
+                                        <button type="button"  id="addCustomLeave" class="btn btn-sm wfp-btn-positive">
                                             <i class="fa-solid fa-plus me-2"></i>Add More Leave
                                         </button>
                                     </div>
@@ -288,7 +288,7 @@
                         </div>
                         {{-- <div class="col-auto">
                             <div class="d-flex justify-content-sm-end align-items-center">
-                                <button  id="addCustomLeave" class="btn btn-sm btn-theme">
+                                <button  id="addCustomLeave" class="btn btn-sm wfp-btn-positive">
                                     <i class="fa-solid fa-plus me-2"></i>Add More Leave
                                 </button>
                             </div>
@@ -511,7 +511,7 @@
                                 </div>
                                 <div class="col-auto">
                                     <div class="d-flex justify-content-sm-end align-items-center">
-                                        <button type="button" type="button" id="add-custom-benefit" class="btn btn-sm btn-theme">
+                                        <button type="button" type="button" id="add-custom-benefit" class="btn btn-sm wfp-btn-positive">
                                             <i class="fa-solid fa-plus me-2"></i>Add Another Benefit
                                         </button>
                                     </div>
@@ -530,7 +530,7 @@
                                             <input type="text" name="custom_benefit_value[]" class="form-control" value="{{ $benefit->benefit_value }}" placeholder="Benefit Value" />
                                         </div>
                                         <div class="col-auto">
-                                            <button type="button" class="btn btn-danger remove-benefit">Remove</button>
+                                            <button type="button" class="btn wfp-btn-critical remove-benefit">Remove</button>
                                         </div>
                                     </div>
                                 @endforeach
@@ -554,7 +554,7 @@
                         </div>
                         {{-- <div class="col-auto">
                             <div class="d-flex justify-content-sm-end align-items-center">
-                                <button type="button" id="add-custom-benefit" class="btn btn-sm btn-theme">
+                                <button type="button" id="add-custom-benefit" class="btn btn-sm wfp-btn-positive">
                                     <i class="fa-solid fa-plus me-2"></i>Add Another Benefit
                                 </button>
                             </div>
@@ -608,7 +608,7 @@
                             </div>
                             <div class="col-auto">
                                 <div class="d-flex justify-content-sm-end align-items-center">
-                                    <button type="button" id="add-custom-discount" class="btn btn-sm btn-theme">
+                                    <button type="button" id="add-custom-discount" class="btn btn-sm wfp-btn-positive">
                                         <i class="fa-solid fa-plus me-2"></i>Add Another Discount
                                     </button>
                                 </div>
@@ -628,7 +628,7 @@
                                             <input type="text" name="custom_discount_value[]" class="form-control" value="{{ $discount->discount_rate }}" placeholder="Discount Value" />
                                         </div>
                                         <div class="col-xxl-4  col-sm-6">
-                                            <button type="button" class="btn btn-danger remove-discount">Remove</button>
+                                            <button type="button" class="btn wfp-btn-critical remove-discount">Remove</button>
                                         </div>
                                     </div>
                                 @endforeach
@@ -662,7 +662,7 @@
                         <div class="col-auto">
                            
 
-                                <button type="button" id="add-custom-sport" class="btn btn-sm btn-theme">
+                                <button type="button" id="add-custom-sport" class="btn btn-sm wfp-btn-positive">
                                     <i class="fa-solid fa-plus me-2"></i>Add Custom Sport
                                 </button>
                             
@@ -711,7 +711,7 @@
                         </div>
                         <div class="col-auto">
                             <div class="d-flex justify-content-sm-end align-items-center">
-                                <button type="button" id="add-custom-benefit" class="btn btn-sm btn-theme">
+                                <button type="button" id="add-custom-benefit" class="btn btn-sm wfp-btn-positive">
                                     <i class="fa-solid fa-plus me-2"></i>Add Another Benefit
                                 </button>
                             </div>
@@ -803,7 +803,7 @@
                                 </div>
                                 <div class="col-auto">
                                     <div class="d-flex justify-content-sm-end align-items-center">
-                                        <button id="add-custom-field" type="button" class="btn btn-sm btn-theme">
+                                        <button id="add-custom-field" type="button" class="btn btn-sm wfp-btn-positive">
                                             <i class="fa-solid fa-plus me-2"></i>Add Another Custom Field
                                         </button>
                                     </div>
@@ -822,7 +822,7 @@
                                     <input type="text" name="custom_field_values[]" class="form-control" value="{{ $field['value'] }}" placeholder="Field Value">
                                 </div>
                                 <div class="col-auto">
-                                    <button type="button" class="btn btn-danger remove-custom-field">Remove</button>
+                                    <button type="button" class="btn wfp-btn-critical remove-custom-field">Remove</button>
                                 </div>
                             </div>
                         @endforeach
@@ -831,11 +831,11 @@
                 </div>
                 {{-- <hr> --}}
                 <div class="modal-footer justify-content-end">
-                    <a href="{{route('resort.benifitgrid.index')}}" type="button" class="btn btn-sm btn-themeGray me-2">Cancel</a>
+                    <a href="{{route('resort.benifitgrid.index')}}" type="button" class="btn btn-sm wfp-btn-secondary me-2">Cancel</a>
                     @if($LeaveCategories->isNotEmpty())
-                    <button type="submit" class="btn btn-sm btn-theme" @if(isset($isViewMode) && $isViewMode) disabled @endif>Submit</button>
+                    <button type="submit" class="btn btn-sm wfp-btn-primary" @if(isset($isViewMode) && $isViewMode) disabled @endif>Submit</button>
                     @else
-                    <button type="button" class="btn btn-sm btn-theme">Please Add Leave Categories in Leave Module (configation page)</button>
+                    <button type="button" class="btn btn-sm wfp-btn-attention">Please add leave categories in the Leave module's configuration page first</button>
                     @endif
                 </div>
             </form>
@@ -845,7 +845,7 @@
 @endSection
 
 @section('import-css')
-
+@include('resorts.workforce_planning._wfp_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')
@@ -1042,7 +1042,7 @@
                     </div>
                     <div class="col-auto">
                         <div class="form-group mb-2">
-                            <button type="button" class="btn btn-danger removeCustomLeave" data-id="${customLeaveIndex}">Remove</button>
+                            <button type="button" class="btn wfp-btn-critical removeCustomLeave" data-id="${customLeaveIndex}">Remove</button>
                         </div>
                     </div>
                 </div>
@@ -1069,7 +1069,7 @@
                     <input type="text" name="custom_benefit_value[]" class="form-control" placeholder="Benefit Value" />
                 </div>
                 <div class="col-auto">
-                    <button type="button" class="btn btn-danger remove-benefit">Remove</button>
+                    <button type="button" class="btn wfp-btn-critical remove-benefit">Remove</button>
                 </div>`;
             container.appendChild(newBenefit);
         });
@@ -1090,7 +1090,7 @@
                     <input type="text" name="custom_discount_value[]" class="form-control" placeholder="Discount Value" />
                 </div>
                 <div class="col-xxl-4  col-sm-6">
-                    <button type="button" class="btn btn-danger remove-discount">Remove</button>
+                    <button type="button" class="btn wfp-btn-critical remove-discount">Remove</button>
                 </div>`;
             container.appendChild(newDiscount);
         });
@@ -1180,7 +1180,7 @@
                     >
                 </div>
                 <div class="col-auto">
-                    <button type="button" class="btn btn-danger remove-custom-field">Remove</button>
+                    <button type="button" class="btn wfp-btn-critical remove-custom-field">Remove</button>
                 </div>
             `;
 

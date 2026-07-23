@@ -127,7 +127,21 @@
                     }
                 }
                 emnurend();
-                $('.hrvmsshowMenu').show(10);
+                // Slick (in emnurend, above) measures slide widths while this
+                // container is still display:none, so variableWidth ends up
+                // computed against zero-width slides — its internal position
+                // table is wrong from the start. Slick recalculates on window
+                // resize, so nudge it once the container has actually finished
+                // becoming visible. Without this, the carousel's position only
+                // self-corrects the first time ANY slide change forces Slick's
+                // own recompute — which is why "next" always worked (it happens
+                // to trigger that recompute) while "prev" silently used the
+                // stale zero-width table until something else had already fixed
+                // it. Safe to fire once per matched element: it's a plain
+                // resize event, not a re-init, so it can't double-bind anything.
+                $('.hrvmsshowMenu').show(10, function () {
+                    $(window).trigger('resize');
+                });
             },
             error: function() {
                 $('.hrvmsshowMenu').show(10);

@@ -21,7 +21,7 @@
                 </div>
                 <div class="col-auto">
                     <div class="d-flex justify-content-end">
-                        <a href="#sendRequest-modal" data-bs-toggle="modal" class=" btn btn-sm btn-theme">Request Manning</a>
+                        <a href="#sendRequest-modal" data-bs-toggle="modal" class=" btn btn-sm wfp-btn-accent">Request Manning</a>
                     </div>
                 </div>
             </div>
@@ -114,7 +114,7 @@
                     <div class="card  mb-30">
                         <div class="card-title d-flex justify-content-between">
                             <h3>Occupancy</h3>
-                            <a href="#add-occupancymodal" data-bs-toggle="modal" class="btn-icon bg-green">
+                            <a href="#add-occupancymodal" data-bs-toggle="modal" class="wfp-icon-positive">
                                 <i class="fa-solid fa-plus"></i>
                             </a>
                         </div>
@@ -210,42 +210,74 @@
                                     $shortNeeded = max(0, (int) ceil(($localRatioMin * $totalEmpForRatio / 100) - $localEmployees));
                                 }
                                 $targetLabel = rtrim(rtrim(number_format($localRatioMin, 1), '0'), '.');
+                                // Alias of the same $localGap sign already used for
+                                // $localPctClass above — kept as its own flag purely
+                                // so the redesigned markup below (segment tint, bar
+                                // fill colour, status box) reads clearly, without
+                                // recomputing anything.
+                                $isCompliant = $localGap >= 0;
                             @endphp
-                            <div class="d-flex justify-content-between mb-3 border-bottom pb-2">
-                                <p class="mb-0">
-                                    Number of Local/Xpat:
-                                </p>
-                                <span class="d-inline-block w-25 text-end">{{$localEmployees}}/{{$expatEmployees}}</span>
+                            {{-- "Number of Local / Expat" — two brand-tinted count
+                                 segments instead of a combined "L/E" figure. Local
+                                 segment mirrors the same pass/fail signal as the
+                                 ratio bar below (green when compliant, red when
+                                 under target) so both live off $isCompliant. --}}
+                            <div class="wct-block wct-block-border">
+                                <p class="wct-label">Number of Local / Expat</p>
+                                <div class="wct-stat-row">
+                                    <div class="wct-stat {{ $isCompliant ? 'wct-stat-ok' : 'wct-stat-bad' }}">
+                                        <span class="wct-stat-count">{{ $localEmployees }}</span>
+                                        <span class="wct-stat-caption">Local</span>
+                                    </div>
+                                    <div class="wct-stat wct-stat-expat">
+                                        <span class="wct-stat-count">{{ $expatEmployees }}</span>
+                                        <span class="wct-stat-caption">Expat</span>
+                                    </div>
+                                </div>
                             </div>
 
-                            {{-- Ratio block: shows current vs target, plus
-                                 an explicit "gap to target" line so HR sees
-                                 immediately whether they're compliant and,
-                                 if not, how many more Maldivian hires would
-                                 close the gap. --}}
-                            <div class="mb-3 border-bottom pb-2">
-                                <div class="d-flex justify-content-between mb-1">
-                                    <p class="mb-0">
-                                        Local / Xpat Ratio:
-                                        <small class="text-muted d-block" style="font-size:10px;">{{ $targetLabel }}% Maldivian target</small>
-                                    </p>
-                                    <span class="text-end">
-                                        <span class="fw-bold {{ $localPctClass }}">{{ $localPct }}%</span>
-                                        <span class="text-muted">/</span>
-                                        <span class="fw-bold">{{ $expatPct }}%</span>
-                                    </span>
+                            {{-- Ratio block: a single bar communicates the split —
+                                 percentages live inside the fill segments instead
+                                 of being repeated as separate text, and a tick
+                                 marks the compliance floor. Status box below still
+                                 carries the same "gap to target" / "hires needed"
+                                 copy as before, from the same $localGap/$shortNeeded
+                                 values, just restyled as a coloured callout. --}}
+                            <div class="wct-block wct-block-border">
+                                <p class="wct-label mb-2">Local / Expat Ratio</p>
+                                <div class="wct-ratio-wrap">
+                                    <div class="wct-ratio-bar">
+                                        <div class="wct-ratio-fill {{ $isCompliant ? 'wct-fill-ok' : 'wct-fill-bad' }}" style="width: {{ $localPct }}%">
+                                            @if($localPct >= 12)
+                                                <span class="wct-ratio-fill-label">{{ $localPct }}%</span>
+                                            @endif
+                                        </div>
+                                        <div class="wct-ratio-fill wct-fill-expat" style="width: {{ $expatPct }}%">
+                                            @if($expatPct >= 12)
+                                                <span class="wct-ratio-fill-label">{{ $expatPct }}%</span>
+                                            @endif
+                                        </div>
+                                        @if($totalEmpForRatio > 0)
+                                            <div class="wct-ratio-marker" style="left: {{ min(100, max(0, $localRatioMin)) }}%">
+                                                <span class="wct-ratio-marker-tick"></span>
+                                            </div>
+                                        @endif
+                                    </div>
+                                    <p class="wct-ratio-caption">{{ $targetLabel }}% Maldivian target (floor)</p>
                                 </div>
                                 @if($totalEmpForRatio > 0)
-                                    @if($localGap >= 0)
-                                        <div class="text-success" style="font-size:11px;">
-                                            <i class="fa-solid fa-circle-check me-1"></i>
-                                            Target met &mdash; <strong>{{ number_format(abs($localGap), 1) }} percentage point{{ abs($localGap) === 1.0 ? '' : 's' }}</strong> above the {{ $targetLabel }}% floor.
+                                    @if($isCompliant)
+                                        <div class="wct-status wct-status-ok">
+                                            <i class="fa-solid fa-circle-check"></i>
+                                            <span>Target met &mdash; <strong>{{ number_format(abs($localGap), 1) }} percentage point{{ abs($localGap) === 1.0 ? '' : 's' }}</strong> above the {{ $targetLabel }}% floor.</span>
                                         </div>
                                     @else
-                                        <div class="text-danger" style="font-size:11px;">
-                                            <i class="fa-solid fa-triangle-exclamation me-1"></i>
-                                            <strong>{{ number_format(abs($localGap), 1) }} percentage point{{ abs($localGap) === 1.0 ? '' : 's' }}</strong> below target.
-                                            Hire <strong>{{ $shortNeeded }}</strong> more Maldivian employee{{ $shortNeeded === 1 ? '' : 's' }} to reach {{ $targetLabel }}%.
+                                        <div class="wct-status wct-status-bad">
+                                            <i class="fa-solid fa-triangle-exclamation"></i>
+                                            <span>
+                                                Below target &mdash; <strong>{{ number_format(abs($localGap), 1) }} percentage point{{ abs($localGap) === 1.0 ? '' : 's' }}</strong> under the {{ $targetLabel }}% floor.
+                                                Hire <strong>{{ $shortNeeded }}</strong> more local staff to comply.
+                                            </span>
                                         </div>
                                     @endif
                                 @endif
@@ -256,41 +288,57 @@
                                  of opening a modal. Horizontal flex with
                                  overflow-auto means any count fits without
                                  wrapping the panel. Modal remains as a
-                                 detail-view fallback. --}}
-                            <div class="mb-3 border-bottom pb-2">
-                                <div class="d-flex justify-content-between mb-2">
-                                    <p class="mb-0">
-                                        Employees Under Minimum Wage:
+                                 detail-view fallback — both the pill and
+                                 "View all" link below open the same
+                                 #minWageEmployeesModal, which already gets
+                                 its X/backdrop/Escape close behaviour for
+                                 free from Bootstrap's own modal JS. --}}
+                            <div class="wct-block">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <p class="wct-label mb-0">
+                                        Employees under minimum wage
                                     </p>
                                     @if(($employeeMinWageList ?? collect())->isNotEmpty())
                                         <a href="#minWageEmployeesModal" data-bs-toggle="modal"
-                                           class="text-danger fw-bold text-decoration-underline"
+                                           class="wct-pill wct-pill-bad"
                                            title="Click to view full list with salaries">
+                                            <i class="fa-solid fa-triangle-exclamation"></i>
                                             {{ $employee_under_min_wage }}
                                         </a>
                                     @else
-                                        <span class="text-success fw-bold">{{ $employee_under_min_wage }}</span>
+                                        <span class="wct-pill wct-pill-ok">
+                                            <i class="fa-solid fa-circle-check"></i>
+                                            {{ $employee_under_min_wage }}
+                                        </span>
                                     @endif
                                 </div>
                                 @if(($employeeMinWageList ?? collect())->isNotEmpty())
-                                    <div class="d-flex flex-nowrap overflow-auto pb-2" style="gap:8px; scrollbar-width:thin;">
+                                    <div class="wct-avatar-scroller">
                                         @foreach($employeeMinWageList as $row)
-                                            <div class="d-flex flex-column align-items-center text-center"
-                                                 style="min-width:64px; max-width:64px;"
+                                            @php
+                                                $firstName = \Illuminate\Support\Str::before($row['name'], ' ');
+                                                $isDefaultPic = $row['picture'] === url(config('settings.default_picture'));
+                                                $initials = collect(explode(' ', trim($row['name'])))
+                                                    ->filter()
+                                                    ->map(fn($part) => mb_strtoupper(mb_substr($part, 0, 1)))
+                                                    ->take(2)
+                                                    ->implode('');
+                                            @endphp
+                                            <div class="wct-avatar-item"
                                                  title="{{ $row['name'] }} &mdash; {{ $row['code'] }} &mdash; {{ $row['salary'] }} {{ $row['currency'] }}">
-                                                <img src="{{ $row['picture'] }}"
-                                                     alt="{{ $row['name'] }}"
-                                                     style="width:42px; height:42px; object-fit:cover; border-radius:50%; border:2px solid #fecaca;">
-                                                <small class="d-block text-truncate w-100 mt-1"
-                                                       style="font-size:10px; line-height:1.1;">
-                                                    {{ \Illuminate\Support\Str::limit($row['name'], 14) }}
-                                                </small>
-                                                <small class="text-muted d-block" style="font-size:9px;">
-                                                    {{ $row['code'] }}
-                                                </small>
+                                                @if($isDefaultPic || !$row['picture'])
+                                                    <span class="wct-avatar-photo wct-avatar-initials">{{ $initials ?: '?' }}</span>
+                                                @else
+                                                    <img class="wct-avatar-photo" src="{{ $row['picture'] }}" alt="{{ $row['name'] }}">
+                                                @endif
+                                                <small class="wct-avatar-name">{{ $firstName }}</small>
+                                                <small class="wct-avatar-code">{{ $row['code'] }}</small>
                                             </div>
                                         @endforeach
                                     </div>
+                                    <a href="#minWageEmployeesModal" data-bs-toggle="modal" class="wct-view-all">
+                                        View all {{ $employee_under_min_wage }} employee{{ (int) $employee_under_min_wage === 1 ? '' : 's' }} <i class="fa-solid fa-chevron-right"></i>
+                                    </a>
                                 @endif
                             </div>
                             <!-- <div class="d-flex justify-content-between mb-3  pb-2">
@@ -390,7 +438,7 @@
                                         </div>
 
                                         <div class="ms-3">
-                                            <a href="#" class="btn btn-theme btn-sm" id="downloadManningBudget">
+                                            <a href="#" class="btn wfp-btn-secondary btn-sm" id="downloadManningBudget">
                                                 <i class="fa-solid fa-download me-1"></i> Download
                                             </a>
                                         </div>
@@ -539,7 +587,7 @@
                             <div class="d-flex justify-content-center mt-3">
                                 @if(isset($PendingDepartmentResoponse) && !empty($PendingDepartmentResoponse) )
 
-                                <a href="#sendReminder-modal"  data-bs-toggle="modal"  class="btn btn-theme mx-auto">Send Reminder</a>
+                                <a href="#sendReminder-modal"  data-bs-toggle="modal"  class="btn wfp-btn-attention mx-auto">Send Reminder</a>
                                 @endif
                             </div>
                         </div>
@@ -621,45 +669,61 @@
 
 @endphp
 {{-- Modal: list of employees flagged as under minimum wage. Triggered
-     from the Compliance Tracking panel. The list is computed in the
-     controller using the same predicate as the count so the two cannot
-     drift. Currency column flags which threshold each row breached. --}}
-<div class="modal fade" id="minWageEmployeesModal" tabindex="-1" aria-labelledby="minWageEmployeesModalLabel" aria-hidden="true">
+     from the Compliance Tracking panel (both the pill and "View all"
+     link). The list is computed in the controller using the same
+     predicate as the count so the two cannot drift. Plain Bootstrap
+     data-bs-toggle/dismiss modal — X button, backdrop click, and
+     Escape all close it via Bootstrap's own modal JS, no extra code
+     needed here. --}}
+<div class="modal fade wct-modal" id="minWageEmployeesModal" tabindex="-1" aria-labelledby="minWageEmployeesModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="minWageEmployeesModalLabel">
-                    Employees Under Minimum Wage
-                    <small class="text-muted ms-2" style="font-size:13px;">
-                        USD &lt; 520 · MVR &lt; 8,021 · NULL currency
-                    </small>
-                </h5>
+                <div>
+                    <h5 class="modal-title" id="minWageEmployeesModalLabel">
+                        Employees Under Minimum Wage
+                    </h5>
+                    <p class="wct-modal-subtitle">USD &lt; 520 · MVR &lt; 8,021 · missing currency</p>
+                </div>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body p-0">
                 @if(($employeeMinWageList ?? collect())->isEmpty())
                     <p class="text-muted text-center py-4 m-0">No employees currently flagged.</p>
                 @else
-                    <table class="table table-sm table-striped m-0">
-                        <thead>
-                            <tr>
-                                <th class="ps-3">Emp ID</th>
-                                <th>Name</th>
-                                <th class="text-end">Basic Salary</th>
-                                <th class="pe-3">Currency</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            @foreach($employeeMinWageList as $row)
-                                <tr>
-                                    <td class="ps-3">{{ $row['code'] }}</td>
-                                    <td>{{ $row['name'] }}</td>
-                                    <td class="text-end">{{ $row['salary'] }}</td>
-                                    <td class="pe-3">{{ $row['currency'] }}</td>
-                                </tr>
-                            @endforeach
-                        </tbody>
-                    </table>
+                    <div class="wct-modal-list">
+                        @foreach($employeeMinWageList as $row)
+                            @php
+                                $isDefaultPic = $row['picture'] === url(config('settings.default_picture'));
+                                $initials = collect(explode(' ', trim($row['name'])))
+                                    ->filter()
+                                    ->map(fn($part) => mb_strtoupper(mb_substr($part, 0, 1)))
+                                    ->take(2)
+                                    ->implode('');
+                            @endphp
+                            <div class="wct-modal-row">
+                                <div class="wct-modal-row-left">
+                                    @if($isDefaultPic || !$row['picture'])
+                                        <span class="wct-avatar-photo wct-avatar-initials wct-modal-avatar">{{ $initials ?: '?' }}</span>
+                                    @else
+                                        <img class="wct-avatar-photo wct-modal-avatar" src="{{ $row['picture'] }}" alt="{{ $row['name'] }}">
+                                    @endif
+                                    <div>
+                                        <p class="wct-modal-name">{{ $row['name'] }}</p>
+                                        <p class="wct-modal-code">{{ $row['code'] }}</p>
+                                    </div>
+                                </div>
+                                <div class="wct-modal-row-right">
+                                    @if($row['salary'] === '—')
+                                        <span class="wct-modal-salary-missing">&mdash;</span>
+                                    @else
+                                        <span class="wct-modal-salary">{{ $row['salary'] }}</span>
+                                        <span class="wct-modal-currency">{{ $row['currency'] }}</span>
+                                    @endif
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
                 @endif
             </div>
         </div>
@@ -696,12 +760,12 @@
                 </div>
                 <div class="modal-footer justify-content-end">
 
-                    <a href="#Import-occupancymodal"  data-bs-dismiss="modal"  data-bs-toggle="modal" class="btn btn-sm bg-green">
+                    <a href="#Import-occupancymodal"  data-bs-dismiss="modal"  data-bs-toggle="modal" class="btn btn-sm wfp-btn-positive">
                         Import Occupancy
                     </a>
-                    <a href="#" class="btn btn-sm btn-themeGray" data-bs-dismiss="modal" aria-label="Close">Cancel</a>
+                    <a href="#" class="btn btn-sm wfp-btn-secondary" data-bs-dismiss="modal" aria-label="Close">Cancel</a>
 
-                    <button type="submit" class="btn btn-sm btn-theme">Submit</button>
+                    <button type="submit" class="btn btn-sm wfp-btn-primary">Submit</button>
                 </div>
             </form>
 
@@ -724,7 +788,7 @@
                         <div class="col-md-6 ">
                             <div class="uploadFile-block">
                                 <div class="uploadFile-btn">
-                                    <a href="#" class="btn btn-themeBlue btn-sm">Upload File </a>
+                                    <a href="#" class="btn wfp-btn-primary btn-sm">Upload File</a>
                                     <input type="file" class="fornm-control" name="importFile" id="importFile" accept=".xls,.xlsx"> <span class="req_span">*</span>
                                 </div>
                             </div>
@@ -734,7 +798,7 @@
 
                         </div>
                         <div class="col-md-6 ">
-                            <a href="{{ URL::asset('resorts_assets/demofiles/Occupancy.xls')}}" target="_blank" class="btn btn-theme btn-small Employeefile mt-2">Download</a>
+                            <a href="{{ URL::asset('resorts_assets/demofiles/Occupancy.xls')}}" target="_blank" class="btn wfp-btn-secondary btn-small Employeefile mt-2">Download</a>
 
                         </div>
                     </div>
@@ -742,9 +806,9 @@
                 </div>
                 <div class="modal-footer justify-content-end">
 
-                    <a href="#" class="btn btn-sm btn-themeGray me-2 " data-bs-dismiss="modal" aria-label="Close">Cancel</a>
+                    <a href="#" class="btn btn-sm wfp-btn-secondary me-2 " data-bs-dismiss="modal" aria-label="Close">Cancel</a>
 
-                    <button type="submit" class="btn btn-sm btn-theme">Submit</button>
+                    <button type="submit" class="btn btn-sm wfp-btn-primary">Submit</button>
                 </div>
             </form>
 
@@ -779,9 +843,9 @@
                         </div>
                     </div>
                     <div class="modal-footer justify-content-end">
-                        <a href="#" class="btn btn-sm btn-themeGray me-2 " data-bs-dismiss="modal" aria-label="Close">Cancel</a>
+                        <a href="#" class="btn btn-sm wfp-btn-secondary me-2 " data-bs-dismiss="modal" aria-label="Close">Cancel</a>
 
-                        <button type="submit" class="btn btn-sm btn-theme">Submit</button>
+                        <button type="submit" class="btn btn-sm wfp-btn-primary">Submit</button>
                     </div>
             </form>
 
@@ -817,9 +881,9 @@
                         </div>
                     </div>
                     <div class="modal-footer justify-content-end">
-                        <a href="#" class="btn btn-sm btn-themeGray me-2 " data-bs-dismiss="modal" aria-label="Close">Cancel</a>
+                        <a href="#" class="btn btn-sm wfp-btn-secondary me-2 " data-bs-dismiss="modal" aria-label="Close">Cancel</a>
 
-                        <button type="submit" class="btn btn-sm btn-theme">Submit</button>
+                        <button type="submit" class="btn btn-sm wfp-btn-primary">Submit</button>
                     </div>
             </form>
 
@@ -864,6 +928,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts.workforce_planning._wfp_buttons_v2_styles')
 <style>
     .pdf-header, .pdf-footer {
         display: none;
@@ -901,6 +966,227 @@
             display: none !important;
         }
     }
+
+    /* ==================================================================
+       Compliance Tracking card — visual redesign only. The card's own
+       header ("Compliance Tracking" <h3>, .card/.card-title) is
+       untouched; every value below (counts, percentages, gap/hire
+       copy, the min-wage list itself) still comes from the exact same
+       $localEmployees/$expatEmployees/$localPct/$localGap/$shortNeeded/
+       $employeeMinWageList/$employee_under_min_wage the controller and
+       the existing @php block already compute — this only changes how
+       they're painted. Literal brand hex values (not CSS custom
+       properties) since this page doesn't already define a --teal-style
+       palette anywhere else, and the modal further down sits outside
+       any wrapper that would give custom properties something to
+       cascade from anyway. ================================== */
+    .wct-block { padding: 14px 0; }
+    .wct-block-border { border-bottom: 1px solid #EEF4F4; }
+    .wct-label {
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        color: #93A4A9;
+        margin: 0 0 8px;
+    }
+
+    /* ---- Section 1: Local / Expat counts ---- */
+    .wct-stat-row { display: flex; gap: 10px; }
+    .wct-stat {
+        flex: 1;
+        border-radius: 10px;
+        padding: 10px 12px;
+        text-align: center;
+    }
+    .wct-stat-ok { background: #EAF7F0; }
+    .wct-stat-ok .wct-stat-count { color: #1F9D6B; }
+    .wct-stat-bad { background: #FDEEEB; }
+    .wct-stat-bad .wct-stat-count { color: #E5573F; }
+    .wct-stat-expat { background: #E6F0F1; }
+    .wct-stat-expat .wct-stat-count { color: #014653; }
+    .wct-stat-count { display: block; font-size: 22px; font-weight: 800; line-height: 1.2; }
+    .wct-stat-caption {
+        display: block;
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: #5D6F75;
+        margin-top: 2px;
+    }
+
+    /* ---- Section 2: ratio bar ---- */
+    .wct-ratio-wrap { position: relative; padding-top: 10px; }
+    .wct-ratio-bar {
+        display: flex;
+        height: 26px;
+        border-radius: 7px;
+        overflow: hidden;
+        background: #EEF4F4;
+    }
+    .wct-ratio-fill {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 0;
+        transition: width .2s ease;
+    }
+    .wct-fill-ok { background: #1F9D6B; }
+    .wct-fill-bad { background: #E5573F; }
+    .wct-fill-expat { background: #014653; }
+    .wct-ratio-fill-label { font-size: 10.5px; font-weight: 700; color: #fff; white-space: nowrap; }
+    .wct-ratio-marker {
+        position: absolute;
+        top: -2px;
+        transform: translateX(-50%);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+    .wct-ratio-marker-tick {
+        width: 0;
+        height: 0;
+        border-left: 5px solid transparent;
+        border-right: 5px solid transparent;
+        border-top: 6px solid #14232A;
+    }
+    .wct-ratio-marker::after {
+        content: '';
+        display: block;
+        width: 2px;
+        height: 26px;
+        background: rgba(20,35,42,0.35);
+    }
+    .wct-ratio-caption {
+        font-size: 10.5px;
+        color: #93A4A9;
+        margin: 6px 0 0;
+    }
+    .wct-status {
+        display: flex;
+        align-items: flex-start;
+        gap: 8px;
+        border-radius: 8px;
+        padding: 8px 10px;
+        margin-top: 10px;
+        font-size: 11.5px;
+        line-height: 1.4;
+    }
+    .wct-status i { margin-top: 2px; font-size: 11px; flex-shrink: 0; }
+    /* The site-wide `strong { font-size: 15px; }` rule (default.css)
+       was overriding the emphasised numbers here to render larger than
+       the sentence around them — pull it back to match. */
+    .wct-status strong { font-size: inherit; font-weight: 700; line-height: inherit; }
+    .wct-status-ok { background: #EAF7F0; color: #1F9D6B; }
+    .wct-status-ok strong { color: #1F9D6B; }
+    .wct-status-bad { background: #FDEEEB; color: #E5573F; }
+    .wct-status-bad strong { color: #E5573F; }
+
+    /* ---- Section 3: minimum-wage pill, avatars, view-all ---- */
+    .wct-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border-radius: 20px;
+        padding: 4px 12px;
+        font-size: 12.5px;
+        font-weight: 700;
+        text-decoration: none;
+        cursor: pointer;
+        border: none;
+    }
+    .wct-pill-bad { background: #FDEEEB; color: #E5573F; }
+    .wct-pill-bad:hover { background: #fbdcd6; color: #E5573F; }
+    .wct-pill-ok { background: #EAF7F0; color: #1F9D6B; }
+    .wct-avatar-scroller {
+        display: flex;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        gap: 10px;
+        padding-bottom: 8px;
+        scrollbar-width: thin;
+    }
+    .wct-avatar-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+        min-width: 60px;
+        max-width: 60px;
+    }
+    .wct-avatar-photo {
+        width: 42px;
+        height: 42px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid #E5573F;
+    }
+    .wct-avatar-initials {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #E6F0F1;
+        color: #014653;
+        font-size: 13px;
+        font-weight: 700;
+    }
+    .wct-avatar-name {
+        display: block;
+        width: 100%;
+        font-size: 10px;
+        line-height: 1.2;
+        color: #14232A;
+        margin-top: 4px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .wct-avatar-code { display: block; font-size: 9px; color: #93A4A9; }
+    .wct-view-all {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 12px;
+        font-weight: 600;
+        color: #014653;
+        text-decoration: none;
+        margin-top: 4px;
+    }
+    .wct-view-all:hover { color: #035b6c; text-decoration: underline; }
+    .wct-view-all i { font-size: 10px; }
+
+    /* ---- Under Minimum Wage modal ---- */
+    .wct-modal .modal-content { border: none; border-radius: 14px; }
+    .wct-modal .modal-header { align-items: flex-start; border-bottom: 1px solid #EEF4F4; }
+    .wct-modal .modal-title { font-size: 16px; font-weight: 700; color: #14232A; }
+    .wct-modal-subtitle { font-size: 12px; color: #93A4A9; margin: 4px 0 0; }
+    .wct-modal-list { padding: 4px 0; }
+    .wct-modal-row {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 20px;
+        border-bottom: 1px solid #EEF4F4;
+    }
+    .wct-modal-row:last-child { border-bottom: none; }
+    .wct-modal-row-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+    .wct-modal-avatar { width: 38px; height: 38px; flex-shrink: 0; font-size: 12px; }
+    .wct-modal-name {
+        margin: 0;
+        font-size: 13px;
+        font-weight: 600;
+        color: #14232A;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+    .wct-modal-code { margin: 0; font-size: 11px; color: #93A4A9; }
+    .wct-modal-row-right { text-align: right; flex-shrink: 0; }
+    .wct-modal-salary { font-size: 13px; font-weight: 700; color: #14232A; }
+    .wct-modal-currency { font-size: 11px; color: #5D6F75; margin-left: 4px; }
+    .wct-modal-salary-missing { font-size: 14px; font-weight: 700; color: #E5573F; }
 </style>
 @endsection
 @section('import-scripts')
