@@ -48,6 +48,18 @@
                         </div>
                         <ul class="navbar-nav  flex-row align-items-center col-auto">
                             <li class="nav-item nav-icon notification-nav">
+                                @php
+                                    // Same unread-count badge the resort header shows next to its
+                                    // bell (App\Helpers\Common::getNotificationCount) — the shopkeeper
+                                    // header never had one, the bell just sat there with no count.
+                                    $shopkeeperUnreadCount = \Illuminate\Support\Facades\DB::table('resort_notifications')
+                                        ->where('resort_id', Auth::guard('shopkeeper')->user()->resort_id)
+                                        ->where('user_id', Auth::guard('shopkeeper')->user()->id)
+                                        ->where('module', 'Staff Shop')
+                                        ->where('status', 'unread')
+                                        ->count();
+                                @endphp
+                                <span>{{ $shopkeeperUnreadCount > 0 ? $shopkeeperUnreadCount : '' }}</span>
                                 <a href="#" class="notification-btn">
                                     <img src="{{ URL::asset('resorts_assets/images/bell.svg')}}" alt="" class="img-fluid" />
                                 </a>
