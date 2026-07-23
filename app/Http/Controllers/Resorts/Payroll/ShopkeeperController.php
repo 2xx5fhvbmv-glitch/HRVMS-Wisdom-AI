@@ -276,8 +276,13 @@ class ShopkeeperController extends Controller
         // USD) — a blind SUM() mixes the two. Normalize each row to USD
         // before summing so the frontend's formatAmount($total, 'USD') call
         // isn't fed a raw MVR value it then mislabels as USD.
+        //
+        // "Payable" means still owed — Paid rows are already settled and
+        // must not count toward it (the table above still lists them for
+        // history; only this total excludes them).
         $usdToMvrRate = Common::getUsdToMvrRate();
         $totalAmount = (clone $tableData)
+            ->where('payments.status', '!=', 'Paid')
             ->select('payments.price', 'p.currency_type')
             ->get()
             ->sum(function ($row) use ($usdToMvrRate) {
@@ -292,7 +297,7 @@ class ShopkeeperController extends Controller
                 'e.Emp_id',
                 'p.name as product_name',
                 'p.currency_type as product_currency_type',
-                'ra.profile_picture'
+                'e.Admin_Parent_id',
             ])
             ->get();
 
@@ -313,7 +318,10 @@ class ShopkeeperController extends Controller
                 return $ct === 'MVR' ? 'MVR' : 'Dollar';
             })
             ->addColumn('name', function ($row) {
-                $profile_pic = Common::getResortUserPicture($row->profile_picture);
+                // getResortUserPicture() looks up by resort_admins.id, not a
+                // raw profile_picture filename — that lookup always failed,
+                // falling back to the default picture for every employee.
+                $profile_pic = Common::getResortUserPicture($row->Admin_Parent_id);
                 if ($row->first_name && $row->last_name) {
                     return '<div class="tableUser-block">
                         <div class="img-circle">
