@@ -645,11 +645,13 @@ header nav {
     border-radius: 100px;
     /* Slick's base theme sets background:transparent on these — the
        border-radius implied an intended filled circle button, but with
-       no fill the icon just floats over whatever nav item is behind it
-       (both white-on-white when it lands over a label), invisible.
-       Same translucent-dark-circle treatment as the bell icon
-       (.notification-nav's own background) for guaranteed contrast. */
-    background-color: rgba(0, 0, 0, 0.2);
+       no fill the icon just floats over whatever nav item is behind it.
+       A translucent fill (rgba(0,0,0,.2), matching the bell icon) still
+       let the white nav-item text directly underneath show through
+       enough to blend with the white icon on top — visually correct in
+       isolation but nearly invisible in place. Solid fill fully occludes
+       whatever's behind it so the icon always has real contrast. */
+    background-color: var(--darkblack);
 }
 
 .navcarosel-box .slick-prev:before,
