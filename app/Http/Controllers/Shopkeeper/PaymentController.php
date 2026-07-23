@@ -82,9 +82,9 @@ class PaymentController extends Controller
                     'ra.first_name',
                     'ra.last_name',
                     'e.Emp_id',
+                    'e.Admin_Parent_id',
                     'p.name as product_name',
                     'p.currency_type as product_currency_type',
-                    'ra.profile_picture'
                 ])
                 ->get();
 
@@ -101,7 +101,11 @@ class PaymentController extends Controller
                     return '—';
                 })
                 ->addColumn('name', function ($row) {
-                    $profile_pic = Common::getResortUserPicture($row->profile_picture);
+                    // Same fix as getEmpDetails() — getResortUserPicture()
+                    // looks up by resort_admins.id, not a raw profile_picture
+                    // filename (always failed the lookup, invisible/broken
+                    // photo every row).
+                    $profile_pic = Common::getResortUserPicture($row->Admin_Parent_id);
                     if ($row->first_name && $row->last_name) {
                         return '<div class="tableUser-block">
                                     <div class="img-circle">
@@ -119,7 +123,14 @@ class PaymentController extends Controller
                         'Paid' => 'badge-success',
                         'Partial Paid' => 'badge-info',
                         'Pending Consent' => 'badge-warning',
-                        'Consented' => 'badge-themeSkyblueLight',
+                        // badge-themeSkyblueLight doesn't exist anywhere in
+                        // the CSS — the badge fell through to the base
+                        // Bootstrap badge's white text with no background
+                        // override, invisible on the page background.
+                        // badge-theme (dark text, light background) is what
+                        // DashboardController's equivalent status column
+                        // already correctly uses for "Consented".
+                        'Consented' => 'badge-theme',
                         'Rejected' => 'badge-danger',
                     ];
                     $class = $statusClasses[$row->status] ?? 'badge-secondary';
