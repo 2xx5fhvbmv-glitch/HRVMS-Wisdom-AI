@@ -1629,6 +1629,60 @@ class EmployeeController extends Controller
                     return $h;
                 });
 
+                // Same fix as EmployeeDetails()/EmpDetailsFilters() above —
+                // this is the actual DataTables source for the "Attendance
+                // History" list view (#EmployeeDetails table), a third,
+                // separate query path pulling straight from parent_attendaces
+                // (which never gets a Status='Absent' row written). Synthesize
+                // an Absent entry for every scheduled work day in range with
+                // no matching punch and no approved leave, pre-built with the
+                // same badge HTML/shape the real rows end up with after their
+                // own transform above, then merge before handing off to
+                // datatables() so its own search/sort/paginate sees them too.
+                $absentRows = DB::select("
+                    SELECT dre.date, ss.ShiftName
+                    FROM duty_roster_entries dre
+                    JOIN shift_settings ss ON ss.id = dre.Shift_id
+                    WHERE dre.Emp_id = ?
+                    AND dre.resort_id = ?
+                    AND dre.Shift_id IS NOT NULL
+                    AND (dre.Status IS NULL OR dre.Status != 'DayOff')
+                    AND dre.date BETWEEN GREATEST(?, IFNULL((SELECT joining_date FROM employees WHERE id = ?), ?)) AND LEAST(?, CURDATE())
+                    AND NOT EXISTS (
+                        SELECT 1 FROM parent_attendaces pa2
+                        WHERE pa2.Emp_id = ? AND pa2.resort_id = ? AND pa2.date = dre.date
+                        AND pa2.Status IN ('Present','HalfDay','On-Time','Late','ShortLeave','HalfDayLeave')
+                        AND pa2.CheckingTime IS NOT NULL AND TRIM(IFNULL(pa2.CheckingTime,'')) NOT IN ('','00:00','00:00:00')
+                    )
+                    AND NOT EXISTS (
+                        SELECT 1 FROM employees_leaves el2
+                        WHERE el2.emp_id = ? AND el2.resort_id = ? AND el2.status = 'Approved'
+                        AND dre.date BETWEEN el2.from_date AND el2.to_date
+                    )
+                ", [$id, $this->resort->resort_id, $previousMonthStart, $id, $previousMonthStart, $previousMonthEnd, $id, $this->resort->resort_id, $id, $this->resort->resort_id]);
+
+                $absentItems = collect($absentRows)->map(function ($row) {
+                    return (object) [
+                        'id' => null,
+                        'InTime_Location' => null,
+                        'note' => null,
+                        'raw_date' => $row->date,
+                        'date' => Carbon::parse($row->date)->format('d M Y'),
+                        'shift' => ucfirst($row->ShiftName),
+                        'CheckInTime' => null,
+                        'CheckOutTime' => null,
+                        'CheckInTimeOne' => null,
+                        'CheckOutTimeOne' => null,
+                        'TotalHours' => '-',
+                        'OverTime' => '-',
+                        'Status' => '<span class="badge badge-themeDanger">Absent</span>',
+                        'Child_id' => null,
+                        'ParentAttd_id' => null,
+                    ];
+                });
+
+                $AttendanceHistroy = $AttendanceHistroy->concat($absentItems)->sortBy('raw_date')->values();
+
                 $edit_class = '';
                 if(Common::checkRouteWisePermission('resort.timeandattendance.employee',config('settings.resort_permissions.edit')) == false){
                     $edit_class ='d-none';
@@ -1656,6 +1710,10 @@ class EmployeeController extends Controller
                         return isset($row->Status) ? $row->Status : 0; // Default to 0
                     })
                     ->addColumn('Action', function ($row) use ($edit_class) {
+                        if (!$row->ParentAttd_id) {
+                            // Synthesized Absent row — nothing was punched, no location/edit target.
+                            return '<span class="text-muted small">No punch recorded</span>';
+                        }
                         return '<a href="#" class="btn-lg-icon icon-bg-skyblue LocationHistoryData" data-location="' . $row->InTime_Location . '" data-id="' . $row->id . '">
                             <i class="fa-regular fa-location-dot"></i>
                         </a>
@@ -1824,7 +1882,7 @@ class EmployeeController extends Controller
                             $i->ThisYearOfused_days = $this->getLeaveCount($id, $i->leave_cat_id);
                             return $i;
             });
-            $AttendanceHistroy = ParentAttendace::join('shift_settings as ss', 'ss.id', '=', 'parent_attendaces.Shift_id')
+            $realAttendance = ParentAttendace::join('shift_settings as ss', 'ss.id', '=', 'parent_attendaces.Shift_id')
                 ->join('employees as t1', 't1.id', '=', 'parent_attendaces.Emp_id')
                 ->leftjoin('child_attendaces as t2', 't2.Parent_attd_id', '=', 'parent_attendaces.id')
                 ->whereIn('parent_attendaces.Status', ['On-Time','Present','Late','DayOff','Absent','ShortLeave','HalfDayLeave'])
@@ -1832,8 +1890,7 @@ class EmployeeController extends Controller
                 ->where('parent_attendaces.resort_id', $resortId)
                 ->whereBetween('parent_attendaces.date', [$monthStartingDate, $monthEndingDate])
                 ->groupBy('parent_attendaces.id')
-                ->orderBy('parent_attendaces.date', 'ASC')
-                ->paginate(10, [
+                ->get([
                     'parent_attendaces.id',
                     't2.InTime_Location',
                     't2.OutTime_Location',
@@ -1850,6 +1907,64 @@ class EmployeeController extends Controller
                     'parent_attendaces.DayWiseTotalHours'
                 ]);
 
+            // Same fix as EmployeeDetails() above — no code path ever writes
+            // a parent_attendaces row with Status='Absent', so this AJAX
+            // date-filter table (a separate query path from the card-view
+            // history) only ever showed punched days. Synthesize an Absent
+            // entry for every scheduled work day in range with no matching
+            // punch and no approved leave.
+            $absentRows = DB::select("
+                SELECT dre.date, ss.ShiftName, ss.StartTime
+                FROM duty_roster_entries dre
+                JOIN shift_settings ss ON ss.id = dre.Shift_id
+                WHERE dre.Emp_id = ?
+                AND dre.resort_id = ?
+                AND dre.Shift_id IS NOT NULL
+                AND (dre.Status IS NULL OR dre.Status != 'DayOff')
+                AND dre.date BETWEEN GREATEST(?, IFNULL((SELECT joining_date FROM employees WHERE id = ?), ?)) AND LEAST(?, CURDATE())
+                AND NOT EXISTS (
+                    SELECT 1 FROM parent_attendaces pa2
+                    WHERE pa2.Emp_id = ? AND pa2.resort_id = ? AND pa2.date = dre.date
+                    AND pa2.Status IN ('Present','HalfDay','On-Time','Late','ShortLeave','HalfDayLeave')
+                    AND pa2.CheckingTime IS NOT NULL AND TRIM(IFNULL(pa2.CheckingTime,'')) NOT IN ('','00:00','00:00:00')
+                )
+                AND NOT EXISTS (
+                    SELECT 1 FROM employees_leaves el2
+                    WHERE el2.emp_id = ? AND el2.resort_id = ? AND el2.status = 'Approved'
+                    AND dre.date BETWEEN el2.from_date AND el2.to_date
+                )
+            ", [$id, $resortId, $monthStartingDate, $id, $monthStartingDate, $monthEndingDate, $id, $resortId, $id, $resortId]);
+
+            $absentItems = collect($absentRows)->map(function ($row) {
+                return (object) [
+                    'id' => null,
+                    'InTime_Location' => null,
+                    'OutTime_Location' => null,
+                    'note' => null,
+                    'date' => $row->date,
+                    'ShiftName' => $row->ShiftName,
+                    'StartTime' => $row->StartTime,
+                    'CheckingTime' => null,
+                    'Chilmd_id' => null,
+                    'Child_id' => null,
+                    'CheckingOutTime' => null,
+                    'OverTime' => null,
+                    'ParentAttd_id' => null,
+                    'Status' => 'Absent',
+                    'DayWiseTotalHours' => null,
+                ];
+            });
+
+            $mergedAttendance = $realAttendance->concat($absentItems)->sortBy('date')->values();
+            $historyPage = (int) $request->input('page', 1);
+            $historyPerPage = 10;
+            $AttendanceHistroy = new \Illuminate\Pagination\LengthAwarePaginator(
+                $mergedAttendance->forPage($historyPage, $historyPerPage)->values(),
+                $mergedAttendance->count(),
+                $historyPerPage,
+                $historyPage,
+                ['path' => request()->url(), 'query' => request()->query()]
+            );
 
             // Transform the data after pagination
             $AttendanceHistroy->setCollection(
@@ -1910,21 +2025,27 @@ class EmployeeController extends Controller
                     $h->CheckOutTimeOne = $h->CheckingOutTime;
                     $h->totalhour = isset($h->DayWiseTotalHours) ? $h->DayWiseTotalHours : '-';
                     $h->OverTime = isset($h->OverTime) ? $h->OverTime : '-';
-                    $h->Action = '<a href="#" class="btn-lg-icon icon-bg-skyblue LocationHistoryData" 
-                                data-location="' . $h->InTime_Location . '" 
+                    if (!$h->ParentAttd_id) {
+                        // Synthesized Absent row — nothing was actually
+                        // punched, so there's no location/edit target.
+                        $h->Action = '<span class="text-muted small">No punch recorded</span>';
+                    } else {
+                        $h->Action = '<a href="#" class="btn-lg-icon icon-bg-skyblue LocationHistoryData"
+                                data-location="' . $h->InTime_Location . '"
                                 data-id="' . $h->id . '">
                                     <i class="fa-regular fa-location-dot"></i>
                                 </a>
-                                <a href="#" class="btn-lg-icon icon-bg-green edit-row-btn ' . $edit_class . '" 
-                                data-note="' . $h->note . '" 
-                                data-checkinTime="' . $h->CheckInTime . '" 
-                                data-checkouttime="' . $h->CheckOutTimeOne . '" 
-                                data-overtime="' . $h->OverTime . '" 
-                                data-id="' . base64_encode($h->Child_id) . '" 
-                                data-ParentAttd_id="' . base64_encode($h->ParentAttd_id) . '" 
+                                <a href="#" class="btn-lg-icon icon-bg-green edit-row-btn ' . $edit_class . '"
+                                data-note="' . $h->note . '"
+                                data-checkinTime="' . $h->CheckInTime . '"
+                                data-checkouttime="' . $h->CheckOutTimeOne . '"
+                                data-overtime="' . $h->OverTime . '"
+                                data-id="' . base64_encode($h->Child_id) . '"
+                                data-ParentAttd_id="' . base64_encode($h->ParentAttd_id) . '"
                                 data-bs-toggle="modal">
                                     <img src="' . asset('resorts_assets/images/edit.svg') . '" alt="Edit Icon">
                                 </a>';
+                    }
 
                     if ($h->CheckingTime && $h->StartTime) {
                         try {
