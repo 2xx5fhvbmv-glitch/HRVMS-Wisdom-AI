@@ -37,7 +37,7 @@
                                 </div>
                                 <div class="col-auto">
                                     <div class="d-flex justify-content-sm-end align-items-center">
-                                        <a href="{{route('resort.benifitgrid.create')}}" class="btn btn-sm btn-theme @if(App\Helpers\Common::checkRouteWisePermission('resort.benifitgrid.index',config('settings.resort_permissions.create')) == false) d-none @endif">
+                                        <a href="{{route('resort.benifitgrid.create')}}" class="btn btn-sm wfp-btn-primary @if(App\Helpers\Common::checkRouteWisePermission('resort.benifitgrid.index',config('settings.resort_permissions.create')) == false) d-none @endif">
                                             <i class="fa-solid fa-plus me-2"></i>Add New
                                         </a>
                                     </div>
@@ -66,6 +66,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts.workforce_planning._wfp_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')

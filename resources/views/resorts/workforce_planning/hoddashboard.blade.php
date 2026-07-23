@@ -178,8 +178,8 @@
                                 </div>
                             </div>
                             <div class="text-center">
-                                <a href="#sendRespond-modal" data-bs-toggle="modal" class="btn btn-sm btn-theme">Send
-                                    Respond</a>
+                                <a href="#sendRespond-modal" data-bs-toggle="modal" class="btn btn-sm wfp-btn-primary">Send
+                                    Response</a>
                             </div>
                         @elseif(!empty($BudgetStatus) && count($BudgetStatus))
                             <div class="card-title d-flex justify-content-between">
@@ -224,8 +224,8 @@
                                 </div>
                             </div>
                             <div class="text-center">
-                                <a href="#sendRespond-modal" data-message_id = "{{ (isset($BudgetRejactedStatus->message_id ) ? $BudgetRejactedStatus->message_id :'') }}" data-Budget_id="{{ (isset($BudgetRejactedStatus->Budget_id ) ? $BudgetRejactedStatus->Budget_id :'') }}" data-bs-toggle="modal" class="btn btn-sm btn-theme">Revise
-                                    Respond</a>
+                                <a href="#sendRespond-modal" data-message_id = "{{ (isset($BudgetRejactedStatus->message_id ) ? $BudgetRejactedStatus->message_id :'') }}" data-Budget_id="{{ (isset($BudgetRejactedStatus->Budget_id ) ? $BudgetRejactedStatus->Budget_id :'') }}" data-bs-toggle="modal" class="btn btn-sm wfp-btn-primary">Revise
+                                    Response</a>
                             </div>
                         @else
                             <p>No Requests</p>
@@ -289,7 +289,7 @@
         <div class="modal-dialog modal-dialog-centered modal-xl">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="staticBackdropLabel">Respond</h5>
+                    <h5 class="modal-title" id="staticBackdropLabel">Response</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <form id="manningResponseForm" method="POST" action="{{ route('manning.responses.store') }}">
@@ -417,9 +417,9 @@
                         </div>
                     </div>
                     <div class="modal-footer justify-content-start">
-                        <button type="button" class="btn btn-themeBlue" id="saveDraftBtn">Save As Draft</button>
-                        <button type="button" class="btn btn-sm btn-themeGray me-2" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-theme">Submit</button>
+                        <button type="button" class="btn wfp-btn-neutral" id="saveDraftBtn">Save As Draft</button>
+                        <button type="button" class="btn btn-sm wfp-btn-secondary me-2" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn wfp-btn-primary">Submit</button>
                     </div>
                 </form>
             </div>
@@ -449,6 +449,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts.workforce_planning._wfp_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')

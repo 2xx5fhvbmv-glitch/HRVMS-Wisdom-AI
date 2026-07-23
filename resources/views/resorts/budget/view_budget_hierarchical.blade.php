@@ -16,10 +16,13 @@
         transform: translateX(2px);
     }
 
+    /* No overflow/border-radius here — the table's own overflow:hidden
+       previously broke position:sticky on every th/td (an ancestor with
+       overflow != visible becomes the sticky containing block, and the
+       table itself never scrolls, so cells never actually stuck).
+       Rounded corners are already provided by .wb-table-scroll below. */
     .budget-monthly-table {
         box-shadow: 0 2px 4px rgba(0,0,0,0.08);
-        border-radius: 8px;
-        overflow: hidden;
     }
 
     .budget-monthly-table th {
@@ -53,6 +56,397 @@
         font-size: 0.875rem;
         box-shadow: 0 -2px 4px rgba(0,0,0,0.05);
     }
+
+    /* ==================================================================
+       Drill-Down Redesign — brand palette + nav/detail-card/table restyle.
+       View-layer only: every existing accordion element/id/class/
+       data-attribute, AJAX endpoint, and calculation stays untouched —
+       these rules only repaint what's already there, plus style the new
+       nav-card/detail-card/toggle markup added alongside it. No DOM
+       nodes are moved: "focus mode" (division→department→section→
+       position→employee/vacant showing one path at a time) is achieved
+       by hiding everything off the current path and collapsing on-path
+       wrapper boxes with `display: contents`, which removes their own
+       box (margin/padding/indentation) while leaving their children — and
+       every .closest()/.find() relationship the total/badge functions
+       rely on — completely intact. See wobbly-munching-lake.md for why.
+       ================================================================== */
+    :root {
+        --wb-teal: #014653;
+        --wb-teal-2: #035b6c;
+        --wb-teal-tint-1: #E6F0F1;
+        --wb-teal-tint-2: #F1F7F7;
+        --wb-lime: #E0FF02;
+        --wb-ink: #14232A;
+        --wb-muted: #5D6F75;
+        --wb-faint: #93A4A9;
+        --wb-line: #E2EBEC;
+        --wb-line-2: #EEF4F4;
+        --wb-bg: #F2F6F6;
+        --wb-card: #FFFFFF;
+        --wb-vacant: #D98A00;
+        --wb-vacant-bg: #FFF6E5;
+        --wb-increase: #1F9D6B;
+        --wb-increase-bg: #EAF7F0;
+        --wb-group-allowances: #014653;
+        --wb-group-overtime: #D98A00;
+        --wb-group-travel: #8A5CF6;
+        --wb-group-insurance: #0EA5E9;
+        --wb-group-other: #5D6F75;
+    }
+
+    /* ---- Nav card (Phase 1) ---- */
+    .wb-nav-card {
+        background: var(--wb-card);
+        border-radius: 14px;
+        box-shadow: 0 1px 3px rgba(1,70,83,0.08);
+        padding: 16px 18px;
+        margin-bottom: 16px;
+    }
+    .wb-nav-top {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-bottom: 12px;
+    }
+    .wb-detail-header-card {
+        background: var(--wb-card);
+        border-radius: 14px;
+        box-shadow: 0 1px 3px rgba(1,70,83,0.08);
+        padding: 14px 18px;
+        margin-bottom: 16px;
+    }
+    .wb-back-btn {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        border: 1px solid var(--wb-line);
+        background: #fff;
+        color: var(--wb-muted);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        flex-shrink: 0;
+        transition: background .12s, color .12s;
+    }
+    .wb-back-btn:hover:not(:disabled) { background: var(--wb-teal-tint-2); color: var(--wb-ink); }
+    .wb-back-btn:disabled { opacity: .35; cursor: not-allowed; }
+    .wb-revise-budget-btn {
+        flex-shrink: 0;
+        border: none;
+        border-radius: 8px;
+        padding: 7px 14px;
+        font-size: 12px;
+        font-weight: 700;
+        color: #fff;
+        background: var(--wb-teal);
+        cursor: pointer;
+    }
+    .wb-revise-budget-btn:hover { background: var(--wb-teal-2); }
+    .wb-revise-budget-btn:disabled { background: var(--wb-muted); opacity: .5; cursor: not-allowed; }
+    .wb-breadcrumb {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        flex-wrap: wrap;
+        font-size: 12.5px;
+        font-weight: 600;
+        color: var(--wb-muted);
+        flex: 1;
+        min-width: 160px;
+    }
+    .wb-breadcrumb button {
+        border: none;
+        background: none;
+        padding: 2px 4px;
+        color: var(--wb-muted);
+        font-weight: 600;
+        font-size: 12.5px;
+        cursor: pointer;
+        border-radius: 6px;
+    }
+    .wb-breadcrumb button:hover { background: var(--wb-teal-tint-1); color: var(--wb-teal); }
+    .wb-breadcrumb button.wb-crumb-current { color: var(--wb-teal); cursor: default; }
+    .wb-breadcrumb button.wb-crumb-current:hover { background: none; }
+    .wb-breadcrumb .wb-crumb-sep { color: var(--wb-faint); }
+    /* Search input itself uses the shared .input-group / .form-control.search
+       / .card-header classes (same as e.g. Talent Pool) — no page-specific
+       input styling here. Only the results dropdown below is this page's
+       own UI. */
+    .wb-search-results {
+        position: absolute;
+        top: calc(100% + 4px);
+        left: 0; right: 0;
+        background: #fff;
+        border: 1px solid var(--wb-line);
+        border-radius: 10px;
+        box-shadow: 0 8px 24px rgba(1,70,83,0.14);
+        max-height: 320px;
+        overflow-y: auto;
+        z-index: 20;
+    }
+    .wb-search-result-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        cursor: pointer;
+        border-bottom: 1px solid var(--wb-line-2);
+        font-size: 12.5px;
+    }
+    .wb-search-result-row:last-child { border-bottom: none; }
+    .wb-search-result-row:hover { background: var(--wb-teal-tint-2); }
+    .wb-search-result-type {
+        font-size: 9.5px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        color: var(--wb-faint);
+        flex-shrink: 0;
+        width: 46px;
+    }
+    .wb-search-result-name { color: var(--wb-ink); font-weight: 600; }
+    .wb-search-result-sub { color: var(--wb-faint); font-size: 11px; }
+
+    /* ---- Drill-down list rows (Phase 1) ---- */
+    .wb-level-list { display: flex; flex-direction: column; gap: 8px; }
+    .wb-group-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        border: 1px solid var(--wb-line);
+        border-radius: 10px;
+        padding: 10px 14px;
+        cursor: pointer;
+        transition: background .12s, border-color .12s;
+    }
+    .wb-group-row:hover { background: var(--wb-teal-tint-2); border-color: var(--wb-teal-tint-1); }
+    .wb-group-row-main { flex: 1; min-width: 0; }
+    .wb-group-row-name { font-size: 13.5px; font-weight: 600; color: var(--wb-ink); }
+    .wb-level-tag {
+        display: inline-block;
+        font-size: 9.5px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        color: var(--wb-teal);
+        background: var(--wb-teal-tint-1);
+        border-radius: 6px;
+        padding: 2px 7px;
+        margin-right: 8px;
+        vertical-align: middle;
+    }
+    .wb-group-row-meta { font-size: 11px; color: var(--wb-muted); margin-top: 3px; }
+    .wb-group-row-budget { font-size: 13px; font-weight: 700; color: var(--wb-teal); flex-shrink: 0; }
+    .wb-group-row-chevron { color: var(--wb-faint); flex-shrink: 0; }
+
+    /* ---- Leaf rows: employee / vacant (Phase 1) ---- */
+    .wb-leaf-row { display: flex; align-items: center; gap: 12px; }
+    .wb-leaf-avatar {
+        width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
+        object-fit: cover; background: var(--wb-teal); color: #fff;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 13px; font-weight: 700;
+    }
+    .wb-leaf-avatar-vacant {
+        border: 2px dashed var(--wb-vacant);
+        background: var(--wb-vacant-bg);
+        color: var(--wb-vacant);
+    }
+    .wb-vacant-pill {
+        display: inline-block;
+        font-size: 9.5px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        color: var(--wb-vacant);
+        background: var(--wb-vacant-bg);
+        border: 1px solid #ffe2ad;
+        border-radius: 10px;
+        padding: 2px 8px;
+    }
+
+    /* ---- Detail card (Phase 2) ---- */
+    .wb-detail-card-inner { background: var(--wb-card); }
+    .wb-annual-summary {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin: 4px 0 14px;
+    }
+    .wb-annual-stat {
+        flex: 1;
+        min-width: 130px;
+        background: var(--wb-teal-tint-2);
+        border-radius: 10px;
+        padding: 10px 12px;
+    }
+    .wb-annual-stat-label {
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        color: var(--wb-faint);
+        display: block;
+        margin-bottom: 3px;
+    }
+    .wb-annual-stat-value { font-size: 15px; font-weight: 800; color: var(--wb-teal); }
+    .wb-annual-stat-delta.wb-delta-up { color: var(--wb-increase); }
+    .wb-annual-stat-delta.wb-delta-down { color: #E5573F; }
+
+    /* ---- Group toggle chips (Phase 5) ---- */
+    .wb-group-toggles { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+    .wb-group-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        border: 1px solid var(--wb-line);
+        border-radius: 20px;
+        padding: 5px 12px;
+        font-size: 11.5px;
+        font-weight: 600;
+        color: var(--wb-muted);
+        background: #fff;
+        cursor: pointer;
+        user-select: none;
+    }
+    .wb-group-chip .wb-group-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .wb-group-chip.wb-chip-active {
+        background: var(--wb-teal-tint-1);
+        border-color: var(--wb-teal-tint-1);
+        color: var(--wb-teal);
+    }
+
+    /* ---- Table framing / sticky (Phase 3) ---- */
+    .wb-table-scroll { max-height: 65vh; overflow: auto; border-radius: 10px; border: 1px solid var(--wb-line-2); }
+    /* Fixed layout so every column's rendered width exactly matches its
+       declared inline width — required for the .wb-col-* left offsets
+       below (0/80/210/340/440) to line up the 5 sticky columns edge to
+       edge. Auto layout would size columns from content across all rows,
+       which the sticky offsets can't know in advance. */
+    .budget-monthly-table { table-layout: fixed; }
+    /* Flat, light header — a finance/spreadsheet-style table reads numbers
+       for a living, so the header's job is to label columns clearly
+       without competing for attention; a saturated gradient reads more
+       "marketing card" than "financial report". Long cost-template names
+       (e.g. "Language Allowance", "R And R Allowance") also need to wrap
+       to a second line instead of overflowing into the next column —
+       white-space:nowrap was inherited from a global table style. */
+    .budget-monthly-table thead th {
+        position: sticky;
+        top: 0;
+        z-index: 3;
+        background: var(--wb-teal-tint-1) !important;
+        color: var(--wb-teal) !important;
+        border-bottom: 2px solid var(--wb-teal) !important;
+        white-space: normal !important;
+        overflow-wrap: break-word;
+        font-size: 12px !important;
+        line-height: 1.3 !important;
+        padding: 8px 10px !important;
+        vertical-align: middle;
+    }
+    .budget-monthly-table .wb-sticky-col {
+        position: sticky;
+        background: #fff;
+        z-index: 2;
+    }
+    .budget-monthly-table thead th.wb-sticky-col { z-index: 4; }
+    .budget-monthly-table tbody tr:hover .wb-sticky-col { background: #f8f9fa !important; }
+    .budget-monthly-table tr.table-total-row .wb-sticky-col { background: #f8f9fa !important; }
+    .wb-col-month { left: 0; }
+    .wb-col-current { left: 80px; }
+    .wb-col-proposed { left: 210px; }
+    .wb-col-action { left: 340px; box-shadow: 2px 0 4px rgba(0,0,0,0.05); }
+    .wb-zero-dash { color: var(--wb-faint); font-weight: 400; }
+
+    /* Column show/hide by cost group (Phase 5) — driven purely by a
+       data-hidden-groups token list on the scroll wrapper; never touches
+       data-cost-id or the totals-recalculation logic. */
+    .wb-table-scroll[data-hidden-groups~="allowances"] [data-cost-group="allowances"],
+    .wb-table-scroll[data-hidden-groups~="overtime"] [data-cost-group="overtime"],
+    .wb-table-scroll[data-hidden-groups~="travel"] [data-cost-group="travel"],
+    .wb-table-scroll[data-hidden-groups~="insurance"] [data-cost-group="insurance"],
+    .wb-table-scroll[data-hidden-groups~="other"] [data-cost-group="other"] {
+        display: none;
+    }
+    @keyframes wbChipShake {
+        0%, 100% { transform: translateX(0); }
+        25% { transform: translateX(-3px); }
+        75% { transform: translateX(3px); }
+    }
+    .wb-group-chip.wb-chip-shake { animation: wbChipShake 0.3s; }
+
+    /* Icon-button restyle for edit-pencil / copy-down — visual only,
+       .btn-edit-month-budget / .btn-copy-down and every data-* attribute
+       stay exactly as the existing delegated handlers expect. */
+    .budget-monthly-table .btn-edit-month-budget,
+    .budget-monthly-table .btn-copy-down {
+        width: 26px;
+        height: 26px;
+        padding: 0 !important;
+        border-radius: 7px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--wb-line);
+        background: #fff;
+        color: var(--wb-muted);
+    }
+    .budget-monthly-table .btn-edit-month-budget:hover { background: var(--wb-teal-tint-1); color: var(--wb-teal); border-color: var(--wb-teal-tint-1); transform: none; }
+    .budget-monthly-table .btn-copy-down:hover { background: var(--wb-teal-tint-1); color: var(--wb-teal); border-color: var(--wb-teal-tint-1); }
+
+    /* ---- Revise Budget button (Phase 6, visual only) ---- */
+    .revisebudgetmodal, a.revisebudgetmodal {
+        background: var(--wb-teal) !important;
+        border-color: var(--wb-teal) !important;
+        color: #fff !important;
+    }
+
+    /* ---- Focus-mode flattening (core drill-down mechanism) ----
+       Unconditional — NOT gated by a .wb-focus-active ancestor class.
+       Bootstrap's own collapse state (.collapse.show) persists in the DOM
+       independently of wbPath (e.g. after drilling deep then coming back
+       to the root, those inner collapses are still "shown"). Gating this
+       on .wb-focus-active meant that once wbPath emptied out and that
+       class was removed, every rule below stopped applying and whatever
+       had previously been expanded reappeared in full, unflattened — the
+       exact "old accordion still showing underneath" bug. Keeping these
+       rules always-on means the original accordion chrome never becomes
+       visible again regardless of prior navigation. */
+    #accordionViewBudget .division-accordion:not(.wb-on-path),
+    #accordionViewBudget .department-accordion:not(.wb-on-path),
+    #accordionViewBudget .section-accordion:not(.wb-on-path),
+    #accordionViewBudget .position-accordion:not(.wb-on-path),
+    #accordionViewBudget .employee-accordion:not(.wb-on-path),
+    #accordionViewBudget .vacant-accordion:not(.wb-on-path) {
+        display: none !important;
+    }
+    #accordionViewBudget .wb-on-path.wb-flatten,
+    /* Division: .division-accordion IS the .accordion-item (same element) —
+       its collapse/body are direct children, not nested under a child
+       .accordion-item like every other level. */
+    #accordionViewBudget .wb-on-path.wb-flatten.division-accordion > .collapse,
+    #accordionViewBudget .wb-on-path.wb-flatten.division-accordion > .collapse.show,
+    #accordionViewBudget .wb-on-path.wb-flatten.division-accordion > .collapse > .accordion-body,
+    /* Department/Section/Position/Employee/Vacant: wrap a child .accordion-item. */
+    #accordionViewBudget .wb-on-path.wb-flatten > .accordion-item,
+    #accordionViewBudget .wb-on-path.wb-flatten > .accordion-item > .collapse,
+    #accordionViewBudget .wb-on-path.wb-flatten > .accordion-item > .collapse.show,
+    #accordionViewBudget .wb-on-path.wb-flatten > .accordion-item > .collapse > .accordion-body,
+    #accordionViewBudget .wb-on-path.wb-flatten > .accordion-item > .row,
+    #accordionViewBudget .wb-on-path.wb-flatten > .accordion-item > .row > div {
+        display: contents !important;
+    }
+    #accordionViewBudget .wb-on-path.wb-flatten.division-accordion > h2.accordion-header,
+    #accordionViewBudget .wb-on-path.wb-flatten > .accordion-item > h2.accordion-header,
+    #accordionViewBudget .wb-on-path.wb-flatten > .accordion-item > .row h2.accordion-header,
+    #accordionViewBudget .wb-on-path.wb-flatten > .accordion-item > .row .col-md-3 {
+        display: none !important;
+    }
+    #accordionViewBudget { padding: 0; }
 </style>
 
 <div class="body-wrapper pb-5">
@@ -70,7 +464,7 @@
 
         <div class="card">
             <div class="card-header">
-                <div class="row g-md-3 g-2 align-items-center">
+                <div class="row g-md-3 g-2 align-items-center justify-content-between">
                     <div class="col-xl-2 col-md-4 col-sm-4 col-6">
                         <form method="GET" action="{{ route('resort.budget.viewbudget') }}" id="yearFilterForm">
                             <select class="form-select" name="year" id="yearFilter" onchange="document.getElementById('yearFilterForm').submit();">
@@ -86,8 +480,55 @@
                             </select>
                         </form>
                     </div>
+                    <div class="col-xl-4 col-md-5 col-sm-6 col-12">
+                        {{-- Same input-group / form-control.search / .card-header
+                             pattern used site-wide (e.g. Talent Pool's search bar)
+                             — reusing the shared CSS rather than a page-specific
+                             look, so this page's search box isn't visually its
+                             own thing. --}}
+                        <div class="input-group" id="wbSearchGroup">
+                            <input type="search" class="form-control search" id="wbSearchInput" placeholder="Search employee or position" autocomplete="off">
+                            <i class="fa-solid fa-search"></i>
+                            <div class="wb-search-results d-none" id="wbSearchResults"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
+
+            {{-- Drill-down nav card — purely additive presentation layer.
+                 Reads from window.budgetTotals (already populated by the
+                 existing eager loadAllBudgetTotalsOnPageLoad() chain) and
+                 the rendered accordion DOM; drilling into a row calls
+                 bootstrap.Collapse.show() on the matching EXISTING collapse
+                 element so the real shown.bs.collapse listeners fire and
+                 load data exactly as they already do today. Nothing here
+                 fetches data on its own. --}}
+            <div class="wb-nav-card" id="wbNavCard">
+                <div class="wb-nav-top">
+                    <button type="button" class="wb-back-btn" id="wbBackBtn" title="Back" disabled>
+                        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+                    </button>
+                    <div class="wb-breadcrumb" id="wbBreadcrumb">
+                        <button type="button" class="wb-crumb-current" data-wb-level="root">All Divisions</button>
+                    </div>
+                    {{-- Only ever shown/wired when the drilled-into department
+                         actually has a live trigger in the (now-hidden)
+                         original accordion — see wbUpdateReviseBudgetButton().
+                         Clicking it just clicks that original trigger, so
+                         the existing modal/save logic is entirely reused. --}}
+                    <button type="button" class="wb-revise-budget-btn d-none" id="wbReviseBudgetBtn">Revise Budget</button>
+                </div>
+                <div class="wb-level-list" id="wbLevelList"></div>
+            </div>
+
+            {{-- Detail-card title bar for the selected employee/vacant —
+                 built from the exact same avatar/name/meta markup as the
+                 nav card's leaf rows (see wbLeafRowInnerHtml()), so this
+                 never looks different from what the user just clicked.
+                 Replaces the original accordion header's generic person
+                 icon + default Bootstrap badges, which is now fully
+                 hidden like every other level (see wbApplyFocus()). --}}
+            <div class="wb-detail-header-card d-none" id="wbDetailHeader"></div>
 
             <div class="viewBudget-accordion" id="accordionViewBudget">
                 @if($divisions->isNotEmpty())
@@ -136,7 +577,7 @@
                                                             @if($isBudgetLocked)
                                                                 {{-- GM has approved this budget — Revise is locked. --}}
                                                                 <button type="button"
-                                                                    class="btn btn-xs btn-secondary ms-2"
+                                                                    class="btn btn-xs wfp-btn-secondary ms-2"
                                                                     disabled
                                                                     title="GM has approved this budget — revisions are locked.">
                                                                     Revise Budget
@@ -145,7 +586,7 @@
                                                                 <a href="#revise-budgetmodal"
                                                                    data-dept_id="{{ $department->id }}"
                                                                    data-Budget_id="{{ $manningResponse->id }}"
-                                                                   class="btn btn-xs btn-themeBlue ms-2 revisebudgetmodal"
+                                                                   class="btn btn-xs wfp-btn-primary ms-2 revisebudgetmodal"
                                                                    data-bs-toggle="modal">
                                                                     Revise Budget
                                                                 </a>
@@ -215,8 +656,8 @@
                     </div>
                 </div>
                 <div class="modal-footer justify-content-end">
-                    <button type="button" class="btn btn-sm btn-themeGray me-2" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-sm btn-theme">Submit</button>
+                    <button type="button" class="btn btn-sm wfp-btn-secondary me-2" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-sm wfp-btn-primary">Submit</button>
                 </div>
             </form>
         </div>
@@ -226,6 +667,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts.workforce_planning._wfp_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')
@@ -237,6 +679,7 @@
         $mvrToDollarRate = $resortSettings->MVRtoDoller ?? 0.065;
     @endphp
     window.mvrToDollarRate = {{ $mvrToDollarRate }};
+    window.wbDefaultPictureUrl = "{{ url(config('settings.default_picture')) }}";
 
 // Format a budget number with thousands separator + 2 decimal places.
 // Used for every Budget badge so 18720.00 → "18,720.00" (matches the
@@ -283,325 +726,36 @@ $(document).ready(function() {
     };
 
     // Load all budget data automatically on page load for badge calculations
+    // Single batched call replacing the old 3-level waterfall (one AJAX
+    // request per department, then per position, then per employee/vacant
+    // — hundreds of requests for a real resort, ~4+ seconds even on a tiny
+    // test dataset). BudgetController::getAllBudgetTotals() computes every
+    // position's total server-side in a fixed number of queries using the
+    // same canonical Common::annualBudgetForEmployee() /
+    // annualBudgetForVacantSlot() arithmetic, and returns exactly the
+    // shape window.budgetTotals.positions already needs — no other client
+    // code changes required.
     function loadAllBudgetTotalsOnPageLoad() {
         console.log('Loading all budget totals on page load...');
 
-        // Collect all departments from the page
-        const departments = [];
-        $('[data-department-id]').each(function() {
-            const deptId = $(this).data('department-id');
-            const divisionIteration = $(this).data('division-iteration');
-            const deptIteration = $(this).data('dept-iteration');
-            const divisionAccordion = $(this).closest('.division-accordion');
-            const divisionIndex = divisionAccordion.length ? divisionAccordion.index('.division-accordion') + 1 : 1;
-
-            if (deptId && !departments.find(d => d.deptId === deptId)) {
-                departments.push({
-                    deptId: deptId,
-                    divisionIteration: divisionIteration,
-                    deptIteration: deptIteration,
-                    divisionIndex: divisionIndex
-                });
-            }
-        });
-
-        // Load each department's budget data
-        let loadedCount = 0;
-        const totalDepartments = departments.length;
-
-        if (totalDepartments === 0) {
-            console.log('No departments found to load.');
-            return;
-        }
-
-        departments.forEach(dept => {
-            loadDepartmentBudgetTotals(dept.deptId, dept.divisionIteration, dept.deptIteration, dept.divisionIndex, function() {
-                loadedCount++;
-                if (loadedCount === totalDepartments) {
-                    // All departments loaded, now calculate and update all badges
-                    setTimeout(() => {
-                        updateAllBadgesFromTotals();
-                    }, 500);
-                }
-            });
-        });
-    }
-
-    // Load budget totals for a department
-    function loadDepartmentBudgetTotals(departmentId, divisionIteration, deptIteration, divisionIndex, callback) {
         $.ajax({
-            url: "{{ route('resort.budget.hierarchy.department') }}",
+            url: "{{ route('resort.budget.hierarchy.all-totals') }}",
             method: 'GET',
             data: {
-                department_id: departmentId,
                 year: year,
                 _token: csrfToken
             },
             success: function(response) {
                 if (response.success) {
-                    const positionPromises = [];
-
-                    // Process sections
-                    if (response.sections && response.sections.length > 0) {
-                        response.sections.forEach((section, sIdx) => {
-                            if (response.positions_by_section[section.id]) {
-                                response.positions_by_section[section.id].forEach(position => {
-                                    positionPromises.push(loadPositionBudgetTotal(position.id, departmentId, divisionIndex, section.id));
-                                });
-                            }
-                        });
-                    }
-
-                    // Process positions without section
-                    if (response.positions_without_section && response.positions_without_section.length > 0) {
-                        response.positions_without_section.forEach(position => {
-                            positionPromises.push(loadPositionBudgetTotal(position.id, departmentId, divisionIndex, null));
-                        });
-                    }
-
-                    Promise.all(positionPromises).then(() => {
-                        if (callback) callback();
-                    });
+                    window.budgetTotals.positions = response.positions;
+                    updateAllBadgesFromTotals();
                 } else {
-                    if (callback) callback();
+                    console.error('Error loading budget totals:', response.message);
                 }
             },
             error: function(xhr) {
-                console.error('Error loading department totals:', xhr);
-                if (callback) callback();
+                console.error('Error loading budget totals:', xhr);
             }
-        });
-    }
-
-    // Load budget total for a position
-    function loadPositionBudgetTotal(positionId, departmentId, divisionIndex, sectionId) {
-        return new Promise((resolve) => {
-            $.ajax({
-                url: "{{ route('resort.budget.hierarchy.position.employees') }}",
-                method: 'GET',
-                data: {
-                    position_id: positionId,
-                    year: year,
-                    _token: csrfToken
-                },
-                success: function(response) {
-                    if (response.success) {
-                        const employeePromises = [];
-
-                        // Load employee totals
-                        if (response.employees && response.employees.length > 0) {
-                            response.employees.forEach(employee => {
-                                employeePromises.push(loadEmployeeBudgetTotal(employee.Empid, positionId));
-                            });
-                        }
-
-                        // Load vacant totals
-                        if (response.total_vacant_positions && response.total_vacant_positions > 0) {
-                            for (let v = 1; v <= response.total_vacant_positions; v++) {
-                                employeePromises.push(loadVacantBudgetTotal(v, positionId));
-                            }
-                        }
-
-                        Promise.all(employeePromises).then(() => {
-                            // Calculate position total
-                            let positionTotal = 0;
-
-                            // Sum employee totals
-                            if (window.budgetTotals.positions[positionId] && window.budgetTotals.positions[positionId].employees) {
-                                Object.values(window.budgetTotals.positions[positionId].employees).forEach(empTotal => {
-                                    positionTotal += empTotal;
-                                });
-                            }
-
-                            // Sum vacant totals
-                            if (window.budgetTotals.positions[positionId] && window.budgetTotals.positions[positionId].vacants) {
-                                Object.values(window.budgetTotals.positions[positionId].vacants).forEach(vacTotal => {
-                                    positionTotal += vacTotal;
-                                });
-                            }
-
-                            // Store position total
-                            if (!window.budgetTotals.positions[positionId]) {
-                                window.budgetTotals.positions[positionId] = {};
-                            }
-                            window.budgetTotals.positions[positionId].total = positionTotal;
-                            window.budgetTotals.positions[positionId].departmentId = departmentId;
-                            window.budgetTotals.positions[positionId].divisionIndex = divisionIndex;
-                            window.budgetTotals.positions[positionId].sectionId = sectionId;
-
-                            // Roll up dept/division badges from stored
-                            // positions data (NOT from DOM) so badges update
-                            // even before the user expands a department.
-                            // updateSectionDepartmentDivisionBadges() walks
-                            // the DOM and would skip unexpanded departments.
-                            try { updateDepartmentDivisionBadgesFromStored(); } catch (e) { /* badges may not be rendered yet */ }
-
-                            resolve();
-                        });
-                    } else {
-                        resolve();
-                    }
-                },
-                error: function(xhr) {
-                    console.error('Error loading position totals:', xhr);
-                    resolve();
-                }
-            });
-        });
-    }
-
-    // Load employee budget total.
-    //
-    // Aligns view-budget to the same canonical aggregator that consolidated-
-    // budget + Liability + Common::computeYearlyBudgetTotal use:
-    //   salary leg per month = monthly_salaries[m].proposed_salary > 0
-    //                          ? proposed_salary
-    //                          : (current_salary > 0 ? current_salary : fallback)
-    //   cost leg per month   = sum(monthCostLookup[m][*].value) with MVR→USD
-    //
-    // Before this fix the JS was using the SHARED current_basic_salary × 12
-    // for the salary leg, ignoring the per-month overrides HR set on the
-    // manning response. That's why view-budget and consolidated-budget
-    // disagreed by exactly the amount of those overrides (e.g. DOF $112k
-    // vs $90k — view-budget was reading the employees.basic_salary × 12
-    // while consolidated was reading the $7,500/mo override).
-    function loadEmployeeBudgetTotal(employeeId, positionId) {
-        return new Promise((resolve) => {
-            $.ajax({
-                url: "{{ route('resort.budget.hierarchy.employee.monthly') }}",
-                method: 'GET',
-                data: {
-                    employee_id: employeeId,
-                    position_id: positionId,
-                    year: year,
-                    _token: csrfToken
-                },
-                success: function(response) {
-                    if (response.success) {
-                        // CANONICAL annual total — same value the consolidated
-                        // aggregator computes for this employee, returned by
-                        // BudgetController::getEmployeeMonthlyData via
-                        // Common::annualBudgetForEmployee. Using it directly
-                        // forces view-budget and consolidated to agree to the
-                        // cent.
-                        //
-                        // The fallback (manual per-month sum) preserves the
-                        // old behaviour if the server response is from a
-                        // pre-helper deploy that doesn't include the field.
-                        let total = parseFloat(response.annual_total_usd);
-                        if (!Number.isFinite(total)) {
-                            const currentFallback  = parseFloat(response.current_basic_salary  || 0);
-                            const proposedFallback = parseFloat(response.proposed_basic_salary || 0);
-                            const monthlySalaries  = response.monthly_salaries || {};
-                            const monthCostData    = response.month_cost_data  || {};
-                            const allowanceMonthlyUsd = parseFloat(response.employee_allowance_monthly_usd || 0);
-                            const mvrToUsdRate     = window.mvrToDollarRate || (1 / 15.42);
-                            total = 0;
-                            for (let m = 1; m <= 12; m++) {
-                                const row = monthlySalaries[m] || {};
-                                const proposed = parseFloat(row.proposed_salary !== undefined && row.proposed_salary !== null
-                                    ? row.proposed_salary : proposedFallback);
-                                const current  = parseFloat(row.current_salary  !== undefined && row.current_salary  !== null
-                                    ? row.current_salary  : currentFallback);
-                                const monthSalary = proposed > 0
-                                    ? proposed
-                                    : (current > 0 ? current : (proposedFallback > 0 ? proposedFallback : currentFallback));
-                                total += monthSalary;
-                                const monthData = monthCostData[m] || {};
-                                Object.keys(monthData).forEach(costId => {
-                                    const costData = monthData[costId];
-                                    let costValue = parseFloat(costData.value || 0);
-                                    if ((costData.currency || 'USD') === 'MVR' && costValue > 0) {
-                                        costValue = costValue * mvrToUsdRate;
-                                    }
-                                    total += costValue;
-                                });
-                                total += allowanceMonthlyUsd;
-                            }
-                        }
-
-                        // Store employee total
-                        if (!window.budgetTotals.positions[positionId]) {
-                            window.budgetTotals.positions[positionId] = { employees: {}, vacants: {} };
-                        }
-                        if (!window.budgetTotals.positions[positionId].employees) {
-                            window.budgetTotals.positions[positionId].employees = {};
-                        }
-                        window.budgetTotals.positions[positionId].employees[employeeId] = total;
-                    }
-                    resolve();
-                },
-                error: function() {
-                    resolve();
-                }
-            });
-        });
-    }
-
-    // Load vacant budget total
-    function loadVacantBudgetTotal(vacantIndex, positionId) {
-        return new Promise((resolve) => {
-            $.ajax({
-                url: "{{ route('resort.budget.hierarchy.vacant.monthly') }}",
-                method: 'GET',
-                data: {
-                    vacant_index: vacantIndex,
-                    position_id: positionId,
-                    year: year,
-                    _token: csrfToken
-                },
-                success: function(response) {
-                    if (response.success) {
-                        // CANONICAL annual total for this vacant slot — same
-                        // value the consolidated aggregator computes, returned
-                        // by BudgetController::getVacantMonthlyData via
-                        // Common::annualBudgetForVacantSlot. Manual per-month
-                        // sum kept as a fallback for any pre-helper response.
-                        let total = parseFloat(response.annual_total_usd);
-                        if (!Number.isFinite(total)) {
-                            const currentFallback  = parseFloat(response.current_basic_salary  || 0);
-                            const proposedFallback = parseFloat(response.proposed_basic_salary || 0);
-                            const monthlySalaries  = response.monthly_salaries || {};
-                            const monthCostData    = response.month_cost_data  || {};
-                            const mvrToUsdRate     = window.mvrToDollarRate || (1 / 15.42);
-                            total = 0;
-                            for (let m = 1; m <= 12; m++) {
-                                const row = monthlySalaries[m] || {};
-                                const proposed = parseFloat(row.proposed_salary !== undefined && row.proposed_salary !== null
-                                    ? row.proposed_salary : proposedFallback);
-                                const current  = parseFloat(row.current_salary  !== undefined && row.current_salary  !== null
-                                    ? row.current_salary  : currentFallback);
-                                const monthSalary = proposed > 0
-                                    ? proposed
-                                    : (current > 0 ? current : (proposedFallback > 0 ? proposedFallback : currentFallback));
-                                total += monthSalary;
-                                const monthData = monthCostData[m] || {};
-                                Object.keys(monthData).forEach(costId => {
-                                    const costData = monthData[costId];
-                                    let costValue = parseFloat(costData.value || 0);
-                                    if ((costData.currency || 'USD') === 'MVR' && costValue > 0) {
-                                        costValue = costValue * mvrToUsdRate;
-                                    }
-                                    total += costValue;
-                                });
-                            }
-                        }
-
-                        // Store vacant total
-                        if (!window.budgetTotals.positions[positionId]) {
-                            window.budgetTotals.positions[positionId] = { employees: {}, vacants: {} };
-                        }
-                        if (!window.budgetTotals.positions[positionId].vacants) {
-                            window.budgetTotals.positions[positionId].vacants = {};
-                        }
-                        window.budgetTotals.positions[positionId].vacants[vacantIndex] = total;
-                    }
-                    resolve();
-                },
-                error: function() {
-                    resolve();
-                }
-            });
         });
     }
 
@@ -964,10 +1118,13 @@ $(document).ready(function() {
         return total;
     }
 
-    // Start loading all budget totals on page load
-    setTimeout(() => {
-        loadAllBudgetTotalsOnPageLoad();
-    }, 1000);
+    // Start loading all budget totals on page load. The 1s artificial
+    // delay this used to have was working around loadAllBudgetTotalsOnPageLoad()
+    // needing to read [data-department-id] elements from the DOM before it
+    // could know what to fetch — the single-request version below doesn't
+    // touch the DOM to decide what to request, so there's nothing left to
+    // wait for.
+    loadAllBudgetTotalsOnPageLoad();
 
     // Load department content when accordion is shown
     $(document).on('shown.bs.collapse', '[id^="collapseDept"]', function() {
@@ -1189,7 +1346,7 @@ $(document).ready(function() {
                             const employeeAccordionId = `empAccordion_${positionId}_${empIteration}`;
 
                             html += `
-                                <div class="accordion mb-2 ms-3 employee-accordion" id="${employeeAccordionId}" data-employee-rank="${employee.rank}" data-employee-rank-name="${rankName}">
+                                <div class="accordion mb-2 ms-3 employee-accordion" id="${employeeAccordionId}" data-employee-rank="${employee.rank}" data-employee-rank-name="${rankName}" data-employee-picture="${employee.picture || ''}">
                                     <div class="accordion-item">
                                         <h2 class="accordion-header" id="heading${employeeAccordionId}">
                                             <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
@@ -1388,20 +1545,23 @@ $(document).ready(function() {
                         costs: {}
                     };
 
-                    // Build table header
+                    // Build table header. Annual summary + group chips are
+                    // prepended once totals are final (below) — they need
+                    // totals.costs fully accumulated first.
                     let html = `
-                        <div class="table-responsive mt-3">
+                        <div class="wb-table-scroll" data-hidden-groups=" overtime travel insurance other ">
                             <table class="table table-bordered table-hover align-middle budget-monthly-table" style="font-size: 0.875rem;">
                                 <thead style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
                                     <tr>
-                                        <th class="text-center" style="width: 80px; font-weight: 600;">Month</th>
-                                        <th class="text-center" style="min-width: 120px; font-weight: 600;">Current Basic<br>Salary</th>
-                                        <th class="text-center" style="min-width: 120px; font-weight: 600;">Proposed Basic<br>Salary</th>
-                                        <th class="text-center" style="width: 80px; font-weight: 600;">Action</th>`;
+                                        <th class="text-center wb-sticky-col wb-col-month" style="width: 80px; font-weight: 600;">Month</th>
+                                        <th class="text-center wb-sticky-col wb-col-current" style="width: 130px; font-weight: 600;">Current Basic<br>Salary</th>
+                                        <th class="text-center wb-sticky-col wb-col-proposed" style="width: 130px; font-weight: 600;">Proposed Basic<br>Salary</th>
+                                        <th class="text-center wb-sticky-col wb-col-action" style="width: 80px; font-weight: 600;">Action</th>`;
 
                     // Add all cost configuration columns
                     resortCosts.forEach(cost => {
-                        html += `<th class="text-center" style="min-width: 100px; font-weight: 600;">${cost.particulars || cost.cost_title || 'N/A'}</th>`;
+                        const costGroup = window.wbClassifyCost(cost);
+                        html += `<th class="text-center" data-cost-group="${costGroup}" style="width: 140px; font-weight: 600;">${cost.particulars || cost.cost_title || 'N/A'}</th>`;
                         totals.costs[cost.id] = 0;
                     });
 
@@ -1416,10 +1576,10 @@ $(document).ready(function() {
                         const rowSalary = salaryForMonth(m);
                         html += `
                             <tr style="transition: all 0.2s;">
-                                <td class="text-center" style="font-weight: 500; font-size: 0.813rem;">${months[m-1]}</td>
-                                <td class="text-end" style="font-size: 0.813rem;">${formatAmount(rowSalary.current, 'USD')}</td>
-                                <td class="text-end" style="font-size: 0.813rem;">${formatAmount(rowSalary.proposed, 'USD')}</td>
-                                <td class="text-center">
+                                <td class="text-center wb-sticky-col wb-col-month" style="font-weight: 500; font-size: 0.813rem;">${months[m-1]}</td>
+                                <td class="text-end wb-sticky-col wb-col-current" style="font-size: 0.813rem;">${formatAmountOrDash(rowSalary.current, 'USD')}</td>
+                                <td class="text-end wb-sticky-col wb-col-proposed" style="font-size: 0.813rem;">${formatAmountOrDash(rowSalary.proposed, 'USD')}</td>
+                                <td class="text-center wb-sticky-col wb-col-action">
                                     <button class="btn btn-sm btn-outline-primary btn-edit-month-budget"
                                             data-month="${m}"
                                             data-month-name="${months[m-1]}"
@@ -1474,12 +1634,13 @@ $(document).ready(function() {
                                 <td class="text-end"
                                     data-month="${m}"
                                     data-cost-id="${cost.id}"
+                                    data-cost-group="${window.wbClassifyCost(cost)}"
                                     data-employee-id="${employeeId}"
                                     data-currency="${currency}"
                                     data-original-value="${originalValue}"
                                     data-usd-value="${costValue.toFixed(2)}"
                                     style="font-size: 0.813rem;">
-                                    ${formatAmount(parseFloat(costValue), 'USD')}
+                                    ${formatAmountOrDash(parseFloat(costValue), 'USD')}
                                 </td>`;
                         });
 
@@ -1489,18 +1650,27 @@ $(document).ready(function() {
                     // Add Total row
                     html += `
                         <tr class="table-total-row" style="background-color: #f8f9fa; font-weight: 600; border-top: 2px solid #dee2e6;">
-                            <td class="text-center" style="font-weight: 700;">TOTAL</td>
-                            <td class="text-end text-primary total-current-salary" style="font-weight: 700;">${formatAmount(totals.currentSalary, 'USD')}</td>
-                            <td class="text-end text-success total-proposed-salary" style="font-weight: 700;">${formatAmount(totals.proposedSalary, 'USD')}</td>
-                            <td></td>`;
+                            <td class="text-center wb-sticky-col wb-col-month" style="font-weight: 700;">TOTAL</td>
+                            <td class="text-end text-primary total-current-salary wb-sticky-col wb-col-current" style="font-weight: 700;">${formatAmountOrDash(totals.currentSalary, 'USD')}</td>
+                            <td class="text-end text-success total-proposed-salary wb-sticky-col wb-col-proposed" style="font-weight: 700;">${formatAmountOrDash(totals.proposedSalary, 'USD')}</td>
+                            <td class="wb-sticky-col wb-col-action"></td>`;
 
                     resortCosts.forEach(cost => {
-                        html += `<td class="text-end text-dark total-cost-${cost.id}" data-cost-id="${cost.id}" style="font-weight: 700;">${formatAmount(totals.costs[cost.id], 'USD')}</td>`;
+                        html += `<td class="text-end text-dark total-cost-${cost.id}" data-cost-id="${cost.id}" data-cost-group="${window.wbClassifyCost(cost)}" style="font-weight: 700;">${formatAmountOrDash(totals.costs[cost.id], 'USD')}</td>`;
                     });
 
                     html += `</tr></tbody></table></div>`;
 
-                    $container.html(html);
+                    // Totals are final now — assemble the detail card in
+                    // visual order: annual summary, then group chips, then
+                    // the table built above.
+                    const finalHtml = '<div class="wb-detail-card-inner mt-3">'
+                        + wbAnnualSummaryHtml(response, totals, resortCosts)
+                        + wbGroupChipsHtml(resortCosts)
+                        + html
+                        + '</div>';
+
+                    $container.html(finalHtml);
 
                     // Server-rendered badges are authoritative — do not recompute
                     // from this freshly-loaded table (it would read sibling
@@ -1589,20 +1759,22 @@ $(document).ready(function() {
                         costs: {}
                     };
 
-                    // Build table header
+                    // Build table header. Annual summary + group chips are
+                    // prepended once totals are final (below).
                     let html = `
-                        <div class="table-responsive mt-3">
+                        <div class="wb-table-scroll" data-hidden-groups=" overtime travel insurance other ">
                             <table class="table table-bordered table-hover align-middle budget-monthly-table" style="font-size: 0.875rem;">
                                 <thead style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;">
                                     <tr>
-                                        <th class="text-center" style="width: 80px; font-weight: 600;">Month</th>
-                                        <th class="text-center" style="min-width: 120px; font-weight: 600;">Current Basic<br>Salary</th>
-                                        <th class="text-center" style="min-width: 120px; font-weight: 600;">Proposed Basic<br>Salary</th>
-                                        <th class="text-center" style="width: 80px; font-weight: 600;">Action</th>`;
+                                        <th class="text-center wb-sticky-col wb-col-month" style="width: 80px; font-weight: 600;">Month</th>
+                                        <th class="text-center wb-sticky-col wb-col-current" style="width: 130px; font-weight: 600;">Current Basic<br>Salary</th>
+                                        <th class="text-center wb-sticky-col wb-col-proposed" style="width: 130px; font-weight: 600;">Proposed Basic<br>Salary</th>
+                                        <th class="text-center wb-sticky-col wb-col-action" style="width: 80px; font-weight: 600;">Action</th>`;
 
                     // Add all cost configuration columns
                     resortCosts.forEach(cost => {
-                        html += `<th class="text-center" style="min-width: 100px; font-weight: 600;">${cost.particulars || cost.cost_title || 'N/A'}</th>`;
+                        const costGroup = window.wbClassifyCost(cost);
+                        html += `<th class="text-center" data-cost-group="${costGroup}" style="width: 140px; font-weight: 600;">${cost.particulars || cost.cost_title || 'N/A'}</th>`;
                         totals.costs[cost.id] = 0;
                     });
 
@@ -1617,10 +1789,10 @@ $(document).ready(function() {
                         const rowSalary = salaryForMonth(m);
                         html += `
                             <tr style="transition: all 0.2s;">
-                                <td class="text-center" style="font-weight: 500; font-size: 0.813rem;">${months[m-1]}</td>
-                                <td class="text-end" style="font-size: 0.813rem;">${formatAmount(rowSalary.current, 'USD')}</td>
-                                <td class="text-end" style="font-size: 0.813rem;">${formatAmount(rowSalary.proposed, 'USD')}</td>
-                                <td class="text-center">
+                                <td class="text-center wb-sticky-col wb-col-month" style="font-weight: 500; font-size: 0.813rem;">${months[m-1]}</td>
+                                <td class="text-end wb-sticky-col wb-col-current" style="font-size: 0.813rem;">${formatAmountOrDash(rowSalary.current, 'USD')}</td>
+                                <td class="text-end wb-sticky-col wb-col-proposed" style="font-size: 0.813rem;">${formatAmountOrDash(rowSalary.proposed, 'USD')}</td>
+                                <td class="text-center wb-sticky-col wb-col-action">
                                     <button class="btn btn-sm btn-outline-warning btn-edit-month-budget"
                                             data-month="${m}"
                                             data-month-name="${months[m-1]}"
@@ -1677,12 +1849,13 @@ $(document).ready(function() {
                                 <td class="text-end"
                                     data-month="${m}"
                                     data-cost-id="${cost.id}"
+                                    data-cost-group="${window.wbClassifyCost(cost)}"
                                     data-vacant-index="${vacantIndex}"
                                     data-currency="${currency}"
                                     data-original-value="${originalValue}"
                                     data-usd-value="${costValue.toFixed(2)}"
                                     style="font-size: 0.813rem;">
-                                    ${formatAmount(parseFloat(costValue), 'USD')}
+                                    ${formatAmountOrDash(parseFloat(costValue), 'USD')}
                                 </td>`;
                         });
 
@@ -1692,18 +1865,24 @@ $(document).ready(function() {
                     // Add Total row
                     html += `
                         <tr class="table-total-row" style="background-color: #f8f9fa; font-weight: 600; border-top: 2px solid #dee2e6;">
-                            <td class="text-center" style="font-weight: 700;">TOTAL</td>
-                            <td class="text-end text-primary total-current-salary" style="font-weight: 700;">${formatAmount(totals.currentSalary, 'USD')}</td>
-                            <td class="text-end text-success total-proposed-salary" style="font-weight: 700;">${formatAmount(totals.proposedSalary, 'USD')}</td>
-                            <td></td>`;
+                            <td class="text-center wb-sticky-col wb-col-month" style="font-weight: 700;">TOTAL</td>
+                            <td class="text-end text-primary total-current-salary wb-sticky-col wb-col-current" style="font-weight: 700;">${formatAmountOrDash(totals.currentSalary, 'USD')}</td>
+                            <td class="text-end text-success total-proposed-salary wb-sticky-col wb-col-proposed" style="font-weight: 700;">${formatAmountOrDash(totals.proposedSalary, 'USD')}</td>
+                            <td class="wb-sticky-col wb-col-action"></td>`;
 
                     resortCosts.forEach(cost => {
-                        html += `<td class="text-end text-dark total-cost-${cost.id}" data-cost-id="${cost.id}" style="font-weight: 700;">${formatAmount(totals.costs[cost.id], 'USD')}</td>`;
+                        html += `<td class="text-end text-dark total-cost-${cost.id}" data-cost-id="${cost.id}" data-cost-group="${window.wbClassifyCost(cost)}" style="font-weight: 700;">${formatAmountOrDash(totals.costs[cost.id], 'USD')}</td>`;
                     });
 
                     html += `</tr></tbody></table></div>`;
 
-                    $container.html(html);
+                    const finalHtml = '<div class="wb-detail-card-inner mt-3">'
+                        + wbAnnualSummaryHtml(response, totals, resortCosts)
+                        + wbGroupChipsHtml(resortCosts)
+                        + html
+                        + '</div>';
+
+                    $container.html(finalHtml);
 
                     // Server-rendered badges are authoritative — do not recompute
                     // from this freshly-loaded table (it would read sibling
@@ -1806,8 +1985,14 @@ $(document).ready(function() {
         // Use the SYSTEM currency symbol (was hardcoded '$' which left "MVR"
         // strings intact on MVR resorts, breaking parseFloat).
         const currencySymbol = '{{ Common::GetResortCurrencySymbol() }}';
-        const basicSalary    = parseFloat($sourceRow.find('td').eq(1).text().replace(currencySymbol, '').replace(/,/g, '').trim() || 0);
-        const proposedSalary = parseFloat($sourceRow.find('td').eq(2).text().replace(currencySymbol, '').replace(/,/g, '').trim() || 0);
+        // parseFloat("—") (the zero-as-dash placeholder) is NaN, not 0 — the
+        // `|| 0` fallback only catches an empty string, so NaN must be
+        // caught explicitly or a genuinely-zero source month would copy
+        // forward as NaN instead of 0.
+        const basicSalaryRaw    = parseFloat($sourceRow.find('td').eq(1).text().replace(currencySymbol, '').replace(/,/g, '').trim());
+        const proposedSalaryRaw = parseFloat($sourceRow.find('td').eq(2).text().replace(currencySymbol, '').replace(/,/g, '').trim());
+        const basicSalary    = isNaN(basicSalaryRaw) ? 0 : basicSalaryRaw;
+        const proposedSalary = isNaN(proposedSalaryRaw) ? 0 : proposedSalaryRaw;
 
         // Cost configurations — preserve original currency + value so the
         // server can re-store the MVR value (data-original-value) the same
@@ -1921,6 +2106,22 @@ $(document).ready(function() {
                     if (typeof window.recalculateAllTotals === 'function') {
                         window.recalculateAllTotals();
                     }
+
+                    // Refresh the annual summary strip with the canonical
+                    // server figure — same staleness issue as a modal save
+                    // (see saveEmployeeMonthBudget/saveVacantMonthBudget):
+                    // it doesn't update itself from the row/badge patches
+                    // above, so it stays frozen at whatever it showed
+                    // before this copy-down.
+                    if (failed === 0) {
+                        if (type === 'employee') {
+                            const $employeeContainer = $(`.accordion-body[data-employee-id="${keyVal}"]`).first();
+                            if ($employeeContainer.length) loadEmployeeMonthlyData(keyVal, positionId, $employeeContainer);
+                        } else {
+                            const $vacantContainer = $(`.accordion-body[data-vacant-index="${keyVal}"]`).first();
+                            if ($vacantContainer.length) loadVacantMonthlyData(keyVal, positionId, $vacantContainer);
+                        }
+                    }
                 }
             });
         });
@@ -1995,9 +2196,15 @@ $(document).ready(function() {
             finalRank: finalRank
         });
 
-        // Get current values from table
-        const currentSalary = $(`td[data-month="${month}"][data-employee-id="${employeeId}"]`).closest('tr').find('td:eq(1)').text().replace(currencySymbol, '').replace(/,/g, '').trim();
-        const proposedSalary = $(`td[data-month="${month}"][data-employee-id="${employeeId}"]`).closest('tr').find('td:eq(2)').text().replace(currencySymbol, '').replace(/,/g, '').trim();
+        // Get current values from table. The cell may render the zero-as-dash
+        // placeholder ("—") for a genuinely-zero month — that isn't a valid
+        // number for the modal's input fields, so normalize through parseFloat
+        // rather than trusting the raw text (which the old `|| '0.00'` fallback
+        // wouldn't catch, since a non-empty "—" string is truthy).
+        const currentSalaryNum = parseFloat($(`td[data-month="${month}"][data-employee-id="${employeeId}"]`).closest('tr').find('td:eq(1)').text().replace(currencySymbol, '').replace(/,/g, '').trim());
+        const proposedSalaryNum = parseFloat($(`td[data-month="${month}"][data-employee-id="${employeeId}"]`).closest('tr').find('td:eq(2)').text().replace(currencySymbol, '').replace(/,/g, '').trim());
+        const currentSalary = isNaN(currentSalaryNum) ? '0.00' : currentSalaryNum.toFixed(2);
+        const proposedSalary = isNaN(proposedSalaryNum) ? '0.00' : proposedSalaryNum.toFixed(2);
 
         // Set salary fields
         $('#formBasicSalary').val(currentSalary || '0.00');
@@ -2101,9 +2308,13 @@ $(document).ready(function() {
 
     // Load vacant data for a specific month into modal
     function loadVacantDataForMonth(vacantIndex, vacantBudgetCostId, positionId, departmentId, month) {
-        // Get current values from table
-        const currentSalary = $(`td[data-month="${month}"][data-vacant-index="${vacantIndex}"]`).closest('tr').find('td:eq(1)').text().replace(currencySymbol, '').replace(/,/g, '').trim();
-        const proposedSalary = $(`td[data-month="${month}"][data-vacant-index="${vacantIndex}"]`).closest('tr').find('td:eq(2)').text().replace(currencySymbol, '').replace(/,/g, '').trim();
+        // Get current values from table (see loadEmployeeDataForMonth for why
+        // this normalizes through parseFloat rather than trusting raw text —
+        // a zero-as-dash "—" cell is a non-empty, truthy string).
+        const currentSalaryNum = parseFloat($(`td[data-month="${month}"][data-vacant-index="${vacantIndex}"]`).closest('tr').find('td:eq(1)').text().replace(currencySymbol, '').replace(/,/g, '').trim());
+        const proposedSalaryNum = parseFloat($(`td[data-month="${month}"][data-vacant-index="${vacantIndex}"]`).closest('tr').find('td:eq(2)').text().replace(currencySymbol, '').replace(/,/g, '').trim());
+        const currentSalary = isNaN(currentSalaryNum) ? '0.00' : currentSalaryNum.toFixed(2);
+        const proposedSalary = isNaN(proposedSalaryNum) ? '0.00' : proposedSalaryNum.toFixed(2);
 
         // Set salary fields
         $('#formBasicSalary').val(currentSalary || '0.00');
@@ -2330,6 +2541,18 @@ $(document).ready(function() {
 
                     // Update badges hierarchically (position -> section -> department -> division)
                     updateBadgesHierarchy(positionId);
+
+                    // The row/total-row patches above are instant client-side
+                    // math, but the annual summary strip's Proposed Annual
+                    // must stay the canonical server figure (never re-derived
+                    // client-side) — re-fetching also refreshes Current
+                    // Annual / Δ / Allowances-per-year, which otherwise stay
+                    // frozen at whatever they were on first load (reported
+                    // as "still showing zero after saving new costs").
+                    const $employeeContainer = $(`.accordion-body[data-employee-id="${employeeId}"]`).first();
+                    if ($employeeContainer.length) {
+                        loadEmployeeMonthlyData(employeeId, positionId, $employeeContainer);
+                    }
                 } else {
                     toastr.error(response.message, 'Error');
                 }
@@ -2347,8 +2570,8 @@ $(document).ready(function() {
         const mvrToUsdRate = parseFloat($('#mvrToDollarRate').val() || 1/15.42);
 
         // Update salary columns
-        $row.find('td:eq(1)').text(formatAmount(parseFloat(basicSalary), 'USD'));
-        $row.find('td:eq(2)').text(formatAmount(parseFloat(currentSalary), 'USD'));
+        $row.find('td:eq(1)').html(formatAmountOrDash(parseFloat(basicSalary), 'USD'));
+        $row.find('td:eq(2)').html(formatAmountOrDash(parseFloat(currentSalary), 'USD'));
 
         // Update cost configuration columns
         costConfigurations.forEach(config => {
@@ -2366,7 +2589,7 @@ $(document).ready(function() {
                 }
 
                 // Store both USD value and original MVR value as data attributes
-                $cell.text(formatAmount(valueInUSD, 'USD'));
+                $cell.html(formatAmountOrDash(valueInUSD, 'USD'));
                 $cell.attr('data-currency', config.currency);
                 $cell.attr('data-original-value', originalMvrValue.toFixed(2));
                 $cell.attr('data-usd-value', valueInUSD.toFixed(2));
@@ -2412,13 +2635,13 @@ $(document).ready(function() {
             });
         });
 
-        $totalRow.find('.total-current-salary').text(formatAmount(totalCurrent, 'USD'));
-        $totalRow.find('.total-proposed-salary').text(formatAmount(totalProposed, 'USD'));
+        $totalRow.find('.total-current-salary').html(formatAmountOrDash(totalCurrent, 'USD'));
+        $totalRow.find('.total-proposed-salary').html(formatAmountOrDash(totalProposed, 'USD'));
 
         Object.keys(costTotals).forEach(function (costId) {
             const $costCell = $totalRow.find(`td[data-cost-id="${costId}"]`);
             if ($costCell.length) {
-                $costCell.text(formatAmount(costTotals[costId], 'USD'));
+                $costCell.html(formatAmountOrDash(costTotals[costId], 'USD'));
             }
         });
 
@@ -2468,6 +2691,16 @@ $(document).ready(function() {
 
                     // Update badges hierarchically (position -> section -> department -> division)
                     updateBadgesHierarchy(positionId);
+
+                    // Refresh the annual summary strip with the canonical
+                    // server figure — see saveEmployeeMonthBudget for why
+                    // (it doesn't update itself from the row/total-row
+                    // patches above and was staying frozen at $0 after a
+                    // save on a previously-empty vacant slot).
+                    const $vacantContainer = $(`.accordion-body[data-vacant-index="${vacantIndex}"]`).first();
+                    if ($vacantContainer.length) {
+                        loadVacantMonthlyData(vacantIndex, positionId, $vacantContainer);
+                    }
                 } else {
                     toastr.error(response.message, 'Error');
                 }
@@ -2485,8 +2718,8 @@ $(document).ready(function() {
         const mvrToUsdRate = parseFloat($('#mvrToDollarRate').val() || 1/15.42);
 
         // Update salary columns
-        $row.find('td:eq(1)').text(formatAmount(parseFloat(basicSalary), 'USD'));
-        $row.find('td:eq(2)').text(formatAmount(parseFloat(currentSalary), 'USD'));
+        $row.find('td:eq(1)').html(formatAmountOrDash(parseFloat(basicSalary), 'USD'));
+        $row.find('td:eq(2)').html(formatAmountOrDash(parseFloat(currentSalary), 'USD'));
 
         // Update cost configuration columns
         costConfigurations.forEach(config => {
@@ -2504,7 +2737,7 @@ $(document).ready(function() {
                 }
 
                 // Store both USD value and original MVR value as data attributes
-                $cell.text(formatAmount(valueInUSD, 'USD'));
+                $cell.html(formatAmountOrDash(valueInUSD, 'USD'));
                 $cell.attr('data-currency', config.currency);
                 $cell.attr('data-original-value', originalMvrValue.toFixed(2));
                 $cell.attr('data-usd-value', valueInUSD.toFixed(2));
@@ -2544,13 +2777,13 @@ $(document).ready(function() {
             });
         });
 
-        $totalRow.find('.total-current-salary').text(formatAmount(totalCurrent, 'USD'));
-        $totalRow.find('.total-proposed-salary').text(formatAmount(totalProposed, 'USD'));
+        $totalRow.find('.total-current-salary').html(formatAmountOrDash(totalCurrent, 'USD'));
+        $totalRow.find('.total-proposed-salary').html(formatAmountOrDash(totalProposed, 'USD'));
 
         Object.keys(costTotals).forEach(function (costId) {
             const $costCell = $totalRow.find(`td[data-cost-id="${costId}"]`);
             if ($costCell.length) {
-                $costCell.text(formatAmount(costTotals[costId], 'USD'));
+                $costCell.html(formatAmountOrDash(costTotals[costId], 'USD'));
             }
         });
 
@@ -2756,6 +2989,688 @@ $(document).ready(function() {
     // bound to both salary inputs and uses the effective salary (Proposed
     // when entered, else Current). The old handler here recalculated pension
     // only — and never overtime — so overtime stayed on the current salary.
+
+    // ==================================================================
+    // Drill-Down Navigation (Phase 1/2) — purely additive on top of the
+    // existing accordion. Every click here resolves to an EXISTING
+    // collapse element and calls Bootstrap's own Collapse.show() on it,
+    // so the real shown.bs.collapse listeners above (unmodified) fire and
+    // load data exactly as they already do. This layer never fetches
+    // data itself — it only marks which accordion is "on path" (for the
+    // CSS flattening rules) and renders a prettier read-out of whatever
+    // the existing accordion just rendered into the DOM.
+    // ==================================================================
+    var wbPath = []; // [{level, id, label, code, iter, domId, positionId}]
+    var wbAwaitingRender = false;
+
+    function wbEsc(s) { return $('<div>').text(s == null ? '' : String(s)).html(); }
+
+    function wbRenderBreadcrumb() {
+        var $bc = $('#wbBreadcrumb');
+        $bc.empty();
+        var $root = $('<button type="button" data-wb-idx="-1">All Divisions</button>');
+        if (wbPath.length === 0) $root.addClass('wb-crumb-current');
+        $bc.append($root);
+        wbPath.forEach(function (p, idx) {
+            $bc.append('<span class="wb-crumb-sep">/</span>');
+            var $btn = $('<button type="button" data-wb-idx="' + idx + '">' + wbEsc(p.label) + '</button>');
+            if (idx === wbPath.length - 1) $btn.addClass('wb-crumb-current');
+            $bc.append($btn);
+        });
+        $('#wbBackBtn').prop('disabled', wbPath.length === 0);
+    }
+
+    function wbFindLevelElement(p) {
+        if (p.level === 'division')   return $('#collapseDiv' + p.iter).closest('.division-accordion');
+        if (p.level === 'department') return $('[data-department-id="' + p.id + '"]').first().closest('.department-accordion');
+        if (p.level === 'section')    return $('#' + p.domId).closest('.section-accordion');
+        if (p.level === 'position')   return $('.position-accordion[data-position-id="' + p.id + '"]').first();
+        if (p.level === 'employee')   return $('[data-employee-id="' + p.id + '"]').first().closest('.employee-accordion');
+        if (p.level === 'vacant')     return $('[data-vacant-index="' + p.id + '"][data-position-id="' + p.positionId + '"]').first().closest('.vacant-accordion');
+        return $();
+    }
+
+    function wbApplyFocus() {
+        $('#accordionViewBudget .wb-on-path').removeClass('wb-on-path wb-flatten');
+        var deepest = wbPath.length ? wbPath[wbPath.length - 1] : null;
+        var isLeaf = deepest && (deepest.level === 'employee' || deepest.level === 'vacant');
+        if (!isLeaf) wbHideDetailHeader();
+
+        if (wbPath.length === 0) {
+            $('#accordionViewBudget').removeClass('wb-focus-active');
+            wbUpdateReviseBudgetButton();
+            return;
+        }
+        $('#accordionViewBudget').addClass('wb-focus-active');
+        wbPath.forEach(function (p) {
+            var $el = wbFindLevelElement(p);
+            if (!$el || !$el.length) return;
+            $el.addClass('wb-on-path');
+            // Every level's own accordion chrome (header, budget badge,
+            // Revise Budget button) is always hidden — the nav card's
+            // breadcrumb/row list and, for the deepest employee/vacant
+            // level, the dedicated #wbDetailHeader title bar (see
+            // wbShowEmployeeDetailHeader/wbShowVacantDetailHeader) already
+            // show that same information in the current design's own
+            // style, so leaving the original header visible read as a
+            // leftover of the old always-expanded accordion underneath.
+            $el.addClass('wb-flatten');
+        });
+        wbUpdateReviseBudgetButton();
+    }
+
+    // Revise Budget lives inside the department's own accordion header,
+    // which is now always hidden (wb-flatten) once the nav card takes
+    // over. Rather than reimplement the trigger, surface a button in the
+    // nav card that — when a department is in the current path — just
+    // clicks the real, existing trigger for that department (still
+    // present in the DOM, only visually hidden). This reuses the exact
+    // same modal population / locked-state / save logic untouched.
+    function wbUpdateReviseBudgetButton() {
+        var $btn = $('#wbReviseBudgetBtn');
+        var deptEntry = wbPath.filter(function (p) { return p.level === 'department'; })[0];
+        if (!deptEntry) { $btn.addClass('d-none'); return; }
+
+        var $deptEl = wbFindLevelElement(deptEntry);
+        var $realTrigger = $deptEl.find('.revisebudgetmodal').first();
+        if ($realTrigger.length) {
+            $btn.removeClass('d-none').prop('disabled', false).attr('title', '')
+                .off('click.wbRevise').on('click.wbRevise', function () {
+                    $realTrigger.get(0).click();
+                });
+            return;
+        }
+
+        // No live anchor — either GM-locked (disabled button present) or
+        // this rank doesn't get a trigger at all (not rendered server-side).
+        var $lockedBtn = $deptEl.find('button:contains("Revise Budget")').first();
+        if ($lockedBtn.length) {
+            $btn.removeClass('d-none').prop('disabled', true).attr('title', $lockedBtn.attr('title') || '');
+            return;
+        }
+
+        $btn.addClass('d-none');
+    }
+
+    // Show an existing Bootstrap collapse element via its own API — this
+    // is what fires the existing shown.bs.collapse listeners that load
+    // AJAX data. No duplicate fetch logic.
+    function wbShowCollapse($collapseEl) {
+        if (!$collapseEl || !$collapseEl.length) return;
+        var el = $collapseEl.get(0);
+        if (window.bootstrap && bootstrap.Collapse) {
+            bootstrap.Collapse.getOrCreateInstance(el, { toggle: false }).show();
+        } else {
+            $collapseEl.collapse('show');
+        }
+    }
+
+    // Poll briefly for the loading spinner inside a container to be
+    // replaced by real content, then run the callback. Existing AJAX
+    // success handlers replace $container.html(...) synchronously once
+    // their request resolves — this just waits for that to happen rather
+    // than assuming a fixed delay. Checks only a DIRECT child ".text-center"
+    // (the exact loading-placeholder wrapper both the department and
+    // position AJAX containers start with) rather than searching the whole
+    // subtree — a deep search would also match a *deeper*, not-yet-expanded
+    // level's own still-unresolved placeholder and wait for the wrong thing.
+    function wbWaitForContent($container, callback, attempts) {
+        attempts = attempts || 0;
+        if (!$container || !$container.length) { callback(); return; }
+        var stillLoading = $container.children('.text-center').find('.spinner-border').length > 0;
+        if (!stillLoading || attempts > 40) { callback(); return; }
+        setTimeout(function () { wbWaitForContent($container, callback, attempts + 1); }, 100);
+    }
+
+    function wbBudgetFor(id, kind) {
+        // Reads the already-computed value from window.budgetTotals
+        // (populated by the existing eager loadAllBudgetTotalsOnPageLoad
+        // chain) rather than recomputing anything.
+        if (kind === 'position') {
+            var p = window.budgetTotals.positions[id];
+            return p && typeof p.total !== 'undefined' ? p.total : null;
+        }
+        if (kind === 'department') return window.budgetTotals.departments[id] || null;
+        return null;
+    }
+
+    // ---- Level renderers: build the pretty row list from whatever the
+    // existing accordion already rendered into the DOM for the current
+    // level. Falls back gracefully if a section/count field isn't
+    // available yet (badge totals load asynchronously).
+    function wbRenderRoot() {
+        var rows = [];
+        $('.division-accordion').each(function () {
+            var $div = $(this);
+            var iter = $div.find('.accordion-header[id^="headingDiv"]').attr('id').replace('headingDiv', '');
+            var name = $div.find('> h2 h3').first().text().trim();
+            var deptCount = $div.find('.department-accordion').length;
+            var budgetTxt = $div.find('.divisionGrandTotal').first().text().trim();
+            rows.push({
+                level: 'division', iter: iter, label: name,
+                meta: deptCount + (deptCount === 1 ? ' department' : ' departments'),
+                budget: budgetTxt
+            });
+        });
+        wbRenderLevelList(rows, 'division');
+    }
+
+    function wbRenderDepartments($divisionEl) {
+        var rows = [];
+        // Iterate the department wrapper elements directly (one per real
+        // department) rather than every [data-department-id] match — that
+        // attribute also appears on nested Action-button data-* attributes
+        // once a department's employees/costs are loaded, which would
+        // otherwise require a de-dupe pass.
+        $divisionEl.find('.department-accordion').each(function () {
+            var $deptAccordion = $(this);
+            var deptId = $deptAccordion.find('[data-department-id]').first().data('department-id');
+            var name = $deptAccordion.find('.accordion-header[id^="headingDept"] span').first().text().trim();
+            var budgetTxt = $deptAccordion.find('.departmentGrandTotal').first().text().trim();
+            rows.push({ level: 'department', id: deptId, label: name, budget: budgetTxt, meta: '' });
+        });
+        wbRenderLevelList(rows, 'department');
+    }
+
+    function wbRenderSectionsAndPositions($deptBodyEl) {
+        var rows = [];
+        $deptBodyEl.children('.section-accordion').each(function () {
+            var $sec = $(this);
+            var posCount = $sec.find('.position-accordion').length;
+            if (posCount === 0) return; // auto-skip empty sections, per spec
+            var domId = $sec.attr('id');
+            var name = $sec.find('.accordion-header span').first().text().trim();
+            var budgetTxt = $sec.find('.sectionGrandTotal').first().text().trim();
+            rows.push({
+                level: 'section', domId: domId, label: name,
+                meta: posCount + (posCount === 1 ? ' position' : ' positions'),
+                budget: budgetTxt
+            });
+        });
+        $deptBodyEl.children('.position-accordion').each(function () {
+            wbPushPositionRow($(this), rows);
+        });
+        wbRenderLevelList(rows, 'section-or-position');
+    }
+
+    function wbRenderPositionsInSection($sectionEl) {
+        var rows = [];
+        $sectionEl.find('.position-accordion').each(function () {
+            wbPushPositionRow($(this), rows);
+        });
+        wbRenderLevelList(rows, 'position');
+    }
+
+    function wbPushPositionRow($posEl, rows) {
+        var posId = $posEl.data('position-id');
+        var title = $posEl.find('.accordion-header span').first().text().trim();
+        var budgetTxt = $posEl.find('.positionGrandTotal').first().text().trim();
+        rows.push({ level: 'position', id: posId, label: title, budget: budgetTxt, meta: '' });
+    }
+
+    function wbRenderEmployeesAndVacant($positionBodyEl, positionId) {
+        var rows = [];
+        $positionBodyEl.find('.employee-accordion').each(function () {
+            var $emp = $(this);
+            var body = $emp.find('.accordion-body[data-employee-id]').first();
+            var empId = body.data('employee-id');
+            var name = $emp.find('.accordion-header span').first().text().trim();
+            var rankName = $emp.find('.badge.bg-secondary').first().text().trim();
+            var nationality = $emp.find('.badge.bg-info').first().text().trim();
+            var picture = $emp.attr('data-employee-picture') || '';
+            rows.push({
+                level: 'employee', id: empId, label: name,
+                role: rankName, nationality: nationality, picture: picture
+            });
+        });
+        $positionBodyEl.find('.vacant-accordion').each(function () {
+            var $vac = $(this);
+            var body = $vac.find('.accordion-body[data-vacant-index]').first();
+            var vIdx = body.data('vacant-index');
+            rows.push({ level: 'vacant', id: vIdx, positionId: positionId, label: 'Vacant ' + vIdx });
+        });
+        wbRenderLevelList(rows, 'leaf');
+    }
+
+    function wbRenderLevelList(rows, kind) {
+        var $list = $('#wbLevelList');
+        $list.empty();
+        if (!rows.length) {
+            $list.append('<p class="text-muted small mb-0">Nothing here yet.</p>');
+            return;
+        }
+        rows.forEach(function (row) {
+            if (row.level === 'employee' || row.level === 'vacant') {
+                $list.append(wbLeafRowHtml(row));
+            } else {
+                $list.append(wbGroupRowHtml(row));
+            }
+        });
+    }
+
+    function wbGroupRowHtml(row) {
+        var levelTagText = { division: 'Division', department: 'Department', section: 'Section', position: 'Position' }[row.level] || row.level;
+        var $row = $('<div class="wb-group-row"></div>');
+        $row.attr('data-wb-level', row.level);
+        if (row.id !== undefined) $row.attr('data-wb-id', row.id);
+        if (row.iter !== undefined) $row.attr('data-wb-iter', row.iter);
+        if (row.domId !== undefined) $row.attr('data-wb-domid', row.domId);
+        $row.html(
+            '<div class="wb-group-row-main">' +
+                '<span class="wb-level-tag">' + wbEsc(levelTagText) + '</span>' +
+                '<span class="wb-group-row-name">' + wbEsc(row.label) + '</span>' +
+                (row.meta ? '<div class="wb-group-row-meta">' + wbEsc(row.meta) + '</div>' : '') +
+            '</div>' +
+            '<div class="wb-group-row-budget">' + wbEsc(row.budget || '') + '</div>' +
+            '<div class="wb-group-row-chevron"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></div>'
+        );
+        return $row;
+    }
+
+    // Shared by the nav card's leaf rows AND the detail-header title bar
+    // (see wbShowEmployeeDetailHeader/wbShowVacantDetailHeader below) — one
+    // implementation so the two never visually drift apart.
+    function wbLeafRowInnerHtml(row) {
+        if (row.level === 'vacant') {
+            return '<div class="wb-leaf-row wb-group-row-main">' +
+                    '<span class="wb-leaf-avatar wb-leaf-avatar-vacant"><i class="fa fa-user-slash"></i></span>' +
+                    '<div><span class="wb-group-row-name">' + wbEsc(row.label) + '</span>' +
+                    '<div class="wb-group-row-meta"><span class="wb-vacant-pill">Vacant</span> Unfilled — no cost</div></div>' +
+                '</div>';
+        }
+        return '<div class="wb-leaf-row wb-group-row-main">' +
+                wbAvatarHtml(row.label, row.picture) +
+                '<div><span class="wb-group-row-name">' + wbEsc(row.label) + '</span>' +
+                '<div class="wb-group-row-meta">' + wbEsc(row.role || '') + (row.nationality ? ' · ' + wbEsc(row.nationality) : '') + '</div></div>' +
+            '</div>';
+    }
+
+    function wbLeafRowHtml(row) {
+        var $row = $('<div class="wb-group-row wb-leaf-row-wrap"></div>');
+        $row.attr('data-wb-level', row.level);
+        $row.attr('data-wb-id', row.id);
+        if (row.positionId !== undefined) $row.attr('data-wb-position-id', row.positionId);
+        $row.html(wbLeafRowInnerHtml(row) + '<div class="wb-group-row-chevron"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg></div>');
+        return $row;
+    }
+
+    // Detail-header title bar — shown full width above the selected
+    // employee/vacant's table, replacing the original accordion header
+    // (now fully hidden, see wbApplyFocus()). Reads straight from the
+    // employee/vacant-accordion element's own data-* attributes rather
+    // than requiring "a row the user just clicked" to exist, so it works
+    // identically whether reached via the nav card list or a search
+    // result.
+    function wbShowEmployeeDetailHeader(employeeId) {
+        var $emp = $('[data-employee-id="' + employeeId + '"]').first().closest('.employee-accordion');
+        if (!$emp.length) { wbHideDetailHeader(); return; }
+        var row = {
+            level: 'employee',
+            label: $emp.find('.accordion-header span').first().text().trim(),
+            role: $emp.attr('data-employee-rank-name') || $emp.find('.badge.bg-secondary').first().text().trim(),
+            nationality: $emp.find('.badge.bg-info').first().text().trim(),
+            picture: $emp.attr('data-employee-picture') || ''
+        };
+        $('#wbDetailHeader').html(wbLeafRowInnerHtml(row)).removeClass('d-none');
+    }
+
+    function wbShowVacantDetailHeader(vacantIndex) {
+        $('#wbDetailHeader').html(wbLeafRowInnerHtml({ level: 'vacant', label: 'Vacant ' + vacantIndex })).removeClass('d-none');
+    }
+
+    function wbHideDetailHeader() {
+        $('#wbDetailHeader').addClass('d-none').empty();
+    }
+
+    // Round photo, falling back to round initials — same pattern already
+    // used on the Workforce Planning dashboard's Compliance Tracking card
+    // this session (compare against the resort's configured default
+    // placeholder picture to detect "no real photo").
+    window.wbAvatarHtml = function (name, pictureUrl) {
+        name = (name || '').trim();
+        var isDefault = !pictureUrl || pictureUrl === window.wbDefaultPictureUrl;
+        if (isDefault) {
+            var parts = name.split(' ').filter(Boolean);
+            var initials = parts.slice(0, 2).map(function (p) { return p.charAt(0).toUpperCase(); }).join('');
+            return '<span class="wb-leaf-avatar">' + (initials || '?') + '</span>';
+        }
+        return '<img class="wb-leaf-avatar" src="' + pictureUrl + '" alt="">';
+    };
+    function wbAvatarHtml(name, pictureUrl) { return window.wbAvatarHtml(name, pictureUrl); }
+
+    // ---- Cost-group classifier (Phase 4) ----
+    // resortCosts is NOT a fixed column list — it's fully per-resort
+    // configurable (confirmed by direct DB query: 23 active items for one
+    // resort, a completely different 17 for another). Bucketing is
+    // therefore keyword-substring matching against the cost's own label,
+    // never a hardcoded name whitelist. Order matters: narrower/more
+    // specific groups are checked before the broader "Allowances" catch-all
+    // so e.g. "Relocation / Luggage Allowance" lands in Travel & Tickets
+    // (it matches "relocation") rather than Allowances (it also contains
+    // the word "allowance").
+    var WB_COST_GROUP_ORDER = ['overtime', 'insurance', 'travel', 'allowances'];
+    var WB_COST_GROUP_LABELS = {
+        overtime: 'Overtime',
+        insurance: 'Insurance & Permits',
+        travel: 'Travel & Tickets',
+        allowances: 'Salary & Allowances',
+        other: 'Other'
+    };
+    var WB_COST_GROUP_COLORS = {
+        allowances: 'var(--wb-teal)', // brand teal per explicit user decision (spec's own #2F6BFF conflicted with its "no blue" rule)
+        overtime: '#8A5CF6',
+        travel: '#E08A00',
+        insurance: '#1F9D6B',
+        other: 'var(--wb-muted)'
+    };
+    var WB_COST_GROUP_KEYWORDS = {
+        overtime: ['overtime', 'ovetime'],
+        insurance: ['insurance', 'medical', 'permit', 'visa'],
+        travel: ['ticket', 'relocation', 'luggage', 'seaplane', 'boat', 'arrival', 'accomodation', 'accommodation', 'transfer', 'overnight'],
+        allowances: ['allowance', 'bonus', 'ramadan', 'fire brigade', 'food cost', 'r and r', 'rnr', 'male', 'airport']
+    };
+    // Returns a CSS-safe slug ('allowances', 'overtime', 'travel',
+    // 'insurance', or the 'other' fallback) — group labels like
+    // "Travel & Tickets" aren't valid class/attribute-value characters.
+    window.wbClassifyCost = function (cost) {
+        var label = ((cost && (cost.particulars || cost.cost_title)) || '').toLowerCase();
+        for (var i = 0; i < WB_COST_GROUP_ORDER.length; i++) {
+            var slug = WB_COST_GROUP_ORDER[i];
+            var keywords = WB_COST_GROUP_KEYWORDS[slug];
+            for (var j = 0; j < keywords.length; j++) {
+                if (label.indexOf(keywords[j]) !== -1) return slug;
+            }
+        }
+        return 'other';
+    };
+
+    // ---- Zero-as-dash (Phase 6) ----
+    // Wraps the existing, unmodified global formatAmount() — only adds a
+    // muted-dash special case for 0/NaN. Must be applied at every
+    // money-rendering call site (initial build, row update, totals
+    // recompute) or values revert to "$0.00" after any edit/copy-down.
+    window.formatAmountOrDash = function (amount, currency) {
+        var num = parseFloat(amount);
+        if (!isFinite(num) || num === 0) {
+            return '<span class="wb-zero-dash">—</span>';
+        }
+        return formatAmount(num, currency);
+    };
+
+    // ---- Annual summary strip (Phase 2) ----
+    // Proposed Annual reuses response.annual_total_usd verbatim — the
+    // canonical figure Common::annualBudgetForEmployee/VacantSlot compute,
+    // deliberately kept in sync with the Consolidated Budget page. Never
+    // re-derive it. Current Annual / Allowances-per-year are built only
+    // from totals this same table already computed for its own TOTAL row —
+    // a display-only regrouping, not a new calculation.
+    function wbAnnualSummaryHtml(response, totals, resortCosts) {
+        var proposedAnnual = parseFloat(response.annual_total_usd);
+        if (!isFinite(proposedAnnual)) proposedAnnual = 0;
+        var costsSum = Object.keys(totals.costs).reduce(function (s, id) { return s + (totals.costs[id] || 0); }, 0);
+        var currentAnnual = totals.currentSalary + costsSum;
+        // Round to cents before comparing/displaying — float subtraction of
+        // two summed totals can land on a tiny non-zero remainder (e.g.
+        // -0.0000001), which a truly-equal pair would otherwise render as
+        // the confusing "$-0.00" instead of "$0.00".
+        var delta = Math.round((proposedAnnual - currentAnnual) * 100) / 100;
+        var deltaClass = delta > 0 ? 'wb-delta-up' : (delta < 0 ? 'wb-delta-down' : '');
+        var deltaSign = delta > 0 ? '+' : '';
+        var allowancesAnnual = 0;
+        resortCosts.forEach(function (cost) {
+            if (window.wbClassifyCost(cost) === 'allowances') {
+                allowancesAnnual += (totals.costs[cost.id] || 0);
+            }
+        });
+        return '' +
+            '<div class="wb-annual-summary">' +
+                '<div class="wb-annual-stat"><span class="wb-annual-stat-label">Current Annual</span>' +
+                    '<span class="wb-annual-stat-value">' + formatAmount(currentAnnual, 'USD') + '</span></div>' +
+                '<div class="wb-annual-stat"><span class="wb-annual-stat-label">Proposed Annual</span>' +
+                    '<span class="wb-annual-stat-value">' + formatAmount(proposedAnnual, 'USD') + '</span></div>' +
+                '<div class="wb-annual-stat"><span class="wb-annual-stat-label">Δ Annual</span>' +
+                    '<span class="wb-annual-stat-value wb-annual-stat-delta ' + deltaClass + '">' + deltaSign + formatAmount(delta, 'USD') + '</span></div>' +
+                '<div class="wb-annual-stat"><span class="wb-annual-stat-label">Allowances / Year</span>' +
+                    '<span class="wb-annual-stat-value">' + formatAmount(allowancesAnnual, 'USD') + '</span></div>' +
+            '</div>';
+    }
+
+    // ---- Group toggle chips (Phase 5) ----
+    // Default: only Allowances visible. "At least one group visible" is
+    // enforced in the click handler below (clicking the last active chip
+    // is a no-op with a brief shake, not a silently-blocked click).
+    function wbGroupChipsHtml(resortCosts) {
+        var present = {};
+        resortCosts.forEach(function (cost) { present[window.wbClassifyCost(cost)] = true; });
+        var order = ['allowances', 'overtime', 'travel', 'insurance', 'other'];
+        var html = '<div class="wb-group-toggles">';
+        order.forEach(function (slug) {
+            if (!present[slug]) return;
+            var active = slug === 'allowances';
+            html += '<button type="button" class="wb-group-chip' + (active ? ' wb-chip-active' : '') + '" data-cost-group-toggle="' + slug + '">' +
+                '<span class="wb-group-dot" style="background:' + WB_COST_GROUP_COLORS[slug] + '"></span>' +
+                WB_COST_GROUP_LABELS[slug] +
+                '</button>';
+        });
+        html += '</div>';
+        return html;
+    }
+
+    // Toggling reads/writes column visibility purely via a data attribute
+    // on the table wrapper + a CSS rule (added below) — the underlying
+    // <td>/<th> data-cost-id and totals-recalculation logic never sees this.
+    $(document).on('click', '.wb-group-chip', function () {
+        var $chip = $(this);
+        var $toggles = $chip.closest('.wb-group-toggles');
+        var activeCount = $toggles.find('.wb-chip-active').length;
+        var isActive = $chip.hasClass('wb-chip-active');
+        if (isActive && activeCount <= 1) {
+            $chip.addClass('wb-chip-shake');
+            setTimeout(function () { $chip.removeClass('wb-chip-shake'); }, 300);
+            return; // at least one group must always stay visible
+        }
+        $chip.toggleClass('wb-chip-active');
+        var $scroll = $toggles.closest('.wb-detail-card-inner').find('.wb-table-scroll');
+        var hidden = [];
+        $toggles.find('.wb-group-chip').each(function () {
+            if (!$(this).hasClass('wb-chip-active')) hidden.push($(this).data('cost-group-toggle'));
+        });
+        $scroll.attr('data-hidden-groups', ' ' + hidden.join(' ') + ' ');
+    });
+
+    // ---- Drill-in on row click ----
+    $(document).on('click', '.wb-group-row[data-wb-level="division"]', function () {
+        var iter = $(this).data('wb-iter');
+        var label = $(this).find('.wb-group-row-name').text();
+        wbPath = [{ level: 'division', iter: iter, label: label }];
+        var $collapse = $('#collapseDiv' + iter);
+        wbShowCollapse($collapse);
+        wbApplyFocus(); wbRenderBreadcrumb();
+        // Departments are server-rendered inside the division body already
+        // (only Section/Position/Employee/Vacant are AJAX-loaded) — no wait.
+        wbRenderDepartments($collapse.closest('.division-accordion'));
+    });
+
+    $(document).on('click', '.wb-group-row[data-wb-level="department"]', function () {
+        var deptId = $(this).data('wb-id');
+        var label = $(this).find('.wb-group-row-name').text();
+        wbPath.push({ level: 'department', id: deptId, label: label });
+        var $body = $('[data-department-id="' + deptId + '"]').first();
+        var $collapse = $body.closest('.collapse');
+        wbShowCollapse($collapse);
+        wbApplyFocus(); wbRenderBreadcrumb();
+        wbWaitForContent($body, function () {
+            wbRenderSectionsAndPositions($body);
+        });
+    });
+
+    $(document).on('click', '.wb-group-row[data-wb-level="section"]', function () {
+        var domId = $(this).data('wb-domid');
+        var label = $(this).find('.wb-group-row-name').text();
+        wbPath.push({ level: 'section', domId: domId, label: label });
+        var $collapse = $('#collapse' + domId);
+        wbShowCollapse($collapse);
+        wbApplyFocus(); wbRenderBreadcrumb();
+        // Positions within a section are already rendered client-side as
+        // part of the parent department's single AJAX response — no wait.
+        wbRenderPositionsInSection($('#' + domId).closest('.section-accordion'));
+    });
+
+    $(document).on('click', '.wb-group-row[data-wb-level="position"]', function () {
+        var posId = $(this).data('wb-id');
+        var label = $(this).find('.wb-group-row-name').text();
+        wbPath.push({ level: 'position', id: posId, label: label });
+        var $posEl = $('.position-accordion[data-position-id="' + posId + '"]').first();
+        var $collapse = $posEl.find('> .accordion-item > .collapse');
+        wbShowCollapse($collapse);
+        wbApplyFocus(); wbRenderBreadcrumb();
+        wbWaitForContent($collapse.find('.accordion-body').first(), function () {
+            wbRenderEmployeesAndVacant($collapse.find('.accordion-body').first(), posId);
+        });
+    });
+
+    $(document).on('click', '.wb-leaf-row-wrap[data-wb-level="employee"]', function () {
+        var empId = $(this).data('wb-id');
+        var label = $(this).find('.wb-group-row-name').text();
+        wbPath.push({ level: 'employee', id: empId, label: label });
+        var $collapse = $('[data-employee-id="' + empId + '"]').first().closest('.collapse');
+        wbShowCollapse($collapse);
+        wbApplyFocus(); wbRenderBreadcrumb();
+        wbShowEmployeeDetailHeader(empId);
+        $('#wbLevelList').empty();
+    });
+
+    $(document).on('click', '.wb-leaf-row-wrap[data-wb-level="vacant"]', function () {
+        var vIdx = $(this).data('wb-id');
+        var posId = $(this).data('wb-position-id');
+        var label = $(this).find('.wb-group-row-name').text();
+        wbPath.push({ level: 'vacant', id: vIdx, positionId: posId, label: label });
+        var $collapse = $('[data-vacant-index="' + vIdx + '"][data-position-id="' + posId + '"]').first().closest('.collapse');
+        wbShowCollapse($collapse);
+        wbApplyFocus(); wbRenderBreadcrumb();
+        wbShowVacantDetailHeader(vIdx);
+        $('#wbLevelList').empty();
+    });
+
+    // ---- Breadcrumb / back navigation (jump to an already-drilled level —
+    // no re-fetch needed, the content is already rendered in the DOM) ----
+    function wbJumpTo(idx) {
+        wbPath = wbPath.slice(0, idx + 1);
+        wbApplyFocus(); wbRenderBreadcrumb();
+        if (wbPath.length === 0) { wbRenderRoot(); return; }
+        var last = wbPath[wbPath.length - 1];
+        if (last.level === 'division') {
+            wbRenderDepartments($('#collapseDiv' + last.iter).closest('.division-accordion'));
+        } else if (last.level === 'department') {
+            wbRenderSectionsAndPositions($('[data-department-id="' + last.id + '"]').first());
+        } else if (last.level === 'section') {
+            wbRenderPositionsInSection($('#' + last.domId).closest('.section-accordion'));
+        } else if (last.level === 'position') {
+            var $posEl = $('.position-accordion[data-position-id="' + last.id + '"]').first();
+            wbRenderEmployeesAndVacant($posEl.find('.accordion-body[data-position-id]').first(), last.id);
+        } else {
+            $('#wbLevelList').empty();
+        }
+    }
+
+    $(document).on('click', '#wbBreadcrumb button', function () {
+        wbJumpTo(parseInt($(this).data('wb-idx'), 10));
+    });
+    $(document).on('click', '#wbBackBtn', function () {
+        if (wbPath.length === 0) return;
+        wbJumpTo(wbPath.length - 2);
+    });
+
+    // ---- Search (Phase 1) — over already-loaded DOM only, per the
+    // explicit "don't bypass existing server-side loading" requirement.
+    // No search endpoint exists for this hierarchy today. ----
+    $(document).on('input', '#wbSearchInput', function () {
+        var q = $(this).val().trim().toLowerCase();
+        var $results = $('#wbSearchResults');
+        if (q.length < 2) { $results.addClass('d-none').empty(); return; }
+
+        var matches = [];
+        $('.employee-accordion').each(function () {
+            var $emp = $(this);
+            var body = $emp.find('.accordion-body[data-employee-id]').first();
+            var name = $emp.find('.accordion-header span').first().text().trim();
+            var role = $emp.find('.badge.bg-secondary').first().text().trim();
+            if ((name + ' ' + role).toLowerCase().indexOf(q) === -1) return;
+            matches.push({
+                type: 'Employee', label: name, sub: role,
+                empId: body.data('employee-id'), positionId: body.data('position-id')
+            });
+        });
+        $('.position-accordion').each(function () {
+            var $pos = $(this);
+            var title = $pos.find('.accordion-header span').first().text().trim();
+            if (title.toLowerCase().indexOf(q) === -1) return;
+            matches.push({ type: 'Position', label: title, positionId: $pos.data('position-id') });
+        });
+
+        if (!matches.length) {
+            $results.removeClass('d-none').html('<div class="wb-search-result-row text-muted">No matches in departments you\'ve opened this session.</div>');
+            return;
+        }
+        var html = '';
+        matches.slice(0, 20).forEach(function (m, i) {
+            html += '<div class="wb-search-result-row" data-wb-idx="' + i + '">' +
+                '<span class="wb-search-result-type">' + wbEsc(m.type) + '</span>' +
+                '<span><span class="wb-search-result-name">' + wbEsc(m.label) + '</span>' +
+                (m.sub ? ' <span class="wb-search-result-sub">' + wbEsc(m.sub) + '</span>' : '') + '</span>' +
+                '</div>';
+        });
+        $results.removeClass('d-none').html(html).data('wb-matches', matches);
+    });
+
+    $(document).on('click', '.wb-search-result-row[data-wb-idx]', function () {
+        var matches = $('#wbSearchResults').data('wb-matches') || [];
+        var m = matches[parseInt($(this).data('wb-idx'), 10)];
+        if (!m) return;
+        $('#wbSearchResults').addClass('d-none').empty();
+        $('#wbSearchInput').val('');
+        if (m.type === 'Employee') {
+            var $collapse = $('[data-employee-id="' + m.empId + '"]').first().closest('.collapse');
+            wbPath.push({ level: 'employee', id: m.empId, label: m.label });
+            wbShowCollapse($collapse);
+            wbApplyFocus(); wbRenderBreadcrumb();
+            wbShowEmployeeDetailHeader(m.empId);
+        } else {
+            var $posEl = $('.position-accordion[data-position-id="' + m.positionId + '"]').first();
+            var $posCollapse = $posEl.find('> .accordion-item > .collapse');
+            wbPath.push({ level: 'position', id: m.positionId, label: m.label });
+            wbShowCollapse($posCollapse);
+            wbApplyFocus(); wbRenderBreadcrumb();
+            wbWaitForContent($posCollapse.find('.accordion-body').first(), function () {
+                wbRenderEmployeesAndVacant($posCollapse.find('.accordion-body').first(), m.positionId);
+            });
+        }
+    });
+    $(document).on('click', function (e) {
+        if (!$(e.target).closest('#wbSearchGroup').length) {
+            $('#wbSearchResults').addClass('d-none');
+        }
+    });
+
+    // Initial render of the top level once divisions exist in the DOM
+    // (they're server-rendered, so this runs immediately — no AJAX wait,
+    // though badge totals are still placeholders at this point).
+    wbRenderRoot();
+
+    // The division/department budget badges start as server-rendered
+    // "$0.00" placeholders and only get their real totals once
+    // updateAllBadgesFromTotals() runs (after the eager background load
+    // chain resolves, ~1.5s after page load). Wrap it — purely additive,
+    // the original function body is untouched and still runs exactly as
+    // before — so the nav card list re-renders with real numbers once
+    // they're available, if the user is still viewing the root level.
+    if (typeof updateAllBadgesFromTotals === 'function') {
+        var wbOrigUpdateAllBadgesFromTotals = updateAllBadgesFromTotals;
+        updateAllBadgesFromTotals = function () {
+            wbOrigUpdateAllBadgesFromTotals.apply(this, arguments);
+            if (wbPath.length === 0) wbRenderRoot();
+        };
+    }
 });
 </script>
 

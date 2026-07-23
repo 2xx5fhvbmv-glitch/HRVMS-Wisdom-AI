@@ -85,7 +85,7 @@
                     </div>
                 </div>
             </div>
-            <div class="col-lg-3 col-sm-6">
+            <div class="col-lg-3 col-sm-6 perf-checkins-col">
                 <div class="card dashboard-boxcard timeAttend-boxcard">
                     <div class="d-flex align-items-center justify-content-between">
                         <div>
@@ -137,7 +137,7 @@
                     @endif
                 </div>
             </div>
-            <div class="col-lg-6">
+            <div class="col-lg-6 perf-appraisal-table-col">
                 <div class="card ">
                     <div class=" card-title">
                         <div class="row justify-content-between align-items-center g-md-2 g-1">
@@ -445,6 +445,19 @@
 @endsection
 
 @section('import-css')
+<style>
+    /* .card-heigth (on the row above) stretches every nested .card to
+       height:100% of its flex item by default, so a short card sitting
+       next to a much taller one (a compact KPI card next to the donut
+       chart; a 2-row table next to the multi-item WAI Insights list) was
+       being force-stretched into a tall box with a lot of empty space at
+       the bottom instead of sizing to its own content. align-self:
+       flex-start opts just these two columns out of that stretch. */
+    .perf-checkins-col,
+    .perf-appraisal-table-col {
+        align-self: flex-start;
+    }
+</style>
 @endsection
 
 @section('import-scripts')

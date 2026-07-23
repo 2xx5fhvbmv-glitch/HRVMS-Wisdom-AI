@@ -5,12 +5,15 @@
             {{-- Level 1: Division --}}
             <div class="accordion-item mb-2 division-accordion">
                 <h2 class="accordion-header" id="headingDiv{{ $divisionIteration }}">
-                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                    <button class="accordion-button collapsed cb-accordion-btn" type="button" data-bs-toggle="collapse"
                             data-bs-target="#collapseDiv{{ $divisionIteration }}" aria-expanded="false"
                             aria-controls="collapseDiv{{ $divisionIteration }}">
-                        <i class="fas fa-building me-2"></i>
-                        <h3>{{ $divisionName }}</h3>
-                        <span class="badge badge-dark ms-2 small divisionGrandTotal">Budget: {!! Common::formatCurrency($divisionData['calculated_total'] ?? 0, 'USD') !!}</span>
+                        <div class="cb-row-main">
+                            <span class="wb-level-tag">Division</span>
+                            <span class="wb-group-row-name">{{ $divisionName }}</span>
+                        </div>
+                        <div class="wb-group-row-budget divisionGrandTotal">{!! Common::formatCurrency($divisionData['calculated_total'] ?? 0, 'USD') !!}</div>
+                        <i class="fas fa-chevron-right cb-chevron"></i>
                     </button>
                 </h2>
                 <div id="collapseDiv{{ $divisionIteration }}" class="collapse"
@@ -19,39 +22,31 @@
                         @php $deptIteration = 1; @endphp
                         @foreach ($divisionData['departments'] as $departmentName => $departmentData)
                             {{-- Level 2: Department --}}
+                            @php
+                                $deptPositionCount = count($departmentData['positions'] ?? []);
+                                foreach (($departmentData['sections'] ?? []) as $sectionData) {
+                                    $deptPositionCount += count($sectionData['positions'] ?? []);
+                                }
+                            @endphp
                             <div class="accordion mb-2 ms-3 department-accordion" id="accordionDept{{ $divisionIteration }}_{{ $deptIteration }}">
                                 <div class="accordion-item">
-                                    <div class="row g-0 align-items-center">
-                                        <div class="col-md-9">
-                                            <h2 class="accordion-header" id="headingDept{{ $divisionIteration }}_{{ $deptIteration }}">
-                                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
-                                                        data-bs-target="#collapseDept{{ $divisionIteration }}_{{ $deptIteration }}"
-                                                        aria-expanded="false" aria-controls="collapseDept{{ $divisionIteration }}_{{ $deptIteration }}">
-                                                    <i class="fas fa-sitemap me-2"></i>
-                                                    <span>{{ $departmentName }}</span>
-                                                    <span class="badge badge-dark ms-2 small departmentGrandTotal">Budget: {!! Common::formatCurrency($departmentData['calculated_total'] ?? 0, 'USD') !!}</span>
-                                                </button>
-                                            </h2>
-                                        </div>
-                                        <div class="col-md-3 text-end pe-2">
-                                            @if($employeeRankPosition['position'] == 'HR' || $employeeRankPosition['position'] == 'Finance')
-                                            <a href="#revise-budgetmodal"
-                                               data-budget_id="{{ $departmentData['manning_response_id'] }}"
-                                               data-dept_id="{{ $departmentData['department_id'] }}"
-                                               data-bs-toggle="modal"
-                                               class="btn btn-sm btn-white open-revise-modal">
-                                                <span class="badge badge-danger">
-                                                    <i class="fa-solid fa-clock-rotate-left"></i> Revise Budget
-                                                </span>
-                                            </a>
-                                            @endif
-                                        </div>
-                                    </div>
+                                    <h2 class="accordion-header" id="headingDept{{ $divisionIteration }}_{{ $deptIteration }}">
+                                        <button class="accordion-button collapsed cb-accordion-btn" type="button" data-bs-toggle="collapse"
+                                                data-bs-target="#collapseDept{{ $divisionIteration }}_{{ $deptIteration }}"
+                                                aria-expanded="false" aria-controls="collapseDept{{ $divisionIteration }}_{{ $deptIteration }}">
+                                            <div class="cb-row-main">
+                                                <span class="wb-level-tag">Department</span>
+                                                <span class="wb-group-row-name">{{ $departmentName }}</span>
+                                                <div class="wb-group-row-meta">{{ $deptPositionCount }} {{ Str::plural('position', $deptPositionCount) }}</div>
+                                            </div>
+                                            <div class="wb-group-row-budget departmentGrandTotal">{!! Common::formatCurrency($departmentData['calculated_total'] ?? 0, 'USD') !!}</div>
+                                            <i class="fas fa-chevron-right cb-chevron"></i>
+                                        </button>
+                                    </h2>
 
                                     <div id="collapseDept{{ $divisionIteration }}_{{ $deptIteration }}"
                                          class="collapse"
-                                         aria-labelledby="headingDept{{ $divisionIteration }}_{{ $deptIteration }}"
-                                         data-bs-parent="#accordionDept{{ $divisionIteration }}_{{ $deptIteration }}">
+                                         aria-labelledby="headingDept{{ $divisionIteration }}_{{ $deptIteration }}">
                                         <div class="accordion-body p-2">
 
                                             {{-- Sections under Department --}}
@@ -61,19 +56,21 @@
                                                     <div class="accordion mb-2 ms-3 section-accordion" id="accordionSec{{ $divisionIteration }}_{{ $deptIteration }}_{{ $sectionIteration }}">
                                                         <div class="accordion-item">
                                                             <h2 class="accordion-header" id="headingSec{{ $divisionIteration }}_{{ $deptIteration }}_{{ $sectionIteration }}">
-                                                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                                                                <button class="accordion-button collapsed cb-accordion-btn" type="button" data-bs-toggle="collapse"
                                                                         data-bs-target="#collapseSec{{ $divisionIteration }}_{{ $deptIteration }}_{{ $sectionIteration }}"
                                                                         aria-expanded="false" aria-controls="collapseSec{{ $divisionIteration }}_{{ $deptIteration }}_{{ $sectionIteration }}">
-                                                                    <i class="fas fa-layer-group me-2"></i>
-                                                                    <span>{{ $sectionName }}</span>
-                                                                    <span class="badge badge-dark ms-2 small sectionGrandTotal">Budget: {!! Common::formatCurrency($sectionData['calculated_total'] ?? 0, 'USD') !!}</span>
+                                                                    <div class="cb-row-main">
+                                                                        <span class="wb-level-tag">Section</span>
+                                                                        <span class="wb-group-row-name">{{ $sectionName }}</span>
+                                                                    </div>
+                                                                    <div class="wb-group-row-budget sectionGrandTotal">{!! Common::formatCurrency($sectionData['calculated_total'] ?? 0, 'USD') !!}</div>
+                                                                    <i class="fas fa-chevron-right cb-chevron"></i>
                                                                 </button>
                                                             </h2>
 
                                                             <div id="collapseSec{{ $divisionIteration }}_{{ $deptIteration }}_{{ $sectionIteration }}"
                                                                  class="collapse"
-                                                                 aria-labelledby="headingSec{{ $divisionIteration }}_{{ $deptIteration }}_{{ $sectionIteration }}"
-                                                                 data-bs-parent="#accordionSec{{ $divisionIteration }}_{{ $deptIteration }}_{{ $sectionIteration }}">
+                                                                 aria-labelledby="headingSec{{ $divisionIteration }}_{{ $deptIteration }}_{{ $sectionIteration }}">
                                                                 <div class="accordion-body p-2">
                                                                     @php $posSecIteration = 1; @endphp
                                                                     @foreach($sectionData['positions'] as $positionName => $positionData)
@@ -85,7 +82,8 @@
                                                                                 'departmentName' => $departmentName,
                                                                                 'resortCosts' => $resortCosts,
                                                                                 'header' => $header,
-                                                                                'accordionId' => "pos{$divisionIteration}_{$deptIteration}_{$sectionIteration}_{$posSecIteration}"
+                                                                                'mvrToDollarRate' => $mvrToDollarRate,
+                                                                'accordionId' => "pos{$divisionIteration}_{$deptIteration}_{$sectionIteration}_{$posSecIteration}"
                                                                             ])
                                                                         </div>
                                                                         @php $posSecIteration++; @endphp
@@ -110,6 +108,7 @@
                                                             'departmentName' => $departmentName,
                                                             'resortCosts' => $resortCosts,
                                                             'header' => $header,
+                                                            'mvrToDollarRate' => $mvrToDollarRate,
                                                             'accordionId' => "pos{$divisionIteration}_{$deptIteration}_0_{$positionIteration}"
                                                         ])
                                                     </div>
@@ -130,3 +129,43 @@
         @endforeach
     @endif
 </div>
+
+<style>
+    /* ---- Accordion shells (Division / Department / Section) ----
+       Same visual language as View Budget's nav-card rows (.wb-group-row /
+       .wb-level-tag / .wb-group-row-name / .wb-group-row-budget), applied
+       directly to the Bootstrap accordion trigger button instead of a
+       plain div — the two pages navigate differently (real expand/collapse
+       here vs. View Budget's replace-in-place drill-down) but should look
+       identical at rest. One shared rule for every tier — View Budget
+       itself uses a single row style for division/department/section/
+       position alike, no per-level size variation. */
+    .cb-accordion-btn {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        width: 100%;
+        border: 1px solid var(--wb-line);
+        border-radius: 10px;
+        padding: 10px 14px;
+        background: var(--wb-card) !important;
+        color: var(--wb-ink);
+        font-weight: 600;
+        transition: background .12s, border-color .12s;
+    }
+    .cb-accordion-btn:hover { background: var(--wb-teal-tint-2) !important; border-color: var(--wb-teal-tint-1); }
+    /* Suppress Bootstrap's default right-side caret — using our own
+       chevron instead, so it stays brand-colored, not the theme's default. */
+    .cb-accordion-btn::after { display: none !important; }
+
+    .cb-row-main { flex: 1; min-width: 0; }
+    .cb-chevron {
+        color: var(--wb-faint);
+        font-size: 12px;
+        flex-shrink: 0;
+        transition: transform 0.2s ease;
+    }
+    .cb-accordion-btn[aria-expanded="true"] .cb-chevron { transform: rotate(90deg); }
+
+    .division-accordion { background: transparent; border: none; }
+</style>
