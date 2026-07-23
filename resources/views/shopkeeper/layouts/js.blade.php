@@ -94,6 +94,54 @@
         });
     });
 
+    // Top nav (Dashboard/Products/Payment History/Configuration) uses the
+    // same .navcarosel-box/.carosel-menu markup as the resort header, which
+    // only gets its Slick prev/next arrows from a .slick() init — the
+    // resort side does this in resources/views/resorts/layouts/js.blade.php
+    // (emnurend()), but this shopkeeper layout never called it at all, so
+    // the arrows never rendered here.
+    $(document).ready(function () {
+        var activeIndex = -1;
+        $('.carosel-menu .dropdown-toggle').each(function (index) {
+            if ($(this).hasClass('active')) {
+                activeIndex = index;
+                return false;
+            }
+        });
+
+        var slideCount = $('.carosel-menu .text-center').length;
+        if (slideCount <= 3) {
+            $('.navcarosel-box').css('max-width', 'fit-content');
+            $('.carosel-menu').addClass('d-flex').css('gap', '8px');
+            $('.carosel-menu .text-center').css('width', 'auto');
+        } else {
+            $('.carosel-menu').slick({
+                variableWidth: true,
+                slidesToShow: 1,
+                infinite: false,
+                slidesToScroll: 3,
+                initialSlide: activeIndex >= 0 ? activeIndex : 0,
+                dots: false,
+                focusOnSelect: false,
+                swipe: true
+            });
+        }
+
+        function updateActiveClasses() {
+            $('.carosel-menu .text-center').each(function () {
+                if ($(this).find('.dropdown-toggle').hasClass('active')) {
+                    $(this).addClass('slick-current slick-active');
+                } else {
+                    $(this).removeClass('slick-current slick-active');
+                }
+            });
+        }
+        updateActiveClasses();
+        $('.carosel-menu').on('afterChange', function () {
+            updateActiveClasses();
+        });
+    });
+
     // Load notifications on page load
     function loadShopkeeperNotifications() {
         $.ajax({
