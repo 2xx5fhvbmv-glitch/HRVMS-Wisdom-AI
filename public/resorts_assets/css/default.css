@@ -647,11 +647,16 @@ header nav {
 .navcarosel-box .slick-next:before {
     content: '\f105';
     font-family: "Font Awesome 6 Free";
+    /* Every other FA6 icon rule in this file sets this — without it the
+       solid glyph falls back to a weight the font file doesn't have,
+       rendering as a barely-visible sliver instead of a bold chevron. */
+    font-weight: 900;
 }
 
 .navcarosel-box .slick-prev:before {
     content: '\f104';
     font-family: "Font Awesome 6 Free";
+    font-weight: 900;
 }
 
 .navcarosel-box .btn-group {
