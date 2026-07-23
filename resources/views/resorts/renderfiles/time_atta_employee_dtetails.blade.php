@@ -173,8 +173,12 @@
                                 <p>{{ isset($item->note) ?  $item->note  : "No notes found.." }}</p>
                             </div>
                             <div class="text-center">
+                                @if($item->ParentAttd_id)
                                 <a href="javascritp:void(0)" class="btn btn-themeBlue btn-sm LocationHistoryData" data-location ="{{ $item->InTime_Location }}" data-id="{{ $item->id }}"><i class="fa-regular fa-location-dot"></i></a>
                                 <a href="javascritp:void(0)" class="btn btn-themeSkyblue btn-sm edit-row-btn" data-note="{{ $item->note }}" data-CheckInTime="{{ $item->CheckInTimeOne }}"  data-CheckOutTime="{{ $item->CheckOutTimeOne }}"  data-OverTime="{{ $item->OverTime }}" data-id="{{ base64_encode($item->Child_id) }}" data-ParentAttd_id="{{ base64_encode($item->ParentAttd_id) }}"  > Edit</a>
+                                @else
+                                <span class="text-muted small">No punch recorded</span>
+                                @endif
                             </div>
 
                         </div>
