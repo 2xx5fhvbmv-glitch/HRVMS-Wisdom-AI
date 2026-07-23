@@ -491,21 +491,57 @@ class FileManageController extends Controller
         
         public function FolderList(Request $request)
         {
-            $FolderList = FilemangementSystem::where('resort_id', $this->resort->resort_id)
-            // ->where('UnderON', 0)
-            // ->where("Folder_Type", "uncategorized")
-            ->orderByDesc('id')
-            ->get()->map(function ($FolderList) {
-                
+            // Was querying every row in filemangement_systems with no
+            // UnderON/permission filter at all — every deeply-nested
+            // sub-folder (including automated-test-probe folders like
+            // "Nest2_...", "NestCheck_...", "MobileApiProbe_...") and every
+            // folder regardless of who's allowed to see it ended up in this
+            // "pick a folder to upload into" dropdown. UnderON = 0 restricts
+            // to top-level folders only; visibleFolderIdsForCurrentUser()
+            // mirrors the scoping already used by the sidebar folder list
+            // (privileged roles see everything, everyone else only their
+            // own + shared folders).
+            $allowedFolderIds = $this->visibleFolderIdsForCurrentUser();
+            $query = FilemangementSystem::where('resort_id', $this->resort->resort_id)
+                ->where('UnderON', 0);
+            if (is_array($allowedFolderIds)) {
+                $query->whereIn('id', $allowedFolderIds ?: [0]);
+            }
+            $FolderList = $query->orderByDesc('id')->get();
+
+            // Employee-owned root folders store the employee's Emp_id as
+            // Folder_Name (see the categorized-folder creation in
+            // Common::createFolder / Employee::created), so the dropdown
+            // only ever showed codes like "DR-1" — never the employee's
+            // actual name. Resolve every categorized folder's code to a
+            // name in one batched query.
+            $empCodes = $FolderList->where('Folder_Type', 'categorized')->pluck('Folder_Name')->unique()->values()->all();
+            $namesByCode = collect();
+            if (!empty($empCodes)) {
+                $namesByCode = Employee::join('resort_admins as ra', 'ra.id', '=', 'employees.Admin_Parent_id')
+                    ->where('employees.resort_id', $this->resort->resort_id)
+                    ->whereIn('employees.Emp_id', $empCodes)
+                    ->get(['employees.Emp_id', DB::raw("TRIM(CONCAT(COALESCE(ra.first_name,''),' ',COALESCE(ra.last_name,''))) as emp_name")])
+                    ->keyBy('Emp_id');
+            }
+
+            $FolderList = $FolderList->map(function ($FolderList) use ($namesByCode) {
                 $FolderList->new_id = base64_encode($FolderList->id);
-                $FolderList->Folder_Name = htmlspecialchars($FolderList->Folder_Name, ENT_QUOTES, 'UTF-8');
+                $displayName = $FolderList->Folder_Name;
+                if ($FolderList->Folder_Type === 'categorized' && $namesByCode->has($FolderList->Folder_Name)) {
+                    $empName = trim($namesByCode->get($FolderList->Folder_Name)->emp_name);
+                    if ($empName !== '') {
+                        $displayName = $empName . ' (' . $FolderList->Folder_Name . ')';
+                    }
+                }
+                $FolderList->Folder_Name = htmlspecialchars($displayName, ENT_QUOTES, 'UTF-8');
 
                 return $FolderList;
             });
             $string ='<option value=""></option>';
             if($FolderList->isNotEmpty())
             {
-                
+
                     foreach($FolderList as $f)
                     {
                         $string .="<option value='".$f->new_id."'>".$f->Folder_Name."</option>";
