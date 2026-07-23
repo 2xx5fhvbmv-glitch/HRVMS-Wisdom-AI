@@ -106,6 +106,7 @@
                 <div>
                     <a href="javascript:void(0)" class="btn btn-themeBlue btn-sm ApplicantsNotes ApplicantsNotes_{{ $a->applicant_id }}" data-notes="{{ $a->Notes }}"  data-id="{{base64_encode($a->id) }}" data-id="{{ $a->id }}">Notes</a>
                     <a href="javascript:void(0)" class="btn btn-themeSkyblue btn-sm userApplicants-btn"  data-id="{{ $a->applicant_id }}">View</a>
+                    <a href="javascript:void(0)" class="btn btn-themeNeon btn-sm waiInsightsBtn" data-id="{{ base64_encode($a->id) }}" data-bs-toggle="tooltip" data-bs-placement="top" title="WAI Insights — CV vs Job Description"><i class="fa-solid fa-robot"></i> WAI CV</a>
                 </div>
             </div>
         </div>
