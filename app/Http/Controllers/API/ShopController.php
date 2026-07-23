@@ -159,6 +159,24 @@ class ShopController extends Controller
             $pendingConsentview->status                     =   $request->status;
             $pendingConsentview->save();
 
+            // Employee accept/reject never notified the shopkeeper at all —
+            // same resort_notifications pattern Payroll\ShopkeeperController::
+            // bulkUpdatePaymentStatus() already uses for the opposite
+            // direction (HR marking a payment Paid).
+            $employeeName = optional(optional($pendingConsentview->employee)->resortAdmin)->first_name ?? 'The employee';
+            $verb = $pendingConsentview->status === 'Consented' ? 'accepted' : 'rejected';
+            DB::table('resort_notifications')->insert([
+                'resort_id'  => $this->resort_id,
+                'user_id'    => $pendingConsentview->shopkeeper_id,
+                'module'     => 'Staff Shop',
+                'type'       => $pendingConsentview->status === 'Consented' ? 'Consent Accepted' : 'Consent Rejected',
+                'message'    => $employeeName . ' ' . $verb . ' the consent request for order ' . $pendingConsentview->order_id . '.',
+                'status'     => 'unread',
+                'request_id' => $pendingConsentview->id,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
+
             $response['status']                             =   true;
             $response['message']                            =   "Pending consents Approved successfully.";
 
