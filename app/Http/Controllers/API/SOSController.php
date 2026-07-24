@@ -723,12 +723,19 @@ class SOSController extends Controller
                 return response()->json(['success' => false, 'message' => 'SOS history not found'], 200);
             }
 
-            $sosHistoryData->sos_approved_by_name       =   Employee::join('resort_admins as ra', 'employees.Admin_Parent_id', '=', 'ra.id')
-                                                                ->where('employees.id', $sosHistoryData->sos_approved_by)
-                                                                ->select('employees.id','employees.Admin_Parent_id', 'ra.first_name', 'ra.last_name', 'ra.profile_picture')
-                                                                ->first();
+            // sos_approved_by is null until someone actually approves/
+            // acknowledges the SOS — every alert not yet acted on crashed
+            // this endpoint with "assign property on null".
+            $sosHistoryData->sos_approved_by_name       =   $sosHistoryData->sos_approved_by
+                                                                ? Employee::join('resort_admins as ra', 'employees.Admin_Parent_id', '=', 'ra.id')
+                                                                    ->where('employees.id', $sosHistoryData->sos_approved_by)
+                                                                    ->select('employees.id','employees.Admin_Parent_id', 'ra.first_name', 'ra.last_name', 'ra.profile_picture')
+                                                                    ->first()
+                                                                : null;
 
-            $sosHistoryData->sos_approved_by_name->profile_picture =   Common::getResortUserPicture( $sosHistoryData->sos_approved_by_name->Admin_Parent_id);
+            if ($sosHistoryData->sos_approved_by_name) {
+                $sosHistoryData->sos_approved_by_name->profile_picture =   Common::getResortUserPicture( $sosHistoryData->sos_approved_by_name->Admin_Parent_id);
+            }
             $sosHistoryData->profile_picture            =   Common::getResortUserPicture($sosHistoryData->Admin_Parent_id);
 
             // Fetch team member activity stats
