@@ -3959,19 +3959,23 @@ class TimeAndAttendanceController extends Controller
                 't2.OverTime',
             ])->get();
 
-            // Actual OT: what was actually recorded on checkout for this date.
-            // Join the employee straight off the attendance row — going via
-            // duty_rosters silently dropped attendance rows whose roster_id
-            // is null (manually marked / ad-hoc attendance).
-            $actualQuery = DB::table('parent_attendaces as t3')
+            // Actual OT: what was actually approved for this date. The web
+            // portal's Attendance Register reads approved OT from
+            // employee_overtimes (status = 'approved'), written by the OT
+            // approval workflow — parent_attendaces.OverTime is a legacy
+            // checkout field that approvals never propagate to, so reading
+            // from it here under-reported approved OT.
+            $actualQuery = DB::table('employee_overtimes as t3')
                 ->join('employees', 'employees.id', '=', 't3.Emp_id')
                 ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
                 ->where('t1.resort_id', $resort_id)
                 ->where('employees.status', 'Active')
                 ->where('t3.date', $date)
-                ->whereNotNull('t3.OverTime')
-                ->where('t3.OverTime', '!=', '00:00')
-                ->where('t3.OverTime', '!=', '');
+                ->where('t3.status', 'approved')
+                ->whereNotNull('t3.total_time')
+                ->where('t3.total_time', '!=', '00:00')
+                ->where('t3.total_time', '!=', '0:0')
+                ->where('t3.total_time', '!=', '');
 
             if (!$canViewAll) {
                 $actualQuery->whereIn('employees.id', $underEmpId);
@@ -3983,7 +3987,7 @@ class TimeAndAttendanceController extends Controller
             $actualRows = $actualQuery->select([
                 'employees.id as employee_id', 'employees.Emp_id as Emp_code',
                 't1.first_name', 't1.last_name', 't1.id as Parentid',
-                't3.OverTime', 't3.OTStatus',
+                't3.total_time as OverTime', 't3.status as OTStatus',
             ])->get();
 
             $toDecimalHours = function ($hm) {
