@@ -1232,10 +1232,37 @@ class BoardingPassController extends Controller
         }
     }
 
+    /**
+     * Manifest create/view is restricted to HR HOD/EXCOM and any Security
+     * department employee (department+rank spec from the Island Pass
+     * Manifest ticket) — everyone else gets a 403.
+     */
+    private function userCanManageManifests(): bool
+    {
+        $employee = $this->user->GetEmployee ?? null;
+        if (!$employee) return false;
+
+        $rank    = $employee->rank ?? null;
+        $isHOD   = ($rank == 2 || $rank === '2');
+        $isEXCOM = ($rank == 1 || $rank === '1');
+
+        $department = $employee->Dept_id
+            ? \App\Models\ResortDepartment::where('id', $employee->Dept_id)->where('resort_id', $this->resort_id)->first(['name'])
+            : null;
+        $deptName       = strtolower(trim($department->name ?? ''));
+        $isHRDept       = in_array($deptName, ['human resources', 'hr']);
+        $isSecurityDept = strpos($deptName, 'security') !== false;
+
+        return ($isHRDept && ($isHOD || $isEXCOM)) || $isSecurityDept;
+    }
+
     public function transportationDateBasedEmp(Request $request)
     {
         if (!Auth::guard('api')->check()) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+        if (!$this->userCanManageManifests()) {
+            return response()->json(['success' => false, 'message' => 'You are not authorized to manage manifests.'], 403);
         }
 
         // Validate request data
@@ -1264,17 +1291,23 @@ class BoardingPassController extends Controller
 
             $employeeTravelPasses                   =   $query->get();
 
-            $employees                              =   $employeeTravelPasses->pluck('employee')->map(function ($employee) {
+            // Return photo/pass-type/date alongside name so the manifest
+            // employee-picker can display them, not just the id/name.
+            $employees                              =   $employeeTravelPasses->map(function ($pass) use ($request) {
+                $employee = $pass->employee;
                 if ($employee && $employee->resortAdmin) {
                     return [
                         'id'                        =>  $employee->id,
                         'first_name'                =>  $employee->resortAdmin->first_name,
                         'last_name'                 =>  $employee->resortAdmin->last_name,
                         'full_name'                 =>  $employee->resortAdmin->full_name,
+                        'profile_picture'           =>  Common::getResortUserPicture($employee->Admin_Parent_id),
+                        'pass_type'                 =>  $request->type,
+                        'date'                      =>  $request->type === 'arrival' ? $pass->arrival_date : $pass->departure_date,
                     ];
                 }
                 return null;
-            })->values();
+            })->filter()->values();
 
             return response()->json([
                 'success'                           =>  true,
@@ -1295,6 +1328,9 @@ class BoardingPassController extends Controller
     {
         if (!Auth::guard('api')->check()) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+        if (!$this->userCanManageManifests()) {
+            return response()->json(['success' => false, 'message' => 'You are not authorized to manage manifests.'], 403);
         }
 
          // Validate request data
@@ -1339,6 +1375,15 @@ class BoardingPassController extends Controller
                 ], 200);
             }
 
+            // Attach employees — filter out empty slots (mobile sends a
+            // fixed-size employee_ids[] and leaves unpicked rows blank).
+            // Computed before the manifest itself so the passes update
+            // below can be scoped to exactly these employees.
+            $validEmployeeIds = array_values(array_filter(
+                (array) $request->employee_ids,
+                fn ($id) => $id !== null && $id !== ''
+            ));
+
             if($request->manifest_type == 'arrival') {
 
                 // Set status for arrival
@@ -1355,9 +1400,20 @@ class BoardingPassController extends Controller
                     'status'                            =>  'saved',
                 ]);
 
-                EmployeeTravelPass::where('arrival_date',$request->date)->update([
-                    'arrival_time'                      =>  $request->time,
-                ]);
+                // Scoped to this resort + the employees actually on this
+                // manifest (was previously any pass anywhere with a
+                // matching arrival_date, regardless of resort or whether
+                // the employee was even on this manifest), and stamps
+                // manifest_id so the pass detail reflects the assignment.
+                if (!empty($validEmployeeIds)) {
+                    EmployeeTravelPass::where('resort_id', $this->resort_id)
+                        ->where('arrival_date', $request->date)
+                        ->whereIn('employee_id', $validEmployeeIds)
+                        ->update([
+                            'arrival_time'               =>  $request->time,
+                            'manifest_id'                =>  $manifest->id,
+                        ]);
+                }
             } else {
 
                 // Set status for departure
@@ -1374,17 +1430,16 @@ class BoardingPassController extends Controller
                     'status'                            =>  'saved',
                 ]);
 
-                EmployeeTravelPass::where('departure_date',$request->date)->update([
-                    'departure_time'                    =>  $request->time,
-                ]);
+                if (!empty($validEmployeeIds)) {
+                    EmployeeTravelPass::where('resort_id', $this->resort_id)
+                        ->where('departure_date', $request->date)
+                        ->whereIn('employee_id', $validEmployeeIds)
+                        ->update([
+                            'departure_time'             =>  $request->time,
+                            'manifest_id'                =>  $manifest->id,
+                        ]);
+                }
             }
-
-            // Attach employees — filter out empty slots (mobile sends a
-            // fixed-size employee_ids[] and leaves unpicked rows blank).
-            $validEmployeeIds = array_values(array_filter(
-                (array) $request->employee_ids,
-                fn ($id) => $id !== null && $id !== ''
-            ));
 
             foreach ($validEmployeeIds as $empId) {
                 ManifestEmployee::create([
@@ -1410,6 +1465,36 @@ class BoardingPassController extends Controller
                     null,
                     false,
                     'boarding-pass-detail',
+                );
+            }
+
+            // Also notify HR and Security — the ticket's spec is that
+            // manifest creation notifies the included employees AND these
+            // two groups, not just the employees.
+            $hrEmployeeIds = Common::getResortHrEmployeeIds($this->resort_id);
+            $securityDeptIds = \App\Models\ResortDepartment::where('resort_id', $this->resort_id)
+                ->where('name', 'Security')
+                ->pluck('id');
+            $securityEmployeeIds = Employee::where('resort_id', $this->resort_id)
+                ->whereIn('Dept_id', $securityDeptIds)
+                ->where('status', 'Active')
+                ->pluck('id')
+                ->toArray();
+            $staffNotifyIds = array_values(array_unique(array_merge($hrEmployeeIds, $securityEmployeeIds)));
+
+            if (!empty($staffNotifyIds)) {
+                Common::sendMobileNotification(
+                    $this->resort_id,
+                    2,
+                    null,
+                    null,
+                    'Manifest ' . ucfirst($request->manifest_type) . ' Created',
+                    ucfirst($request->manifest_type) . ' manifest for ' . $request->transportation_mode . ' (' . $request->transportation_name . ') on ' . $request->date . ' at ' . $request->time . ' created with ' . count($validEmployeeIds) . ' employee(s).',
+                    'Boarding Pass',
+                    $staffNotifyIds,
+                    null,
+                    false,
+                    'boarding-pass-manifest-created',
                 );
             }
 
@@ -1901,6 +1986,9 @@ class BoardingPassController extends Controller
         if (!Auth::guard('api')->check()) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
+        if (!$this->userCanManageManifests()) {
+            return response()->json(['success' => false, 'message' => 'You are not authorized to manage manifests.'], 403);
+        }
          $validator = Validator::make($request->all(), [
             'manifest_type'                     => 'required|in:arrival,departure',
         ]);
@@ -1936,6 +2024,9 @@ class BoardingPassController extends Controller
     {
         if (!Auth::guard('api')->check()) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+        if (!$this->userCanManageManifests()) {
+            return response()->json(['success' => false, 'message' => 'You are not authorized to manage manifests.'], 403);
         }
 
         $manifestId = base64_decode($manifestId);
@@ -1979,6 +2070,9 @@ class BoardingPassController extends Controller
     {
         if (!Auth::guard('api')->check()) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+        if (!$this->userCanManageManifests()) {
+            return response()->json(['success' => false, 'message' => 'You are not authorized to manage manifests.'], 403);
         }
 
         $manifestId = base64_decode($manifestId);
