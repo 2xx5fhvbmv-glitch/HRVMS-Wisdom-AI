@@ -3680,7 +3680,13 @@ class LeaveController extends Controller
                     'etps.approved_at',
                 )
                 ->where('etp.resort_id', $resort_id)
-                ->where('e.reporting_to', $employee->id)
+                // Approvers are assigned per-pass in employee_travel_pass_status
+                // (department+rank lookup at submission time — see
+                // EmployeeTravelPassStatus::create() above), which does NOT
+                // guarantee the requesting employee's reporting_to points at
+                // this HOD. Filtering by reporting_to silently hid passes
+                // this HOD was actually assigned to approve.
+                ->where('etps.approver_id', $employee->id)
                 ->orderBy('etp.id', 'desc') // Order by ID descending
                 ->get();
 
@@ -3758,7 +3764,11 @@ class LeaveController extends Controller
                     'etps.approved_at',
                 )
                 ->where('etp.resort_id', $resort_id)
-                ->where('e.reporting_to', $employee->id)
+                // Same fix as islandPassViewHOD() above — approver_id (from
+                // employee_travel_pass_status, department+rank assigned at
+                // submission time) is the real source of "am I an approver
+                // for this pass", not the employee's reporting_to.
+                ->where('etps.approver_id', $employee->id)
                 ->where('etp.id', $pass_id) // Order by ID descending
                 ->orderBy('etp.id', 'desc') // Order by ID descending
                 ->first();
