@@ -111,6 +111,24 @@ class BoardingPassController extends Controller
                     $role                           =   ucfirst(strtolower($item->approver_rank ?? ''));
                     $item->rank_type                =   $rankConfig[$role] ?? '';
                 }
+
+                // Parent status only flips once every stage is Approved (or
+                // immediately to Rejected), so it stays "Pending" through the
+                // whole HOD -> HR -> Security chain. Derive which stage is
+                // actually pending right now from the per-stage rows, ordered
+                // by submission order (ascending id), not the desc-ordered
+                // relation above.
+                $pass->current_status_label        =   $pass->status;
+                if ($pass->status === 'Pending') {
+                    $pendingStage                   =   $pass->employeeTravelPassStatusData
+                                                            ->sortBy('id')
+                                                            ->first(function ($item) {
+                                                                return $item->status === 'Pending';
+                                                            });
+                    if ($pendingStage) {
+                        $pass->current_status_label =   'Pending by ' . ($pendingStage->rank_type ?: $pendingStage->approver_rank);
+                    }
+                }
             }
             $dahsboardArr                           =   [
                 'departed_count'                    =>  $EmployeeTravelDepartedCount,
