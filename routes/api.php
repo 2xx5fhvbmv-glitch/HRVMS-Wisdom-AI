@@ -244,6 +244,9 @@ use Illuminate\Support\Facades\Route;
 		// Called by the app's background geofence monitoring on zone
 		// enter/exit (native OS geofencing, not a manual button tap).
 		Route::post('timeandattendance/geofence-event', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'geofenceEvent']);
+		// Home screen: given the employee's current location, return the
+		// duty roster's assigned geofence zone + whether they're inside it.
+		Route::post('timeandattendance/my-geofence-zone', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'myGeofenceZone']);
 		Route::get('timeandattendance/emp-checkinout-time/{date}', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'employeeCheckinCheckoutTime']);
 		Route::get('timeandattendance/time-attendance-employee-leave', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'timeAttendanceEmployeeLeave']);
 		Route::post('timeandattendance/approve-reject-ot', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'approveRejectOT']);
