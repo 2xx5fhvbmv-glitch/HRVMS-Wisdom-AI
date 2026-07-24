@@ -2079,6 +2079,90 @@ class TimeAndAttendanceController extends Controller
         return $this->manualCheckOut($syntheticRequest);
     }
 
+    /**
+     * Home screen geofence lookup: the app sends the employee's current
+     * location, this returns the zone assigned to their duty roster
+     * (shape/coordinates/color so it can be drawn on a map) plus whether
+     * the given point currently falls inside it, so the UI can show a
+     * within/outside indicator or gate the break-in/break-out button
+     * without waiting for an actual check-in attempt.
+     */
+    public function myGeofenceZone(Request $request)
+    {
+        if (!Auth::guard('api')->check()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'latitude'  => 'nullable|numeric',
+            'longitude' => 'nullable|numeric',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
+        }
+
+        try {
+            $user     = Auth::guard('api')->user();
+            $employee = $user->GetEmployee;
+            if (!$employee) {
+                return response()->json(['success' => false, 'message' => 'Employee record not found.'], 404);
+            }
+
+            // An employee can accumulate many duty_rosters template rows
+            // over time (one per schedule range) — take the latest one so
+            // an old/superseded roster's zone (or lack of one) doesn't win
+            // over their current assignment.
+            $rosterData = DutyRoster::where('resort_id', $user->resort_id)
+                ->where('Emp_id', $employee->id)
+                ->orderByDesc('id')
+                ->first();
+
+            if (!$rosterData || !$rosterData->geofence_zone_id) {
+                return response()->json([
+                    'success'  => true,
+                    'message'  => 'No geofence zone configured for your duty roster.',
+                    'geofence' => null,
+                ]);
+            }
+
+            $geofence = \App\Models\ResortGeofence::where('id', $rosterData->geofence_zone_id)
+                ->where('status', 'active')
+                ->first();
+
+            if (!$geofence) {
+                return response()->json([
+                    'success'  => true,
+                    'message'  => 'Assigned geofence zone is not active.',
+                    'geofence' => null,
+                ]);
+            }
+
+            $within = null;
+            if ($request->filled('latitude') && $request->filled('longitude')) {
+                $within = Common::isWithinGeofence((float) $request->latitude, (float) $request->longitude, $geofence);
+            }
+
+            return response()->json([
+                'success'  => true,
+                'message'  => 'Geofence zone fetched successfully.',
+                'geofence' => [
+                    'id'           => $geofence->id,
+                    'name'         => $geofence->name,
+                    'color'        => $geofence->color,
+                    'shape_type'   => $geofence->shape_type,
+                    'coordinates'  => json_decode($geofence->coordinates, true),
+                    'grace_period' => $geofence->grace_period,
+                    'within'       => $within,
+                ],
+            ]);
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
     public function hrTimeAttendance(Request $request)
     {
         if (!Auth::guard('api')->check()) {
