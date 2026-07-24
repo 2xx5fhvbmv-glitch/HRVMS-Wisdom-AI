@@ -10,6 +10,7 @@ use App\Models\Employee;
 use App\Models\GrievanceCategory;
 use App\Models\GrievanceSubcategory;
 use App\Models\ActionStore;
+use App\Models\GrievanceInformalResolution;
 use Illuminate\Support\Facades\Auth;
 use Validator;
 use DB;
@@ -231,6 +232,54 @@ class GrievanceController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::emergency("Message: " . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    /**
+     * Mobile pre-check dialog shown before an employee starts a formal
+     * grievance: "did you try to resolve this informally first?" Logged
+     * standalone (not folded into GrievanceStore) so HR sees informal
+     * attempts even when the employee answers "Yes" and never files a
+     * formal grievance at all.
+     */
+    public function InformalResolution(Request $request)
+    {
+        if (!$this->user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'resolved_informally' => 'required|in:Yes,No',
+            'description'         => 'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
+        }
+
+        try {
+            $employee = $this->user->GetEmployee;
+            if (!$employee) {
+                return response()->json(['success' => false, 'message' => 'Employee record not found.'], 404);
+            }
+
+            $record = GrievanceInformalResolution::create([
+                'resort_id'            => $this->resort_id,
+                'employee_id'          => $employee->id,
+                'resolved_informally'  => $request->resolved_informally,
+                'description'         => $request->description,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Response recorded successfully.',
+                'data'    => $record,
+            ]);
+        } catch (\Exception $e) {
             \Log::emergency("File: " . $e->getFile());
             \Log::emergency("Line: " . $e->getLine());
             \Log::emergency("Message: " . $e->getMessage());
