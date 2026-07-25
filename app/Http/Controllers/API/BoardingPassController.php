@@ -108,8 +108,15 @@ class BoardingPassController extends Controller
 
             foreach ($EmployeeTravelPass as $pass) {
                 foreach ($pass->employeeTravelPassStatusData as $item) {
-                    $role                           =   ucfirst(strtolower($item->approver_rank ?? ''));
-                    $item->rank_type                =   $rankConfig[$role] ?? '';
+                    // approver_role (the actual HOD/HR/SM stage) takes
+                    // precedence — falls back to the rank-derived label
+                    // only for rows created before this column existed.
+                    if ($item->approver_role) {
+                        $item->rank_type            =   $item->approver_role;
+                    } else {
+                        $role                       =   ucfirst(strtolower($item->approver_rank ?? ''));
+                        $item->rank_type            =   $rankConfig[$role] ?? '';
+                    }
                 }
 
                 // Parent status only flips once every stage is Approved (or
@@ -252,6 +259,13 @@ class BoardingPassController extends Controller
                                                                 ->first();
 
                 if ($SMApprover) {
+                    // Tag the FUNCTIONAL stage this approver fills — not
+                    // their personal rank. An HR head or Security Manager
+                    // can personally hold rank=2 ("HOD") same as a real
+                    // department HOD, which made every rank_type lookup
+                    // derived from approver_rank mislabel their rows "HOD"
+                    // too (see approver_role column comment).
+                    $SMApprover->approver_role          =   'SM';
                     $passApprovalFlow->push($SMApprover); // Fourth approver: Security Officer
                 }
 
@@ -261,12 +275,14 @@ class BoardingPassController extends Controller
                 // silently dropping HR from the whole approval chain.
                 $hrApprover                             =   Employee::select('id', 'rank')->whereIn('id', Common::getResortHrEmployeeIds($this->resort_id))->first();
                 if ($hrApprover) {
+                    $hrApprover->approver_role           =   'HR';
                     $passApprovalFlow->push($hrApprover); // Third approver: HR
                 }
 
                 // Add HOD to the approval flow (rank 2)
                 $hodApprover                             =   Employee::select('id', 'rank')->where('rank', 2)->where('resort_id',$this->resort_id)->where('Dept_id', $employee->Dept_id)->first();
                 if ($hodApprover ) {
+                    $hodApprover->approver_role          =   'HOD';
                     $passApprovalFlow->push($hodApprover); // Second approver: HOD
                 }
 
@@ -276,6 +292,7 @@ class BoardingPassController extends Controller
                         'travel_pass_id'                =>  $boardingPass->id,
                         'approver_id'                   =>  $approver->id,
                         'approver_rank'                 =>  $approver->rank,
+                        'approver_role'                 =>  $approver->approver_role,
                         'status'                        =>  'Pending',
                     ]);
 
@@ -350,8 +367,12 @@ class BoardingPassController extends Controller
 
             foreach ($EmployeeTravelApprovePass as $pass) {
                 foreach ($pass->employeeTravelPassStatusData as $item) {
-                    $role                           =   ucfirst(strtolower($item->approver_rank ?? ''));
-                    $item->rank_type                =   $rankConfig[$role] ?? '';
+                    if ($item->approver_role) {
+                        $item->rank_type            =   $item->approver_role;
+                    } else {
+                        $role                       =   ucfirst(strtolower($item->approver_rank ?? ''));
+                        $item->rank_type            =   $rankConfig[$role] ?? '';
+                    }
                 }
             }
             return response()->json([
@@ -466,8 +487,12 @@ class BoardingPassController extends Controller
 
             foreach ($EmployeeTravelPassReq as $pass) {
                 foreach ($pass->employeeTravelPassStatusData as $item) {
-                    $role                           =   ucfirst(strtolower($item->approver_rank ?? ''));
-                    $item->rank_type                =   $rankConfig[$role] ?? '';
+                    if ($item->approver_role) {
+                        $item->rank_type            =   $item->approver_role;
+                    } else {
+                        $role                       =   ucfirst(strtolower($item->approver_rank ?? ''));
+                        $item->rank_type            =   $rankConfig[$role] ?? '';
+                    }
                 }
                 // 'transportation' column on the pass itself is never set
                 // (boardingPassAdd only stores arrival_mode/departure_mode
@@ -606,8 +631,12 @@ class BoardingPassController extends Controller
 
             foreach ($EmployeeTravelPassReq as $pass) {
                 foreach ($pass->employeeTravelPassStatusData as $item) {
-                    $role                           =   ucfirst(strtolower($item->approver_rank ?? ''));
-                    $item->rank_type                =   $rankConfig[$role] ?? '';
+                    if ($item->approver_role) {
+                        $item->rank_type            =   $item->approver_role;
+                    } else {
+                        $role                       =   ucfirst(strtolower($item->approver_rank ?? ''));
+                        $item->rank_type            =   $rankConfig[$role] ?? '';
+                    }
                 }
                 // 'transportation' column on the pass itself is never set
                 // (boardingPassAdd only stores arrival_mode/departure_mode
@@ -728,8 +757,12 @@ class BoardingPassController extends Controller
 
             foreach ($EmployeeTravelPassReq as $pass) {
                 foreach ($pass->employeeTravelPassStatusData as $item) {
-                    $role                           =   ucfirst(strtolower($item->approver_rank ?? ''));
-                    $item->rank_type                =   $rankConfig[$role] ?? '';
+                    if ($item->approver_role) {
+                        $item->rank_type            =   $item->approver_role;
+                    } else {
+                        $role                       =   ucfirst(strtolower($item->approver_rank ?? ''));
+                        $item->rank_type            =   $rankConfig[$role] ?? '';
+                    }
                 }
                 // 'transportation' column on the pass itself is never set
                 // (boardingPassAdd only stores arrival_mode/departure_mode
@@ -831,8 +864,12 @@ class BoardingPassController extends Controller
 
             $rankConfig = config('settings.Position_Rank', []);
             foreach ($EmployeeTravelPassView->employeeTravelPassStatusData ?? [] as $item) {
-                $role = ucfirst(strtolower($item->approver_rank ?? ''));
-                $item->rank_type = $rankConfig[$role] ?? '';
+                if ($item->approver_role) {
+                    $item->rank_type = $item->approver_role;
+                } else {
+                    $role = ucfirst(strtolower($item->approver_rank ?? ''));
+                    $item->rank_type = $rankConfig[$role] ?? '';
+                }
             }
 
             $emp = $EmployeeTravelPassView->employee;
