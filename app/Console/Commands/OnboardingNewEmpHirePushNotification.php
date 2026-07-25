@@ -52,7 +52,7 @@ class OnboardingNewEmpHirePushNotification extends Command
                                                 $moduleName                             =   'Announcement';
                     
                                                 //Send in app notification to the team member
-                                                Common::sendMobileNotification($employee->resort_id,2, null,null, $title,$body,$moduleName,[$emp->id],null);
+                                                Common::sendMobileNotification($employee->resort_id,2, null,null, $title,$body,$moduleName,[$emp->id],$employee->id);
                                                 if($emp->device_token != null && $emp->device_token != '') {
                                                     //Send in push notification in mobile app
                                                     $data = Common::sendPushNotificationForMobile([$emp->device_token], $title, $body, $moduleName,NULL,NULL,NULL,NULL);

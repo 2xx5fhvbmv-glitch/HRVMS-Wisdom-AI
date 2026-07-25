@@ -219,7 +219,7 @@ class GrievanceController extends Controller
                         'A grievance submission has been sent by ' . $this->user->first_name . ' ' . $this->user->last_name . '.',
                         'Employee Grievance',
                         [$hrEmployee->id],
-                        null,
+                        $GrivanceSubmission->id,
                         false,
                         'grievance-submission',
                     );

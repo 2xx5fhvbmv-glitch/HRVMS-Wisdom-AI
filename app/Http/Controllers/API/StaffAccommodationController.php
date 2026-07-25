@@ -303,7 +303,7 @@ class StaffAccommodationController extends Controller
                         "The Maintenance Request for #$emp_id has been Created.".$request->descriptionIssues,
                         'Maintenance',
                         [$hrEmployee->id],
-                        null,
+                        $m_id->id,
                         false,
                         'maintenance-request-created',
                     );

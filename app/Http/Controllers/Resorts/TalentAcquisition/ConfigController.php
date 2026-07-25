@@ -631,7 +631,7 @@ class ConfigController extends Controller
                         $msg,
                         'Talent Acquisition (Hiring Request)',
                         $senttoIds,
-                        null,
+                        $parentNotification->V_id,
                         false,
                         'talent-acquisition-hiring-request'
                     );

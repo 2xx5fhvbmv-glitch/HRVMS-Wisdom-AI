@@ -635,7 +635,7 @@ class IncidentController extends Controller
                 $msg,
                 $ModuleName,
                 [$user],
-                null,
+                $incident->id,
                 true,
                 'incident-notification'
             );

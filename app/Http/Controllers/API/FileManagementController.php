@@ -414,7 +414,7 @@ class FileManagementController extends Controller
                 ($emp->resortAdmin->full_name ?? $emp->Emp_id) . ' uploaded a file: ' . $request->file('file')->getClientOriginalName(),
                 'File Management',
                 $hrEmployeeIds,
-                null,
+                $fileRecord->id,
                 false,
                 'file-management-upload',
             );

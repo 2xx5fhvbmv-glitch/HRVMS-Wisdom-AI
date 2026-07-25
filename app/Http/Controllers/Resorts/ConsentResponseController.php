@@ -131,7 +131,7 @@ class ConsentResponseController extends Controller
             $message,
             'Talent Acquisition (Consent Response)',
             $hrIds,
-            null,
+            $applicant->id,
             false,
             'talent-acquisition-consent-response'
         );

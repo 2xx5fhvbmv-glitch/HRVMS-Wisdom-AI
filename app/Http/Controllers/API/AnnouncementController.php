@@ -91,7 +91,7 @@ class AnnouncementController extends Controller
                 'employee_id'                           =>  $employee->id
             ]);
 
-            Common::sendMobileNotification($this->resort_id,3,null,$announcement->employee_id,'Congratulation','You have a new message.','Announcement',[$announcement->employee_id],null,false,'announcement-message');
+            Common::sendMobileNotification($this->resort_id,3,null,$announcement->employee_id,'Congratulation','You have a new message.','Announcement',[$announcement->employee_id],$announcement->id,false,'announcement-message');
 
             DB::commit();
 

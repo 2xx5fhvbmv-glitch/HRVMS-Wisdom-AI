@@ -479,7 +479,7 @@ class FileManageController extends Controller
                         ($this->resort->GetEmployee->resortAdmin->full_name ?? $this->resort->full_name ?? 'An employee') . ' uploaded a file.',
                         'File Management',
                         $hrEmployeeIds,
-                        null,
+                        $fileRecord->id,
                         false,
                         'file-management-upload',
                     );
