@@ -255,7 +255,9 @@ class BoardingPassController extends Controller
 
                 // Get employees who hold these positions in the current resort
                 $SMApprover                             =   Employee::with(['resortAdmin','position'])->whereIn('Position_id', $positionIds)
-                                                                ->where('resort_id', $this->resort_id)->select('id', 'rank')
+                                                                ->where('resort_id', $this->resort_id)->where('status', 'Active')
+                                                                ->select('id', 'rank')
+                                                                ->orderBy('id')
                                                                 ->first();
 
                 if ($SMApprover) {
@@ -273,14 +275,20 @@ class BoardingPassController extends Controller
                 // resort whose real HR employee isn't literally rank 3
                 // (e.g. an HR-department employee ranked HOD/EXCOM),
                 // silently dropping HR from the whole approval chain.
-                $hrApprover                             =   Employee::select('id', 'rank')->whereIn('id', Common::getResortHrEmployeeIds($this->resort_id))->first();
+                $hrApprover                             =   Employee::select('id', 'rank')->whereIn('id', Common::getResortHrEmployeeIds($this->resort_id))->where('status', 'Active')->orderBy('id')->first();
                 if ($hrApprover) {
                     $hrApprover->approver_role           =   'HR';
                     $passApprovalFlow->push($hrApprover); // Third approver: HR
                 }
 
                 // Add HOD to the approval flow (rank 2)
-                $hodApprover                             =   Employee::select('id', 'rank')->where('rank', 2)->where('resort_id',$this->resort_id)->where('Dept_id', $employee->Dept_id)->first();
+                // Onboarding/inactive employees can carry a valid rank/dept
+                // (a placeholder record before onboarding completes), so an
+                // unfiltered, unordered first() could non-deterministically
+                // resolve one of those instead of the real active HOD —
+                // confirmed against real data where a department had 3
+                // rank=2 employees, only one of them Active.
+                $hodApprover                             =   Employee::select('id', 'rank')->where('rank', 2)->where('resort_id',$this->resort_id)->where('Dept_id', $employee->Dept_id)->where('status', 'Active')->orderBy('id')->first();
                 if ($hodApprover ) {
                     $hodApprover->approver_role          =   'HOD';
                     $passApprovalFlow->push($hodApprover); // Second approver: HOD
