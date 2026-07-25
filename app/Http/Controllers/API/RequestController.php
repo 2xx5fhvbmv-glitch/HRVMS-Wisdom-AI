@@ -46,9 +46,37 @@ class RequestController extends Controller
             $requests                                   =   PayrollAdvance::join('employees', 'payroll_advance.employee_id', '=', 'employees.id')
                                                                 ->join('payroll_advance_guarantor as pag', 'payroll_advance.id', '=', 'pag.payroll_advance_id')
                                                                 ->where('payroll_advance.employee_id', $employee_id)
-                                                                ->where('payroll_advance.resort_id', $this->resort_id)  
+                                                                ->where('payroll_advance.resort_id', $this->resort_id)
                                                                 ->orderBy('payroll_advance.created_at', 'desc')
                                                                 ->get(['payroll_advance.*','employees.Emp_id', 'pag.status as guarantor_status', 'pag.guarantor_id']);
+
+            // The upload endpoint's response includes payroll_advance_attachment,
+            // but this dashboard/listing never surfaced it at all — a file
+            // uploaded on submission was invisible ever after.
+            $attachmentsByAdvanceId                     =   PayrollAdvanceAttachments::whereIn('payroll_advance_id', $requests->pluck('id'))
+                                                                ->get()
+                                                                ->groupBy('payroll_advance_id');
+
+            $requests                                   =   $requests->map(function ($req) use ($attachmentsByAdvanceId) {
+                $rows                                   =   $attachmentsByAdvanceId->get($req->id, collect());
+                $req->attachments                       =   $rows->flatMap(function ($row) {
+                    $decoded                            =   json_decode((string) $row->attachments, true);
+                    return is_array($decoded) ? $decoded : [];
+                })->map(function ($file) {
+                    $childId                            =   $file['Child_id'] ?? null;
+                    $url                                =   null;
+                    if ($childId) {
+                        try {
+                            $aws                         =   Common::GetAWSFile($childId, $this->resort_id);
+                            if (!empty($aws['success'])) $url = $aws['NewURLshow'];
+                        } catch (\Throwable $e) {
+                            // leave url null for attachments that fail to resolve
+                        }
+                    }
+                    return ['filename' => $file['Filename'] ?? null, 'url' => $url];
+                })->values();
+                return $req;
+            });
 
             // Count statuses from collection instead of DB for performance
             $requestsApproved                           =   $requests->where('status', 'Approved')->count();
