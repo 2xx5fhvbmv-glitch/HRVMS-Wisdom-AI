@@ -3879,7 +3879,7 @@ class LeaveController extends Controller
                         $empName->first_name . ' ' . $empName->last_name . ' Your leave request from '.$action . ' by '.$role,
                         'Leave',
                         [$leave->emp_id],
-                        NULL,
+                        $leave->id,
                         false,
                         'leave-' . strtolower($action),
                     );
@@ -3910,7 +3910,7 @@ class LeaveController extends Controller
                         $empName->first_name . ' ' . $empName->last_name . 'Your leave request from ' . $leave->from_date . ' to ' . $leave->to_date . ' has been ' . $action . '.',
                         'Leave',
                         [$leave->emp_id],
-                        NULL,
+                        $leave->id,
                         false,
                         'leave-approved',
                     );
@@ -3939,7 +3939,7 @@ class LeaveController extends Controller
                     $empName->first_name . ' ' . $empName->last_name . 'Your leave request from ' . $leave->from_date . ' to ' . $leave->to_date . ' has been ' . $action . '.',
                     'Leave',
                     [$leave->emp_id],
-                    NULL,
+                    $leave->id,
                     false,
                     'leave-rejected',
                 );
