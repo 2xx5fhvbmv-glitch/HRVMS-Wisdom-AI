@@ -56,7 +56,10 @@ class ProfileController extends Controller
         'GetEmployee.department',
         'GetEmployee.section',
         'GetEmployee.reportingToAdmin',
-        'GetEmployee.employeeLanguage:id,employee_id,language',
+        // proficiency_level (Native/Fluent/Intermediate) exists on the web
+        // Additional Information tab but was left out of this select list,
+        // so the column was always silently dropped for mobile.
+        'GetEmployee.employeeLanguage:id,employee_id,language,proficiency_level',
         // Web portal's Education/Qualification tab shows this data, but it
         // was never eager-loaded here, so the mobile app's Personal Info
         // screen always got a blank Education field regardless of what HR
