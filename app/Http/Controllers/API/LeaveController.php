@@ -55,6 +55,11 @@ class LeaveController extends Controller
             'to_date.*'                 => 'required|date_format:Y-m-d',
             'reason'                    => 'required|string',
             'task_delegation'           => 'nullable|integer',
+            // Extending an already-approved leave: this is just a normal
+            // leave request for the additional days, tagged back to the
+            // original. Ownership + Approved-status of the referenced
+            // leave is checked below (Validator can't reach $emp_id yet).
+            'extends_leave_id'          => 'nullable|integer|exists:employees_leaves,id',
 
             // Conditional validation for transportation
             'transportation'            => 'nullable|array',
@@ -86,6 +91,19 @@ class LeaveController extends Controller
         $emp_id                                         =   $employee->id;
         $rank                                           =   $employee->rank;
         $resortId                                       =   $user->resort_id;
+
+        if ($request->filled('extends_leave_id')) {
+            $originalLeave                              =   EmployeeLeave::where('id', $request->extends_leave_id)
+                                                                ->where('emp_id', $emp_id)
+                                                                ->where('resort_id', $resortId)
+                                                                ->first();
+            if (!$originalLeave) {
+                return response()->json(['success' => false, 'message' => 'The leave you are trying to extend was not found.'], 200);
+            }
+            if ($originalLeave->status !== 'Approved') {
+                return response()->json(['success' => false, 'message' => 'You can only extend a leave that has already been approved.'], 200);
+            }
+        }
 
         try {
             // Start a database transaction
@@ -423,6 +441,7 @@ class LeaveController extends Controller
                     'from_date'                         =>  $fromDate,
                     'to_date'                           =>  $toDate,
                     'flag'                              =>  $currentFlag,
+                    'extends_leave_id'                  =>  $request->extends_leave_id ?? null,
                     'total_days'                        =>  $totalDays,
                     'reason'                            =>  $request->reason,
                     'task_delegation'                   =>  $request->task_delegation,
@@ -1484,6 +1503,16 @@ class LeaveController extends Controller
 
                     $baseUrl = url('/');
                     $leaveDetail->attachments               =   self::resolveLeaveAttachmentUrl($leaveDetail->attachments);
+
+                    // Give the approver context in one call instead of
+                    // requiring a second lookup for the leave this one
+                    // extends.
+                    $leaveDetail->original_leave             =   $leaveDetail->extends_leave_id
+                                                                    ? DB::table('employees_leaves')
+                                                                        ->where('id', $leaveDetail->extends_leave_id)
+                                                                        ->select('id', 'from_date', 'to_date', 'total_days', 'status')
+                                                                        ->first()
+                                                                    : null;
                 }
 
                 if (!$leaveDetail) {
