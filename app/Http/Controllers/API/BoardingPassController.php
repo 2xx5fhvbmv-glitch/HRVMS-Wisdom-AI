@@ -296,7 +296,7 @@ class BoardingPassController extends Controller
                         'A boarding pass request has been submitted by ' . $this->user->first_name . ' ' . $this->user->last_name . '.',
                         'Boarding Pass',
                         [$approver->id],
-                        null,
+                        $boardingPass->id,
                         false,
                         'boarding-pass-request'
                     );
@@ -1006,7 +1006,7 @@ class BoardingPassController extends Controller
                     'A boarding pass request has been ' . $action . ' by ' . $this->user->first_name . ' ' . $this->user->last_name . '.',
                     'Boarding Pass',
                     [$employeeTravelPasses->employee_id],
-                    null,
+                    $employeeTravelPasses->id,
                     false,
                     'boarding-pass-' . strtolower($action),
                 );
@@ -1033,7 +1033,7 @@ class BoardingPassController extends Controller
                         'A boarding pass request is awaiting your approval.',
                         'Boarding Pass',
                         [$nextPendingStatus->approver_id],
-                        null,
+                        $employeeTravelPasses->id,
                         false,
                         'boarding-pass-approval-required',
                     );
