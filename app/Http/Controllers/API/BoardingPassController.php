@@ -1564,6 +1564,11 @@ class BoardingPassController extends Controller
         if (!Auth::guard('api')->check()) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
+        // Name says HR/SM-only, but had no actual role check — any
+        // authenticated user could edit any pass's arrival/departure time.
+        if (!$this->userCanManageManifests()) {
+            return response()->json(['success' => false, 'message' => 'You are not authorized to manage manifests.'], 403);
+        }
 
          // Validate request data
          $validator = Validator::make($request->all(), [
