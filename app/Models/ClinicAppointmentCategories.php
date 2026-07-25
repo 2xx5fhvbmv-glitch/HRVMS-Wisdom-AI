@@ -23,6 +23,11 @@ class ClinicAppointmentCategories extends Model
                 if (!$model->exists) {
                     $model->created_by = $user->id;
                 }
+                // modified_by is NOT NULL with no default — was never set
+                // here, silently stored as 0 locally (lenient sql_mode) but
+                // would hard-fail with a real SQL error on any environment
+                // running STRICT_TRANS_TABLES.
+                $model->modified_by = $user->id;
             }
         });
     }
