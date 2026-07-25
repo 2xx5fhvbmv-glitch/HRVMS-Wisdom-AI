@@ -201,7 +201,7 @@ class InfoUpdateController extends Controller
                               'Your profile update request has been approved.',
                               'People',
                               [$employeeinfoUpdateRequest->employee_id],
-                              null,
+                              $employeeinfoUpdateRequest->id,
                               false,
                               'info-update-approved'
                          );
@@ -252,7 +252,7 @@ class InfoUpdateController extends Controller
                     'Your profile update request was rejected.' . ($request->reject_reason ? ' Reason: ' . $request->reject_reason : ''),
                     'People',
                     [$employeeinfoUpdateRequest->employee_id],
-                    null,
+                    $employeeinfoUpdateRequest->id,
                     false,
                     'info-update-rejected'
                );
