@@ -2809,7 +2809,7 @@ class Common
             //  ->where('duty_rosters.Year','=',date('Y'))
              ->orderBy('t2.date','asc')
              ->get(['t2.Status','t2.id as Attd_id','t2.date','t2.Shift_id','t2.roster_id','duty_rosters.DayOfDate','t1.ShiftName','t2.OverTime','t1.StartTime','t1.EndTime','t2.DayWiseTotalHours'])
-             ->map(function ($roster)  {
+             ->map(function ($roster) use ($resort_id, $Employee) {
                  if($roster->ShiftName =="First Shift")
                  {
                      $roster->ShiftNameColor = "createDuty-green";
@@ -2832,9 +2832,68 @@ class Common
                      $roster->DayOfDate = $roster->DayOfDate;
                  }
 
+                 // This branch never looked up leave at all (unlike the
+                 // Monthwise branch below) — an employee on approved leave
+                 // never saw it reflected on their own weekly duty roster
+                 // view, only whatever the raw attendance Status happened
+                 // to be (usually blank, since no shift was ever assigned).
+                 $employeeLeave = EmployeeLeave::join('leave_categories as t4', 't4.id', '=', 'employees_leaves.leave_category_id')
+                     ->where('employees_leaves.Emp_id', $Employee)
+                     ->where('employees_leaves.status', 'Approved')
+                     ->whereDate('employees_leaves.from_date', '<=', $roster->date)
+                     ->whereDate('employees_leaves.to_date', '>=', $roster->date)
+                     ->where('t4.resort_id', $resort_id)
+                     ->first(['t4.color', 't4.leave_type', 'employees_leaves.total_days', 'employees_leaves.from_date', 'employees_leaves.to_date']);
+
+                 $roster->LeaveType     = $employeeLeave->leave_type ?? $roster->Status;
+                 $roster->LeaveDays     = $employeeLeave->total_days ?? null;
+                 $roster->LeaveFromDate = $employeeLeave->from_date ?? null;
+                 $roster->LeaveToDate   = $employeeLeave->to_date ?? null;
+                 $roster->LeaveColor    = $employeeLeave->color ?? ($roster->Status ? "" : "#be09af");
+                 $roster->LeaveFirstName = isset($employeeLeave->leave_type)
+                     ? substr($employeeLeave->leave_type, 0, 1)
+                     : (isset($roster->Status) ? substr($roster->Status, 0, 1) : "-");
 
                  return $roster;
              });
+
+            // Same backfill as the Monthwise branch: a day with no
+            // duty_roster_entries row at all must still surface an
+            // approved leave covering it, not just be absent.
+            if (!empty($Employee)) {
+                $existingDates = $DutyRoster->pluck('date')->map(fn($d) => is_object($d) ? $d->format('Y-m-d') : (string) $d)->toArray();
+                $dateIterator  = Carbon::parse($WeekstartDate);
+                $weekEnd       = Carbon::parse($WeekendDate);
+                while ($dateIterator->lte($weekEnd)) {
+                    $date = $dateIterator->format('Y-m-d');
+                    if (!in_array($date, $existingDates, true)) {
+                        $placeholderLeave = static::lookupApprovedLeaveForDate($resort_id, $Employee, $date);
+                        $DutyRoster->push((object)[
+                            'Status'            => null,
+                            'Attd_id'           => null,
+                            'Emp_id'            => $Employee,
+                            'date'              => $date,
+                            'Shift_id'          => null,
+                            'roster_id'         => null,
+                            'DayOfDate'         => Carbon::parse($date)->format('D'),
+                            'ShiftName'         => null,
+                            'OverTime'          => null,
+                            'StartTime'         => null,
+                            'EndTime'           => null,
+                            'DayWiseTotalHours' => null,
+                            'ShiftNameColor'    => null,
+                            'LeaveType'         => $placeholderLeave->leave_type ?? null,
+                            'LeaveDays'         => $placeholderLeave->total_days ?? null,
+                            'LeaveFromDate'     => $placeholderLeave->from_date ?? null,
+                            'LeaveToDate'       => $placeholderLeave->to_date ?? null,
+                            'LeaveColor'        => $placeholderLeave->color ?? "",
+                            'LeaveFirstName'    => isset($placeholderLeave->leave_type) ? substr($placeholderLeave->leave_type, 0, 1) : "-",
+                        ]);
+                    }
+                    $dateIterator->addDay();
+                }
+                $DutyRoster = $DutyRoster->sortBy('date')->values();
+            }
         }
         if($flag =="Monthwise")
         {
