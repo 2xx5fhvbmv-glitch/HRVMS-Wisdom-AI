@@ -1250,7 +1250,7 @@ class BoardingPassController extends Controller
                     'Your approved boarding pass has been cancelled by ' . $employee->resortAdmin->first_name . ' ' . $employee->resortAdmin->last_name . ($comments ? (': ' . $comments) : '.'),
                     'Boarding Pass',
                     [$employeeTravelPasses->employee_id],
-                    null,
+                    $employeeTravelPasses->id,
                     false,
                     'boarding-pass-cancelled'
                 );
