@@ -343,8 +343,97 @@ class RequestController extends Controller
             \Log::emergency("Line: " . $e->getLine());
             \Log::error($e->getMessage());
             return response()->json(['success' => false, 'message' => 'Server error'], 500);
-        } 
+        }
     }
 
+    /**
+     * GET request/salary-advance-details/{id}
+     * Single request's full detail — request info, guarantor, repayment
+     * schedule and deduction history. requestDashboard() only ever
+     * returned the list/summary shape; nothing exposed the recovery
+     * schedule or guarantor approval info to mobile at all.
+     */
+    public function salaryAdvanceDetails($id)
+    {
+        if (!Auth::guard('api')->check()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        try {
+            $employeeId = $this->user->GetEmployee->id;
+
+            $advance = PayrollAdvance::with([
+                    'guarantor.employee.resortAdmin:id,first_name,last_name',
+                    'payrollRecoverySchedule',
+                ])
+                ->where('resort_id', $this->resort_id)
+                ->where('employee_id', $employeeId)
+                ->find($id);
+
+            if (!$advance) {
+                return response()->json(['success' => false, 'message' => 'Request not found.'], 200);
+            }
+
+            $guarantorInformation = null;
+            if ($advance->guarantor) {
+                $g = $advance->guarantor;
+                $guarantorAdmin = optional($g->employee)->resortAdmin;
+                $guarantorInformation = [
+                    'guarantor_name'            => $guarantorAdmin ? trim($guarantorAdmin->first_name . ' ' . $guarantorAdmin->last_name) : null,
+                    'guarantor_approval_status' => $g->status,
+                    // payroll_advance_guarantor has no dedicated approval-date
+                    // column — updated_at only changes when status is actually
+                    // set (create/save both touch it, but a still-Pending row
+                    // means no approval has happened yet), so it's null until
+                    // the guarantor has actually responded.
+                    'guarantor_approval_date'   => $g->status !== 'Pending' ? $g->updated_at : null,
+                ];
+            }
+
+            // Web portal's "Deduction History" section (AdvanceSalaryRepaymentTrackerController)
+            // re-labels this SAME payroll_recovery_schedule collection —
+            // there is no separate deduction ledger tied to a salary advance.
+            $repaymentSchedule = $advance->payrollRecoverySchedule->map(function ($s) {
+                return [
+                    'month'  => $s->repayment_date ? Carbon::parse($s->repayment_date)->format('F Y') : null,
+                    'amount' => $s->amount,
+                    'remark' => $s->remark,
+                ];
+            })->values();
+
+            $deductionHistory = $advance->payrollRecoverySchedule->map(function ($s) {
+                return [
+                    'payroll_month'   => $s->repayment_date ? Carbon::parse($s->repayment_date)->format('F Y') : null,
+                    'deducted_amount' => $s->amount,
+                    'status'          => $s->status === 'Paid' ? 'Completed' : 'Pending',
+                ];
+            })->values();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Salary advance details fetched successfully',
+                'data'    => [
+                    'request_information' => [
+                        'requested_date'  => $advance->request_date,
+                        'status'          => $advance->status,
+                        'priority'        => $advance->priority,
+                        'amount'          => $advance->request_amount,
+                        'currency'        => $advance->currency,
+                        'purpose'         => $advance->pourpose,
+                        'recovery_status' => $advance->recovery_status,
+                    ],
+                    'guarantor_information' => $guarantorInformation,
+                    'repayment_schedule'    => $repaymentSchedule,
+                    'deduction_history'     => $deductionHistory,
+                ],
+            ], 200);
+
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
 
 }
