@@ -360,7 +360,9 @@ class ClinicController extends Controller
         }
 
         try {
-            $upcomingAppointmentsCount                  =   ClinicAppointment::whereDate('date', '>=', Carbon::today())->count();
+            $upcomingAppointmentsCount                  =   ClinicAppointment::where('resort_id', $this->resort_id)
+                                                                ->whereDate('date', '>=', Carbon::today())
+                                                                ->count();
 
             $treatmentCount                             =   ClinicTreatment::where('resort_id', $this->resort_id)
                                                                 ->distinct('employee_id')
@@ -472,6 +474,7 @@ class ClinicController extends Controller
             $upcomingAppointments                   =   ClinicAppointment::join('employees as e', 'e.id', '=', 'clinic_appointment.employee_id')
                                                             ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
                                                             ->join('resort_positions as rp', 'rp.id', '=', 'e.Position_id')
+                                                            ->where('clinic_appointment.resort_id', $this->resort_id)
                                                             ->whereBetween('clinic_appointment.date', [$date[0], $date[1]])
                                                             ->orderBy('clinic_appointment.date', 'asc')
                                                             ->orderBy('clinic_appointment.time', 'asc')
@@ -1047,9 +1050,16 @@ class ClinicController extends Controller
                 $emp_id                                     =   Employee::where('id',$request->employee_id)->first();
                 $filePath                                   =   null;
 
-            if($request->hasFile('attachment')) {
+            if($request->hasFile('attachments')) {
                     // Define leave attachment path
-                  
+                    // Was checking hasFile('attachment') (singular) but
+                    // reading file('attachments') (plural) — a client
+                    // sending the singular key (as the check implied it
+                    // should) got hasFile()=false, so never even reached
+                    // here; a client sending the plural key got past the
+                    // check but file('attachments') still worked, so this
+                    // only ever succeeded by accident when the WRONG key
+                    // per the check was sent.
                     $file       =   $request->file('attachments');
                     $SubFolder  =   "clinicMedicalCertificateAttachments";
                     $status     =   Common::AWSEmployeeFileUpload($this->resort_id, $file, $emp_id->Emp_id, $SubFolder, true);
