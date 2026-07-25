@@ -583,6 +583,16 @@ return [
         '5' => 'SUP',
         '6' => 'LINE WORKERS',
 		'7' => 'Finance',
+        // Dropped when this array was last trimmed (the commented-out
+        // version above still had them) — '12' => 'CLINIC_STAFF' is what
+        // routes/api.php's check.rank:CLINIC_STAFF middleware checks
+        // against, so with these missing, NO employee's rank could ever
+        // resolve to a value the middleware would accept: the entire
+        // Clinic Manager mobile API group was unreachable by anyone.
+        '9' => 'MD',
+        '10' => 'SO',
+        '11' => 'EDHOD', // Engineering Department Head
+        '12' => 'CLINIC_STAFF',
     ],
 
 	'final_rank' => [
