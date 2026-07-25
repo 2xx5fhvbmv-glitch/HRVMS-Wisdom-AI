@@ -54,6 +54,7 @@ class ProfileController extends Controller
         'GetEmployee.resort_divisions',
         'GetEmployee.resort_positions',
         'GetEmployee.department',
+        'GetEmployee.section',
         'GetEmployee.reportingToAdmin',
         'GetEmployee.employeeLanguage:id,employee_id,language',
         // Web portal's Education/Qualification tab shows this data, but it
@@ -62,6 +63,11 @@ class ProfileController extends Controller
         // had actually entered.
         'GetEmployee.education',
         'GetEmployee.experiance',
+        // Employment Information tab on web also shows Salary/Allowances/
+        // Bank Details — none of these were eager-loaded, so mobile's
+        // Employment Information screen was missing them entirely.
+        'GetEmployee.allowance.allowanceName:id,particulars',
+        'GetEmployee.bankDetails',
       ])->find($user->id);
 
       if ($profile) {
@@ -101,6 +107,59 @@ class ProfileController extends Controller
               $summary = trim(($e['job_title'] ?? '') . (!empty($e['company_name']) ? ' at ' . $e['company_name'] : ''));
               return $summary . (!empty($e['duration']) ? ' (' . $e['duration'] . ')' : '');
           })->filter()->implode('; ') ?: null;
+
+          // Employment Information tab (web) shows a human-readable Benefit
+          // Grid Level label, not the raw grade code — falls back to rank
+          // when benefit_grid_level isn't set, same as detail.blade.php.
+          $eligibility = config('settings.eligibilty') ?? [];
+          $effectiveBgl = $profileArray['get_employee']['benefit_grid_level'] ?? null;
+          if (empty($effectiveBgl) && !empty($empRank) && isset($eligibility[$empRank])) {
+              $effectiveBgl = $empRank;
+          }
+          $profileArray['get_employee']['benefit_grid_level_label'] = ($effectiveBgl && isset($eligibility[$effectiveBgl]))
+              ? $eligibility[$effectiveBgl]
+              : 'N/A';
+
+          // Salary Details tab: total monthly earning (basic + allowances,
+          // converted to MVR) and EWT status/indicative deduction — computed
+          // in the web controller (EmployeeController::detail), never
+          // exposed via API, so mobile only had the raw basic_salary figure.
+          $employeeModel = $profile->GetEmployee;
+          $conversionRate = optional(\App\Models\ResortSiteSettings::where('resort_id', $this->resort_id)->first())->DollertoMVR ?? 15.42;
+          $basicSalary = (float) ($profileArray['get_employee']['basic_salary'] ?? 0);
+          $basicMvr = ($profileArray['get_employee']['basic_salary_currency'] ?? null) === 'USD' ? $basicSalary * $conversionRate : $basicSalary;
+
+          $allowanceRows = $employeeModel ? $employeeModel->allowance : collect();
+          $totalAllowanceMvr = $allowanceRows->sum(function ($a) use ($conversionRate) {
+              $amt = (float) ($a->amount ?? 0);
+              return ($a->amount_unit ?? 'USD') === 'USD' ? $amt * $conversionRate : $amt;
+          });
+          $totalMonthlyEarningMvr = $basicMvr + $totalAllowanceMvr;
+          $profileArray['get_employee']['total_monthly_earning_mvr'] = round($totalMonthlyEarningMvr, 2);
+
+          $tin = $profileArray['get_employee']['tin'] ?? null;
+          $ewtStatus = $profileArray['get_employee']['ewt_status'] ?? null;
+          $profileArray['get_employee']['ewt_status_label'] = $tin
+              ? 'Enrolled'
+              : ($totalMonthlyEarningMvr >= 30000 ? 'Not Enrolled' : 'Not Required');
+          $profileArray['get_employee']['indicative_ewt_deduction_mvr'] = ($ewtStatus === 'yes' && $totalMonthlyEarningMvr > 0)
+              ? Common::computeEwtDeduction((float) $totalMonthlyEarningMvr)
+              : null;
+
+          // Allowances: flatten the eager-loaded relation down to what the
+          // Allowances tab actually displays (particulars/amount/unit)
+          // instead of the raw employees_allowance + nested allowance_name
+          // relation shape.
+          $profileArray['get_employee']['allowances'] = collect($profileArray['get_employee']['allowance'] ?? [])
+              ->map(function ($a) {
+                  return [
+                      'id'          => $a['id'] ?? null,
+                      'particulars' => $a['allowance_name']['particulars'] ?? null,
+                      'amount'      => $a['amount'] ?? null,
+                      'amount_unit' => $a['amount_unit'] ?? null,
+                  ];
+              })->values();
+          unset($profileArray['get_employee']['allowance']);
         }
 
         return response()->json(['success' => true, 'profile' => $profileArray,]);
