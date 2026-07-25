@@ -2928,6 +2928,47 @@ class Common
                         return $roster;
                     });
 
+            // Same gap as dutyRosterMonthAndWeekWise's Monthwise branch: a
+            // day with no duty_roster_entries row at all (the common case
+            // during a long approved leave like Maternity Leave, where no
+            // shift is ever assigned) was simply absent from the result —
+            // this is the employee's OWN dashboard/duty-roster view, so a
+            // missing day here read as "nothing scheduled" instead of
+            // showing the approved leave that actually covers it.
+            if (!empty($Employee)) {
+                $existingDates = $DutyRoster->pluck('date')->map(fn($d) => is_object($d) ? $d->format('Y-m-d') : (string) $d)->toArray();
+                $dateIterator  = Carbon::parse($startOfMonth);
+                $monthEnd      = Carbon::parse($endOfMonth);
+                while ($dateIterator->lte($monthEnd)) {
+                    $date = $dateIterator->format('Y-m-d');
+                    if (!in_array($date, $existingDates, true)) {
+                        $placeholderLeave = static::lookupApprovedLeaveForDate($resort_id, $Employee, $date);
+                        $DutyRoster->push((object)[
+                            'Status'            => null,
+                            'Attd_id'           => null,
+                            'Emp_id'            => $Employee,
+                            'date'              => $date,
+                            'Shift_id'          => null,
+                            'roster_id'         => null,
+                            'DayOfDate'         => Carbon::parse($date)->format('D'),
+                            'ShiftName'         => null,
+                            'OverTime'          => null,
+                            'StartTime'         => null,
+                            'EndTime'           => null,
+                            'DayWiseTotalHours' => null,
+                            'ShiftNameColor'    => null,
+                            'LeaveType'         => $placeholderLeave->leave_type ?? null,
+                            'LeaveDays'         => $placeholderLeave->total_days ?? null,
+                            'LeaveFromDate'     => $placeholderLeave->from_date ?? null,
+                            'LeaveToDate'       => $placeholderLeave->to_date ?? null,
+                            'LeaveColor'        => $placeholderLeave->color ?? "",
+                            'LeaveFirstName'    => isset($placeholderLeave->leave_type) ? substr($placeholderLeave->leave_type, 0, 1) : "-",
+                        ]);
+                    }
+                    $dateIterator->addDay();
+                }
+                $DutyRoster = $DutyRoster->sortBy('date')->values();
+            }
         }
         return $DutyRoster;
     }
