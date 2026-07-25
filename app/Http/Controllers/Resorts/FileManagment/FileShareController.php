@@ -9,6 +9,7 @@ use App\Models\FilemangementSystem;
 use App\Models\FileShare;
 use App\Models\ResortAdmin;
 use App\Models\ResortDepartment;
+use App\Helpers\Common;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -102,6 +103,12 @@ class FileShareController extends Controller
             $share->permissions = ['view' => true];
             $share->save();
 
+            // Track which employees are genuinely NEW recipients on this
+            // call (not already-shared-with, re-notified every time the
+            // modal reopens) so the notification below only fires once
+            // per person per share.
+            $newlyNotifiableEmployeeIds = [];
+
             if ($scopeType === 'employees') {
                 // Insert ignoring duplicates — the table PK is
                 // (share_id, employee_id) so duplicates would error.
@@ -119,6 +126,7 @@ class FileShareController extends Controller
                     ];
                 }
                 if (!empty($rows)) DB::table('file_share_employees')->insert($rows);
+                $newlyNotifiableEmployeeIds = array_map('intval', $newOnes);
             }
 
             if ($scopeType === 'departments') {
@@ -136,6 +144,23 @@ class FileShareController extends Controller
                     ];
                 }
                 if (!empty($rows)) DB::table('file_share_departments')->insert($rows);
+                if (!empty($newOnes)) {
+                    $newlyNotifiableEmployeeIds = Employee::where('resort_id', $this->resort->resort_id)
+                        ->whereIn('Dept_id', $newOnes)
+                        ->where('status', 'Active')
+                        ->pluck('id')->all();
+                }
+            }
+
+            if ($scopeType === 'organization') {
+                // No per-recipient pivot to diff against — an org-wide
+                // share is a single row, so every active employee is
+                // "newly notifiable" the first (and only) time it's created.
+                if ($share->wasRecentlyCreated) {
+                    $newlyNotifiableEmployeeIds = Employee::where('resort_id', $this->resort->resort_id)
+                        ->where('status', 'Active')
+                        ->pluck('id')->all();
+                }
             }
 
             DB::commit();
@@ -143,6 +168,30 @@ class FileShareController extends Controller
             DB::rollBack();
             \Log::error('FileShare store failed: ' . $e->getMessage());
             return response()->json(['success' => false, 'message' => 'Could not save share: ' . $e->getMessage()], 500);
+        }
+
+        // Notify recipients — sharing a file/folder previously produced no
+        // push or in-app notification of any kind, so an employee only
+        // found out if they happened to browse "Shared with Me".
+        if (!empty($newlyNotifiableEmployeeIds)) {
+            $itemName = $shareableType === 'file'
+                ? (ChildFileManagement::where('id', $shareableId)->value('NewFileName')
+                    ?: ChildFileManagement::where('id', $shareableId)->value('File_Name'))
+                : FilemangementSystem::where('id', $shareableId)->value('Folder_Name');
+
+            Common::sendMobileNotification(
+                $this->resort->resort_id,
+                2,
+                null,
+                null,
+                'Document Shared',
+                trim($this->resort->first_name . ' ' . $this->resort->last_name) . ' shared "' . $itemName . '" with you.',
+                'File Management',
+                $newlyNotifiableEmployeeIds,
+                $share->id,
+                false,
+                'file-management-shared',
+            );
         }
 
         return response()->json(['success' => true, 'share_id' => $share->id, 'message' => 'Share saved']);
