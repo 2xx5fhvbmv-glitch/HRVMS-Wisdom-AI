@@ -16,6 +16,7 @@ class EmployeeTravelPassStatus extends Model
         'travel_pass_id',
         'approver_id',
         'approver_rank',
+        'approver_role',
         'status',
         'emergency_cancel_status',
         'comments','approved_at'
