@@ -159,7 +159,7 @@ class DisciplinaryController extends Controller
                     'A disciplinary acknowledgment has been sent by ' . $this->user->first_name . ' ' . $this->user->last_name . '.',
                     'Employee Disciplinary',
                     [$hrEmployee->id],
-                    null,
+                    $DisciplinaryModel->id,
                     false,
                     'disciplinary-acknowledgment',
                 );
