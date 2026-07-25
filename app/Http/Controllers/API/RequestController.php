@@ -135,7 +135,7 @@ class RequestController extends Controller
                     $this->user->first_name . ' ' . $this->user->last_name . ' has named you as a guarantor for a ' . $request->request_type . ' request.',
                     'Request',
                     $guarantorIds,
-                    null,
+                    $PayrollAdvance->id,
                     false,
                     'guarantor-request-new',
                 );
@@ -183,7 +183,7 @@ class RequestController extends Controller
                         'A request has been sent by ' . $this->user->first_name . ' ' . $this->user->last_name . '.',
                         'Request',
                         $hrEmployeeIds,
-                        null,
+                        $PayrollAdvance->id,
                         false,
                         'general-request-hr',
                     );
@@ -307,7 +307,7 @@ class RequestController extends Controller
             $guarantorRequests->status                =   $request->status;
             $guarantorRequests->save();
 
-            Common::sendMobileNotification($this->resort_id,2,null,null,"Guarantor Request {$request->status}","Your Guarantor Request {$request->status}","Request",[$PayrollAdvance->employee_id],null,false,'guarantor-request-status');
+            Common::sendMobileNotification($this->resort_id,2,null,null,"Guarantor Request {$request->status}","Your Guarantor Request {$request->status}","Request",[$PayrollAdvance->employee_id],$PayrollAdvance->id,false,'guarantor-request-status');
 
             // HR's own Approve action is gated on the guarantor status (see
             // AdvanceSalaryController::updateStatus's "Guarantor approval is
@@ -325,7 +325,7 @@ class RequestController extends Controller
                     'Guarantor request for ' . ($PayrollAdvance->request_type ?? 'a request') . ' has been ' . strtolower($request->status) . '.',
                     'Request',
                     $hrEmployeeIds,
-                    null,
+                    $PayrollAdvance->id,
                     false,
                     'guarantor-request-status-hr',
                 );
