@@ -114,12 +114,31 @@ class RequestController extends Controller
                 'request_date'                          =>  $request->request_date,
                 'pourpose'                              =>  $request->purpose,
             ]);
-            foreach($request->guarantor_id ?? [] as $guaid) {
+            $guarantorIds = $request->guarantor_id ?? [];
+            foreach($guarantorIds as $guaid) {
                 PayrollAdvanceGuarantor::create([
                     'payroll_advance_id'                    =>  $PayrollAdvance->id,
                     'guarantor_id'                          =>  $guaid,
                     'status'                                =>  'Pending',
                 ]);
+            }
+            // Guarantors were never told they'd been named on a request —
+            // the only notification fired went to HR, so a guarantor found
+            // out only if they happened to open the app and check the list.
+            if (!empty($guarantorIds)) {
+                Common::sendMobileNotification(
+                    $this->resort_id,
+                    2,
+                    null,
+                    null,
+                    'Guarantor Request',
+                    $this->user->first_name . ' ' . $this->user->last_name . ' has named you as a guarantor for a ' . $request->request_type . ' request.',
+                    'Request',
+                    $guarantorIds,
+                    null,
+                    false,
+                    'guarantor-request-new',
+                );
             }
 
             // Mobile app posts the files as "attachments"; older builds used
@@ -190,31 +209,46 @@ class RequestController extends Controller
         } 
     }
 
-    public function PeopleGuarantorRequestList()
+    public function PeopleGuarantorRequestList(Request $request)
     {
         if (!Auth::guard('api')->check()) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
         try {
-            $guarantorRequests                          =   PayrollAdvanceGuarantor::join('payroll_advance as pa', 'payroll_advance_guarantor.payroll_advance_id', '=', 'pa.id')
+            $query                                       =   PayrollAdvanceGuarantor::join('payroll_advance as pa', 'payroll_advance_guarantor.payroll_advance_id', '=', 'pa.id')
                                                                 ->join('employees as e', 'payroll_advance_guarantor.guarantor_id', '=', 'e.id')
                                                                 ->join('resort_admins as ra','e.Admin_Parent_id', '=', 'ra.id')
                                                                 ->where('guarantor_id', $this->user->GetEmployee->id)
-                                                                ->select('payroll_advance_guarantor.id','payroll_advance_guarantor.payroll_advance_id','payroll_advance_guarantor.guarantor_id','payroll_advance_guarantor.status', 'pa.request_type', 'pa.request_amount', 'pa.request_date', 'pa.status', 'ra.first_name', 'ra.last_name', 'ra.profile_picture', 'e.Admin_Parent_id','e.Emp_id')
-                                                                ->where('pa.resort_id', $this->resort_id)
-                                                                ->where('payroll_advance_guarantor.status', 'Pending')
-                                                                ->orderBy('payroll_advance_guarantor.created_at', 'desc')
+                                                                ->select('payroll_advance_guarantor.id','payroll_advance_guarantor.payroll_advance_id','payroll_advance_guarantor.guarantor_id','payroll_advance_guarantor.status', 'pa.request_type', 'pa.request_amount', 'pa.currency', 'pa.request_date', 'pa.status', 'ra.first_name', 'ra.last_name', 'ra.profile_picture', 'e.Admin_Parent_id','e.Emp_id')
+                                                                ->where('pa.resort_id', $this->resort_id);
+
+            // Default (no ?status=) stays Pending-only to avoid changing
+            // behavior for whatever screen already treats this as an
+            // action queue. ?status=all returns every status; any other
+            // value filters to that specific status.
+            $statusFilter = $request->query('status');
+            if ($statusFilter === null) {
+                $query->where('payroll_advance_guarantor.status', 'Pending');
+            } elseif (strtolower($statusFilter) !== 'all') {
+                $query->where('payroll_advance_guarantor.status', $statusFilter);
+            }
+
+            $guarantorRequests                          =   $query->orderBy('payroll_advance_guarantor.created_at', 'desc')
                                                                 ->get()->map(function ($guarantorRequests) {
                                                                     $guarantorRequests->guarantor_profile_picture               =   Common::getResortUserPicture($guarantorRequests->Admin_Parent_id);
                                                                     $guarantorRequests->request_data                            =    PayrollAdvance::join('employees as e', 'payroll_advance.employee_id', '=', 'e.id')
-                                                                        ->join('resort_admins as ra','e.Admin_Parent_id', '=', 'ra.id')                 
+                                                                        ->join('resort_admins as ra','e.Admin_Parent_id', '=', 'ra.id')
                                                                         ->join('resort_departments as rd', 'e.Dept_id', '=', 'rd.id')
                                                                         ->where('payroll_advance.resort_id', $this->resort_id)
                                                                         ->where('payroll_advance.id', $guarantorRequests->payroll_advance_id)
                                                                         ->select('payroll_advance.*','e.Emp_id','ra.first_name', 'ra.last_name', 'rd.name as department_name','e.Admin_Parent_id')
                                                                         ->first();
-                                                                        
-                                                                    $guarantorRequests->request_data->emp_profile_picture       =   Common::getResortUserPicture($guarantorRequests->Admin_Parent_id);
+
+                                                                    // Was reusing the OUTER guarantor's Admin_Parent_id here —
+                                                                    // every requester's photo came back as the guarantor's own
+                                                                    // photo. Use request_data's own Admin_Parent_id (the
+                                                                    // requester's), not the guarantor row's.
+                                                                    $guarantorRequests->request_data->emp_profile_picture       =   Common::getResortUserPicture($guarantorRequests->request_data->Admin_Parent_id);
                                                                     return $guarantorRequests;
                                                                 });
 
