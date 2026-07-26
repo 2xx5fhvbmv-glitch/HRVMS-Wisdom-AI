@@ -418,6 +418,7 @@ use Illuminate\Support\Facades\Route;
 		Route::get('request/request-guarantor-list', [App\Http\Controllers\API\RequestController::class, 'PeopleGuarantorRequestList']);
 		Route::post('request/guarantor-request-handle', [App\Http\Controllers\API\RequestController::class, 'PeopleGuarantorRequestHandleAction']);
 		Route::get('request/salary-advance-details/{id}', [App\Http\Controllers\API\RequestController::class, 'salaryAdvanceDetails']);
+		Route::get('request/guarantor-employee-list', [App\Http\Controllers\API\RequestController::class, 'GuarantorEmployeeList']);
 
 		//SOS
 		Route::get('sos/emergency-types', [App\Http\Controllers\API\SOSController::class, 'getEmergencyTypes']);

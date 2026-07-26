@@ -59,22 +59,7 @@ class RequestController extends Controller
 
             $requests                                   =   $requests->map(function ($req) use ($attachmentsByAdvanceId) {
                 $rows                                   =   $attachmentsByAdvanceId->get($req->id, collect());
-                $req->attachments                       =   $rows->flatMap(function ($row) {
-                    $decoded                            =   json_decode((string) $row->attachments, true);
-                    return is_array($decoded) ? $decoded : [];
-                })->map(function ($file) {
-                    $childId                            =   $file['Child_id'] ?? null;
-                    $url                                =   null;
-                    if ($childId) {
-                        try {
-                            $aws                         =   Common::GetAWSFile($childId, $this->resort_id);
-                            if (!empty($aws['success'])) $url = $aws['NewURLshow'];
-                        } catch (\Throwable $e) {
-                            // leave url null for attachments that fail to resolve
-                        }
-                    }
-                    return ['filename' => $file['Filename'] ?? null, 'url' => $url];
-                })->values();
+                $req->attachments                       =   $this->resolveAttachments($rows);
                 return $req;
             });
 
@@ -103,6 +88,26 @@ class RequestController extends Controller
             \Log::error($e->getMessage());
             return response()->json(['success' => false, 'message' => 'Server error'], 500);
         } 
+    }
+
+    private function resolveAttachments($rows)
+    {
+        return $rows->flatMap(function ($row) {
+            $decoded                                    =   json_decode((string) $row->attachments, true);
+            return is_array($decoded) ? $decoded : [];
+        })->map(function ($file) {
+            $childId                                    =   $file['Child_id'] ?? null;
+            $url                                         =   null;
+            if ($childId) {
+                try {
+                    $aws                                 =   Common::GetAWSFile($childId, $this->resort_id);
+                    if (!empty($aws['success'])) $url = $aws['NewURLshow'];
+                } catch (\Throwable $e) {
+                    // leave url null for attachments that fail to resolve
+                }
+            }
+            return ['filename' => $file['Filename'] ?? null, 'url' => $url];
+        })->values();
     }
 
     public function RequestStore(Request $request)
@@ -235,6 +240,64 @@ class RequestController extends Controller
             \Log::error($e->getMessage());
             return response()->json(['success' => false, 'message' => 'Server error'], 500);
         } 
+    }
+
+    // Nothing in the app previously listed employees for the "Select
+    // Guarantor Employee" picker — mobile had no endpoint to search against,
+    // hence no search box on that field.
+    public function GuarantorEmployeeList(Request $request)
+    {
+        if (!Auth::guard('api')->check()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+        try {
+            $selfEmployeeId                              =   $this->user->GetEmployee->id;
+            $search                                       =   trim((string) $request->query('search', ''));
+
+            $query                                        =   Employee::join('resort_admins as ra', 'ra.id', '=', 'employees.Admin_Parent_id')
+                                                                ->join('resort_positions as rp', 'rp.id', '=', 'employees.Position_id')
+                                                                ->where('employees.resort_id', $this->resort_id)
+                                                                ->where('employees.status', 'Active')
+                                                                ->where('employees.id', '!=', $selfEmployeeId)
+                                                                ->select(
+                                                                    'employees.id',
+                                                                    'employees.Emp_id',
+                                                                    'employees.Admin_Parent_id',
+                                                                    'ra.first_name',
+                                                                    'ra.last_name',
+                                                                    'rp.position_title'
+                                                                );
+
+            if ($search !== '') {
+                $query->where(function ($q) use ($search) {
+                    $q->where('ra.first_name', 'like', "%$search%")
+                        ->orWhere('ra.last_name', 'like', "%$search%")
+                        ->orWhere('employees.Emp_id', 'like', "%$search%")
+                        ->orWhereRaw("CONCAT(ra.first_name, ' ', ra.last_name) like ?", ["%$search%"]);
+                });
+            }
+
+            $employees                                    =   $query->orderBy('ra.first_name')
+                                                                ->get()
+                                                                ->map(function ($e) {
+                                                                    $e->employee_name    = trim($e->first_name . ' ' . $e->last_name);
+                                                                    $e->profile_picture  = Common::getResortUserPicture($e->Admin_Parent_id);
+                                                                    return $e;
+                                                                })
+                                                                ->values();
+
+            return response()->json([
+                'success'                                 =>  true,
+                'message'                                 =>  'Employee list fetched successfully',
+                'data'                                    =>  $employees,
+            ], 200);
+
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
     }
 
     public function PeopleGuarantorRequestList(Request $request)
@@ -391,8 +454,14 @@ class RequestController extends Controller
             $employeeId = $this->user->GetEmployee->id;
 
             $advance = PayrollAdvance::with([
-                    'guarantor.employee.resortAdmin:id,first_name,last_name',
+                    // request_amount/currency accepts an ARRAY of guarantor_id
+                    // on submit (RequestStore), but this endpoint only ever
+                    // loaded the singular latest-updated `guarantor` relation —
+                    // a request with 2+ guarantors silently dropped all but one
+                    // from the detail view.
+                    'guarantors.employee.resortAdmin:id,first_name,last_name',
                     'payrollRecoverySchedule',
+                    'PayrollAdvanceAttachment',
                 ])
                 ->where('resort_id', $this->resort_id)
                 ->where('employee_id', $employeeId)
@@ -402,11 +471,10 @@ class RequestController extends Controller
                 return response()->json(['success' => false, 'message' => 'Request not found.'], 200);
             }
 
-            $guarantorInformation = null;
-            if ($advance->guarantor) {
-                $g = $advance->guarantor;
+            $guarantorsInformation = $advance->guarantors->map(function ($g) {
                 $guarantorAdmin = optional($g->employee)->resortAdmin;
-                $guarantorInformation = [
+                return [
+                    'guarantor_id'              => $g->guarantor_id,
                     'guarantor_name'            => $guarantorAdmin ? trim($guarantorAdmin->first_name . ' ' . $guarantorAdmin->last_name) : null,
                     'guarantor_approval_status' => $g->status,
                     // payroll_advance_guarantor has no dedicated approval-date
@@ -416,7 +484,9 @@ class RequestController extends Controller
                     // the guarantor has actually responded.
                     'guarantor_approval_date'   => $g->status !== 'Pending' ? $g->updated_at : null,
                 ];
-            }
+            })->values();
+
+            $attachments = $this->resolveAttachments($advance->PayrollAdvanceAttachment);
 
             // Web portal's "Deduction History" section (AdvanceSalaryRepaymentTrackerController)
             // re-labels this SAME payroll_recovery_schedule collection —
@@ -450,7 +520,8 @@ class RequestController extends Controller
                         'purpose'         => $advance->pourpose,
                         'recovery_status' => $advance->recovery_status,
                     ],
-                    'guarantor_information' => $guarantorInformation,
+                    'guarantors_information' => $guarantorsInformation,
+                    'attachments'           => $attachments,
                     'repayment_schedule'    => $repaymentSchedule,
                     'deduction_history'     => $deductionHistory,
                 ],
