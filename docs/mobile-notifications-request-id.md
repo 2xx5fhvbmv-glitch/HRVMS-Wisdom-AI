@@ -42,6 +42,26 @@ pass id, leave id, appointment id, grievance id...). Combine both to
 deep-link a tapped notification straight to the right record instead of
 just the right screen.
 
+## Update: the live push payload had its own separate gap
+
+Re-raised specifically for Island Pass ("HOD Not Receiving Request Data")
+— tracing it found a second, more fundamental bug behind the same
+symptom: `sendMobileNotification()`'s outbound **push** payload (what's
+actually POSTed to the push-notification microservice / what a tapped
+push notification carries) is built separately from the DB row, in a
+`switch`-like block keyed by `$type`. Type 2 — which covers Boarding Pass,
+Request/Salary Advance/Loan, SOS, Resignation, Survey, Incident, Monthly
+Check-in — only ever included `page_id` in that payload, never
+`request_id`, even though every call site was already passing the real id
+(confirmed with `Http::fake()`: before this fix, the captured payload for
+a boarding-pass-request push had no `request_id` key at all).
+
+So there were two independent gaps stacked on each other: call sites
+passing `null` (fixed earlier, see above), and the type-2 payload builder
+dropping `request_id` even when a real value *was* passed. Both are fixed
+now — the DB row, the in-app notification list, and the live push payload
+all carry `request_id` consistently.
+
 ## A few call sites deliberately left as `null`
 
 A handful of notifications are genuinely not about a single record (broad
