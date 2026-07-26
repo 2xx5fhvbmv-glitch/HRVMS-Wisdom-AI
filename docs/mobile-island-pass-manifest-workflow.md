@@ -1,4 +1,4 @@
-# Island Pass Manifest Workflow (Arrival & Departure)
+Island Pass – Approval Status Not Updating After HOD Approval# Island Pass Manifest Workflow (Arrival & Departure)
 
 For the mobile team. Covers the manifest batch-confirmation feature that
 sits on top of the per-employee Island Pass approval chain — see
