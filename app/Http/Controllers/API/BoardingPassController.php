@@ -960,7 +960,15 @@ class BoardingPassController extends Controller
 
         $validator = Validator::make($request->all(), [
             'pass_id'                              =>  'required',
-            'action'                                =>  'required',
+            // Was 'required' only, no enum check — employee_travel_pass_status.status
+            // and employee_travel_passes.status are both DB-level ENUMs
+            // ('Pending','Approved','Rejected','Cancel'). Sending anything
+            // else (e.g. "Reject" instead of "Rejected") locally just
+            // silently truncates to '' (confirmed: lenient sql_mode), but
+            // a stricter production MySQL (STRICT_TRANS_TABLES) throws a
+            // real SQL error on that same write, caught by the generic
+            // catch block below as a raw 500 with no useful message.
+            'action'                                =>  'required|in:Approved,Rejected',
             'reason'                                =>  'required_if:action,Rejected',
         ]);
 
