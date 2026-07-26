@@ -17,6 +17,7 @@ use App\Helpers\Common;
 use Auth;
 use Config;
 use DB;
+use Carbon\Carbon;
 
 class DashboardController extends Controller
 {
@@ -118,25 +119,7 @@ class DashboardController extends Controller
         $isEstimated = false;
         if (!$upcomingPayroll || $upcomingPayroll->total_payroll <= 0) {
             $isEstimated = true;
-            $activeEmployeeIds = Employee::where('resort_id', $resort_id)
-                ->whereIn('status', ['Active', 'Probationary'])
-                ->pluck('id');
-
-            // Only include employees who have attendance records in the current cutoff period
-            $employeesWithAttendance = DB::table('parent_attendaces')
-                ->whereIn('Emp_id', $activeEmployeeIds)
-                ->whereBetween('date', [$cutoffPeriod['start']->format('Y-m-d'), $cutoffPeriod['end']->format('Y-m-d')])
-                ->distinct('Emp_id')
-                ->pluck('Emp_id');
-
-            if ($employeesWithAttendance->isNotEmpty()) {
-                $totalMonthlySalary = Employee::whereIn('id', $employeesWithAttendance)->sum('basic_salary');
-                $totalMonthlyAllowances = DB::table('employees_allowance')
-                    ->whereIn('employee_id', $employeesWithAttendance)
-                    ->sum('amount');
-
-                $upcomingEstimated = round($totalMonthlySalary + $totalMonthlyAllowances, 2);
-            }
+            $upcomingEstimated = $this->estimateUpcomingPayrollLive($resort_id, $cutoffPeriod['start'], $cutoffPeriod['end']);
         }
 
         // Only show drafts that have review data and no overlapping locked/completed payroll
@@ -203,6 +186,149 @@ class DashboardController extends Controller
             'payrollData', 'upcomingCutoffDate', 'draftPayrolls', 'approvalPayrolls', 'lockedPayrolls',
             'payrollInsights'
         ));
+    }
+
+    /**
+     * Live "upcoming payroll" projection for the current cutoff period —
+     * a real forecast (day-accrued basic + prorated allowances + approved
+     * OT, minus absence/third-party/pension/EWT deductions), not a flat
+     * sum of monthly basic_salary + allowances regardless of days worked.
+     * Mirrors the math in PayrollController::fetchTimeAttendance() /
+     * calculatePensionAndEWT() but without that flow's hard validation
+     * gates (pending-leave block, missing-OT-status block, etc.) — a
+     * dashboard estimate must degrade gracefully, not 422 on incomplete
+     * mid-cycle attendance. Returned in USD (view renders it via
+     * Common::formatCurrency($upcomingEstimated, 'USD')).
+     */
+    private function estimateUpcomingPayrollLive(int $resortId, $periodStart, $periodEnd): float
+    {
+        $settings = ResortSiteSettings::where('resort_id', $resortId)->first();
+        // Derive MVR<->USD only from DollertoMVR — never multiply by a
+        // stored inverse rate (see FX-rate developer reference).
+        $rate = $settings && $settings->DollertoMVR ? (float) $settings->DollertoMVR : 15.42;
+
+        $activeEmployeeIds = Employee::where('resort_id', $resortId)
+            ->whereIn('status', ['Active', 'Probationary'])
+            ->pluck('id');
+
+        $employeesWithAttendance = DB::table('parent_attendaces')
+            ->whereIn('Emp_id', $activeEmployeeIds)
+            ->whereBetween('date', [$periodStart->format('Y-m-d'), $periodEnd->format('Y-m-d')])
+            ->distinct('Emp_id')
+            ->pluck('Emp_id');
+
+        if ($employeesWithAttendance->isEmpty()) return 0.0;
+
+        $totalDaysInPeriod = max(1, $periodStart->diffInDays($periodEnd) + 1);
+
+        $employees = Employee::with('allowance')->whereIn('id', $employeesWithAttendance)->get()->keyBy('id');
+
+        $attendanceByEmp = DB::table('parent_attendaces')
+            ->whereIn('Emp_id', $employeesWithAttendance)
+            ->whereBetween('date', [$periodStart->format('Y-m-d'), $periodEnd->format('Y-m-d')])
+            ->get()
+            ->groupBy('Emp_id');
+
+        // Third-party / staff-shop outstanding (approved, not yet fully paid).
+        $outstandingByEmp = DB::table('payments as pay')
+            ->join('products as prod', 'prod.id', '=', 'pay.product_id')
+            ->whereIn('pay.emp_id', $employeesWithAttendance)
+            ->whereIn('pay.status', ['Consented', 'Partial Paid'])
+            ->select('pay.emp_id', 'pay.price', 'pay.cash_paid', 'pay.payroll_deducted', 'prod.currency_type')
+            ->get()
+            ->groupBy('emp_id');
+
+        // Loan recovery installments due within this cutoff period.
+        $loanDueByEmp = DB::table('payroll_recovery_schedule')
+            ->whereIn('employee_id', $employeesWithAttendance)
+            ->where('status', 'Pending')
+            ->whereBetween('repayment_date', [$periodStart->format('Y-m-d'), $periodEnd->format('Y-m-d')])
+            ->select('employee_id', DB::raw('SUM(amount) as due'))
+            ->groupBy('employee_id')
+            ->pluck('due', 'employee_id');
+
+        $total = 0.0;
+
+        foreach ($employeesWithAttendance as $empId) {
+            $employee = $employees->get($empId);
+            if (!$employee) continue;
+
+            $records = $attendanceByEmp->get($empId, collect());
+
+            $dayOffCount = $records->where('Status', 'DayOff')->count();
+            $presentCount = $records->whereIn('Status', ['Present', 'On-Time', 'Late', 'ShortLeave', 'HalfDay', 'FullDayLeave'])->count();
+            $absentRecords = $records->where('Status', 'Absent');
+            $unpaidCount = $absentRecords->filter(fn($r) => stripos($r->note ?? '', 'Unpaid Leave') !== false)->count();
+            $absentCount = $absentRecords->count() - $unpaidCount;
+
+            $basicUSD = (float) $employee->basic_salary;
+            if (($employee->basic_salary_currency ?? 'USD') === 'MVR') {
+                $basicUSD = $basicUSD / $rate;
+            }
+
+            $perDay = $basicUSD / $totalDaysInPeriod;
+            $earnedSalary = round($perDay * ($presentCount + $dayOffCount), 2);
+            $absentDeduction = round($perDay * ($absentCount + $unpaidCount), 2);
+
+            // Approved OT only — same 1.25x/1.5x rates as the real payroll run.
+            $perHour = $basicUSD / $totalDaysInPeriod / 8;
+            $regularOT = $fridayOT = $holidayOT = 0.0;
+            foreach ($records as $rec) {
+                if (empty($rec->OverTime) || in_array($rec->OverTime, ['0', '0:0', '0:00', '00:00', '00:00:00', '-', ''], true)) continue;
+                if (strtolower(trim($rec->OTStatus ?? '')) !== 'approved') continue;
+                $otParts = explode(':', $rec->OverTime);
+                $hours = (int) ($otParts[0] ?? 0) + ((int) ($otParts[1] ?? 0) / 60);
+                if (Carbon::parse($rec->date)->isFriday()) {
+                    $fridayOT += $hours;
+                } elseif ($rec->Status === 'DayOff') {
+                    $holidayOT += $hours;
+                } else {
+                    $regularOT += $hours;
+                }
+            }
+            $otPay = round($perHour * 1.25 * $regularOT + $perHour * 1.50 * $fridayOT + $perHour * 1.50 * $holidayOT, 2);
+
+            // Allowances prorated by elapsed payable days (Daily Allowance = Monthly / Total Days).
+            $totalAllowance = 0.0;
+            foreach ($employee->allowance as $allowance) {
+                $amt = (float) $allowance->amount;
+                if (($allowance->amount_unit ?? 'USD') === 'MVR') {
+                    $amt /= $rate;
+                }
+                $totalAllowance += ($amt / $totalDaysInPeriod) * ($presentCount + $dayOffCount);
+            }
+            $totalAllowance = round($totalAllowance, 2);
+
+            $totalEarnings = round($earnedSalary + $totalAllowance + $otPay, 2);
+
+            // Pension — Maldivian employees only, 7% of earned (prorated) salary.
+            $isMaldivian = strtolower((string) $employee->nationality) === 'maldivian';
+            $pension = $isMaldivian ? round($earnedSalary * 0.07, 2) : 0.0;
+
+            // EWT — bracket table (ewt_tax_brackets) is MVR-denominated.
+            $totalEarningsMVR = $totalEarnings * $rate;
+            $pensionMVR = $pension * $rate;
+            $taxableIncomeMVR = max($totalEarningsMVR - $pensionMVR, 0);
+            $ewt = round(Common::calculateEWT($taxableIncomeMVR) / $rate, 2);
+
+            $thirdParty = 0.0;
+            foreach ($outstandingByEmp->get($empId, collect()) as $p) {
+                $outstanding = (float) $p->price - (float) $p->cash_paid - (float) $p->payroll_deducted;
+                if ($outstanding <= 0) continue;
+                if (($p->currency_type ?? 'USD') === 'MVR') {
+                    $outstanding /= $rate;
+                }
+                $thirdParty += $outstanding;
+            }
+
+            $loanDue = (float) ($loanDueByEmp[$empId] ?? 0);
+
+            $totalDeductions = round($absentDeduction + $thirdParty + $pension + $ewt + $loanDue, 2);
+
+            $total += ($totalEarnings - $totalDeductions);
+        }
+
+        return round($total, 2);
     }
 
     /**
