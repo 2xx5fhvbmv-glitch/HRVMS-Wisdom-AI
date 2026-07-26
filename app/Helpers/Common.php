@@ -6761,6 +6761,17 @@ class Common
             $fileSizeMB = round($file->getSize() / 1024, 2);
             $isImage = in_array($extension, ['jpg', 'jpeg', 'png']);
 
+            // DomPDF renders the embedded base64 image on a full HTML page,
+            // which needs many times the source file's size in memory (a
+            // ~2.5MB photo reproduced a real "Allowed memory size exhausted"
+            // fatal here, even with ini_set('memory_limit','-1') above —
+            // that override can itself be locked out by the server's PHP-FPM
+            // pool config (php_admin_value), which code can't ever raise).
+            // Skip the PDF conversion above a safe threshold and store the
+            // original image as-is rather than crash the whole request.
+            $skipPdfConversionThresholdBytes = 1.5 * 1024 * 1024; // 1.5MB
+            $isImage = $isImage && $file->getSize() <= $skipPdfConversionThresholdBytes;
+
             // Convert image to PDF
             if ($isImage) {
                 $tempImagePath = $file->store('temp', 'local');
