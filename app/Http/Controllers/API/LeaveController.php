@@ -489,12 +489,20 @@ class LeaveController extends Controller
                                                                 ->whereIn('position_title', $securityManagerTitles)
                                                                 ->pluck('id'); // Get the position IDs
 
-                // Get employees who hold these positions in the current resort
+                // Get employees who hold these positions in the current resort.
+                // Same fix as BoardingPassController::boardingPassAdd() (this
+                // is a separate, duplicate approver-assignment code path for
+                // the Island Pass linked to a leave request with travel
+                // dates) — no status filter or ordering meant an Onboarding
+                // placeholder could be resolved instead of the real approver.
                 $SMApprover                             =   Employee::with(['resortAdmin','position'])->whereIn('Position_id', $positionIds)
-                                                                ->where('resort_id', $user->resort_id)->select('id', 'rank')
+                                                                ->where('resort_id', $user->resort_id)->where('status', 'Active')
+                                                                ->select('id', 'rank')
+                                                                ->orderBy('id')
                                                                 ->first();
 
                 if ($SMApprover) {
+                    $SMApprover->approver_role           =   'SM';
                     $passApprovalFlow->push($SMApprover); // Fourth approver: Security Officer
                 }
 
@@ -502,14 +510,16 @@ class LeaveController extends Controller
                 // whose real HR employee isn't literally rank 3 (e.g. an
                 // HR-department employee ranked HOD/EXCOM), silently dropping
                 // HR from the whole approval chain.
-                $hrApprover                             =   Employee::select('id', 'rank')->whereIn('id', Common::getResortHrEmployeeIds($user->resort_id))->first();
+                $hrApprover                             =   Employee::select('id', 'rank')->whereIn('id', Common::getResortHrEmployeeIds($user->resort_id))->where('status', 'Active')->orderBy('id')->first();
                 if ($hrApprover) {
+                    $hrApprover->approver_role            =   'HR';
                     $passApprovalFlow->push($hrApprover); // Third approver: HR
                 }
 
                 // Add HOD to the approval flow (rank 2)
-                $hodApprover                             =   Employee::select('id', 'rank')->where('rank', 2)->where('resort_id',$user->resort_id)->where('Dept_id', $employee->Dept_id)->first();
+                $hodApprover                             =   Employee::select('id', 'rank')->where('rank', 2)->where('resort_id',$user->resort_id)->where('Dept_id', $employee->Dept_id)->where('status', 'Active')->orderBy('id')->first();
                 if ($hodApprover ) {
+                    $hodApprover->approver_role           =   'HOD';
                     $passApprovalFlow->push($hodApprover); // Second approver: HOD
                 }
 
@@ -536,6 +546,7 @@ class LeaveController extends Controller
                             'travel_pass_id'            =>  $boardingPass->id,
                             'approver_id'               =>  $approverFlw->id,
                             'approver_rank'             =>  $approverFlw->rank,
+                            'approver_role'             =>  $approverFlw->approver_role ?? null,
                             'status'                    =>  'Pending',
                         ]);
                     }
@@ -2314,23 +2325,33 @@ class LeaveController extends Controller
                                                                         ->whereIn('position_title', $securityManagerTitles)
                                                                         ->pluck('id'); // Get the position IDs
 
-                        // Get employees who hold these positions in the current resort
+                        // Get employees who hold these positions in the current resort.
+                        // Same status/ordering fix as the other two copies of this
+                        // approver-assignment logic in this file.
                         $SMApprover                             =   Employee::with(['resortAdmin','position'])->whereIn('Position_id', $positionIds)
-                                                                        ->where('resort_id', $user->resort_id)->select('id', 'rank')
+                                                                        ->where('resort_id', $user->resort_id)->where('status', 'Active')
+                                                                        ->select('id', 'rank')
+                                                                        ->orderBy('id')
                                                                         ->first();
                         if ($SMApprover) {
+                            $SMApprover->approver_role           =   'SM';
                             $passApprovalFlow->push($SMApprover); // Fourth approver: Security Officer
                         }
 
-                        // Add HR to the approval flow (rank 3)
-                        $hrApprover                             =   Employee::select('id', 'rank')->where('resort_id',$user->resort_id)->where('rank', 3)->first();
+                        // Add HR to the approval flow. Raw rank=3 excluded any resort
+                        // whose real HR employee isn't literally rank 3 (e.g. an
+                        // HR-department employee ranked HOD/EXCOM) — matches the fix
+                        // already applied to the other two copies of this logic.
+                        $hrApprover                             =   Employee::select('id', 'rank')->whereIn('id', Common::getResortHrEmployeeIds($user->resort_id))->where('status', 'Active')->orderBy('id')->first();
                         if ($hrApprover) {
+                            $hrApprover->approver_role            =   'HR';
                             $passApprovalFlow->push($hrApprover); // Third approver: HR
                         }
 
                         // Add HOD to the approval flow (rank 2)
-                        $hodApprover                             =   Employee::select('id', 'rank')->where('rank', 2)->where('resort_id',$user->resort_id)->where('Dept_id', $employee->Dept_id)->first();
+                        $hodApprover                             =   Employee::select('id', 'rank')->where('rank', 2)->where('resort_id',$user->resort_id)->where('Dept_id', $employee->Dept_id)->where('status', 'Active')->orderBy('id')->first();
                         if ($hodApprover ) {
+                            $hodApprover->approver_role           =   'HOD';
                             $passApprovalFlow->push($hodApprover); // Second approver: HOD
                         }
 
@@ -2356,11 +2377,23 @@ class LeaveController extends Controller
                                 // Add the same approval flow for Exit Pass as well
                                foreach ($passApprovalFlow as $approverFlw) {
 
-                                    // Create approval status for Entry Pass
+                                    // Create approval status for Entry Pass.
+                                    // Was $entryPass->id — $entryPass is the
+                                    // EmployeesLeaveTransportation row from the
+                                    // unrelated loop above (a completely
+                                    // different table), not this travel pass.
+                                    // Every leave UPDATE that included travel
+                                    // dates created approval rows pointing at
+                                    // the wrong travel_pass_id entirely — this
+                                    // is almost certainly the real source of
+                                    // the "stray wrong-department HOD" rows
+                                    // two prior data migrations had to clean
+                                    // up, not a department-scoping mismatch.
                                     EmployeeTravelPassStatus::create([
-                                        'travel_pass_id'    =>  $entryPass->id,
+                                        'travel_pass_id'    =>  $boardingPass->id,
                                         'approver_id'       =>  $approverFlw->id,
                                         'approver_rank'     =>  $approverFlw->rank,
+                                        'approver_role'     =>  $approverFlw->approver_role ?? null,
                                         'status'            =>  'Pending',
                                     ]);
                                 }
