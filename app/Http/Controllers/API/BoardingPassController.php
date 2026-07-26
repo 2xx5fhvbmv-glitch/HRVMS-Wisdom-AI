@@ -331,6 +331,13 @@ class BoardingPassController extends Controller
 
                 $response['status']                     =   true;
                 $response['message']                    =   'Pass submitted successfully';
+                // The submit response returned nothing about the pass
+                // itself — mobile had no transportation/mode data to show
+                // immediately after submitting without a second fetch.
+                $response['data']                       =   $boardingPass->fresh()->load([
+                                                                    'DepartureResortTransportation:id,resort_id,transportation_option',
+                                                                    'ArrivalResortTransportation:id,resort_id,transportation_option',
+                                                                ]);
 
                 return response()->json($response);
             }
