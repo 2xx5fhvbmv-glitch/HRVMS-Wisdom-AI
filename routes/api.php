@@ -359,6 +359,7 @@ use Illuminate\Support\Facades\Route;
 		Route::get('shop/consent-request-view/{consent_request_id}', [App\Http\Controllers\API\ShopController::class, 'consentRequestview']);
 		Route::post('shop/consent-request-handle', [App\Http\Controllers\API\ShopController::class, 'consentRequestHandle']);
 		Route::get('shop/consent-request-history', [App\Http\Controllers\API\ShopController::class, 'consentRequestHistory']);
+		Route::get('shop/product-details/{product_id}', [App\Http\Controllers\API\ShopController::class, 'productDetails']);
 
 		//Monthly-Check-In
 		Route::get('monthlycheckin/manager-dashboard', [App\Http\Controllers\API\MonthlyCheckInController::class, 'managerDashboard']);
