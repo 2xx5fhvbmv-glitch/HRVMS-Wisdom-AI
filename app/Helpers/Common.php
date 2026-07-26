@@ -6410,6 +6410,16 @@ class Common
 
         //SOS,Resignation,Request,Monthly check-in Meeting,sos Employee and Team member,Survey,Incident request
         if($type == 2) {
+            // Was missing request_id entirely — every call site already
+            // passes the real record id as $request_id (island pass id,
+            // payroll advance id, etc.) and it's stored correctly on the
+            // ResortNotification row, but the outbound push payload (what
+            // the mobile app actually receives to deep-link into the
+            // record) only ever carried page_id. Type 2 covers the large
+            // majority of app modules (Boarding Pass, Request, SOS,
+            // Resignation, Survey, Incident, Monthly Check-in), so this was
+            // the single root cause behind "no object id in notifications"
+            // across nearly every module, not a per-module bug.
             $payload                =   [
                 'id'                =>  $ids,
                 'resortid'          =>  (string) $resortId,
@@ -6418,6 +6428,7 @@ class Common
                 'status'            =>  $statusData,
                 'module'            =>  $module,
                 'page_id'           =>  $pageId,
+                'request_id'        =>  $request_id,
                 'sendto'            =>  $sendto,
                 'created_at'        =>  $time
             ];
