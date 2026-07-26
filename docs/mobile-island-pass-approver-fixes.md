@@ -44,17 +44,43 @@ notified of a request that was organizationally theirs, and later seeing
 lookups, so the result no longer depends on implementation-defined query
 ordering or includes not-yet-active employees.
 
-## Still open — worth checking on your end
+## Root cause 3: wrong foreign key in the Leave-linked Island Pass path (fixed)
 
-The exact repro in "Incorrect HOD Validation" showed the message *"You
-cannot approve this. The request must first be approved by the HOD."* —
-that specific string only exists in the **Leave** approval endpoint
-(`LeaveController::handleLeaveAction`), not the Boarding Pass endpoint
-(which says *"...currently awaiting action from the..."*, worded
-differently). If you still see the exact Leave-worded message on an Island
-Pass screen after these fixes, it likely means that specific request is a
-combined Leave+Island-Pass submission (travel details attached to a leave
-application create both records) and the Approve/Reject tap on the mobile
-Island Pass card is actually hitting the Leave endpoint for it, not the
-Boarding Pass one — worth confirming which endpoint that button calls for
-this request type.
+This is the real explanation for the exact repro in "Incorrect HOD
+Validation" (Rani Khan / F&B, message *"You cannot approve this. The
+request must first be approved by the HOD."*) — that exact string only
+exists in the **Leave** endpoint, which is a strong hint the request was a
+**combined Leave + Island Pass submission** (a leave application that also
+includes travel dates creates both records together). That combined-
+creation code lives in `LeaveController::leaveAdd()`/`leaveUpdate()` — a
+third, separate copy of the same approver-assignment logic covered by
+Root Cause 2 above, not `BoardingPassController::boardingPassAdd()`.
+
+While hardening this third copy, found something more serious than a
+missing status filter: `leaveUpdate()`'s version was writing
+`employee_travel_pass_status.travel_pass_id` from **`$entryPass->id`** —
+which is `EmployeesLeaveTransportation` (a transportation-entry row from
+an unrelated loop a few lines earlier), not `EmployeeTravelPass` (the
+actual pass just created in the same block). Confirmed with real data:
+these are two completely different tables with unrelated ids (e.g. 67 vs
+504 in testing) — so every leave update that included travel dates was
+writing its approval-chain rows against the wrong pass id entirely (or a
+nonexistent one).
+
+This is a far more direct explanation for the "stray wrong-department HOD
+approver" pattern than a department mismatch — it explains why two prior
+one-off data migrations
+(`2026_07_16_010000_purge_wrong_department_pending_hod_travel_pass_approvers.php`,
+`2026_07_19_010000_purge_stray_wrong_department_hod_travel_pass_approvers.php`)
+kept finding new instances of it: the code that created them was never
+fixed, only the symptoms were cleaned up reactively each time.
+
+**Fix:** corrected the FK to `$boardingPass->id`, and applied the same
+Active-only/deterministic-ordering/`approver_role` hardening from Root
+Causes 1–2 to this third copy, including fixing its HR lookup (it still
+had the old raw `rank = 3` check, not `getResortHrEmployeeIds()`).
+
+Passes created via this path **before** this fix may still have a
+corrupted `travel_pass_id` on their status rows — if a specific historical
+pass still misbehaves after this, share its id and it can be checked/
+cleaned up individually the same way the two prior migrations did.
