@@ -76,10 +76,10 @@
                             <a href="{{ route('payroll.bankcashsheet.download', ['id' => $payroll_id]) }}" class="a-link">Cash And Bank Sheets</a>
                         </div>
                             <div class="col-auto">
-                                <a href="{{ route('payroll.activity-log', ['payroll_id' => base64_encode($payroll_id)]) }}" class="btn btn-themeSkyblue">Activity Log</a>
+                                <a href="{{ route('payroll.activity-log', ['payroll_id' => base64_encode($payroll_id)]) }}" class="btn payroll-btn-secondary">Activity Log</a>
                             </div>
                         <div class="col-auto">
-                            <a href="{{ route('payroll.export.review', ['payrollId' => $payroll_id, 'type' => 'excel']) }}" class="btn btn-themeSkyblue btn-sm">
+                            <a href="{{ route('payroll.export.review', ['payrollId' => $payroll_id, 'type' => 'excel']) }}" class="btn payroll-btn-secondary btn-sm">
                                 <i class="fa-solid fa-file-excel me-1"></i> Download Excel
                             </a>
                         </div>
@@ -125,6 +125,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts.payroll._payroll_buttons_v2_styles')
 <style>
     .dateRangeAb{position: relative;}
     .dateRangeAb .daterangepicker {

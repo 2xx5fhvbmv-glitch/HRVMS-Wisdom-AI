@@ -57,7 +57,7 @@
 @endsection
 
 @section('import-css')
-
+@include('resorts.payroll._payroll_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')
