@@ -12,6 +12,8 @@ use App\Models\TicketAgent;
 use App\Models\ResortDivision;
 use App\Models\ResortTransportation;
 use App\Models\ResortBenifitGridChild;
+use App\Models\ResortBenefitGradeLevelRank;
+use App\Models\ResortBenefitGradeLevel;
 use App\Jobs\ImportLeavesJob;
 use Auth;
 use Config;
@@ -214,10 +216,36 @@ class ConfigController extends Controller
 
     public function getEligibleLeaves(Request $request)
     {
-        $empGrade = $request->input('emp_grade'); // Get the selected employee grade
+        // The Benefit Grid form's grade field is a free-text name (e.g.
+        // "HOD L1"), not a stable id — resolve it to the matching
+        // resort_benefit_grade_levels row for this resort first. A grade
+        // typed but not yet saved (new tag, or a typo) simply has no rank
+        // mapping yet, so nothing is eligible until it's created and
+        // mapped under People > Configuration > Benefit Grade Levels.
+        $empGradeName = trim((string) $request->input('emp_grade'));
+        $gradeLevelId = ResortBenefitGradeLevel::where('resort_id', $this->resort->resort_id)
+            ->where('name', $empGradeName)
+            ->value('id');
 
-        // Query the leave categories that include the given employee grade
-        $leaves = LeaveCategory::whereRaw("FIND_IN_SET(?, eligibility)", [$empGrade])->where('resort_id',$this->resort->resort_id)->get();
+        // leave_categories.eligibility is a CSV of numeric RANK ids (matches
+        // FinalSettlementService's own FIND_IN_SET usage and how this table
+        // is seeded) — NOT the Benefit Grid grade tag/id. Translate the
+        // selected grade tag to its mapped rank(s) first, then match on any
+        // of those, so this keeps working once emp_grade stops being a
+        // small fixed config key.
+        $ranks = $gradeLevelId
+            ? ResortBenefitGradeLevelRank::where('resort_id', $this->resort->resort_id)
+                ->where('grade_level_id', $gradeLevelId)
+                ->pluck('rank')
+            : collect();
+
+        $query = LeaveCategory::where('resort_id', $this->resort->resort_id);
+        $query->where(function ($q) use ($ranks) {
+            foreach ($ranks as $rank) {
+                $q->orWhereRaw("FIND_IN_SET(?, eligibility)", [$rank]);
+            }
+        });
+        $leaves = $ranks->isEmpty() ? collect() : $query->get();
 
         return response()->json([
             'success' => true,

@@ -140,7 +140,7 @@
                                             Grade of the Benefit Grid
                                         </td>
                                         <td style="border-bottom: 1px solid #E7E7E7;padding:0px 4px 6px; width: 130px;text-align: right;font-weight: 500">
-                                            {{$benefit_grid->emp_grade}}
+                                            {{ optional(\App\Models\ResortBenefitGradeLevel::find($benefit_grid->emp_grade))->name ?? $benefit_grid->emp_grade }}
                                         </td>
                                     </tr>
                                     <tr>
