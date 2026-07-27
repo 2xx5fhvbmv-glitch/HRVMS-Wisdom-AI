@@ -8,6 +8,8 @@
     <meta name=keywords content="">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
+    @include('partials.sentry-init')
+
     @include('resorts.layouts.css')
 
 </head>
