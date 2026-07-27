@@ -310,7 +310,18 @@ class RequestController extends Controller
                                                                 ->join('employees as e', 'payroll_advance_guarantor.guarantor_id', '=', 'e.id')
                                                                 ->join('resort_admins as ra','e.Admin_Parent_id', '=', 'ra.id')
                                                                 ->where('guarantor_id', $this->user->GetEmployee->id)
-                                                                ->select('payroll_advance_guarantor.id','payroll_advance_guarantor.payroll_advance_id','payroll_advance_guarantor.guarantor_id','payroll_advance_guarantor.status', 'pa.request_type', 'pa.request_amount', 'pa.currency', 'pa.request_date', 'pa.status', 'ra.first_name', 'ra.last_name', 'ra.profile_picture', 'e.Admin_Parent_id','e.Emp_id')
+                                                                // 'pa.status' was selected alongside
+                                                                // 'payroll_advance_guarantor.status' with both bare-named
+                                                                // "status" — PDO's associative fetch keeps whichever
+                                                                // column comes LAST for a repeated key, so the overall
+                                                                // request's status (pa.status, e.g. still "Pending" until
+                                                                // HR/Finance/GM act) silently overwrote the guarantor's
+                                                                // own Approved/Rejected decision on every response. The
+                                                                // overall request status is already available separately
+                                                                // via request_data.status below, so pa.status is dropped
+                                                                // here rather than aliased — it was never actually used
+                                                                // as a distinct field.
+                                                                ->select('payroll_advance_guarantor.id','payroll_advance_guarantor.payroll_advance_id','payroll_advance_guarantor.guarantor_id','payroll_advance_guarantor.status', 'pa.request_type', 'pa.request_amount', 'pa.currency', 'pa.request_date', 'ra.first_name', 'ra.last_name', 'ra.profile_picture', 'e.Admin_Parent_id','e.Emp_id')
                                                                 ->where('pa.resort_id', $this->resort_id);
 
             // Default (no ?status=) stays Pending-only to avoid changing

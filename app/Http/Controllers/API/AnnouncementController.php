@@ -101,7 +101,13 @@ class AnnouncementController extends Controller
                 'data'                                  =>  $AnnouncementNotification
             ], 200);
 
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
+            // Was \Exception only — sendMobileNotification()'s type-3 path
+            // (below) had an unguarded null property access, which throws
+            // \Error, not \Exception, and would skip this catch block
+            // entirely, producing a raw uncaught 500 with nothing logged.
+            // Widened to \Throwable so any future bug in that path still
+            // returns a proper JSON response instead of a bare crash.
             DB::rollBack();
             \Log::emergency("File: " . $e->getFile());
             \Log::emergency("Line: " . $e->getLine());

@@ -379,6 +379,18 @@ class TimeAndAttendanceController extends Controller
                     $timeAttendanceData                    =   Common::GetRosterdata($resort_id, $duty_roster_id, $emp_id, $WeekstartDate, $WeekendDate, $startOfMonth, $endOfMonth, 'Monthwise');
                 }
                 $timeAttendanceData                         =   $timeAttendanceData ? (is_array($timeAttendanceData) ? $timeAttendanceData : $timeAttendanceData->toArray()) : [];
+                // GetRosterdata() backfills days with no duty_roster_entries
+                // row by pushing a raw stdClass placeholder into the same
+                // collection as the real DutyRoster/DutyRosterEntry rows.
+                // Collection::toArray() only recurses into Arrayable items
+                // (the Eloquent rows), so any leftover stdClass placeholder
+                // survives untouched — every downstream $row['...'] access
+                // below then fatals with "Cannot use object of type stdClass
+                // as array" for any employee with even one unscheduled day
+                // in the viewed week/month (i.e. almost everyone).
+                $timeAttendanceData                         =   array_map(function ($item) {
+                                                                    return is_array($item) ? $item : (array) $item;
+                                                                }, $timeAttendanceData);
                 $todayStr                                  =   Carbon::today(config('app.timezone'))->format('Y-m-d');
                 $datesInRoster                             =   array_values(array_unique(array_filter(array_map(function ($r) {
                     $d = $r['date'] ?? null;

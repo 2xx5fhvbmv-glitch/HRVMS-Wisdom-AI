@@ -6450,11 +6450,24 @@ class Common
                                             ->select('ra.first_name', 'ra.last_name')
                                             ->first();
 
+                                        // $employee was read with no null check — if the
+                                        // sender's Employee/ResortAdmin join ever fails to
+                                        // resolve (e.g. a stale/edited record), accessing
+                                        // ->first_name on null throws an uncaught \Error
+                                        // (not an \Exception), which skips the caller's
+                                        // catch block entirely and surfaces as a raw 500
+                                        // with no logged message — exactly the symptom
+                                        // reported for the Announcement "Congratulate"
+                                        // button, without a server log line to confirm it.
+                                        $senderName         =   $employee
+                                                                    ? trim($employee->first_name . ' ' . $employee->last_name)
+                                                                    : 'Someone';
+
                                         return [
                                             'id'            => $payload->id,
                                             'resortid'      => $payload->resort_id,
                                             'title'         => 'You have a new message',
-                                            'message'       => $employee->first_name . ' ' . $employee->last_name . ' says Congratulation',
+                                            'message'       => $senderName . ' says Congratulation',
                                             'status'        => $payload->status,
                                             'module'        => 'Announcement Wish',
                                             'sendto'        => $payload->employee_id,
