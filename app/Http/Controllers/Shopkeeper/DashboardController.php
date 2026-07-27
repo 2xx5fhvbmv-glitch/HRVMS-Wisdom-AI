@@ -56,9 +56,15 @@ class DashboardController extends Controller
                 $tableData->whereYear('purchased_date', $request->year);
             }
             
-            $tableData = $tableData->orderBy('payments.updated_at', 'DESC')
+            // updated_at bumps on every status change (Consented, Rejected,
+            // deduction, ...), so an old payment whose status just changed
+            // jumped above genuinely newer payments that hadn't been
+            // touched since creation — created_at is the actual "recent"
+            // the user means.
+            $tableData = $tableData->orderBy('payments.created_at', 'DESC')
                 ->select([
                     'payments.*',
+                    'ra.id as admin_id',
                     'ra.first_name',
                     'ra.last_name',
                     'e.Emp_id',
@@ -66,7 +72,7 @@ class DashboardController extends Controller
                     'p.currency_type as product_currency_type',
                     'ra.profile_picture',
                 ])
-                ->get(); 
+                ->get();
         
             return datatables()->of($tableData)
                 ->addColumn('currency_type', function ($row) {
@@ -81,7 +87,10 @@ class DashboardController extends Controller
                     return '—';
                 })
                 ->addColumn('name', function ($row) {
-                    $profile_pic = Common::getResortUserPicture($row->profile_picture);
+                    // getResortUserPicture() expects the ResortAdmin id, not
+                    // the raw stored picture path — it was never resolving
+                    // a real photo, only ever the default placeholder.
+                    $profile_pic = Common::getResortUserPicture($row->admin_id);
                     if ($row->first_name && $row->last_name) {
                         return '<div class="tableUser-block">
                                     <div class="img-circle">
@@ -90,6 +99,9 @@ class DashboardController extends Controller
                                     <span>' . $row->first_name . ' ' . $row->last_name . '</span>
                                 </div>';
                     }
+                })
+                ->editColumn('purchased_date', function ($row) {
+                    return $row->purchased_date ? \Carbon\Carbon::parse($row->purchased_date)->format('d M Y') : '—';
                 })
                 ->addColumn('product', function ($row) {
                     return $row->product_name;
@@ -189,7 +201,9 @@ class DashboardController extends Controller
             'deduction_amt'  => 'required|numeric|min:0',
         ]);
 
-        $payment = Payment::findOrFail($request->paymentID);
+        $payment = Payment::where('id', $request->paymentID)
+            ->where('shopkeeper_id', $this->shopkeeper->id)
+            ->firstOrFail();
         $cutoff_day = PayrollConfig::where('resort_id', $this->shopkeeper->resort_id)->value('cutoff_day');
         $current_day = now()->day; // Get current day (1-31)
 

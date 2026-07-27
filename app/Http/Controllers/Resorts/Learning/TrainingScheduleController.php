@@ -801,7 +801,7 @@ class TrainingScheduleController extends Controller
                                                                     $notificationMessage,
                                                                     $moduleName,
                                                                     [$value->employee_id],
-                                                                    null,
+                                                                    $participant->id,
                                                                     false,
                                                                     'training-feedback-form-assigned',
                                                                 );

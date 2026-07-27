@@ -25,7 +25,8 @@ class EmployeeTravelPass extends Model
         'departure_time',
         'departure_mode',
         'departure_reason',
-        'status'
+        'status',
+        'manifest_id',
     ];
 
     public static function boot(){

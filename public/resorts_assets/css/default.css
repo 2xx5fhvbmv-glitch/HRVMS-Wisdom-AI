@@ -618,6 +618,12 @@ header nav {
 
 .navcarosel-box {
     max-width: 650px;
+    /* Slick's .slick-prev/.slick-next are position:absolute (slick-theme.css)
+       — this box's own left:10px/right:10px overrides below only mean
+       anything if this is their positioned ancestor. Without this, they
+       anchor to whatever non-static ancestor is further up the tree and
+       land at wildly wrong offsets depending on viewport width. */
+    position: relative;
 }
 
 .navcarosel-box .carosel-menu {
@@ -634,24 +640,42 @@ header nav {
 
 .navcarosel-box .slick-prev,
 .navcarosel-box .slick-next {
-    width: 16px;
-    height: 16px;
+    width: 24px;
+    height: 24px;
     border-radius: 100px;
+    /* Slick's base theme sets background:transparent on these — the
+       border-radius implied an intended filled circle button, but with
+       no fill the icon just floats over whatever nav item is behind it.
+       A translucent fill (rgba(0,0,0,.2), matching the bell icon) still
+       let the white nav-item text directly underneath show through
+       enough to blend with the white icon on top — visually correct in
+       isolation but nearly invisible in place. Solid fill fully occludes
+       whatever's behind it so the icon always has real contrast. */
+    background-color: var(--darkblack);
 }
 
 .navcarosel-box .slick-prev:before,
 .navcarosel-box .slick-next:before {
-    font-size: 12px;
+    font-size: 14px;
 }
 
 .navcarosel-box .slick-next:before {
-    content: '\f105';
+    /* \f105 is fa-angle-right — this self-hosted FA6 kit's solid-900
+       font file (fa-solid-900.woff2) doesn't include that glyph at all
+       (confirmed by rendering nothing even forced to full opacity/size/
+       color), so it painted blank regardless of font-weight. \f054 is
+       fa-chevron-right, confirmed present in the same font file. */
+    content: '\f054';
     font-family: "Font Awesome 6 Free";
+    font-weight: 900;
 }
 
 .navcarosel-box .slick-prev:before {
-    content: '\f104';
+    /* \f104 (fa-angle-left) has the same missing-glyph problem as
+       \f105 above; \f053 (fa-chevron-left) is confirmed present. */
+    content: '\f053';
     font-family: "Font Awesome 6 Free";
+    font-weight: 900;
 }
 
 .navcarosel-box .btn-group {

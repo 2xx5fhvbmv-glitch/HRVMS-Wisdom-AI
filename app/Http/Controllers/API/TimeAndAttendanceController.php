@@ -1271,6 +1271,57 @@ class TimeAndAttendanceController extends Controller
         }
     }
 
+    /**
+     * Resolve which employee a manual check-in/out acts on. Defaults to the
+     * caller's own employee (self check-in/out, the original behaviour).
+     * The Time & Attendance To-Do List sends other employees' pending
+     * items to HOD/HR/EXCOM to resolve — without this, manualCheckIn/
+     * manualCheckOut always looked up the attendance row under the
+     * caller's own Emp_id, so resolving a subordinate's item 404'd with
+     * "Attendance record not found" even though the row exists.
+     *
+     * Returns [$targetEmployee, null] on success, or [null, $errorResponse]
+     * if the caller isn't allowed to act on the requested employee.
+     */
+    private function resolveTargetEmployeeForManualAction(Request $request, $user, $employee)
+    {
+        $requestedEmployeeId = $request->input('employee_id');
+        if (empty($requestedEmployeeId) || (int) $requestedEmployeeId === (int) $employee->id) {
+            return [$employee, null];
+        }
+
+        $targetEmployee = Employee::where('id', $requestedEmployeeId)->where('resort_id', $user->resort_id)->first();
+        if (!$targetEmployee) {
+            return [null, response()->json(['success' => false, 'message' => 'Employee not found'], 404)];
+        }
+
+        $rank       = $employee->rank ?? null;
+        $deptId     = $employee->Dept_id ?? null;
+        $department = $deptId ? ResortDepartment::where('id', $deptId)->where('resort_id', $user->resort_id)->first(['name', 'code']) : null;
+        $deptName   = strtolower(trim($department->name ?? ''));
+        $deptCode   = $department->code ?? '';
+        $isHRDept   = in_array($deptName, ['human resources', 'hr']);
+        $isEODept   = ($deptCode === 'EO_1') || (strpos($deptName, 'executive office') !== false);
+
+        $rankPosition = Common::getEmployeeRankPosition($employee);
+        $isGM    = ($rankPosition['position'] ?? '') === 'GM' || ($rankPosition['rank'] ?? '') === 'GM';
+        $isEXCOM = ($rankPosition['position'] ?? '') === 'EXCOM' || ($rankPosition['rank'] ?? '') === 'EXCOM' || $rank == 1 || $rank === '1';
+        $isHOD   = ($rank == 2 || $rank === '2');
+
+        $canViewAll = ($isHRDept || $isEODept) && ($isGM || $isEXCOM || $isHOD);
+        $isDeptHOD  = ($rank == 2 && $deptId && $department && !$isHRDept);
+
+        $isAllowed = $canViewAll
+            || ($isDeptHOD && (int) $targetEmployee->Dept_id === (int) $deptId)
+            || in_array((int) $targetEmployee->id, Common::getSubordinates($employee->id), true);
+
+        if (!$isAllowed) {
+            return [null, response()->json(['success' => false, 'message' => 'You do not have permission to act on this employee\'s attendance.'], 403)];
+        }
+
+        return [$targetEmployee, null];
+    }
+
     public function manualCheckIn(Request $request)
     {
         if (!Auth::guard('api')->check()) {
@@ -1291,7 +1342,12 @@ class TimeAndAttendanceController extends Controller
 
         $user                                               =   Auth::guard('api')->user();
         $employee                                           =   $user->GetEmployee;
-        $emp_id                                             =   $employee->id;
+
+        [$targetEmployee, $permissionError]                 =   $this->resolveTargetEmployeeForManualAction($request, $user, $employee);
+        if ($permissionError) {
+            return $permissionError;
+        }
+        $emp_id                                             =   $targetEmployee->id;
         // The client's `current_time` was stored verbatim — if the device
         // formats it with a 12-hour pattern and no AM/PM marker, 10:23 PM
         // and 10:23 AM arrive as the identical string "10:23:00", so
@@ -1314,7 +1370,9 @@ class TimeAndAttendanceController extends Controller
             $ParentAttendance                               =   ParentAttendace::where('resort_id', $user->resort_id)->where('date', $date)->where('Emp_id', $emp_id)->first();
 
             // Get employee rank to determine if roster check is required
-            $employeeRank                                    =   $employee->rank ?? null;
+            // (the employee whose attendance this is — not necessarily the
+            // caller, when a HOD/HR/EXCOM is resolving it on their behalf).
+            $employeeRank                                    =   $targetEmployee->rank ?? null;
             $positionRankConfig                             =   config('settings.Position_Rank', []);
             $isSupervisorOrLineWorker                       =   in_array($employeeRank, ['5', '6']); // '5' => 'SUP', '6' => 'LINE WORKERS'
 
@@ -1633,20 +1691,6 @@ class TimeAndAttendanceController extends Controller
 
     public function manualCheckOut(Request $request)
     {
-        // #region agent log
-        $logFile = 'c:\wamp64\www\Wisdom-Ai\HRVMS-Wisdom-AI\.cursor\debug.log';
-        $logEntry = json_encode([
-            'sessionId' => 'debug-session',
-            'runId' => 'run1',
-            'hypothesisId' => 'ENTRY',
-            'location' => 'TimeAndAttendanceController.php:manualCheckOut:START',
-            'message' => 'manualCheckOut method called',
-            'data' => ['request_data' => $request->all()],
-            'timestamp' => round(microtime(true) * 1000)
-        ]) . "\n";
-        @file_put_contents($logFile, $logEntry, FILE_APPEND);
-        // #endregion
-
         if (!Auth::guard('api')->check()) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
@@ -1660,25 +1704,17 @@ class TimeAndAttendanceController extends Controller
         ]);
 
         if ($validator->fails()) {
-            // #region agent log
-            $logEntry = json_encode([
-                'sessionId' => 'debug-session',
-                'runId' => 'run1',
-                'hypothesisId' => 'VALIDATION',
-                'location' => 'TimeAndAttendanceController.php:manualCheckOut:VALIDATION_FAILED',
-                'message' => 'Validation failed',
-                'data' => ['errors' => $validator->errors()->toArray()],
-                'timestamp' => round(microtime(true) * 1000)
-            ]) . "\n";
-            @file_put_contents($logFile, $logEntry, FILE_APPEND);
-            // #endregion
-
             return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
         }
 
         $user                                               =   Auth::guard('api')->user();
         $employee                                           =   $user->GetEmployee;
-        $emp_id                                             =   $employee->id;
+
+        [$targetEmployee, $permissionError]                 =   $this->resolveTargetEmployeeForManualAction($request, $user, $employee);
+        if ($permissionError) {
+            return $permissionError;
+        }
+        $emp_id                                             =   $targetEmployee->id;
         // Same AM/PM ambiguity as manualCheckIn — use server time, not the
         // client's raw current_time string.
         $checkOutTime                                       =   Carbon::now()->format('H:i:s');
@@ -1940,6 +1976,186 @@ class TimeAndAttendanceController extends Controller
             return response()->json($response);
         } catch (\Exception $e) {
             DB::rollBack(); // Rollback transaction on error
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    /**
+     * Fully-automatic punch in/out, driven by the app's own background
+     * geofence monitoring (native OS geofencing — CLLocationManager /
+     * Android Geofencing API) firing an enter/exit event, not a manual
+     * button tap. Deliberately reuses manualCheckIn()/manualCheckOut() by
+     * constructing a compatible synthetic Request and calling them
+     * directly, rather than duplicating their duty-roster resolution,
+     * shift lookup, and overtime logic — "automatic" and "manual" punches
+     * go through the exact same validated path, they just differ in what
+     * triggered them (flag = 'Geofence-Auto' marks that on check-in).
+     * Auth::guard('api')->user() inside those methods resolves from the
+     * real authenticated request (auth:api middleware already ran for
+     * *this* request) — it doesn't depend on which Request object gets
+     * passed as a plain method argument, so this is safe.
+     */
+    public function geofenceEvent(Request $request)
+    {
+        if (!Auth::guard('api')->check()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'event'     => 'required|in:enter,exit',
+            'latitude'  => 'required|numeric',
+            'longitude' => 'required|numeric',
+            'accuracy'  => 'nullable|numeric',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
+        }
+
+        $user = Auth::guard('api')->user();
+        $employee = $user->GetEmployee;
+        if (!$employee) {
+            return response()->json(['success' => false, 'message' => 'Employee record not found.'], 404);
+        }
+
+        $now = Carbon::now();
+        $locationPayload = [
+            'latitude'  => (float) $request->latitude,
+            'longitude' => (float) $request->longitude,
+            'accuracy'  => $request->filled('accuracy') ? (float) $request->accuracy : null,
+        ];
+
+        if ($request->event === 'enter') {
+            // Confirm the reported point is genuinely inside the zone
+            // assigned to today's roster before triggering a punch —
+            // the app's own geofence trigger should already guarantee
+            // this, but GPS drift near a zone boundary can fire a false
+            // "enter" just outside it, and the server is the one source
+            // of truth manual check-in also relies on (resolveGeofenceCheck).
+            $rosterData = DutyRoster::where('resort_id', $user->resort_id)
+                ->where('Emp_id', $employee->id)
+                ->first();
+            $geofenceCheck = $this->resolveGeofenceCheck($locationPayload, $rosterData);
+            if ($geofenceCheck['within'] !== true) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Reported location is not within the assigned geofence zone; no auto check-in.',
+                ], 422);
+            }
+
+            $syntheticRequest = Request::create('', 'POST', [
+                'current_time'     => $now->format('H:i:s'),
+                'current_date'     => $now->format('Y-m-d'),
+                'in_time_location' => $locationPayload,
+                'flag'             => 'Geofence-Auto',
+            ]);
+            return $this->manualCheckIn($syntheticRequest);
+        }
+
+        // event === 'exit'
+        $parentAttendance = ParentAttendace::where('resort_id', $user->resort_id)
+            ->where('Emp_id', $employee->id)
+            ->where('date', $now->format('Y-m-d'))
+            ->first();
+        $hasCheckedOut = $parentAttendance
+            && !empty($parentAttendance->CheckingOutTime)
+            && $parentAttendance->CheckingOutTime != '00:00';
+
+        if (!$parentAttendance || $hasCheckedOut) {
+            // No open check-in to close — an exit fired with nothing
+            // punched in yet (or already punched out) isn't an error,
+            // just nothing for this event to do.
+            return response()->json(['success' => true, 'message' => 'No active check-in to close out.']);
+        }
+
+        $syntheticRequest = Request::create('', 'POST', [
+            'attendace_id'      => $parentAttendance->id,
+            'current_time'      => $now->format('H:i:s'),
+            'current_date'      => $now->format('Y-m-d'),
+            'out_time_location' => $locationPayload,
+        ]);
+        return $this->manualCheckOut($syntheticRequest);
+    }
+
+    /**
+     * Home screen geofence lookup: the app sends the employee's current
+     * location, this returns the zone assigned to their duty roster
+     * (shape/coordinates/color so it can be drawn on a map) plus whether
+     * the given point currently falls inside it, so the UI can show a
+     * within/outside indicator or gate the break-in/break-out button
+     * without waiting for an actual check-in attempt.
+     */
+    public function myGeofenceZone(Request $request)
+    {
+        if (!Auth::guard('api')->check()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'latitude'  => 'nullable|numeric',
+            'longitude' => 'nullable|numeric',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
+        }
+
+        try {
+            $user     = Auth::guard('api')->user();
+            $employee = $user->GetEmployee;
+            if (!$employee) {
+                return response()->json(['success' => false, 'message' => 'Employee record not found.'], 404);
+            }
+
+            // An employee can accumulate many duty_rosters template rows
+            // over time (one per schedule range) — take the latest one so
+            // an old/superseded roster's zone (or lack of one) doesn't win
+            // over their current assignment.
+            $rosterData = DutyRoster::where('resort_id', $user->resort_id)
+                ->where('Emp_id', $employee->id)
+                ->orderByDesc('id')
+                ->first();
+
+            if (!$rosterData || !$rosterData->geofence_zone_id) {
+                return response()->json([
+                    'success'  => true,
+                    'message'  => 'No geofence zone configured for your duty roster.',
+                    'geofence' => null,
+                ]);
+            }
+
+            $geofence = \App\Models\ResortGeofence::where('id', $rosterData->geofence_zone_id)
+                ->where('status', 'active')
+                ->first();
+
+            if (!$geofence) {
+                return response()->json([
+                    'success'  => true,
+                    'message'  => 'Assigned geofence zone is not active.',
+                    'geofence' => null,
+                ]);
+            }
+
+            $within = null;
+            if ($request->filled('latitude') && $request->filled('longitude')) {
+                $within = Common::isWithinGeofence((float) $request->latitude, (float) $request->longitude, $geofence);
+            }
+
+            return response()->json([
+                'success'  => true,
+                'message'  => 'Geofence zone fetched successfully.',
+                'geofence' => [
+                    'id'           => $geofence->id,
+                    'name'         => $geofence->name,
+                    'color'        => $geofence->color,
+                    'shape_type'   => $geofence->shape_type,
+                    'coordinates'  => json_decode($geofence->coordinates, true),
+                    'grace_period' => $geofence->grace_period,
+                    'within'       => $within,
+                ],
+            ]);
+        } catch (\Exception $e) {
             \Log::emergency("File: " . $e->getFile());
             \Log::emergency("Line: " . $e->getLine());
             \Log::error($e->getMessage());
@@ -2548,6 +2764,16 @@ class TimeAndAttendanceController extends Controller
                                                                     ->where('t1.resort_id', $resort_id)
                                                                     ->where('employees.resort_id', $resort_id)
                                                                     ->where('employees.status', 'Active')
+                                                                    // Only employees with a duty roster entry for today can
+                                                                    // be marked (hodMarkAttendancePresent creates the
+                                                                    // attendance row from the roster entry), so hide the
+                                                                    // rest instead of letting the mark silently fail.
+                                                                    ->whereExists(function ($q) use ($currentDate) {
+                                                                        $q->select(DB::raw(1))
+                                                                          ->from('duty_roster_entries as dre')
+                                                                          ->whereColumn('dre.Emp_id', 'employees.id')
+                                                                          ->whereRaw('DATE(dre.date) = ?', [$currentDate]);
+                                                                    })
                                                                     ->select(
                                                                         't3.id as id',
                                                                         't1.id as admin_id',
@@ -3817,17 +4043,23 @@ class TimeAndAttendanceController extends Controller
                 't2.OverTime',
             ])->get();
 
-            // Actual OT: what was actually recorded on checkout for this date.
-            $actualQuery = DB::table('parent_attendaces as t3')
-                ->join('duty_rosters as t2', 't2.id', '=', 't3.roster_id')
-                ->join('employees', 'employees.id', '=', 't2.Emp_id')
+            // Actual OT: what was actually approved for this date. The web
+            // portal's Attendance Register reads approved OT from
+            // employee_overtimes (status = 'approved'), written by the OT
+            // approval workflow — parent_attendaces.OverTime is a legacy
+            // checkout field that approvals never propagate to, so reading
+            // from it here under-reported approved OT.
+            $actualQuery = DB::table('employee_overtimes as t3')
+                ->join('employees', 'employees.id', '=', 't3.Emp_id')
                 ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
                 ->where('t1.resort_id', $resort_id)
                 ->where('employees.status', 'Active')
                 ->where('t3.date', $date)
-                ->whereNotNull('t3.OverTime')
-                ->where('t3.OverTime', '!=', '00:00')
-                ->where('t3.OverTime', '!=', '');
+                ->where('t3.status', 'approved')
+                ->whereNotNull('t3.total_time')
+                ->where('t3.total_time', '!=', '00:00')
+                ->where('t3.total_time', '!=', '0:0')
+                ->where('t3.total_time', '!=', '');
 
             if (!$canViewAll) {
                 $actualQuery->whereIn('employees.id', $underEmpId);
@@ -3839,7 +4071,7 @@ class TimeAndAttendanceController extends Controller
             $actualRows = $actualQuery->select([
                 'employees.id as employee_id', 'employees.Emp_id as Emp_code',
                 't1.first_name', 't1.last_name', 't1.id as Parentid',
-                't3.OverTime', 't3.OTStatus',
+                't3.total_time as OverTime', 't3.status as OTStatus',
             ])->get();
 
             $toDecimalHours = function ($hm) {

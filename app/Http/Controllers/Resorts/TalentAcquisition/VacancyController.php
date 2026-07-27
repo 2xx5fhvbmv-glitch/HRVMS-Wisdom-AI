@@ -488,7 +488,7 @@ class VacancyController extends Controller
                             $msg,
                             'Talent Acquisition (Hiring Request)',
                             $hrIds,
-                            null,
+                            $vacancy->id,
                             false,
                             'talent-acquisition-hiring-request'
                         );
@@ -896,7 +896,7 @@ class VacancyController extends Controller
                         $msg,
                         'Talent Acquisition (Hiring Request)',
                         $hrIds,
-                        null,
+                        $vacancy->id,
                         false,
                         'talent-acquisition-hiring-request'
                     );

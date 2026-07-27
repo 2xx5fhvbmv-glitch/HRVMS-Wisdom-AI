@@ -128,7 +128,7 @@ class SOSController extends Controller
                 $custom_sound_channel                       =   'custom_sound_channel';
                 $sosPushNotification                        =   Common::sendPushNotificationForMobile([$smEmployee['device_token']], $title, $body, $moduleName,'Pending',$sound,$custom_sound_channel,NULL);
 
-                $sosNotification                            =   Common::sendMobileNotification($this->resort_id,2,null,null,$title,$body,$moduleName,[$smEmployee['id']],null,false,'sos-alert-security-manager');
+                $sosNotification                            =   Common::sendMobileNotification($this->resort_id,2,null,null,$title,$body,$moduleName,[$smEmployee['id']],$SOSHistoryAdd->id,false,'sos-alert-security-manager');
             } else {
                 \Log::warning("SOSStore: no active Security Manager found for resort_id {$this->resort_id} — SOS #{$SOSHistoryAdd->id} saved without push notification.");
             }
@@ -228,7 +228,7 @@ class SOSController extends Controller
                 $sosStatus                              = 'Rejected';
                 $body                                   = "{$empName->first_name} {$empName->last_name} SOS {$sosStatus}";
                 Common::sendPushNotificationForMobile([$empInitiatedDeviceToken['device_token']], $title, $body, $moduleName, $sosStatus, null, null,NULL);
-                Common::sendMobileNotification($this->resort_id,2,null, null, $title, $body, $moduleName, [$empInitiatedDeviceToken['id']], null,false,'sos-status-update');
+                Common::sendMobileNotification($this->resort_id,2,null, null, $title, $body, $moduleName, [$empInitiatedDeviceToken['id']], $sosHistory->id,false,'sos-status-update');
                 return response()->json([
                     'success'                           =>  true, 
                     'message'                           =>  "SOS {$request->action} successfully.", 
@@ -310,11 +310,11 @@ class SOSController extends Controller
 
             //Send in app and push notification to the team member
             Common::sendPushNotificationForMobile($deviceTokens, $title, $request->team_message, $moduleName,$sosStatus,$sound,$custom_sound_channel,NULL);
-            Common::sendMobileNotification($this->resort_id,2,null,null, $title,$request->team_message,$moduleName,$empIds,null,false,'sos-team-alert');
+            Common::sendMobileNotification($this->resort_id,2,null,null, $title,$request->team_message,$moduleName,$empIds,$sosHistory->id,false,'sos-team-alert');
 
             //Send in app and push notification to the who initiated the SOS
             Common::sendPushNotificationForMobile([$empInitiatedDeviceToken['device_token']], $title, $body, $moduleName,'Active',$sound,$custom_sound_channel,NULL);
-            Common::sendMobileNotification($this->resort_id,2,null,null,$title, $body,$moduleName,[$empInitiatedDeviceToken['id']],null,false,'sos-status-update');
+            Common::sendMobileNotification($this->resort_id,2,null,null,$title, $body,$moduleName,[$empInitiatedDeviceToken['id']],$sosHistory->id,false,'sos-status-update');
 
             //Send push notification to the employee same resort
             $allEmpDeviceId                             =   Employee::where('resort_id',$this->resort_id)->where('status','Active')
@@ -329,7 +329,7 @@ class SOSController extends Controller
                                                                 ->pluck('id');
 
             Common::sendPushNotificationForMobile($allEmpDeviceId->toArray(), $title, $request->employee_message ?? 'Please help us, SOS Alert has been raised.', $moduleName,'Active',$sound,$custom_sound_channel,NULL);
-            Common::sendMobileNotification($this->resort_id,2,null,null,$title, $request->employee_message ?? 'Please help us, SOS Alert has been raised.',$moduleName,$allEmpId,null,false,'sos-team-alert');
+            Common::sendMobileNotification($this->resort_id,2,null,null,$title, $request->employee_message ?? 'Please help us, SOS Alert has been raised.',$moduleName,$allEmpId,$sosHistory->id,false,'sos-team-alert');
 
             ChildSOSHistoryStatus::create([
                 'sos_history_id'                        =>  $sosHistory->id,
@@ -723,12 +723,19 @@ class SOSController extends Controller
                 return response()->json(['success' => false, 'message' => 'SOS history not found'], 200);
             }
 
-            $sosHistoryData->sos_approved_by_name       =   Employee::join('resort_admins as ra', 'employees.Admin_Parent_id', '=', 'ra.id')
-                                                                ->where('employees.id', $sosHistoryData->sos_approved_by)
-                                                                ->select('employees.id','employees.Admin_Parent_id', 'ra.first_name', 'ra.last_name', 'ra.profile_picture')
-                                                                ->first();
+            // sos_approved_by is null until someone actually approves/
+            // acknowledges the SOS — every alert not yet acted on crashed
+            // this endpoint with "assign property on null".
+            $sosHistoryData->sos_approved_by_name       =   $sosHistoryData->sos_approved_by
+                                                                ? Employee::join('resort_admins as ra', 'employees.Admin_Parent_id', '=', 'ra.id')
+                                                                    ->where('employees.id', $sosHistoryData->sos_approved_by)
+                                                                    ->select('employees.id','employees.Admin_Parent_id', 'ra.first_name', 'ra.last_name', 'ra.profile_picture')
+                                                                    ->first()
+                                                                : null;
 
-            $sosHistoryData->sos_approved_by_name->profile_picture =   Common::getResortUserPicture( $sosHistoryData->sos_approved_by_name->Admin_Parent_id);
+            if ($sosHistoryData->sos_approved_by_name) {
+                $sosHistoryData->sos_approved_by_name->profile_picture =   Common::getResortUserPicture( $sosHistoryData->sos_approved_by_name->Admin_Parent_id);
+            }
             $sosHistoryData->profile_picture            =   Common::getResortUserPicture($sosHistoryData->Admin_Parent_id);
 
             // Fetch team member activity stats

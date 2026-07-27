@@ -333,7 +333,7 @@ class SurveyController extends Controller
                     '📝 A survey has been completed by ' . $this->user->first_name . ' ' . $this->user->last_name . '.',
                     'Survey',
                     [$hrEmployee->id],
-                    null,
+                    $request->parent_survey_id[0],
                     false,
                     'survey-completed',
                 );

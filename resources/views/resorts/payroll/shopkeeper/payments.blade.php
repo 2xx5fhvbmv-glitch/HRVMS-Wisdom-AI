@@ -38,10 +38,14 @@
                         </div>
                     </div>
                     <div class="col-xl-3 col-lg-5 col-md-7 col-sm-8">
-                        <div class="dateRangeAb datepicker" id="datapicker">
-                            <div>
-                                <input type="text" class="form-control dateRangeAb datepicker" name="hiddenInput" id="hiddenInput">
-                            </div>
+                        <div class="form-group">
+                            <select class="form-select" id="month-filter">
+                                <option value="">All Months ({{ date('Y') }})</option>
+                                @php $months = ['01'=>'January','02'=>'February','03'=>'March','04'=>'April','05'=>'May','06'=>'June','07'=>'July','08'=>'August','09'=>'September','10'=>'October','11'=>'November','12'=>'December']; @endphp
+                                @foreach ($months as $value => $label)
+                                    <option value="{{ $value }}">{{ $label }}</option>
+                                @endforeach
+                            </select>
                         </div>
                     </div>
                     <div class="col-auto">
@@ -89,13 +93,6 @@
 @section('import-css')
 @include('resorts.payroll._payroll_buttons_v2_styles')
 <style>
-    .dateRangeAb { position: relative; }
-    .dateRangeAb .form-control {
-        background-image: url('{{ URL::asset("resorts_assets/images/calendar.svg") }}');
-        background-position: right 12px center;
-        background-repeat: no-repeat;
-        padding-right: 2.75rem;
-    }
     /* Prevent search icon and browser clear (X) from overlapping */
     .card-header .input-group .form-control.search {
         padding-right: 3rem;
@@ -114,37 +111,23 @@
 <script type="text/javascript">
     var currencySymbol = "{{ Common::GetResortCurrencySymbol() }}";
     $(document).ready(function () {
-        $("#hiddenInput").daterangepicker({
-            autoApply: true,
-            startDate: moment().startOf('month'),
-            endDate: moment().endOf('month'),
-            opens: 'right',
-            parentEl: '#datapicker',
-            locale: { format: "DD-MM-YYYY" }
-        });
-        $("#hiddenInput").on('apply.daterangepicker', function () {
+        PaymentList();
+        $(document).on('change', '#month-filter', function() {
             PaymentList();
         });
-        PaymentList();
         $(document).on('keyup', '.search', function() {
             PaymentList();
         });
         $('#payment-download-btn').on('click', function() {
-            var dateRange = $("#hiddenInput").val();
-            var dates = dateRange ? dateRange.split(' - ') : [];
-            var startDate = dates[0] ? moment(dates[0], "DD-MM-YYYY").format("YYYY-MM-DD") : '';
-            var endDate = dates[1] ? moment(dates[1], "DD-MM-YYYY").format("YYYY-MM-DD") : '';
+            var month = $('#month-filter').val() || '';
             var searchTerm = $('.search').val() || '';
-            var url = "{{ route('resort.shopkeeper.payments.export', ['id' => $shopkeeper->id]) }}?start_date=" + encodeURIComponent(startDate) + "&end_date=" + encodeURIComponent(endDate) + "&search_term=" + encodeURIComponent(searchTerm);
+            var url = "{{ route('resort.shopkeeper.payments.export', ['id' => $shopkeeper->id]) }}?month=" + encodeURIComponent(month) + "&search_term=" + encodeURIComponent(searchTerm);
             window.location.href = url;
         });
     });
 
     function PaymentList() {
-        var dateRange = $("#hiddenInput").val();
-        var dates = dateRange ? dateRange.split(' - ') : [];
-        var startDate = dates[0] ? moment(dates[0], "DD-MM-YYYY").format("YYYY-MM-DD") : '';
-        var endDate = dates[1] ? moment(dates[1], "DD-MM-YYYY").format("YYYY-MM-DD") : '';
+        var month = $('#month-filter').val() || '';
 
         if ($.fn.DataTable.isDataTable('#payment-table')) {
             $('#payment-table').DataTable().destroy();
@@ -180,8 +163,7 @@
                 type: 'GET',
                 data: function (d) {
                     d.searchTerm = $('.search').val();
-                    d.start_date = startDate;
-                    d.end_date = endDate;
+                    d.month = month;
                 },
                 dataSrc: function (json) {
                     var total = (json.total_amount != null) ? parseFloat(json.total_amount) : json.data.reduce(function (sum, p) { return sum + parseFloat(p.price || 0); }, 0);

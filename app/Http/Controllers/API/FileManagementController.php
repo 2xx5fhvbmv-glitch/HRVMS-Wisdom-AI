@@ -99,12 +99,26 @@ class FileManagementController extends Controller
     }
 
     /** Root itself, a direct subfolder of root, a shared folder, or a subfolder of a shared folder. */
+    /**
+     * Only checked the folder itself and its immediate parent against
+     * sharedFolderIds — so anything more than one level under a shared
+     * folder (a shared root that itself has subfolders) 403'd, which is
+     * exactly what broke "open a shared folder" navigation once it had
+     * any real depth. Walk the full UnderON ancestor chain instead so any
+     * depth under either the employee's own root or a shared folder works.
+     */
     private function folderAccessible(FilemangementSystem $folder, int $ownRootId, array $sharedFolderIds): bool
     {
-        if ($folder->id === $ownRootId || (int) $folder->UnderON === $ownRootId) {
-            return true;
+        $current = $folder;
+        $depth = 0;
+        while ($current && $depth < 50) {
+            if ($current->id === $ownRootId || in_array($current->id, $sharedFolderIds, true)) {
+                return true;
+            }
+            $current = $current->UnderON ? FilemangementSystem::find($current->UnderON) : null;
+            $depth++;
         }
-        return in_array($folder->id, $sharedFolderIds, true) || in_array((int) $folder->UnderON, $sharedFolderIds, true);
+        return false;
     }
 
     /** Write actions (create/upload/rename/delete) are restricted to the employee's own tree — shares here are read-only. */
@@ -127,18 +141,36 @@ class FileManagementController extends Controller
         ];
     }
 
-    private function folderMeta(FilemangementSystem $folder, int $ownRootId): array
+    /**
+     * parent_unique_id lets the mobile client implement real "back"
+     * navigation instead of assuming a flat, always-own hierarchy — null
+     * means this is a top-level entry (own root, or a shared folder whose
+     * real parent isn't itself accessible), so "back" should return to
+     * My Drive / the Shared with Me list rather than fetch a folder that
+     * would 403.
+     */
+    private function folderMeta(FilemangementSystem $folder, int $ownRootId, array $sharedFolderIds = []): array
     {
+        $parentUniqueId = null;
+        $parentId = (int) $folder->UnderON;
+        if ($parentId) {
+            $parent = FilemangementSystem::find($parentId);
+            if ($parent && $this->folderAccessible($parent, $ownRootId, $sharedFolderIds)) {
+                $parentUniqueId = $parent->Folder_unique_id;
+            }
+        }
+
         return [
-            'id'        => $folder->id,
-            'unique_id' => $folder->Folder_unique_id,
-            'name'      => $folder->Folder_Name,
-            'is_own'    => $folder->id === $ownRootId || (int) $folder->UnderON === $ownRootId,
+            'id'               => $folder->id,
+            'unique_id'        => $folder->Folder_unique_id,
+            'name'             => $folder->Folder_Name,
+            'is_own'           => $folder->id === $ownRootId || $parentId === $ownRootId,
+            'parent_unique_id' => $parentUniqueId,
         ];
     }
 
     /** Subfolders directly under this folder + files stored directly in it. Uniform for root and one-level-deep subfolders. */
-    private function buildFolderContents(FilemangementSystem $folder, int $ownRootId): array
+    private function buildFolderContents(FilemangementSystem $folder, int $ownRootId, array $sharedFolderIds = []): array
     {
         $subfolders = FilemangementSystem::where('resort_id', $folder->resort_id)
             ->where('UnderON', $folder->id)
@@ -147,8 +179,8 @@ class FileManagementController extends Controller
             ->withCount('children as file_count')
             ->orderBy('Folder_Name')
             ->get()
-            ->map(function ($f) use ($ownRootId) {
-                $meta = $this->folderMeta($f, $ownRootId);
+            ->map(function ($f) use ($ownRootId, $sharedFolderIds) {
+                $meta = $this->folderMeta($f, $ownRootId, $sharedFolderIds);
                 $meta['file_count'] = $f->file_count;
                 $meta['total_size_kb'] = (float) ($f->file_count_sum ?? 0);
                 return $meta;
@@ -161,7 +193,7 @@ class FileManagementController extends Controller
             ->map(fn ($f) => $this->fileMeta($f));
 
         return [
-            'folder'     => $this->folderMeta($folder, $ownRootId),
+            'folder'     => $this->folderMeta($folder, $ownRootId, $sharedFolderIds),
             'subfolders' => $subfolders,
             'files'      => $files,
         ];
@@ -204,9 +236,13 @@ class FileManagementController extends Controller
             ->whereIn('id', $sharedFolderIds ?: [0])
             ->withCount('children as file_count')
             ->get()
-            ->map(function ($f) use ($root) {
-                $meta = $this->folderMeta($f, $root->id);
+            ->map(function ($f) use ($root, $sharedFolderIds) {
+                $meta = $this->folderMeta($f, $root->id, $sharedFolderIds);
                 $meta['is_own'] = false;
+                // These are the shared roots themselves — parent_unique_id
+                // would point outside what this employee can browse, so
+                // force null: "back" from here means the Shared with Me list.
+                $meta['parent_unique_id'] = null;
                 $meta['file_count'] = $f->file_count;
                 return $meta;
             });
@@ -244,13 +280,24 @@ class FileManagementController extends Controller
         if (!$folder) {
             return response()->json(['success' => false, 'message' => 'Folder not found.'], 404);
         }
-        if (!$this->folderAccessible($folder, $root->id, $this->sharedFolderIds($emp))) {
+        $sharedFolderIds = $this->sharedFolderIds($emp);
+        if (!$this->folderAccessible($folder, $root->id, $sharedFolderIds)) {
             return response()->json(['success' => false, 'message' => 'You do not have access to this folder.'], 403);
+        }
+        // A folder reached directly (not one hop from a shared root) is
+        // itself the top of what this employee was granted — same reasoning
+        // as sharedWithMe() above, so "back" doesn't try to climb into the
+        // sharer's wider tree.
+        $isDirectlySharedRoot = in_array($folder->id, $sharedFolderIds, true) && (int) $folder->UnderON !== $root->id;
+
+        $data = $this->buildFolderContents($folder, $root->id, $sharedFolderIds);
+        if ($isDirectlySharedRoot) {
+            $data['folder']['parent_unique_id'] = null;
         }
 
         return response()->json([
             'success' => true,
-            'data'    => $this->buildFolderContents($folder, $root->id),
+            'data'    => $data,
         ], 200);
     }
 
@@ -367,7 +414,7 @@ class FileManagementController extends Controller
                 ($emp->resortAdmin->full_name ?? $emp->Emp_id) . ' uploaded a file: ' . $request->file('file')->getClientOriginalName(),
                 'File Management',
                 $hrEmployeeIds,
-                null,
+                $fileRecord->id,
                 false,
                 'file-management-upload',
             );

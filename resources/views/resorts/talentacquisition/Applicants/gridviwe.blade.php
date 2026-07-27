@@ -53,7 +53,7 @@
                         <circle class="progress-background" cx="60" cy="60" r="54"></circle>
                         <circle class="progress" cx="60" cy="60" r="54"></circle>
                     </svg>
-                    <div class="img-obj cover"> <img src="{{ $a->profileImg }}" alt="image"></div>
+                    <div class="img-obj cover"> <img src="{{ $a->profileImg ?: url(config('settings.default_picture')) }}" alt="image"></div>
                 </div>
                 <h6>{{ ucfirst($a->first_name) }} {{ ucfirst($a->last_name) }}</h6>
                 <p>{{ ucfirst($a->position_title) }} </p>
@@ -106,6 +106,7 @@
                 <div>
                     <a href="javascript:void(0)" class="btn btn-themeBlue btn-sm ApplicantsNotes ApplicantsNotes_{{ $a->applicant_id }}" data-notes="{{ $a->Notes }}"  data-id="{{base64_encode($a->id) }}" data-id="{{ $a->id }}">Notes</a>
                     <a href="javascript:void(0)" class="btn btn-themeSkyblue btn-sm userApplicants-btn"  data-id="{{ $a->applicant_id }}">View</a>
+                    <a href="javascript:void(0)" class="btn btn-themeNeon btn-sm waiInsightsBtn" data-id="{{ base64_encode($a->id) }}" data-bs-toggle="tooltip" data-bs-placement="top" title="WAI Insights — CV vs Job Description"><i class="fa-solid fa-robot"></i> WAI CV</a>
                 </div>
             </div>
         </div>

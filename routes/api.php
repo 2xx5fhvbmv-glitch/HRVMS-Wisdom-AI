@@ -241,6 +241,12 @@ use Illuminate\Support\Facades\Route;
 		Route::post('timeandattendance/manual-check-in', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'manualCheckIn']);
 		Route::post('timeandattendance/break-check-in-out', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'breakCheckInCheckOut']);
 		Route::post('timeandattendance/manual-check-out', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'manualCheckOut']);
+		// Called by the app's background geofence monitoring on zone
+		// enter/exit (native OS geofencing, not a manual button tap).
+		Route::post('timeandattendance/geofence-event', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'geofenceEvent']);
+		// Home screen: given the employee's current location, return the
+		// duty roster's assigned geofence zone + whether they're inside it.
+		Route::post('timeandattendance/my-geofence-zone', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'myGeofenceZone']);
 		Route::get('timeandattendance/emp-checkinout-time/{date}', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'employeeCheckinCheckoutTime']);
 		Route::get('timeandattendance/time-attendance-employee-leave', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'timeAttendanceEmployeeLeave']);
 		Route::post('timeandattendance/approve-reject-ot', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'approveRejectOT']);
@@ -353,6 +359,7 @@ use Illuminate\Support\Facades\Route;
 		Route::get('shop/consent-request-view/{consent_request_id}', [App\Http\Controllers\API\ShopController::class, 'consentRequestview']);
 		Route::post('shop/consent-request-handle', [App\Http\Controllers\API\ShopController::class, 'consentRequestHandle']);
 		Route::get('shop/consent-request-history', [App\Http\Controllers\API\ShopController::class, 'consentRequestHistory']);
+		Route::get('shop/product-details/{product_id}', [App\Http\Controllers\API\ShopController::class, 'productDetails']);
 
 		//Monthly-Check-In
 		Route::get('monthlycheckin/manager-dashboard', [App\Http\Controllers\API\MonthlyCheckInController::class, 'managerDashboard']);
@@ -371,6 +378,7 @@ use Illuminate\Support\Facades\Route;
 		Route::get('grievance/get-grievance-cat', [App\Http\Controllers\API\GrievanceController::class, 'GetGrievanceCat']);
 		Route::post('grievance/get-grievance-sub-cat', [App\Http\Controllers\API\GrievanceController::class, 'GetGrievanceSubCat']);
 		Route::post('grievance/grievance-store', [App\Http\Controllers\API\GrievanceController::class, 'GrievanceStore']);
+		Route::post('grievance/informal-resolution', [App\Http\Controllers\API\GrievanceController::class, 'InformalResolution']);
 		Route::get('grievance/my-grievances', [App\Http\Controllers\API\GrievanceController::class, 'myGrievances']);
 		Route::get('grievance/{id}', [App\Http\Controllers\API\GrievanceController::class, 'grievanceDetail']);
 
@@ -409,6 +417,8 @@ use Illuminate\Support\Facades\Route;
 		Route::post('request/request-store', [App\Http\Controllers\API\RequestController::class, 'RequestStore']);
 		Route::get('request/request-guarantor-list', [App\Http\Controllers\API\RequestController::class, 'PeopleGuarantorRequestList']);
 		Route::post('request/guarantor-request-handle', [App\Http\Controllers\API\RequestController::class, 'PeopleGuarantorRequestHandleAction']);
+		Route::get('request/salary-advance-details/{id}', [App\Http\Controllers\API\RequestController::class, 'salaryAdvanceDetails']);
+		Route::get('request/guarantor-employee-list', [App\Http\Controllers\API\RequestController::class, 'GuarantorEmployeeList']);
 
 		//SOS
 		Route::get('sos/emergency-types', [App\Http\Controllers\API\SOSController::class, 'getEmergencyTypes']);

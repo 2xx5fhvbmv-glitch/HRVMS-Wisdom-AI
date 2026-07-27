@@ -57,6 +57,60 @@ class LeaveController extends Controller
         }
     }
 
+    /**
+     * getScopedDepartmentIds() returns the CALLER's own department for any
+     * employee once hasFullDataAccess() is false, regardless of rank — it's
+     * built for read-scoping (e.g. "list only my department"), not for
+     * gating a privileged write like applying leave on a colleague's
+     * behalf. A plain rank 5/6 (SUP/LINE WORKERS) employee having a
+     * Dept_id must NOT be able to apply leave for teammates. Only
+     * supervisory ranks (HOD/MGR/EXCOM) or HR/GM get that capability.
+     */
+    private function canApplyLeaveForOthers()
+    {
+        if (Common::hasFullDataAccess()) {
+            return true;
+        }
+        $user = \Auth::guard('resort-admin')->user();
+        $selfEmployee = $user->GetEmployee ?? $user->getEmployee ?? null;
+        if (!$selfEmployee) {
+            return false;
+        }
+        $rankPosition = Common::getEmployeeRankPosition($selfEmployee);
+        return in_array($rankPosition['rank'] ?? null, ['HOD', 'MGR', 'EXCOM'], true)
+            || in_array($rankPosition['position'] ?? null, ['HOD', 'MGR', 'EXCOM'], true);
+    }
+
+    /**
+     * Employees the logged-in account is allowed to apply/backfill leave
+     * for, besides themselves. HR/GM (full data access) can apply for any
+     * active employee; a HOD/EXCOM/MGR with only their own department
+     * scoped can apply for employees in that department. Everyone else
+     * gets an empty list, which hides the picker entirely (self-service
+     * only).
+     */
+    private function getApplicableEmployeesForLeave($resortId)
+    {
+        if (!$this->canApplyLeaveForOthers()) {
+            return collect();
+        }
+
+        $query = Employee::join('resort_admins as ra', 'ra.id', '=', 'employees.Admin_Parent_id')
+            ->where('employees.resort_id', $resortId)
+            ->where('employees.status', 'Active');
+
+        if (!Common::hasFullDataAccess()) {
+            $scopedDeptIds = Common::getScopedDepartmentIds();
+            if (empty($scopedDeptIds)) {
+                return collect();
+            }
+            $query->whereIn('employees.Dept_id', $scopedDeptIds);
+        }
+
+        return $query->orderBy('ra.first_name')
+            ->get(['employees.id', 'employees.Emp_id', 'ra.first_name', 'ra.last_name']);
+    }
+
     public function index()
     {
         $page_title = 'Leave Application';
@@ -68,6 +122,28 @@ class LeaveController extends Controller
         }
 
         $resort_id = $this->resort->resort_id;
+
+        // HR/HOD/EXCOM applying leave on behalf of another employee — this
+        // form was otherwise self-service only (emp_id/rank/gender all came
+        // from the logged-in account), so there was no way to apply or
+        // backfill leave for someone who can't submit it themselves.
+        // getApplicableEmployeesForLeave() returns empty when the caller has
+        // no elevated access, so the picker simply never renders for them.
+        $applicableEmployees = $this->getApplicableEmployeesForLeave($resort_id);
+        $canApplyForOthers = $applicableEmployees->isNotEmpty();
+        $targetIsSelf = true;
+        if ($canApplyForOthers && request()->filled('apply_for_employee_id') && $getEmployee) {
+            $requestedId = (int) request('apply_for_employee_id');
+            if ($requestedId !== (int) $getEmployee->id) {
+                $candidate = $applicableEmployees->firstWhere('id', $requestedId);
+                if ($candidate) {
+                    $getEmployee = Employee::find($requestedId);
+                    $targetIsSelf = false;
+                }
+            }
+        }
+        $selectedEmployeeId = $getEmployee->id ?? 0;
+
         $emp_id = $getEmployee->id ?? 0;
         $rank = $getEmployee->rank ?? 0;
         $emp_grade_for_eligibility = Common::getEmpGrade($rank);
@@ -93,8 +169,10 @@ class LeaveController extends Controller
             $benefit_grid_emp_grade = $benefit_grid->emp_grade ?? $emp_grade;
             $benefit_grid_id = $benefit_grid->id ?? null;
 
-            // Get the logged-in employee's gender
-            $empGender = $this->resort->gender ?? '';
+            // Gender drives which leave categories are eligible (eligible_emp_type).
+            // For self, it's the logged-in account's own gender; when applying on
+            // behalf of another employee, it must be THEIR gender, not the submitter's.
+            $empGender = $targetIsSelf ? ($this->resort->gender ?? '') : ($getEmployee->resortAdmin->gender ?? '');
 
             $leave_categories = ResortBenifitGridChild::select(
                 'resort_benefit_grid_child.*',
@@ -315,7 +393,7 @@ class LeaveController extends Controller
             ->unique()
             ->values()
             ->all();
-        return view('resorts.leaves.leave.index', compact('page_title', 'emp_id','leave_categories', 'delegations', 'transportations', 'leaveFormValidation', 'airports', 'holidayDates'));
+        return view('resorts.leaves.leave.index', compact('page_title', 'emp_id','leave_categories', 'delegations', 'transportations', 'leaveFormValidation', 'airports', 'holidayDates', 'canApplyForOthers', 'applicableEmployees', 'selectedEmployeeId'));
     }
 
     /**
@@ -1368,6 +1446,40 @@ class LeaveController extends Controller
         }
         $emp_id = $applicantEmployeeRecord->id;
         $rank = $applicantEmployeeRecord->rank;
+        $targetReportingTo = $applicantEmployeeRecord->reporting_to;
+
+        // HR/HOD/EXCOM applying leave on behalf of another employee — see
+        // getApplicableEmployeesForLeave()/index() for the read-side picker.
+        // Re-checked here independently since a client can post any
+        // apply_for_employee_id regardless of what the form rendered.
+        if ($request->filled('apply_for_employee_id') && (int) $request->apply_for_employee_id !== (int) $emp_id) {
+            $targetEmployee = Employee::where('id', (int) $request->apply_for_employee_id)
+                ->where('resort_id', $resort_id)
+                ->first();
+            if (!$targetEmployee) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Selected employee not found.',
+                ], 422);
+            }
+            $authorized = false;
+            if ($this->canApplyLeaveForOthers()) {
+                $authorized = Common::hasFullDataAccess();
+                if (!$authorized) {
+                    $scopedDeptIds = Common::getScopedDepartmentIds();
+                    $authorized = !empty($scopedDeptIds) && in_array((int) $targetEmployee->Dept_id, $scopedDeptIds);
+                }
+            }
+            if (!$authorized) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'You are not authorized to apply leave on behalf of this employee.',
+                ], 403);
+            }
+            $emp_id = $targetEmployee->id;
+            $rank = $targetEmployee->rank;
+            $targetReportingTo = $targetEmployee->reporting_to;
+        }
 
         // Resolve validation rules from first leave category (Mandatory/Optional/Hidden)
         $categoryIds = $request->input('leave_category_id');
@@ -1724,7 +1836,11 @@ class LeaveController extends Controller
 
                 $passapprovalFlow                       =   collect();
 
-                $directReportingManagerId = $this->resort->GetEmployee->reporting_to;
+                // Boarding-pass approval chain follows the TRAVELING employee's
+                // own manager chain, not the submitter's — matters when HR/HOD
+                // applies this leave on the employee's behalf (see
+                // $targetReportingTo resolution above).
+                $directReportingManagerId = $targetReportingTo;
                 $directReportingManager = Employee::select('id', 'rank','reporting_to')->where('resort_id',$this->resort->resort_id)->find($directReportingManagerId); // Fetch only id and rank
                
                 if ($directReportingManager && $directReportingManager->rank < "8") {
@@ -1786,11 +1902,35 @@ class LeaveController extends Controller
 
                 // Leave approval: only the applicant's reporting_to can approve (reporting_to is set in employee profile and can be changed there).
                 // Use applicant's reporting_to at submit time to create the approval chain.
-                $applicantEmployee = Employee::select('id', 'rank', 'reporting_to', 'Admin_Parent_id')->where('resort_id', $this->resort->resort_id)->find($emp_id);
+                $applicantEmployee = Employee::select('id', 'rank', 'reporting_to', 'Admin_Parent_id', 'Dept_id')->where('resort_id', $this->resort->resort_id)->find($emp_id);
                 $directReportingManagerId = $applicantEmployee ? $applicantEmployee->reporting_to : null;
                 $directReportingManager = $directReportingManagerId
                     ? Employee::select('id', 'rank', 'reporting_to')->where('resort_id', $this->resort->resort_id)->find($directReportingManagerId)
                     : null;
+
+                // Line Worker (6) / Supervisor (5) leave must go to a
+                // Supervisor or Manager only (per approval-flow doc) — but
+                // reporting_to is set per-employee and, in departments with
+                // no Supervisor layer, can point straight at the HOD,
+                // skipping the intended approver level entirely. If the
+                // resolved reporting_to isn't rank 4/5, look for an actual
+                // Supervisor/Manager in the applicant's own department
+                // before falling back to whatever reporting_to has.
+                if (
+                    in_array((string)($applicantEmployee->rank ?? ''), ['5', '6'], true)
+                    && (!$directReportingManager || !in_array((string)$directReportingManager->rank, ['4', '5'], true))
+                ) {
+                    $deptSupervisorOrManager = Employee::select('id', 'rank', 'reporting_to')
+                        ->where('resort_id', $this->resort->resort_id)
+                        ->where('Dept_id', $applicantEmployee->Dept_id)
+                        ->where('id', '!=', $emp_id)
+                        ->whereIn('rank', ['5', '4'])
+                        ->orderByRaw("FIELD(rank, '5', '4')")
+                        ->first();
+                    if ($deptSupervisorOrManager) {
+                        $directReportingManager = $deptSupervisorOrManager;
+                    }
+                }
 
                 $approvalFlow = collect(); // Store the approval flow dynamically
 

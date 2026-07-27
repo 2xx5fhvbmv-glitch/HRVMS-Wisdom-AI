@@ -68,6 +68,10 @@ class Payment extends Model
     {
         return $this->belongsTo(Product::class, 'product_id');
     }
-    
-    
+
+    public function employee()
+    {
+        return $this->belongsTo(Employee::class, 'emp_id');
+    }
+
 }
