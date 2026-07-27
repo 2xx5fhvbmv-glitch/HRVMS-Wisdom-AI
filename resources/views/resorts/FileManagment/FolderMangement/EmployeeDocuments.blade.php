@@ -1043,6 +1043,13 @@
        } else if (scope === 'departments') {
            if (!__share.selectedDepartments.length) { toastr.warning('Pick at least one department', '', { positionClass: 'toast-bottom-right' }); return; }
            payload.department_ids = __share.selectedDepartments;
+       } else if (scope === 'organization') {
+           // Org-wide share is a single radio click with no confirmation —
+           // a mis-click here silently exposes an item (e.g. Payroll Review)
+           // to every active employee at the resort with no expiry.
+           if (!confirm('Share "' + __share.targetName + '" with every active employee in your resort? This cannot be undone by anyone but you, and has no expiry.')) {
+               return;
+           }
        }
        $.post("{{ route('FileShare.store') }}", payload, function (r) {
            if (r.success) {

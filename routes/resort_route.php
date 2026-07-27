@@ -2060,6 +2060,48 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
     Route::post('report/employee/export', 'EmployeeMasterReportController@export')->name('resort.report.employee.export');
     Route::post('report/employee/insights', 'EmployeeMasterReportController@insights')->name('resort.report.employee.insights');
 
+    // Predefined People Management – Announcement reports (Option B).
+    Route::get('report/announcement', 'AnnouncementReportController@index')->name('resort.report.announcement.index');
+    Route::post('report/announcement/run', 'AnnouncementReportController@run')->name('resort.report.announcement.run');
+    Route::post('report/announcement/export', 'AnnouncementReportController@export')->name('resort.report.announcement.export');
+    Route::post('report/announcement/insights', 'AnnouncementReportController@insights')->name('resort.report.announcement.insights');
+
+    // Predefined People Management – Probation reports (Option B).
+    Route::get('report/probation', 'ProbationReportController@index')->name('resort.report.probation.index');
+    Route::post('report/probation/run', 'ProbationReportController@run')->name('resort.report.probation.run');
+    Route::post('report/probation/export', 'ProbationReportController@export')->name('resort.report.probation.export');
+    Route::post('report/probation/insights', 'ProbationReportController@insights')->name('resort.report.probation.insights');
+
+    // Predefined People Management – Promotion reports (Option B).
+    Route::get('report/promotion', 'PromotionReportController@index')->name('resort.report.promotion.index');
+    Route::post('report/promotion/run', 'PromotionReportController@run')->name('resort.report.promotion.run');
+    Route::post('report/promotion/export', 'PromotionReportController@export')->name('resort.report.promotion.export');
+    Route::post('report/promotion/insights', 'PromotionReportController@insights')->name('resort.report.promotion.insights');
+
+    // Predefined People Management – Transfer reports (Option B).
+    Route::get('report/transfer', 'TransferReportController@index')->name('resort.report.transfer.index');
+    Route::post('report/transfer/run', 'TransferReportController@run')->name('resort.report.transfer.run');
+    Route::post('report/transfer/export', 'TransferReportController@export')->name('resort.report.transfer.export');
+    Route::post('report/transfer/insights', 'TransferReportController@insights')->name('resort.report.transfer.insights');
+
+    // Predefined People Management – Salary Increment reports (Option B).
+    Route::get('report/salary-increment', 'SalaryIncrementReportController@index')->name('resort.report.salary_increment.index');
+    Route::post('report/salary-increment/run', 'SalaryIncrementReportController@run')->name('resort.report.salary_increment.run');
+    Route::post('report/salary-increment/export', 'SalaryIncrementReportController@export')->name('resort.report.salary_increment.export');
+    Route::post('report/salary-increment/insights', 'SalaryIncrementReportController@insights')->name('resort.report.salary_increment.insights');
+
+    // Predefined People Management – Salary Advance & Loan reports (Option B).
+    Route::get('report/salary-advance-loan', 'SalaryAdvanceLoanReportController@index')->name('resort.report.salary_advance_loan.index');
+    Route::post('report/salary-advance-loan/run', 'SalaryAdvanceLoanReportController@run')->name('resort.report.salary_advance_loan.run');
+    Route::post('report/salary-advance-loan/export', 'SalaryAdvanceLoanReportController@export')->name('resort.report.salary_advance_loan.export');
+    Route::post('report/salary-advance-loan/insights', 'SalaryAdvanceLoanReportController@insights')->name('resort.report.salary_advance_loan.insights');
+
+    // Predefined People Management – Resignation & Exit Clearance reports (Option B).
+    Route::get('report/resignation-exit', 'ResignationExitReportController@index')->name('resort.report.resignation_exit.index');
+    Route::post('report/resignation-exit/run', 'ResignationExitReportController@run')->name('resort.report.resignation_exit.run');
+    Route::post('report/resignation-exit/export', 'ResignationExitReportController@export')->name('resort.report.resignation_exit.export');
+    Route::post('report/resignation-exit/insights', 'ResignationExitReportController@insights')->name('resort.report.resignation_exit.insights');
+
 
     Route::delete('report/{id}', 'ReportController@destroy')->name('reports.destroy');
 

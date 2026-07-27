@@ -194,7 +194,13 @@ class ProbationController extends Controller
                     if (!$end) {
                         return 'Not set';
                     }
-                    return $end->format('d M Y');
+                    // probation_end_date is stored/derived as an end-EXCLUSIVE
+                    // boundary (joining + 3 months, e.g. Jun 1 -> Sep 1) — Sep 1
+                    // is the first day AFTER probation, not the last day of it.
+                    // details() already subtracts a day for the same reason
+                    // (see its $probationEndLabel); this list was showing the
+                    // exclusive boundary raw, one day later than the details page.
+                    return $end->copy()->subDay()->format('d M Y');
                 })
                 ->addColumn('onboarding_training', function ($row) use ($resortId) {
                     // Reflects whatever L&D training the employee is booked on.
@@ -838,10 +844,14 @@ class ProbationController extends Controller
         }
         // Probation end: the explicit column, else joining_date + 3 months
         // (Carbon::parse(null) would otherwise put today's date in the letter).
+        // Both are stored/derived as the end-EXCLUSIVE boundary (Jun 1 join ->
+        // Sep 1), so subtract a day for the letter's actual last-day-of-
+        // probation date — same convention as details()'s $probationEndLabel
+        // and the list page's probation_end_date column.
         if ($employee->probation_end_date) {
-            $probationEndDate = \Carbon\Carbon::parse($employee->probation_end_date)->format('d M Y');
+            $probationEndDate = \Carbon\Carbon::parse($employee->probation_end_date)->subDay()->format('d M Y');
         } elseif ($employee->joining_date) {
-            $probationEndDate = \Carbon\Carbon::parse($employee->joining_date)->addMonths(3)->format('d M Y');
+            $probationEndDate = \Carbon\Carbon::parse($employee->joining_date)->addMonths(3)->subDay()->format('d M Y');
         } else {
             $probationEndDate = 'N/A';
         }

@@ -63,12 +63,16 @@
                                 <div id="product_currency_display" class="form-control-plaintext fw-semibold text-muted" style="min-height: 38px; line-height: 38px;">—</div>
                             </div>
                         </div>
-                        <div class="col-xl-8 col-md-6" id="payment_QRCode">
-                                
+                        {{-- Hidden per request — QR is already shown on the payments
+                             listing page, no need to duplicate it here. Left in the
+                             DOM (not removed) since the submit handler still reads
+                             the generated QR image's src from this element. --}}
+                        <div class="col-xl-8 col-md-6 d-none" id="payment_QRCode">
+
                         </div>
                         <div class="d-none d-md-block" style="height: 426px;"></div>
                         <div class="card-footer text-end">
-                            <button type="submit" id="submitButton" class="btn btn-themeBlue btn-sm">Consent Send</button>
+                            <button type="submit" id="submitButton" class="btn btn-themeBlue btn-sm">Submit</button>
                         </div>
                     </div>
                 </form>

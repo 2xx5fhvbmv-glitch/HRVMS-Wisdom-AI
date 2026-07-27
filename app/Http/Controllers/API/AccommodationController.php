@@ -1341,7 +1341,7 @@ class AccommodationController extends Controller
                 'Housekeeping request has been assigned to you by ' . $this->user->first_name . ' ' . $this->user->last_name,
                 'Accommodation',
                 [$request->hod_id],
-                null,
+                $childHouseKeepingSchedules->id,
                 false,
                 'housekeeping-request-assigned'
             );
@@ -1893,7 +1893,7 @@ class AccommodationController extends Controller
                     "The Maintenance Request for #{$hrEmployee->Emp_id} has been Approved and assigned to you.{$maintanance->descriptionIssues}",
                     'Maintenance',
                     [$engineeringDepHOD->id],
-                    null,
+                    $maintanance->id,
                     false,
                     'maintenance-request-assigned',
                 );
@@ -2172,7 +2172,7 @@ class AccommodationController extends Controller
                 "The Maintenance Request for #{$this->user->GetEmployee->Emp_id} has been Approved and assigned to you.{$maintanance->descriptionIssues}",
                 'Maintenance',
                 [$assingEmployeeId],
-                null,
+                $maintanance->id,
                 false,
                 'maintenance-request-assigned',
             );
@@ -2456,7 +2456,7 @@ class AccommodationController extends Controller
                         "The Maintenance Request for #{$this->user->GetEmployee->Emp_id} has been Completed and assigned to you.{$request->input('comments', null)}",
                         'Maintenance',
                         [$findEDHODChildRequest->ApprovedBy],
-                       null,
+                       $maintanance->id,
                         false,
                         'maintenance-request-completed',
                         );
@@ -2551,7 +2551,7 @@ class AccommodationController extends Controller
                         "The Maintenance Request for #{$this->user->GetEmployee->Emp_id} has been Completed and assigned to you.{$maintanance->descriptionIssues}",
                         'Maintenance',
                         [$findHRChildRequest->ApprovedBy],
-                        null,
+                        $maintanance->id,
                         false,
                         'maintenance-request-completed',
                     );

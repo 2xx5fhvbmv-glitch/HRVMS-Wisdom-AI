@@ -21,12 +21,18 @@ class EmployeeLeave extends Model
         'emp_id',
         'leave_category_id',
         'from_date',
-        'to_date','total_days','flag',
+        'to_date','total_days','flag','extends_leave_id',
         'attachments','reason','task_delegation',
         'destination','transportation','status','departure_date','arrival_date'
     ];
     public static function boot(){
         parent::boot();
+    }
+
+    /** The approved leave this request extends, if any. */
+    public function originalLeave()
+    {
+        return $this->belongsTo(EmployeeLeave::class, 'extends_leave_id');
     }
 
     public function getCreatedAtAttribute($value): ?string {

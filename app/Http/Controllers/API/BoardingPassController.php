@@ -102,15 +102,39 @@ class BoardingPassController extends Controller
                                                                     });
                                                             })
                                                             ->orderBy('created_at', 'desc')
-                                                            ->take(2)
                                                             ->get();
 
             $rankConfig                             =   config('settings.Position_Rank');
 
             foreach ($EmployeeTravelPass as $pass) {
                 foreach ($pass->employeeTravelPassStatusData as $item) {
-                    $role                           =   ucfirst(strtolower($item->approver_rank ?? ''));
-                    $item->rank_type                =   $rankConfig[$role] ?? '';
+                    // approver_role (the actual HOD/HR/SM stage) takes
+                    // precedence — falls back to the rank-derived label
+                    // only for rows created before this column existed.
+                    if ($item->approver_role) {
+                        $item->rank_type            =   $item->approver_role;
+                    } else {
+                        $role                       =   ucfirst(strtolower($item->approver_rank ?? ''));
+                        $item->rank_type            =   $rankConfig[$role] ?? '';
+                    }
+                }
+
+                // Parent status only flips once every stage is Approved (or
+                // immediately to Rejected), so it stays "Pending" through the
+                // whole HOD -> HR -> Security chain. Derive which stage is
+                // actually pending right now from the per-stage rows, ordered
+                // by submission order (ascending id), not the desc-ordered
+                // relation above.
+                $pass->current_status_label        =   $pass->status;
+                if ($pass->status === 'Pending') {
+                    $pendingStage                   =   $pass->employeeTravelPassStatusData
+                                                            ->sortBy('id')
+                                                            ->first(function ($item) {
+                                                                return $item->status === 'Pending';
+                                                            });
+                    if ($pendingStage) {
+                        $pass->current_status_label =   'Pending by ' . ($pendingStage->rank_type ?: $pendingStage->approver_rank);
+                    }
                 }
             }
             $dahsboardArr                           =   [
@@ -231,10 +255,19 @@ class BoardingPassController extends Controller
 
                 // Get employees who hold these positions in the current resort
                 $SMApprover                             =   Employee::with(['resortAdmin','position'])->whereIn('Position_id', $positionIds)
-                                                                ->where('resort_id', $this->resort_id)->select('id', 'rank')
+                                                                ->where('resort_id', $this->resort_id)->where('status', 'Active')
+                                                                ->select('id', 'rank')
+                                                                ->orderBy('id')
                                                                 ->first();
 
                 if ($SMApprover) {
+                    // Tag the FUNCTIONAL stage this approver fills — not
+                    // their personal rank. An HR head or Security Manager
+                    // can personally hold rank=2 ("HOD") same as a real
+                    // department HOD, which made every rank_type lookup
+                    // derived from approver_rank mislabel their rows "HOD"
+                    // too (see approver_role column comment).
+                    $SMApprover->approver_role          =   'SM';
                     $passApprovalFlow->push($SMApprover); // Fourth approver: Security Officer
                 }
 
@@ -242,14 +275,22 @@ class BoardingPassController extends Controller
                 // resort whose real HR employee isn't literally rank 3
                 // (e.g. an HR-department employee ranked HOD/EXCOM),
                 // silently dropping HR from the whole approval chain.
-                $hrApprover                             =   Employee::select('id', 'rank')->whereIn('id', Common::getResortHrEmployeeIds($this->resort_id))->first();
+                $hrApprover                             =   Employee::select('id', 'rank')->whereIn('id', Common::getResortHrEmployeeIds($this->resort_id))->where('status', 'Active')->orderBy('id')->first();
                 if ($hrApprover) {
+                    $hrApprover->approver_role           =   'HR';
                     $passApprovalFlow->push($hrApprover); // Third approver: HR
                 }
 
                 // Add HOD to the approval flow (rank 2)
-                $hodApprover                             =   Employee::select('id', 'rank')->where('rank', 2)->where('resort_id',$this->resort_id)->where('Dept_id', $employee->Dept_id)->first();
+                // Onboarding/inactive employees can carry a valid rank/dept
+                // (a placeholder record before onboarding completes), so an
+                // unfiltered, unordered first() could non-deterministically
+                // resolve one of those instead of the real active HOD —
+                // confirmed against real data where a department had 3
+                // rank=2 employees, only one of them Active.
+                $hodApprover                             =   Employee::select('id', 'rank')->where('rank', 2)->where('resort_id',$this->resort_id)->where('Dept_id', $employee->Dept_id)->where('status', 'Active')->orderBy('id')->first();
                 if ($hodApprover ) {
+                    $hodApprover->approver_role          =   'HOD';
                     $passApprovalFlow->push($hodApprover); // Second approver: HOD
                 }
 
@@ -259,6 +300,7 @@ class BoardingPassController extends Controller
                         'travel_pass_id'                =>  $boardingPass->id,
                         'approver_id'                   =>  $approver->id,
                         'approver_rank'                 =>  $approver->rank,
+                        'approver_role'                 =>  $approver->approver_role,
                         'status'                        =>  'Pending',
                     ]);
 
@@ -279,7 +321,7 @@ class BoardingPassController extends Controller
                         'A boarding pass request has been submitted by ' . $this->user->first_name . ' ' . $this->user->last_name . '.',
                         'Boarding Pass',
                         [$approver->id],
-                        null,
+                        $boardingPass->id,
                         false,
                         'boarding-pass-request'
                     );
@@ -289,6 +331,13 @@ class BoardingPassController extends Controller
 
                 $response['status']                     =   true;
                 $response['message']                    =   'Pass submitted successfully';
+                // The submit response returned nothing about the pass
+                // itself — mobile had no transportation/mode data to show
+                // immediately after submitting without a second fetch.
+                $response['data']                       =   $boardingPass->fresh()->load([
+                                                                    'DepartureResortTransportation:id,resort_id,transportation_option',
+                                                                    'ArrivalResortTransportation:id,resort_id,transportation_option',
+                                                                ]);
 
                 return response()->json($response);
             }
@@ -333,8 +382,12 @@ class BoardingPassController extends Controller
 
             foreach ($EmployeeTravelApprovePass as $pass) {
                 foreach ($pass->employeeTravelPassStatusData as $item) {
-                    $role                           =   ucfirst(strtolower($item->approver_rank ?? ''));
-                    $item->rank_type                =   $rankConfig[$role] ?? '';
+                    if ($item->approver_role) {
+                        $item->rank_type            =   $item->approver_role;
+                    } else {
+                        $role                       =   ucfirst(strtolower($item->approver_rank ?? ''));
+                        $item->rank_type            =   $rankConfig[$role] ?? '';
+                    }
                 }
             }
             return response()->json([
@@ -449,8 +502,12 @@ class BoardingPassController extends Controller
 
             foreach ($EmployeeTravelPassReq as $pass) {
                 foreach ($pass->employeeTravelPassStatusData as $item) {
-                    $role                           =   ucfirst(strtolower($item->approver_rank ?? ''));
-                    $item->rank_type                =   $rankConfig[$role] ?? '';
+                    if ($item->approver_role) {
+                        $item->rank_type            =   $item->approver_role;
+                    } else {
+                        $role                       =   ucfirst(strtolower($item->approver_rank ?? ''));
+                        $item->rank_type            =   $rankConfig[$role] ?? '';
+                    }
                 }
                 // 'transportation' column on the pass itself is never set
                 // (boardingPassAdd only stores arrival_mode/departure_mode
@@ -589,8 +646,12 @@ class BoardingPassController extends Controller
 
             foreach ($EmployeeTravelPassReq as $pass) {
                 foreach ($pass->employeeTravelPassStatusData as $item) {
-                    $role                           =   ucfirst(strtolower($item->approver_rank ?? ''));
-                    $item->rank_type                =   $rankConfig[$role] ?? '';
+                    if ($item->approver_role) {
+                        $item->rank_type            =   $item->approver_role;
+                    } else {
+                        $role                       =   ucfirst(strtolower($item->approver_rank ?? ''));
+                        $item->rank_type            =   $rankConfig[$role] ?? '';
+                    }
                 }
                 // 'transportation' column on the pass itself is never set
                 // (boardingPassAdd only stores arrival_mode/departure_mode
@@ -711,8 +772,12 @@ class BoardingPassController extends Controller
 
             foreach ($EmployeeTravelPassReq as $pass) {
                 foreach ($pass->employeeTravelPassStatusData as $item) {
-                    $role                           =   ucfirst(strtolower($item->approver_rank ?? ''));
-                    $item->rank_type                =   $rankConfig[$role] ?? '';
+                    if ($item->approver_role) {
+                        $item->rank_type            =   $item->approver_role;
+                    } else {
+                        $role                       =   ucfirst(strtolower($item->approver_rank ?? ''));
+                        $item->rank_type            =   $rankConfig[$role] ?? '';
+                    }
                 }
                 // 'transportation' column on the pass itself is never set
                 // (boardingPassAdd only stores arrival_mode/departure_mode
@@ -814,8 +879,12 @@ class BoardingPassController extends Controller
 
             $rankConfig = config('settings.Position_Rank', []);
             foreach ($EmployeeTravelPassView->employeeTravelPassStatusData ?? [] as $item) {
-                $role = ucfirst(strtolower($item->approver_rank ?? ''));
-                $item->rank_type = $rankConfig[$role] ?? '';
+                if ($item->approver_role) {
+                    $item->rank_type = $item->approver_role;
+                } else {
+                    $role = ucfirst(strtolower($item->approver_rank ?? ''));
+                    $item->rank_type = $rankConfig[$role] ?? '';
+                }
             }
 
             $emp = $EmployeeTravelPassView->employee;
@@ -891,7 +960,15 @@ class BoardingPassController extends Controller
 
         $validator = Validator::make($request->all(), [
             'pass_id'                              =>  'required',
-            'action'                                =>  'required',
+            // Was 'required' only, no enum check — employee_travel_pass_status.status
+            // and employee_travel_passes.status are both DB-level ENUMs
+            // ('Pending','Approved','Rejected','Cancel'). Sending anything
+            // else (e.g. "Reject" instead of "Rejected") locally just
+            // silently truncates to '' (confirmed: lenient sql_mode), but
+            // a stricter production MySQL (STRICT_TRANS_TABLES) throws a
+            // real SQL error on that same write, caught by the generic
+            // catch block below as a raw 500 with no useful message.
+            'action'                                =>  'required|in:Approved,Rejected',
             'reason'                                =>  'required_if:action,Rejected',
         ]);
 
@@ -933,10 +1010,27 @@ class BoardingPassController extends Controller
 
             $actionname                             =   ($action == "Rejected") ? "reject" : "approve";
 
+            // If the logged-in approver already actioned their own step,
+            // say so instead of the misleading "must first be approved by
+            // the X" message (the pending row at this point belongs to the
+            // NEXT approver in the chain, not a missing earlier one).
+            $ownStatusRow                           =   EmployeeTravelPassStatus::where('travel_pass_id', $passId)
+                                                            ->where('approver_id', $currentApproverId)
+                                                            ->orderBy('id', 'desc')
+                                                            ->first();
+            if ($ownStatusRow && $ownStatusRow->status !== 'Pending') {
+                return response()->json([
+                    'status'                        =>  false,
+                    'already_actioned'              =>  true,
+                    'pass_status'                   =>  $employeeTravelPasses->status,
+                    'message'                       =>  'You have already ' . strtolower($ownStatusRow->status) . ' this request. It is now awaiting action from the ' . $lastApproverRank . '.',
+                ], 200);
+            }
+
             if ($employeeTravelPassStatus && $employeeTravelPassStatus->approver_id != $currentApproverId) {
                 return response()->json([
                     'status'                        =>  false,
-                    'message'                       =>  "You cannot $actionname this request. The request must first be approved by the $lastApproverRank.",
+                    'message'                       =>  "You cannot $actionname this request. It is currently awaiting action from the $lastApproverRank.",
                 ], 200);
             }
 
@@ -972,7 +1066,7 @@ class BoardingPassController extends Controller
                     'A boarding pass request has been ' . $action . ' by ' . $this->user->first_name . ' ' . $this->user->last_name . '.',
                     'Boarding Pass',
                     [$employeeTravelPasses->employee_id],
-                    null,
+                    $employeeTravelPasses->id,
                     false,
                     'boarding-pass-' . strtolower($action),
                 );
@@ -983,9 +1077,33 @@ class BoardingPassController extends Controller
                     $employeeTravelPasses->status   =   "Approved";
                     $employeeTravelPasses->save();
                 }
+
+                // Tell the next approver in the chain their action is now due.
+                $nextPendingStatus                  =   EmployeeTravelPassStatus::where('travel_pass_id', $employeeTravelPasses->id)
+                                                            ->where('status', 'Pending')
+                                                            ->orderBy('id', 'desc')
+                                                            ->first();
+                if ($nextPendingStatus && $nextPendingStatus->approver_id) {
+                    Common::sendMobileNotification(
+                        $this->resort_id,
+                        2,
+                        null,
+                        null,
+                        'Boarding Pass Approval Required',
+                        'A boarding pass request is awaiting your approval.',
+                        'Boarding Pass',
+                        [$nextPendingStatus->approver_id],
+                        $employeeTravelPasses->id,
+                        false,
+                        'boarding-pass-approval-required',
+                    );
+                }
+
                 return response()->json([
                     'status'                        =>  true,
                     'isAssigned'                    =>  true,
+                    'pass_status'                   =>  $employeeTravelPasses->fresh()->status,
+                    'all_approved'                  =>  (bool) $allApproved,
                     'message'                       =>  'Boarding pass approved successfully.',
                 ]);
             } elseif ($action === 'Rejected') {
@@ -1147,7 +1265,7 @@ class BoardingPassController extends Controller
                     'Your approved boarding pass has been cancelled by ' . $employee->resortAdmin->first_name . ' ' . $employee->resortAdmin->last_name . ($comments ? (': ' . $comments) : '.'),
                     'Boarding Pass',
                     [$employeeTravelPasses->employee_id],
-                    null,
+                    $employeeTravelPasses->id,
                     false,
                     'boarding-pass-cancelled'
                 );
@@ -1174,10 +1292,37 @@ class BoardingPassController extends Controller
         }
     }
 
+    /**
+     * Manifest create/view is restricted to HR HOD/EXCOM and any Security
+     * department employee (department+rank spec from the Island Pass
+     * Manifest ticket) — everyone else gets a 403.
+     */
+    private function userCanManageManifests(): bool
+    {
+        $employee = $this->user->GetEmployee ?? null;
+        if (!$employee) return false;
+
+        $rank    = $employee->rank ?? null;
+        $isHOD   = ($rank == 2 || $rank === '2');
+        $isEXCOM = ($rank == 1 || $rank === '1');
+
+        $department = $employee->Dept_id
+            ? \App\Models\ResortDepartment::where('id', $employee->Dept_id)->where('resort_id', $this->resort_id)->first(['name'])
+            : null;
+        $deptName       = strtolower(trim($department->name ?? ''));
+        $isHRDept       = in_array($deptName, ['human resources', 'hr']);
+        $isSecurityDept = strpos($deptName, 'security') !== false;
+
+        return ($isHRDept && ($isHOD || $isEXCOM)) || $isSecurityDept;
+    }
+
     public function transportationDateBasedEmp(Request $request)
     {
         if (!Auth::guard('api')->check()) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+        if (!$this->userCanManageManifests()) {
+            return response()->json(['success' => false, 'message' => 'You are not authorized to manage manifests.'], 403);
         }
 
         // Validate request data
@@ -1206,17 +1351,23 @@ class BoardingPassController extends Controller
 
             $employeeTravelPasses                   =   $query->get();
 
-            $employees                              =   $employeeTravelPasses->pluck('employee')->map(function ($employee) {
+            // Return photo/pass-type/date alongside name so the manifest
+            // employee-picker can display them, not just the id/name.
+            $employees                              =   $employeeTravelPasses->map(function ($pass) use ($request) {
+                $employee = $pass->employee;
                 if ($employee && $employee->resortAdmin) {
                     return [
                         'id'                        =>  $employee->id,
                         'first_name'                =>  $employee->resortAdmin->first_name,
                         'last_name'                 =>  $employee->resortAdmin->last_name,
                         'full_name'                 =>  $employee->resortAdmin->full_name,
+                        'profile_picture'           =>  Common::getResortUserPicture($employee->Admin_Parent_id),
+                        'pass_type'                 =>  $request->type,
+                        'date'                      =>  $request->type === 'arrival' ? $pass->arrival_date : $pass->departure_date,
                     ];
                 }
                 return null;
-            })->values();
+            })->filter()->values();
 
             return response()->json([
                 'success'                           =>  true,
@@ -1237,6 +1388,9 @@ class BoardingPassController extends Controller
     {
         if (!Auth::guard('api')->check()) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+        if (!$this->userCanManageManifests()) {
+            return response()->json(['success' => false, 'message' => 'You are not authorized to manage manifests.'], 403);
         }
 
          // Validate request data
@@ -1281,6 +1435,15 @@ class BoardingPassController extends Controller
                 ], 200);
             }
 
+            // Attach employees — filter out empty slots (mobile sends a
+            // fixed-size employee_ids[] and leaves unpicked rows blank).
+            // Computed before the manifest itself so the passes update
+            // below can be scoped to exactly these employees.
+            $validEmployeeIds = array_values(array_filter(
+                (array) $request->employee_ids,
+                fn ($id) => $id !== null && $id !== ''
+            ));
+
             if($request->manifest_type == 'arrival') {
 
                 // Set status for arrival
@@ -1297,9 +1460,20 @@ class BoardingPassController extends Controller
                     'status'                            =>  'saved',
                 ]);
 
-                EmployeeTravelPass::where('arrival_date',$request->date)->update([
-                    'arrival_time'                      =>  $request->time,
-                ]);
+                // Scoped to this resort + the employees actually on this
+                // manifest (was previously any pass anywhere with a
+                // matching arrival_date, regardless of resort or whether
+                // the employee was even on this manifest), and stamps
+                // manifest_id so the pass detail reflects the assignment.
+                if (!empty($validEmployeeIds)) {
+                    EmployeeTravelPass::where('resort_id', $this->resort_id)
+                        ->where('arrival_date', $request->date)
+                        ->whereIn('employee_id', $validEmployeeIds)
+                        ->update([
+                            'arrival_time'               =>  $request->time,
+                            'manifest_id'                =>  $manifest->id,
+                        ]);
+                }
             } else {
 
                 // Set status for departure
@@ -1316,17 +1490,16 @@ class BoardingPassController extends Controller
                     'status'                            =>  'saved',
                 ]);
 
-                EmployeeTravelPass::where('departure_date',$request->date)->update([
-                    'departure_time'                    =>  $request->time,
-                ]);
+                if (!empty($validEmployeeIds)) {
+                    EmployeeTravelPass::where('resort_id', $this->resort_id)
+                        ->where('departure_date', $request->date)
+                        ->whereIn('employee_id', $validEmployeeIds)
+                        ->update([
+                            'departure_time'             =>  $request->time,
+                            'manifest_id'                =>  $manifest->id,
+                        ]);
+                }
             }
-
-            // Attach employees — filter out empty slots (mobile sends a
-            // fixed-size employee_ids[] and leaves unpicked rows blank).
-            $validEmployeeIds = array_values(array_filter(
-                (array) $request->employee_ids,
-                fn ($id) => $id !== null && $id !== ''
-            ));
 
             foreach ($validEmployeeIds as $empId) {
                 ManifestEmployee::create([
@@ -1352,6 +1525,36 @@ class BoardingPassController extends Controller
                     null,
                     false,
                     'boarding-pass-detail',
+                );
+            }
+
+            // Also notify HR and Security — the ticket's spec is that
+            // manifest creation notifies the included employees AND these
+            // two groups, not just the employees.
+            $hrEmployeeIds = Common::getResortHrEmployeeIds($this->resort_id);
+            $securityDeptIds = \App\Models\ResortDepartment::where('resort_id', $this->resort_id)
+                ->where('name', 'Security')
+                ->pluck('id');
+            $securityEmployeeIds = Employee::where('resort_id', $this->resort_id)
+                ->whereIn('Dept_id', $securityDeptIds)
+                ->where('status', 'Active')
+                ->pluck('id')
+                ->toArray();
+            $staffNotifyIds = array_values(array_unique(array_merge($hrEmployeeIds, $securityEmployeeIds)));
+
+            if (!empty($staffNotifyIds)) {
+                Common::sendMobileNotification(
+                    $this->resort_id,
+                    2,
+                    null,
+                    null,
+                    'Manifest ' . ucfirst($request->manifest_type) . ' Created',
+                    ucfirst($request->manifest_type) . ' manifest for ' . $request->transportation_mode . ' (' . $request->transportation_name . ') on ' . $request->date . ' at ' . $request->time . ' created with ' . count($validEmployeeIds) . ' employee(s).',
+                    'Boarding Pass',
+                    $staffNotifyIds,
+                    null,
+                    false,
+                    'boarding-pass-manifest-created',
                 );
             }
 
@@ -1420,6 +1623,11 @@ class BoardingPassController extends Controller
     {
         if (!Auth::guard('api')->check()) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+        // Name says HR/SM-only, but had no actual role check — any
+        // authenticated user could edit any pass's arrival/departure time.
+        if (!$this->userCanManageManifests()) {
+            return response()->json(['success' => false, 'message' => 'You are not authorized to manage manifests.'], 403);
         }
 
          // Validate request data
@@ -1843,6 +2051,9 @@ class BoardingPassController extends Controller
         if (!Auth::guard('api')->check()) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
+        if (!$this->userCanManageManifests()) {
+            return response()->json(['success' => false, 'message' => 'You are not authorized to manage manifests.'], 403);
+        }
          $validator = Validator::make($request->all(), [
             'manifest_type'                     => 'required|in:arrival,departure',
         ]);
@@ -1878,6 +2089,9 @@ class BoardingPassController extends Controller
     {
         if (!Auth::guard('api')->check()) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+        if (!$this->userCanManageManifests()) {
+            return response()->json(['success' => false, 'message' => 'You are not authorized to manage manifests.'], 403);
         }
 
         $manifestId = base64_decode($manifestId);
@@ -1921,6 +2135,9 @@ class BoardingPassController extends Controller
     {
         if (!Auth::guard('api')->check()) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+        if (!$this->userCanManageManifests()) {
+            return response()->json(['success' => false, 'message' => 'You are not authorized to manage manifests.'], 403);
         }
 
         $manifestId = base64_decode($manifestId);

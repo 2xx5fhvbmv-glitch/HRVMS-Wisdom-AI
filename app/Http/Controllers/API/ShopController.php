@@ -93,6 +93,46 @@ class ShopController extends Controller
         }
     }
 
+    /**
+     * GET shop/product-details/{product_id}
+     * Target of a scanned product QR code (see docs/mobile-shop-qr-scan.md
+     * for the QR payload format) — the Third-Party Shop module's "scan to
+     * view details/pricing/checkout" screen.
+     */
+    public function productDetails($productId)
+    {
+        if (!$this->user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        try {
+            $product                                        =   DB::table('products as p')
+                                                                    ->join('shopkeepers as sk', 'sk.id', '=', 'p.shopkeeper_id')
+                                                                    ->where('p.id', $productId)
+                                                                    ->where('sk.resort_id', $this->resort_id)
+                                                                    ->select(
+                                                                        'p.id', 'p.name', 'p.price', 'p.currency_type',
+                                                                        'sk.id as shopkeeper_id', 'sk.name as shopkeeper_name'
+                                                                    )
+                                                                    ->first();
+
+            if (!$product) {
+                return response()->json(['success' => false, 'message' => 'Product not found.'], 200);
+            }
+
+            return response()->json([
+                'success'                                   =>  true,
+                'message'                                   =>  'Product details fetched successfully.',
+                'product_data'                               =>  $product,
+            ], 200);
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
     public function consentRequestview($consentRequestId)
     {
         if (!$this->user) {
@@ -158,6 +198,24 @@ class ShopController extends Controller
 
             $pendingConsentview->status                     =   $request->status;
             $pendingConsentview->save();
+
+            // Employee accept/reject never notified the shopkeeper at all —
+            // same resort_notifications pattern Payroll\ShopkeeperController::
+            // bulkUpdatePaymentStatus() already uses for the opposite
+            // direction (HR marking a payment Paid).
+            $employeeName = optional(optional($pendingConsentview->employee)->resortAdmin)->first_name ?? 'The employee';
+            $verb = $pendingConsentview->status === 'Consented' ? 'accepted' : 'rejected';
+            DB::table('resort_notifications')->insert([
+                'resort_id'  => $this->resort_id,
+                'user_id'    => $pendingConsentview->shopkeeper_id,
+                'module'     => 'Staff Shop',
+                'type'       => $pendingConsentview->status === 'Consented' ? 'Consent Accepted' : 'Consent Rejected',
+                'message'    => $employeeName . ' ' . $verb . ' the consent request for order ' . $pendingConsentview->order_id . '.',
+                'status'     => 'unread',
+                'request_id' => $pendingConsentview->id,
+                'created_at' => now(),
+                'updated_at' => now(),
+            ]);
 
             $response['status']                             =   true;
             $response['message']                            =   "Pending consents Approved successfully.";

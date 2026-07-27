@@ -54,7 +54,12 @@ class LeaveController extends Controller
             'to_date'                   => 'required|array',
             'to_date.*'                 => 'required|date_format:Y-m-d',
             'reason'                    => 'required|string',
-            'task_delegation'           => 'required|integer',
+            'task_delegation'           => 'nullable|integer',
+            // Extending an already-approved leave: this is just a normal
+            // leave request for the additional days, tagged back to the
+            // original. Ownership + Approved-status of the referenced
+            // leave is checked below (Validator can't reach $emp_id yet).
+            'extends_leave_id'          => 'nullable|integer|exists:employees_leaves,id',
 
             // Conditional validation for transportation
             'transportation'            => 'nullable|array',
@@ -86,6 +91,19 @@ class LeaveController extends Controller
         $emp_id                                         =   $employee->id;
         $rank                                           =   $employee->rank;
         $resortId                                       =   $user->resort_id;
+
+        if ($request->filled('extends_leave_id')) {
+            $originalLeave                              =   EmployeeLeave::where('id', $request->extends_leave_id)
+                                                                ->where('emp_id', $emp_id)
+                                                                ->where('resort_id', $resortId)
+                                                                ->first();
+            if (!$originalLeave) {
+                return response()->json(['success' => false, 'message' => 'The leave you are trying to extend was not found.'], 200);
+            }
+            if ($originalLeave->status !== 'Approved') {
+                return response()->json(['success' => false, 'message' => 'You can only extend a leave that has already been approved.'], 200);
+            }
+        }
 
         try {
             // Start a database transaction
@@ -235,18 +253,15 @@ class LeaveController extends Controller
                         }
                     }
                 } else {
-                    // Local Storage
+                    // Local Storage — must land under public/ (like
+                    // leaveUpdate() already does); Storage::storeAs() put it
+                    // in storage/app which the web server can't serve, so
+                    // every attachment URL 404'd.
                     $leave_attachment                       =   config('settings.leave_attachments');
                     $dynamic_path                           =   $leave_attachment . '/' . $emp_id;
 
-                    // Create the directory if it doesn't exist
-                    if (!Storage::exists($dynamic_path)) {
-                        Storage::makeDirectory($dynamic_path);
-                    }
-
-                    // Store the file locally
                     $filename                               =   time() . '_' . $file->getClientOriginalName();
-                    $file->storeAs($dynamic_path, $filename);
+                    $file->move(public_path($dynamic_path), $filename);
                     $filePath                               =   $dynamic_path . '/' . $filename;
                 }
             }
@@ -426,11 +441,17 @@ class LeaveController extends Controller
                     'from_date'                         =>  $fromDate,
                     'to_date'                           =>  $toDate,
                     'flag'                              =>  $currentFlag,
+                    'extends_leave_id'                  =>  $request->extends_leave_id ?? null,
                     'total_days'                        =>  $totalDays,
                     'reason'                            =>  $request->reason,
                     'task_delegation'                   =>  $request->task_delegation,
                     'destination'                       =>  $request->destination,
-                    'attachments'                       =>  $filePath ? json_encode($filePath) : null,
+                    // Local uploads produce a plain path string —
+                    // json_encode()ing it wrapped the path in literal quotes
+                    // ("uploads\/...") which then got concatenated into the
+                    // download URL and 404'd. Only the S3 array shape
+                    // (Filename/Child_id) needs JSON.
+                    'attachments'                       =>  $filePath ? (is_array($filePath) ? json_encode($filePath) : $filePath) : null,
                     'status'                            =>  "Pending",
                 ]);
 
@@ -468,12 +489,20 @@ class LeaveController extends Controller
                                                                 ->whereIn('position_title', $securityManagerTitles)
                                                                 ->pluck('id'); // Get the position IDs
 
-                // Get employees who hold these positions in the current resort
+                // Get employees who hold these positions in the current resort.
+                // Same fix as BoardingPassController::boardingPassAdd() (this
+                // is a separate, duplicate approver-assignment code path for
+                // the Island Pass linked to a leave request with travel
+                // dates) — no status filter or ordering meant an Onboarding
+                // placeholder could be resolved instead of the real approver.
                 $SMApprover                             =   Employee::with(['resortAdmin','position'])->whereIn('Position_id', $positionIds)
-                                                                ->where('resort_id', $user->resort_id)->select('id', 'rank')
+                                                                ->where('resort_id', $user->resort_id)->where('status', 'Active')
+                                                                ->select('id', 'rank')
+                                                                ->orderBy('id')
                                                                 ->first();
 
                 if ($SMApprover) {
+                    $SMApprover->approver_role           =   'SM';
                     $passApprovalFlow->push($SMApprover); // Fourth approver: Security Officer
                 }
 
@@ -481,14 +510,16 @@ class LeaveController extends Controller
                 // whose real HR employee isn't literally rank 3 (e.g. an
                 // HR-department employee ranked HOD/EXCOM), silently dropping
                 // HR from the whole approval chain.
-                $hrApprover                             =   Employee::select('id', 'rank')->whereIn('id', Common::getResortHrEmployeeIds($user->resort_id))->first();
+                $hrApprover                             =   Employee::select('id', 'rank')->whereIn('id', Common::getResortHrEmployeeIds($user->resort_id))->where('status', 'Active')->orderBy('id')->first();
                 if ($hrApprover) {
+                    $hrApprover->approver_role            =   'HR';
                     $passApprovalFlow->push($hrApprover); // Third approver: HR
                 }
 
                 // Add HOD to the approval flow (rank 2)
-                $hodApprover                             =   Employee::select('id', 'rank')->where('rank', 2)->where('resort_id',$user->resort_id)->where('Dept_id', $employee->Dept_id)->first();
+                $hodApprover                             =   Employee::select('id', 'rank')->where('rank', 2)->where('resort_id',$user->resort_id)->where('Dept_id', $employee->Dept_id)->where('status', 'Active')->orderBy('id')->first();
                 if ($hodApprover ) {
+                    $hodApprover->approver_role           =   'HOD';
                     $passApprovalFlow->push($hodApprover); // Second approver: HOD
                 }
 
@@ -515,6 +546,7 @@ class LeaveController extends Controller
                             'travel_pass_id'            =>  $boardingPass->id,
                             'approver_id'               =>  $approverFlw->id,
                             'approver_rank'             =>  $approverFlw->rank,
+                            'approver_role'             =>  $approverFlw->approver_role ?? null,
                             'status'                    =>  'Pending',
                         ]);
                     }
@@ -805,7 +837,7 @@ class LeaveController extends Controller
         }
     }
 
-    public function taskDelegation()
+    public function taskDelegation(Request $request)
     {
         if (!Auth::guard('api')->check()) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
@@ -869,16 +901,32 @@ class LeaveController extends Controller
                 }
             } else {
 
+                // Master admin: no department of their own — show every
+                // active employee in the resort. ($targetRanks was
+                // referenced here but never defined, which 500'd every
+                // master-admin call.)
                 $delegations                            =   DB::table('employees')
                                                                 ->join('resort_admins', 'employees.Admin_Parent_id', '=', 'resort_admins.id')
                                                                 ->where('employees.resort_id', $resort_id)
-                                                                ->whereIn('employees.rank', $targetRanks)
+                                                                ->where('employees.status', 'Active')
+                                                                ->whereNull('employees.deleted_at')
                                                                 ->select(
                                                                     'employees.*',
                                                                     'resort_admins.first_name as first_name',
                                                                     'resort_admins.last_name as last_name',
                                                                     'resort_admins.email as admin_email'
                                                                 )->get();
+            }
+
+            // Optional server-side search so the app dropdown can filter as
+            // the user types (?search=...) — matches name or email.
+            $search                                     =   trim((string) $request->query('search', ''));
+            if ($search !== '') {
+                $needle                                 =   mb_strtolower($search);
+                $delegations                            =   $delegations->filter(function ($row) use ($needle) {
+                    $haystack                           =   mb_strtolower(trim(($row->first_name ?? '') . ' ' . ($row->last_name ?? '') . ' ' . ($row->admin_email ?? '')));
+                    return strpos($haystack, $needle) !== false;
+                })->values();
             }
 
             if ($delegations->isEmpty()) {
@@ -1002,8 +1050,8 @@ class LeaveController extends Controller
                                                             ->join('employees_leaves_status as els', 'els.leave_request_id', '=', 'el.id')
                                                             ->join('employees as e', 'e.id', '=', 'el.emp_id') // Main employee
                                                             ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id') // Main employee admin details
-                                                            ->join('employees as delegated_emp', 'delegated_emp.id', '=', 'el.task_delegation') // Delegated employee
-                                                            ->join('resort_admins as ra_td', 'ra_td.id', '=', 'delegated_emp.Admin_Parent_id') // Task delegation admin details
+                                                            ->leftJoin('employees as delegated_emp', 'delegated_emp.id', '=', 'el.task_delegation') // Delegated employee
+                                                            ->leftJoin('resort_admins as ra_td', 'ra_td.id', '=', 'delegated_emp.Admin_Parent_id') // Task delegation admin details
                                                             ->join('resort_positions as rp', 'rp.id', '=', 'e.Position_id')
                                                             ->join('resort_departments as rd', 'rd.id', '=', 'e.Dept_id')
                                                             ->join('leave_categories as lc', 'lc.id', '=', 'el.leave_category_id')
@@ -1037,6 +1085,11 @@ class LeaveController extends Controller
             $leaveData['leave_balances']                =   null;
             $leaveData['total_allocated_days']          =   null;
             $leaveData['total_available_days']          =   null;
+            // Employee's saved default destination (set via web portal
+            // Employee Details > Additional Information) — the mobile Apply
+            // Leave screen should prefill its editable Destination field
+            // with this instead of leaving it blank.
+            $leaveData['default_destination']           =   $employee->leave_destination;
 
             $emp_grade                                  =   Common::getEmpGrade($user->GetEmployee->rank);
 
@@ -1385,8 +1438,8 @@ class LeaveController extends Controller
                                                                 ->join('employees_leaves_status as els', 'els.leave_request_id', '=', 'el.id')
                                                                 ->join('employees as e', 'e.id', '=', 'el.emp_id') // Main employee
                                                                 ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id') // Main employee admin details
-                                                                ->join('employees as delegated_emp', 'delegated_emp.id', '=', 'el.task_delegation') // Delegated employee
-                                                                ->join('resort_admins as ra_td', 'ra_td.id', '=', 'delegated_emp.Admin_Parent_id') // Task delegation admin details
+                                                                ->leftJoin('employees as delegated_emp', 'delegated_emp.id', '=', 'el.task_delegation') // Delegated employee
+                                                                ->leftJoin('resort_admins as ra_td', 'ra_td.id', '=', 'delegated_emp.Admin_Parent_id') // Task delegation admin details
                                                                 ->join('resort_positions as rp', 'rp.id', '=', 'e.Position_id')
                                                                 ->join('resort_departments as rd', 'rd.id', '=', 'e.Dept_id')
                                                                 ->join('leave_categories as lc', 'lc.id', '=', 'el.leave_category_id')
@@ -1460,7 +1513,17 @@ class LeaveController extends Controller
                     $leaveDetail->transportation_details    =   json_decode($leaveDetail->transportation_details, true);
 
                     $baseUrl = url('/');
-                    $leaveDetail->attachments               =   $leaveDetail->attachments ? $baseUrl . '/' . $leaveDetail->attachments : '';
+                    $leaveDetail->attachments               =   self::resolveLeaveAttachmentUrl($leaveDetail->attachments);
+
+                    // Give the approver context in one call instead of
+                    // requiring a second lookup for the leave this one
+                    // extends.
+                    $leaveDetail->original_leave             =   $leaveDetail->extends_leave_id
+                                                                    ? DB::table('employees_leaves')
+                                                                        ->where('id', $leaveDetail->extends_leave_id)
+                                                                        ->select('id', 'from_date', 'to_date', 'total_days', 'status')
+                                                                        ->first()
+                                                                    : null;
                 }
 
                 if (!$leaveDetail) {
@@ -1670,8 +1733,8 @@ class LeaveController extends Controller
                                                 })
                                                 ->join('employees as e', 'e.id', '=', 'el.emp_id') // Main employee
                                                 ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id') // Main employee admin details
-                                                ->join('employees as delegated_emp', 'delegated_emp.id', '=', 'el.task_delegation') // Delegated employee
-                                                ->join('resort_admins as ra_td', 'ra_td.id', '=', 'delegated_emp.Admin_Parent_id') // Task delegation admin details
+                                                ->leftJoin('employees as delegated_emp', 'delegated_emp.id', '=', 'el.task_delegation') // Delegated employee
+                                                ->leftJoin('resort_admins as ra_td', 'ra_td.id', '=', 'delegated_emp.Admin_Parent_id') // Task delegation admin details
                                                 ->join('resort_positions as rp', 'rp.id', '=', 'e.Position_id')
                                                 ->join('resort_departments as rd', 'rd.id', '=', 'e.Dept_id')
                                                 ->join('leave_categories as lc', 'lc.id', '=', 'el.leave_category_id')
@@ -1776,13 +1839,13 @@ class LeaveController extends Controller
                         if ($leaveDetail->leave_data) {
                             foreach ($leaveDetail->leave_data as $leaveData) {
                                 $leaveData->employee_profile_picture    = Common::getResortUserPicture($leaveData->employee_id);
-                                $leaveData->attachments                 = $leaveData->attachments ? $baseUrl . '/' . $leaveData->attachments : '';
+                                $leaveData->attachments                 = self::resolveLeaveAttachmentUrl($leaveData->attachments);
                             }
                         }
 
                         // Update profile picture dynamically
                         $leaveDetail->employee_profile_picture  = Common::getResortUserPicture($leaveDetail->employee_id);
-                        $leaveDetail->attachments               = $leaveDetail->attachments ? $baseUrl . '/' . $leaveDetail->attachments : '';
+                        $leaveDetail->attachments               = self::resolveLeaveAttachmentUrl($leaveDetail->attachments);
                     }
                 }
 
@@ -1835,9 +1898,13 @@ class LeaveController extends Controller
             }
 
             if ($resortId) {
+                // Was excluding Pending leaves entirely, so tapping a
+                // still-pending leave in the mobile "My Leave" list (any
+                // newly-applied leave, before HOD/HR acts on it) 404'd with
+                // "Leave ID not found" — this is a single-record detail
+                // view, it should show a leave regardless of status.
                 $leaveDetails = DB::table('employees_leaves')
                     ->where('id', $decodedId)
-                    ->whereNotIn('status', ['Pending'])
                     ->first();
 
                 if (!$leaveDetails) {
@@ -1852,8 +1919,8 @@ class LeaveController extends Controller
                     ->join('employees_leaves_status as els', 'els.leave_request_id', '=', 'el.id')
                     ->join('employees as e', 'e.id', '=', 'el.emp_id') // Main employee
                     ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id') // Main employee admin details
-                    ->join('employees as delegated_emp', 'delegated_emp.id', '=', 'el.task_delegation') // Delegated employee
-                    ->join('resort_admins as ra_td', 'ra_td.id', '=', 'delegated_emp.Admin_Parent_id') // Task delegation admin details
+                    ->leftJoin('employees as delegated_emp', 'delegated_emp.id', '=', 'el.task_delegation') // Delegated employee
+                    ->leftJoin('resort_admins as ra_td', 'ra_td.id', '=', 'delegated_emp.Admin_Parent_id') // Task delegation admin details
                     ->join('resort_positions as rp', 'rp.id', '=', 'e.Position_id')
                     ->join('resort_departments as rd', 'rd.id', '=', 'e.Dept_id')
                     ->join('leave_categories as lc', 'lc.id', '=', 'el.leave_category_id')
@@ -1862,8 +1929,6 @@ class LeaveController extends Controller
                         $query->where('el.flag', $leaveCategoryId) // Matches flag with leave_category_id
                             ->orWhere('el.id', $decodedId); // Include the original record
                     })
-                    ->whereNotIn('el.status', ['Pending'])
-                    ->whereNotIn('els.status', ['Pending'])
                     ->where('el.emp_id', $empId);
 
                 $combineLeaveDetails = $combineLeaveDetails->select(
@@ -1942,7 +2007,7 @@ class LeaveController extends Controller
                 $response['message']                = 'Leave Details';
                 $response['leave_request']          = $combineLeaveDetails;
                 $response['total_leave']            = $totalLeave;
-                $response['attachments']            = $combineLeaveDetails[0]->attachments ? $baseUrl . '/' . $combineLeaveDetails[0]->attachments : '';
+                $response['attachments']            = self::resolveLeaveAttachmentUrl($combineLeaveDetails[0]->attachments);
 
                 return response()->json($response);
             }
@@ -2260,23 +2325,33 @@ class LeaveController extends Controller
                                                                         ->whereIn('position_title', $securityManagerTitles)
                                                                         ->pluck('id'); // Get the position IDs
 
-                        // Get employees who hold these positions in the current resort
+                        // Get employees who hold these positions in the current resort.
+                        // Same status/ordering fix as the other two copies of this
+                        // approver-assignment logic in this file.
                         $SMApprover                             =   Employee::with(['resortAdmin','position'])->whereIn('Position_id', $positionIds)
-                                                                        ->where('resort_id', $user->resort_id)->select('id', 'rank')
+                                                                        ->where('resort_id', $user->resort_id)->where('status', 'Active')
+                                                                        ->select('id', 'rank')
+                                                                        ->orderBy('id')
                                                                         ->first();
                         if ($SMApprover) {
+                            $SMApprover->approver_role           =   'SM';
                             $passApprovalFlow->push($SMApprover); // Fourth approver: Security Officer
                         }
 
-                        // Add HR to the approval flow (rank 3)
-                        $hrApprover                             =   Employee::select('id', 'rank')->where('resort_id',$user->resort_id)->where('rank', 3)->first();
+                        // Add HR to the approval flow. Raw rank=3 excluded any resort
+                        // whose real HR employee isn't literally rank 3 (e.g. an
+                        // HR-department employee ranked HOD/EXCOM) — matches the fix
+                        // already applied to the other two copies of this logic.
+                        $hrApprover                             =   Employee::select('id', 'rank')->whereIn('id', Common::getResortHrEmployeeIds($user->resort_id))->where('status', 'Active')->orderBy('id')->first();
                         if ($hrApprover) {
+                            $hrApprover->approver_role            =   'HR';
                             $passApprovalFlow->push($hrApprover); // Third approver: HR
                         }
 
                         // Add HOD to the approval flow (rank 2)
-                        $hodApprover                             =   Employee::select('id', 'rank')->where('rank', 2)->where('resort_id',$user->resort_id)->where('Dept_id', $employee->Dept_id)->first();
+                        $hodApprover                             =   Employee::select('id', 'rank')->where('rank', 2)->where('resort_id',$user->resort_id)->where('Dept_id', $employee->Dept_id)->where('status', 'Active')->orderBy('id')->first();
                         if ($hodApprover ) {
+                            $hodApprover->approver_role           =   'HOD';
                             $passApprovalFlow->push($hodApprover); // Second approver: HOD
                         }
 
@@ -2302,11 +2377,23 @@ class LeaveController extends Controller
                                 // Add the same approval flow for Exit Pass as well
                                foreach ($passApprovalFlow as $approverFlw) {
 
-                                    // Create approval status for Entry Pass
+                                    // Create approval status for Entry Pass.
+                                    // Was $entryPass->id — $entryPass is the
+                                    // EmployeesLeaveTransportation row from the
+                                    // unrelated loop above (a completely
+                                    // different table), not this travel pass.
+                                    // Every leave UPDATE that included travel
+                                    // dates created approval rows pointing at
+                                    // the wrong travel_pass_id entirely — this
+                                    // is almost certainly the real source of
+                                    // the "stray wrong-department HOD" rows
+                                    // two prior data migrations had to clean
+                                    // up, not a department-scoping mismatch.
                                     EmployeeTravelPassStatus::create([
-                                        'travel_pass_id'    =>  $entryPass->id,
+                                        'travel_pass_id'    =>  $boardingPass->id,
                                         'approver_id'       =>  $approverFlw->id,
                                         'approver_rank'     =>  $approverFlw->rank,
+                                        'approver_role'     =>  $approverFlw->approver_role ?? null,
                                         'status'            =>  'Pending',
                                     ]);
                                 }
@@ -3022,8 +3109,8 @@ class LeaveController extends Controller
                                             ->join('employees_leaves_status as els', 'els.leave_request_id', '=', 'el.id')
                                             ->join('employees as e', 'e.id', '=', 'el.emp_id') // Main employee
                                             ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id') // Main employee admin details
-                                            ->join('employees as delegated_emp', 'delegated_emp.id', '=', 'el.task_delegation') // Delegated employee
-                                            ->join('resort_admins as ra_td', 'ra_td.id', '=', 'delegated_emp.Admin_Parent_id') // Task delegation admin details
+                                            ->leftJoin('employees as delegated_emp', 'delegated_emp.id', '=', 'el.task_delegation') // Delegated employee
+                                            ->leftJoin('resort_admins as ra_td', 'ra_td.id', '=', 'delegated_emp.Admin_Parent_id') // Task delegation admin details
                                             ->join('resort_positions as rp', 'rp.id', '=', 'e.Position_id')
                                             ->join('resort_departments as rd', 'rd.id', '=', 'e.Dept_id')
                                             ->join('leave_categories as lc', 'lc.id', '=', 'el.leave_category_id')
@@ -3092,7 +3179,7 @@ class LeaveController extends Controller
                     // Add approve_data to the base record
                     $base->approve_data                 = $approveData;
                     $base->employee_profile_picture     = Common::getResortUserPicture($base->employee_id);
-                    $base->attachments                  = $base->attachments ? $baseUrl . '/' . $base->attachments : '';
+                    $base->attachments                  = self::resolveLeaveAttachmentUrl($base->attachments);
                     // Clear duplicate fields in the base record
                     unset($base->approver_rank, $base->approver_id);
 
@@ -3167,8 +3254,8 @@ class LeaveController extends Controller
                     // ->join('employees_leaves_status as els', 'els.leave_request_id', '=', 'el.id')
                     ->join('employees as e', 'e.id', '=', 'el.emp_id') // Main employee
                     ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id') // Main employee admin details
-                    ->join('employees as delegated_emp', 'delegated_emp.id', '=', 'el.task_delegation') // Delegated employee
-                    ->join('resort_admins as ra_td', 'ra_td.id', '=', 'delegated_emp.Admin_Parent_id') // Task delegation admin details
+                    ->leftJoin('employees as delegated_emp', 'delegated_emp.id', '=', 'el.task_delegation') // Delegated employee
+                    ->leftJoin('resort_admins as ra_td', 'ra_td.id', '=', 'delegated_emp.Admin_Parent_id') // Task delegation admin details
                     ->join('resort_positions as rp', 'rp.id', '=', 'e.Position_id')
                     ->join('resort_departments as rd', 'rd.id', '=', 'e.Dept_id')
                     ->join('leave_categories as lc', 'lc.id', '=', 'el.leave_category_id')
@@ -3295,7 +3382,7 @@ class LeaveController extends Controller
                     $leaveDetail->transportation_details    = $transportationDetails;
                     // $leaveDetail->island_pass               = json_decode($leaveDetail->island_pass, true);
                     $baseUrl                                = url('/');
-                    $leaveDetail->attachments               = $leaveDetail->attachments ? $baseUrl . '/' . $leaveDetail->attachments : '';
+                    $leaveDetail->attachments               = self::resolveLeaveAttachmentUrl($leaveDetail->attachments);
                     // $role                                   = ucfirst(strtolower($leaveDetail->approver_rank ?? ''));
                     // $rank                                   = config('settings.Position_Rank');
                     // $role                                   = $rank[$role] ?? '';
@@ -3655,7 +3742,13 @@ class LeaveController extends Controller
                     'etps.approved_at',
                 )
                 ->where('etp.resort_id', $resort_id)
-                ->where('e.reporting_to', $employee->id)
+                // Approvers are assigned per-pass in employee_travel_pass_status
+                // (department+rank lookup at submission time — see
+                // EmployeeTravelPassStatus::create() above), which does NOT
+                // guarantee the requesting employee's reporting_to points at
+                // this HOD. Filtering by reporting_to silently hid passes
+                // this HOD was actually assigned to approve.
+                ->where('etps.approver_id', $employee->id)
                 ->orderBy('etp.id', 'desc') // Order by ID descending
                 ->get();
 
@@ -3733,7 +3826,11 @@ class LeaveController extends Controller
                     'etps.approved_at',
                 )
                 ->where('etp.resort_id', $resort_id)
-                ->where('e.reporting_to', $employee->id)
+                // Same fix as islandPassViewHOD() above — approver_id (from
+                // employee_travel_pass_status, department+rank assigned at
+                // submission time) is the real source of "am I an approver
+                // for this pass", not the employee's reporting_to.
+                ->where('etps.approver_id', $employee->id)
                 ->where('etp.id', $pass_id) // Order by ID descending
                 ->orderBy('etp.id', 'desc') // Order by ID descending
                 ->first();
@@ -3844,7 +3941,7 @@ class LeaveController extends Controller
                         $empName->first_name . ' ' . $empName->last_name . ' Your leave request from '.$action . ' by '.$role,
                         'Leave',
                         [$leave->emp_id],
-                        NULL,
+                        $leave->id,
                         false,
                         'leave-' . strtolower($action),
                     );
@@ -3875,7 +3972,7 @@ class LeaveController extends Controller
                         $empName->first_name . ' ' . $empName->last_name . 'Your leave request from ' . $leave->from_date . ' to ' . $leave->to_date . ' has been ' . $action . '.',
                         'Leave',
                         [$leave->emp_id],
-                        NULL,
+                        $leave->id,
                         false,
                         'leave-approved',
                     );
@@ -3904,7 +4001,7 @@ class LeaveController extends Controller
                     $empName->first_name . ' ' . $empName->last_name . 'Your leave request from ' . $leave->from_date . ' to ' . $leave->to_date . ' has been ' . $action . '.',
                     'Leave',
                     [$leave->emp_id],
-                    NULL,
+                    $leave->id,
                     false,
                     'leave-rejected',
                 );
@@ -3997,5 +4094,50 @@ class LeaveController extends Controller
             \Log::error("Error in processLeaveWithHolidayCheck: " . $e->getMessage());
             return null;
         }
+    }
+
+    /**
+     * Turn whatever is stored in employees_leaves.attachments into a URL the
+     * app can open. Historical rows hold three shapes: a plain relative path,
+     * a json_encode()d path string (with literal quotes that used to corrupt
+     * the URL), or the S3 shape {"Filename":...,"Child_id":...}.
+     */
+    public static function resolveLeaveAttachmentUrl($raw)
+    {
+        if (empty($raw)) {
+            return '';
+        }
+
+        $value   = trim((string) $raw);
+        $decoded = json_decode($value, true);
+        if (json_last_error() === JSON_ERROR_NONE) {
+            if (is_string($decoded)) {
+                $value = $decoded;
+            } elseif (is_array($decoded)) {
+                $childId = $decoded['Child_id'] ?? null;
+                if ($childId) {
+                    $fileRecord = \App\Models\ChildFileManagement::find($childId);
+                    if ($fileRecord && $fileRecord->File_Path) {
+                        try {
+                            return \App\Helpers\StorageHelper::temporaryUrl($fileRecord->File_Path);
+                        } catch (\Exception $e) {
+                            \Log::error('resolveLeaveAttachmentUrl: ' . $e->getMessage());
+                        }
+                    }
+                }
+                return '';
+            }
+        }
+
+        // Defensive: strip any stray quotes left by older double-encoded rows.
+        $value = trim($value, "\"' \t");
+        if ($value === '') {
+            return '';
+        }
+        if (preg_match('#^https?://#i', $value)) {
+            return $value;
+        }
+
+        return url('/') . '/' . ltrim($value, '/');
     }
 }

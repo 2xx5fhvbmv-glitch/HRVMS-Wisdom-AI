@@ -46,6 +46,13 @@
                                 <li><a class="dropdown-item" href="{{ route('resort.report.compliance.index') }}">Compliance Reports</a></li>
                                 <li><a class="dropdown-item" href="{{ route('resort.report.employee.index') }}">Employee Master Reports</a></li>
                                 <li><a class="dropdown-item" href="{{ route('resort.report.onboarding.index') }}">Onboarding Reports</a></li>
+                                <li><a class="dropdown-item" href="{{ route('resort.report.announcement.index') }}">Announcement Reports</a></li>
+                                <li><a class="dropdown-item" href="{{ route('resort.report.probation.index') }}">Probation Reports</a></li>
+                                <li><a class="dropdown-item" href="{{ route('resort.report.promotion.index') }}">Promotion Reports</a></li>
+                                <li><a class="dropdown-item" href="{{ route('resort.report.transfer.index') }}">Transfer Reports</a></li>
+                                <li><a class="dropdown-item" href="{{ route('resort.report.salary_increment.index') }}">Salary Increment Reports</a></li>
+                                <li><a class="dropdown-item" href="{{ route('resort.report.salary_advance_loan.index') }}">Salary Advance & Loan Reports</a></li>
+                                <li><a class="dropdown-item" href="{{ route('resort.report.resignation_exit.index') }}">Resignation & Exit Clearance Reports</a></li>
                             </ul>
                         </div>
                         <a href="{{ route('reports.create') }}" class="btn btn-sm btn-theme @if(Common::checkRouteWisePermission('resort.report.index',config('settings.resort_permissions.create')) == false) d-none @endif">Custom Report</a>

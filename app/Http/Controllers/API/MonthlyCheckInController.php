@@ -501,7 +501,7 @@ class MonthlyCheckInController extends Controller
                                                                     $msg,
                                                                     $ModuleName,
                                                                     [$createdByEmployeeId->id],
-                                                                    null,
+                                                                    $monthly->id,
                                                                     false,
                                                                     'monthly-checkin-created',
                                                                 );

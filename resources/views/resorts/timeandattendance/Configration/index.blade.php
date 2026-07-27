@@ -465,6 +465,9 @@
                                     <button type="button" id="btn-place-marker" class="btn btn-sm btn-themeGray">
                                         <i class="fa-solid fa-map-marker-alt"></i> Place Marker
                                     </button>
+                                    <button type="button" id="btn-locate-me" class="btn btn-sm btn-themeSkyblue">
+                                        <i class="fa-solid fa-location-crosshairs"></i> Locate Me
+                                    </button>
                                     <span id="draw-status" class="text-muted small ms-2"></span>
                                 </div>
                             </div>
@@ -535,6 +538,9 @@
                                 </button>
                                 <button type="button" id="gf-tool-clear" class="btn btn-sm btn-outline-danger" disabled>
                                     <i class="fa-solid fa-trash"></i> Clear
+                                </button>
+                                <button type="button" id="gf-tool-locate" class="btn btn-sm btn-outline-primary">
+                                    <i class="fa-solid fa-location-crosshairs"></i> Locate Me
                                 </button>
                                 <span id="gf-draw-status" class="text-muted small ms-auto"></span>
                             </div>
@@ -1316,6 +1322,38 @@
                 }
             });
 
+            $(document).on('click', '#btn-locate-me', function() {
+                var $btn = $(this);
+                if (!navigator.geolocation) {
+                    toastr.error('Geolocation is not supported by this browser.', 'Error', { positionClass: 'toast-bottom-right' });
+                    return;
+                }
+                var originalHtml = $btn.html();
+                $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Locating...');
+                navigator.geolocation.getCurrentPosition(function(position) {
+                    var lat = position.coords.latitude;
+                    var lng = position.coords.longitude;
+                    $('#latitude').val(lat.toFixed(8));
+                    $('#longitude').val(lng.toFixed(8));
+                    if (geoMap) {
+                        var pos = { lat: lat, lng: lng };
+                        geoMap.setCenter(pos);
+                        geoMap.setZoom(17);
+                        if (geoMarker) {
+                            geoMarker.setPosition(pos);
+                        }
+                    }
+                    $btn.prop('disabled', false).html(originalHtml);
+                }, function(error) {
+                    var message = 'Unable to retrieve your location.';
+                    if (error.code === error.PERMISSION_DENIED) {
+                        message = 'Location access was denied. Please allow location permission and try again.';
+                    }
+                    toastr.error(message, 'Error', { positionClass: 'toast-bottom-right' });
+                    $btn.prop('disabled', false).html(originalHtml);
+                }, { enableHighAccuracy: true, timeout: 10000 });
+            });
+
             // Update marker when lat/lng inputs change manually
             $(document).on('change', '#latitude, #longitude', function() {
                 var lat = parseFloat($('#latitude').val());
@@ -1360,7 +1398,10 @@
 
             function getcheckit() {
                 if ($('.flexSwitchCheckDefaultCheck').is(':checked')) {
-                    $(".AddGeoFancing").show();
+                    // Add Geo-Fencing (the single-marker/polygon modal) kept
+                    // confusing users alongside Manage Zones (which covers
+                    // the same job — multiple named zones) — hidden per
+                    // request, Manage Zones is now the only entry point.
                     $("#openGeofenceManager").show();
                     $("#geofence-zones-preview").show();
                 } else {
@@ -1741,6 +1782,29 @@
 
             $(document).on('click', '#gf-tool-polygon', function() { gfActivateTool('polygon'); });
             $(document).on('click', '#gf-tool-circle', function() { gfActivateTool('circle'); });
+            $(document).on('click', '#gf-tool-locate', function() {
+                var $btn = $(this);
+                if (!navigator.geolocation) {
+                    toastr.error('Geolocation is not supported by this browser.', 'Error', { positionClass: 'toast-bottom-right' });
+                    return;
+                }
+                var originalHtml = $btn.html();
+                $btn.prop('disabled', true).html('<i class="fa-solid fa-spinner fa-spin"></i> Locating...');
+                navigator.geolocation.getCurrentPosition(function(position) {
+                    if (gfMap) {
+                        gfMap.setCenter({ lat: position.coords.latitude, lng: position.coords.longitude });
+                        gfMap.setZoom(17);
+                    }
+                    $btn.prop('disabled', false).html(originalHtml);
+                }, function(error) {
+                    var message = 'Unable to retrieve your location.';
+                    if (error.code === error.PERMISSION_DENIED) {
+                        message = 'Location access was denied. Please allow location permission and try again.';
+                    }
+                    toastr.error(message, 'Error', { positionClass: 'toast-bottom-right' });
+                    $btn.prop('disabled', false).html(originalHtml);
+                }, { enableHighAccuracy: true, timeout: 10000 });
+            });
             $(document).on('click', '#gf-tool-undo', function() { gfUndoLastPoint(); });
             $(document).on('click', '#gf-tool-clear', function() { gfClearDrawing(); });
 

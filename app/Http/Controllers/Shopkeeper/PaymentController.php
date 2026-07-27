@@ -23,6 +23,7 @@ use App\Models\Product;
 use App\Models\ResortNotification;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\PaymentsExport;
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
 class PaymentController extends Controller
 {
     public $shopkeeper;
@@ -51,6 +52,11 @@ class PaymentController extends Controller
             $tableData = Payment::join('employees as e', 'e.id', '=', 'payments.emp_id')
                 ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
                 ->join('products as p', 'p.id', '=', 'payments.product_id')
+                ->whereExists(function ($query) {
+                    $query->select(DB::raw(1))
+                        ->from('payroll_employees')
+                        ->whereColumn('payroll_employees.employee_id', 'e.id');
+                })
                 ->where('payments.shopkeeper_id', $shopkeeper_id)
                 ->whereIn('payments.status', ['Paid', 'Partial Paid', 'Pending', 'Pending Consent', 'Consented', 'Rejected']);
 
@@ -76,9 +82,9 @@ class PaymentController extends Controller
                     'ra.first_name',
                     'ra.last_name',
                     'e.Emp_id',
+                    'e.Admin_Parent_id',
                     'p.name as product_name',
                     'p.currency_type as product_currency_type',
-                    'ra.profile_picture'
                 ])
                 ->get();
 
@@ -95,7 +101,11 @@ class PaymentController extends Controller
                     return '—';
                 })
                 ->addColumn('name', function ($row) {
-                    $profile_pic = Common::getResortUserPicture($row->profile_picture);
+                    // Same fix as getEmpDetails() — getResortUserPicture()
+                    // looks up by resort_admins.id, not a raw profile_picture
+                    // filename (always failed the lookup, invisible/broken
+                    // photo every row).
+                    $profile_pic = Common::getResortUserPicture($row->Admin_Parent_id);
                     if ($row->first_name && $row->last_name) {
                         return '<div class="tableUser-block">
                                     <div class="img-circle">
@@ -113,7 +123,14 @@ class PaymentController extends Controller
                         'Paid' => 'badge-success',
                         'Partial Paid' => 'badge-info',
                         'Pending Consent' => 'badge-warning',
-                        'Consented' => 'badge-themeSkyblueLight',
+                        // badge-themeSkyblueLight doesn't exist anywhere in
+                        // the CSS — the badge fell through to the base
+                        // Bootstrap badge's white text with no background
+                        // override, invisible on the page background.
+                        // badge-theme (dark text, light background) is what
+                        // DashboardController's equivalent status column
+                        // already correctly uses for "Consented".
+                        'Consented' => 'badge-theme',
                         'Rejected' => 'badge-danger',
                     ];
                     $class = $statusClasses[$row->status] ?? 'badge-secondary';
@@ -166,7 +183,11 @@ class PaymentController extends Controller
             'id' => $employee->id,
             'emp_id' => $employee->Emp_id,
             'name' => $employee->resortAdmin->first_name . ' ' . $employee->resortAdmin->last_name,
-            'profile_picture' => Common::getResortUserPicture($employee->Emp_id)
+            // getResortUserPicture() looks up by resort_admins.id, not the
+            // Emp_id code (e.g. "DR-1") — passing Emp_id always failed the
+            // ResortAdmin::find() lookup and silently fell back to the
+            // default picture for every employee.
+            'profile_picture' => Common::getResortUserPicture($employee->Admin_Parent_id)
         ]);
     }
 
@@ -185,7 +206,13 @@ class PaymentController extends Controller
         $order_id = 'ORD-' . strtoupper(Str::random(8));
 
         try {
-            // Create payment record with the base64 QR code
+            // Create payment record. The client-submitted qr_code is only a
+            // live preview generated before the row (and its id) existed —
+            // it encodes the raw form fields as JSON, not a lookup key. The
+            // mobile scan flow (consent-request-view/{id}) expects the QR
+            // to decode to this row's own numeric id, so it's regenerated
+            // server-side right after the id is known and overwrites the
+            // preview value below.
             $payment = Payment::create([
                 'shopkeeper_id' => $shopkeeper->id,
                 'order_id' => $order_id,
@@ -198,6 +225,16 @@ class PaymentController extends Controller
                 'qr_code' => $request->qr_code,  // Store QR code base64 string
             ]);
 
+            // 'png' needs the imagick extension, which isn't installed on
+            // this server (only GD is) — 'svg' renders identically as a
+            // scannable QR once displayed in an <img> tag or printed, with
+            // no extra extension dependency.
+            $qrCodeBase64 = 'data:image/svg+xml;base64,' . base64_encode(
+                QrCode::format('svg')->size(256)->generate(base64_encode((string) $payment->id))
+            );
+            $payment->qr_code = $qrCodeBase64;
+            $payment->save();
+
             // Send consent notification (optional)
             if($payment) {
                 // $payment->sendConsentProductPurchaseNotification($payment, $shopkeeper);
@@ -208,7 +245,7 @@ class PaymentController extends Controller
                 'message' => 'Payment added successfully',
                 'redirect_url' => route('shopkeeper.dashboard'),
                 'order_id' => $payment->order_id,
-                'qr_code_base64' => $request->qr_code,  // Optionally return the base64 QR code to frontend
+                'qr_code_base64' => $qrCodeBase64,  // Optionally return the base64 QR code to frontend
             ]);
         } catch (\Exception $e) {
             // Handle error gracefully
@@ -229,16 +266,17 @@ class PaymentController extends Controller
             abort(404);
         }
 
-        $qr = $payment->qr_code;
-        if (is_string($qr) && strpos($qr, 'data:') === 0) {
-            $qr = preg_replace('#^data:image/\w+;base64,#i', '', $qr);
-            $qr = base64_decode($qr);
+        $qr          = $payment->qr_code;
+        $contentType = 'image/png';
+        if (is_string($qr) && preg_match('#^data:(image/[\w.+-]+);base64,#i', $qr, $m)) {
+            $contentType = $m[1];
+            $qr          = base64_decode(substr($qr, strlen($m[0])));
         }
         if (empty($qr)) {
             abort(404);
         }
 
-        return response($qr, 200, ['Content-Type' => 'image/png']);
+        return response($qr, 200, ['Content-Type' => $contentType]);
     }
 
     public function getProductPrice(Request $request)
@@ -277,7 +315,9 @@ class PaymentController extends Controller
             'paymentID' => 'required|exists:payments,id',
         ]);
 
-        $payment = Payment::with('shopKeeper', 'product')->findOrFail($request->paymentID);
+        $payment = Payment::with('shopKeeper', 'product')
+            ->where('shopkeeper_id', $this->shopkeeper->id)
+            ->findOrFail($request->paymentID);
         $shopkeeper = $this->shopkeeper;
 
         $resortId = $payment->shopKeeper->resort_id ?? null;

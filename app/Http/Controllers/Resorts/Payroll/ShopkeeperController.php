@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Validator;
 use App\Helpers\Common;
 use App\Exports\ResortShopkeeperPaymentsExport;
 use Maatwebsite\Excel\Facades\Excel;
+use Carbon\Carbon;
 use Auth;
 use Config;
 use DB;
@@ -237,8 +238,18 @@ class ShopkeeperController extends Controller
         $shopkeeper = Shopkeeper::where('id', $id)->where('resort_id', $resort_id)->firstOrFail();
 
         $searchTerm = $request->searchTerm;
-        $startDate = $request->start_date;
-        $endDate = $request->end_date;
+        // Month filter (current year only, per the dropdown) replaces the old
+        // date-range picker, which defaulted to the current month and
+        // silently hid every payment outside it — e.g. a shopkeeper with
+        // 14 real Consented/Paid payments across the last several months
+        // only ever saw the 1 that happened to land in the current month.
+        $startDate = null;
+        $endDate = null;
+        if ($request->filled('month')) {
+            $monthDate = Carbon::createFromDate(now()->year, (int) $request->month, 1);
+            $startDate = $monthDate->copy()->startOfMonth()->format('Y-m-d');
+            $endDate = $monthDate->copy()->endOfMonth()->format('Y-m-d');
+        }
 
         // Only approved consent: Consented, Paid, Partial Paid (exclude Pending Consent, Rejected, Pending)
         $tableData = Payment::join('employees as e', 'e.id', '=', 'payments.emp_id')
@@ -261,7 +272,22 @@ class ShopkeeperController extends Controller
             $tableData->whereBetween('payments.purchased_date', [$startDate, $endDate]);
         }
 
-        $totalAmount = (clone $tableData)->sum('payments.price');
+        // payments.price is stored in the product's own currency (MVR or
+        // USD) — a blind SUM() mixes the two. Normalize each row to USD
+        // before summing so the frontend's formatAmount($total, 'USD') call
+        // isn't fed a raw MVR value it then mislabels as USD.
+        //
+        // "Payable" means still owed — Paid rows are already settled and
+        // must not count toward it (the table above still lists them for
+        // history; only this total excludes them).
+        $usdToMvrRate = Common::getUsdToMvrRate();
+        $totalAmount = (clone $tableData)
+            ->where('payments.status', '!=', 'Paid')
+            ->select('payments.price', 'p.currency_type')
+            ->get()
+            ->sum(function ($row) use ($usdToMvrRate) {
+                return $row->currency_type === 'MVR' ? ($row->price / $usdToMvrRate) : $row->price;
+            });
 
         $tableData = $tableData->orderBy('payments.updated_at', 'DESC')
             ->select([
@@ -271,7 +297,7 @@ class ShopkeeperController extends Controller
                 'e.Emp_id',
                 'p.name as product_name',
                 'p.currency_type as product_currency_type',
-                'ra.profile_picture'
+                'e.Admin_Parent_id',
             ])
             ->get();
 
@@ -292,7 +318,10 @@ class ShopkeeperController extends Controller
                 return $ct === 'MVR' ? 'MVR' : 'Dollar';
             })
             ->addColumn('name', function ($row) {
-                $profile_pic = Common::getResortUserPicture($row->profile_picture);
+                // getResortUserPicture() looks up by resort_admins.id, not a
+                // raw profile_picture filename — that lookup always failed,
+                // falling back to the default picture for every employee.
+                $profile_pic = Common::getResortUserPicture($row->Admin_Parent_id);
                 if ($row->first_name && $row->last_name) {
                     return '<div class="tableUser-block">
                         <div class="img-circle">
@@ -305,6 +334,9 @@ class ShopkeeperController extends Controller
             })
             ->addColumn('product', function ($row) {
                 return $row->product_name;
+            })
+            ->editColumn('purchased_date', function ($row) {
+                return $row->purchased_date ? \Carbon\Carbon::parse($row->purchased_date)->format('d M Y') : '—';
             })
             ->addColumn('status', function ($row) {
                 $statusClasses = [
@@ -327,8 +359,13 @@ class ShopkeeperController extends Controller
         $resort_id = $this->resort->resort_id;
         $shopkeeper = Shopkeeper::where('id', $id)->where('resort_id', $resort_id)->firstOrFail();
 
-        $startDate = $request->query('start_date');
-        $endDate = $request->query('end_date');
+        $startDate = null;
+        $endDate = null;
+        if ($request->filled('month')) {
+            $monthDate = Carbon::createFromDate(now()->year, (int) $request->query('month'), 1);
+            $startDate = $monthDate->copy()->startOfMonth()->format('Y-m-d');
+            $endDate = $monthDate->copy()->endOfMonth()->format('Y-m-d');
+        }
         $searchTerm = $request->query('search_term');
 
         $export = new ResortShopkeeperPaymentsExport($shopkeeper->id, $startDate, $endDate, $searchTerm);

@@ -268,7 +268,7 @@ class ResignationController extends Controller
                     "📝 {$empName} has submitted a resignation request. Please review and approve to forward it to HR.",
                     'Resignation',
                     [$hodEmployee->id],
-                    null,
+                    $resignation->id,
                     false,
                     'resignation-request-hod',
                 );
@@ -303,7 +303,7 @@ class ResignationController extends Controller
                     "📝 {$empName} has submitted a resignation request. It will reach you for final approval once HOD signs off.",
                     'Resignation',
                     [$hrEmployee->id],
-                    null,
+                    $resignation->id,
                     false,
                     'resignation-request-hr',
                 );

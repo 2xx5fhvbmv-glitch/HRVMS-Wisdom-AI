@@ -108,13 +108,13 @@ class ConsentResponseController extends Controller
      */
     private function notifyHrOfConsentResponse(Applicant_form_data $applicant, string $status): void
     {
-        // rank=3 doesn't reliably mean "HR" — this resort's actual HR
-        // department employees are rank 1/2, not 3, so the lookup always
-        // found nobody and this notification silently never fired.
-        // Common::FindResortHR() is the established department-based
-        // lookup used everywhere else in the app for this exact purpose.
-        $hr = Common::FindResortHR($applicant->resort_id);
-        if (!$hr) {
+        // FindResortHR() only ever returns the FIRST matching HR employee —
+        // this resort has two real HR employees (e.g. Fatima id=179 and
+        // Olivia id=188), and FindResortHR only found Fatima, so Olivia
+        // never got notified regardless of whether the applicant approved
+        // or rejected. getResortHrEmployeeIds() returns every HR employee.
+        $hrIds = Common::getResortHrEmployeeIds($applicant->resort_id);
+        if (empty($hrIds)) {
             return;
         }
 
@@ -130,8 +130,8 @@ class ConsentResponseController extends Controller
             $title,
             $message,
             'Talent Acquisition (Consent Response)',
-            [$hr->id],
-            null,
+            $hrIds,
+            $applicant->id,
             false,
             'talent-acquisition-consent-response'
         );

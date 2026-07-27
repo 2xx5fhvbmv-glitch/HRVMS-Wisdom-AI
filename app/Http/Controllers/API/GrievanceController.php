@@ -10,6 +10,7 @@ use App\Models\Employee;
 use App\Models\GrievanceCategory;
 use App\Models\GrievanceSubcategory;
 use App\Models\ActionStore;
+use App\Models\GrievanceInformalResolution;
 use Illuminate\Support\Facades\Auth;
 use Validator;
 use DB;
@@ -218,7 +219,7 @@ class GrievanceController extends Controller
                         'A grievance submission has been sent by ' . $this->user->first_name . ' ' . $this->user->last_name . '.',
                         'Employee Grievance',
                         [$hrEmployee->id],
-                        null,
+                        $GrivanceSubmission->id,
                         false,
                         'grievance-submission',
                     );
@@ -236,6 +237,87 @@ class GrievanceController extends Controller
             \Log::emergency("Message: " . $e->getMessage());
             return response()->json(['success' => false, 'message' => 'Server error'], 500);
         }
+    }
+
+    /**
+     * Mobile pre-check dialog shown before an employee starts a formal
+     * grievance: "did you try to resolve this informally first?" Logged
+     * standalone (not folded into GrievanceStore) so HR sees informal
+     * attempts even when the employee answers "Yes" and never files a
+     * formal grievance at all.
+     */
+    public function InformalResolution(Request $request)
+    {
+        if (!$this->user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'resolved_informally' => 'required|in:Yes,No',
+            'description'         => 'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
+        }
+
+        try {
+            $employee = $this->user->GetEmployee;
+            if (!$employee) {
+                return response()->json(['success' => false, 'message' => 'Employee record not found.'], 404);
+            }
+
+            $record = GrievanceInformalResolution::create([
+                'resort_id'            => $this->resort_id,
+                'employee_id'          => $employee->id,
+                'resolved_informally'  => $request->resolved_informally,
+                'description'         => $request->description,
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Response recorded successfully.',
+                'data'    => $record,
+            ]);
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::emergency("Message: " . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    /**
+     * Employee_id on a grievance row is the SUBJECT of the complaint (the
+     * person it's about), not the submitter — resolved the same way
+     * GetEmployeeDetails() does, plus their supervisor via reporting_to.
+     * Shared by the listing and detail endpoints so both surface it.
+     */
+    private function resolveSubjectAndSupervisor($employeeId): array
+    {
+        if (!$employeeId) {
+            return ['employee' => null, 'supervisor' => null];
+        }
+        $subject = Employee::with(['resortAdmin:id,first_name,last_name', 'department:id,name', 'position:id,position_title'])->find($employeeId);
+        if (!$subject) {
+            return ['employee' => null, 'supervisor' => null];
+        }
+        $supervisor = $subject->reporting_to
+            ? Employee::with('resortAdmin:id,first_name,last_name')->find($subject->reporting_to)
+            : null;
+
+        return [
+            'employee' => [
+                'id'         => $subject->id,
+                'name'       => trim(optional($subject->resortAdmin)->first_name . ' ' . optional($subject->resortAdmin)->last_name),
+                'department' => optional($subject->department)->name,
+                'position'   => optional($subject->position)->position_title,
+            ],
+            'supervisor' => $supervisor ? [
+                'id'   => $supervisor->id,
+                'name' => trim(optional($supervisor->resortAdmin)->first_name . ' ' . optional($supervisor->resortAdmin)->last_name),
+            ] : null,
+        ];
     }
 
     /**
@@ -261,14 +343,37 @@ class GrievanceController extends Controller
             $subCatIds = $grievances->pluck('Grivance_Sub_cat')->filter()->unique()->values();
             $subCatNames = GrievanceSubcategory::whereIn('id', $subCatIds)->pluck('Sub_Category_Name', 'id');
 
-            $data = $grievances->map(function ($g) use ($subCatNames) {
+            $witnessCounts = GrivanceSubmissionWitness::whereIn('G_S_Parent_id', $grievances->pluck('id'))
+                ->get()
+                ->groupBy('G_S_Parent_id')
+                ->map(fn ($rows) => $rows->count());
+
+            $data = $grievances->map(function ($g) use ($subCatNames, $witnessCounts) {
+                $subjectAndSupervisor = $this->resolveSubjectAndSupervisor($g->Employee_id);
+                $hasAttachments = !empty(json_decode((string) $g->Attachements, true));
+
                 return [
-                    'id'           => $g->id,
-                    'grievance_id' => $g->Grivance_id,
-                    'category'     => optional($g->category)->Category_Name,
-                    'subcategory'  => $subCatNames[$g->Grivance_Sub_cat] ?? null,
-                    'submitted_on' => $g->date,
-                    'status'       => $g->status,
+                    'id'                  => $g->id,
+                    'grievance_id'        => $g->Grivance_id,
+                    'category'            => optional($g->category)->Category_Name,
+                    // "Offense" in older UI copy and "subcategory" are the
+                    // same underlying field — Grivance_offence_id was
+                    // renamed to Grivance_Sub_cat (migration
+                    // 2025_04_17_164241_add_grivance_field.php) and the web
+                    // create form's leftover "SELECT OFFENSE" label targets
+                    // a DOM id nothing binds to anymore. There's no second,
+                    // separate offense value to expose here.
+                    'subcategory'         => $subCatNames[$g->Grivance_Sub_cat] ?? null,
+                    'employee'            => $subjectAndSupervisor['employee'],
+                    'supervisor'          => $subjectAndSupervisor['supervisor'],
+                    'submitted_on'        => $g->date,
+                    'status'              => $g->status,
+                    'location'            => $g->location,
+                    'description'         => $g->Grivance_description,
+                    'confidential'        => $g->Grivance_Submission_Type,
+                    'resolved_informally' => $g->grievance_informally,
+                    'witness_count'       => $witnessCounts[$g->id] ?? 0,
+                    'has_attachments'     => $hasAttachments,
                 ];
             });
 
@@ -337,12 +442,17 @@ class GrievanceController extends Controller
             }
 
             $actionTakenName = $g->action_taken ? ActionStore::where('id', $g->action_taken)->value('ActionName') : null;
+            $subjectAndSupervisor = $this->resolveSubjectAndSupervisor($g->Employee_id);
 
             $data = [
                 'id'                     => $g->id,
                 'grievance_id'           => $g->Grivance_id,
                 'category'               => optional($g->category)->Category_Name,
+                // Same field as the legacy "Offense" label — see the note
+                // in myGrievances(); no separate offense value exists.
                 'subcategory'            => $subCategoryName,
+                'employee'               => $subjectAndSupervisor['employee'],
+                'supervisor'             => $subjectAndSupervisor['supervisor'],
                 'submitted_on'           => $g->date,
                 'status'                 => $g->status,
                 'incident_datetime'      => $g->Grivance_date_time,
@@ -350,8 +460,10 @@ class GrievanceController extends Controller
                 'description'            => $g->Grivance_description,
                 'explanation'            => $g->Grivance_Eexplination_description,
                 'confidential'           => $g->Grivance_Submission_Type,
+                'resolved_informally'    => $g->grievance_informally,
                 'witnesses'              => $witnesses,
                 'attachments'            => $attachments,
+                'has_attachments'        => count($attachments) > 0,
                 // Populated once the review process has completed.
                 'outcome_type'           => $g->outcome_type,
                 'action_taken'           => $actionTakenName,

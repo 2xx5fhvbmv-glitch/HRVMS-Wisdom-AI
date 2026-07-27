@@ -1555,7 +1555,11 @@ class Common
             // Ignore when route is not available
         }
         $prefixMatch = $routePrefix === 'resort' || $routePrefix === '/resort';
-        $isResortContext = (Auth::guard('resort-admin')->check() && $prefixMatch) || Auth::guard('api')->check();
+        // Shopkeeper-guard pages (e.g. the payments dashboard) render
+        // employee photos via this same helper — neither resort-admin nor
+        // api guard is ever authenticated there, so it always fell through
+        // to the default picture regardless of which id was passed.
+        $isResortContext = (Auth::guard('resort-admin')->check() && $prefixMatch) || Auth::guard('api')->check() || Auth::guard('shopkeeper')->check();
 
         if (!$isResortContext) {
             return $defaultPicture;
@@ -2846,7 +2850,7 @@ class Common
             //  ->where('duty_rosters.Year','=',date('Y'))
              ->orderBy('t2.date','asc')
              ->get(['t2.Status','t2.id as Attd_id','t2.date','t2.Shift_id','t2.roster_id','duty_rosters.DayOfDate','t1.ShiftName','t2.OverTime','t1.StartTime','t1.EndTime','t2.DayWiseTotalHours'])
-             ->map(function ($roster)  {
+             ->map(function ($roster) use ($resort_id, $Employee) {
                  if($roster->ShiftName =="First Shift")
                  {
                      $roster->ShiftNameColor = "createDuty-green";
@@ -2869,9 +2873,68 @@ class Common
                      $roster->DayOfDate = $roster->DayOfDate;
                  }
 
+                 // This branch never looked up leave at all (unlike the
+                 // Monthwise branch below) — an employee on approved leave
+                 // never saw it reflected on their own weekly duty roster
+                 // view, only whatever the raw attendance Status happened
+                 // to be (usually blank, since no shift was ever assigned).
+                 $employeeLeave = EmployeeLeave::join('leave_categories as t4', 't4.id', '=', 'employees_leaves.leave_category_id')
+                     ->where('employees_leaves.Emp_id', $Employee)
+                     ->where('employees_leaves.status', 'Approved')
+                     ->whereDate('employees_leaves.from_date', '<=', $roster->date)
+                     ->whereDate('employees_leaves.to_date', '>=', $roster->date)
+                     ->where('t4.resort_id', $resort_id)
+                     ->first(['t4.color', 't4.leave_type', 'employees_leaves.total_days', 'employees_leaves.from_date', 'employees_leaves.to_date']);
+
+                 $roster->LeaveType     = $employeeLeave->leave_type ?? $roster->Status;
+                 $roster->LeaveDays     = $employeeLeave->total_days ?? null;
+                 $roster->LeaveFromDate = $employeeLeave->from_date ?? null;
+                 $roster->LeaveToDate   = $employeeLeave->to_date ?? null;
+                 $roster->LeaveColor    = $employeeLeave->color ?? ($roster->Status ? "" : "#be09af");
+                 $roster->LeaveFirstName = isset($employeeLeave->leave_type)
+                     ? substr($employeeLeave->leave_type, 0, 1)
+                     : (isset($roster->Status) ? substr($roster->Status, 0, 1) : "-");
 
                  return $roster;
              });
+
+            // Same backfill as the Monthwise branch: a day with no
+            // duty_roster_entries row at all must still surface an
+            // approved leave covering it, not just be absent.
+            if (!empty($Employee)) {
+                $existingDates = $DutyRoster->pluck('date')->map(fn($d) => is_object($d) ? $d->format('Y-m-d') : (string) $d)->toArray();
+                $dateIterator  = Carbon::parse($WeekstartDate);
+                $weekEnd       = Carbon::parse($WeekendDate);
+                while ($dateIterator->lte($weekEnd)) {
+                    $date = $dateIterator->format('Y-m-d');
+                    if (!in_array($date, $existingDates, true)) {
+                        $placeholderLeave = static::lookupApprovedLeaveForDate($resort_id, $Employee, $date);
+                        $DutyRoster->push((object)[
+                            'Status'            => null,
+                            'Attd_id'           => null,
+                            'Emp_id'            => $Employee,
+                            'date'              => $date,
+                            'Shift_id'          => null,
+                            'roster_id'         => null,
+                            'DayOfDate'         => Carbon::parse($date)->format('D'),
+                            'ShiftName'         => null,
+                            'OverTime'          => null,
+                            'StartTime'         => null,
+                            'EndTime'           => null,
+                            'DayWiseTotalHours' => null,
+                            'ShiftNameColor'    => null,
+                            'LeaveType'         => $placeholderLeave->leave_type ?? null,
+                            'LeaveDays'         => $placeholderLeave->total_days ?? null,
+                            'LeaveFromDate'     => $placeholderLeave->from_date ?? null,
+                            'LeaveToDate'       => $placeholderLeave->to_date ?? null,
+                            'LeaveColor'        => $placeholderLeave->color ?? "",
+                            'LeaveFirstName'    => isset($placeholderLeave->leave_type) ? substr($placeholderLeave->leave_type, 0, 1) : "-",
+                        ]);
+                    }
+                    $dateIterator->addDay();
+                }
+                $DutyRoster = $DutyRoster->sortBy('date')->values();
+            }
         }
         if($flag =="Monthwise")
         {
@@ -2965,6 +3028,47 @@ class Common
                         return $roster;
                     });
 
+            // Same gap as dutyRosterMonthAndWeekWise's Monthwise branch: a
+            // day with no duty_roster_entries row at all (the common case
+            // during a long approved leave like Maternity Leave, where no
+            // shift is ever assigned) was simply absent from the result —
+            // this is the employee's OWN dashboard/duty-roster view, so a
+            // missing day here read as "nothing scheduled" instead of
+            // showing the approved leave that actually covers it.
+            if (!empty($Employee)) {
+                $existingDates = $DutyRoster->pluck('date')->map(fn($d) => is_object($d) ? $d->format('Y-m-d') : (string) $d)->toArray();
+                $dateIterator  = Carbon::parse($startOfMonth);
+                $monthEnd      = Carbon::parse($endOfMonth);
+                while ($dateIterator->lte($monthEnd)) {
+                    $date = $dateIterator->format('Y-m-d');
+                    if (!in_array($date, $existingDates, true)) {
+                        $placeholderLeave = static::lookupApprovedLeaveForDate($resort_id, $Employee, $date);
+                        $DutyRoster->push((object)[
+                            'Status'            => null,
+                            'Attd_id'           => null,
+                            'Emp_id'            => $Employee,
+                            'date'              => $date,
+                            'Shift_id'          => null,
+                            'roster_id'         => null,
+                            'DayOfDate'         => Carbon::parse($date)->format('D'),
+                            'ShiftName'         => null,
+                            'OverTime'          => null,
+                            'StartTime'         => null,
+                            'EndTime'           => null,
+                            'DayWiseTotalHours' => null,
+                            'ShiftNameColor'    => null,
+                            'LeaveType'         => $placeholderLeave->leave_type ?? null,
+                            'LeaveDays'         => $placeholderLeave->total_days ?? null,
+                            'LeaveFromDate'     => $placeholderLeave->from_date ?? null,
+                            'LeaveToDate'       => $placeholderLeave->to_date ?? null,
+                            'LeaveColor'        => $placeholderLeave->color ?? "",
+                            'LeaveFirstName'    => isset($placeholderLeave->leave_type) ? substr($placeholderLeave->leave_type, 0, 1) : "-",
+                        ]);
+                    }
+                    $dateIterator->addDay();
+                }
+                $DutyRoster = $DutyRoster->sortBy('date')->values();
+            }
         }
         return $DutyRoster;
     }
@@ -3148,6 +3252,86 @@ class Common
 
     private static $attendanceCache = [];
 
+    /**
+     * No code path ever writes a parent_attendaces row with Status='Absent'
+     * (every real check-in hardcodes 'Present'), so the register's
+     * DutyRoster::join('parent_attendaces') queries above only ever return
+     * punched days — a scheduled work day with no punch simply has no row,
+     * so the cell renders blank instead of "Absent" (the blade already has
+     * an Absent-status branch, it just never receives one). Synthesize an
+     * Absent entry for every scheduled work day in range with no matching
+     * punch and no approved leave, using the same rule as AbsentCount in
+     * TimeAndAttendance/EmployeeController — so this stays consistent with
+     * the Absent counts shown on the employee list/detail pages.
+     */
+    private static function getAbsentRegisterEntries($resortId, $empId, $startDate, $endDate)
+    {
+        $rows = DB::select("
+            SELECT dre.date, dre.Shift_id, ss.ShiftName, ss.StartTime, ss.EndTime
+            FROM duty_roster_entries dre
+            JOIN shift_settings ss ON ss.id = dre.Shift_id
+            WHERE dre.Emp_id = ?
+            AND dre.resort_id = ?
+            AND dre.Shift_id IS NOT NULL
+            AND (dre.Status IS NULL OR dre.Status != 'DayOff')
+            AND dre.date BETWEEN GREATEST(?, IFNULL((SELECT joining_date FROM employees WHERE id = ?), ?)) AND LEAST(?, CURDATE())
+            AND NOT EXISTS (
+                SELECT 1 FROM parent_attendaces pa2
+                WHERE pa2.Emp_id = ? AND pa2.resort_id = ? AND pa2.date = dre.date
+                AND pa2.Status IN ('Present','HalfDay','On-Time','Late','ShortLeave','HalfDayLeave')
+                AND pa2.CheckingTime IS NOT NULL AND TRIM(IFNULL(pa2.CheckingTime,'')) NOT IN ('','00:00','00:00:00')
+            )
+            AND NOT EXISTS (
+                SELECT 1 FROM employees_leaves el2
+                WHERE el2.emp_id = ? AND el2.resort_id = ? AND el2.status = 'Approved'
+                AND dre.date BETWEEN el2.from_date AND el2.to_date
+            )
+        ", [$empId, $resortId, $startDate, $empId, $startDate, $endDate, $empId, $resortId, $empId, $resortId]);
+
+        return collect($rows)->map(function ($row) use ($empId) {
+            return (object) [
+                'date' => $row->date,
+                'Status' => 'Absent',
+                'Emp_id' => $empId,
+                'Shift_id' => $row->Shift_id,
+                'ShiftName' => $row->ShiftName,
+                'StartTime' => $row->StartTime,
+                'EndTime' => $row->EndTime,
+                'StartTimeShow' => null,
+                'EndTimeShow' => null,
+                'CheckingTime' => null,
+                'CheckingOutTime' => null,
+                'CheckInTime' => null,
+                'CheckOutTime' => null,
+                'OverTime' => null,
+                'DayWiseTotalHours' => null,
+                'note' => null,
+                'DayOfDate' => null,
+                'InternalStatus' => null,
+                'InTime_Location' => null,
+                'OutTime_Location' => null,
+                'InTime_Latitude' => null,
+                'InTime_Longitude' => null,
+                'InTime_Accuracy' => null,
+                'OutTime_Latitude' => null,
+                'OutTime_Longitude' => null,
+                'OutTime_Accuracy' => null,
+                'InTime_GeofenceName' => null,
+                'OutTime_GeofenceName' => null,
+                'Attd_id' => null,
+                'OTStatus' => null,
+                'OTstatus' => null,
+                'OTApproved_By' => null,
+                'ApprovedName' => '',
+                'differenceInHours' => null,
+                'msg' => null,
+                'LeaveData' => [],
+                'LeaveFirstName' => null,
+                'LeaveColor' => null,
+            ];
+        });
+    }
+
     public static function GetAttandanceRegister($resort_id,$duty_roster_id,$Employee,$WeekstartDate, $WeekendDate,$startOfMonth,$endOfMonth,$flag)
     {
         // Cache key to avoid duplicate queries for same employee/flag
@@ -3285,6 +3469,8 @@ class Common
                 return $roster;
             });
 
+            $absentEntries = self::getAbsentRegisterEntries($resort_id, $Employee, $WeekstartDate, $WeekendDate);
+            $DutyRoster = $DutyRoster->concat($absentEntries)->sortBy('date')->values();
         }
 
         if($flag =="Monthwise")
@@ -3436,7 +3622,8 @@ class Common
                         return $roster;
                     });
 
-
+            $absentEntries = self::getAbsentRegisterEntries($resort_id, $Employee, $startOfMonth->format('Y-m-d'), $endOfMonth->format('Y-m-d'));
+            $DutyRoster = $DutyRoster->concat($absentEntries)->sortBy('date')->values();
         }
         self::$attendanceCache[$cacheKey] = $DutyRoster;
         return $DutyRoster;
@@ -4239,8 +4426,15 @@ class Common
         if (!is_array($coordinates)) return null;
 
         if (($geofence->shape_type ?? 'polygon') === 'circle') {
-            $centerLat = (float) ($coordinates['lat'] ?? 0);
-            $centerLng = (float) ($coordinates['lng'] ?? 0);
+            // The stored shape is {"center":{"lat":...,"lng":...},"radius":...}
+            // (see Geofence Zone Manager's save payload) — reading 'lat'/'lng'
+            // at the top level always missed, so centerLat/centerLng were
+            // always 0 and this returned null for every circle zone,
+            // regardless of the actual point. Every circle geofence — the
+            // only shape type in real use — was effectively unusable.
+            $center = $coordinates['center'] ?? $coordinates;
+            $centerLat = (float) ($center['lat'] ?? 0);
+            $centerLng = (float) ($center['lng'] ?? 0);
             $radiusMeters = (float) ($coordinates['radius'] ?? 0);
             if (!$centerLat || !$centerLng || !$radiusMeters) return null;
             return self::haversineDistanceMeters($lat, $lng, $centerLat, $centerLng) <= $radiusMeters;
@@ -4477,6 +4671,12 @@ class Common
             $existingDates = $DutyRoster->pluck('date')->toArray();
             foreach ($datesInWeek as $date) {
                 if (!in_array($date, $existingDates)) {
+                    // Days with no duty_roster_entries row (e.g. an employee
+                    // on long leave who was never given a shift for that
+                    // day) used to hardcode LeaveType/LeaveFirstName to
+                    // null/"-" here, so an approved Maternity/Annual leave
+                    // never showed on exactly the days it was needed most.
+                    $placeholderLeave              = static::lookupApprovedLeaveForDate($resort_id, $Employee, $date);
                     $DutyRoster->push((object)[
                         'Status'            => null,
                         'Attd_id'           => null,
@@ -4489,12 +4689,12 @@ class Common
                         'StartTime'         => null,
                         'EndTime'           => null,
                         'DayWiseTotalHours' => null,
-                        'LeaveType'         => null,
-                        'LeaveDays'         => null,
-                        'LeaveFromDate'     => null,
-                        'LeaveToDate'       => null,
-                        'LeaveColor'        => "",
-                        'LeaveFirstName'    => "-",
+                        'LeaveType'         => $placeholderLeave->leave_type ?? null,
+                        'LeaveDays'         => $placeholderLeave->total_days ?? null,
+                        'LeaveFromDate'     => $placeholderLeave->from_date ?? null,
+                        'LeaveToDate'       => $placeholderLeave->to_date ?? null,
+                        'LeaveColor'        => $placeholderLeave->color ?? "",
+                        'LeaveFirstName'    => isset($placeholderLeave->leave_type) ? substr($placeholderLeave->leave_type, 0, 1) : "-",
                     ]);
                 }
             }
@@ -4630,6 +4830,10 @@ class Common
             $existingDates = $DutyRoster->pluck('date')->toArray();
             foreach ($datesInMonth as $date) {
                 if (!in_array($date, $existingDates)) {
+                    // Same gap as the weekly branch above — a day with no
+                    // duty_roster_entries row (mid-Maternity-Leave, no shift
+                    // ever assigned) must still report the approved leave.
+                    $placeholderLeave              = static::lookupApprovedLeaveForDate($resort_id, $Employee, $date);
                     $DutyRoster->push((object)[
                         'Status'            => null,
                         'Attd_id'           => null,
@@ -4642,18 +4846,35 @@ class Common
                         'StartTime'         => null,
                         'EndTime'           => null,
                         'DayWiseTotalHours' => null,
-                        'LeaveType'         => null,
-                        'LeaveDays'         => null,
-                        'LeaveFromDate'     => null,
-                        'LeaveToDate'       => null,
-                        'LeaveColor'        => "",
-                        'LeaveFirstName'    => "-",
+                        'LeaveType'         => $placeholderLeave->leave_type ?? null,
+                        'LeaveDays'         => $placeholderLeave->total_days ?? null,
+                        'LeaveFromDate'     => $placeholderLeave->from_date ?? null,
+                        'LeaveToDate'       => $placeholderLeave->to_date ?? null,
+                        'LeaveColor'        => $placeholderLeave->color ?? "",
+                        'LeaveFirstName'    => isset($placeholderLeave->leave_type) ? substr($placeholderLeave->leave_type, 0, 1) : "-",
                     ]);
                 }
             }
             $DutyRoster = $DutyRoster->sortBy('date')->values();
         }
         return $DutyRoster;
+    }
+
+    /**
+     * Approved leave (if any) covering $date for $empId — used to fill in
+     * LeaveType/LeaveColor on duty-roster/register days that have no
+     * duty_roster_entries row at all (the common case for multi-day leave
+     * such as Maternity Leave, where no shift is ever assigned).
+     */
+    private static function lookupApprovedLeaveForDate($resort_id, $empId, $date)
+    {
+        return EmployeeLeave::join('leave_categories as t4', 't4.id', '=', 'employees_leaves.leave_category_id')
+            ->where('employees_leaves.Emp_id', $empId)
+            ->where('employees_leaves.status', 'Approved')
+            ->where('t4.resort_id', $resort_id)
+            ->whereDate('employees_leaves.from_date', '<=', $date)
+            ->whereDate('employees_leaves.to_date', '>=', $date)
+            ->first(['t4.color', 't4.leave_type', 'employees_leaves.total_days', 'employees_leaves.from_date', 'employees_leaves.to_date']);
     }
 
     private static function calculateTotalTime($overTime, $checkingTime, $checkingOutTime)
@@ -6250,6 +6471,16 @@ class Common
 
         //SOS,Resignation,Request,Monthly check-in Meeting,sos Employee and Team member,Survey,Incident request
         if($type == 2) {
+            // Was missing request_id entirely — every call site already
+            // passes the real record id as $request_id (island pass id,
+            // payroll advance id, etc.) and it's stored correctly on the
+            // ResortNotification row, but the outbound push payload (what
+            // the mobile app actually receives to deep-link into the
+            // record) only ever carried page_id. Type 2 covers the large
+            // majority of app modules (Boarding Pass, Request, SOS,
+            // Resignation, Survey, Incident, Monthly Check-in), so this was
+            // the single root cause behind "no object id in notifications"
+            // across nearly every module, not a per-module bug.
             $payload                =   [
                 'id'                =>  $ids,
                 'resortid'          =>  (string) $resortId,
@@ -6258,6 +6489,7 @@ class Common
                 'status'            =>  $statusData,
                 'module'            =>  $module,
                 'page_id'           =>  $pageId,
+                'request_id'        =>  $request_id,
                 'sendto'            =>  $sendto,
                 'created_at'        =>  $time
             ];
@@ -6600,6 +6832,17 @@ class Common
             $extension = strtolower($file->getClientOriginalExtension());
             $fileSizeMB = round($file->getSize() / 1024, 2);
             $isImage = in_array($extension, ['jpg', 'jpeg', 'png']);
+
+            // DomPDF renders the embedded base64 image on a full HTML page,
+            // which needs many times the source file's size in memory (a
+            // ~2.5MB photo reproduced a real "Allowed memory size exhausted"
+            // fatal here, even with ini_set('memory_limit','-1') above —
+            // that override can itself be locked out by the server's PHP-FPM
+            // pool config (php_admin_value), which code can't ever raise).
+            // Skip the PDF conversion above a safe threshold and store the
+            // original image as-is rather than crash the whole request.
+            $skipPdfConversionThresholdBytes = 1.5 * 1024 * 1024; // 1.5MB
+            $isImage = $isImage && $file->getSize() <= $skipPdfConversionThresholdBytes;
 
             // Convert image to PDF
             if ($isImage) {
@@ -8586,6 +8829,17 @@ class Common
 
         $overtimeEntries = [];
 
+        // CheckingTime/checkout/shift values are sometimes 'H:i:s' (with
+        // seconds) and sometimes 'H:i' depending on caller — every
+        // createFromFormat below hardcodes 'H:i', so an 'H:i:s' value
+        // (e.g. "14:23:05") throws Carbon's "Trailing data" error. Strip
+        // to HH:MM up front so the rest of this function can rely on a
+        // single consistent format.
+        $checkInTime = substr($checkInTime, 0, 5);
+        $checkOutTime = substr($checkOutTime, 0, 5);
+        $shiftStartTime = substr($shiftStartTime, 0, 5);
+        $shiftEndTime = substr($shiftEndTime, 0, 5);
+
         // Parse times to Carbon instances
         $checkInCarbon = Carbon::createFromFormat('H:i', $checkInTime);
         $checkOutCarbon = Carbon::createFromFormat('H:i', $checkOutTime);
@@ -8624,8 +8878,10 @@ class Common
         if (!empty($breakData)) {
             foreach ($breakData as $break) {
                 if (!empty($break->Break_OutTime) && !empty($break->Break_InTime)) {
-                    $breakOut = Carbon::createFromFormat('Y-m-d H:i', $date . ' ' . $break->Break_OutTime);
-                    $breakIn = Carbon::createFromFormat('Y-m-d H:i', $date . ' ' . $break->Break_InTime);
+                    $breakOutTime = substr($break->Break_OutTime, 0, 5);
+                    $breakInTime = substr($break->Break_InTime, 0, 5);
+                    $breakOut = Carbon::createFromFormat('Y-m-d H:i', $date . ' ' . $breakOutTime);
+                    $breakIn = Carbon::createFromFormat('Y-m-d H:i', $date . ' ' . $breakInTime);
 
                     // Handle break spanning to next day
                     if ($breakIn->lt($breakOut)) {
