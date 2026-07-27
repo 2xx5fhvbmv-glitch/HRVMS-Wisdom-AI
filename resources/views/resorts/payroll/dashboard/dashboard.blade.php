@@ -393,7 +393,7 @@
                         <h1>Dashboard</h1>
                     </div>
                 </div>
-                <div class="col-auto ms-auto"><a href="{{route('payroll.payslip.index')}}" class="btn btn-sm btn-theme @if(App\Helpers\Common::checkRouteWisePermission('payroll.run',config('settings.resort_permissions.view')) == false) d-none @endif">Share Payslips</a></div>
+                <div class="col-auto ms-auto"><a href="{{route('payroll.payslip.index')}}" class="btn btn-sm payroll-btn-accent @if(App\Helpers\Common::checkRouteWisePermission('payroll.run',config('settings.resort_permissions.view')) == false) d-none @endif">Share Payslips</a></div>
                 @php
                     $currentEmployee = Auth::guard('resort-admin')->user()->GetEmployee ?? null;
                     $rankPos = $currentEmployee ? App\Helpers\Common::getEmployeeRankPosition($currentEmployee) : ['rank' => null];
@@ -417,7 +417,7 @@
                     $canRunPayroll = $isSupervisor || $isFinanceLead;
                 @endphp
                 @if($canRunPayroll)
-                <div class="col-auto"><a href="{{route('payroll.run')}}" class="btn btn-theme" onclick="localStorage.removeItem('currentStep');localStorage.removeItem('payroll_id');localStorage.removeItem('selectedEmployees');localStorage.removeItem('selectedEmployeesIds');localStorage.removeItem('deductions');">Run Payroll</a></div>
+                <div class="col-auto"><a href="{{route('payroll.run')}}" class="btn payroll-btn-accent" onclick="localStorage.removeItem('currentStep');localStorage.removeItem('payroll_id');localStorage.removeItem('selectedEmployees');localStorage.removeItem('selectedEmployeesIds');localStorage.removeItem('deductions');">Run Payroll</a></div>
                 @endif
             </div>
         </div>
@@ -430,9 +430,6 @@
                             <p class="mb-0  fw-500">Total Employees</p>
                             <strong>{{$total_employees}}</strong>
                         </div>
-                        <a href="#">
-                            <img src="assets/images/arrow-right-circle.svg" alt="" class="img-fluid">
-                        </a>
                     </div>
                 </div>
             </div>
@@ -443,9 +440,6 @@
                             <p class="mb-0  fw-500">Paid Employees</p>
                             <strong>{{$total_paid_employees}} <small>/{{$total_employees}}</small></strong>
                         </div>
-                        <a href="#">
-                            <img src="assets/images/arrow-right-circle.svg" alt="" class="img-fluid">
-                        </a>
                     </div>
                 </div>
             </div>
@@ -599,7 +593,7 @@
                             @endforeach
                         </select>
                     </div>
-                    <a href="#" class="btn btn-themeBlue @if(App\Helpers\Common::checkRouteWisePermission('payroll.run',config('settings.resort_permissions.view')) == false) d-none @endif" id="viewPayroll">View Payroll</a>
+                    <a href="#" class="btn payroll-btn-secondary @if(App\Helpers\Common::checkRouteWisePermission('payroll.run',config('settings.resort_permissions.view')) == false) d-none @endif" id="viewPayroll">View Payroll</a>
                 </div>
             </div>
             <div class="col-xl-6 col-md-6 @if(App\Helpers\Common::checkRouteWisePermission('payroll.run',config('settings.resort_permissions.view')) == false) d-none @endif">
@@ -733,7 +727,7 @@
                                                     <td>{{ \Carbon\Carbon::flexible($draft->created_at)->format('d M Y') }}</td>
                                                     <td><span class="badge badge-themeGray">{{ ucfirst($draft->status) }}</span></td>
                                                     <td>
-                                                        <a href="{{ route('payroll.run') }}?resume={{ $draft->id }}" class="btn btn-sm btn-themeBlue" onclick="localStorage.setItem('payroll_id','{{ $draft->id }}');localStorage.setItem('currentStep','7');">
+                                                        <a href="{{ route('payroll.run') }}?resume={{ $draft->id }}" class="btn btn-sm payroll-btn-secondary" onclick="localStorage.setItem('payroll_id','{{ $draft->id }}');localStorage.setItem('currentStep','7');">
                                                             <i class="fa-solid fa-eye"></i> View
                                                         </a>
                                                     </td>
@@ -796,12 +790,12 @@
                                                     </td>
                                                     <td>
                                                         @if($ap->has_rejection && $ap->status === 'draft')
-                                                            <a href="{{ route('payroll.run') }}?resume={{ $ap->id }}" class="btn btn-sm btn-themeBlue"
+                                                            <a href="{{ route('payroll.run') }}?resume={{ $ap->id }}" class="btn btn-sm payroll-btn-primary"
                                                                onclick="localStorage.setItem('payroll_id','{{ $ap->id }}');localStorage.setItem('currentStep','1');">
                                                                 <i class="fa-solid fa-pen-to-square"></i> Edit & Resubmit
                                                             </a>
                                                         @else
-                                                            <a href="{{ route('payroll.run') }}?resume={{ $ap->id }}&viewonly=1" class="btn btn-sm btn-themeBlue"
+                                                            <a href="{{ route('payroll.run') }}?resume={{ $ap->id }}&viewonly=1" class="btn btn-sm payroll-btn-secondary"
                                                                onclick="localStorage.setItem('payroll_id','{{ $ap->id }}');localStorage.setItem('currentStep','7');">
                                                                 <i class="fa-solid fa-eye"></i> View
                                                             </a>
@@ -838,7 +832,7 @@
                                                     <td class="text-end">{!! Common::formatCurrency($lp->total_payroll ?? 0, 'USD') !!}</td>
                                                     <td>{{ \Carbon\Carbon::flexible($lp->updated_at)->format('d M Y, h:i A') }}</td>
                                                     <td>
-                                                        <a href="{{ route('payroll.view', ['payroll_id' => base64_encode($lp->id)]) }}" class="btn btn-sm btn-themeBlue">
+                                                        <a href="{{ route('payroll.view', ['payroll_id' => base64_encode($lp->id)]) }}" class="btn btn-sm payroll-btn-secondary">
                                                             <i class="fa-solid fa-eye"></i> View
                                                         </a>
                                                     </td>
@@ -1088,45 +1082,12 @@
         </div>
     </div>
 </div>
-<!-- Modal -->
-<div class="modal fade" id="assign-modal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-small modal-assign">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="staticBackdropLabel">Payroll Components</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <label for="basic_salary" class="form-label">Total Basic Salary</label>
-                    <input type="text" id="basic_salary" class="form-control" value="54,415.20">
-                </div>
-                <div class="mb-3">
-                    <label for="service_charge" class="form-label">Service Charge Values</label>
-                    <input type="text" id="service_charge" class="form-control" value="145.00">
-                </div>
-                <div class="mb-3">
-                    <label for="normal_ot" class="form-label">Normal OT</label>
-                    <input type="text" id="normal_ot" class="form-control" value="{{ Common::GetResortCurrencySymbol() }} 1,110.00 (120 Hrs)">
-                </div>
-                <div>
-                    <label for="holiday_ot" class="form-label">Holiday OT</label>
-                    <input type="text" id="holiday_ot" class="form-control" value="{{ Common::GetResortCurrencySymbol() }} 142.00 (70Hrs)">
-                </div>
-
-            </div>
-            <div class="modal-footer">
-                <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                <a href="#" class="btn btn-themeBlue">Submit</a>
-            </div>
-        </div>
-    </div>
-</div>
 
 @include('resorts.payroll.dashboard._insight_modals')
 @endsection
 
 @section('import-css')
+@include('resorts.payroll._payroll_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')

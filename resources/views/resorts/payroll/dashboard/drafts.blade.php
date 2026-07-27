@@ -13,7 +13,7 @@
                     </div>
                 </div>
                 <div class="col-auto">
-                    <a href="{{ route('payroll.dashboard') }}" class="btn btn-themeGray btn-sm">Back to Dashboard</a>
+                    <a href="{{ route('payroll.dashboard') }}" class="btn payroll-btn-secondary btn-sm">Back to Dashboard</a>
                 </div>
             </div>
         </div>
@@ -42,7 +42,7 @@
                                 <td>{{ \Carbon\Carbon::flexible($draft->created_at)->format('d M Y, h:i A') }}</td>
                                 <td><span class="badge badge-themeWarning">{{ ucfirst($draft->status) }}</span></td>
                                 <td>
-                                    <a href="{{ route('payroll.run') }}?resume={{ $draft->id }}" class="btn btn-sm btn-themeBlue"
+                                    <a href="{{ route('payroll.run') }}?resume={{ $draft->id }}" class="btn btn-sm payroll-btn-secondary"
                                        onclick="localStorage.setItem('payroll_id','{{ $draft->id }}');localStorage.setItem('currentStep','7');">
                                         <i class="fa-solid fa-eye"></i> View
                                     </a>
@@ -62,4 +62,8 @@
         </div>
     </div>
 </div>
+@endsection
+
+@section('import-css')
+@include('resorts.payroll._payroll_buttons_v2_styles')
 @endsection

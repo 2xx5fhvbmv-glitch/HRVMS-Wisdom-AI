@@ -87,10 +87,10 @@
                         </div>
 
                         <div class="col-auto ms-auto">
-                            <a href="#" class="btn btn-themeSkyblue btn-sm" id="printFinalSettlement">Print</a>
+                            <a href="#" class="btn payroll-btn-secondary btn-sm" id="printFinalSettlement">Print</a>
                         </div>
                         <div class="col-auto">
-                            <a href="#" class="btn btn-themeBlue btn-sm" id="downloadPdf">Download</a>
+                            <a href="#" class="btn payroll-btn-secondary btn-sm" id="downloadPdf">Download</a>
                         </div>
                     </div>
                     <hr>
@@ -492,14 +492,14 @@
                                         <strong>{{ \Carbon\Carbon::parse($finalSettlement->finalized_at)->format('d M Y H:i') }}</strong>.
                                     @endif
                                 </div>
-                                <a href="{{ route('final.settlement.list') }}" class="btn btn-sm btn-outline-secondary">
+                                <a href="{{ route('final.settlement.list') }}" class="btn btn-sm payroll-btn-secondary">
                                     Back to list
                                 </a>
                             </div>
                         </div>
                     @else
                         <div class="card-footer text-end">
-                            <button type="submit" class="btn btn-themeBlue">Submit</button>
+                            <button type="submit" class="btn payroll-btn-critical">Submit</button>
                         </div>
                     @endif
                 </div>
@@ -510,6 +510,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts.payroll._payroll_buttons_v2_styles')
 <style>
     @media print {
     body * {

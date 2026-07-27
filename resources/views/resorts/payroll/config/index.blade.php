@@ -39,148 +39,23 @@
                                 </select>
                             </div>
                             <div class="card-footer text-end">
-                                <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                                <button type="submit" class="btn payroll-btn-primary btn-sm">Submit</button>
                             </div>
                         </form>
                     </div>
-                    <!-- <div class="card mb-30">
-                        <div class="card-title">
-                            <h3>Earnings</h3>
-                        </div>
-
-                        <div class="row g-2 align-items-center mb-3">
-                            <div class="col-auto">
-                                <a href="{{route('allowances.download-template')}}" class="btn btn-themeSkyblue btn-sm">Download Template</a>
-                            </div>
-                            <form id="ImportEarningsForm">
-                                @csrf
-                                <div class="col-auto">
-                                    <div class="uploadFile-btn me-0">
-                                        <a href="javascript:void(0)" class="btn btn-themeBlue btn-sm"
-                                        onclick="document.getElementById('ImportEarnings').click();">
-                                        Upload File
-                                        </a>
-                                        <input type="file" id="ImportEarnings" name="ImportEarnings"
-                                        accept=".csv,.xls,.xlsx,.ods,.xlsb,.xlt,.xltx,.xltm" style="opacity: 0; position: absolute; z-index: -1;"
-                                        onchange="displayEarningImportFileName()">
-                                        <div id="earningImportFile" style="margin-top: 10px; color: #333;"></div>
-                                    </div>
-                                </div>
-                                <div class="card-footer text-end">
-                                    <button type="submit" class="btn btn-themeBlue">Submit</button>
-                                </div>
-                            </form>
-                        </div>
-
-                        <form id="earningsForm">
-                            <div class="earnings-main">
-                                <div class="earnings-block mb-md-4 mb-3">
-                                    <div class="row align-items-end g-md-4 g-2 earnings-row">
-                                        <div class="col-sm-6">
-                                            <label for="allow_name1" class="form-label">ALLOWANCE NAME</label>
-                                            <input type="text" class="form-control allow_name" id="allow_name1"
-                                                placeholder="Allowance Name" name="allow_name[]">
-                                        </div>
-                                        <div class="col-sm-6">
-                                            <label for="allow_type1" class="form-label">ALLOWANCE TYPE</label>
-                                            <input type="text" class="form-control allow_type" id="allow_type1"
-                                                placeholder="Allowance type" name="allow_type[]">
-                                        </div>
-                                        <div class="col">
-                                            <div class="d-flex align-items-center">
-                                                <label for="" class="form-label mb-0 me-md-4 me-3">CURRENCY:</label>
-                                                <label for="flexSwitchCheckDefault"
-                                                    class="form-label mb-0 me-3">Rufiyaa</label>
-                                                <div class="form-check form-switch form-switchTheme">
-                                                    <input class="form-check-input currency-switch" type="checkbox" role="switch" id="flexSwitchCheckDefault" name="currency[]">
-                                                    <label class="form-check-label" for="flexSwitchCheckDefault">USD</label>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="col-auto">
-                                            <button type="button" class="btn btn-danger remove-earnings">Remove</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <button type="button" class="btn btn-themeSkyblue btn-sm mb-3 add-earnings">Add More</button>
-                            <div class="card-footer text-end">
-                                <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
-                            </div>
-                        </form>
-                    </div> -->
-                    <!-- <div class="card mb-30">
-                        <div class="card-title">
-                            <h3>Bank Payroll Template</h3>
-                        </div>
-                        <form>
-                            <div class="mb-md-3 mb-2">
-                                <label for="" class="form-label">BANK</label>
-                                <select class="form-select select2t-none" aria-label="Default select example">
-                                    <option selected>Select Bank</option>
-                                    <option value="1">aaa</option>
-                                    <option value="2">bbb</option>
-                                </select>
-                            </div>
-                            <div class="row g-2 mb-3">
-                                <div class="col-auto">
-                                    <div class="uploadFile-block">
-                                        <div class="uploadFile-btn me-0">
-                                            <a href="#" class="btn btn-themeBlue btn-sm">Upload File</a>
-                                            <input type="file" id="uploadFile">
-                                        </div>
-                                        <div class="uploadFile-text"></div>
-                                    </div>
-                                </div>
-                                <div class="col-auto"><a href="#" class="btn btn-themeSkyblue btn-sm">View</a></div>
-                            </div>
-                        </form>
-                        <div class="card-footer text-end"><a href="#" class="btn btn-themeBlue btn-sm">Submit</a>
-                        </div>
-                    </div> -->
-                    <!-- <div class="card mb-30">
-                        <div class="card-title">
-                            <h3>Previous Month Payroll Upload</h3>
-                        </div>
-                        <form id="">
-                            <div class="mb-md-3 mb-2">
-                                <label for="" class="form-label">PAYROLL FOR</label>
-                                <select class="form-select select2t-none" aria-label="Default select example">
-                                    <option selected>Select Month</option>
-                                    <option value="1">aaa</option>
-                                    <option value="2">bbb</option>
-                                </select>
-                            </div>
-                            <div class="row g-2 mb-3">
-                                <div class="col-auto"><a href="#" class="btn btn-themeSkyblue btn-sm">Download
-                                        Template</a></div>
-                                <div class="col-auto">
-                                    <div class="uploadFile-block">
-                                        <div class="uploadFile-btn me-0">
-                                            <a href="#" class="btn btn-themeBlue btn-sm">Upload File</a>
-                                            <input type="file" id="uploadFile">
-                                        </div>
-                                        <div class="uploadFile-text"></div>
-                                    </div>
-                                </div>
-                            </div>
-                        </form>
-                        <div class="card-footer text-end"><a href="#" class="btn btn-themeBlue btn-sm">Submit</a>
-                        </div>
-                    </div> -->
                      <div class="card card-uploadSerCharg">
                         <div class="card-title">
                             <h3>Upload Previous Service Charge</h3>
                         </div>
                         <div class="row g-md-3 g-2 align-items-center mb-3">
                             <div class="col-auto">
-                                <a href="{{ route('export.service-charges') }}" class="btn btn-themeSkyblue btn-sm">Download Template</a>
+                                <a href="{{ route('export.service-charges') }}" class="btn payroll-btn-secondary btn-sm">Download Template</a>
                             </div>
                             <form id="ImportServiceChargeForm">
                                 @csrf
                                 <div class="col-auto">
                                     <div class="uploadFile-btn me-0">
-                                        <a href="javascript:void(0)" class="btn btn-themeBlue btn-sm"
+                                        <a href="javascript:void(0)" class="btn payroll-btn-primary btn-sm"
                                             onclick="document.getElementById('ImportServiceCharge').click();">
                                             Upload File
                                         </a>
@@ -190,7 +65,7 @@
                                     </div>
                                 </div>
                                 <div class="card-footer text-end">
-                                    <button type="submit" class="btn btn-themeBlue">Submit</button>
+                                    <button type="submit" class="btn payroll-btn-primary">Submit</button>
                                 </div>
                             </form>
                         </div>
@@ -204,13 +79,13 @@
 
                         <div class="row g-2 align-items-center mb-3">
                             <div class="col-auto">
-                                <a href="{{route('deductions.download-template')}}" class="btn btn-themeSkyblue btn-sm">Download Template</a>
+                                <a href="{{route('deductions.download-template')}}" class="btn payroll-btn-secondary btn-sm">Download Template</a>
                             </div>
                             <form id="ImportDeductionForm">
                                 @csrf
                                 <div class="col-auto">
                                     <div class="uploadFile-btn me-0">
-                                        <a href="javascript:void(0)" class="btn btn-themeBlue btn-sm"
+                                        <a href="javascript:void(0)" class="btn payroll-btn-primary btn-sm"
                                         onclick="document.getElementById('ImportDeductions').click();">
                                         Upload File
                                         </a>
@@ -221,7 +96,7 @@
                                     </div>
                                 </div>
                                 <div class="card-footer text-end">
-                                    <button type="submit" class="btn btn-themeBlue">Submit</button>
+                                    <button type="submit" class="btn payroll-btn-primary">Submit</button>
                                 </div>
                             </form>
                         </div>
@@ -268,7 +143,7 @@
                                 </div>
                             </div>
                             <div class="card-footer text-end">
-                                <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                                <button type="submit" class="btn payroll-btn-primary btn-sm">Submit</button>
                             </div>
                         </form>
                     </div>
@@ -280,7 +155,7 @@
                                     <h3>Recent Deductions</h3>
                                 </div>
                                 <div class="col-auto">
-                                    <a href="{{ route('deductions.index') }}" class="btn btn-themeSkyblue btn-sm">View All</a>
+                                    <a href="{{ route('deductions.index') }}" class="btn payroll-btn-secondary btn-sm">View All</a>
                                 </div>
                             </div>
                         </div>
@@ -309,6 +184,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts.payroll._payroll_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')

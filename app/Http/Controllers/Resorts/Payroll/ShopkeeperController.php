@@ -103,7 +103,7 @@ class ShopkeeperController extends Controller
             return datatables()->of($tableData)
             ->addColumn('view_more', function ($row) {
                 $url = route('resort.shopkeeper.payments', ['id' => $row->id]);
-                return '<a href="' . e($url) . '" class="btn btn-themeSkyblue btn-sm">View more</a>';
+                return '<a href="' . e($url) . '" class="btn payroll-btn-secondary btn-sm">View more</a>';
             })
             ->addColumn('action', function ($row) use ($edit_class,$delete_class) {
                 return '

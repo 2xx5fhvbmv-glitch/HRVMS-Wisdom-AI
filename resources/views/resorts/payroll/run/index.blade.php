@@ -83,7 +83,7 @@
                                                                     <strong>{{ \Carbon\Carbon::parse($pp->start_date)->format('d M Y') }} - {{ \Carbon\Carbon::parse($pp->end_date)->format('d M Y') }}</strong>
                                                                     <span class="badge {{ $pp->status === 'approved' ? 'badge-themeSuccess' : 'badge-themeWarning' }} ms-2">{{ ucfirst(str_replace('_', ' ', $pp->status)) }}</span>
                                                                 </div>
-                                                                <button type="button" class="btn btn-sm btn-themeBlue view-pending-payroll" data-payroll-id="{{ $pp->id }}">
+                                                                <button type="button" class="btn btn-sm payroll-btn-secondary view-pending-payroll" data-payroll-id="{{ $pp->id }}">
                                                                     <i class="fa-solid fa-eye me-1"></i> View
                                                                 </button>
                                                             </div>
@@ -99,7 +99,7 @@
                                                     <p id="endDate" class="d-none"></p>
                                                 </div>
                                             </div>
-                                            <button type="button" class="btn btn-themeBlue btn-sm next">   Continue</button>
+                                            <button type="button" class="btn payroll-btn-primary btn-sm next">   Continue</button>
                                         </div>
                                     </div>
                                 </div>
@@ -188,8 +188,8 @@
                             </div>
                             <hr class="hr-footer">
                             <!-- <a href=" # " class="a-link ">Save As Draft</a> -->
-                            <button type="button" class="btn btn-themeBlue btn-sm float-end next">Next</button>
-                            <a href=" # " class=" btn btn-themeSkyblue btn-sm float-end previous me-2">Back</a>
+                            <button type="button" class="btn payroll-btn-primary btn-sm float-end next">Next</button>
+                            <a href=" # " class=" btn payroll-btn-secondary btn-sm float-end previous me-2">Back</a>
                         </fieldset>
                         <fieldset data-step="3">
                             <div class="card-header">
@@ -233,8 +233,8 @@
                             </div>
                             <hr class="hr-footer border-0">
                             <!-- <a href=" # " class="a-link ">Save As Draft</a> -->
-                            <button type="button" class="btn btn-themeBlue btn-sm float-end next">Next</button>
-                            <a href=" # " class=" btn btn-themeSkyblue btn-sm float-end previous me-2">Back</a>
+                            <button type="button" class="btn payroll-btn-primary btn-sm float-end next">Next</button>
+                            <a href=" # " class=" btn payroll-btn-secondary btn-sm float-end previous me-2">Back</a>
                         </fieldset>
                         <fieldset data-step="4">
                             <div class="card-header">
@@ -250,7 +250,7 @@
                                     </div>
                                     <div class="col-auto">
                                         <div class="uploadFile-btn me-0">
-                                            <a href="javascript:void(0)" id="upload-city-ledger-button" class="btn btn-themeBlue btn-sm"
+                                            <a href="javascript:void(0)" id="upload-city-ledger-button" class="btn payroll-btn-primary btn-sm"
                                                 >
                                                 Upload Excel
                                             </a>
@@ -289,8 +289,8 @@
                             </div>
                             <hr class="hr-footer border-0">
                             <!-- <a href=" # " class="a-link ">Save As Draft</a> -->
-                            <button type="button" class="btn btn-themeBlue btn-sm float-end next">Next</button>
-                            <a href=" # " class=" btn btn-themeSkyblue btn-sm float-end previous me-2">Back</a>
+                            <button type="button" class="btn payroll-btn-primary btn-sm float-end next">Next</button>
+                            <a href=" # " class=" btn payroll-btn-secondary btn-sm float-end previous me-2">Back</a>
                         </fieldset>
 
                         <fieldset data-step="5">
@@ -311,7 +311,7 @@
                                         <input type="text" class="form-control" id="total-ser" placeholder="ENTER TOTAL SERVICE CHARGE AMOUNT" maxlength="10" required>
                                     </div>
                                     <div class="col-auto">
-                                        <a href="#" id="distribute-service-charge" class="btn btn-themeSkyblue">Distribute Amount</a>
+                                        <a href="#" id="distribute-service-charge" class="btn payroll-btn-primary">Distribute Amount</a>
                                     </div>
                                 </div>
                             </div>
@@ -337,8 +337,8 @@
                                 </table>
                             </div>
                             <hr class="hr-footer border-0">
-                            <button type="button" class="btn btn-themeBlue btn-sm float-end next">Next</button>
-                            <a href="#" class="btn btn-themeSkyblue btn-sm float-end previous me-2">Back</a>
+                            <button type="button" class="btn payroll-btn-primary btn-sm float-end next">Next</button>
+                            <a href="#" class="btn payroll-btn-secondary btn-sm float-end previous me-2">Back</a>
                         </fieldset>
 
                         <fieldset data-step="6">
@@ -392,8 +392,8 @@
                             </div>
                             <hr class="hr-footer border-0">
                             <!-- <a href=" # " class="a-link ">Save As Draft</a> -->
-                            <button type="button" class="btn btn-themeBlue btn-sm float-end next">Next</button>
-                            <a href=" # " class=" btn btn-themeSkyblue btn-sm float-end previous me-2">Back</a>
+                            <button type="button" class="btn payroll-btn-primary btn-sm float-end next">Next</button>
+                            <a href=" # " class=" btn payroll-btn-secondary btn-sm float-end previous me-2">Back</a>
                         </fieldset>
                         <fieldset data-step="7">
                             <div class="card-header">
@@ -494,7 +494,7 @@
                             </div>
 
                             <div class="d-flex gap-2 mb-3">
-                                <button type="button" class="btn btn-themeSkyblue btn-sm" id="downloadPayrollExcel">
+                                <button type="button" class="btn payroll-btn-secondary btn-sm" id="downloadPayrollExcel">
                                     <i class="fa-solid fa-file-excel me-1"></i> Download Excel
                                 </button>
                             </div>
@@ -506,24 +506,24 @@
                             </div>
 
                             <div class="d-flex justify-content-end gap-2 flex-wrap">
-                                <a href="#" class="btn btn-themeSkyblue btn-sm previous">Back</a>
-                                <button type="button" class="btn btn-themeGray btn-sm" id="saveAsDraft">Save as Draft</button>
+                                <a href="#" class="btn payroll-btn-secondary btn-sm previous">Back</a>
+                                <button type="button" class="btn payroll-btn-neutral btn-sm" id="saveAsDraft">Save as Draft</button>
 
                                 {{-- Supervisor: Send for Approval --}}
-                                <button type="button" class="btn btn-themeBlue btn-sm d-none" id="sendForApproval">
+                                <button type="button" class="btn payroll-btn-attention btn-sm d-none" id="sendForApproval">
                                     <i class="fa-solid fa-paper-plane me-1"></i> Send Payroll for Approval
                                 </button>
 
                                 {{-- Approver: Approve/Reject --}}
-                                <button type="button" class="btn btn-themeBlue btn-sm d-none" id="approvePayroll">
+                                <button type="button" class="btn payroll-btn-positive btn-sm d-none" id="approvePayroll">
                                     <i class="fa-solid fa-check me-1"></i> Approve
                                 </button>
-                                <button type="button" class="btn btn-danger btn-sm d-none" id="rejectPayroll">
+                                <button type="button" class="btn payroll-btn-attention btn-sm d-none" id="rejectPayroll">
                                     <i class="fa-solid fa-times me-1"></i> Reject
                                 </button>
 
                                 {{-- Supervisor: Confirm and Lock (only after all approvals) --}}
-                                <button type="button" class="btn btn-themeBlue btn-sm d-none" id="showLockModal">
+                                <button type="button" class="btn payroll-btn-critical btn-sm d-none" id="showLockModal">
                                     <i class="fa-solid fa-lock me-1"></i> Confirm and Lock Payroll
                                 </button>
                                 <button type="submit" class="d-none" id="submit"></button>
@@ -554,8 +554,8 @@
                     </div>
                 </div>
                 <div class="modal-footer border-0 pt-0">
-                    <button type="button" class="btn btn-themeGray" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-danger" id="confirmLockBtn">
+                    <button type="button" class="btn payroll-btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn payroll-btn-critical" id="confirmLockBtn">
                         <i class="fa-solid fa-lock me-1"></i> Confirm & Lock
                     </button>
                 </div>
@@ -607,8 +607,8 @@
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                        <button type="submit" class="btn btn-themeBlue" id="submitDeduction">Submit</button>
+                        <a href="#" data-bs-dismiss="modal" class="btn payroll-btn-secondary ms-auto">Cancel</a>
+                        <button type="submit" class="btn payroll-btn-primary" id="submitDeduction">Submit</button>
                     </div>
                 </form>
             </div>
@@ -626,8 +626,8 @@
                     <textarea id="addNote" name="add_note" class="form-control" rows="3" placeholder="Add Note (optional)"></textarea>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-themeSkyblue" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" id="submit_note" class="btn btn-themeBlue">Submit</button>
+                    <button type="button" class="btn payroll-btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" id="submit_note" class="btn payroll-btn-primary">Submit</button>
                 </div>
             </div>
         </div>
@@ -648,6 +648,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts.payroll._payroll_buttons_v2_styles')
 <style>
     .leave-tooltip{position:fixed;background:#2C2C2C;color:#fff;padding:12px 16px;border-radius:10px;font-size:13px;z-index:9999;min-width:180px;max-width:280px;box-shadow:0 4px 20px rgba(0,0,0,.3);display:none;pointer-events:none}
     .leave-tooltip.show{display:block!important}
@@ -2971,7 +2972,7 @@
                             <td class="other">${currencySymbol}0.00</td>
                             <td class="total-deduction">${currencySymbol}0.00</td>
                             <td>
-                                <a href="javascript:void(0)" class="btn btn-themeSkyblueLight btn-small add-deduction-btn" data-emp-id="${employee.employee_id}">
+                                <a href="javascript:void(0)" class="btn payroll-btn-positive btn-small add-deduction-btn" data-emp-id="${employee.employee_id}">
                                     Add Deduction
                                 </a>
                             </td>
@@ -3538,7 +3539,7 @@
         });
 
         // Change Edit button to Save
-        $(this).replaceWith('<a href="#" class="btn btn-sm btn-themeBlue save-btn">Save</a>');
+        $(this).replaceWith('<a href="#" class="btn btn-sm payroll-btn-positive save-btn">Save</a>');
     });
 
     let activityLog = []; // Store changes
