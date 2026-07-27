@@ -283,6 +283,23 @@
                             </div>
                         </div>
                                          
+                        <div class="card mb-30">
+                            <div class="card-title">
+                                <div class="row g-2">
+                                    <div class="col">
+                                        <h3 class="text-nowrap">Benefit Grade Levels</h3>
+                                    </div>
+                                    <div class="col-auto"><a href="{{route('resort.benefitgradelevel.index')}}" class="a-link">View Existing</a></div>
+                                </div>
+                            </div>
+                            <p class="mb-3">Custom grade tags used on Benefit Grid (e.g. "HOD L1") and which rank each tag currently applies to.</p>
+                            <div class="row g-2 mb-md-4 mb-3">
+                                <div class="col-12">
+                                    <a href="{{route('resort.benefitgradelevel.index')}}" class="btn btn-themeSkyblue btn-sm">Manage Grade Levels</a>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="card mb-30 @if(App\Helpers\Common::checkRouteWisePermission('resort.ta.emailtemplates',config('settings.resort_permissions.view')) == false) d-none @endif">
                             <div class="card-title">
                                 <h3>Letter Templates</h3>

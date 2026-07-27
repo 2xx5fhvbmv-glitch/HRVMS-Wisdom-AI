@@ -20,21 +20,17 @@
                 <div class=" row g-md-4 g-3 mb-4">
                     <div class="col-sm-6">
                         <div class="form-group mb-2">
-                            <label  class="form-label" for="emp-grade-select">Select Employee Grade <span class="req_span">*</span></label>
+                            <label  class="form-label" for="emp-grade-select">Employee Grade <span class="req_span">*</span></label>
 
-                            <select id="emp-grade-select" class="form-select select2t-none" name="emp_grade" 
-                            data-parsley-errors-container="#div-emp_grade" 
+                            <input type="text" id="emp-grade-select" class="form-control" name="emp_grade"
+                            value="{{ $currentGradeName ?? '' }}"
+                            placeholder="e.g. HOD L1"
+                            data-parsley-errors-container="#div-emp_grade"
                             required
-                            data-parsley-required-message="Please Select Employee Grade"
+                            data-parsley-required-message="Please enter an Employee Grade"
                             @if(isset($isViewMode) && $isViewMode) disabled @endif>
-                                <option value="">Select Employee Grade</option>
-                                @if(!empty($emp_grade))
-                                    @foreach ($emp_grade as $key => $value)
-                                        <option value="{{ $key }}" @if($benefit_grid->emp_grade == $key) selected @endif>{{ $value }}</option>
-                                    @endforeach
-                                @endif
-                            </select>
                             <div id="div-emp_grade"></div>
+                            <small class="text-muted">Type a new grade name (e.g. "HOD L1") or the name of an existing one — assign which rank(s) it applies to afterwards under People &gt; Configuration &gt; Benefit Grade Levels.</small>
                         </div>
                     </div>
                     <div class="col-sm-6">
@@ -853,7 +849,6 @@
     $(document).ready(function(){
         $("#addBenifitGridForm").parsley();
 
-
         $("#effective_date").datepicker({
             dateFormat: 'dd-mm-yy'
         });
@@ -946,7 +941,7 @@
                             `;
                             container.append(bonusHtml);
 
-                            $('.select2t-none').select2(); // Reinitialize select2
+                            $('.select2t-none').select2();
                         } else {
                             alert('No leave categories found.');
                         }
@@ -963,25 +958,18 @@
             }
         });
 
-        $('#addBenifitGridForm').submit(function(e) {
-            e.preventDefault();
-
-            if (formSubmitted) return; // Prevent multiple form submissions
-
-            var form = $(this);
-            var dataString = form.serialize();
+        function submitBenifitGridForm() {
+            var form = $('#addBenifitGridForm');
             var url = form.attr('action');
 
-            // Initialize Parsley validation
             form.parsley();
 
-            // Check if the form is valid
             if (form.parsley().isValid()) {
                 formSubmitted = true;
                 $.ajax({
                     url: url,
                     type: "POST",
-                    data: $('#addBenifitGridForm').serialize(),
+                    data: form.serialize(),
                     success: function(response) {
                         if(response.success == true) {
                             toastr.success(response.msg, "Success", {
@@ -1004,6 +992,17 @@
                     positionClass: 'toast-bottom-right'
                 });
             }
+        }
+
+        $('#addBenifitGridForm').submit(function(e) {
+            e.preventDefault();
+
+            if (formSubmitted) return; // Prevent multiple form submissions
+
+            // emp_grade is now the typed grade NAME (e.g. "HOD L1") — the
+            // controller resolves/creates the matching resort_benefit_grade_levels
+            // row server-side, so nothing extra needs to happen here.
+            submitBenifitGridForm();
         });
 
          $('#overtime-select').on('change', function() {
