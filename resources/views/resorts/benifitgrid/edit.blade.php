@@ -30,7 +30,23 @@
                             data-parsley-required-message="Please enter an Employee Grade"
                             @if(isset($isViewMode) && $isViewMode) disabled @endif>
                             <div id="div-emp_grade"></div>
-                            <small class="text-muted">Type a new grade name (e.g. "HOD L1") or the name of an existing one — assign which rank(s) it applies to afterwards under People &gt; Configuration &gt; Benefit Grade Levels.</small>
+                            <small class="text-muted">Type a new grade name (e.g. "HOD L1") or the name of an existing one.</small>
+                        </div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="form-group mb-2">
+                            <label class="form-label" for="grade-ranks-select">Applies to Rank(s) <span class="req_span">*</span></label>
+                            <select id="grade-ranks-select" name="ranks[]" multiple class="form-select select2t-none"
+                            data-parsley-errors-container="#div-ranks"
+                            required
+                            data-parsley-required-message="Please select at least one rank"
+                            @if(isset($isViewMode) && $isViewMode) disabled @endif>
+                                @foreach($rankConfig ?? [] as $rankValue => $rankLabel)
+                                    <option value="{{ $rankValue }}" @if(in_array($rankValue, $currentGradeRanks ?? [])) selected @endif>{{ $rankLabel }}</option>
+                                @endforeach
+                            </select>
+                            <div id="div-ranks"></div>
+                            <small class="text-muted">A rank can only belong to one grade at a time — selecting it here moves it off whatever grade currently holds it.</small>
                         </div>
                     </div>
                     <div class="col-sm-6">
@@ -183,6 +199,7 @@
                         </div>
                 </div>
 
+                {{--
                 <div class="row g-md-4 g-3 mb-4">
                     <!-- Existing fields... -->
                     <div class="col-sm-12 mt-3">
@@ -202,7 +219,6 @@
                                 </div>
                             </div>
                         </div>
-                        {{-- <h5>Custom Leave Types</h5> --}}
                         <div id="customLeaveContainer"></div>
                     </div>
                 </div>
@@ -217,6 +233,7 @@
                         </div>
                     @endforeach
                 @endif
+                --}}
                 
                 <div class="row g-md-4 g-3 mb-4">                   
                     <div class="col-xxl-4  col-sm-6">
@@ -1025,7 +1042,11 @@
     </script>
     <script>
         let customLeaveIndex = 0; // To track the index of custom leaves
-        document.getElementById('addCustomLeave').addEventListener('click', function() {
+        // Custom Leave Types section is commented out above — guard so this
+        // doesn't throw on a missing element and break every handler after
+        // it in this same <script> block (custom-benefits, custom-discount).
+        const addCustomLeaveBtn = document.getElementById('addCustomLeave');
+        if (addCustomLeaveBtn) addCustomLeaveBtn.addEventListener('click', function() {
             customLeaveIndex++;
             const customLeaveHtml = `
                 <div class="row custom-leave" id="custom-leave-${customLeaveIndex}">

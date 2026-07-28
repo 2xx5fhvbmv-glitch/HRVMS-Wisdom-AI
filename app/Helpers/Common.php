@@ -4405,23 +4405,21 @@ class Common
         return self::pointInPolygon(['lat' => $lat, 'lng' => $lng], $vertices);
     }
 
-    public static function getEmpGrade($rank){
-        if($rank == 1 || $rank == 3 || $rank == 7 || $rank == 8){
-            $emp_grade = "1";
-        }
-        else if($rank == 4){
-            $emp_grade = "4";
-        }
-        else if($rank == 2){
-            $emp_grade = "2";
-        }
-        else if($rank == 5){
-            $emp_grade = "5";
-        }
-        else{
-            $emp_grade = "6";
-        }
-        return $emp_grade;
+    /**
+     * Resolves which Benefit Grid grade a rank currently belongs to, for
+     * this resort. Used to be a hardcoded rank -> fixed-key switch (1/2/4/5/6),
+     * which broke the moment Benefit Grid grades became resort-customizable
+     * (e.g. "HOD L1") — resort_benifit_grid.emp_grade now stores a
+     * resort_benefit_grade_levels id, not one of those old fixed keys, so
+     * every caller needs the CURRENT mapping for this resort, not a
+     * hardcoded guess. Returns null if this resort hasn't mapped this rank
+     * to any grade — callers should treat that as "no benefit grid for
+     * this rank" rather than falling back to a guess.
+     */
+    public static function getEmpGrade($resortId, $rank){
+        return \App\Models\ResortBenefitGradeLevelRank::where('resort_id', $resortId)
+            ->where('rank', $rank)
+            ->value('grade_level_id');
     }
 
     /**

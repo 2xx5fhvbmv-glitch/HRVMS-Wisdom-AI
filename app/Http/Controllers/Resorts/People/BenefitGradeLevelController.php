@@ -198,20 +198,8 @@ class BenefitGradeLevelController extends Controller
 
         DB::beginTransaction();
         try {
-            // Release every rank this grade level currently owns, then
-            // re-assign exactly the submitted set — updateOrInsert on the
-            // unique (resort_id, rank) pair evicts any other grade level
-            // that currently owns a requested rank.
-            ResortBenefitGradeLevelRank::where('resort_id', $resort_id)->where('grade_level_id', $id)->delete();
-
-            $newRankArray = [];
-            foreach ($request->input('ranks', []) as $rank) {
-                ResortBenefitGradeLevelRank::updateOrCreate(
-                    ['resort_id' => $resort_id, 'rank' => $rank],
-                    ['grade_level_id' => $id]
-                );
-                $newRankArray[] = (int) $rank;
-            }
+            $newRankArray = array_map('intval', $request->input('ranks', []));
+            ResortBenefitGradeLevelRank::assignRanksToGrade($resort_id, $id, $newRankArray);
 
             // Benefit Grid's "Select Employee Grade" no longer picks a rank
             // directly (store()/update() resolve it from this mapping table

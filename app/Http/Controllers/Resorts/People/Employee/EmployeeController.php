@@ -1785,7 +1785,7 @@ class EmployeeController extends Controller
 
 
         $position = ResortPosition::find($request->Position_id);
-        $grade = Common::getEmpGrade($position->Rank);
+        $grade = Common::getEmpGrade($this->resort->resort_id, $position->Rank);
 
         $benefitGrid = ResortBenifitGrid::where('resort_id', $this->resort->resort_id)
             ->where('emp_grade', $grade)
@@ -2438,7 +2438,7 @@ class EmployeeController extends Controller
 
         $positionId = $request->position_id;
         $position = ResortPosition::find($positionId);
-        $grade = Common::getEmpGrade($position->Rank);
+        $grade = Common::getEmpGrade($this->resort->resort_id, $position->Rank);
 
         $benefitGrid = ResortBenifitGrid::where('resort_id', $this->resort->resort_id)
             ->where('status', 'active')
@@ -2453,7 +2453,7 @@ class EmployeeController extends Controller
             'success' => true,
             'benfitGrid_emp_id' => $benefitGrid->emp_grade,
             'position_rank' => $position->Rank,
-            'emp_grade_name' => config('settings.Position_Rank')[$benefitGrid->emp_grade] ?? null,
+            'emp_grade_name' => optional(\App\Models\ResortBenefitGradeLevel::find($benefitGrid->emp_grade))->name,
             'service' => $benefitGrid->service_charge == 1 ? 'yes' : 'no',
             'overtime' => $benefitGrid->overtime,
             'holiday_overtime' => $benefitGrid->paid_worked_public_holiday_and_friday == 1 ? 'yes' : 'no',
@@ -2480,7 +2480,7 @@ class EmployeeController extends Controller
         }
         return response()->json([
             'success'         => true,
-            'emp_grade_name'  => config('settings.Position_Rank')[$benefitGrid->emp_grade] ?? null,
+            'emp_grade_name'  => optional(\App\Models\ResortBenefitGradeLevel::find($benefitGrid->emp_grade))->name,
             'service'         => $benefitGrid->service_charge == 1 ? 'yes' : 'no',
             'overtime'        => $benefitGrid->overtime,
             'holiday_overtime'=> $benefitGrid->paid_worked_public_holiday_and_friday == 1 ? 'yes' : 'no',
