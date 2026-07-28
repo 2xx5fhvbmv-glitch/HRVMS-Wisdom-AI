@@ -587,80 +587,152 @@ class LeaveController extends Controller
                     }
                 }
 
+                // Approval chain per the documented leave-approval-flow spec
+                // (same rules already implemented correctly in
+                // Resorts/Leave/LeaveController.php's leaveAdd() — ported
+                // here so mobile submissions follow the same rules instead
+                // of the old broken version: a tautological rank check
+                // that always added an extra approver regardless of rank,
+                // an undefined $resortId (typo for $user->resort_id) that
+                // silently made every EXCOM/HOD/HR/GM lookup below it
+                // resolve nothing, and no GM step at all for Manager/HOD.
+                //
+                // Line Worker (6) / Supervisor (5) -> Reporting Manager only (1 approval)
+                // Manager (4) -> HOD or EXCOM -> then GM (2 approvals)
+                // HOD (2) -> EXCOM -> then GM (2 approvals)
+                // EXCOM (1) -> GM only (1 approval)
+                // GM (8) -> HR dept EXCOM, else HR dept HOD, else any EXCOM (1 approval)
                 $directReportingManagerId               =   $employee->reporting_to;
+                $directReportingManager                 =   $directReportingManagerId
+                                                                ? Employee::select('id', 'rank', 'reporting_to')->where('resort_id', $user->resort_id)->find($directReportingManagerId)
+                                                                : null;
 
-                if($rank != "1" || $rank != "3" || $rank != "8") { // If not EXCOM, HR, or GM
-                    $directReporting                        =   Employee::where('id', $directReportingManagerId)
-                                                                    ->where('resort_id',$user->resort_id)
-                                                                    ->where('Dept_id', $employee->Dept_id)
-                                                                    ->first();
-                    if ($directReporting) {
-                        $approvalFlow->push($directReporting); // First approver: Supervisor/Manager
+                // Line Worker/Supervisor: reporting_to can point straight at
+                // the HOD in departments with no Supervisor layer, skipping
+                // the intended approver level — look for an actual
+                // Supervisor/Manager in the applicant's own department first.
+                if (
+                    in_array($rank, ['5', '6'], true)
+                    && (!$directReportingManager || !in_array((string) $directReportingManager->rank, ['4', '5'], true))
+                ) {
+                    $deptSupervisorOrManager             =   Employee::select('id', 'rank', 'reporting_to')
+                                                                ->where('resort_id', $user->resort_id)
+                                                                ->where('Dept_id', $employee->Dept_id)
+                                                                ->where('id', '!=', $emp_id)
+                                                                ->whereIn('rank', ['5', '4'])
+                                                                ->orderByRaw("FIELD(rank, '5', '4')")
+                                                                ->first();
+                    if ($deptSupervisorOrManager) {
+                        $directReportingManager          =   $deptSupervisorOrManager;
                     }
                 }
 
-                // Helper to get EXCOM, HOD, HR
-                $getApprover                            =   function($deptId, $rank,$resortId) {
-                                                                return Employee::select('id', 'rank')
-                                                                    ->where('resort_id',$resortId)
-                                                                    ->where('Dept_id', $deptId)
-                                                                    ->where('rank', $rank)
-                                                                    ->first();
-                                                            };
+                $approvalIds                             =   $approvalFlow->pluck('id')->toArray();
 
-                $getHR                                  =   function($resortId) {
-                                                                // Raw rank=3 excluded HR employees whose actual rank
-                                                                // isn't literally 3 (e.g. HR-department HOD/EXCOM).
-                                                                return Employee::select('id', 'rank')->whereIn('id', Common::getResortHrEmployeeIds($resortId))->first();
-                                                            };
-
-                $getGM                                  =   function($resortId) {
-                                                                return Employee::select('id', 'rank')->where('rank', 8)->where('resort_id',$resortId)->first();
-                                                            };
-
-
-                // Line worked and supervisor applied leave
-                if($rank === "6" || $rank === "5") {
-
-                    $findEXCOM                          =   $getApprover($employee->Dept_id, 1,$resortId);
-                    if ($findEXCOM) {
-                        $approvalFlow->push($findEXCOM); // Only EXCOM approves
-                    } else {
-                        $findHOD                    =   $getApprover($employee->Dept_id, 2,$resortId);
-                        if ($findHOD) {
-                            $approvalFlow->push($findHOD); // Only HOD approves if EXCOM not found
+                if ($rank === '8') {
+                    // GM leave: HR dept EXCOM, else HR dept HOD, else any EXCOM
+                    $hrDeptId                            =   ResortDepartment::where('resort_id', $user->resort_id)
+                                                                ->where('name', 'Human Resources')->value('id');
+                    $gmApproverFound                     =   false;
+                    if ($hrDeptId) {
+                        $hrExcom                          =   Employee::select('id', 'rank')
+                                                                ->where('resort_id', $user->resort_id)
+                                                                ->where('Dept_id', $hrDeptId)
+                                                                ->where('rank', 1)
+                                                                ->where('id', '!=', $emp_id)
+                                                                ->first();
+                        if ($hrExcom && !in_array($hrExcom->id, $approvalIds)) {
+                            $approvalFlow->push($hrExcom);
+                            $approvalIds[]                = $hrExcom->id;
+                            $gmApproverFound              = true;
                         }
                     }
-
-                    if ($findHR = $getHR($resortId)) {
-                        $approvalFlow->push($findHR); // Only HR approves
+                    if (!$gmApproverFound && $hrDeptId) {
+                        $hrHod                            =   Employee::select('id', 'rank')
+                                                                ->where('resort_id', $user->resort_id)
+                                                                ->where('Dept_id', $hrDeptId)
+                                                                ->where('rank', 2)
+                                                                ->where('id', '!=', $emp_id)
+                                                                ->first();
+                        if ($hrHod && !in_array($hrHod->id, $approvalIds)) {
+                            $approvalFlow->push($hrHod);
+                            $approvalIds[]                = $hrHod->id;
+                            $gmApproverFound              = true;
+                        }
                     }
-                }
-
-                // MGR applied leave
-                if ($rank === "4") {
-
-                    $findEXCOM                          =   $getApprover($employee->Dept_id, 1,$resortId);
-                    if ($findEXCOM) {
-                        $approvalFlow->push($findEXCOM); // Only EXCOM approves
+                    if (!$gmApproverFound) {
+                        $anyExcom                         =   Employee::select('id', 'rank')
+                                                                ->where('resort_id', $user->resort_id)
+                                                                ->where('rank', 1)
+                                                                ->where('id', '!=', $emp_id)
+                                                                ->first();
+                        if ($anyExcom && !in_array($anyExcom->id, $approvalIds)) {
+                            $approvalFlow->push($anyExcom);
+                        }
                     }
-
-                    if ($findHR = $getHR($resortId)) {
-                        $approvalFlow->push($findHR); // Only HR approves
+                } elseif ($rank === '1') {
+                    // EXCOM leave: GM only
+                    $gmApprover                          =   Employee::select('id', 'rank')
+                                                                ->where('resort_id', $user->resort_id)
+                                                                ->where('rank', 8)
+                                                                ->where('id', '!=', $emp_id)
+                                                                ->first();
+                    if ($gmApprover && !in_array($gmApprover->id, $approvalIds)) {
+                        $approvalFlow->push($gmApprover);
                     }
-                }
-
-                // HOD and GM applied leave
-                if ($rank === "2" || $rank === "8") {
-                    if ($findHR = $getHR($resortId)) {
-                        $approvalFlow->push($findHR); // Only HR approves
+                } elseif ($rank === '2') {
+                    // HOD leave: EXCOM (reporting manager, with fallback) -> then GM
+                    if ($directReportingManager && $directReportingManager->rank) {
+                        $approvalFlow->push($directReportingManager);
+                        $approvalIds[]                    = $directReportingManager->id;
+                    } else {
+                        $excomApprover                    =   Employee::select('id', 'rank')
+                                                                ->where('resort_id', $user->resort_id)
+                                                                ->where('rank', 1)
+                                                                ->where('id', '!=', $emp_id)
+                                                                ->first();
+                        if ($excomApprover && !in_array($excomApprover->id, $approvalIds)) {
+                            $approvalFlow->push($excomApprover);
+                            $approvalIds[]                = $excomApprover->id;
+                        }
                     }
-                }
-
-                // EXCOM & HR applied leave
-                if ($rank === "1" || $rank === "3") {
-                    if ($findGM = $getGM($resortId)) {
-                        $approvalFlow->push($findGM); // Only GM approves
+                    $gmApprover                          =   Employee::select('id', 'rank')
+                                                                ->where('resort_id', $user->resort_id)
+                                                                ->where('rank', 8)
+                                                                ->where('id', '!=', $emp_id)
+                                                                ->first();
+                    if ($gmApprover && !in_array($gmApprover->id, $approvalIds)) {
+                        $approvalFlow->push($gmApprover);
+                    }
+                } elseif ($rank === '4') {
+                    // Manager leave: HOD/EXCOM (reporting manager, with fallback) -> then GM
+                    if ($directReportingManager && $directReportingManager->rank) {
+                        $approvalFlow->push($directReportingManager);
+                        $approvalIds[]                    = $directReportingManager->id;
+                    } else {
+                        $hodApprover                      =   Employee::select('id', 'rank')
+                                                                ->where('resort_id', $user->resort_id)
+                                                                ->where('Dept_id', $employee->Dept_id)
+                                                                ->where('rank', 2)
+                                                                ->where('id', '!=', $emp_id)
+                                                                ->first();
+                        if ($hodApprover && !in_array($hodApprover->id, $approvalIds)) {
+                            $approvalFlow->push($hodApprover);
+                            $approvalIds[]                = $hodApprover->id;
+                        }
+                    }
+                    $gmApprover                          =   Employee::select('id', 'rank')
+                                                                ->where('resort_id', $user->resort_id)
+                                                                ->where('rank', 8)
+                                                                ->where('id', '!=', $emp_id)
+                                                                ->first();
+                    if ($gmApprover && !in_array($gmApprover->id, $approvalIds)) {
+                        $approvalFlow->push($gmApprover);
+                    }
+                } else {
+                    // Line Worker (6) / Supervisor (5) / others: reporting manager only
+                    if ($directReportingManager && $directReportingManager->rank) {
+                        $approvalFlow->push($directReportingManager);
                     }
                 }
 

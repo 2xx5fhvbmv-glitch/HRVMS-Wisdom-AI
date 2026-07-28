@@ -2915,6 +2915,28 @@ class Common
         if($flag =="weekly")
         {
 
+            // Batch all approved leave rows for this employee covering the
+            // whole week in one query instead of one EmployeeLeave query per
+            // day (previously up to 7+ queries per call, x10 paginated rows
+            // x N tabs on the duty-roster page).
+            $approvedWeekLeaves = EmployeeLeave::join('leave_categories as t4', 't4.id', '=', 'employees_leaves.leave_category_id')
+                ->where('employees_leaves.Emp_id', $Employee)
+                ->where('employees_leaves.status', 'Approved')
+                ->where('t4.resort_id', $resort_id)
+                ->whereDate('employees_leaves.from_date', '<=', $WeekendDate)
+                ->whereDate('employees_leaves.to_date', '>=', $WeekstartDate)
+                ->get(['t4.color', 't4.leave_type', 't4.leave_category', 'employees_leaves.total_days', 'employees_leaves.from_date', 'employees_leaves.to_date']);
+
+            $findApprovedLeaveForDate = function ($date) use ($approvedWeekLeaves) {
+                $target = Carbon::parse($date);
+                foreach ($approvedWeekLeaves as $leave) {
+                    if (Carbon::parse($leave->from_date)->lte($target) && Carbon::parse($leave->to_date)->gte($target)) {
+                        return $leave;
+                    }
+                }
+                return null;
+            };
+
             $DutyRoster = DutyRoster::join('duty_roster_entries as t2', 't2.Emp_id', '=', 'duty_rosters.Emp_id')
              ->join('shift_settings as t1','t1.id',"=","t2.Shift_id")
              ->whereBetween('t2.date',[$WeekstartDate, $WeekendDate])
@@ -2923,7 +2945,7 @@ class Common
             //  ->where('duty_rosters.Year','=',date('Y'))
              ->orderBy('t2.date','asc')
              ->get(['t2.Status','t2.id as Attd_id','t2.date','t2.Shift_id','t2.roster_id','duty_rosters.DayOfDate','t1.ShiftName','t2.OverTime','t1.StartTime','t1.EndTime','t2.DayWiseTotalHours'])
-             ->map(function ($roster) use ($resort_id, $Employee) {
+             ->map(function ($roster) use ($findApprovedLeaveForDate) {
                  if($roster->ShiftName =="First Shift")
                  {
                      $roster->ShiftNameColor = "createDuty-green";
@@ -2946,20 +2968,10 @@ class Common
                      $roster->DayOfDate = $roster->DayOfDate;
                  }
 
-                 // This branch never looked up leave at all (unlike the
-                 // Monthwise branch below) — an employee on approved leave
-                 // never saw it reflected on their own weekly duty roster
-                 // view, only whatever the raw attendance Status happened
-                 // to be (usually blank, since no shift was ever assigned).
-                 $employeeLeave = EmployeeLeave::join('leave_categories as t4', 't4.id', '=', 'employees_leaves.leave_category_id')
-                     ->where('employees_leaves.Emp_id', $Employee)
-                     ->where('employees_leaves.status', 'Approved')
-                     ->whereDate('employees_leaves.from_date', '<=', $roster->date)
-                     ->whereDate('employees_leaves.to_date', '>=', $roster->date)
-                     ->where('t4.resort_id', $resort_id)
-                     ->first(['t4.color', 't4.leave_type', 'employees_leaves.total_days', 'employees_leaves.from_date', 'employees_leaves.to_date']);
+                 $employeeLeave = $findApprovedLeaveForDate($roster->date);
 
                  $roster->LeaveType     = $employeeLeave->leave_type ?? $roster->Status;
+                 $roster->LeaveCategory = $employeeLeave->leave_category ?? null;
                  $roster->LeaveDays     = $employeeLeave->total_days ?? null;
                  $roster->LeaveFromDate = $employeeLeave->from_date ?? null;
                  $roster->LeaveToDate   = $employeeLeave->to_date ?? null;
@@ -2981,7 +2993,7 @@ class Common
                 while ($dateIterator->lte($weekEnd)) {
                     $date = $dateIterator->format('Y-m-d');
                     if (!in_array($date, $existingDates, true)) {
-                        $placeholderLeave = static::lookupApprovedLeaveForDate($resort_id, $Employee, $date);
+                        $placeholderLeave = $findApprovedLeaveForDate($date);
                         $DutyRoster->push((object)[
                             'Status'            => null,
                             'Attd_id'           => null,
@@ -2997,6 +3009,7 @@ class Common
                             'DayWiseTotalHours' => null,
                             'ShiftNameColor'    => null,
                             'LeaveType'         => $placeholderLeave->leave_type ?? null,
+                            'LeaveCategory'     => $placeholderLeave->leave_category ?? null,
                             'LeaveDays'         => $placeholderLeave->total_days ?? null,
                             'LeaveFromDate'     => $placeholderLeave->from_date ?? null,
                             'LeaveToDate'       => $placeholderLeave->to_date ?? null,
@@ -3011,7 +3024,8 @@ class Common
         }
         if($flag =="Monthwise")
         {
-                $LeaveCategory = LeaveCategory::where('resort_id', $resort_id)->get(['leave_type']);
+                $LeaveCategory = LeaveCategory::where('resort_id', $resort_id)->get(['leave_type', 'color']);
+                $leaveColorByType = $LeaveCategory->pluck('color', 'leave_type');
                 // Use the EMPLOYEE id to scope the entries — the previous
                 // filter `where('duty_rosters.id', '=', $duty_roster_id)`
                 // broke when the calling controller's groupBy('employees.id')
@@ -3032,8 +3046,40 @@ class Common
                     ->get([
                         't2.Status', 't2.id as Attd_id', 't2.Emp_id', 't2.date', 't2.Shift_id', 't2.roster_id', 'duty_rosters.DayOfDate',
                         't1.ShiftName', 't2.OverTime', 't1.StartTime', 't1.EndTime', 't2.DayWiseTotalHours'
-                    ])
-                    ->map(function ($roster)    use ($LeaveCategory,$resort_id) {
+                    ]);
+
+                // Batch all approved leave rows for every employee appearing
+                // in this result set in one query, instead of one
+                // EmployeeLeave query (plus a redundant leave_categories
+                // color query) per row — previously up to 2 extra queries
+                // per duty-roster-entry row for the whole visible month.
+                $monthEmpIds = $DutyRoster->pluck('Emp_id')->filter()->unique()->values();
+                if ($monthEmpIds->isEmpty() && !empty($Employee)) {
+                    $monthEmpIds = collect([$Employee]);
+                }
+                $approvedMonthLeaves = $monthEmpIds->isEmpty()
+                    ? collect()
+                    : EmployeeLeave::join('leave_categories as t4', 't4.id', '=', 'employees_leaves.leave_category_id')
+                        ->whereIn('employees_leaves.Emp_id', $monthEmpIds)
+                        ->where('employees_leaves.status', 'Approved')
+                        ->where('t4.resort_id', $resort_id)
+                        ->whereDate('employees_leaves.from_date', '<=', $endOfMonth)
+                        ->whereDate('employees_leaves.to_date', '>=', $startOfMonth)
+                        ->get(['employees_leaves.Emp_id', 't4.color', 't4.leave_type', 't4.leave_category', 'employees_leaves.total_days', 'employees_leaves.from_date', 'employees_leaves.to_date', 'employees_leaves.leave_category_id'])
+                        ->groupBy('Emp_id');
+
+                $findApprovedLeaveForEmpDate = function ($empId, $date) use ($approvedMonthLeaves) {
+                    $target = Carbon::parse($date);
+                    foreach ($approvedMonthLeaves->get($empId, collect()) as $leave) {
+                        if (Carbon::parse($leave->from_date)->lte($target) && Carbon::parse($leave->to_date)->gte($target)) {
+                            return $leave;
+                        }
+                    }
+                    return null;
+                };
+
+                $DutyRoster = $DutyRoster
+                    ->map(function ($roster)    use ($LeaveCategory, $leaveColorByType, $findApprovedLeaveForEmpDate) {
 
                         // Matches real shift names (e.g. "Morning Shift") via
                         // keyword lookup instead of exact-matching only the
@@ -3047,26 +3093,20 @@ class Common
                         }
 
                         // Get Employee Leave data
-                        $EmployeeLeave = EmployeeLeave::join('leave_categories as t4', 't4.id', '=', 'employees_leaves.leave_category_id')
-                            ->where('employees_leaves.Emp_id', $roster->Emp_id)
-                            ->where('employees_leaves.status', 'Approved')
-                            ->where(function ($query) use ($roster) {
-                                $query->whereDate('employees_leaves.from_date', '<=', $roster->date)
-                                    ->whereDate('employees_leaves.to_date', '>=', $roster->date);
-                            })
-                            ->first(['t4.color', 't4.leave_type', 'employees_leaves.total_days', 'employees_leaves.from_date', 'employees_leaves.to_date', 'employees_leaves.leave_category_id']);
+                        $EmployeeLeave = $findApprovedLeaveForEmpDate($roster->Emp_id, $roster->date);
 
                         $roster->LeaveType = $EmployeeLeave->leave_type ?? $roster->Status;
+                        $roster->LeaveCategory = $EmployeeLeave->leave_category ?? null;
                         $roster->LeaveDays = $EmployeeLeave->total_days ?? null;
                         $roster->LeaveFromDate = $EmployeeLeave->from_date ?? null;
                         $roster->LeaveToDate = $EmployeeLeave->to_date ?? null;
-                        $LeaveCategorycolur  = LeaveCategory::where('resort_id', $resort_id)->where("leave_type", $roster->Status)->first(['color']);
+                        $leaveCategoryColor = $leaveColorByType[$roster->Status] ?? null;
 
                         if (isset($roster->Status)) {
                             if (isset($EmployeeLeave->color)) {
                                 $roster->LeaveColor = $EmployeeLeave->color;
-                            } elseif (isset($LeaveCategorycolur->color)) {
-                                $roster->LeaveColor = $LeaveCategorycolur->color;
+                            } elseif ($leaveCategoryColor) {
+                                $roster->LeaveColor = $leaveCategoryColor;
                             } else {
 
                                 $roster->LeaveColor = "";
@@ -3115,7 +3155,7 @@ class Common
                 while ($dateIterator->lte($monthEnd)) {
                     $date = $dateIterator->format('Y-m-d');
                     if (!in_array($date, $existingDates, true)) {
-                        $placeholderLeave = static::lookupApprovedLeaveForDate($resort_id, $Employee, $date);
+                        $placeholderLeave = $findApprovedLeaveForEmpDate($Employee, $date);
                         $DutyRoster->push((object)[
                             'Status'            => null,
                             'Attd_id'           => null,
@@ -3131,6 +3171,7 @@ class Common
                             'DayWiseTotalHours' => null,
                             'ShiftNameColor'    => null,
                             'LeaveType'         => $placeholderLeave->leave_type ?? null,
+                            'LeaveCategory'     => $placeholderLeave->leave_category ?? null,
                             'LeaveDays'         => $placeholderLeave->total_days ?? null,
                             'LeaveFromDate'     => $placeholderLeave->from_date ?? null,
                             'LeaveToDate'       => $placeholderLeave->to_date ?? null,
