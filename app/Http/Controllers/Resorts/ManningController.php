@@ -51,18 +51,12 @@ class ManningController extends Controller
         $positions = Position::where('status', 'active')->get();
         $resort_sections = ResortSection::where('status', 'active')->where('resort_id',$resort_id)->get();
         $resort_positions = ResortPosition::where('status', 'active')->where('resort_id',$resort_id)->get();
-        // Positions here carry the numeric Rank column shown in the table
-        // below — Benefit Grade Levels map custom grade tags (e.g. "HOD L1")
-        // onto these same ranks, so it's surfaced on this page rather than
-        // only under People > Configuration.
-        $rankConfig = config('settings.Position_Rank');
 
         return view('resorts.manning.index')->with(
             compact(
             'page_title',
             'divisions','departments','sections','positions',
-            'resort_divisions','resort_departments','resort_sections','resort_positions',
-            'rankConfig'
+            'resort_divisions','resort_departments','resort_sections','resort_positions'
             )
         );
     }

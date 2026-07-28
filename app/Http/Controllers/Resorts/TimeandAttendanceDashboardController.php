@@ -279,7 +279,7 @@ class TimeandAttendanceDashboardController extends Controller
                 if (!$emp) {
                     continue;
                 }
-                $grade = Common::getEmpGrade($emp->rank);
+                $grade = Common::getEmpGrade($resortId, $emp->rank);
                 $limit = (int) ($gridLimits[$grade] ?? 48);
                 if ($limit <= 0) {
                     $limit = 48;

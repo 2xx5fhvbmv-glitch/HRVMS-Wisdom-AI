@@ -99,24 +99,12 @@ class EmployeeController extends Controller
                         $religion = "muslim";
                     }
 
-                    // $emp_grade      = Common::getEmpGrade($value->rank);
                     $rank      = $value->rank;
-
-                    if($rank == 1 || $rank == 3 || $rank == 7 || $rank == 8){
-                        $emp_grade = "1";
-                    }
-                    else if($rank == 4){
-                        $emp_grade = "4";
-                    }
-                    else if($rank == 2){
-                        $emp_grade = "2";
-                    }
-                    else if($rank == 5){
-                        $emp_grade = "5";
-                    }
-                    else{
-                        $emp_grade = "6";
-                    }
+                    // Was an inline duplicate of the old hardcoded rank->key
+                    // switch — same fix as Common::getEmpGrade() itself:
+                    // resolve via the resort's current grade-level mapping
+                    // instead of a fixed guess.
+                    $emp_grade = Common::getEmpGrade($resortId, $rank);
 
                     $benefit_grid = ResortBenifitGrid::where('emp_grade', $emp_grade)
                                                     ->where('resort_id', $resortId)
@@ -201,22 +189,9 @@ class EmployeeController extends Controller
             }
 
             $rank           = $profile->rank;
-
-                if($rank == 1 || $rank == 3 || $rank == 7 || $rank == 8){
-                    $emp_grade = "1";
-                }
-                else if($rank == 4){
-                    $emp_grade = "4";
-                }
-                else if($rank == 2){
-                    $emp_grade = "2";
-                }
-                else if($rank == 5){
-                    $emp_grade = "5";
-                }
-                else{
-                    $emp_grade = "6";
-                }
+            // See the sibling copy of this same lookup above — resolve via
+            // the resort's current grade-level mapping, not a fixed guess.
+            $emp_grade = Common::getEmpGrade($resortId, $rank);
 
                 $benefit_grid = ResortBenifitGrid::where('emp_grade', $emp_grade)
                 ->where('resort_id', $resortId)

@@ -742,22 +742,9 @@ class EmployeeController extends Controller
 
 
             $rank = $employee->rank;
-
-            if($rank == 1 || $rank == 3 || $rank == 7 || $rank == 8){
-                $emp_grade = "1";
-            }
-            else if($rank == 4){
-                $emp_grade = "4";
-            }
-            else if($rank == 2){
-                $emp_grade = "2";
-            }
-            else if($rank == 5){
-                $emp_grade = "5";
-            }
-            else{
-                $emp_grade = "6";
-            }
+            // Was an inline duplicate of the old hardcoded rank->key switch —
+            // resolve via the resort's current grade-level mapping instead.
+            $emp_grade = Common::getEmpGrade($this->resort->resort_id, $rank);
 
             // Get the viewed employee's gender (from their resort_admin record)
             $empGender = \App\Models\ResortAdmin::where('id', $employee->Parentid)->value('gender') ?? '';
@@ -1240,22 +1227,10 @@ class EmployeeController extends Controller
 
 
                 $rank = $employee->rank;
-
-                if($rank == 1 || $rank == 3 || $rank == 7 || $rank == 8){
-                    $emp_grade = "1";
-                }
-                else if($rank == 4){
-                    $emp_grade = "4";
-                }
-                else if($rank == 2){
-                    $emp_grade = "2";
-                }
-                else if($rank == 5){
-                    $emp_grade = "5";
-                }
-                else{
-                    $emp_grade = "6";
-                }
+                // Was an inline duplicate of the old hardcoded rank->key
+                // switch — resolve via the resort's current grade-level
+                // mapping instead.
+                $emp_grade = Common::getEmpGrade($this->resort->resort_id, $rank);
 
                 $benefit_grid = ResortBenifitGrid::where('emp_grade', $emp_grade)
                         ->where('resort_id', $this->resort->resort_id)
@@ -1822,22 +1797,9 @@ class EmployeeController extends Controller
 
 
             $rank = $employee->rank;
-
-            if($rank == 1 || $rank == 3 || $rank == 7 || $rank == 8){
-                $emp_grade = "1";
-            }
-            else if($rank == 4){
-                $emp_grade = "4";
-            }
-            else if($rank == 2){
-                $emp_grade = "2";
-            }
-            else if($rank == 5){
-                $emp_grade = "5";
-            }
-            else{
-                $emp_grade = "6";
-            }
+            // Was an inline duplicate of the old hardcoded rank->key switch —
+            // resolve via the resort's current grade-level mapping instead.
+            $emp_grade = Common::getEmpGrade($this->resort->resort_id, $rank);
 
             // Get the viewed employee's gender (from their resort_admin record)
             $empGender = \App\Models\ResortAdmin::where('id', $employee->Parentid)->value('gender') ?? '';

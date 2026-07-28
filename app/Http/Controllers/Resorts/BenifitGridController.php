@@ -121,6 +121,8 @@ class BenifitGridController extends Controller
             // Creating a new benefit grid, passing an empty model for form binding
             $benefit_grid = new ResortBenifitGrid();
             $currentGradeName = '';
+            $currentGradeRanks = [];
+            $rankConfig = config('settings.Position_Rank');
 
             // Initializing arrays for form selection (empty for create)
             $selected_linen_array = [];
@@ -133,7 +135,7 @@ class BenifitGridController extends Controller
             $isViewMode = false;
             $custom_fields = [];
             return view('resorts.benifitgrid.edit', compact(
-                'page_title', 'resort_id', 'sports', 'accomodation_type','isViewMode','currentGradeName', 'benefit_grid', 'selected_linen_array', 'selected_laundry', 'selected_sports','custom_leave','custom_benefits','custom_discounts','custom_fields','LeaveCategories'
+                'page_title', 'resort_id', 'sports', 'accomodation_type','isViewMode','currentGradeName','currentGradeRanks','rankConfig', 'benefit_grid', 'selected_linen_array', 'selected_laundry', 'selected_sports','custom_leave','custom_benefits','custom_discounts','custom_fields','LeaveCategories'
             ));
         } catch (\Exception $e) {
             // Log the error for debugging
@@ -159,19 +161,19 @@ class BenifitGridController extends Controller
 
             // Employee Grade is a free-text name (e.g. "HOD L1") — resolve
             // it to the resort's matching grade-level row, creating one if
-            // this name hasn't been used before. Which rank(s) it applies
-            // to is then set separately under People > Configuration >
-            // Benefit Grade Levels, not derived from the name itself.
+            // this name hasn't been used before.
             $gradeLevel = ResortBenefitGradeLevel::firstOrCreate(
                 ['resort_id' => $resort_id, 'name' => trim($request->emp_grade)],
                 ['status' => 'active']
             );
             $empGrade = (string) $gradeLevel->id;
 
-            $rankArray = ResortBenefitGradeLevelRank::where('resort_id', $resort_id)
-                ->where('grade_level_id', $gradeLevel->id)
-                ->pluck('rank')
-                ->all();
+            // Rank(s) this grade applies to are submitted right here on the
+            // same form — same "one rank belongs to at most one active
+            // grade" rule as the standalone config screen, reusing the
+            // exact same assignment logic so the two never drift apart.
+            $rankArray = array_map('intval', $request->input('ranks', []));
+            ResortBenefitGradeLevelRank::assignRanksToGrade($resort_id, $gradeLevel->id, $rankArray);
 
             // ✅ Process custom fields
             $customFields = [];
@@ -369,6 +371,11 @@ class BenifitGridController extends Controller
             // Fetch the existing benefit grid record by ID
             $benefit_grid = ResortBenifitGrid::findOrFail($id);
             $currentGradeName = optional(ResortBenefitGradeLevel::find($benefit_grid->emp_grade))->name ?? '';
+            $currentGradeRanks = ResortBenefitGradeLevelRank::where('resort_id', $resort_id)
+                ->where('grade_level_id', $benefit_grid->emp_grade)
+                ->pluck('rank')
+                ->all();
+            $rankConfig = config('settings.Position_Rank');
             $benefitGridChildren = ResortBenifitGridChild::where('benefit_grid_id', $id)->get();
 
             // Create a mapping of leave_cat_id to allocated_days
@@ -387,7 +394,7 @@ class BenifitGridController extends Controller
             $custom_discounts = $benefit_grid->customDiscounts;
             $custom_fields = json_decode($benefit_grid->custom_fields, true) ?? [];
             return view('resorts.benifitgrid.edit', compact(
-                'page_title', 'resort_id', 'sports','LeaveCategories','accomodation_type','currentGradeName', 'benefit_grid', 'isViewMode', 'selected_linen_array', 'selected_laundry', 'selected_sports','custom_leave','custom_benefits','custom_discounts','custom_fields','benefitGridChildMap'
+                'page_title', 'resort_id', 'sports','LeaveCategories','accomodation_type','currentGradeName','currentGradeRanks','rankConfig', 'benefit_grid', 'isViewMode', 'selected_linen_array', 'selected_laundry', 'selected_sports','custom_leave','custom_benefits','custom_discounts','custom_fields','benefitGridChildMap'
             ));
         } catch (\Exception $e) {
             // Log the error for debugging
@@ -414,10 +421,10 @@ class BenifitGridController extends Controller
             );
             $empGrade = (string) $gradeLevel->id;
 
-            $rankArray = ResortBenefitGradeLevelRank::where('resort_id', $resort_id)
-                ->where('grade_level_id', $gradeLevel->id)
-                ->pluck('rank')
-                ->all();
+            // See store() — ranks submitted on the same form, same shared
+            // assignment logic as the standalone config screen.
+            $rankArray = array_map('intval', $request->input('ranks', []));
+            ResortBenefitGradeLevelRank::assignRanksToGrade($resort_id, $gradeLevel->id, $rankArray);
 
             // ✅ Handle custom fields
             $customFields = [];

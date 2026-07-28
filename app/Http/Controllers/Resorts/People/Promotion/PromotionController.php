@@ -589,7 +589,7 @@ class PromotionController extends Controller
             ], 404);
         }
 
-        $emp_grade = Common::getEmpGrade($position->Rank);
+        $emp_grade = Common::getEmpGrade($resort_id, $position->Rank);
 
         // Vacancy check — mirror TransferController::isTargetPositionVacant().
         // Primary source: manning_responses + position_monthly_data (Workforce
