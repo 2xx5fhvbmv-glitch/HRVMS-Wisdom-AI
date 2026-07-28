@@ -197,14 +197,29 @@ class DutyRosterController extends Controller
 
         // try
         // {
+            // resort_benifit_grid.emp_grade stores a resort_benefit_grade_levels
+            // id (see ResortBenefitGradeLevelRank), not a raw rank number, so it
+            // can no longer be joined directly against employees.rank — resolve
+            // the employee's grade level via the rank-mapping table first, same
+            // as every other Common::getEmpGrade() call site.
             $employees = Employee::join('resort_admins as t1',"t1.id","=","employees.Admin_Parent_id")
                                     ->join('resort_positions as t2',"t2.id","=","employees.Position_id")
-                                    ->join('resort_benifit_grid as t3',"t3.emp_grade","=","employees.rank")
                                     ->where("employees.id",$id)
                                     ->where('t1.status','Active')
                                     ->where('employees.status','Active')
                                     ->where('t1.resort_id',$this->resort->resort_id)
-                                    ->first(['t3.overtime','t1.id as Parentid','employees.rank','t1.first_name','t1.last_name','t1.profile_picture','employees.*','t2.position_title']);
+                                    ->first(['t1.id as Parentid','employees.rank','t1.first_name','t1.last_name','t1.profile_picture','employees.*','t2.position_title']);
+
+            $overtime = null;
+            if ($employees) {
+                $gradeLevelId = Common::getEmpGrade($this->resort->resort_id, $employees->rank);
+                if ($gradeLevelId) {
+                    $overtime = \App\Models\ResortBenifitGrid::where('resort_id', $this->resort->resort_id)
+                        ->where('emp_grade', $gradeLevelId)
+                        ->value('overtime');
+                }
+                $employees->overtime = $overtime;
+            }
 
             $currentDay = Carbon::now()->format('Y-m-d');
             $currentMonthEnd = Carbon::now()->endOfMonth()->format('Y-m-d');
