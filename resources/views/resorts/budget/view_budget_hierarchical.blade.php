@@ -3334,7 +3334,7 @@ $(document).ready(function() {
             var initials = parts.slice(0, 2).map(function (p) { return p.charAt(0).toUpperCase(); }).join('');
             return '<span class="wb-leaf-avatar">' + (initials || '?') + '</span>';
         }
-        return '<img class="wb-leaf-avatar" src="' + pictureUrl + '" alt="">';
+        return '<img class="wb-leaf-avatar" src="' + wbEsc(pictureUrl) + '" alt="">';
     };
     function wbAvatarHtml(name, pictureUrl) { return window.wbAvatarHtml(name, pictureUrl); }
 
