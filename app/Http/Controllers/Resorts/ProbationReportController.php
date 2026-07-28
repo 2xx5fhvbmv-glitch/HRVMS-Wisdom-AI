@@ -280,16 +280,24 @@ class ProbationReportController extends Controller
         $today = Carbon::today();
         $defaultWindowEnd = $today->copy()->addDays(30);
 
+        // Same gap as probationRegister(): e.probation_end_date is null for
+        // most employees (derived on the live probation page as
+        // joining_date + 3 months instead). Filtering on the raw column
+        // alone excluded virtually every row — apply the same fallback via
+        // SQL so the date-range filter matches what the live page shows.
+        $effectiveEndExpr = 'COALESCE(e.probation_end_date, DATE_ADD(e.joining_date, INTERVAL 3 MONTH))';
+
         $rows = $this->baseQuery($rid, $scoped)
             ->whereIn('e.probation_status', ['Active', 'Extended'])
-            ->whereDate('e.probation_end_date', '>=', $today->toDateString())
-            ->whereDate('e.probation_end_date', '<=', ($f['to_date'] ?? $defaultWindowEnd->toDateString()))
+            ->whereRaw("$effectiveEndExpr >= ?", [$today->toDateString()])
+            ->whereRaw("$effectiveEndExpr <= ?", [$f['to_date'] ?? $defaultWindowEnd->toDateString()])
             ->when($f['department'] ?? null, fn($q) => $q->where('e.Dept_id', $f['department']))
             ->when($f['reporting_manager'] ?? null, fn($q) => $q->where('e.reporting_to', $f['reporting_manager']))
-            ->when($f['from_date'] ?? null, fn($q) => $q->whereDate('e.probation_end_date', '>=', $f['from_date']))
-            ->orderBy('e.probation_end_date')
+            ->when($f['from_date'] ?? null, fn($q) => $q->whereRaw("$effectiveEndExpr >= ?", [$f['from_date']]))
+            ->orderByRaw($effectiveEndExpr)
             ->get([
                 'e.Emp_id', 'e.joining_date', 'e.probation_end_date', 'e.probation_status',
+                DB::raw("$effectiveEndExpr as effective_end_date"),
                 DB::raw("TRIM(CONCAT(COALESCE(ra.first_name,''),' ',COALESCE(ra.last_name,''))) as employee_name"),
                 'd.name as dept', 'p.position_title',
                 DB::raw("TRIM(CONCAT(COALESCE(rmra.first_name,''),' ',COALESCE(rmra.last_name,''))) as manager_name"),
@@ -300,8 +308,8 @@ class ProbationReportController extends Controller
                 'Department'              => $r->dept ?? 'N/A',
                 'Position'                => $r->position_title ?? 'N/A',
                 'Joining Date'            => $r->joining_date ? Carbon::parse($r->joining_date)->format('d M Y') : 'N/A',
-                'Probation End Date'      => $this->probationEndDateLabel($r->probation_end_date),
-                'Days Remaining'          => $this->daysRemaining($r->probation_end_date) ?? 'N/A',
+                'Probation End Date'      => $this->probationEndDateLabel($r->effective_end_date),
+                'Days Remaining'          => $this->daysRemaining($r->effective_end_date) ?? 'N/A',
                 'Reporting Manager'       => trim($r->manager_name) ?: 'N/A',
                 'Probation Review Status' => $r->probation_status ?: 'N/A',
             ])->values()->all();

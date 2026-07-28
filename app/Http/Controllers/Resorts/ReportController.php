@@ -367,11 +367,12 @@ class ReportController extends Controller
                 try { return Carbon::parse($v)->format($dateFormat); } catch (\Exception) { return $v; }
             }
             if ($cast === 'money') {
-                // Salaries can be held in USD or MVR per employee, so show the
-                // currency alongside the amount instead of a bare number.
-                $amount = is_numeric($v) ? number_format((float) $v, 2) : $v;
-                $currency = isset($fd['currency_col']) ? ($srcRow[$fd['currency_col']] ?? null) : null;
-                return $currency ? trim($amount . ' ' . $currency) : $amount;
+                if (!is_numeric($v)) { return $v; }
+                // Salaries can be held in USD or MVR per employee — convert
+                // via the shared helper (same as every other money report)
+                // instead of appending the raw currency code as text.
+                $currency = isset($fd['currency_col']) ? ($srcRow[$fd['currency_col']] ?? 'USD') : 'USD';
+                return Common::formatCurrency((float) $v, $currency);
             }
             return $v;
         };
