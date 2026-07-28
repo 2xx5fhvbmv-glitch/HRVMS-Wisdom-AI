@@ -185,9 +185,10 @@ class GrivanceController extends Controller
             {
                 return $row->category->Category_Name;
             })
-            ->addColumn('Grivance_EmployeeName', function ($row) 
+            ->addColumn('Grivance_EmployeeName', function ($row)
             {
-                return  $row->GetEmployee->resortAdmin->first_name.' '. $row->GetEmployee->resortAdmin->last_name;
+                $admin = optional($row->GetEmployee)->resortAdmin;
+                return $admin ? $admin->first_name.' '.$admin->last_name : 'N/A';
             })
             ->addColumn('Status', function ($row) {
                 if($row->status == "pending")

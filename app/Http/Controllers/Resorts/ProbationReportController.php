@@ -243,7 +243,13 @@ class ProbationReportController extends Controller
                 DB::raw("TRIM(CONCAT(COALESCE(rmra.first_name,''),' ',COALESCE(rmra.last_name,''))) as manager_name"),
             ])
             ->map(function ($r) use ($rid) {
-                $days = $this->daysRemaining($r->probation_end_date);
+                // employees.probation_end_date is frequently unset — same as
+                // People\Probation\ProbationController's list column, derive
+                // it as joining_date + 3 months when the explicit column is
+                // empty, instead of falling straight to 'N/A'.
+                $effectiveEnd = $r->probation_end_date
+                    ?: ($r->joining_date ? Carbon::parse($r->joining_date)->addMonths(3)->format('Y-m-d') : null);
+                $days = $this->daysRemaining($effectiveEnd);
                 return [
                     'Employee ID'                => $r->Emp_id ?: 'N/A',
                     'Employee Name'              => trim($r->employee_name) ?: 'N/A',
@@ -251,7 +257,7 @@ class ProbationReportController extends Controller
                     'Position'                   => $r->position_title ?? 'N/A',
                     'Joining Date'               => $r->joining_date ? Carbon::parse($r->joining_date)->format('d M Y') : 'N/A',
                     'Probation Start Date'       => $r->joining_date ? Carbon::parse($r->joining_date)->format('d M Y') : 'N/A',
-                    'Probation End Date'         => $this->probationEndDateLabel($r->probation_end_date),
+                    'Probation End Date'         => $this->probationEndDateLabel($effectiveEnd),
                     'Days Remaining'             => $days !== null ? $days : 'N/A',
                     'Reporting Manager'          => trim($r->manager_name) ?: 'N/A',
                     'Onboarding Training Status' => $this->onboardingTrainingStatus($rid, $r->id),
