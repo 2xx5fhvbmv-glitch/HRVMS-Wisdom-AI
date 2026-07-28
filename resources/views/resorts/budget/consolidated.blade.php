@@ -9,6 +9,95 @@
 
 @section('content')
 
+<style>
+    /* ---- Brand tokens — same values as View Budget's :root block
+       (view_budget_hierarchical.blade.php), copied rather than shared
+       so this page has no new cross-page CSS dependency. ---- */
+    :root {
+        --wb-teal: #014653;
+        --wb-teal-2: #035b6c;
+        --wb-teal-tint-1: #E6F0F1;
+        --wb-teal-tint-2: #F1F7F7;
+        --wb-lime: #E0FF02;
+        --wb-ink: #14232A;
+        --wb-muted: #5D6F75;
+        --wb-faint: #93A4A9;
+        --wb-line: #E2EBEC;
+        --wb-line-2: #EEF4F4;
+        --wb-bg: #F2F6F6;
+        --wb-card: #FFFFFF;
+        --wb-vacant: #D98A00;
+        --wb-vacant-bg: #FFF6E5;
+        --wb-increase: #1F9D6B;
+        --wb-increase-bg: #EAF7F0;
+    }
+
+    /* ---- Nav-row primitives — copied verbatim from View Budget's
+       .wb-level-tag / .wb-group-row-name / .wb-group-row-meta /
+       .wb-group-row-budget (view_budget_hierarchical.blade.php) so
+       division/department/section/position rows here render with the
+       exact same look, not a page-specific lookalike. ---- */
+    .wb-level-tag {
+        display: inline-block;
+        font-size: 9.5px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .04em;
+        color: var(--wb-teal);
+        background: var(--wb-teal-tint-1);
+        border-radius: 6px;
+        padding: 2px 7px;
+        margin-right: 8px;
+        vertical-align: middle;
+    }
+    .wb-group-row-name { font-size: 13.5px; font-weight: 600; color: var(--wb-ink); }
+    .wb-group-row-meta { font-size: 11px; color: var(--wb-muted); margin-top: 3px; }
+    .wb-group-row-budget { font-size: 13px; font-weight: 700; color: var(--wb-teal); flex-shrink: 0; }
+
+    /* ---- Summary cards ---- */
+    .cb-summary-row { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 16px; }
+    .cb-summary-card {
+        flex: 1 1 220px;
+        background: var(--wb-card);
+        border: 1px solid var(--wb-line);
+        border-radius: 14px;
+        padding: 16px 18px;
+        box-shadow: 0 1px 3px rgba(1,70,83,0.06);
+    }
+    .cb-summary-label {
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: .04em;
+        text-transform: uppercase;
+        color: var(--wb-muted);
+        margin-bottom: 6px;
+    }
+    .cb-summary-value {
+        font-size: 24px;
+        font-weight: 700;
+        color: var(--wb-ink);
+        font-variant-numeric: tabular-nums;
+    }
+    .cb-summary-value.cb-money { color: var(--wb-teal); }
+
+    /* ---- Toolbar ---- */
+    .cb-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
+
+    /* ---- Loading skeleton (shown until the initial auto-fetch resolves) ---- */
+    .cb-skeleton-row {
+        height: 52px;
+        border-radius: 10px;
+        margin-bottom: 8px;
+        background: linear-gradient(90deg, var(--wb-line-2) 25%, var(--wb-teal-tint-1) 37%, var(--wb-line-2) 63%);
+        background-size: 400% 100%;
+        animation: cbSkeletonPulse 1.4s ease infinite;
+    }
+    @keyframes cbSkeletonPulse {
+        0% { background-position: 100% 50%; }
+        100% { background-position: 0 50%; }
+    }
+</style>
+
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
         <div class="page-hedding">
@@ -26,28 +115,19 @@
                             <input type="hidden" name="year" id="SendToFinanceYear" value="">
                             <p class="mb-0 fw-500 departmentBudget"></p>
                             @if($employeeRankPosition['position'] == 'HR')
-                                <button type="submit" class="btn btn-theme SendToFinance" id="SendToFinanceButton" >Send To Finance</button>
+                                <button type="submit" class="btn wfp-btn-primary SendToFinance" id="SendToFinanceButton" >Send To Finance</button>
                             @endif
                             @if($employeeRankPosition['position'] == 'Finance')
-                                <button type="submit" class="btn btn-theme SendToGM" id="SendToGMButton" >Send To GM</button>
+                                <button type="submit" class="btn wfp-btn-primary SendToGM" id="SendToGMButton" >Send To GM</button>
                             @endif
                             @if($employeeRankPosition['position'] == 'GM')
                                 {{-- <button type="submit" class="btn btn-theme SendToCorporateOffice" >Send To Corporate Office</button> --}}
-                                <button type="submit" class="btn btn-theme SendToCorporateOffice" >Aproove Budget</button>
-
-                                <a href="#revise-budgetmodal"
-                                    class="open-revise-modal btn btn-white ms-3"
-                                    style="background: #F5F8F8;"
-                                    data-budget_id="{{ $deptData->Budget_id }}"
-                                    data-dept_id="{{ $deptData->department->id }}"
-                                    data-bs-toggle="modal">
-                                        <span class="badge badge-danger">
-                                            <i class="fa-solid fa-clock-rotate-left"></i> Revise Budget
-                                        </span>
-                                </a>
+                                <button type="submit" class="btn wfp-btn-positive SendToCorporateOffice" >Approve Budget</button>
+                                {{-- Revise Budget was removed from this page per explicit
+                                     decision: revisions now happen only on View Budget. --}}
                             @endif
                             {{-- @if($employeeRankPosition['position'] == 'Corporate Office')
-                                <button type="submit" class="btn btn-theme SendToHR" >Send To HR</button>
+                                <button type="submit" class="btn wfp-btn-primary SendToHR" >Send To HR</button>
                             @endif --}}
                         </form>
                     </div>
@@ -56,107 +136,65 @@
         </div>
         <div class="card">
             <div class="card-header">
-                <div class="row g-md-3 g-2 align-items-center">
+                <div class="row g-md-3 g-2 align-items-center justify-content-between">
                     <div class="col-xl-2 col-md-4 col-sm-4 col-6">
                         <select class="form-select" name="year" id="year" onchange="fetchConsolidatedBudget(this.value)">
                             <option>Select Year</option>
                             {{-- Years will be dynamically populated --}}
                         </select>
                     </div>
-                    <!-- <div class="col-xl-3 col-lg-5 col-md-8 col-sm-8 ">
-                        <div class="input-group">
-                            <input type="sh" class="form-control searchPermission" placeholder="Search">
+                    <div class="col-xl-4 col-md-5 col-sm-6 col-12">
+                        {{-- Same input-group / form-control.search / .card-header
+                             pattern used site-wide (View Budget, Talent Pool) —
+                             reusing the shared CSS rather than a page-specific
+                             look. --}}
+                        <div class="input-group" id="cbSearchGroup">
+                            <input type="search" class="form-control search" id="cbSearchInput" placeholder="Search department or position" autocomplete="off">
                             <i class="fa-solid fa-search"></i>
                         </div>
-                    </div> -->
+                    </div>
+                </div>
+            </div>
+            <div class="card-body pt-0">
+                <div class="cb-summary-row">
+                    <div class="cb-summary-card">
+                        <div class="cb-summary-label">Total Annual Budget</div>
+                        <div class="cb-summary-value cb-money" id="cbSummaryTotalBudget">—</div>
+                    </div>
+                    <div class="cb-summary-card">
+                        <div class="cb-summary-label">Departments</div>
+                        <div class="cb-summary-value" id="cbSummaryDepartments">—</div>
+                    </div>
+                    <div class="cb-summary-card">
+                        <div class="cb-summary-label">Positions</div>
+                        <div class="cb-summary-value" id="cbSummaryPositions">—</div>
+                    </div>
+                </div>
+                <div class="cb-toolbar">
+                    <button type="button" class="btn btn-sm wfp-btn-secondary" id="cbExpandAllBtn">Expand all</button>
+                    <button type="button" class="btn btn-sm wfp-btn-secondary" id="cbCollapseAllBtn">Collapse all</button>
                 </div>
             </div>
             <div class="viewBudget-accordion" id="accordionViewBudget">
-                @if(!empty($MainArray))
-                    @php $iteation=1; @endphp
-                        @foreach ($MainArray as $key => $value)
-                            <div class="accordion-item">
-                                <h2 class="accordion-header" id="heading{{ $iteation }}">
-                                    <button class="accordion-button" type="button" data-bs-toggle="collapse"
-                                        data-bs-target="#collapse{{ $iteation }}" aria-expanded="true" aria-controls="collapse{{ $iteation }}">
-                                        <h3>{{ $key }}</h3>
-                                        <span class="badge badge-dark">Budget: {!! array_key_exists($key,$DepartmentTotal) ? Common::formatCurrency($DepartmentTotal[$key], 'USD') : (Common::GetResortCurrencySymbol() . ' 0.00') !!}</span>
-                                        <a href="#" class="text-lightblue fw-500 fs-13">WSB: $11,985</a>
-                                        <!-- <a href="#" class="btn btn-xs btn-coolblue">compare</a> -->
-                                    </button>
-                                </h2>
-                                <div id="collapse{{ $iteation }}" class="accordion-collapse collapse {{ ($iteation == 1)  ? 'show':''}} " aria-labelledby="heading{{ $iteation }}"
-                                    data-bs-parent="#accordionViewBudget">
-                                    <div class="table-responsive">
-                                        <table id="department-budget-table" class="table table-striped w-100">
-                                            <thead>
-                                                <tr>
-                                                    <th class="text-nowrap">Positions</th>
-                                                    <th class="text-nowrap">No. of position</th>
-                                                    <th class="text-nowrap w-120">Rank</th>
-                                                    <th class="text-nowrap">Nation</th>
-                                                    <th>Current Basic Salary</th>
-                                                    @foreach ($header as $h)
-                                                        <th>{{ $h }}</th>
-                                                    @endforeach
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                @foreach ($value as $item)
-                                                    <tr>
-                                                        @foreach ($item as $key=>$i)
-                                                            <td class="text-nowrap">
-                                                                {{ $i }}
-                                                            </td>
-                                                        @endforeach
-                                                    </tr>
-                                                @endforeach
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                </div>
-                            </div>
-                        @php $iteation++; @endphp
-                    @endforeach
-                @endif
+                {{-- Loading skeleton — the real Division/Department/Section/
+                     Position hierarchy always replaces this via the
+                     DOMContentLoaded fetchConsolidatedBudget() call below.
+                     Deliberately not rendering the flat legacy $MainArray
+                     table here anymore: it briefly flashed a different,
+                     older-looking layout (with a hardcoded fake WSB badge)
+                     before that AJAX call swapped it out a moment later. --}}
+                <div class="cb-skeleton-row"></div>
+                <div class="cb-skeleton-row"></div>
+                <div class="cb-skeleton-row"></div>
             </div>
         </div>
     </div>
 </div>
 
-<!-- modal -->
-<div class="modal fade" id="revise-budgetmodal" tabindex="-1" aria-labelledby="exampleModalLabel"
-aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-small">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="staticBackdropLabel">Revise Budget</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <form id="ReviseBudget">
-                @csrf
-                <div class="modal-body">
-                    <div class="form-group mb-20">
-                        <input type="hidden" id="budget_id" name="budget_id" value="">
-                        <input type="hidden" id="department_id" name="department_id" value="">
-                        @php
-                            $manning_request =  config('settings.manning_request');
-                            $manning_request = array_key_exists('msg3', $manning_request) ? $manning_request['msg3'] : '' ;
-                        @endphp
-                        <textarea class="form-control" name="ReviseBudgetComment" id="ReviseBudgetComment" rows="7" placeholder="Add Comment Regarding Revision">{{ $manning_request }}</textarea>
-                    </div>
-                </div>
-                <div class="modal-footer justify-content-end">
-                    <button type="button" class="btn btn-sm btn-themeGray me-2" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-sm btn-theme">Submit</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
 @endsection
 
 @section('import-css')
+@include('resorts.workforce_planning._wfp_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')
@@ -199,6 +237,8 @@ aria-hidden="true">
                 data: { year: selectedYear },
                 success: function(response) {
                     $('#accordionViewBudget').html(response.html); // Update this to match your HTML structure
+                    $('#cbSearchInput').val('');
+                    cbUpdateSummaryCards();
                     if (response.isBudgetCompleted === true) {
                         $("#SendToFinanceButton").prop("disabled", true);
                         $("#SendToGMButton").prop("disabled", true);
@@ -227,69 +267,103 @@ aria-hidden="true">
         }
     }
 
-    document.addEventListener('DOMContentLoaded', function() {
-        populateYears();
-        
-        // Handle revise budget modal button click
-        $(document).on('click', '.open-revise-modal', function() {
-            const budgetId = $(this).data('budget_id');
-            const deptId = $(this).data('dept_id');
-            
-            $('#budget_id').val(budgetId);
-            $('#department_id').val(deptId);
+    // ---- Summary cards (Section 1) ----
+    // Computed purely from what's already rendered inside #accordionViewBudget
+    // after fetchConsolidatedBudget() injects the AJAX partial — no new
+    // endpoint, no new query. Re-run after every load (initial + year change)
+    // so the cards always match whatever's currently on screen.
+    function cbParseMoney(text) {
+        var n = parseFloat(String(text).replace(/[^0-9.\-]/g, ''));
+        return isFinite(n) ? n : 0;
+    }
+
+    function cbUpdateSummaryCards() {
+        var $depts = $('#accordionViewBudget .department-accordion');
+        var $positions = $('#accordionViewBudget .position-accordion');
+        var totalBudget = 0;
+        $depts.each(function () {
+            var $badge = $(this).find('.departmentGrandTotal').first();
+            totalBudget += cbParseMoney($badge.text());
         });
-        
-        // Revise Budget form submission handler
-        $('#ReviseBudget').validate({
-            rules: {
-                ReviseBudgetComment: {
-                    required: true,
+        $('#cbSummaryTotalBudget').text(formatAmount ? formatAmount(totalBudget, 'USD') : totalBudget.toFixed(2));
+        $('#cbSummaryDepartments').text($depts.length);
+        $('#cbSummaryPositions').text($positions.length);
+    }
+
+    // ---- Toolbar: Expand all / Collapse all (Section 2) ----
+    // Same bootstrap.Collapse API already used (and fixed) on View Budget's
+    // own drill-down this session.
+    $(document).on('click', '#cbExpandAllBtn', function () {
+        document.querySelectorAll('#accordionViewBudget .collapse').forEach(function (el) {
+            bootstrap.Collapse.getOrCreateInstance(el).show();
+        });
+    });
+    $(document).on('click', '#cbCollapseAllBtn', function () {
+        document.querySelectorAll('#accordionViewBudget .collapse').forEach(function (el) {
+            bootstrap.Collapse.getOrCreateInstance(el).hide();
+        });
+    });
+
+    // ---- Toolbar: Search (Section 2) ----
+    // Whole hierarchy is already present in the DOM once the AJAX partial
+    // loads (unlike View Budget's lazily-loaded nav card), so this is pure
+    // client-side text filtering — no endpoint needed.
+    $(document).on('input', '#cbSearchInput', function () {
+        var term = $(this).val().trim().toLowerCase();
+
+        if (!term) {
+            // Clearing search restores the complete hierarchy — remove every
+            // filter-added inline display:none, leave expand/collapse state
+            // as-is (don't force a re-collapse).
+            $('#accordionViewBudget .division-accordion, #accordionViewBudget .department-accordion, #accordionViewBudget .section-accordion, #accordionViewBudget .position-accordion').css('display', '');
+            return;
+        }
+
+        $('#accordionViewBudget .department-accordion').each(function () {
+            var $dept = $(this);
+            var deptName = $dept.find('> .accordion-item > h2 .wb-group-row-name').first().text().toLowerCase();
+            var deptNameMatches = deptName.indexOf(term) !== -1;
+            var anyPositionMatches = false;
+
+            $dept.find('.position-accordion').each(function () {
+                var $pos = $(this);
+                var posName = $pos.find('.accordion-header .wb-group-row-name').first().text().toLowerCase();
+                var matches = deptNameMatches || posName.indexOf(term) !== -1;
+                $pos.css('display', matches ? '' : 'none');
+                if (matches) {
+                    anyPositionMatches = true;
+                    bootstrap.Collapse.getOrCreateInstance($pos.find('.accordion-collapse')[0]).show();
                 }
-            },
-            messages: {
-                ReviseBudgetComment: {
-                    required: "Please Add Revise Budget Comment.",
-                }
-            },
-            submitHandler: function(form, event) {
-                if (event) {
-                    event.preventDefault();
-                }
-                
-                $.ajax({
-                    url: "{{ route('resort.ReviseBudget.manning.notification') }}",
-                    type: "POST",
-                    data: $(form).serialize(),
-                    success: function(response) {
-                        if (response.success) {
-                            $('#revise-budgetmodal').modal('hide');
-                            $(".open-revise-modal").prop('disabled', true);
-                            toastr.success(response.msg, "Success", {
-                                positionClass: 'toast-bottom-right'
-                            });
-                            // Reload the page to reflect changes
-                            setTimeout(function() {
-                                location.reload();
-                            }, 1500);
-                        }
-                    },
-                    error: function(response) {
-                        let errors = response.responseJSON;
-                        let errs = '';
-                        
-                        if (errors && errors.errors) {
-                            $.each(errors.errors, function(key, error) {
-                                errs += error + '<br>';
-                            });
-                        } else {
-                            errs = 'An unexpected error occurred. Please try again.';
-                        }
-                        
-                        toastr.error(errs, { positionClass: 'toast-bottom-right' });
-                    }
-                });
+            });
+
+            var deptVisible = deptNameMatches || anyPositionMatches;
+            $dept.css('display', deptVisible ? '' : 'none');
+            if (deptVisible) {
+                var $deptCollapse = $dept.find('> .accordion-item [id^="collapseDept"]');
+                if ($deptCollapse.length) bootstrap.Collapse.getOrCreateInstance($deptCollapse[0]).show();
+                var $section = $dept.find('.section-accordion');
+                $section.css('display', '');
+                var $sectionCollapse = $section.find('[id^="collapseSec"]');
+                if ($sectionCollapse.length) bootstrap.Collapse.getOrCreateInstance($sectionCollapse[0]).show();
+                var $division = $dept.closest('.division-accordion');
+                $division.css('display', '');
+                var $divCollapse = $division.find('[id^="collapseDiv"]').first();
+                if ($divCollapse.length) bootstrap.Collapse.getOrCreateInstance($divCollapse[0]).show();
             }
         });
+    });
+
+    document.addEventListener('DOMContentLoaded', function() {
+        populateYears();
+
+        // Always load the rich Division/Department/Section/Position/Employee
+        // structure by default instead of waiting for a year-dropdown touch —
+        // closes the gap where a fresh page load showed a different, flatter
+        // legacy table than every subsequent interaction.
+        var $yearSelect = $('#year');
+        var defaultYear = @json((int) ($year ?? now()->year));
+        $yearSelect.val(String(defaultYear));
+        fetchConsolidatedBudget(defaultYear);
     });
 
 

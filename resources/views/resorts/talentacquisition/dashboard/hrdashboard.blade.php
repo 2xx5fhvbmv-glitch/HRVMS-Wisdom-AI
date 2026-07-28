@@ -26,107 +26,11 @@
             </div>
         </div>
         <div class="row g-3 g-xxl-4 recHR-main ">
-            <div class="@if(App\Helpers\Common::checkRouteWisePermission('interview-assessment.index',config('settings.resort_permissions.view')) == false) col-xl-12 @else col-xl-8 @endif col-lg-12 ">
+            <div class="@if(App\Helpers\Common::checkRouteWisePermission('interview-assessment.index',config('settings.resort_permissions.view')) == false) col-xl-12 @else col-xl-9 @endif col-lg-12 ">
                 <div class="row g-3 g-xxl-4 ">
-                    <div class="col-md-4 @if(App\Helpers\Common::checkRouteWisePermission('resort.ta.shortlistedapplicants',config('settings.resort_permissions.view')) == false) d-none @endif">
-                        <div class="card card-hod ">
-                            <div class="">
-                                <div class="card-title">
-                                    <h3>Total Applicants</h3>
-                                </div>
-                                <div class="d-flex align-items-center">
-                                    <strong>{{ $TotalApplicants ?? 0 }}</strong>
-
-                                </div>
-                            </div>
-                            <div>
-                                <!-- <a href="#">
-                                    <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg')}}" alt="" class="img-fluid">
-                                </a> -->
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4 @if(App\Helpers\Common::checkRouteWisePermission('interview-assessment.index',config('settings.resort_permissions.view')) == false) d-none @endif">
-                        <div class="card card-hod ">
-                            <div class="">
-                                <div class="card-title">
-                                    <h3>Interviews</h3>
-                                </div>
-                                <div class="d-flex align-items-center">
-                                    <strong>{{ $Interviews ?? 0 }}</strong>
-
-                                </div>
-                            </div>
-                            <div>
-                                <!-- <a href="#">
-                                    <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg') }}" alt="" class="img-fluid">
-                                </a> -->
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card card-hod ">
-                            <div class="">
-                                <div class="card-title">
-                                    <h3>Hired</h3>
-                                </div>
-                                <div class="d-flex align-items-center">
-                                    <strong>{{ $Hired ?? 0 }}</strong>
-
-                                </div>
-                            </div>
-                            <div>
-                                <!-- <a href="#">
-                                    <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg')}}" alt="" class="img-fluid">
-                                </a> -->
-                            </div>
-                        </div>
-                    </div>
+                    @include('resorts.talentacquisition.dashboard._kpi_strip')
                     <div class="col-lg-8 @if(App\Helpers\Common::checkRouteWisePermission('resort.vacancies.FreshApplicant',config('settings.resort_permissions.view')) == false) d-none @endif">
-                        <div class="card h-auto" id="card-vac">
-                            <div class="card-title">
-                                <div class="row justify-content-between align-items-center g-">
-                                    <div class="col">
-                                        <h3>Vacancies</h3>
-                                    </div>
-                                    <div class="col-auto">
-                                        <a href="{{route('resort.vacancies.FreshApplicant')}}" class="a-link">View all</a>
-                                    </div>
-                                </div>
-
-                            </div>
-                            <div class="table-responsive">
-                                <table class="table table-collapse table-vacRec">
-                                    <thead>
-                                        <tr>
-                                            <th>Positions</th>
-                                            <th>Department</th>
-                                            <th>No. of Vacancy</th>
-                                            <th>No. of Applicant</th>
-                                            <th>Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                    @if(isset($NewVacancies) && $NewVacancies->isNotEmpty())
-                                        @foreach ($NewVacancies as $vac)
-                                                <tr>
-                                                    <td> {{ $vac->positionTitle }}
-                                                        <span class="badge badge-themeLight"> {{ $vac->PositonCode }} </span>
-                                                    </td>
-                                                    <td> {{ $vac->Department }} <span class="badge badge-themeLight"> {{ $vac->DepartmentCode }}</span></td>
-                                                    <td>{{ $vac->NoOfVacnacy }}</td>
-                                                    <td>{{ $vac->NoOfApplication }}</td>
-                                                    <td><a href="{{ route("resort.ta.Applicants",    base64_encode($vac->vacancy_id)) }}" class="eye-btn"><i class="fa-regular fa-eye"></i></a>
-                                                    </td>
-                                                </tr>
-                                        @endforeach
-                                    @endif
-
-
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
+                        @include('resorts.talentacquisition.dashboard._open_vacancies_table')
                     </div>
                     <div class="col-lg-4 col-md-6 @if(App\Helpers\Common::checkRouteWisePermission('resort.vacancies.FreshApplicant',config('settings.resort_permissions.view')) == false) d-none @endif">
                         <div class="card" id="card-todoList">
@@ -162,11 +66,11 @@
                                                     </div>
                                                     <div>
 
-                                                        <p>{{ $t->rank_name }} Is Approved Vacancy For {{ $t->Position ?? '' }} </p>
+                                                        <p>{{ $t->rank_name }} approved the vacancy for {{ $t->Position ?? '' }}</p>
                                                         @if($t->LinkShareOrNot =="No")
                                                             <a  href="{{route('resort.ta.add.Questionnaire')}}"
                                                             target="_blank"
-                                                               class="a-link">Before You Create  Job Advertisement You must be add Questioners</a>
+                                                               class="a-link">Before you create a job advertisement, you must first add a questionnaire</a>
 
 
                                                         @else
@@ -187,7 +91,7 @@
                                                             <img src="{{ $t->profileImg}}" alt="image">
                                                         </div>
                                                         <div>
-                                                            <p>{{ ucfirst($t->first_name).'  '.ucfirst($t->last_name) }} has applied for {{ $t->Position ?? '' }} - Needs HR Review</p>
+                                                            <p>{{ ucfirst($t->first_name).'  '.ucfirst($t->last_name) }} has applied for {{ $t->Position ?? '' }} &mdash; needs HR review</p>
                                                             <a href="{{ route('resort.ta.Applicants', base64_encode($t->V_id)) }}" class="a-link">Review Applicant</a>
                                                         </div>
 
@@ -196,7 +100,7 @@
                                                             <img src="{{ $t->profileImg}}" alt="image">
                                                         </div>
                                                         <div>
-                                                            <p>{{ ucfirst($t->first_name).'  '.ucfirst($t->last_name) }} Is Shortlisted for {{ $t->Position ?? '' }} </p>
+                                                            <p>{{ ucfirst($t->first_name).'  '.ucfirst($t->last_name) }} is shortlisted for {{ $t->Position ?? '' }}</p>
                                                             <a
                                                             href="javascript:void(0)"
                                                             data-Resort_id="{{$t->Resort_id}}"
@@ -223,9 +127,9 @@
                                                         </div>
                                                         <div>
                                                             @if($isLastRound)
-                                                                <p>{{ ucfirst($t->first_name).'  '.ucfirst($t->last_name) }} - {{ $completedRoundName }} Round Completed for {{ $t->Position ?? '' }}, Ready for Selection</p>
+                                                                <p>{{ ucfirst($t->first_name).'  '.ucfirst($t->last_name) }} completed the {{ $completedRoundName }} round for {{ $t->Position ?? '' }} &mdash; ready for selection</p>
                                                             @else
-                                                                <p>{{ ucfirst($t->first_name).'  '.ucfirst($t->last_name) }} - {{ $completedRoundName }} Round Completed for {{ $t->Position ?? '' }}, Ready for {{ $nextRoundName }} Round</p>
+                                                                <p>{{ ucfirst($t->first_name).'  '.ucfirst($t->last_name) }} completed the {{ $completedRoundName }} round for {{ $t->Position ?? '' }} &mdash; ready for the {{ $nextRoundName }} round</p>
                                                             @endif
                                                             <a href="{{ route('resort.ta.Applicants', base64_encode($t->V_id)) }}" class="a-link">View Applicant</a>
                                                         </div>
@@ -235,7 +139,7 @@
                                                             <img src="{{ $t->profileImg}}" alt="image">
                                                         </div>
                                                         <div>
-                                                            <p>{{ ucfirst($t->first_name).'  '.ucfirst($t->last_name) }} has accepted interview invitation for {{ $t->Position ?? '' }} </p>
+                                                            <p>{{ ucfirst($t->first_name).'  '.ucfirst($t->last_name) }} has accepted the interview invitation for {{ $t->Position ?? '' }}</p>
                                                             <a
                                                             href="javascript:void(0)"
                                                             data-interview_id="{{ base64_encode($t->InterviewId) }}"
@@ -256,7 +160,7 @@
                                         @endforeach
                                     @else
                                         <div>
-                                            <p>No Data Reacord</p>
+                                            <p>No pending items</p>
 
                                         </div>
                                     @endif
@@ -266,102 +170,19 @@
 
                         </div>
                     </div>
-                    <div class="col-lg-4 col-md-6">
-                        <div class="card ">
-                            <div class="card-title">
-                                <div class="row justify-content-between align-items-center g-3">
-                                    <div class="col">
-                                        <h3>Top Countries</h3>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="table-responsive">
-                                <table class="table table-collapse table-topCoun">
-                                    <tbody id="topCountriesWiseCount">
-                                        @if(isset($topCountries) && $topCountries->count() > 0)
-                                            @foreach($topCountries as $country)
-                                                @php
-                                                    // countries.flag_url is empty in the prod DB, so derive
-                                                    // a CDN flag URL from countries.shortname (ISO-2).
-                                                    $flagSrc = !empty($country->flag_url)
-                                                        ? $country->flag_url
-                                                        : (!empty($country->country_code)
-                                                            ? 'https://flagcdn.com/24x18/' . strtolower($country->country_code) . '.png'
-                                                            : asset('admin_assets/files/user-image.png'));
-                                                @endphp
-                                                <tr>
-                                                    <td><img src="{{ $flagSrc }}" alt="flag" class="flag" onerror="this.style.display='none';"> {{ $country->country }}</td>
-                                                    <td>{{ $country->total_count }}</td>
-                                                </tr>
-                                            @endforeach
-                                        @else
-                                            <tr><td colspan="3" class="text-center">No Data Found</td></tr>
-                                        @endif
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-lg-8">
-                        <div class="card card-topHiring">
-                            <div class="card-title">
-                                <div class="row justify-content-between align-items-center g-2">
-                                    <div class="col">
-                                        <h3 class="text-nowrap">Top Hiring Sources</h3>
-                                    </div>
-                                    <div class="col-auto">
-                                        <div class="form-group">
-                                            <select class="form-select YearWiseTopSource" aria-label="Default select example">
-                                                <?php
-                                                $currentYear = date('Y');
-
-                                                for ($i = 0; $i < 3; $i++) {
-                                                    $startYear = $currentYear - $i;
-                                                    $endYear = $startYear + 1;
-
-                                                    echo "<option value=\"$startYear\"";
-
-                                                    if ($i == 0)
-                                                    {
-                                                        echo " selected";
-                                                    }
-
-                                                    echo ">Jan $startYear - Dec $startYear</option>";
-                                                }
-                                                ?>
-                                            </select>
-
-                                        </div>
-                                    </div>
-
-                                </div>
-                            </div>
-                            <div class="row align-items-center g-2">
-                                <div class="col-xxl-9 col-xl-12 col-md-9">
-                                    <canvas id="myStackedBarChart" width="544"
-                                        height="326"></canvas></div>
-                                <div class="col-xxl-3 col-xl-auto col-lg-3 col-md-3  offset-xl-0 ">
-                                    <div class="row g-2">
-                                        @if(isset($HiringSource) &&  $HiringSource->isNotEmpty())
-                                            @foreach ( $HiringSource as  $h)
-                                            <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
-                                                <div class="doughnut-label">
-                                                    <span style="background-color: {{ $h->colour }};"></span>{{ $h->source_name }}
-                                                </div>
-                                            </div>
-                                            @endforeach
-                                        @endif
-                                    </div>
-                                </div>
-                            </div>
-                          
-                        </div>
-                    </div>
+                    {{-- Top Hiring Sources / Top Countries / WAI Insights / New Hire
+                         Requests moved out of this col-xl-9 wrapper — see the
+                         full-width row right after row.recHR-main closes below.
+                         Nested in here, they were capped at 75% of the page
+                         width (col-xl-9's share), leaving a permanent blank
+                         gap on the right where the Interview Calendar's
+                         reserved col-xl-3 column ends up empty everywhere
+                         except alongside the very top of the page. --}}
                 </div>
             </div>
 
-            <div class="col-xl-4 col-lg-6 @if(App\Helpers\Common::checkRouteWisePermission('interview-assessment.index',config('settings.resort_permissions.view')) == false) d-none @endif">
-                <div class="card h-auto">
+            <div class="col-xl-3 col-lg-6 @if(App\Helpers\Common::checkRouteWisePermission('interview-assessment.index',config('settings.resort_permissions.view')) == false) d-none @endif">
+                <div class="card h-auto" id="card-interviewCalendar">
                     <div class="mb-4 overflow-hidden">
                         <div id="calendar"></div>
                     </div>
@@ -376,7 +197,7 @@
                     </div>
                 </div>
             </div>
-                    <div class="col-lg-4 col-md-6 @if(App\Helpers\Common::checkRouteWisePermission('resort.ta.TalentPool',config('settings.resort_permissions.view')) == false) d-none @endif">
+                    <div class="col-lg-3 col-md-6 @if(App\Helpers\Common::checkRouteWisePermission('resort.ta.TalentPool',config('settings.resort_permissions.view')) == false) d-none @endif">
                         <div class="card" style="height: 450px; overflow: auto;">
                             <div class="card-title">
                                 <div class="row justify-content-between align-items-center g-3">
@@ -429,97 +250,23 @@
                          minus the column. Rank filtering on the controller
                          already ensures each user sees only the vacancies
                          that need THEIR action (Common::GetTheFreshVacancies). --}}
-                    <div class="col-lg-4 col-md-6">
-                        <div class="card">
-                            <div class="card-title">
-                                <div class="row justify-content-between align-items-center g-3">
-                                    <div class="col">
-                                        <h3>New Hire Requests</h3>
-                                    </div>
-                                    <div class="col-auto">
-                                        <a href="{{ route('resort.ta.ViewVacancies') }}" class="a-link">View all</a>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="hireReq-main"  id="FreshHiringRequest">
-                                @if(isset($Vacancies) &&  $Vacancies->count() > 0)
-                                    @foreach ($Vacancies->take(5) as $vacancy)
-                                        <div class="hireReq-block">
-                                            <div class="img-circle">
-                                                <img src="{{ Common::getResortUserPicture($vacancy->resort_id)}}" alt="image">
-                                            </div>
-                                            <div>
-                                                <h6>{{ $vacancy->Department }} ({{ $vacancy->rank_name }})  </h6>
-                                                <p><strong>{{ $vacancy->created_by_name }} ({{ $vacancy->creator_rank_name }})</strong> Requested for Hire {{ $vacancy->NoOfVacnacy }} {{ $vacancy->Position ?? 'Position' }}</p>
-                                            </div>
-                                            <div class="icon">
-                                                <a href="javascript:void(0)" class="respondOfFreshmodal"
-                                                        data-images="{{ Common::getResortUserPicture($vacancy->resort_id) }}"
-                                                        data-ta_id="{{ $vacancy->ta_id }}"
-                                                        data-departmentName="{{ $vacancy->Department }}"
-                                                        data-rank="{{ $vacancy->rank_name }}"
-                                                        data-position="{{ $vacancy->Position }}"
-                                                        data-NoOfVacnacy="{{ $vacancy->NoOfVacnacy }}"
-                                                        data-Child_ta_id ="{{ $vacancy->Child_ta_id }}"
-                                                        data-createdby="{{ $vacancy->created_by_name }}"
-                                                        data-creatorrank="{{ $vacancy->creator_rank_name }}">
-                                                        Respond
-                                                </a>
-
-                                            </div>
-                                        </div>
-                                    @endforeach
-                                @else
-                                    <p>No new hire requests available.</p>
-                                @endif
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-lg-4 col-md-12">
-                        <div class="card card-wiINsight card-wiINsightTa" id="card-wiINsightTa">
-                            @php $taMeta = $taInsights['_meta'] ?? null; @endphp
-                            <div class="card-title">
-                                <div class="row justify-content-between align-items-center g-md-3 g-1">
-                                    <div class="col">
-                                        <h3 class="text-nowrap">WAI Insight's</h3>
-                                    </div>
-                                    <div class="col-auto text-end" style="font-size:12px;line-height:1.3;">
-                                        @if($taMeta)
-                                            <div class="text-muted">Updated {{ $taMeta['generated_at']->diffForHumans() }}</div>
-                                            @if($taMeta['can_regenerate'])
-                                                <a href="?regenerate_insights=1" class="a-link">Regenerate</a>
-                                            @else
-                                                <span class="text-muted" title="{{ $taMeta['next_available']->format('d M Y, H:i') }}">Regenerate {{ $taMeta['next_available']->diffForHumans() }}</span>
-                                            @endif
-                                        @endif
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="leaveUser-main">
-                                @foreach([['key'=>'rejection','modal'=>'taInsightRejectionModal'],['key'=>'funnel','modal'=>'taInsightFunnelModal'],['key'=>'acceptance','modal'=>'taInsightAcceptanceModal'],['key'=>'tth','modal'=>'taInsightTthModal'],['key'=>'demand','modal'=>'taInsightDemandModal']] as $tc)
-                                <div class="leaveUser-block">
-                                    <div class="img">
-                                        <img src="{{ URL::asset('resorts_assets/images/wisdom-ai-small.svg') }}" alt="image">
-                                    </div>
-                                    <div>
-                                        <h6>{{ $taInsights[$tc['key']]['title'] ?? '' }}</h6>
-                                        <p>{{ $taInsights[$tc['key']]['body'] ?? '' }}</p>
-                                        @if(!empty($taInsights[$tc['key']]['recommendation']))
-                                            <p class="mb-2" style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $taInsights[$tc['key']]['recommendation'] }}</p>
-                                        @endif
-                                        <div>
-                                            <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#{{ $tc['modal'] }}" class="a-link">View Details</a>
-                                        </div>
-                                    </div>
-                                </div>
-                                @endforeach
-                            </div>
-                        </div>
-                    </div>
-
-            @if(isset($approvalHistory) && $approvalHistory->count() > 0)
-            <div class="col-xl-8 col-lg-6">
-                <div class="card h-auto">
+            @if(isset($approvalHistoryChains) && $approvalHistoryChains->count() > 0)
+            @php
+                // Presentation-only grouping of the SAME already-fetched
+                // $approvalHistoryChains rows — no new query beyond the one
+                // small, already-added lookup that fetches the complete
+                // HR/Finance/GM chain (including still-"Active"/pending
+                // stages) for whichever requisitions are recent. Grouped by
+                // vacancy_id (the actual hiring requisition), NOT by
+                // position_title/department_name text — two SEPARATE
+                // requisitions can share the same position (e.g. two
+                // different "Waitress" hires raised independently) and must
+                // stay as two separate rows with their own approval chains,
+                // never merged just because the position name matches.
+                $groupedApprovalHistory = $approvalHistoryChains->groupBy('vacancy_id');
+            @endphp
+            <div class="col-lg-9 col-md-12">
+                <div class="card h-auto appr-history-v2">
                     <div class="card-title">
                         <div class="row justify-content-between align-items-center g-3">
                             <div class="col">
@@ -530,37 +277,170 @@
                             </div>
                         </div>
                     </div>
-                    <div class="table-responsive">
-                        <table class="table table-collapse">
-                            <thead>
-                                <tr>
-                                    <th>Position</th>
-                                    <th>Department</th>
-                                    <th>Action</th>
-                                    <th>Level</th>
-                                    <th>By</th>
-                                    <th>Date</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach($approvalHistory as $history)
-                                    <tr>
-                                        <td>{{ $history->position_title }}</td>
-                                        <td>{{ $history->department_name }}</td>
-                                        <td><span class="badge {{ $history->badge_class }}">{{ $history->action_label }}</span></td>
-                                        <td>{{ $history->rank_name }}</td>
-                                        <td>{{ $history->action_by ?? 'N/A' }}</td>
-                                        <td>{{ $history->action_date ? \Carbon\Carbon::parse($history->action_date)->format('d M Y, h:i A') : 'N/A' }}</td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
+                    <div class="appr-history-list">
+                        @foreach($groupedApprovalHistory as $historyRows)
+                            @php
+                                // Fixed HR -> Finance -> GM order (by rank),
+                                // not by date — pending stages have no
+                                // meaningful date to sort by.
+                                $historyRows = $historyRows->sortBy('Approved_By')->values();
+                                $historyFirst = $historyRows->first();
+                            @endphp
+                            <div class="appr-row">
+                                <div class="appr-row-heading">
+                                    <h6>{{ $historyFirst->position_title }}</h6>
+                                    <span>{{ $historyFirst->department_name }}</span>
+                                </div>
+                                <div class="appr-chain">
+                                    @foreach($historyRows as $history)
+                                        @php
+                                            $isMissing = !empty($history->is_missing);
+                                            $isPending = $history->action_label === 'Pending' && !$isMissing;
+                                            $pillClass = 'appr-chain-pill-approved';
+                                            $pillIcon = 'fa-check';
+                                            if ($isMissing) {
+                                                $pillClass = 'appr-chain-pill-missing';
+                                                $pillIcon = 'fa-triangle-exclamation';
+                                            } elseif ($isPending) {
+                                                $pillClass = 'appr-chain-pill-pending';
+                                                $pillIcon = 'fa-clock';
+                                            } elseif ($history->badge_class === 'bg-danger') {
+                                                $pillClass = 'appr-chain-pill-rejected';
+                                                $pillIcon = 'fa-xmark';
+                                            } elseif ($history->badge_class === 'bg-warning') {
+                                                $pillClass = 'appr-chain-pill-hold';
+                                                $pillIcon = 'fa-pause';
+                                            }
+                                        @endphp
+                                        <div class="appr-chain-item">
+                                            @if($isMissing)
+                                                {{-- No t_anotification_children row exists at all for
+                                                     this rank on this requisition — a genuine gap in
+                                                     the workflow, not a normal queued/pending stage.
+                                                     Flagged distinctly (red) so it reads as "needs
+                                                     attention" rather than a routine pending step. --}}
+                                                <span class="appr-chain-pill {{ $pillClass }}"><i class="fa-solid {{ $pillIcon }}"></i> {{ $history->rank_name }} &mdash; No record</span>
+                                                <span class="appr-chain-date appr-chain-date-missing">Missing from workflow</span>
+                                            @elseif($isPending)
+                                                {{-- No name shown for a pending stage — nobody has
+                                                     acted on it yet, so there's no real approver to
+                                                     attribute it to. --}}
+                                                <span class="appr-chain-pill {{ $pillClass }}"><i class="fa-solid {{ $pillIcon }}"></i> {{ $history->rank_name }} &mdash; Pending</span>
+                                                <span class="appr-chain-date">Awaiting action</span>
+                                            @else
+                                                <span class="appr-chain-pill {{ $pillClass }}"><i class="fa-solid {{ $pillIcon }}"></i> {{ $history->rank_name }} &mdash; {{ $history->action_by ?? 'N/A' }}</span>
+                                                <span class="appr-chain-date">{{ $history->action_date ? \Carbon\Carbon::parse($history->action_date)->format('d M, h:i A') : 'N/A' }}</span>
+                                            @endif
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endforeach
                     </div>
                 </div>
             </div>
             @endif
 
         </div>
+
+        {{-- Full page-width row (not nested inside the col-xl-9 main column
+             above, so it isn't capped at 75% width the way the row above
+             is — that's what was leaving a permanent blank gap on the
+             right where the Interview Calendar's reserved column ends up
+             empty everywhere except near the very top of the page). Still
+             inside container-fluid (sibling of row.recHR-main above) so it
+             keeps the same side padding as the rest of the page. --}}
+        <div class="row g-3 g-xxl-4 ta-toprow-section">
+        <div class="col-lg-3 col-md-6">
+            @include('resorts.talentacquisition.dashboard._top_hiring_sources')
+        </div>
+        <div class="col-lg-3 col-md-6">
+            <div class="card ta-toprow-card">
+                <div class="card-title">
+                    <div class="row justify-content-between align-items-center g-3">
+                        <div class="col">
+                            <h3>Top Countries</h3>
+                        </div>
+                    </div>
+                </div>
+                <div class="table-responsive ta-toprow-scroll">
+                    <table class="table table-collapse table-topCoun">
+                        <tbody id="topCountriesWiseCount">
+                            @if(isset($topCountries) && $topCountries->count() > 0)
+                                @foreach($topCountries as $country)
+                                    @php
+                                        // countries.flag_url is empty in the prod DB, so derive
+                                        // a CDN flag URL from countries.shortname (ISO-2).
+                                        // w80 (80px wide source) rather than the old fixed
+                                        // 24x18 — that was being upscaled to the 30px display
+                                        // size in CSS (and further on any high-DPI/retina
+                                        // screen), which is what made it look blurry/low-res.
+                                        // Requesting a higher-res source and letting CSS scale
+                                        // it down looks crisp at any pixel density.
+                                        $flagSrc = !empty($country->flag_url)
+                                            ? $country->flag_url
+                                            : (!empty($country->country_code)
+                                                ? 'https://flagcdn.com/w80/' . strtolower($country->country_code) . '.png'
+                                                : asset('admin_assets/files/user-image.png'));
+                                    @endphp
+                                    <tr>
+                                        <td><img src="{{ $flagSrc }}" alt="flag" class="flag" onerror="this.style.display='none';"> {{ $country->country }}</td>
+                                        <td>{{ $country->total_count }}</td>
+                                    </tr>
+                                @endforeach
+                            @else
+                                <tr><td colspan="3" class="text-center">No Data Found</td></tr>
+                            @endif
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6">
+            <div class="card card-wiINsight card-wiINsightTa ta-toprow-card" id="card-wiINsightTa">
+                @php $taMeta = $taInsights['_meta'] ?? null; @endphp
+                <div class="card-title">
+                    <div class="row justify-content-between align-items-center g-md-3 g-1">
+                        <div class="col">
+                            <h3 class="text-nowrap">WAI Insights</h3>
+                        </div>
+                        <div class="col-auto text-end" style="font-size:12px;line-height:1.3;">
+                            @if($taMeta)
+                                <div class="text-muted">Updated {{ $taMeta['generated_at']->diffForHumans() }}</div>
+                                @if($taMeta['can_regenerate'])
+                                    <a href="?regenerate_insights=1" class="a-link">Regenerate</a>
+                                @else
+                                    <span class="text-muted" title="{{ $taMeta['next_available']->format('d M Y, H:i') }}">Regenerate {{ $taMeta['next_available']->diffForHumans() }}</span>
+                                @endif
+                            @endif
+                        </div>
+                    </div>
+                </div>
+                <div class="leaveUser-main">
+                    @foreach([['key'=>'rejection','modal'=>'taInsightRejectionModal'],['key'=>'funnel','modal'=>'taInsightFunnelModal'],['key'=>'acceptance','modal'=>'taInsightAcceptanceModal'],['key'=>'tth','modal'=>'taInsightTthModal'],['key'=>'demand','modal'=>'taInsightDemandModal']] as $tc)
+                    <div class="leaveUser-block">
+                        <div class="img">
+                            <img src="{{ URL::asset('resorts_assets/images/wisdom-ai-small.svg') }}" alt="image">
+                        </div>
+                        <div>
+                            <h6>{{ $taInsights[$tc['key']]['title'] ?? '' }}</h6>
+                            <p>{{ $taInsights[$tc['key']]['body'] ?? '' }}</p>
+                            @if(!empty($taInsights[$tc['key']]['recommendation']))
+                                <p class="mb-2" style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $taInsights[$tc['key']]['recommendation'] }}</p>
+                            @endif
+                            <div>
+                                <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#{{ $tc['modal'] }}" class="a-link">View Details</a>
+                            </div>
+                        </div>
+                    </div>
+                    @endforeach
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-3 col-md-6">
+            @include('resorts.talentacquisition.dashboard._new_hire_requests_card')
+        </div>
+    </div>
     </div>
 </div>
 <div class="modal fade" id="FreshRespond-modal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
@@ -852,11 +732,12 @@
 </div>
 <input type="hidden" name="Dasboard_resort_id" value="{{$resort_id}}" id="Dasboard_resort_id" >
 @includeWhen(isset($taInsights), 'resorts.talentacquisition.dashboard._insight_modals')
+@include('resorts.talentacquisition.dashboard._ta_widgets_v2_styles')
 @endsection
 
 @section('import-css')
 <style>
-    /* WAI Insight's — third column alongside Talent Pool & New Hire Requests.
+    /* WAI Insights — third column alongside Talent Pool & New Hire Requests.
        Fixed height (aligns with the 450px Talent Pool card) with the insight
        list scrolling inside its own space rather than stretching the row. */
     .card-wiINsightTa {
@@ -869,6 +750,17 @@
         flex: 1 1 auto;
         min-height: 0;
         overflow-y: auto;
+    }
+    .th-upcoming-footer {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        padding: 14px 0 4px;
+        margin-top: 4px;
+        border-top: 1px dashed #E7E7E7;
+        font-size: 12px;
+        color: #93A4A9;
     }
 </style>
 @endsection
@@ -895,6 +787,23 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         var YESTERDAY = todayDate.clone().subtract(1, 'day').format('YYYY-MM-DD');
         var TODAY = todayDate.format('YYYY-MM-DD');
         var TOMORROW = todayDate.clone().add(1, 'day').format('YYYY-MM-DD');
+
+        // #card-interviewCalendar's outer height is forced (via
+        // equalizeHeights() below) to match the Vacancies/To Do row's
+        // bottom edge. The calendar grid + #upinterviews list often don't
+        // fill that whole height on their own, which left a large blank
+        // gap under a short interview list. Appending a small "end of
+        // list" note makes that leftover space read as intentional
+        // instead of looking broken.
+        function thAppendUpcomingFooter() {
+            var $list = $('#upinterviews');
+            $list.find('.th-upcoming-footer').remove();
+            var $blocks = $list.find('.upInterviews-block');
+            var isNoRecordState = $blocks.length === 1 && $blocks.first().text().trim() === 'No Record Found';
+            if ($blocks.length === 0 || isNoRecordState) return;
+            $list.append('<div class="th-upcoming-footer"><i class="fa-regular fa-circle-check"></i> That\'s everything scheduled for now</div>');
+        }
+
         var cal = $('#calendar').fullCalendar({
             header: {
                 left: 'prev',
@@ -921,6 +830,7 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
                     },
                     success: function(response) {
                         $("#upinterviews").html(response.view);
+                        thAppendUpcomingFooter();
                         $('.fc-day').removeClass('custom-dot');
 
                         response.dates.forEach(function(date) {
@@ -955,6 +865,7 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
 
                                 $("#upinterviews").html(response.view);
+                                thAppendUpcomingFooter();
 
                             } else {
                                 // Display error message if success is false
@@ -1043,76 +954,61 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         });
 
 
-        var ctx = document.getElementById('myStackedBarChart').getContext('2d');
-        var myStackedBarChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: [],
-                datasets: []
-            },
-            options: {
-                plugins: {
-                    legend: {
-                        display: true
-                    }
-                },
-                scales: {
-                    x: {
-                        stacked: true
-                    },
-                    y: {
-                        stacked: true,
-                        beginAtZero: true,
-                        min: 0,
-                        max: 100,
-                        ticks: {
-                            stepSize: 20
-                        }
-                    }
-                }
-            }
-        });
-        GetHiringSource();
-
-        $(document).on("change",".YearWiseTopSource",function(){
-
-            GetHiringSource();
-        });
         //    equal heigth js
         function equalizeHeights() {
             // Get the elements
             const block1 = document.getElementById('card-vac');
             const block2 = document.getElementById('card-todoList');
+            const block3 = document.getElementById('card-interviewCalendar');
+            if (!block1) return;
 
             // Get the height of block1
             const block1Height = block1.offsetHeight;
+            if (!block1Height) return;
 
-            // Set the height of block2 to match block1's height
-            block2.style.height = block1Height + 'px';
-        }
+            // Set the height of block2 to match block1's height. Using
+            // setProperty(..., "important") since these cards carry the
+            // global .h-auto class (height:auto) — a plain .style.height
+            // assignment already wins the cascade against a non-important
+            // class rule, but forcing "important" removes any doubt.
+            if (block2) block2.style.setProperty('height', block1Height + 'px', 'important');
 
-        window.onload = equalizeHeights; // Initial height adjustment
-
-        // Adjust heights on window resize
-        window.onresize = equalizeHeights;
-
-        function GetHiringSource()
-        {
-            $.ajax({
-                url: "{{ route('resort.ta.topHiringSources') }}", // Replace with your route
-                type: "post",
-                data: {"_token":"{{ csrf_token() }}","YearWiseTopSource":$(".YearWiseTopSource").val()},
-                success: function (response) {
-                    myStackedBarChart.data.labels = response.labels;
-                    myStackedBarChart.data.datasets = response.datasets;
-                    myStackedBarChart.update();
-                },
-                error: function (xhr) {
-                    console.error("Failed to fetch chart data", xhr);
+            // Interview Calendar sits in a column that's a sibling of the
+            // WHOLE main content column (top-aligned with the KPI strip),
+            // while Vacancies/To Do List are in a separate inner row that
+            // starts further down (below the KPI strip). So giving the
+            // calendar the SAME height as Vacancies (like block2 above)
+            // still left its bottom edge well short of Vacancies/To Do's
+            // bottom edge — same height, but a higher starting point.
+            // Instead, size it using actual on-screen positions so its own
+            // bottom edge lines up with Vacancies' bottom edge exactly.
+            if (block3) {
+                const vacRect = block1.getBoundingClientRect();
+                const calRect = block3.getBoundingClientRect();
+                const targetHeight = vacRect.bottom - calRect.top;
+                if (targetHeight > 0) {
+                    block3.style.setProperty('height', targetHeight + 'px', 'important');
                 }
-            });
+            }
         }
 
+        // addEventListener (not window.onload = ...) so this can never be
+        // silently clobbered by another handler assigned later, and re-runs
+        // on load, on resize, AND whenever #card-vac's own size changes
+        // (e.g. its table finishes rendering/wrapping a tick after "load") —
+        // a plain one-shot window.onload measurement was found to sometimes
+        // run before #card-vac's true height had settled.
+        document.addEventListener('DOMContentLoaded', equalizeHeights);
+        window.addEventListener('load', equalizeHeights);
+        window.addEventListener('resize', equalizeHeights);
+        setTimeout(equalizeHeights, 500);
+
+        if (window.ResizeObserver) {
+            var cardVacEl = document.getElementById('card-vac');
+            if (cardVacEl) {
+                new ResizeObserver(equalizeHeights).observe(cardVacEl);
+            }
+        }
 
         //New Code End
 

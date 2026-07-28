@@ -34,7 +34,7 @@
                                     <div class="row g-md-4 g-3 mb-md-5 mb-4">
                                         <div class="col-md-6">
                                             <label class="form-label d-block" for="position">Export Department and Position File</label>
-                                            <a href="{{ route('resort.export.Employee')}}"  class="btn btn-theme btn-small Employeefile mt-2">Download Template</a>
+                                            <a href="{{ route('resort.export.Employee')}}"  class="btn wfp-btn-secondary btn-small Employeefile mt-2">Download Template</a>
                                             <!-- <a href=""  class="btn btn-theme btn-small Employeefile mt-2">Download</a> -->
                                         </div>
                                         <!-- <div class="col-md-6">
@@ -47,7 +47,7 @@
                                             
                                             <div class="uploadFile-block">
                                                 <div class="uploadFile-btn">
-                                                    <a href="javascript:void(0);" target="_blank" class="btn btn-themeBlue btn-sm">Upload File</a>
+                                                    <a href="javascript:void(0);" target="_blank" class="btn wfp-btn-primary btn-sm">Upload File</a>
                                                     <input type="file" name="Employeefile" id="Employeefile" style="display: none;">
                                                 </div>
                                                 <span id="file-name-display" class="text-muted d-block mt-2"></span>
@@ -57,7 +57,7 @@
                                     </div>
 
                                     <div class="card-footer text-end ">
-                                        <button type="submit" class="btn btn-theme">Submit</button>
+                                        <button type="submit" class="btn wfp-btn-primary">Submit</button>
                                     </div>
                                 </form>
 
@@ -95,6 +95,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts.workforce_planning._wfp_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')

@@ -26,109 +26,11 @@
             </div>
         </div>
         <div class="row g-3 g-xxl-4 recHR-main">
-            <div class="col-xl-8 col-lg-12">
+            <div class="col-xl-9 col-lg-12">
                 <div class="row g-3 g-xxl-4 ">
-                    <div class="col-md-4">
-                        <div class="card card-hod ">
-                            <div class="">
-                                <div class="card-title">
-                                    <h3>Total Applicants</h3>
-                                </div>
-                                <div class="d-flex align-items-center">
-                                    <strong>{{ $TotalApplicants ?? 0 }}</strong>
-
-                                </div>
-                            </div>
-                            <div>
-                                <!-- <a href="#">
-                                    <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg')}}" alt="" class="img-fluid">
-                                </a> -->
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card card-hod ">
-                            <div class="">
-                                <div class="card-title">
-                                    <h3>Interviews</h3>
-                                </div>
-                                <div class="d-flex align-items-center">
-                                    <strong>{{ $Interviews ?? 0 }}</strong>
-
-                                </div>
-                            </div>
-                            <div>
-                                <!-- <a href="#">
-                                    <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg') }}" alt="" class="img-fluid">
-                                </a> -->
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card card-hod ">
-                            <div class="">
-                                <div class="card-title">
-                                    <h3>Hired</h3>
-                                </div>
-                                <div class="d-flex align-items-center">
-                                    <strong>{{ $Hired ?? 0 }}</strong>
-
-                                </div>
-                            </div>
-                            <div>
-                                <!-- <a href="#">
-                                    <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg')}}" alt="" class="img-fluid">
-                                </a> -->
-                            </div>
-                        </div>
-                    </div>
+                    @include('resorts.talentacquisition.dashboard._kpi_strip')
                     <div class="col-lg-8">
-                        <div class="card h-auto" id="card-vac">
-                            <div class="card-title">
-                                <div class="row justify-content-between align-items-center g-">
-                                    <div class="col">
-                                        <h3>Vacancies</h3>
-                                    </div>
-                                    <div class="col-auto">
-                                        <a href="{{route('resort.vacancies.FreshApplicant')}}" class="a-link">View all</a>
-                                    </div>
-                                </div>
-
-                            </div>
-                            <div class="table-responsive">
-                                <table class="table table-collapse table-vacRec">
-                                    <thead>
-                                        <tr>
-                                            <th>Positions</th>
-                                            <th>Department</th>
-                                            <th>No. of Vacancy</th>
-                                            <th>No. of Applicant</th>
-                                            <th>Action</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                    @if(isset($NewVacancies) && $NewVacancies->isNotEmpty())
-                                    @foreach ($NewVacancies as $vac)
-
-
-                                            <tr>
-                                                <td> {{ $vac->positionTitle }}
-                                                    <span class="badge badge-themeLight"> {{ $vac->PositonCode }} </span>
-                                                </td>
-                                                <td> {{ $vac->Department }} <span class="badge badge-themeLight"> {{ $vac->DepartmentCode }}</span></td>
-                                                <td>{{ $vac->NoOfVacnacy }}</td>
-                                                <td>{{ $vac->NoOfApplication }}</td>
-                                                <td><a href="{{ route("resort.ta.Applicants",    base64_encode($vac->vacancy_id)) }}" class="eye-btn"><i class="fa-regular fa-eye"></i></a>
-                                                </td>
-                                            </tr>
-                                        @endforeach
-                                    @endif
-
-
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
+                        @include('resorts.talentacquisition.dashboard._open_vacancies_table')
                     </div>
                     <div class="col-lg-4 col-md-6">
                         <div class="card" id="card-todoList">
@@ -164,11 +66,11 @@
                                                     </div>
                                                     <div>
 
-                                                        <p>{{ $t->rank_name }} Is Approved Vacancy For {{ $t->Position ?? '' }} </p>
+                                                        <p>{{ $t->rank_name }} approved the vacancy for {{ $t->Position ?? '' }}</p>
                                                         @if($t->LinkShareOrNot =="No")
                                                             <a  href="{{route('resort.ta.add.Questionnaire')}}"
                                                             target="_blank"
-                                                               class="a-link">Before You Create  Job Advertisement You must be add Questioners</a>
+                                                               class="a-link">Before you create a job advertisement, you must first add a questionnaire</a>
 
 
                                                         @else
@@ -186,7 +88,7 @@
                                                             <img src="{{ $t->profileImg}}" alt="image">
                                                         </div>
                                                         <div>
-                                                            <p>{{ ucfirst($t->first_name).'  '.ucfirst($t->last_name) }} Is Shortlisted for {{ $t->Position ?? '' }} </p>
+                                                            <p>{{ ucfirst($t->first_name).'  '.ucfirst($t->last_name) }} is shortlisted for {{ $t->Position ?? '' }}</p>
                                                             <a
                                                             href="javascript:void(0)"
                                                             data-Resort_id="{{$t->Resort_id}}"
@@ -213,9 +115,9 @@
                                                         </div>
                                                         <div>
                                                             @if($isLastRound)
-                                                                <p>{{ ucfirst($t->first_name).'  '.ucfirst($t->last_name) }} - {{ $completedRoundName }} Round Completed for {{ $t->Position ?? '' }}, Ready for Selection</p>
+                                                                <p>{{ ucfirst($t->first_name).'  '.ucfirst($t->last_name) }} completed the {{ $completedRoundName }} round for {{ $t->Position ?? '' }} &mdash; ready for selection</p>
                                                             @else
-                                                                <p>{{ ucfirst($t->first_name).'  '.ucfirst($t->last_name) }} - {{ $completedRoundName }} Round Completed for {{ $t->Position ?? '' }}, Ready for {{ $nextRoundName }} Round</p>
+                                                                <p>{{ ucfirst($t->first_name).'  '.ucfirst($t->last_name) }} completed the {{ $completedRoundName }} round for {{ $t->Position ?? '' }} &mdash; ready for the {{ $nextRoundName }} round</p>
                                                             @endif
                                                             <a href="{{ route('resort.ta.Applicants', base64_encode($t->V_id)) }}" class="a-link">View Applicant</a>
                                                         </div>
@@ -225,7 +127,7 @@
                                                             <img src="{{ $t->profileImg}}" alt="image">
                                                         </div>
                                                         <div>
-                                                            <p>{{ ucfirst($t->first_name).'  '.ucfirst($t->last_name) }} has accepted interview invitation for {{ $t->Position ?? '' }} </p>
+                                                            <p>{{ ucfirst($t->first_name).'  '.ucfirst($t->last_name) }} has accepted the interview invitation for {{ $t->Position ?? '' }}</p>
                                                             <a
                                                             href="javascript:void(0)"
                                                             data-interview_id="{{ base64_encode($t->InterviewId) }}"
@@ -237,7 +139,7 @@
                                         @endforeach
                                     @else
                                         <div>
-                                            <p>No Data Reacord</p>
+                                            <p>No pending items</p>
 
                                         </div>
                                     @endif
@@ -281,88 +183,7 @@
                         </div>
                     </div>
                     <div class="col-lg-8">
-                        <div class="card card-topHiring">
-                            <div class="card-title">
-                                <div class="row justify-content-between align-items-center g-2">
-                                    <div class="col">
-                                        <h3 class="text-nowrap">Top Hiring Sources</h3>
-                                    </div>
-                                    <div class="col-auto">
-                                        <div class="form-group">
-                                            <select class="form-select YearWiseTopSource" aria-label="Default select example">
-                                                <?php
-                                                $currentYear = date('Y');
-
-                                                for ($i = 0; $i < 3; $i++) {
-                                                    $startYear = $currentYear - $i;
-                                                    $endYear = $startYear + 1;
-
-                                                    echo "<option value=\"$startYear\"";
-
-                                                    if ($i == 0)
-                                                    {
-                                                        echo " selected";
-                                                    }
-
-                                                    echo ">Jan $startYear - Dec $startYear</option>";
-                                                }
-                                                ?>
-                                            </select>
-
-                                        </div>
-                                    </div>
-
-                                </div>
-                            </div>
-                            <div class="row align-items-center g-2">
-                                <div class="col-xxl-9 col-xl-12 col-md-9">
-                                    <canvas id="myStackedBarChart" width="544"
-                                        height="326"></canvas></div>
-                                <div class="col-xxl-3 col-xl-auto col-lg-3 col-md-3  offset-xl-0 ">
-                                    <div class="row g-2">
-                                        @if(isset($HiringSource) &&  $HiringSource->isNotEmpty())
-                                            @foreach ( $HiringSource as  $h)
-                                            <div class="col-xxl-12 col-xl-auto col-md-12 col-auto">
-                                                <div class="doughnut-label">
-                                                    <span style="background-color: {{ $h->colour }};"></span>{{ $h->source_name }}
-                                                </div>
-                                            </div>
-                                            @endforeach
-                                        @endif
-                                    </div>
-                                </div>
-                            </div>
-                            {{-- <div class=" mb-3">
-                                <canvas id="myStackedBarChart"></canvas>
-                            </div>
-                            <div class="row g-2 justify-content-center">
-                                <div class="col-auto">
-                                    <div class="doughnut-label">
-                                        <span class="bg-theme"></span>Loremipsum.Com
-                                    </div>
-                                </div>
-                                <div class="col-auto">
-                                    <div class="doughnut-label">
-                                        <span class="bg-themeLightBlue"></span>Lorem Ipsum
-                                    </div>
-                                </div>
-                                <div class="col-auto">
-                                    <div class="doughnut-label">
-                                        <span class="bg bg-themeYellow"></span>Direct
-                                    </div>
-                                </div>
-                                <div class="col-auto">
-                                    <div class="doughnut-label">
-                                        <span class="bg-themeSkyblueLight"></span>Loremipsum.Com
-                                    </div>
-                                </div>
-                                <div class="col-auto">
-                                    <div class="doughnut-label">
-                                        <span class="bg-themeGray"></span>Lorem Ipsum
-                                    </div>
-                                </div>
-                            </div> --}}
-                        </div>
+                        @include('resorts.talentacquisition.dashboard._top_hiring_sources')
                     </div>
                     <div class="col-md-6">
                         <div class="card">
@@ -409,54 +230,13 @@
                         </div>
                     </div>
                     <div class="col-md-6">
-                        <div class="card">
-                            <div class="card-title">
-                                <div class="row justify-content-between align-items-center g-3">
-                                    <div class="col">
-                                        <h3>New Hire Requests</h3>
-                                    </div>
-                                    <div class="col-auto">
-                                        <a href="{{ route('resort.ta.ViewVacancies') }}" class="a-link">View all</a>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="hireReq-main"  id="FreshHiringRequest">
-                                @if(isset($Vacancies) &&  $Vacancies->count() > 0)
-                                    @foreach ($Vacancies as $vacancy)
-                                        <div class="hireReq-block">
-                                            <div class="img-circle">
-                                                <img src="{{ Common::getResortUserPicture($vacancy->resort_id)}}" alt="image">
-                                            </div>
-                                            <div>
-                                                <h6>{{ $vacancy->Department }} ({{ $vacancy->rank_name }})  </h6>
-                                                <p>Requested for Hire {{ $vacancy->NoOfVacnacy }} {{ $vacancy->Position ?? 'Position' }}</p>           
-                                            </div>
-                                            <div class="icon">
-                                                <a href="javascript:void(0)" class="respondOfFreshmodal"
-                                                        data-images="{{ Common::getResortUserPicture($vacancy->resort_id) }}"
-                                                        data-ta_id="{{ $vacancy->ta_id }}"
-                                                        data-departmentName="{{ $vacancy->Department }}"
-                                                        data-rank="{{ $vacancy->rank_name }}"
-                                                        data-position="{{ $vacancy->Position }}"
-                                                        data-NoOfVacnacy="{{ $vacancy->NoOfVacnacy }}"
-                                                        data-Child_ta_id ="{{ $vacancy->Child_ta_id }}">
-                                                        Respond
-                                                </a>
-
-                                            </div>
-                                        </div>
-                                    @endforeach
-                                @else
-                                    <p>No new hire requests available.</p>
-                                @endif
-                            </div>
-                        </div>
+                        @include('resorts.talentacquisition.dashboard._new_hire_requests_card')
                     </div>
                 </div>
             </div>
 
-            <div class="col-xl-4 col-lg-6">
-                <div class="card h-auto">
+            <div class="col-xl-3 col-lg-6">
+                <div class="card h-auto" id="card-interviewCalendar">
                     <div class="mb-4 overflow-hidden">
                         <div id="calendar"></div>
                     </div>
@@ -741,6 +521,7 @@
     </div>
 </div>
 <input type="hidden" name="Dasboard_resort_id" value="{{$resort_id}}" id="Dasboard_resort_id" >
+@include('resorts.talentacquisition.dashboard._ta_widgets_v2_styles')
 @endsection
 
 @section('import-css')
@@ -916,76 +697,61 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         });
 
 
-        var ctx = document.getElementById('myStackedBarChart').getContext('2d');
-        var myStackedBarChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: [],
-                datasets: []
-            },
-            options: {
-                plugins: {
-                    legend: {
-                        display: true
-                    }
-                },
-                scales: {
-                    x: {
-                        stacked: true
-                    },
-                    y: {
-                        stacked: true,
-                        beginAtZero: true,
-                        min: 0,
-                        max: 100,
-                        ticks: {
-                            stepSize: 20
-                        }
-                    }
-                }
-            }
-        });
-        GetHiringSource();
-
-        $(document).on("change",".YearWiseTopSource",function(){
-
-            GetHiringSource();
-        });
         //    equal heigth js
         function equalizeHeights() {
             // Get the elements
             const block1 = document.getElementById('card-vac');
             const block2 = document.getElementById('card-todoList');
+            const block3 = document.getElementById('card-interviewCalendar');
+            if (!block1) return;
 
             // Get the height of block1
             const block1Height = block1.offsetHeight;
+            if (!block1Height) return;
 
-            // Set the height of block2 to match block1's height
-            block2.style.height = block1Height + 'px';
-        }
+            // Set the height of block2 to match block1's height. Using
+            // setProperty(..., "important") since these cards carry the
+            // global .h-auto class (height:auto) — a plain .style.height
+            // assignment already wins the cascade against a non-important
+            // class rule, but forcing "important" removes any doubt.
+            if (block2) block2.style.setProperty('height', block1Height + 'px', 'important');
 
-        window.onload = equalizeHeights; // Initial height adjustment
-
-        // Adjust heights on window resize
-        window.onresize = equalizeHeights;
-
-        function GetHiringSource()
-        {
-            $.ajax({
-                url: "{{ route('resort.ta.topHiringSources') }}", // Replace with your route
-                type: "post",
-                data: {"_token":"{{ csrf_token() }}","YearWiseTopSource":$(".YearWiseTopSource").val()},
-                success: function (response) {
-                    myStackedBarChart.data.labels = response.labels;
-                    myStackedBarChart.data.datasets = response.datasets;
-                    myStackedBarChart.update();
-                },
-                error: function (xhr) {
-                    console.error("Failed to fetch chart data", xhr);
+            // Interview Calendar sits in a column that's a sibling of the
+            // WHOLE main content column (top-aligned with the KPI strip),
+            // while Vacancies/To Do List are in a separate inner row that
+            // starts further down (below the KPI strip). So giving the
+            // calendar the SAME height as Vacancies (like block2 above)
+            // still left its bottom edge well short of Vacancies/To Do's
+            // bottom edge — same height, but a higher starting point.
+            // Instead, size it using actual on-screen positions so its own
+            // bottom edge lines up with Vacancies' bottom edge exactly.
+            if (block3) {
+                const vacRect = block1.getBoundingClientRect();
+                const calRect = block3.getBoundingClientRect();
+                const targetHeight = vacRect.bottom - calRect.top;
+                if (targetHeight > 0) {
+                    block3.style.setProperty('height', targetHeight + 'px', 'important');
                 }
-            });
+            }
         }
 
+        // addEventListener (not window.onload = ...) so this can never be
+        // silently clobbered by another handler assigned later, and re-runs
+        // on load, on resize, AND whenever #card-vac's own size changes
+        // (e.g. its table finishes rendering/wrapping a tick after "load") —
+        // a plain one-shot window.onload measurement was found to sometimes
+        // run before #card-vac's true height had settled.
+        document.addEventListener('DOMContentLoaded', equalizeHeights);
+        window.addEventListener('load', equalizeHeights);
+        window.addEventListener('resize', equalizeHeights);
+        setTimeout(equalizeHeights, 500);
+
+        if (window.ResizeObserver) {
+            var cardVacEl = document.getElementById('card-vac');
+            if (cardVacEl) {
+                new ResizeObserver(equalizeHeights).observe(cardVacEl);
+            }
+        }
 
         //New Code End
 

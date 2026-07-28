@@ -84,14 +84,14 @@
                         </div>
                     </div>
                 </div>
-                {{-- WAI Insight's — AI-narrated visa metrics (took the Payment Request Tracker slot) --}}
+                {{-- WAI Insights — AI-narrated visa metrics (took the Payment Request Tracker slot) --}}
                 <div class="col-xl-3 col-sm-6">
                     <div class="card card-wiINsight card-wiINsightVisa h-100" id="card-wiINsightVisa">
                         @php $vMeta = $visaInsights['_meta'] ?? null; @endphp
                         <div class="card-title">
                             <div class="row justify-content-between align-items-center g-md-3 g-1">
                                 <div class="col">
-                                    <h3 class="text-nowrap">WAI Insight's</h3>
+                                    <h3 class="text-nowrap">WAI Insights</h3>
                                 </div>
                                 <div class="col-auto text-end" style="font-size:12px;line-height:1.3;">
                                     @if($vMeta)
@@ -602,7 +602,7 @@
 
 @section('import-css')
 <style>
-    /* WAI Insight's — visa card in the Payment Request Tracker slot. Fixed
+    /* WAI Insights — visa card in the Payment Request Tracker slot. Fixed
        height with the insight list scrolling inside the narrow column. */
     .card-wiINsightVisa {
         height: 100% !important;

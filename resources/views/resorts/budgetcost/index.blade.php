@@ -37,7 +37,7 @@
                             </div>
                         </div>
                          <div class="col-xl-2 col-md-3 col-sm-4 col-6">
-                            <button class="btn btn-themeBlue btn-sm" id="clearFilter">Clear Filter</button>
+                            <button class="btn wfp-btn-secondary btn-sm" id="clearFilter">Clear Filter</button>
                         </div>
                         
 
@@ -52,7 +52,7 @@
                                 </div>
                                 <div class="col-auto">
                                     <div class="d-flex justify-content-sm-end align-items-center">
-                                        <a href="#" class="btn btn-sm btn-theme " data-bs-toggle="modal"
+                                        <a href="#" class="btn btn-sm wfp-btn-primary " data-bs-toggle="modal"
                                             data-bs-target="#add-costmodal">
                                             <i class="fa-solid fa-plus me-2"></i>Add New
                                         </a>
@@ -266,8 +266,8 @@
                         </div>
 
                         <div class="modal-footer justify-content-end">
-                            <button type="button" class="btn btn-sm btn-themeGray me-2" data-bs-dismiss="modal">Cancel</button>
-                            <button type="submit" class="btn btn-sm btn-theme">Submit</button>
+                            <button type="button" class="btn btn-sm wfp-btn-secondary me-2" data-bs-dismiss="modal">Cancel</button>
+                            <button type="submit" class="btn btn-sm wfp-btn-primary">Submit</button>
                         </div>
                     </form>
 
@@ -279,6 +279,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts.workforce_planning._wfp_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')
@@ -508,7 +509,7 @@ $(document).ready(function()
                 </div>
             </td>
             <td class="py-1">
-                <a href="#" class="btn btn-theme update-row-btn" data-cost-id="${costId}">Submit</a>
+                <a href="#" class="btn wfp-btn-primary update-row-btn" data-cost-id="${costId}">Submit</a>
             </td>
         </form>
         `;

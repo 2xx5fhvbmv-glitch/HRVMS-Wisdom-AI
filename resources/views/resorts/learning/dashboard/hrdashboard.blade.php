@@ -73,7 +73,7 @@
                     </div>
                 </div>
 
-                {{-- Row 2: Pending Actions (col-4) + WAI Insight's (col-5) + Calendar (col-3), side by side. --}}
+                {{-- Row 2: Pending Actions (col-4) + WAI Insights (col-5) + Calendar (col-3), side by side. --}}
                 <div class="col-xl-4 col-12 @if(Common::checkRouteWisePermission('learning.request.add',config('settings.resort_permissions.view')) == false) d-none @endif">
                     <div class="card h-100" id="card-pendingActions">
                         <div class="card-title">
@@ -106,14 +106,14 @@
                     </div>
                 </div>
 
-                {{-- WAI Insight's — AI-narrated L&D metrics, beside Pending Actions --}}
+                {{-- WAI Insights — AI-narrated L&D metrics, beside Pending Actions --}}
                 <div class="col-xl-5 col-md-6">
                     <div class="card card-wiINsight card-wiINsightLearning h-100" id="card-wiINsightLearning">
                         @php $lMeta = $learningInsights['_meta'] ?? null; @endphp
                         <div class="card-title">
                             <div class="row justify-content-between align-items-center g-md-3 g-1">
                                 <div class="col">
-                                    <h3 class="text-nowrap">WAI Insight's</h3>
+                                    <h3 class="text-nowrap">WAI Insights</h3>
                                 </div>
                                 <div class="col-auto text-end" style="font-size:12px;line-height:1.3;">
                                     @if($lMeta)
@@ -355,7 +355,7 @@
 
 @section('import-css')
 <style>
-    /* WAI Insight's — narrow column beside Pending Actions; the four insights
+    /* WAI Insights — narrow column beside Pending Actions; the four insights
        stack vertically and the list scrolls inside the fixed-height card. */
     .card-wiINsightLearning {
         height: 450px !important;

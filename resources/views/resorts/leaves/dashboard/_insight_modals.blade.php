@@ -2,7 +2,7 @@
      Included by the HR, Admin and HOD leave dashboards; reads $leaveInsights.
      Opened by the "View Details" links via data-bs-toggle="modal". --}}
 <style>
-    /* Keep the WAI Insight's card at its fixed height and let the insight
+    /* Keep the WAI Insights card at its fixed height and let the insight
        list scroll inside it (the AI body + recommendation can overflow). */
     .card-wiINsight {
         display: flex;
