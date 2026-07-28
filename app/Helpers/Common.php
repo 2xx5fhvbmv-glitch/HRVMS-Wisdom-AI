@@ -1607,6 +1607,79 @@ class Common
 	}
 
     /**
+     * Batch version of getResortUserPicture() — resolves profile pictures
+     * for many ResortAdmin ids in one query instead of one per id. Same
+     * auth/route-context gate and same AWS/Wasabi + public-path fallback
+     * resolution per admin, just fetched together up front. Introduced to
+     * fix a real N+1 (search/index.blade.php called getResortUserPicture()
+     * once per matched employee inside an unbounded @foreach).
+     *
+     * @param  array  $userIds
+     * @param  int    $type  0 = profile_picture, 1 = signature_img
+     * @return array  [userId => url]
+     */
+    public static function getResortUserPicturesBatch(array $userIds, $type = 0): array
+    {
+        $defaultPicture = url(config('settings.default_picture'));
+        $userIds = array_values(array_unique(array_filter($userIds)));
+
+        if (empty($userIds)) {
+            return [];
+        }
+
+        $routePrefix = null;
+        try {
+            if (request()->route()) {
+                $routePrefix = request()->route()->getPrefix();
+            }
+        } catch (\Throwable $e) {
+            // Ignore when route is not available
+        }
+        $prefixMatch = $routePrefix === 'resort' || $routePrefix === '/resort';
+        $isResortContext = (Auth::guard('resort-admin')->check() && $prefixMatch) || Auth::guard('api')->check() || Auth::guard('shopkeeper')->check();
+
+        $result = array_fill_keys($userIds, $defaultPicture);
+        if (!$isResortContext) {
+            return $result;
+        }
+
+        $admins = ResortAdmin::whereIn('id', $userIds)->get();
+
+        foreach ($admins as $admin) {
+            $sourcePath = $type == 1 ? $admin->signature_img : $admin->profile_picture;
+            if (empty($sourcePath)) {
+                continue;
+            }
+
+            $aws = Self::GetApplicantAWSFile($sourcePath);
+            if ($aws['success'] == true) {
+                $result[$admin->id] = $aws['NewURLshow'];
+                continue;
+            }
+
+            if ($type == 1) {
+                continue; // signature has no public-path fallback in the single-id version either
+            }
+
+            if (strpos($sourcePath, 'http') === 0) {
+                $result[$admin->id] = $sourcePath;
+                continue;
+            }
+            $path = ltrim($sourcePath, '/');
+            if (file_exists(public_path($path))) {
+                $result[$admin->id] = asset($path);
+                continue;
+            }
+            $folder = config('settings.ResortProfile_folder', 'uploads/resortprofile');
+            if (file_exists(public_path($folder . '/' . basename($path)))) {
+                $result[$admin->id] = asset($folder . '/' . basename($path));
+            }
+        }
+
+        return $result;
+    }
+
+    /**
      * Resolve a ResortAdmin's profile picture without enforcing resort-route
      * context. Used in admin-side views (e.g. support chat) where the admin
      * legitimately needs to see the customer's avatar across tenants.
