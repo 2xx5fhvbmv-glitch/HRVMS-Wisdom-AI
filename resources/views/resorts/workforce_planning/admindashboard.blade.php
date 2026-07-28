@@ -21,7 +21,7 @@
                 </div>
                 <div class="col-auto">
                     <div class="d-flex justify-content-end">
-                        <a href="#sendRequest-modal" data-bs-toggle="modal" class=" btn btn-sm btn-theme">Request Manning</a>
+                        <a href="#sendRequest-modal" data-bs-toggle="modal" class=" btn btn-sm wfp-btn-accent">Request Manning</a>
                     </div>
                 </div>
             </div>
@@ -114,7 +114,7 @@
                     <div class="card  mb-30">
                         <div class="card-title d-flex justify-content-between">
                             <h3>Occupancy</h3>
-                            <a href="#add-occupancymodal" data-bs-toggle="modal" class="btn-icon bg-green">
+                            <a href="#add-occupancymodal" data-bs-toggle="modal" class="wfp-icon-positive">
                                 <i class="fa-solid fa-plus"></i>
                             </a>
                         </div>
@@ -309,7 +309,7 @@
                                         </div>
 
                                         <div class="ms-3">
-                                            <a href="#" class="btn btn-theme btn-sm" id="downloadManningBudget">
+                                            <a href="#" class="btn wfp-btn-secondary btn-sm" id="downloadManningBudget">
                                                 <i class="fa-solid fa-download me-1"></i> Download
                                             </a>
                                         </div>
@@ -425,7 +425,7 @@
                             <div class="d-flex justify-content-center mt-3">
                                 @if(isset($PendingDepartmentResoponse) && !empty($PendingDepartmentResoponse) )
 
-                                <a href="#sendReminder-modal"  data-bs-toggle="modal"  class="btn btn-theme mx-auto">Send Reminder</a>
+                                <a href="#sendReminder-modal"  data-bs-toggle="modal"  class="btn wfp-btn-attention mx-auto">Send Reminder</a>
                                 @endif
                             </div>
                         </div>
@@ -517,18 +517,18 @@
                         </div>
 
                         <div class="form-group mb-20">
-                            <input type="number" readonly min="0" class="form-control occupancyinPer"  name="occupancyinPer" placeholder="Add Occupancy In %">
+                            <input type="number" readonly min="0" class="form-control occupancyinPer"  name="occupancyinPer" placeholder="Occupancy In %">
                         </div>
 
                 </div>
                 <div class="modal-footer justify-content-end">
 
-                    <a href="#Import-occupancymodal"  data-bs-dismiss="modal"  data-bs-toggle="modal" class="btn btn-sm bg-green">
+                    <a href="#Import-occupancymodal"  data-bs-dismiss="modal"  data-bs-toggle="modal" class="btn btn-sm wfp-btn-positive">
                         Import Occupancy
                     </a>
-                    <a href="#" class="btn btn-sm btn-themeGray" data-bs-dismiss="modal" aria-label="Close">Cancel</a>
+                    <a href="#" class="btn btn-sm wfp-btn-secondary" data-bs-dismiss="modal" aria-label="Close">Cancel</a>
 
-                    <button type="submit" class="btn btn-sm btn-theme">Submit</button>
+                    <button type="submit" class="btn btn-sm wfp-btn-primary">Submit</button>
                 </div>
             </form>
 
@@ -551,7 +551,7 @@
                         <div class="col-md-6 ">
                             <div class="uploadFile-block">
                                 <div class="uploadFile-btn">
-                                    <a href="#" class="btn btn-themeBlue btn-sm">Upload File</a>
+                                    <a href="#" class="btn wfp-btn-primary btn-sm">Upload File</a>
                                     <input type="file" class="fornm-control" name="importFile" id="importFile" accept=".xls,.xlsx">
                                 </div>
                                 <div class="uploadFile-text" id="ImportOccupancy">Excel Only</div>
@@ -559,7 +559,7 @@
 
                         </div>
                         <div class="col-md-6 ">
-                            <a href="{{ URL::asset('resorts_assets/demofiles/Occupancy.xls')}}" target="_blank" class="btn btn-theme btn-small Employeefile mt-2">Download</a>
+                            <a href="{{ URL::asset('resorts_assets/demofiles/Occupancy.xls')}}" target="_blank" class="btn wfp-btn-secondary btn-small Employeefile mt-2">Download</a>
 
                         </div>
                     </div>
@@ -567,9 +567,9 @@
                 </div>
                 <div class="modal-footer justify-content-end">
 
-                    <a href="#" class="btn btn-sm btn-themeGray me-2 " data-bs-dismiss="modal" aria-label="Close">Cancel</a>
+                    <a href="#" class="btn btn-sm wfp-btn-secondary me-2 " data-bs-dismiss="modal" aria-label="Close">Cancel</a>
 
-                    <button type="submit" class="btn btn-sm btn-theme">Submit</button>
+                    <button type="submit" class="btn btn-sm wfp-btn-primary">Submit</button>
                 </div>
             </form>
 
@@ -604,9 +604,9 @@
                         </div>
                     </div>
                     <div class="modal-footer justify-content-end">
-                        <a href="#" class="btn btn-sm btn-themeGray me-2 " data-bs-dismiss="modal" aria-label="Close">Cancel</a>
+                        <a href="#" class="btn btn-sm wfp-btn-secondary me-2 " data-bs-dismiss="modal" aria-label="Close">Cancel</a>
 
-                        <button type="submit" class="btn btn-sm btn-theme">Submit</button>
+                        <button type="submit" class="btn btn-sm wfp-btn-primary">Submit</button>
                     </div>
             </form>
 
@@ -642,9 +642,9 @@
                         </div>
                     </div>
                     <div class="modal-footer justify-content-end">
-                        <a href="#" class="btn btn-sm btn-themeGray me-2 " data-bs-dismiss="modal" aria-label="Close">Cancel</a>
+                        <a href="#" class="btn btn-sm wfp-btn-secondary me-2 " data-bs-dismiss="modal" aria-label="Close">Cancel</a>
 
-                        <button type="submit" class="btn btn-sm btn-theme">Submit</button>
+                        <button type="submit" class="btn btn-sm wfp-btn-primary">Submit</button>
                     </div>
             </form>
 
@@ -689,6 +689,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts.workforce_planning._wfp_buttons_v2_styles')
 <style>
 @media print {
     #downloadManningBudget,

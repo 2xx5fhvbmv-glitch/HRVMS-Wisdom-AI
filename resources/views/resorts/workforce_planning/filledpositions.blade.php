@@ -20,7 +20,7 @@
                 </div>
                 <div class="col-auto">
                     <div class="d-flex justify-content-end">
-                        <a href="#sendRequest-modal" data-bs-toggle="modal" class=" btn btn-sm btn-theme">Request Manning</a>
+                        <a href="#sendRequest-modal" data-bs-toggle="modal" class=" btn btn-sm wfp-btn-accent">Request Manning</a>
                     </div>
                 </div>
             </div>
@@ -101,9 +101,9 @@
                         </div>
                     </div>
                     <div class="modal-footer justify-content-end">
-                        <a href="#" class="btn btn-sm btn-themeGray me-2 " data-bs-dismiss="modal" aria-label="Close">Cancel</a>
+                        <a href="#" class="btn btn-sm wfp-btn-secondary me-2 " data-bs-dismiss="modal" aria-label="Close">Cancel</a>
 
-                        <button type="submit" class="btn btn-sm btn-theme">Submit</button>
+                        <button type="submit" class="btn btn-sm wfp-btn-primary">Submit</button>
                     </div>
             </form>
 
@@ -113,6 +113,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts.workforce_planning._wfp_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')

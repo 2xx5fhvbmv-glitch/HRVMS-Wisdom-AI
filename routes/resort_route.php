@@ -255,6 +255,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get('/budget/hierarchy/position/employees', 'BudgetController@getPositionEmployees')->name('resort.budget.hierarchy.position.employees');
     Route::get('/budget/hierarchy/employee/monthly', 'BudgetController@getEmployeeMonthlyData')->name('resort.budget.hierarchy.employee.monthly');
     Route::get('/budget/hierarchy/vacant/monthly', 'BudgetController@getVacantMonthlyData')->name('resort.budget.hierarchy.vacant.monthly');
+    Route::get('/budget/hierarchy/all-totals', 'BudgetController@getAllBudgetTotals')->name('resort.budget.hierarchy.all-totals');
     Route::get('/budget/holiday-hours', 'BudgetController@getHolidayHoursForMonth')->name('resort.budget.holiday.hours');
     Route::post('/budget/hierarchy/employee/update', 'BudgetController@updateEmployeeMonthlyBudget')->name('resort.budget.hierarchy.employee.update');
     Route::post('/budget/hierarchy/vacant/update', 'BudgetController@updateVacantMonthlyBudget')->name('resort.budget.hierarchy.vacant.update');

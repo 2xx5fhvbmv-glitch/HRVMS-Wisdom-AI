@@ -127,7 +127,21 @@
                     }
                 }
                 emnurend();
-                $('.hrvmsshowMenu').show(10);
+                // Slick (in emnurend, above) measures slide widths while this
+                // container is still display:none, so variableWidth ends up
+                // computed against zero-width slides — its internal position
+                // table is wrong from the start. Slick recalculates on window
+                // resize, so nudge it once the container has actually finished
+                // becoming visible. Without this, the carousel's position only
+                // self-corrects the first time ANY slide change forces Slick's
+                // own recompute — which is why "next" always worked (it happens
+                // to trigger that recompute) while "prev" silently used the
+                // stale zero-width table until something else had already fixed
+                // it. Safe to fire once per matched element: it's a plain
+                // resize event, not a re-init, so it can't double-bind anything.
+                $('.hrvmsshowMenu').show(10, function () {
+                    $(window).trigger('resize');
+                });
             },
             error: function() {
                 $('.hrvmsshowMenu').show(10);
@@ -1580,6 +1594,19 @@
                 element.scrollIntoView({ behavior: "smooth", block: "nearest" });
             }
         }
+
+        // Escape closes the search results dropdown — additive only, does
+        // not touch the existing ArrowUp/ArrowDown/Enter handler above.
+        // Also clears the search input: the existing keyup handler on
+        // .search-input doesn't exclude Escape, so it fires right after
+        // this (same keypress) and re-shows the dropdown if the input
+        // still holds a 3+ character value — clearing it first stops that.
+        $(document).on("keydown", function (e) {
+            if (e.key === "Escape" && !$(".search-result").hasClass("d-none")) {
+                $(".search-result").addClass("d-none");
+                $(".search-input").val("");
+            }
+        });
     });
   
 </script>

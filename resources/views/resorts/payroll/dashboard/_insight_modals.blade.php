@@ -1,7 +1,7 @@
 {{-- Payroll AI-insight detail modals. Included by the payroll dashboard;
      reads $payrollInsights. Opened by the "View Details" links. --}}
 <style>
-    /* Keep the WAI Insight's card at its fixed height and let the insight
+    /* Keep the WAI Insights card at its fixed height and let the insight
        list scroll inside it (the AI body + recommendation can overflow). */
     .card-wiINsightPayroll {
         display: flex;

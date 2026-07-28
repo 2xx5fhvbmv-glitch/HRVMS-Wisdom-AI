@@ -148,14 +148,14 @@
                     </div>
                 </div>
 
-                {{-- WAI Insight's — AI-narrated incident metrics, beside Incident List & Delegated Cases --}}
+                {{-- WAI Insights — AI-narrated incident metrics, beside Incident List & Delegated Cases --}}
                 <div class="col-xl-4 @if(!Common::hasFullDataAccess()) d-none @endif">
                     <div class="card card-wiINsight card-wiINsightIncident h-100" id="card-wiINsightIncident">
                         @php $iMeta = $incidentInsights['_meta'] ?? null; @endphp
                         <div class="card-title">
                             <div class="row justify-content-between align-items-center g-md-3 g-1">
                                 <div class="col">
-                                    <h3 class="text-nowrap">WAI Insight's</h3>
+                                    <h3 class="text-nowrap">WAI Insights</h3>
                                 </div>
                                 <div class="col-auto text-end" style="font-size:12px;line-height:1.3;">
                                     @if($iMeta)
@@ -500,7 +500,7 @@
 
 @section('import-css')
 <style>
-    /* WAI Insight's — incident card beside Incident List & Delegated Cases.
+    /* WAI Insights — incident card beside Incident List & Delegated Cases.
        Fixed height with the insight list scrolling inside. */
     .card-wiINsightIncident {
         height: 450px !important;

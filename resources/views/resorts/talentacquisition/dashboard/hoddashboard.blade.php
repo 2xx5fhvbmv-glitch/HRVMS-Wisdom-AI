@@ -26,59 +26,9 @@
             </div>
         </div>
         <div class="row g-3 g-xxl-4 recHR-main">
-            <div class="col-xl-8 col-lg-12">
+            <div class="col-xl-9 col-lg-12">
                 <div class="row g-3 g-xxl-4 ">
-                    <div class="col-md-4  @if(App\Helpers\Common::checkRouteWisePermission('resort.ta.shortlistedapplicants',config('settings.resort_permissions.view')) == false) d-none @endif">
-                        <div class="card card-hod ">
-                            <div class="">
-                                <div class="card-title">
-                                    <h3>Total Applicants</h3>
-                                </div>
-                                <div class="d-flex align-items-center">
-                                    <strong>{{$TotalApplicants}}</strong>
-
-                                </div>
-                            </div>
-                            <div>
-                                <!-- <a href="#">
-                                    <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg')}}" alt="" class="img-fluid">
-                                </a> -->
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4 @if(App\Helpers\Common::checkRouteWisePermission('interview-assessment.index',config('settings.resort_permissions.view')) == false) d-none @endif">
-                        <div class="card card-hod ">
-                            <div class="">
-                                <div class="card-title">
-                                    <h3>Interviews</h3>
-                                </div>
-                                <div class="d-flex align-items-center">
-                                    <strong>{{$Interviews}}</strong>
-
-                                </div>
-                            </div>
-                            <div>
-                                <!-- <a href="#">
-                                    <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg')}}" alt="" class="img-fluid">
-                                </a> -->
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-4">
-                        <div class="card card-hod ">
-                            <div class="">
-                                <div class="card-title">
-                                    <h3>Hired</h3>
-                                </div>
-                                <div class="d-flex align-items-center">
-                                    <strong>{{$Hired}}</strong>
-                                </div>
-                            </div>
-                            <div>
-                              
-                            </div>
-                        </div>
-                    </div>
+                    @include('resorts.talentacquisition.dashboard._kpi_strip')
                     <div class="col-lg-12 @if(App\Helpers\Common::checkRouteWisePermission('resort.vacancies.FreshApplicant',config('settings.resort_permissions.view')) == false) d-none @endif">
                         <div class="card h-auto" id="card-vac">
                             <div class="card-title">
@@ -92,11 +42,11 @@
                                 </div>
                             </div>
                             <div class="table-responsive">
-                                <table class="table table-collapse ">
+                                <table class="table table-collapse vac-table-v2">
                                     <thead>
                                         <tr>
-                                            <th>Positions</th>
-                                            <th>No. of Vacancy</th>
+                                            <th>Position</th>
+                                            <th class="vac-col-action">Vac.</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -104,7 +54,7 @@
                                             @foreach($vacancies as $list)
                                                 <tr>
                                                     <td>{{$list->Getposition->position_title}}</td>
-                                                    <td>{{$list->Total_position_required}}</td>
+                                                    <td class="vac-col-num">{{$list->Total_position_required}}</td>
                                                 </tr>
                                             @endforeach
                                         @endif
@@ -185,49 +135,7 @@
                          shouldn't see this section exist in the first place. --}}
                     @if($canSeeAllDepts || $effectiveRank == 7)
                     <div class="col-lg-12">
-                        <div class="card h-auto">
-                            <div class="card-title">
-                                <div class="row justify-content-between align-items-center g-3">
-                                    <div class="col">
-                                        <h3>Hire Requests Pending Your Approval</h3>
-                                    </div>
-                                    <div class="col-auto">
-                                        <a href="{{ route('resort.ta.ViewVacancies') }}" class="a-link">View all</a>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="hireReq-main" id="FreshHiringRequest">
-                                @if(isset($Vacancies) && $Vacancies->count() > 0)
-                                @foreach ($Vacancies->take(5) as $vacancy)
-                                    <div class="hireReq-block">
-                                        <div class="img-circle">
-                                            <img src="{{ Common::getResortUserPicture($vacancy->resort_id) }}" alt="image">
-                                        </div>
-                                        <div>
-                                            <h6>{{ $vacancy->Department }} ({{ $vacancy->rank_name }})</h6>
-                                            <p><strong>{{ $vacancy->created_by_name }} ({{ $vacancy->creator_rank_name }})</strong> Requested for Hire {{ $vacancy->NoOfVacnacy }} {{ $vacancy->Position ?? 'Position' }}</p>
-                                        </div>
-                                        <div class="icon">
-                                            <a href="javascript:void(0)" class="respondOfFreshmodal"
-                                                    data-images="{{ Common::getResortUserPicture($vacancy->resort_id) }}"
-                                                    data-ta_id="{{ $vacancy->ta_id }}"
-                                                    data-departmentName="{{ $vacancy->Department }}"
-                                                    data-rank="{{ $vacancy->rank_name }}"
-                                                    data-position="{{ $vacancy->Position }}"
-                                                    data-NoOfVacnacy="{{ $vacancy->NoOfVacnacy }}"
-                                                    data-Child_ta_id="{{ $vacancy->Child_ta_id }}"
-                                                    data-createdby="{{ $vacancy->created_by_name }}"
-                                                    data-creatorrank="{{ $vacancy->creator_rank_name }}">
-                                                    Respond
-                                            </a>
-                                        </div>
-                                    </div>
-                                @endforeach
-                                @else
-                                    <p>No new hire requests available.</p>
-                                @endif
-                            </div>
-                        </div>
+                        @include('resorts.talentacquisition.dashboard._new_hire_requests_card', ['newHireRequestsTitle' => 'Hire Requests Pending Your Approval'])
                     </div>
                     @endif
 
@@ -521,7 +429,7 @@
                 </div>
             </div>
             <input type="hidden" name="Dasboard_resort_id" value="{{$resort_id}}" id="Dasboard_resort_id">
-            <div class="col-xl-4 col-lg-6 @if(App\Helpers\Common::checkRouteWisePermission('interview-assessment.index',config('settings.resort_permissions.view')) == false) d-none @endif">
+            <div class="col-xl-3 col-lg-6 @if(App\Helpers\Common::checkRouteWisePermission('interview-assessment.index',config('settings.resort_permissions.view')) == false) d-none @endif">
                 <div class="card h-auto">
                     <div class="mb-4 overflow-hidden">
                         <div id="calendar"></div>
@@ -578,6 +486,7 @@
 @if(isset($Vacancies) && $Vacancies->count() > 0)
     @include('resorts.talentacquisition.dashboard._partials.vacancy_approval_modals')
 @endif
+@include('resorts.talentacquisition.dashboard._ta_widgets_v2_styles')
 @endsection
 
 @section('import-css')
