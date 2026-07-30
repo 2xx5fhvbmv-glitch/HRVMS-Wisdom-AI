@@ -798,8 +798,7 @@ class MonthlyCheckingController extends Controller
         $query = MonthlyCheckingModel::with('employee.resortAdmin', 'employee.position')
             ->where('resort_id', $this->resort->resort_id)
             ->when(is_array($scopedIds), fn($q) => $q->whereIn('emp_id', $scopedIds))
-            ->whereNotNull('finalized_at')
-            ->orderByDesc('finalized_at');
+            ->orderByDesc('created_at');
 
         return datatables()->of($query)
             ->addColumn('employee', function ($row) {
@@ -810,10 +809,24 @@ class MonthlyCheckingController extends Controller
             ->addColumn('date', fn($row) => $row->date_discussion ? date('d M Y', strtotime($row->date_discussion)) : '-')
             ->addColumn('time', fn($row) => $row->start_time.' - '.$row->end_time)
             ->addColumn('meeting_place', fn($row) => e($row->Meeting_Place))
-            ->addColumn('area', fn($row) => e($row->Area_of_Discussion))
-            ->addColumn('improvement', fn($row) => e($row->Area_of_Improvement))
+            ->addColumn('area', fn($row) => e($row->Area_of_Discussion) ?: '-')
+            ->addColumn('improvement', fn($row) => e($row->Area_of_Improvement) ?: '-')
             ->addColumn('status_badge', function ($row) {
-                return '<span class="badge badge-themeSuccess">Submitted</span>';
+                // Reflects every stage of the real workflow (schedule ->
+                // employee approve/reject -> HR finalize) — previously
+                // hardcoded to "Submitted" for every row, which only ever
+                // matched because the query itself was silently restricted
+                // to finalized rows only.
+                if ($row->approval_status === 'rejected') {
+                    return '<span class="badge badge-themeDanger">Rejected</span>';
+                }
+                if ($row->finalized_at) {
+                    return '<span class="badge badge-themeSuccess">Submitted</span>';
+                }
+                if ($row->approval_status === 'approved') {
+                    return '<span class="badge badge-themeInfo">Approved - Awaiting Submission</span>';
+                }
+                return '<span class="badge badge-themeWarning">Pending Approval</span>';
             })
             ->addColumn('action', function ($row) {
                 return '<a href="'.route('Performance.GetMonthlyCheckInDetails', $row->id).'" class="btn btn-theme btn-sm">View</a>';
