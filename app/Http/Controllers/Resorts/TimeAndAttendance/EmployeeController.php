@@ -690,6 +690,7 @@ class EmployeeController extends Controller
                 'employees.Emp_id as Emp_Code',
                 'employees.rank',
                 'employees.religion',
+                'employees.benefit_grid_level',
                 't2.position_title',
                 't2.code as PositionCode',
                 'employees.Dept_id',
@@ -742,9 +743,7 @@ class EmployeeController extends Controller
 
 
             $rank = $employee->rank;
-            // Was an inline duplicate of the old hardcoded rank->key switch —
-            // resolve via the resort's current grade-level mapping instead.
-            $emp_grade = Common::getEmpGrade($this->resort->resort_id, $rank);
+            $emp_grade = Common::resolveEmpGrade($this->resort->resort_id, $rank, $employee->benefit_grid_level);
 
             // Get the viewed employee's gender (from their resort_admin record)
             $empGender = \App\Models\ResortAdmin::where('id', $employee->Parentid)->value('gender') ?? '';
@@ -1175,6 +1174,7 @@ class EmployeeController extends Controller
                     'employees.Emp_id as Emp_Code',
                     'employees.rank',
                     'employees.religion',
+                    'employees.benefit_grid_level',
                     't2.position_title',
                     't2.code as PositionCode',
                     'employees.Dept_id',
@@ -1227,10 +1227,7 @@ class EmployeeController extends Controller
 
 
                 $rank = $employee->rank;
-                // Was an inline duplicate of the old hardcoded rank->key
-                // switch — resolve via the resort's current grade-level
-                // mapping instead.
-                $emp_grade = Common::getEmpGrade($this->resort->resort_id, $rank);
+                $emp_grade = Common::resolveEmpGrade($this->resort->resort_id, $rank, $employee->benefit_grid_level);
 
                 $benefit_grid = ResortBenifitGrid::where('emp_grade', $emp_grade)
                         ->where('resort_id', $this->resort->resort_id)
@@ -1748,6 +1745,7 @@ class EmployeeController extends Controller
                 'employees.Emp_id as Emp_Code',
                 'employees.rank',
                 'employees.religion',
+                'employees.benefit_grid_level',
                 't2.position_title',
                 't2.code as PositionCode',
             ], $detailCols))
@@ -1797,9 +1795,7 @@ class EmployeeController extends Controller
 
 
             $rank = $employee->rank;
-            // Was an inline duplicate of the old hardcoded rank->key switch —
-            // resolve via the resort's current grade-level mapping instead.
-            $emp_grade = Common::getEmpGrade($this->resort->resort_id, $rank);
+            $emp_grade = Common::resolveEmpGrade($this->resort->resort_id, $rank, $employee->benefit_grid_level);
 
             // Get the viewed employee's gender (from their resort_admin record)
             $empGender = \App\Models\ResortAdmin::where('id', $employee->Parentid)->value('gender') ?? '';

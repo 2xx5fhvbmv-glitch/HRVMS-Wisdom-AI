@@ -430,7 +430,7 @@ class FinalSettlementService
 
     public function getLeaveBalance(Employee $employee, $resortId): array
     {
-        $emp_grade = Common::getEmpGrade($resortId, $employee->rank);
+        $emp_grade = Common::resolveEmpGrade($resortId, $employee->rank, $employee->benefit_grid_level);
 
         $benefit_grids = DB::table('resort_benifit_grid as rbg')
             ->join('resort_benefit_grid_child as rbgc', 'rbg.id', '=', 'rbgc.benefit_grid_id')
@@ -743,7 +743,7 @@ class FinalSettlementService
      */
     private function getEligibleLeaveTypes(Employee $employee, $resortId): array
     {
-        $empGrade = Common::getEmpGrade($resortId, $employee->rank);
+        $empGrade = Common::resolveEmpGrade($resortId, $employee->rank, $employee->benefit_grid_level);
         $rows = DB::table('resort_benifit_grid as rbg')
             ->join('resort_benefit_grid_child as rbgc', 'rbg.id', '=', 'rbgc.benefit_grid_id')
             ->join('leave_categories as lc', 'lc.id', '=', 'rbgc.leave_cat_id')

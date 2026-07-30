@@ -212,7 +212,7 @@ class DutyRosterController extends Controller
 
             $overtime = null;
             if ($employees) {
-                $gradeLevelId = Common::getEmpGrade($this->resort->resort_id, $employees->rank);
+                $gradeLevelId = Common::resolveEmpGrade($this->resort->resort_id, $employees->rank, $employees->benefit_grid_level);
                 if ($gradeLevelId) {
                     $overtime = \App\Models\ResortBenifitGrid::where('resort_id', $this->resort->resort_id)
                         ->where('emp_grade', $gradeLevelId)

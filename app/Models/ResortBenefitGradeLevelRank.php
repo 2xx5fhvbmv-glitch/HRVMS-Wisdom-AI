@@ -15,23 +15,31 @@ class ResortBenefitGradeLevelRank extends Model
     }
 
     /**
-     * Assign exactly the given rank set to a grade level. A rank belongs to
-     * at most one active grade at a time (unique on resort_id+rank), so
-     * this releases whatever this grade level currently owns and
-     * re-assigns the new set, evicting any other grade level that
-     * currently owns a requested rank. Shared by both the Benefit Grid
-     * form (assign inline while saving a grid) and the standalone Benefit
-     * Grade Levels config screen, so the two never drift apart.
+     * Assign exactly the given rank set to a grade level. Multiple grade
+     * levels may now share the same rank (e.g. "HOD L1" and "HOD L2" both
+     * rank=HOD) — which specific one an employee actually gets is decided
+     * per-employee via employees.benefit_grid_level (Common::resolveEmpGrade()),
+     * not by rank exclusivity. This only ever touches this grade level's
+     * own rows (resort_id+grade_level_id) — it no longer evicts a rank
+     * from any OTHER grade level that also holds it. Shared by both the
+     * Benefit Grid form (assign inline while saving a grid) and the
+     * standalone Benefit Grade Levels config screen, so the two never
+     * drift apart.
      */
     public static function assignRanksToGrade(int $resortId, int $gradeLevelId, array $ranks): void
     {
         static::where('resort_id', $resortId)->where('grade_level_id', $gradeLevelId)->delete();
 
-        foreach ($ranks as $rank) {
-            static::updateOrCreate(
-                ['resort_id' => $resortId, 'rank' => (int) $rank],
-                ['grade_level_id' => $gradeLevelId]
-            );
+        $rows = collect($ranks)->unique()->map(fn ($rank) => [
+            'resort_id'      => $resortId,
+            'grade_level_id' => $gradeLevelId,
+            'rank'           => (int) $rank,
+            'created_at'     => now(),
+            'updated_at'     => now(),
+        ])->all();
+
+        if ($rows) {
+            static::insert($rows);
         }
     }
 }

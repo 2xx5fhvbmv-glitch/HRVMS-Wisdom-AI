@@ -677,12 +677,11 @@ class PayrollController extends Controller
                 // Already settled via F&F — exclude from SC pool.
                 continue;
             }
-            // Resolve fresh from rank via the current grade mapping — the
-            // stored employees.benefit_grid_level is a stale legacy value,
-            // never updated when a resort renames/remaps a grade (e.g.
-            // "HOD L1"), so it can no longer be trusted to match
-            // resort_benifit_grid.emp_grade.
-            $empGrade = Common::getEmpGrade($resortId, $employee->rank);
+            // Employee's own benefit_grid_level wins when it's still a real,
+            // active grade for this resort (resolveEmpGrade() guards against
+            // stale/poisoned values); otherwise falls back to the rank-based
+            // default grade mapping.
+            $empGrade = Common::resolveEmpGrade($resortId, $employee->rank, $employee->benefit_grid_level);
             $grid = ResortBenifitGrid::where('resort_id', $resortId)
                 ->where('emp_grade', $empGrade)
                 ->where('service_charge', 1)
@@ -762,7 +761,7 @@ class PayrollController extends Controller
                 foreach ($payroll_service_charges as $payroll) 
                 {
                     $employee           =  Employee::where('id', $payroll->employee_id)->where('resort_id', $this->resort->resort_id)->first();
-                    $grade              =  Common::getEmpGrade($this->resort->resort_id, $employee->rank);
+                    $grade              =  Common::resolveEmpGrade($this->resort->resort_id, $employee->rank, $employee->benefit_grid_level);
                     $resortBenifitsGrid =  ResortBenifitGrid::where('resort_id', $this->resort->resort_id)->where('emp_grade', $grade)->where('service_charge', '1')->where('status','Active')->first();
                     
                     if($resortBenifitsGrid && $payroll->service_charge_amount > 0)
@@ -2153,9 +2152,7 @@ class PayrollController extends Controller
                     })
                     ->first();
 
-                // See the other benefit-grid lookup above — resolve fresh
-                // from rank rather than trusting the stale employees.benefit_grid_level.
-                $empGradeForLeave = Common::getEmpGrade($this->resort->resort_id, $employee->rank);
+                $empGradeForLeave = Common::resolveEmpGrade($this->resort->resort_id, $employee->rank, $employee->benefit_grid_level);
                 $resort_benefitGrid = ResortBenifitGrid::where('resort_id', $this->resort->resort_id)->where('emp_grade', $empGradeForLeave)->where('status','Active')->first();
                 if ($paidLeave && $resort_benefitGrid) {
                     $benefitGrid = ResortBenifitGridChild::where('benefit_grid_id', optional($resort_benefitGrid)->id)
