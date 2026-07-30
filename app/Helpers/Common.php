@@ -7374,6 +7374,39 @@ class Common
         ];
     }
 
+    /**
+     * Resolves a maintanace_requests.Image/Completed_Image (or any column
+     * with the same dual convention) value into a real, viewable URL.
+     *
+     * The stored value comes from two genuinely different upload paths that
+     * both write into the same column:
+     *  - Web portal (MaintananceContorller::CreateMaintenanceRequest) stores
+     *    a plain filename under uploads/MaintanceRequest/{resort_id}/.
+     *  - Mobile app (StaffAccommodationController) stores
+     *    json_encode(['Filename'=>.., 'Child_id'=>ChildFileManagement id])
+     *    via AWSEmployeeFileUpload() — the real file lives wherever that
+     *    ChildFileManagement row's File_Path says, NOT under
+     *    uploads/MaintanceRequest/ at all.
+     * Every render call site used to blindly concatenate the raw column
+     * value into a path, which for the mobile/JSON case produced a URL
+     * with a literal `{"Filename":"...","Child_id":123}` path segment —
+     * always 404/SignatureDoesNotMatch, never viewable.
+     */
+    public static function resolveMaintenanceAttachmentUrl($value, $resortId)
+    {
+        if (empty($value)) {
+            return null;
+        }
+
+        $decoded = json_decode($value, true);
+        if (is_array($decoded) && !empty($decoded['Child_id'])) {
+            $aws = self::GetAWSFile($decoded['Child_id'], $resortId);
+            return $aws['success'] ? $aws['NewURLshow'] : null;
+        }
+
+        $path_path = config('settings.MaintanceRequest') . '/' . $resortId;
+        return StorageHelper::temporaryUrl($path_path . '/' . $value);
+    }
 
     public static function GetApplicantAWSFile($path)
     {
