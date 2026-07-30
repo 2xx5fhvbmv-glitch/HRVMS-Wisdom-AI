@@ -679,6 +679,102 @@ class IncidentController extends Controller
         }
     }
 
+    /**
+     * What an involved employee or witness fetches after receiving the
+     * "please provide a statement" push (requestEmployeeStatements() ->
+     * sendMobileNotification with request_id = incidents.id). Deliberately
+     * NOT scoped to created_by like incidentDetails() — that endpoint is
+     * for the person who logged the incident, this one is for someone the
+     * incident was logged ABOUT, who has no relationship to created_by at
+     * all. Mirrors provideStatement()'s own involved/witness authorization
+     * check so "can I see this" and "can I submit for this" never drift
+     * apart, and returns just enough context (what/when/where + category)
+     * plus the caller's own existing statement, if any, so re-opening the
+     * screen after a partial submit shows what was already sent instead of
+     * a blank form.
+     */
+    public function getStatementRequest($incidentId)
+    {
+        if (!Auth::guard('api')->check()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $user     = Auth::guard('api')->user();
+        $employee = $user->GetEmployee;
+        $emp_id   = $employee->id;
+
+        try {
+            $incidentId = base64_decode($incidentId, true) ?: $incidentId;
+
+            $incident = Incidents::with(['categoryName', 'subcategoryName'])
+                ->where('resort_id', $this->resort_id)
+                ->where('id', $incidentId)
+                ->first();
+
+            if (!$incident) {
+                return response()->json(['success' => false, 'message' => 'No such incident found'], 200);
+            }
+
+            $witness = IncidentsWitness::where('incident_id', $incident->id)
+                ->where('witness_id', $emp_id)
+                ->first();
+
+            $involvedEmployeeIds = array_filter(explode(',', (string) $incident->involved_employees));
+            $isInvolved = in_array((string) $emp_id, $involvedEmployeeIds, true);
+            $isWitness  = (bool) $witness;
+
+            if (!$isInvolved && !$isWitness) {
+                return response()->json(['success' => false, 'message' => 'You are not authorized to view this incident.'], 200);
+            }
+
+            $existingStatement = null;
+            $alreadySubmitted  = false;
+            if ($isInvolved) {
+                $row = IncidentsEmployeeStatements::where('incident_id', $incident->id)
+                    ->where('employee_id', $emp_id)
+                    ->orderByDesc('id')
+                    ->first();
+                if ($row) {
+                    $existingStatement = $row->statement;
+                    $alreadySubmitted  = $row->status === 'submitted';
+                }
+            } elseif ($isWitness) {
+                $existingStatement = $witness->witness_statements;
+                $alreadySubmitted  = !empty($witness->witness_statements);
+            }
+
+            $attachments = json_decode($incident->attachements, true);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Incident statement request fetched successfully',
+                'data' => [
+                    'incident' => [
+                        'id'              => $incident->id,
+                        'incident_id'     => $incident->incident_id,
+                        'incident_name'   => $incident->incident_name,
+                        'incident_date'   => $incident->incident_date ? date('d M Y', strtotime($incident->incident_date)) : null,
+                        'incident_time'   => $incident->incident_time,
+                        'location'        => $incident->location,
+                        'category_name'   => optional($incident->categoryName)->category_name,
+                        'subcategory_name'=> optional($incident->subcategoryName)->subcategory_name,
+                        'description'     => (string) ($incident->description ?? ''),
+                        'attachments'     => !empty($attachments) ? $this->resolveAttachmentUrls($attachments) : [],
+                    ],
+                    'your_role'          => $isWitness ? 'witness' : 'involved_employee',
+                    'existing_statement' => $existingStatement,
+                    'already_submitted'  => $alreadySubmitted,
+                    'can_submit'         => !$alreadySubmitted,
+                ],
+            ], 200);
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
     public function provideStatement(Request $request)
     {
         if (!Auth::guard('api')->check()) {
@@ -722,23 +818,24 @@ class IncidentController extends Controller
                 return response()->json(['success' => false, 'message' => 'You are not authorized to submit a statement for this incident.'], 200);
             }
              
-              $imagePaths = [];         
+              $imagePaths = [];
 
+                // Was public_path()/mkdir()/Common::uploadFile() — a raw
+                // filesystem write that never touches the configured
+                // storage disk, same root cause as the accommodation
+                // maintenance-request attachments (never viewable once
+                // STORAGE_DRIVER=wasabi, prod's setting).
                 if ($request->hasFile('attatchements')) {
                     $incident_doc_path  = config('settings.incident_statements');
                     $absolute_path      =  $incident_doc_path . '/' . $incident->incident_id . '/' . $emp_id;
-    
-                    if (!file_exists(public_path($absolute_path))) {
-                        mkdir(public_path($absolute_path), 0755, true);
-                    }
-    
+
                         foreach ($request->file('attatchements') as $uploadedFile) {
                             $fileName = $uploadedFile->getClientOriginalName();
-                            Common::uploadFile($uploadedFile, $fileName, $absolute_path);
-                            $file_path      = $absolute_path . '/' . $fileName;
-                            $imagePaths[]   = $file_path; 
-                        }    
-                } 
+                            $file_path = $absolute_path . '/' . $fileName;
+                            \App\Helpers\StorageHelper::put($file_path, file_get_contents($uploadedFile->getRealPath()));
+                            $imagePaths[]   = $file_path;
+                        }
+                }
 
                 if ($isWitness) {
                     $witness_statement      =   IncidentsWitness::where('id', $witness->id)
