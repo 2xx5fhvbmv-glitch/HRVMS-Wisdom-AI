@@ -1372,6 +1372,9 @@ class LeaveController extends Controller
                                                                     ];
                                                                 })->values();
 
+                foreach (Common::buildLeaveApprovalFlow($leaveRequest->id, $emp_id) as $key => $value) {
+                    $leaveRequest->{$key} = $value;
+                }
             }
 
             if ($myLeaveRequest) {
@@ -1392,6 +1395,10 @@ class LeaveController extends Controller
                 $myLeaveRequest->approve_data           =   $approveData;
                 $myLeaveRequest->from_date              =   Carbon::parse($myLeaveRequest->from_date)->format('Y-m-d');
                 $myLeaveRequest->to_date                =   Carbon::parse($myLeaveRequest->to_date)->format('Y-m-d');
+
+                foreach (Common::buildLeaveApprovalFlow($myLeaveRequest->id, $emp_id) as $key => $value) {
+                    $myLeaveRequest->{$key} = $value;
+                }
             }
 
             //Leave Request data end here
@@ -1430,6 +1437,10 @@ class LeaveController extends Controller
                                                                             'rank_type'         => $role,
                                                                         ];
                                                                     })->values();
+
+                                                                foreach (Common::buildLeaveApprovalFlow($item->id, $emp_id) as $key => $value) {
+                                                                    $item->{$key} = $value;
+                                                                }
 
                                                                 return $item;
                                                             });
@@ -1701,7 +1712,7 @@ class LeaveController extends Controller
 
 
             // Group data by 'id'
-            $leaveRequests                              =   $leaveRequests->groupBy('id')->map(function ($group) {
+            $leaveRequests                              =   $leaveRequests->groupBy('id')->map(function ($group) use ($employee) {
                 // Use the first record as the base
                 $base                                   =   $group->first();
 
@@ -1726,6 +1737,10 @@ class LeaveController extends Controller
 
                 // Add approve_data to the base record
                 $base->approve_data                     =   $approveData;
+
+                foreach (Common::buildLeaveApprovalFlow($base->id, $employee->id) as $key => $value) {
+                    $base->{$key} = $value;
+                }
 
                 return $base;
             })->values();
@@ -2708,6 +2723,10 @@ class LeaveController extends Controller
             // Clear duplicate fields in the base record
             unset($base->approver_rank, $base->approver_id);
 
+            foreach (Common::buildLeaveApprovalFlow($base->id, $emp_id) as $key => $value) {
+                $base->{$key} = $value;
+            }
+
             return $base;
         })->values();
 
@@ -3227,7 +3246,7 @@ class LeaveController extends Controller
                 $baseUrl                =   url('/');
 
                 // Group data by 'id'
-                $leaveDetails       = $leaveDetails->groupBy('id')->map(function ($group) {
+                $leaveDetails       = $leaveDetails->groupBy('id')->map(function ($group) use ($empId) {
 
 
                     // Use the first record as the base
@@ -3256,6 +3275,10 @@ class LeaveController extends Controller
                     $base->attachments                  = self::resolveLeaveAttachmentUrl($base->attachments);
                     // Clear duplicate fields in the base record
                     unset($base->approver_rank, $base->approver_id);
+
+                    foreach (Common::buildLeaveApprovalFlow($base->id, $empId) as $key => $value) {
+                        $base->{$key} = $value;
+                    }
 
                     return $base;
                 })->values(); // Re-index the collection
@@ -3476,15 +3499,16 @@ class LeaveController extends Controller
                         return $item;
                     });
 
+                    // Full chain, not filtered to the viewer's own row — a
+                    // timeline needs every stage, and per-stage
+                    // can_approve/can_reject (from approval_flow below)
+                    // already tell the viewer whether THEY can act.
+                    $leaveDetail->approve_data  =   $approveData->values();
 
-                    // Filter only if approver_id matches emp_id
-                    $filteredApproveData    =   $approveData->where('approver_id', $emp_id);
+                    foreach (Common::buildLeaveApprovalFlow($leaveDetail->id, $emp_id) as $key => $value) {
+                        $leaveDetail->{$key} = $value;
+                    }
 
-                    // Attach approve_data to the main island pass object
-                    // $leaveDetail->approve_data      = $approveData;
-
-                    // If emp_id is found, assign filtered data, otherwise assign an empty array
-                    $leaveDetail->approve_data  =   $filteredApproveData->isNotEmpty() ? $filteredApproveData->values() : [];
                     if ($isHOD) {
                         $leaveDetail->already_emp_leave = $alreadyEmpLeaveQuery;
                     }
@@ -3739,13 +3763,18 @@ class LeaveController extends Controller
                     'etps.approver_rank',
                     'etps.approver_id',
                     'etps.approved_at',
+                    // etp.* (selected above) already has its own `status`
+                    // column (the parent pass's overall status) — without
+                    // aliasing this, $item->status below silently read that
+                    // instead of the per-stage status.
+                    'etps.status as stage_status',
                 )
                 ->orderBy('etp.id', 'desc') // Order by ID descending
                 ->get();
 
 
             // Group data by 'id'
-            $islandPassQuery  = $islandPassQuery->groupBy('id')->map(function ($group) {
+            $islandPassQuery  = $islandPassQuery->groupBy('id')->map(function ($group) use ($emp_id) {
                 // Use the first record as the base
                 $base           = $group->first();
                 // Collect approver details for the grouped records
@@ -3759,7 +3788,7 @@ class LeaveController extends Controller
                         'approver_rank' => $item->approver_rank,
                         'approver_id'   => $item->approver_id,
                         'rank_type'     => $role,
-                        'status'        => $item->status,
+                        'status'        => $item->stage_status,
                     ];
                 })->unique()->values();
 
@@ -3768,6 +3797,15 @@ class LeaveController extends Controller
                 // Clear duplicate fields in the base record
                 unset($base->approver_rank, $base->approver_id);
                 $base->profile_picture  = Common::getResortUserPicture($base->Admin_Parent_id);
+
+                // Built from its own independent, unfiltered stage query —
+                // unlike approve_data above (which, on islandPassViewHOD,
+                // only ever contains the viewer's own row because of that
+                // method's approver_id-filtered join), this always reflects
+                // the FULL chain regardless of how the base query is scoped.
+                foreach (Common::buildIslandPassApprovalFlow($base->id, $emp_id) as $key => $value) {
+                    $base->{$key} = $value;
+                }
 
                 return $base;
             })->values();
@@ -3815,6 +3853,11 @@ class LeaveController extends Controller
                     'etps.approver_rank',
                     'etps.approver_id',
                     'etps.approved_at',
+                    // etp.* (selected above) already has its own `status`
+                    // column (the parent pass's overall status) — without
+                    // aliasing this, $item->status below silently read that
+                    // instead of the per-stage status.
+                    'etps.status as stage_status',
                 )
                 ->where('etp.resort_id', $resort_id)
                 // Approvers are assigned per-pass in employee_travel_pass_status
@@ -3828,7 +3871,7 @@ class LeaveController extends Controller
                 ->get();
 
             // Group data by 'id'
-            $islandPassQuery  = $islandPassQuery->groupBy('id')->map(function ($group) {
+            $islandPassQuery  = $islandPassQuery->groupBy('id')->map(function ($group) use ($emp_id) {
                 // Use the first record as the base
                 $base           = $group->first();
                 // Collect approver details for the grouped records
@@ -3842,7 +3885,7 @@ class LeaveController extends Controller
                         'approver_rank' => $item->approver_rank,
                         'approver_id'   => $item->approver_id,
                         'rank_type'     => $role,
-                        'status'        => $item->status,
+                        'status'        => $item->stage_status,
                     ];
                 })->unique()->values();
 
@@ -3851,6 +3894,15 @@ class LeaveController extends Controller
                 // Clear duplicate fields in the base record
                 unset($base->approver_rank, $base->approver_id);
                 $base->profile_picture  = Common::getResortUserPicture($base->Admin_Parent_id);
+
+                // Built from its own independent, unfiltered stage query —
+                // unlike approve_data above (which, on islandPassViewHOD,
+                // only ever contains the viewer's own row because of that
+                // method's approver_id-filtered join), this always reflects
+                // the FULL chain regardless of how the base query is scoped.
+                foreach (Common::buildIslandPassApprovalFlow($base->id, $emp_id) as $key => $value) {
+                    $base->{$key} = $value;
+                }
 
                 return $base;
             })->values();
@@ -3899,6 +3951,11 @@ class LeaveController extends Controller
                     'etps.approver_rank',
                     'etps.approver_id',
                     'etps.approved_at',
+                    // etp.* (selected above) already has its own `status`
+                    // column (the parent pass's overall status) — without
+                    // aliasing this, $item->status below silently read that
+                    // instead of the per-stage status.
+                    'etps.status as stage_status',
                 )
                 ->where('etp.resort_id', $resort_id)
                 // Same fix as islandPassViewHOD() above — approver_id (from
@@ -3983,10 +4040,10 @@ class LeaveController extends Controller
             $actionname                                 =   ($action == "Rejected") ? "reject" : "approve";
 
             if ($lastStatus && $lastStatus->approver_id != $currentApproverId) {
-                return response()->json([
+                return response()->json(array_merge([
                     'status'                            =>  false,
                     'message'                           =>  "You cannot $actionname this request. The request must first be approved by the $lastApproverRank.",
-                ], 200);
+                ], Common::buildLeaveApprovalFlow($leaveId, $currentApproverId)), 200);
             }
 
             EmployeeLeaveStatus::where('leave_request_id', $leave->id)->where('approver_id', $currentApproverId)->update([
@@ -4053,10 +4110,10 @@ class LeaveController extends Controller
                     );
                 }
 
-                return response()->json([
+                return response()->json(array_merge([
                     'status'                            =>  true,
                     'message'                           =>  'Leave approved successfully.',
-                ]);
+                ], Common::buildLeaveApprovalFlow($leave->id, $currentApproverId)));
 
             } else if ($action === 'Rejected') {
 
@@ -4081,15 +4138,15 @@ class LeaveController extends Controller
                     'leave-rejected',
                 );
 
-                return response()->json([
+                return response()->json(array_merge([
                     'status'                            =>  true,
                     'message'                           =>  'Leave Rejected.',
-                ], 200);
+                ], Common::buildLeaveApprovalFlow($leave->id, $currentApproverId)), 200);
             } else {
-                return response()->json([
+                return response()->json(array_merge([
                     'status'                            =>  false,
                     'message'                           =>  'Invalid action.',
-                ], 200);
+                ], Common::buildLeaveApprovalFlow($leaveId, $currentApproverId)), 200);
             }
         } catch (\Exception $e) {
             \Log::emergency("File: " . $e->getFile());

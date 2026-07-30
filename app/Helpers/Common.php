@@ -4614,6 +4614,162 @@ class Common
     }
 
     /**
+     * Builds the standardized multi-step approval payload for a single
+     * Leave request, for mobile's timeline UI. Pure read-side — does not
+     * change how approve/reject is enforced (that stays in
+     * handleLeaveAction()), just normalizes what already exists into one
+     * consistent shape every Leave endpoint returns.
+     *
+     * overall_status is read directly off employees_leaves.status — never
+     * re-derived — so the clinic-staff-reject-doesn't-flip-parent rule and
+     * the HR/GM immediate-approve shortcut (both already correct in
+     * handleLeaveAction()) are reflected automatically with zero
+     * special-casing here.
+     *
+     * "Current step" = the first stage row, in submission order (ascending
+     * id — matches handleLeaveAction()'s own unordered ->first() pick made
+     * explicit), whose status is still Pending — but only meaningful while
+     * the parent itself is still Pending; a resolved parent means nothing
+     * is actionable regardless of any stage row left un-updated by a
+     * terminal-rank shortcut.
+     *
+     * @return array{approval_flow: object, can_approve: bool, can_reject: bool, current_pending_rank: ?string, overall_status: string}
+     */
+    public static function buildLeaveApprovalFlow(int $leaveId, ?int $viewerEmployeeId): array
+    {
+        $overallStatus = \App\Models\EmployeeLeave::where('id', $leaveId)->value('status') ?? 'Pending';
+
+        $stages = \App\Models\EmployeeLeaveStatus::where('leave_request_id', $leaveId)
+            ->orderBy('id')
+            ->get(['id', 'approver_id', 'approver_rank', 'status', 'comments', 'approved_at']);
+
+        $approvers = \App\Models\Employee::with(['resortAdmin', 'position'])
+            ->whereIn('id', $stages->pluck('approver_id')->filter()->unique())
+            ->get()
+            ->keyBy('id');
+
+        $rankConfig = config('settings.Position_Rank', []);
+
+        $currentStageId = null;
+        if ($overallStatus === 'Pending') {
+            $currentStage = $stages->firstWhere('status', 'Pending');
+            $currentStageId = $currentStage ? $currentStage->id : null;
+        }
+
+        $flow = [];
+        $currentPendingRank = null;
+        foreach ($stages->values() as $index => $stage) {
+            $isCurrentStep = $currentStageId !== null && $stage->id === $currentStageId;
+            $approver = $approvers->get($stage->approver_id);
+            $rankType = $rankConfig[$stage->approver_rank] ?? 'Unknown';
+
+            if ($isCurrentStep) {
+                $currentPendingRank = $rankType;
+            }
+
+            $flow[(string) $index] = [
+                'step'            => $index,
+                'approver_id'     => $stage->approver_id,
+                'name'            => $approver ? (trim(($approver->resortAdmin->first_name ?? '') . ' ' . ($approver->resortAdmin->last_name ?? '')) ?: null) : null,
+                'position'        => optional(optional($approver)->position)->position_title,
+                'rank_type'       => $rankType,
+                'status'          => $stage->status,
+                'comment'         => $stage->comments,
+                'approved_at'     => $stage->approved_at,
+                // Clinic-staff (rank 12) can comment/approve but a reject
+                // from them never flips the leave — never expose
+                // can_reject=true for that stage.
+                'can_approve'     => $isCurrentStep,
+                'can_reject'      => $isCurrentStep && (string) $stage->approver_rank !== '12',
+                'is_current_step' => $isCurrentStep,
+            ];
+        }
+
+        $viewerIsCurrentApprover = $currentStageId !== null
+            && $viewerEmployeeId !== null
+            && (string) optional($stages->firstWhere('id', $currentStageId))->approver_id === (string) $viewerEmployeeId;
+
+        return [
+            'approval_flow'         => (object) $flow,
+            'can_approve'           => $viewerIsCurrentApprover,
+            'can_reject'            => $viewerIsCurrentApprover,
+            'current_pending_rank'  => $currentPendingRank,
+            'overall_status'        => $overallStatus,
+        ];
+    }
+
+    /**
+     * Same contract as buildLeaveApprovalFlow(), for Island Pass. The real
+     * approval order is HOD -> HR -> SM — the highest-id (last-inserted)
+     * stage row acts FIRST, matching boardingPassApprovedAction()'s own
+     * orderBy('id','desc')->first() pick exactly. rank_type prefers
+     * approver_role (the functional stage) over approver_rank (personal
+     * rank, which can coincidentally also read "HOD" for an HR/SM
+     * approver) — falling back to approver_rank only for legacy rows that
+     * predate the approver_role column.
+     */
+    public static function buildIslandPassApprovalFlow(int $passId, ?int $viewerEmployeeId): array
+    {
+        $rawStatus = \App\Models\EmployeeTravelPass::where('id', $passId)->value('status') ?? 'Pending';
+        $overallStatus = $rawStatus === 'Cancel' ? 'Cancelled' : $rawStatus;
+
+        $stages = \App\Models\EmployeeTravelPassStatus::where('travel_pass_id', $passId)
+            ->orderBy('id', 'desc')
+            ->get(['id', 'approver_id', 'approver_rank', 'approver_role', 'status', 'comments', 'approved_at']);
+
+        $approvers = \App\Models\Employee::with(['resortAdmin', 'position'])
+            ->whereIn('id', $stages->pluck('approver_id')->filter()->unique())
+            ->get()
+            ->keyBy('id');
+
+        $rankConfig = config('settings.Position_Rank', []);
+
+        $currentStageId = null;
+        if ($overallStatus === 'Pending') {
+            $currentStage = $stages->firstWhere('status', 'Pending');
+            $currentStageId = $currentStage ? $currentStage->id : null;
+        }
+
+        $flow = [];
+        $currentPendingRank = null;
+        foreach ($stages->values() as $index => $stage) {
+            $isCurrentStep = $currentStageId !== null && $stage->id === $currentStageId;
+            $approver = $approvers->get($stage->approver_id);
+            $rankType = $stage->approver_role ?: ($rankConfig[$stage->approver_rank] ?? 'Unknown');
+
+            if ($isCurrentStep) {
+                $currentPendingRank = $rankType;
+            }
+
+            $flow[(string) $index] = [
+                'step'            => $index,
+                'approver_id'     => $stage->approver_id,
+                'name'            => $approver ? (trim(($approver->resortAdmin->first_name ?? '') . ' ' . ($approver->resortAdmin->last_name ?? '')) ?: null) : null,
+                'position'        => optional(optional($approver)->position)->position_title,
+                'rank_type'       => $rankType,
+                'status'          => $stage->status,
+                'comment'         => $stage->comments,
+                'approved_at'     => $stage->approved_at,
+                'can_approve'     => $isCurrentStep,
+                'can_reject'      => $isCurrentStep,
+                'is_current_step' => $isCurrentStep,
+            ];
+        }
+
+        $viewerIsCurrentApprover = $currentStageId !== null
+            && $viewerEmployeeId !== null
+            && (string) optional($stages->firstWhere('id', $currentStageId))->approver_id === (string) $viewerEmployeeId;
+
+        return [
+            'approval_flow'         => (object) $flow,
+            'can_approve'           => $viewerIsCurrentApprover,
+            'can_reject'            => $viewerIsCurrentApprover,
+            'current_pending_rank'  => $currentPendingRank,
+            'overall_status'        => $overallStatus,
+        ];
+    }
+
+    /**
      * Prorate allocated leave days based on employee's joining date.
      * If employee joined in the current year, prorate by months worked.
      * If joined before current year, return full allocation.
