@@ -43,14 +43,22 @@ Controller: `app/Http/Controllers/API/LeaveController.php`
 
 ### Approver assignment (rank cascade, decided at submission)
 
-Based on the **applicant's own rank**, not their manager chain:
+Rank numbers (`config('settings.Position_Rank')`): `1`=EXCOM, `2`=HOD,
+`3`=HR, `4`=MGR, `5`=SUP, `6`=LINE WORKERS, `8`=GM, `12`=CLINIC_STAFF.
 
-| Applicant rank | Approval chain |
-|---|---|
-| 5/6 (Supervisor/Line) | EXCOM (or HOD if no EXCOM) → HR |
-| 4 (MGR) | EXCOM → HR |
-| 2/8 (HOD/GM) | HR |
-| 1/3 (EXCOM/HR) | GM |
+Based on the **applicant's own rank**, not a generic manager-chain walk:
+
+| Applicant rank | Approval chain | Notes |
+|---|---|---|
+| 5/6 (Supervisor/Line Worker) | 1 approver: `reporting_to`, unless that person isn't rank 4/5 — then the applicant's own department's Supervisor(5)/Manager(4), preferring 5 | Guards against `reporting_to` skipping straight to HOD in flat departments |
+| 4 (MGR) | `reporting_to` (if set) else dept HOD(2) → then GM(8) | 2 approvals |
+| 2 (HOD) | `reporting_to` (if set) else any EXCOM(1) → then GM(8) | 2 approvals |
+| 1 (EXCOM) | GM(8) only | 1 approval |
+| 8 (GM) | HR-dept EXCOM(1), else HR-dept HOD(2), else any EXCOM(1) | 1 approval; "HR-dept" = the department literally named "Human Resources" |
+
+Same rules in both `App\Http\Controllers\API\LeaveController::leaveAdd()` and
+the web portal's `App\Http\Controllers\Resorts\Leave\LeaveController::leaveAdd()`
+— kept identical on purpose, verify both if you change this.
 
 Plus: a clinic-staff approver stage (rank `12`) is auto-injected for sick
 leave ≥2 days, maternity leave ≥30 days, or the applicant's >15th single-day
@@ -85,9 +93,13 @@ Request: `{"leave_id": 123, "action": "Approved", "reason": null}`
 
 - Validates the caller is the `approver_id` on the current pending
   `employees_leaves_status` row — else `{"status": false, "message": "You cannot approve/reject this request. The request must first be approved by the {rank}."}`
-- On approve: updates that stage row; if it was the last stage (or its
-  `approver_rank` is `3`/HR or `8`/GM — terminal ranks), parent flips to
-  `Approved`.
+- On approve: updates that stage row; parent flips to `Approved` once
+  **every** `employees_leaves_status` row for this leave is `Approved`
+  (checked via `doesntExist()` on any non-Approved row — not by rank number).
+  There's also a secondary rank check (`approver_rank == 3 || 8`) as a
+  redundant terminal shortcut, but under the current chain rules above no
+  stage row is ever created with `approver_rank == 3`, so that branch is
+  effectively dead for new requests — don't rely on it.
 - On reject: parent flips to `Rejected` immediately, **unless** the
   rejecting stage is clinic staff (rank `12`).
 

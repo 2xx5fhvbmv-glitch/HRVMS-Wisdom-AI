@@ -103,6 +103,7 @@ class Employee extends Model
         'latitude',
         'longitude',
         'main_rank',
+        'benefit_grid_level',
     ];
 
     public static function boot(){

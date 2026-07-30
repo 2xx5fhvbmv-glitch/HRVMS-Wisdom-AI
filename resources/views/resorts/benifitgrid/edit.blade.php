@@ -873,17 +873,11 @@
         $("#effective_date").datepicker("setDate",currentDate);
         var formSubmitted = false; // Flag to track form submission
 
-        $('#emp-grade-select').on('change', function () {
-            let empGrade = $(this).val(); // Get selected employee grade
-
-            if (empGrade) {
+        function fetchEligibleLeaves(payload) {
                 $.ajax({
                     url: '{{ route('leaves.getEligible') }}', // Your defined route
                     method: 'POST',
-                    data: {
-                        emp_grade: empGrade,
-                        _token: '{{ csrf_token() }}' // Include CSRF token for security
-                    },
+                    data: Object.assign({ _token: '{{ csrf_token() }}' }, payload),
                     success: function (response) {
                         if (response.success) {
                             let container = $('#Leave-categories');
@@ -969,9 +963,34 @@
                         alert('An error occurred while fetching eligible leaves.');
                     }
                 });
+        }
+
+        function clearEligibleLeaves() {
+            $('#Leave-categories').empty();
+            $('#leave-category-select').empty().append('<option value="">Select Leave Category</option>');
+        }
+
+        $('#emp-grade-select').on('change', function () {
+            let empGrade = $(this).val();
+            if (empGrade) {
+                fetchEligibleLeaves({ emp_grade: empGrade });
             } else {
-                // Clear the leave category dropdown if no grade is selected
-                $('#leave-category-select').empty().append('<option value="">Select Leave Category</option>');
+                clearEligibleLeaves();
+            }
+        });
+
+        // Leave eligibility is keyed by RANK (leave_categories.eligibility),
+        // not the grade name — the rank multi-select is what should drive
+        // this preview. Split out of the grade text field when "Applies to
+        // Rank(s)" was added; this listener was missing entirely, so
+        // picking a rank here never refreshed the Leave and Holiday Policy
+        // section.
+        $('#grade-ranks-select').on('change', function () {
+            let ranks = $(this).val(); // array of selected rank values, or null
+            if (ranks && ranks.length) {
+                fetchEligibleLeaves({ ranks: ranks });
+            } else {
+                clearEligibleLeaves();
             }
         });
 

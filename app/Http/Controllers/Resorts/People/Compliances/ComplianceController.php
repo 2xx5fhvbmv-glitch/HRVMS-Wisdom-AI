@@ -782,7 +782,7 @@ class ComplianceController extends Controller
                     foreach ($payroll_service_charges as $payroll) 
                     {
                          $employee           =  Employee::where('id', $payroll->employee_id)->where('resort_id', $resort->resort_id)->first();
-                         $grade              =  Common::getEmpGrade($resort->resort_id, $employee->rank);
+                         $grade              =  Common::resolveEmpGrade($resort->resort_id, $employee->rank, $employee->benefit_grid_level);
                          $resortBenifitsGrid =  ResortBenifitGrid::where('resort_id', $resort->resort_id)->where('emp_grade', $grade)->where('service_charge', '1')->where('status','Active')->first();
                          
                          if($resortBenifitsGrid && $payroll->service_charge_amount > 0) 
@@ -888,7 +888,7 @@ class ComplianceController extends Controller
                {
                     foreach ($overtimeData as $overtime) 
                     {
-                         $grade = Common::getEmpGrade($resort->resort_id, $overtime->rank);
+                         $grade = Common::resolveEmpGrade($resort->resort_id, $overtime->rank, $overtime->benefit_grid_level);
                          $resortBenifitsGrid = ResortBenifitGrid::where('resort_id', $resort->resort_id)->where('emp_grade', $grade)->where('status','Active')
                               ->where('overtime', '!=','yes')
                               ->first();
@@ -1070,7 +1070,7 @@ class ComplianceController extends Controller
                     {
                          $employee = Employee::where('id', $deduction->employee_id)->where('resort_id', $resort->resort_id)->first();
                          if ($employee) {
-                              $grade = Common::getEmpGrade($resort->resort_id, $employee->rank);
+                              $grade = Common::resolveEmpGrade($resort->resort_id, $employee->rank, $employee->benefit_grid_level);
                               // Calculate age from date of birth
                               if ($employee->dob) {
                                          try {
@@ -2181,7 +2181,7 @@ class ComplianceController extends Controller
           $employees = Employee::where('resort_id',$resort->resort_id)->where('status','Active')->get();
 
           foreach($employees as $employee) {
-               $emp_grade = Common::getEmpGrade($resort->resort_id, $employee->rank);
+               $emp_grade = Common::resolveEmpGrade($resort->resort_id, $employee->rank, $employee->benefit_grid_level);
                $leaveCategory = LeaveCategory::where('resort_id', $resort->resort_id)
                     ->where(function($query) use ($emp_grade) {
                          $query->where('eligibility', $emp_grade)

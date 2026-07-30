@@ -4572,9 +4572,45 @@ class Common
      * this rank" rather than falling back to a guess.
      */
     public static function getEmpGrade($resortId, $rank){
+        // Multiple grades can now share a rank (see resolveEmpGrade()) — when
+        // a rank matches more than one grade, orderBy('id') keeps this
+        // deterministic and picks the oldest/originally-assigned grade, so
+        // resorts that never create a second grid on a shared rank see zero
+        // behavior change.
         return \App\Models\ResortBenefitGradeLevelRank::where('resort_id', $resortId)
             ->where('rank', $rank)
+            ->orderBy('id')
             ->value('grade_level_id');
+    }
+
+    /**
+     * Resolves the grade level to use for a SPECIFIC employee: their own
+     * explicit benefit_grid_level wins if it's still a real, active grade
+     * for this resort — otherwise falls back to the rank-based default
+     * (getEmpGrade()). The "still real and active" check is what makes it
+     * safe to trust benefit_grid_level again: it silently ignores rows
+     * poisoned by the pre-refactor backfill (2026_04_22_030000_backfill_employee_benefit_grid_level.php,
+     * which wrote raw rank ids like 1/2/6 into this column before
+     * resort_benefit_grade_levels existed) and any grade since renamed/deleted
+     * out from under the employee — both of which made trusting this
+     * column unsafe before. Every call site that resolves a grade FOR A
+     * SPECIFIC EMPLOYEE should use this instead of getEmpGrade() directly;
+     * getEmpGrade() alone is still correct for position-only lookups where
+     * no specific employee exists yet.
+     */
+    public static function resolveEmpGrade($resortId, $rank, $benefitGridLevel = null)
+    {
+        if (!empty($benefitGridLevel)) {
+            $stillValid = \App\Models\ResortBenefitGradeLevel::where('id', $benefitGridLevel)
+                ->where('resort_id', $resortId)
+                ->where('status', 'active')
+                ->exists();
+            if ($stillValid) {
+                return $benefitGridLevel;
+            }
+        }
+
+        return self::getEmpGrade($resortId, $rank);
     }
 
     /**

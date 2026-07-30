@@ -915,12 +915,27 @@
                                                                 </td>
                                                             </tr>
                                                             @php
-                                                                // Fall back to employee's rank when benefit_grid_level is not set.
-                                                                // This aligns with how the benefit_grid table keys off emp_grade = rank.
-                                                                $eligibility = config('settings.eligibilty') ?? [];
+                                                                // Employee's own explicit level wins when it's still a
+                                                                // real, active grade for this resort; otherwise fall
+                                                                // back to the rank's current default grade — same
+                                                                // resolution Common::resolveEmpGrade() uses everywhere
+                                                                // else, instead of the old static
+                                                                // config('settings.eligibilty') rank-name map (which
+                                                                // only has keys 1/2/4/5/6/8 and always showed "N/A"
+                                                                // for any custom-named grade's auto-increment id).
                                                                 $effectiveBgl = $employee->benefit_grid_level;
-                                                                if (empty($effectiveBgl) && !empty($employee->rank) && isset($eligibility[$employee->rank])) {
-                                                                    $effectiveBgl = $employee->rank;
+                                                                $effectiveGradeName = $effectiveBgl
+                                                                    ? optional(\App\Models\ResortBenefitGradeLevel::where('id', $effectiveBgl)->where('resort_id', $employee->resort_id)->where('status', 'active')->first())->name
+                                                                    : null;
+                                                                if (!$effectiveGradeName && !empty($employee->rank)) {
+                                                                    $fallbackGradeId = \App\Models\ResortBenefitGradeLevelRank::where('resort_id', $employee->resort_id)
+                                                                        ->where('rank', $employee->rank)
+                                                                        ->orderBy('id')
+                                                                        ->value('grade_level_id');
+                                                                    $effectiveBgl = $fallbackGradeId;
+                                                                    $effectiveGradeName = $fallbackGradeId
+                                                                        ? optional(\App\Models\ResortBenefitGradeLevel::find($fallbackGradeId))->name
+                                                                        : null;
                                                                 }
                                                             @endphp
                                                             <tr>
@@ -928,7 +943,7 @@
                                                                 <td>
                                                                     {{-- View Mode --}}
                                                                     <span class="view-mode">
-                                                                        {{ $effectiveBgl && isset($eligibility[$effectiveBgl]) ? $eligibility[$effectiveBgl] : 'N/A' }}
+                                                                        {{ $effectiveGradeName ?? 'N/A' }}
                                                                     </span>
 
                                                                     {{-- Edit Mode --}}
@@ -936,9 +951,9 @@
                                                                             id="benefit_grid_level"
                                                                             class="form-select edit-mode d-none"
                                                                             data-placeholder="Benefit Grid Level">
-                                                                        @if($effectiveBgl && isset($eligibility[$effectiveBgl]))
+                                                                        @if($effectiveBgl && $effectiveGradeName)
                                                                             <option value="{{ $effectiveBgl }}" selected>
-                                                                                {{ $eligibility[$effectiveBgl] }}
+                                                                                {{ $effectiveGradeName }}
                                                                             </option>
                                                                         @endif
                                                                     </select>
@@ -3700,12 +3715,14 @@
             type: 'GET',
             data: { position_id: positionId },
             success: function (res) {
-                if (res && res.benfitGrid_emp_id) {
-                    let html = '<option>Select Employee Grid</option>';
-                    html += `<option value="${res.benfitGrid_emp_id}" selected>${res.emp_grade_name}</option>`;
-
-                    $('#benefit_grid_level').html(html).trigger('change');
-                }
+                if (!res || !res.success) return;
+                let opts = res.options || [];
+                let html = '<option>Select Employee Grid</option>';
+                opts.forEach(function (o) {
+                    let sel = opts.length === 1 ? ' selected' : '';
+                    html += `<option value="${o.emp_grade}"${sel}>${o.name}</option>`;
+                });
+                $('#benefit_grid_level').html(html).trigger('change');
             }
         });
     });

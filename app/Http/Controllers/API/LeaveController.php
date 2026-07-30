@@ -299,7 +299,7 @@ class LeaveController extends Controller
                 }
 
                 // Get the employee grade and leave balances
-                $emp_grade                              =   Common::getEmpGrade($resortId, $rank);
+                $emp_grade                              =   Common::resolveEmpGrade($resortId, $rank, $employee->benefit_grid_level);
 
                 // Fetch the benefit grid (allocated days) for the employee's grade and rank
                 $benefit_grid                           =   DB::table('resort_benifit_grid as rbg')
@@ -809,7 +809,7 @@ class LeaveController extends Controller
                 }
 
                 $rank                                   =   $employee->rank;
-                $emp_grade                              =   Common::getEmpGrade($resort_id, $rank);
+                $emp_grade                              =   Common::resolveEmpGrade($resort_id, $rank, $employee->benefit_grid_level);
                 $benefit_grid                           =   Common::getBenefitGrid($emp_grade, $resort_id);
 
                 if (!$benefit_grid) {
@@ -1163,7 +1163,7 @@ class LeaveController extends Controller
             // with this instead of leaving it blank.
             $leaveData['default_destination']           =   $employee->leave_destination;
 
-            $emp_grade                                  =   Common::getEmpGrade($user->resort_id, $user->GetEmployee->rank);
+            $emp_grade                                  =   Common::resolveEmpGrade($user->resort_id, $user->GetEmployee->rank, $user->GetEmployee->benefit_grid_level);
 
             $benefit_grids                              =   DB::table('resort_benifit_grid as rbg')
                                                                 ->join('resort_benefit_grid_child as rbgc', 'rbg.id', '=', 'rbgc.benefit_grid_id')
@@ -1524,6 +1524,7 @@ class LeaveController extends Controller
                                                                 'el.*',
                                                                 'e.Emp_id as employee_id',
                                                                 'e.rank',
+                                                                'e.benefit_grid_level',
                                                                 'els.status as leave_status',
                                                                 'els.approver_rank',
                                                                 'els.approver_id',
@@ -1554,7 +1555,7 @@ class LeaveController extends Controller
 
                 if ($leaveDetail) {
                     // Fetch total leave allocation for the employee
-                    $emp_grade                          =   Common::getEmpGrade($resortId, $leaveDetail->rank);
+                    $emp_grade                          =   Common::resolveEmpGrade($resortId, $leaveDetail->rank, $leaveDetail->benefit_grid_level);
                     $benefit_grid                       =   DB::table('resort_benifit_grid as rbg')
                                                                     ->join('resort_benefit_grid_child as rbgc', 'rbg.id', '=', 'rbgc.benefit_grid_id')
                                                                     ->where('rbg.emp_grade', $emp_grade)
@@ -2007,6 +2008,7 @@ class LeaveController extends Controller
                     'el.*',
                     'e.Emp_id as employee_id',
                     'e.rank',
+                    'e.benefit_grid_level',
                     'els.status as leave_status',
                     'els.approver_rank',
                     'els.approver_id',
@@ -2030,7 +2032,7 @@ class LeaveController extends Controller
                     foreach ($combineLeaveDetails as $leaveDetail) {
 
                         // Fetch total leave allocation for the employee
-                        $emp_grade          = Common::getEmpGrade($user->resort_id, $leaveDetail->rank);
+                        $emp_grade          = Common::resolveEmpGrade($user->resort_id, $leaveDetail->rank, $leaveDetail->benefit_grid_level);
                         $benefit_grid       = DB::table('resort_benifit_grid as rbg')
                             ->join('resort_benefit_grid_child as rbgc', 'rbg.id', '=', 'rbgc.benefit_grid_id')
                             ->where('rbg.emp_grade', $emp_grade)
@@ -2259,7 +2261,7 @@ class LeaveController extends Controller
                 }
 
                 // Get the employee grade and leave balances
-                $emp_grade                              =   Common::getEmpGrade($user->resort_id, $rank);
+                $emp_grade                              =   Common::resolveEmpGrade($user->resort_id, $rank, $employee->benefit_grid_level);
 
                 // Fetch the benefit grid (allocated days) for the employee's grade and rank
                 $benefit_grid                           =   DB::table('resort_benifit_grid as rbg')
@@ -3340,6 +3342,7 @@ class LeaveController extends Controller
                     'el.*',
                     'e.Emp_id as employee_id',
                     'e.rank',
+                    'e.benefit_grid_level',
                     // Main employee details
                     'ra.first_name as employee_first_name',
                     'ra.last_name as employee_last_name',
@@ -3404,7 +3407,7 @@ class LeaveController extends Controller
 
                 if ($leaveDetail) {
                     // Fetch total leave allocation for the employee
-                    $emp_grade      = Common::getEmpGrade($resortId, $leaveDetail->rank);
+                    $emp_grade      = Common::resolveEmpGrade($resortId, $leaveDetail->rank, $leaveDetail->benefit_grid_level);
                     // Was missing a resort_id scope entirely — summed
                     // every resort's benefit grid at this emp_grade, not
                     // just this resort's, massively inflating the total

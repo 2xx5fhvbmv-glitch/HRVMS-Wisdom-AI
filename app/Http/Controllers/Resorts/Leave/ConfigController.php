@@ -216,28 +216,30 @@ class ConfigController extends Controller
 
     public function getEligibleLeaves(Request $request)
     {
-        // The Benefit Grid form's grade field is a free-text name (e.g.
-        // "HOD L1"), not a stable id — resolve it to the matching
-        // resort_benefit_grade_levels row for this resort first. A grade
-        // typed but not yet saved (new tag, or a typo) simply has no rank
-        // mapping yet, so nothing is eligible until it's created and
-        // mapped under People > Configuration > Benefit Grade Levels.
-        $empGradeName = trim((string) $request->input('emp_grade'));
-        $gradeLevelId = ResortBenefitGradeLevel::where('resort_id', $this->resort->resort_id)
-            ->where('name', $empGradeName)
-            ->value('id');
+        // The Benefit Grid form's "Applies to Rank(s)" multi-select sends
+        // ranks directly — that's the primary path now (leave eligibility
+        // is rank-based, not grade-based). Fall back to resolving via the
+        // grade NAME (e.g. "HOD L1") only when ranks weren't sent, for any
+        // caller still using the older emp_grade-only lookup.
+        $ranks = collect($request->input('ranks', []))->filter(fn ($r) => $r !== null && $r !== '')->values();
 
-        // leave_categories.eligibility is a CSV of numeric RANK ids (matches
-        // FinalSettlementService's own FIND_IN_SET usage and how this table
-        // is seeded) — NOT the Benefit Grid grade tag/id. Translate the
-        // selected grade tag to its mapped rank(s) first, then match on any
-        // of those, so this keeps working once emp_grade stops being a
-        // small fixed config key.
-        $ranks = $gradeLevelId
-            ? ResortBenefitGradeLevelRank::where('resort_id', $this->resort->resort_id)
-                ->where('grade_level_id', $gradeLevelId)
-                ->pluck('rank')
-            : collect();
+        if ($ranks->isEmpty()) {
+            $empGradeName = trim((string) $request->input('emp_grade'));
+            $gradeLevelId = ResortBenefitGradeLevel::where('resort_id', $this->resort->resort_id)
+                ->where('name', $empGradeName)
+                ->value('id');
+
+            // leave_categories.eligibility is a CSV of numeric RANK ids
+            // (matches FinalSettlementService's own FIND_IN_SET usage and
+            // how this table is seeded) — NOT the Benefit Grid grade
+            // tag/id. Translate the selected grade tag to its mapped
+            // rank(s) first, then match on any of those.
+            $ranks = $gradeLevelId
+                ? ResortBenefitGradeLevelRank::where('resort_id', $this->resort->resort_id)
+                    ->where('grade_level_id', $gradeLevelId)
+                    ->pluck('rank')
+                : collect();
+        }
 
         $query = LeaveCategory::where('resort_id', $this->resort->resort_id);
         $query->where(function ($q) use ($ranks) {
