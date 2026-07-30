@@ -8,6 +8,7 @@ use URL;
 use Auth;
 use Carbon\Carbon;
 use App\Helpers\Common;
+use App\Helpers\StorageHelper;
 use App\Models\Employee;
 use Carbon\CarbonInterval;
 use Illuminate\Http\Request;
@@ -63,7 +64,7 @@ class AccommodationDashboardController extends Controller
                                                 {
                                                     $row->RequestedBy=$row->first_name.' '.$row->last_name;
                                                     $row->AssgingedStaff=$row->Assigned_To;
-                                                    $row->Location=$row->BuilidngData->BuildingName . (!empty($row->RoomNo) ? ', Room No - '.$row->RoomNo : '') . (!empty($row->FloorNo) ? ', Floor No - '.$row->FloorNo : '');
+                                                    $row->Location=optional($row->BuilidngData)->BuildingName . (!empty($row->RoomNo) ? ', Room No - '.$row->RoomNo : '') . (!empty($row->FloorNo) ? ', Floor No - '.$row->FloorNo : '');
                                                     $row->Priority = $row->priority;
                                                     $row->Date =$row->created_at->format('d M Y');
                                                     $row->profileImg = Common::getResortUserPicture($row->Parentid);
@@ -368,7 +369,7 @@ class AccommodationDashboardController extends Controller
                                                 ->map(function ($row) {
                                                     $row->RequestedBy=$row->first_name.' '.$row->last_name;
                                                     $row->AssgingedStaff=$row->Assigned_To;
-                                                    $row->Location=$row->BuilidngData->BuildingName . (!empty($row->RoomNo) ? ', Room No - '.$row->RoomNo : '') . (!empty($row->FloorNo) ? ', Floor No - '.$row->FloorNo : '');
+                                                    $row->Location=optional($row->BuilidngData)->BuildingName . (!empty($row->RoomNo) ? ', Room No - '.$row->RoomNo : '') . (!empty($row->FloorNo) ? ', Floor No - '.$row->FloorNo : '');
                                                     $row->Priority = $row->priority;
                                                     $row->Date =$row->created_at->format('d M Y');
                                                     $row->profileImg = Common::getResortUserPicture($row->Parentid);
@@ -904,7 +905,11 @@ class AccommodationDashboardController extends Controller
         $page_header = '<span class="arca-font">'.$dashboardLabel.'</span> Dashboard';
 
         $ResortDepartment= ResortDepartment::where("resort_id",$this->globalUser->resort_id)->get();
-        $currentHod = Auth::guard('resort-admin')->user()->GetEmployee->id;
+        // Unguarded ->GetEmployee->id crashed this whole page (and its
+        // DataTables ajax refresh) for any XCOM/HOD admin account with no
+        // linked employee row — same null-check the constructor already
+        // uses for $this->reporting_to.
+        $currentHod = optional(Auth::guard('resort-admin')->user()->GetEmployee)->id;
         $MaintanaceRequest = MaintanaceRequest::join("employees as t3","t3.id","maintanace_requests.Raised_By")
                                                     ->join("resort_admins as t1","t1.id","t3.Admin_Parent_id")
                                                     ->join("resort_departments as t4","t4.id","t3.Dept_id")
@@ -921,7 +926,7 @@ class AccommodationDashboardController extends Controller
                                                 ->map(function ($row) {
                                                     $row->RequestedBy=$row->first_name.' '.$row->last_name;
                                                     $row->AssgingedStaff=$row->Assigned_To;
-                                                    $row->Location=$row->BuilidngData->BuildingName . (!empty($row->RoomNo) ? ', Room No - '.$row->RoomNo : '') . (!empty($row->FloorNo) ? ', Floor No - '.$row->FloorNo : '');
+                                                    $row->Location=optional($row->BuilidngData)->BuildingName . (!empty($row->RoomNo) ? ', Room No - '.$row->RoomNo : '') . (!empty($row->FloorNo) ? ', Floor No - '.$row->FloorNo : '');
                                                     $row->Priority = $row->priority;
                                                     $row->Date =$row->created_at->format('d M Y');
                                                     $row->profileImg = Common::getResortUserPicture($row->Parentid);
@@ -1023,7 +1028,7 @@ class AccommodationDashboardController extends Controller
 
         }
 
-        $currentHodId = Auth::guard('resort-admin')->user()->GetEmployee->id;
+        $currentHodId = optional(Auth::guard('resort-admin')->user()->GetEmployee)->id;
 
         $Totalnumberofopenrequests= MaintanaceRequest::where('maintanace_requests.resort_id', $this->globalUser->resort_id)
                                                 ->where('maintanace_requests.Assigned_To', $currentHodId)
@@ -1183,8 +1188,14 @@ class AccommodationDashboardController extends Controller
         $row->EscalationTimeOver                            =   ($daysSinceRequest > ($EscalationDay->EscalationDay ?? 0)) ? '#ffb4b4' :null;
         // **Set Profile Image**
         $row->profileImg                                    =   Common::getResortUserPicture($row->Parentid);
-        $row->Image                                         =  URL::asset($row->Image); 
-        $row->Completed_Image                               =  URL::asset($row->Completed_Image); 
+        // Was URL::asset($row->Image) — missing the resort-scoped directory
+        // the file actually lives under (see MaintananceContorller.php),
+        // AND URL::asset only ever produces a working URL for the local
+        // disk, not the configured storage driver (Wasabi in prod). Same
+        // root cause as the maintenance-request details page attachments.
+        $path_path = config('settings.MaintanceRequest') . '/' . $this->resort->resort_id;
+        $row->Image           = $row->Image ? StorageHelper::temporaryUrl($path_path . '/' . $row->Image) : null;
+        $row->Completed_Image = $row->Completed_Image ? StorageHelper::temporaryUrl($path_path . '/' . $row->Completed_Image) : null;
         // **Get Inventory Item Name**
         $row->EffectedAmenity                               =   ucfirst($inventoryItems[$row->item_id] ?? 'N/A');
 
@@ -1322,7 +1333,7 @@ class AccommodationDashboardController extends Controller
                                                     ->map(function ($row) {
                                                         $row->RequestedBy=$row->first_name.' '.$row->last_name;
                                                         $row->AssgingedStaff=$row->Assigned_To;
-                                                        $row->Location=$row->BuilidngData->BuildingName . (!empty($row->RoomNo) ? ', Room No - '.$row->RoomNo : '') . (!empty($row->FloorNo) ? ', Floor No - '.$row->FloorNo : '');
+                                                        $row->Location=optional($row->BuilidngData)->BuildingName . (!empty($row->RoomNo) ? ', Room No - '.$row->RoomNo : '') . (!empty($row->FloorNo) ? ', Floor No - '.$row->FloorNo : '');
                                                         $row->Priority = $row->priority;
                                                         $row->Date =$row->created_at->format('d M Y');
                                                         $row->profileImg = Common::getResortUserPicture($row->Parentid);
