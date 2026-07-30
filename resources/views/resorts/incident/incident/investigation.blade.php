@@ -326,7 +326,7 @@
 
                                                                 @if ($file)
                                                                     @php
-                                                                        $fileUrl = asset($file);
+                                                                        $fileUrl = \App\Helpers\StorageHelper::temporaryUrl($file);
                                                                         $extension = strtolower(pathinfo($file, PATHINFO_EXTENSION));
 
                                                                         switch ($extension) {
@@ -393,7 +393,7 @@
 
                                                                 @if ($file)
                                                                     @php
-                                                                        $fileUrl = asset($file);
+                                                                        $fileUrl = \App\Helpers\StorageHelper::temporaryUrl($file);
                                                                         $extension = strtolower(pathinfo($file, PATHINFO_EXTENSION));
 
                                                                         switch ($extension) {
