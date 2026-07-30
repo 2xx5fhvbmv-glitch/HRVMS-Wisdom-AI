@@ -308,7 +308,8 @@ class EmployeeController extends Controller
             ], $attendanceCols))
             ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
             ->join('resort_positions as t2', 't2.id', '=', 'employees.Position_id')
-            ->where('t1.resort_id', $this->resort->resort_id);
+            ->where('t1.resort_id', $this->resort->resort_id)
+            ->where('employees.status', 'Active');
 
             $employeeRankPosition = Common::getEmployeeRankPosition($this->resort->getEmployee);
             // getEmployeeRankPosition()'s 'position' key is only ever set to
@@ -415,7 +416,8 @@ class EmployeeController extends Controller
         ], $attendanceCols))
         ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
         ->join('resort_positions as t2', 't2.id', '=', 'employees.Position_id')
-        ->where('t1.resort_id', $this->resort->resort_id);
+        ->where('t1.resort_id', $this->resort->resort_id)
+        ->where('employees.status', 'Active');
 
         $employeeRankPosition = Common::getEmployeeRankPosition($this->resort->getEmployee);
         // See the identical fix/comment in index() above — bare
@@ -536,7 +538,8 @@ class EmployeeController extends Controller
             ], $attendanceCols))
             ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
             ->join('resort_positions as t2', 't2.id', '=', 'employees.Position_id')
-            ->where('t1.resort_id', $this->resort->resort_id);
+            ->where('t1.resort_id', $this->resort->resort_id)
+            ->where('employees.status', 'Active');
 
             // Raw rank=3 assumed HR/full-access and everyone else got
             // subordinate-chain-only scoping, with no department-scoped
