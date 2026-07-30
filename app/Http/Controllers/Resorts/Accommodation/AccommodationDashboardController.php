@@ -1193,8 +1193,11 @@ class AccommodationDashboardController extends Controller
         // AND URL::asset only ever produces a working URL for the local
         // disk, not the configured storage driver (Wasabi in prod). Same
         // root cause as the maintenance-request details page attachments.
+        // Image specifically can also be a json_encode(['Filename'=>..,
+        // 'Child_id'=>..]) value from the mobile "raise request" upload —
+        // resolveMaintenanceAttachmentUrl() handles both formats.
         $path_path = config('settings.MaintanceRequest') . '/' . $this->resort->resort_id;
-        $row->Image           = $row->Image ? StorageHelper::temporaryUrl($path_path . '/' . $row->Image) : null;
+        $row->Image           = Common::resolveMaintenanceAttachmentUrl($row->Image, $this->resort->resort_id);
         $row->Completed_Image = $row->Completed_Image ? StorageHelper::temporaryUrl($path_path . '/' . $row->Completed_Image) : null;
         // **Get Inventory Item Name**
         $row->EffectedAmenity                               =   ucfirst($inventoryItems[$row->item_id] ?? 'N/A');

@@ -913,9 +913,12 @@ class MaintananceContorller extends Controller
                                                 </div>';
             if(  $MaintanaceRequest->Image)
             {
-                $path_path = config('settings.MaintanceRequest') . '/' . Auth::guard('resort-admin')->user()->resort->resort_id;
-
-                $MaintanaceRequest->Image = '<img width="150px"; src="'.StorageHelper::temporaryUrl($path_path.'/'.$MaintanaceRequest->Image).'" alt="user">';
+                // Image can be either a plain filename (web upload) or a
+                // json_encode(['Filename'=>..,'Child_id'=>..]) value (mobile
+                // upload via AWSEmployeeFileUpload) — resolveMaintenanceAttachmentUrl()
+                // handles both instead of blindly concatenating a path.
+                $imageUrl = Common::resolveMaintenanceAttachmentUrl($MaintanaceRequest->Image, Auth::guard('resort-admin')->user()->resort->resort_id);
+                $MaintanaceRequest->Image = $imageUrl ? '<img width="150px"; src="'.$imageUrl.'" alt="user">' : null;
             }
             if ($MaintanaceRequest->Video)
             {
@@ -1203,9 +1206,12 @@ class MaintananceContorller extends Controller
                                                 </div>';
             if(  $MaintanaceRequest->Image)
             {
-                $path_path = config('settings.MaintanceRequest') . '/' . Auth::guard('resort-admin')->user()->resort->resort_id;
-
-                $MaintanaceRequest->Image = '<img width="150px"; src="'.StorageHelper::temporaryUrl($path_path.'/'.$MaintanaceRequest->Image).'" alt="user">';
+                // Image can be either a plain filename (web upload) or a
+                // json_encode(['Filename'=>..,'Child_id'=>..]) value (mobile
+                // upload via AWSEmployeeFileUpload) — resolveMaintenanceAttachmentUrl()
+                // handles both instead of blindly concatenating a path.
+                $imageUrl = Common::resolveMaintenanceAttachmentUrl($MaintanaceRequest->Image, Auth::guard('resort-admin')->user()->resort->resort_id);
+                $MaintanaceRequest->Image = $imageUrl ? '<img width="150px"; src="'.$imageUrl.'" alt="user">' : null;
             }
             if ($MaintanaceRequest->Video)
             {
