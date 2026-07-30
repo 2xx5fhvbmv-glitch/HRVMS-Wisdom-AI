@@ -602,13 +602,16 @@ class IncidentController extends Controller
                 $ModuleName
             )));
 
+            // No ctaUrl/ctaLabel — the button pointed at the web portal
+            // login screen, useless for an employee who's meant to respond
+            // via the mobile app's statement flow (see
+            // docs/mobile-incident-statement.md), not by logging into the
+            // portal.
             $this->notifyByEmail(
                 $user,
                 'Statement requested for an incident',
                 $msg,
-                [],
-                route('incident.index'),
-                'Open Incidents'
+                []
             );
 
             // Common::nofitication(type=10) already inserted the
