@@ -500,9 +500,36 @@ class TimeAndAttendanceController extends Controller
                 $timeAttendanceData                         =   array_values($timeAttendanceData);
             }
 
+            // Roster-level, not per-day — a geofence zone is assigned to
+            // the whole duty_rosters row (see myGeofenceZone()), not per
+            // schedule entry, so this is resolved once per response instead
+            // of duplicated onto every row in $timeAttendanceData. Was
+            // entirely absent from this endpoint's response, so the app had
+            // no way to know a roster was geofence-bound at all.
+            $geofence = null;
+            if ($rosterEntry) {
+                $rosterRow = DutyRoster::find($rosterEntry->roster_id);
+                if ($rosterRow && $rosterRow->geofence_zone_id) {
+                    $zone = \App\Models\ResortGeofence::where('id', $rosterRow->geofence_zone_id)
+                        ->where('status', 'active')
+                        ->first();
+                    if ($zone) {
+                        $geofence = [
+                            'id'           => $zone->id,
+                            'name'         => $zone->name,
+                            'color'        => $zone->color,
+                            'shape_type'   => $zone->shape_type,
+                            'coordinates'  => json_decode($zone->coordinates, true),
+                            'grace_period' => $zone->grace_period,
+                        ];
+                    }
+                }
+            }
+
             $response['status']                             =   true;
             $response['message']                            =   'Employee duty roster';
             $response['filter']                             =   $filter;
+            $response['geofence']                           =   $geofence;
             $response['time_attendance']                    =   $timeAttendanceData;
 
             return response()->json($response);
