@@ -90,7 +90,7 @@
                                         </tr>
                                         <tr>
                                             <th>Requested Amount:</th>
-                                            <td>{{ Common::formatCurrency($advance_salary->request_amount, 'USD') }}</td>
+                                            <td>{{ Common::formatRequestCurrency($advance_salary->request_amount, $advance_salary->currency ?: 'USD') }}</td>
                                         </tr>
                                         <tr>
                                             <th>Request Date:</th>
@@ -227,7 +227,7 @@
                                                                            <option selected value="{{$month}}">{{ $month }}</option>
                                                                       </select>
                                                                  </td>
-                                                                 <td>{{ Common::formatCurrency($value->amount, 'USD') }}</td>
+                                                                 <td>{{ Common::formatRequestCurrency($value->amount, $advance_salary->currency ?: 'USD') }}</td>
                                                                  <td>
                                                                       <div class="position-relative">
                                                                            <input type="text" class="form-control" 
@@ -235,7 +235,7 @@
                                                                            <i class="fa-solid fa-percent"></i>
                                                                       </div>
                                                                  </td>
-                                                                 <td>{{ Common::formatCurrency($value->remaining_balance, 'USD') }}</td>
+                                                                 <td>{{ Common::formatRequestCurrency($value->remaining_balance, $advance_salary->currency ?: 'USD') }}</td>
                                                             </tr>
                                                        @endforeach
 
@@ -248,19 +248,19 @@
                                                   <div class="col-lg-12 col-sm-6">
                                                        <div class="bg-white">
                                                             <h6>Total Requested Amount</h6>
-                                                            <strong>{{ Common::formatCurrency($actual_amount, 'USD') }}</strong>
+                                                            <strong>{{ Common::formatRequestCurrency($actual_amount, $advance_salary->currency ?: 'USD') }}</strong>
                                                        </div>
                                                   </div>
                                                   <div class="col-lg-12 col-sm-6">
                                                        <div class="bg-white">
                                                             <h6>Interest</h6>
-                                                            <strong >{{ Common::formatCurrency($total_interest, 'USD') }}</strong>
+                                                            <strong >{{ Common::formatRequestCurrency($total_interest, $advance_salary->currency ?: 'USD') }}</strong>
                                                        </div>
                                                   </div>
                                                   <div class="col-lg-12 col-sm-6">
                                                        <div class="bg-white">
                                                             <h6>Total Repayment Amount</h6>
-                                                            <strong >{{ Common::formatCurrency($total_recovery, 'USD') }}</strong>
+                                                            <strong >{{ Common::formatRequestCurrency($total_recovery, $advance_salary->currency ?: 'USD') }}</strong>
                                                        </div>
                                                   </div>
                                              </div>
@@ -312,19 +312,19 @@
                                                   <div class="col-lg-12 col-sm-6">
                                                   <div class="bg-white">
                                                        <h6>Total Requested Amount</h6>
-                                                       <strong>{{ Common::formatCurrency($advance_salary->request_amount, 'USD') }}</strong>
+                                                       <strong>{{ Common::formatRequestCurrency($advance_salary->request_amount, $advance_salary->currency ?: 'USD') }}</strong>
                                                   </div>
                                                   </div>
                                                   <div class="col-lg-12 col-sm-6">
                                                   <div class="bg-white">
                                                        <h6>Interest</h6>
-                                                       <strong id="interest_amount">{{ Common::GetResortCurrencySymbol() }} 0</strong>
+                                                       <strong id="interest_amount">{{ ($advance_salary->currency ?: 'USD') === 'MVR' ? 'MVR' : '$' }} 0</strong>
                                                   </div>
                                                   </div>
                                                   <div class="col-lg-12 col-sm-6">
                                                   <div class="bg-white">
                                                        <h6>Total Repayment Amount</h6>
-                                                       <strong id="total_amount">{{ Common::formatCurrency($advance_salary->request_amount, 'USD') }}</strong>
+                                                       <strong id="total_amount">{{ Common::formatRequestCurrency($advance_salary->request_amount, $advance_salary->currency ?: 'USD') }}</strong>
                                                   </div>
                                                   </div>
                                              </div>
