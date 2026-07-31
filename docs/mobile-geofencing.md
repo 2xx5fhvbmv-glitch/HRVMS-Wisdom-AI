@@ -53,6 +53,49 @@ resolving for a specific roster, check whether that roster's
 `geofence_zone_id` is a JSON-encoded array string instead of a plain
 integer.
 
+## Duty roster / shift APIs — geofence data (added)
+
+Two endpoints you already call for the roster screen, now covering
+geofence too:
+
+- **`GET timeandattendance/resort-base-shift`** — plain resort-wide shift
+  catalog (`shift_settings`), not tied to any employee or roster. **Does
+  not and cannot carry geofence data** — geofence is assigned at the
+  `duty_rosters` level, not the shift level (`shift_settings` has no
+  geofence column at all). Nothing to change here; don't expect a
+  `geofence` key on this one.
+- **`POST timeandattendance/employee-duty-roster`** — was missing geofence
+  entirely, now returns it as a **top-level** `geofence` key (resolved once
+  per response, not duplicated onto every day-row — a zone is assigned to
+  the whole roster, not per-day):
+
+```json
+{
+  "status": true,
+  "message": "Employee duty roster",
+  "filter": "weekly",
+  "geofence": {
+    "id": 3,
+    "name": "Staff Village",
+    "color": "#FF4444",
+    "shape_type": "circle",
+    "coordinates": {"center": {"lat": 4.1755, "lng": 73.5093}, "radius": 150},
+    "grace_period": 10
+  },
+  "time_attendance": [ ... ]
+}
+```
+`geofence` is `null` (key still present) when the employee's current roster
+has no zone assigned, or the assigned zone is `paused`. Same shape as
+`my-geofence-zone`'s `geofence` object minus `within` (this endpoint isn't
+given a location to check against — use `my-geofence-zone` for that, or
+`geofence-event`/`manual-check-in` at actual punch time).
+
+Resolution mirrors `my-geofence-zone`, but keys off the **specific roster
+row** this response is already built from (`DutyRosterEntry.roster_id`),
+not "employee's latest roster" — slightly more precise when an employee has
+multiple roster template rows.
+
 ## Manual check-in — `POST timeandattendance/manual-check-in`
 
 Request:
