@@ -767,7 +767,7 @@ class ResortModulePagesSeeder extends Seeder
               "place_order"     => "10"
             ],
            [
-              "page_name"       => "Salary Advance",
+              "page_name"       => "Salary & Loan Advance",
               "Module_Id"       => "4",
               "internal_route"  => "people.advance-salary.index",
               "TypeOfPage"      => "InsideOfMenu",

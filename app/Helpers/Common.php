@@ -5434,6 +5434,28 @@ class Common
     }
 
     /**
+     * Format an amount in whatever currency the REQUEST ITSELF was made in
+     * (e.g. payroll_advance.currency, where the employee explicitly picked
+     * MVR or USD as the unit they want the advance paid out in) — NO
+     * conversion, NO resort display-currency substitution. This is
+     * different from formatCurrency(): that helper assumes the amount is
+     * stored in a fixed source currency and converts it to whatever the
+     * resort displays; here the amount genuinely IS denominated in the
+     * requester's chosen currency, so showing anything other than that
+     * literal currency's own symbol would misrepresent the amount (128
+     * MVR shown as "$128" reads as $128, not the ~$8 it's actually worth).
+     */
+    public static function formatRequestCurrency($amount, $currency = 'USD', $decimals = 2)
+    {
+        if ($amount === null || $amount === '' || $amount === false) {
+            return '-';
+        }
+        $currency = strtoupper((string) $currency) === 'MVR' ? 'MVR' : 'USD';
+        $symbol = $currency === 'MVR' ? 'MVR' : '$';
+        return $symbol . ' ' . number_format((float) $amount, $decimals);
+    }
+
+    /**
      * Constrain a query so a nationality column matches a given nationality
      * value even when one side is a demonym and the other a country name —
      * employees store "Indian"/"Russian" while the visa deposit-rate config

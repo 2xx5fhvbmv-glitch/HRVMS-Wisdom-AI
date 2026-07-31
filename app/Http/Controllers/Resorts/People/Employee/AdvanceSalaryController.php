@@ -116,7 +116,13 @@ class AdvanceSalaryController extends Controller
                     return $payroll_data->employee->position->position_title ?? 'N/A';
                 })
                 ->editColumn('request_amount', function ($payroll_data) {
-                    return Common::formatCurrency($payroll_data->request_amount, 'USD');
+                    // The employee picks MVR or USD as the currency they
+                    // want the advance IN (payroll_advance.currency) — this
+                    // is not a "stored in USD, display in resort currency"
+                    // value, so it must show its own literal currency, not
+                    // run through formatCurrency()'s resort-display
+                    // conversion (which always hardcoded '$' here).
+                    return Common::formatRequestCurrency($payroll_data->request_amount, $payroll_data->currency ?: 'USD');
                 })
                 ->addColumn('department', function ($payroll_data) {
                     return $payroll_data->employee->department->name ?? 'N/A';
