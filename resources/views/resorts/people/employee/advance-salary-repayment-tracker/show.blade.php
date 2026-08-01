@@ -160,17 +160,19 @@
                              <thead>
                                 <tr>
                                     <th>Month/Date</th>
+                                    <th>Principal</th>
                                     <th>Schedule Amount</th>
                                     <th>Remark</th>
                                     <th>Action</th>
                                 </tr>
-                            </thead> 
+                            </thead>
                             <tbody>
 
                                @foreach($payrollAdvance->payrollRecoverySchedule as $schedule)
-                                
+
                                 <tr>
                                     <td>{{Carbon\Carbon::parse($schedule->repayment_date)->format('F Y')}}</td>
+                                    <td>{{ Common::formatRequestCurrency($schedule->amount - ($schedule->interest_amount ?? 0), $payrollAdvance->currency ?: 'USD') }}</td>
                                     <td>{{ Common::formatRequestCurrency($schedule->amount, $payrollAdvance->currency ?: 'USD') }}</td>
                                     <td>{{$schedule->remark ?? ''}}</td>
                                     <td><a href="javascript:void(0);" class="a-link me-md-2 me-1 edit-row-btn @if(Common::checkRouteWisePermission('people.advance-salary-repayment-tracker.index',config('settings.resort_permissions.edit')) == false) d-none @endif" data-id="{{$schedule->id}}">Edit</a>
@@ -178,7 +180,7 @@
                                     </td>
                                 </tr>
                                @endforeach
-                              
+
                                 @php
                                     $scheduleCurrency = $payrollAdvance->currency ?: 'USD';
                                     $scheduleInterestTotal = $payrollAdvance->payrollRecoverySchedule->sum('interest_amount');
@@ -190,15 +192,18 @@
                                     <th>{!! Common::formatRequestCurrency($schedulePrincipalTotal, $scheduleCurrency) !!}</th>
                                     <th></th>
                                     <th></th>
+                                    <th></th>
                                 </tr>
                                 <tr>
                                     <th>Interest Total</th>
+                                    <th></th>
                                     <th>{!! Common::formatRequestCurrency($scheduleInterestTotal, $scheduleCurrency) !!}</th>
                                     <th></th>
                                     <th></th>
                                 </tr>
                                 <tr>
                                     <th>Total</th>
+                                    <th></th>
                                     <th>{!! Common::formatRequestCurrency($scheduleAmountTotal, $scheduleCurrency) !!}</th>
                                     <th></th>
                                     <th></th>
