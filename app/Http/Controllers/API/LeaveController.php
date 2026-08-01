@@ -2627,6 +2627,7 @@ class LeaveController extends Controller
     private function getUpcomingLeaveRequest($resort_id, $emp_id, $available_rank,$emp_rank)
     {
         $isHOD                                          = ($available_rank === "HOD");
+        $leaveRequest                                   =   collect();
 
         if($emp_rank == 1 || $emp_rank == 3 || $emp_rank == 8) {
 
@@ -2696,7 +2697,7 @@ class LeaveController extends Controller
         }
 
         // Group data by 'id'
-        $finalData                                      =   $leaveRequest->groupBy('id')->map(function ($group) {
+        $finalData                                      =   $leaveRequest->groupBy('id')->map(function ($group) use ($emp_id) {
             // Use the first record as the base
             $base                                       =   $group->first();
 

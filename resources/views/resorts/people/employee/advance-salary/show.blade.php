@@ -465,8 +465,8 @@ $(document).on('keyup', '.interest-input', function () {
           },
           success: function (response) {
                $('.table-repaySchedPeopleEmp tbody').html(response.html);
-               $('#interest_amount').text(currencySymbol + ' ' + response.total_interest);
-               $('#total_amount').text(currencySymbol + ' ' + response.total_amount);
+               $('#interest_amount').text(currencySymbol + ' ' + Number(response.total_interest).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
+               $('#total_amount').text(currencySymbol + ' ' + Number(response.total_amount).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2}));
 
           },
           error: function (xhr) {
