@@ -4561,6 +4561,23 @@ class Common
     }
 
     /**
+     * duty_rosters.geofence_zone_id holds a JSON-encoded array of zone ids
+     * (Assign Geo-Fence Zone is a multi-select checkbox list) — resolves it
+     * to the actual active ResortGeofence rows. Falls back to treating the
+     * raw value as a single legacy int id for any row saved before this was
+     * stored as JSON.
+     */
+    public static function resolveDutyRosterGeofences($rawValue)
+    {
+        if (empty($rawValue)) return collect();
+        $ids = json_decode($rawValue, true);
+        if (!is_array($ids)) $ids = [(int) $rawValue];
+        $ids = array_filter($ids);
+        if (empty($ids)) return collect();
+        return \App\Models\ResortGeofence::whereIn('id', $ids)->where('status', 'active')->get();
+    }
+
+    /**
      * Resolves which Benefit Grid grade a rank currently belongs to, for
      * this resort. Used to be a hardcoded rank -> fixed-key switch (1/2/4/5/6),
      * which broke the moment Benefit Grid grades became resort-customizable

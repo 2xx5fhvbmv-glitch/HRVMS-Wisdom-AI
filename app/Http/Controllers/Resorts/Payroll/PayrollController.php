@@ -1078,10 +1078,15 @@ class PayrollController extends Controller
                 $staffshoptAmount = $deduction->staff_shop;
 
                 if ($advanceLoanAmount > 0) {
+                    // Match fetchAdvanceRecovery()'s filter exactly (status='Pending',
+                    // same date window) — that's what the advance_loan figure was
+                    // summed from, so every row it summed must close out here, not
+                    // just one. A prior limit(1) left a second same-period
+                    // installment (e.g. loan + separate salary advance) stuck
+                    // Pending forever even though it was already deducted.
                     PayrollRecoverySchedule::where('employee_id', $employeeId)
-                        ->where('status', 'pending')
+                        ->where('status', 'Pending')
                         ->whereBetween('repayment_date', [$payroll->start_date, $payroll->end_date])
-                        ->limit(1) // in case of partial deduction logic
                         ->update([
                             'status' => 'Paid',
                         ]);

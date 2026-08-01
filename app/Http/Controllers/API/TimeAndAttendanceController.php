@@ -72,19 +72,21 @@ class TimeAndAttendanceController extends Controller
         $result['lng'] = (float) $lng;
         $result['accuracy'] = $accuracy !== null ? (float) $accuracy : null;
 
-        $geofenceZoneId = $rosterData->geofence_zone_id ?? null;
-        if (!$geofenceZoneId) return $result;
+        $zones = Common::resolveDutyRosterGeofences($rosterData->geofence_zone_id ?? null);
+        if ($zones->isEmpty()) return $result;
 
-        $geofence = \App\Models\ResortGeofence::where('id', $geofenceZoneId)
-            ->where('status', 'active')
-            ->first();
-        if (!$geofence) return $result;
-
-        $result['within'] = Common::isWithinGeofence($result['lat'], $result['lng'], $geofence);
-        // Was already fetching this row for the within-bounds check but
-        // only ever returning the boolean — the app had no real location
-        // name to show and fell back to a hardcoded "Office" label.
-        $result['name'] = $geofence->name;
+        // Multiple zones can be assigned to one roster — the punch only
+        // needs to fall inside any one of them.
+        foreach ($zones as $zone) {
+            $within = Common::isWithinGeofence($result['lat'], $result['lng'], $zone);
+            if ($within === true) {
+                $result['within'] = true;
+                $result['name'] = $zone->name;
+                return $result;
+            }
+        }
+        $result['within'] = false;
+        $result['name'] = $zones->first()->name;
         return $result;
     }
 
@@ -506,15 +508,15 @@ class TimeAndAttendanceController extends Controller
             // of duplicated onto every row in $timeAttendanceData. Was
             // entirely absent from this endpoint's response, so the app had
             // no way to know a roster was geofence-bound at all.
-            $geofence = null;
+            // A roster can have more than one zone assigned (Assign
+            // Geo-Fence Zone is a multi-select) — returns a list, empty
+            // when none configured.
+            $geofence = [];
             if ($rosterEntry) {
                 $rosterRow = DutyRoster::find($rosterEntry->roster_id);
-                if ($rosterRow && $rosterRow->geofence_zone_id) {
-                    $zone = \App\Models\ResortGeofence::where('id', $rosterRow->geofence_zone_id)
-                        ->where('status', 'active')
-                        ->first();
-                    if ($zone) {
-                        $geofence = [
+                if ($rosterRow) {
+                    foreach (Common::resolveDutyRosterGeofences($rosterRow->geofence_zone_id) as $zone) {
+                        $geofence[] = [
                             'id'           => $zone->id,
                             'name'         => $zone->name,
                             'color'        => $zone->color,
@@ -2156,43 +2158,35 @@ class TimeAndAttendanceController extends Controller
                 ->orderByDesc('id')
                 ->first();
 
-            if (!$rosterData || !$rosterData->geofence_zone_id) {
+            $zones = $rosterData ? Common::resolveDutyRosterGeofences($rosterData->geofence_zone_id) : collect();
+
+            if ($zones->isEmpty()) {
                 return response()->json([
                     'success'  => true,
                     'message'  => 'No geofence zone configured for your duty roster.',
-                    'geofence' => null,
+                    'geofence' => [],
                 ]);
             }
 
-            $geofence = \App\Models\ResortGeofence::where('id', $rosterData->geofence_zone_id)
-                ->where('status', 'active')
-                ->first();
-
-            if (!$geofence) {
-                return response()->json([
-                    'success'  => true,
-                    'message'  => 'Assigned geofence zone is not active.',
-                    'geofence' => null,
-                ]);
-            }
-
-            $within = null;
-            if ($request->filled('latitude') && $request->filled('longitude')) {
-                $within = Common::isWithinGeofence((float) $request->latitude, (float) $request->longitude, $geofence);
-            }
+            $hasCoords = $request->filled('latitude') && $request->filled('longitude');
+            $geofence = $zones->map(function ($zone) use ($request, $hasCoords) {
+                return [
+                    'id'           => $zone->id,
+                    'name'         => $zone->name,
+                    'color'        => $zone->color,
+                    'shape_type'   => $zone->shape_type,
+                    'coordinates'  => json_decode($zone->coordinates, true),
+                    'grace_period' => $zone->grace_period,
+                    'within'       => $hasCoords
+                        ? Common::isWithinGeofence((float) $request->latitude, (float) $request->longitude, $zone)
+                        : null,
+                ];
+            })->values();
 
             return response()->json([
                 'success'  => true,
                 'message'  => 'Geofence zone fetched successfully.',
-                'geofence' => [
-                    'id'           => $geofence->id,
-                    'name'         => $geofence->name,
-                    'color'        => $geofence->color,
-                    'shape_type'   => $geofence->shape_type,
-                    'coordinates'  => json_decode($geofence->coordinates, true),
-                    'grace_period' => $geofence->grace_period,
-                    'within'       => $within,
-                ],
+                'geofence' => $geofence,
             ]);
         } catch (\Exception $e) {
             \Log::emergency("File: " . $e->getFile());

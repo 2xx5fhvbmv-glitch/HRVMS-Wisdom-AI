@@ -222,6 +222,57 @@ class RequestController extends Controller
                     );
                 }
 
+                // Advance Salary (loan) requests also need Finance and XCOM
+                // in the loop up front — approval later routes through them
+                // anyway, so they should see the request the moment it lands,
+                // not only at their own approval step.
+                if ($request->request_type === 'Payroll Advance') {
+                    $financeEmployeeIds = Common::getResortFinanceEmployeeIds($this->resort_id);
+                    if (!empty($financeEmployeeIds)) {
+                        Common::sendMobileNotification(
+                            $this->resort_id,
+                            2,
+                            null,
+                            null,
+                            'Request',
+                            'An advance salary request has been sent by ' . $this->user->first_name . ' ' . $this->user->last_name . '.',
+                            'Request',
+                            $financeEmployeeIds,
+                            $PayrollAdvance->id,
+                            false,
+                            'advance-salary-request-finance',
+                        );
+                    }
+
+                    // Advance Salary approval chain is HR -> Finance -> GM
+                    // (see AdvanceSalaryController::updateStatus / the
+                    // rank_status column on the resort admin list) — GM is
+                    // rank=8, not "XCOM".
+                    $gmEmployeeIds = \App\Models\Employee::where('resort_id', $this->resort_id)
+                        ->where('rank', 8)
+                        ->where(function ($q) {
+                            $q->whereNull('status')->orWhere('status', 'Active')->orWhere('status', 'Probationary');
+                        })
+                        ->pluck('id')
+                        ->map(fn($v) => (int) $v)
+                        ->all();
+                    if (!empty($gmEmployeeIds)) {
+                        Common::sendMobileNotification(
+                            $this->resort_id,
+                            2,
+                            null,
+                            null,
+                            'Request',
+                            'An advance salary request has been sent by ' . $this->user->first_name . ' ' . $this->user->last_name . '.',
+                            'Request',
+                            $gmEmployeeIds,
+                            $PayrollAdvance->id,
+                            false,
+                            'advance-salary-request-gm',
+                        );
+                    }
+                }
+
             DB::commit();
             
             if (!$PayrollAdvance) {
