@@ -420,6 +420,22 @@ class FileManagementController extends Controller
             );
         }
 
+        // HR got notified above, but the uploader never got any
+        // confirmation their own file actually went through.
+        Common::sendMobileNotification(
+            $resortId,
+            2,
+            null,
+            null,
+            'File Uploaded',
+            'Your document has been uploaded successfully.',
+            'File Management',
+            [$emp->id],
+            $fileRecord->id,
+            false,
+            'file-management-upload',
+        );
+
         return response()->json([
             'success' => true,
             'message' => 'File uploaded successfully.',

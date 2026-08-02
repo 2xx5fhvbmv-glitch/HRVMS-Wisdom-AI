@@ -511,8 +511,7 @@ class EmployeeController extends Controller
             }
 
            DB::beginTransaction();
-            $resortAdmin = ResortAdmin::create([
-                'resort_id' => $this->resort->resort_id,
+            $resortAdminData = [
                 'first_name' => $request->employeeF_name,
                 'middle_name' => $request->employeeM_name,
                 'last_name' => $request->employeeL_name,
@@ -525,7 +524,7 @@ class EmployeeController extends Controller
                 'state' => $request->parmanent_state,
                 'zip' => $request->parmanent_postal_code,
                 'country' => $request->parmanent_country,
-            ]);
+            ];
 
             $dob = Carbon::createFromFormat('d/m/Y', $request->date_birth)->format('Y-m-d');
             $joining_date = Carbon::createFromFormat('d/m/Y', $request->joining_date)->format('Y-m-d');
@@ -591,10 +590,8 @@ class EmployeeController extends Controller
                     ? $request->vacancy_division_id
                     : ($vacancy->division ?? null));
 
-            $employee = Employee::create([
+            $employeeData = [
                 'resort_id' => $this->resort->resort_id,
-                'Emp_id' => $request->employee_id,
-                'Admin_Parent_id' => $resortAdmin->id,
                 'title' => $request->gender =='male'? 'Mr.' : 'Ms.',
                 'Dept_id'=> $deptId,
                 'Section_id' => $request->section,
@@ -650,16 +647,12 @@ class EmployeeController extends Controller
                 'ewt_status' => $request->ewt_status ? 'yes' : 'no',
                 'pension' => $request->pension ?? null,
                 'benefit_grid_level' => $request->benefit_grid_level ?: null,
-            ]);
+            ];
 
-            $fileManagement = FilemangementSystem::where('resort_id', $this->resort->resort_id)->where('Folder_Name',$employee->Emp_id)->where('Folder_Type', 'categorized')->first();
-
-            if(!$fileManagement)
-            {
-                $fileManagement = Common::createFolderByName($resortAdmin->resort_id, $employee->Emp_id, 'categorized');
-            }
-
-            $folder_name = $fileManagement->Folder_Name;
+            $profile = Common::persistEmployeeProfile($resortAdminData, $employeeData, $this->resort->resort_id, null);
+            $resortAdmin = $profile['resortAdmin'];
+            $employee = $profile['employee'];
+            $folder_name = $employee->Emp_id;
 
             if($request->hasFile('cv')){
                 $cv = $request->file('cv');

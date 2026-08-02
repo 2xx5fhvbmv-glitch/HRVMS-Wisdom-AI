@@ -11,11 +11,11 @@ use App\Models\ResortDepartment;
 use App\Models\ResortPosition;
 use Validator;
 use Auth;
-use App\Imports\EmployeeImport;
 use App\Jobs\ConsolidateBudgetImportJob;
 use App\Helpers\Common;
 use App\Exports\ExportEmployees;
 use Maatwebsite\Excel\Facades\Excel;
+use App\Models\ImportHistory;
 
 use App\Jobs\ImportEmployeesJob;
 class EmployeeController extends Controller
@@ -164,7 +164,7 @@ class EmployeeController extends Controller
             return Excel::download(new ExportEmployees, 'ResortDepartmentAndPostionsList.xlsx');
 
     }
-    public function ImportEmployee(Request $request)    
+    public function ImportEmployee(Request $request)
     {
         $validator = Validator::make($request->all(), [
             'Employeefile' => 'required|file|mimes:xls,xlsx', // Accept only Excel files up to 5MB
@@ -173,53 +173,67 @@ class EmployeeController extends Controller
             'Employeefile.file' => 'The uploaded file must be a valid file.',
             'Employeefile.mimes' => 'The file must be an Excel sheet (xls or xlsx).',
         ]);
-       
+
         if ($validator->fails()) {
             return response()->json(['success' => false, 'msg' => $validator->errors()->first()], 422);
         }
-
-        session()->forget('import_errors');
 
         if (!$request->hasFile('Employeefile')) {
             return response()->json(['success' => false, 'msg' => 'No file uploaded'], 422);
         }
 
-        // Store file locally (storage/app/imports) with explicit disk specification
-        $relativePath = $request->file('Employeefile')->store('imports', 'local');
+        $file = $request->file('Employeefile');
 
-        // Get full path
+        // Store file locally (storage/app/imports) with explicit disk specification
+        $relativePath = $file->store('imports', 'local');
         $fullPath = storage_path('app/' . $relativePath);
-        
-        // Check if file was actually stored
+
         if (!file_exists($fullPath)) {
             return response()->json(['success' => false, 'msg' => 'Failed to store uploaded file'], 500);
         }
 
-        try {
-            // Import using full path
-            $import = new EmployeeImport();
-            Excel::import($import, $fullPath);
+        $admin = Auth::guard('resort-admin')->user();
 
-            $importErrors = session('import_errors');
+        $history = ImportHistory::create([
+            'resort_id' => $admin->resort_id,
+            'module' => 'employee',
+            'file_name' => $file->getClientOriginalName(),
+            'status' => 'queued',
+            'created_by' => $admin->id,
+        ]);
 
-            if (!empty($importErrors)) {
-                return response()->json([
-                    'success' => false,
-                    'msg' => 'Some rows could not be imported',
-                    'errors' => $importErrors
-                ], 422);
-            }
+        ImportEmployeesJob::dispatch($history->id, $fullPath, $admin->resort_id, $admin->id);
 
-            return response()->json([
-                'success' => true,
-                'msg' => "{$import->created} employee(s) created, {$import->updated} updated."
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'msg' => 'Import failed: ' . $e->getMessage()
-            ], 500);
+        return response()->json([
+            'processing' => true,
+            'history_id' => $history->id,
+            'status_url' => route('resort.import.status', $history->id),
+        ]);
+    }
+
+    /**
+     * Polled by the upload page while a queued import runs — mirrors the
+     * existing Visa\FetchDataAiController::syncStatus() pattern.
+     */
+    public function importStatus($historyId)
+    {
+        $admin = Auth::guard('resort-admin')->user();
+
+        $history = ImportHistory::where('id', $historyId)
+            ->where('resort_id', $admin->resort_id)
+            ->first();
+
+        if (!$history) {
+            return response()->json(['success' => false, 'msg' => 'Import not found.'], 404);
         }
+
+        return response()->json([
+            'status' => $history->status,
+            'created_count' => $history->created_count,
+            'updated_count' => $history->updated_count,
+            'error_report' => $history->error_report ?? [],
+            'failure_message' => $history->failure_message,
+        ]);
     }
 
 
