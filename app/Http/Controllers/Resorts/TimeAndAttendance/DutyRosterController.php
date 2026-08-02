@@ -733,6 +733,30 @@ class DutyRosterController extends Controller
 
     }
 
+    /**
+     * Re-assign the geofence zone(s) on an existing duty_rosters row — the
+     * only way to change it today is re-creating the roster from scratch;
+     * this lets HR/HOD change it from view-duty-roster the same way they
+     * already change Shift/Overtime.
+     */
+    public function UpdateDutyRosterGeofence(Request $request)
+    {
+        $request->validate([
+            'roster_id' => 'required|integer|exists:duty_rosters,id',
+            'geofence_zone_ids' => 'nullable|array',
+            'geofence_zone_ids.*' => 'integer|exists:resort_geofences,id',
+        ]);
+
+        try {
+            DutyRoster::where('id', $request->roster_id)->update([
+                'geofence_zone_id' => !empty($request->geofence_zone_ids) ? json_encode($request->geofence_zone_ids) : null,
+            ]);
+            return response()->json(['success' => true, 'message' => 'Geofence zone updated successfully']);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
     public function DutyRosterSearch(Request $request)
     {
         $searchTerm = $request->input('search');
@@ -1739,8 +1763,10 @@ class DutyRosterController extends Controller
         // Get public holidays (including Fridays)
         $publicHolidays = $this->getPublicHolidays($resort_id, $startOfMonth->format('Y-m-d'), $endOfMonth->format('Y-m-d'));
 
+        $geofenceZones = \App\Models\ResortGeofence::where('resort_id', $resort_id)->where('status', 'active')->orderBy('name')->get();
+
         $page_title = 'View Duty Roster';
-        return view('resorts.timeandattendance.dutyroster.ViewDutyRoster',compact('headers','WeekstartDate','WeekendDate','monthwiseheaders','headers','Rosterdata','groupedRosterData','resort_id','ResortPosition','ResortDepartment','employees','ShiftSettings','startOfMonth','endOfMonth','page_title','LeaveCategory','publicHolidays'));
+        return view('resorts.timeandattendance.dutyroster.ViewDutyRoster',compact('headers','WeekstartDate','WeekendDate','monthwiseheaders','headers','Rosterdata','groupedRosterData','resort_id','ResortPosition','ResortDepartment','employees','ShiftSettings','startOfMonth','endOfMonth','page_title','LeaveCategory','publicHolidays','geofenceZones'));
 
     }
 

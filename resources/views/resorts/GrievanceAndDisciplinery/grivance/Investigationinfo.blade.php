@@ -120,8 +120,7 @@
                                         @endif
                                     </h6>
 
-                                    @if(in_array($auth_id, $GrivanceKeys) || 
-                                        (!in_array($auth_id, $GrivanceKeys) && $Grivance_Parent->Grivance_Submission_Type != "Yes" && $Grivance_Parent->Grivance_Submission_Type != "No"))
+                                    @if($canViewIdentity)
 
                                             <div class="d-flex align-items-center mb-md-2 mb-1">
                                                 <div class="img-circle me-2">

@@ -381,6 +381,7 @@ use Illuminate\Support\Facades\Route;
 		Route::post('grievance/grievance-store', [App\Http\Controllers\API\GrievanceController::class, 'GrievanceStore']);
 		Route::post('grievance/informal-resolution', [App\Http\Controllers\API\GrievanceController::class, 'InformalResolution']);
 		Route::get('grievance/my-grievances', [App\Http\Controllers\API\GrievanceController::class, 'myGrievances']);
+		Route::post('grievance/identity-disclosure-respond', [App\Http\Controllers\API\GrievanceController::class, 'respondIdentityDisclosure']);
 		Route::get('grievance/{id}', [App\Http\Controllers\API\GrievanceController::class, 'grievanceDetail']);
 
 
