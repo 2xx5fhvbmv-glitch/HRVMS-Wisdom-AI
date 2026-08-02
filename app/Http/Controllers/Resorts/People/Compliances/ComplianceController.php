@@ -41,6 +41,14 @@ use App\Models\ResortHoliday;
 class ComplianceController extends Controller
 {
     public $resort;
+
+    // Shared "AI / magic" sparkle glyph — identical markup to the
+    // resorts.renderfiles.ai_spark Blade partial used in Blade-rendered
+    // pages. This copy exists because DataTables cells here are built as
+    // raw PHP strings, not Blade views, so the same fixed SVG literal is
+    // duplicated once here rather than re-rendering a view per row.
+    const AI_SPARK_SVG = '<svg class="ai-spark" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 2c.4 3.4 1.6 4.6 5 5-3.4.4-4.6 1.6-5 5-.4-3.4-1.6-4.6-5-5 3.4-.4 4.6-1.6 5-5z"/><path d="M19 13c.2 1.7.8 2.3 2.5 2.5-1.7.2-2.3.8-2.5 2.5-.2-1.7-.8-2.3-2.5-2.5 1.7-.2 2.3-.8 2.5-2.5z"/></svg>';
+
     public function __construct()
     {
         $this->resort = Auth::guard('resort-admin')->user();
@@ -540,10 +548,53 @@ class ComplianceController extends Controller
      public function index(Request $request){
           $page_title = 'Compliance';
         $resort = $this->resort;
+        $resortId = $resort->resort_id;
             $positions = ResortPosition::where('resort_id', $resort->resort_id)->where('status', 'active')->get();
                $departments = ResortDepartment::where('resort_id', $resort->resort_id)->where('status', 'active')->get();
-            return view('resorts.people.compliance.list', compact('positions', 'departments','page_title'));
 
+          // Summary strip + filter chips — cheap aggregate counts over the
+          // same "active breach" scope as list()'s base query (resort,
+          // Dismissal_status=Pending, employee belongs to this resort).
+          // Presentation-only: no change to how breaches are detected or
+          // generated, just grouped counts for the header cards/chips.
+          $base = $this->complianceBaseQuery($resortId);
+          $moduleCounts = (clone $base)->select('module_name', DB::raw('count(*) as cnt'))
+               ->groupBy('module_name')->pluck('cnt', 'module_name');
+          $ruleCounts = (clone $base)->select('compliance_breached_name', DB::raw('count(*) as cnt'))
+               ->groupBy('compliance_breached_name')->pluck('cnt', 'compliance_breached_name');
+          $totalCount        = (clone $base)->count();
+          $criticalCount     = (clone $base)->where('severity_ai', 'Critical')->count();
+          $employeesAffected = (clone $base)->distinct()->count('employee_id');
+
+          $complianceSummary = [
+               'critical'  => $criticalCount,
+               'employees' => $employeesAffected,
+               'rules'     => $ruleCounts->count(),
+               'modules'   => $moduleCounts->count(),
+          ];
+          $complianceChips = [
+               'all'      => $totalCount,
+               'critical' => $criticalCount,
+               'rules'    => $ruleCounts,
+               'modules'  => $moduleCounts,
+          ];
+
+            return view('resorts.people.compliance.list', compact('positions', 'departments', 'page_title', 'complianceSummary', 'complianceChips'));
+
+     }
+
+     /**
+      * Base "active breach" scope shared by index()'s summary/chip counts
+      * and list()'s table query: this resort, not yet dismissed, employee
+      * verified to belong to the same resort (cross-resort data guard).
+      */
+     private function complianceBaseQuery($resortId)
+     {
+          return Compliance::where('resort_id', $resortId)
+               ->where('Dismissal_status', 'Pending')
+               ->whereHas('employee', function ($q) use ($resortId) {
+                    $q->where('resort_id', $resortId)->whereHas('resortAdmin');
+               });
      }
 
      // List Page
@@ -561,7 +612,7 @@ class ComplianceController extends Controller
           // resort's employee — the reported "other resort data" leak.
           $query = Compliance::where('resort_id', $resortId)->with([
                'employee' => function ($q) use ($resortId) {
-                    $q->where('resort_id', $resortId)->with('resortAdmin');
+                    $q->where('resort_id', $resortId)->with(['resortAdmin', 'position']);
                },
           ]);
           if ($request->searchTerm != null) {
@@ -586,6 +637,14 @@ class ComplianceController extends Controller
 
           if ($request->compliance_breached_name != null) {
                $query->where('compliance_breached_name', $request->compliance_breached_name);
+          }
+
+          // Filter chip: "Critical" — same severity_ai field the
+          // Description column badges off of. Presentation filter only,
+          // mirrors the existing status/module_name/compliance_breached_name
+          // params above.
+          if ($request->severity != null) {
+               $query->where('severity_ai', $request->severity);
           }
           // whereHas restricts the result to rows whose employee belongs to
           // THIS resort. Belt-and-braces with the eager-load constraint
@@ -617,6 +676,18 @@ class ComplianceController extends Controller
                }
                return datatables()->of($compliances)
                     ->addIndexColumn()  // This adds the DT_RowIndex column
+                    // Rule name + severity badge together — severity reads
+                    // as a property of the rule that fired, not something
+                    // buried inside the Description cell.
+                    ->editColumn('compliance_breached_name', function ($compliance) {
+                         $sev = trim((string) ($compliance->severity_ai ?? ''));
+                         $html = '<div class="cc-rule-name">' . e($compliance->compliance_breached_name) . '</div>';
+                         if ($sev !== '') {
+                              $badgeClass = ($sev === 'Critical') ? 'cc-badge--crit' : 'cc-badge--warn';
+                              $html .= '<span class="cc-badge cc-rule-badge ' . $badgeClass . '">' . e($sev) . '</span>';
+                         }
+                         return $html;
+                    })
                     ->addColumn('employee_id', function ($compliance) {
                          return $compliance->employee ? $compliance->employee->Emp_id : '-';
                     })
@@ -625,93 +696,126 @@ class ComplianceController extends Controller
                               return '<span class="text-danger">-</span>';
                          }
                          $name = $compliance->employee->resortAdmin->full_name ?? 'N/A';
-                         $profileImage = Common::getResortUserPicture($compliance->employee->Admin_Parent_id);
+
+                         // Real profile photo when the employee has one;
+                         // initials avatar as the fallback rather than a
+                         // generic placeholder image.
+                         $photo = Common::getResortUserPicture($compliance->employee->Admin_Parent_id);
+                         $hasRealPhoto = $photo !== url(config('settings.default_picture'));
+
+                         if ($hasRealPhoto) {
+                              $avatarHtml = '<img src="' . e($photo) . '" alt="' . e($name) . '">';
+                         } else {
+                              $initials = collect(explode(' ', trim($name)))
+                                   ->filter()
+                                   ->map(fn($p) => mb_strtoupper(mb_substr($p, 0, 1)))
+                                   ->take(2)->implode('');
+                              $avatarHtml = e($initials ?: '?');
+                         }
+
+                         $roleLine = trim((string) optional($compliance->employee->position)->position_title);
+
                          return '
-                         <div class="tableUser-block">
-                              <div class="img-circle">
-                                   <img src="'.e($profileImage).'" alt="user">
-                              </div>
-                              <span class="userApplicants-btn">'.e($name).'</span>
+                         <div class="cc-emp">
+                              <div class="cc-emp-avatar">' . $avatarHtml . '</div>
+                              <div class="cc-emp-info">
+                                   <div class="cc-emp-name">' . e($name) . '</div>'
+                                   . ($roleLine !== '' ? '<div class="cc-emp-role">' . e($roleLine) . '</div>' : '') .
+                              '</div>
                          </div>';
                     })
                     ->addColumn('reported_on', function ($compliance) {
-                         // Human-readable: "09 Jun 2026 14:32". Drops seconds
-                         // (no operational value on this screen) and uses a
-                         // 3-letter month so the column never wraps.
-                         return $compliance->reported_on ? Carbon::parse($compliance->reported_on)->format('d M Y H:i') : 'N/A';
+                         if (!$compliance->reported_on) {
+                              return '<span class="cc-muted">N/A</span>';
+                         }
+                         $c = Carbon::parse($compliance->reported_on);
+                         return '<div class="cc-reported"><div>' . $c->format('d M Y') . '</div><div class="cc-muted">' . $c->format('H:i') . '</div></div>';
                     })
                     // Render the description column with the AI enrichment
-                    // when present: severity badge + AI explanation + the
-                    // suggested remediation. Falls back to the original
-                    // hardcoded `description` whenever the AI field is
-                    // empty (rule fired but enrichment failed, or the row
-                    // pre-dates the migration). Same column, richer
-                    // payload — the existing DataTables binding doesn't
-                    // need to change.
+                    // when present: AI explanation (statute reference
+                    // bolded) + the suggested remediation. Falls back to
+                    // the original hardcoded `description` whenever the AI
+                    // field is empty (rule fired but enrichment failed, or
+                    // the row pre-dates the migration). The severity badge
+                    // itself now lives on the Rule Breached column instead
+                    // of here (see compliance_breached_name editColumn).
                     ->editColumn('description', function ($compliance) {
                          $aiDesc = trim((string) ($compliance->description_ai ?? ''));
                          $hard   = (string) $compliance->description;
                          if ($aiDesc === '') {
-                              return e($hard);
+                              return '<div class="cc-desc"><div class="cc-desc-text">' . e($hard) . '</div></div>';
                          }
 
-                         // Severity → badge class. Unknown values fall to "secondary".
-                         $sev   = trim((string) ($compliance->severity_ai ?? 'Medium'));
-                         $color = [
-                              'Critical' => 'danger',
-                              'High'     => 'warning',
-                              'Medium'   => 'info',
-                              'Low'      => 'secondary',
-                              'Info'     => 'secondary',
-                         ][$sev] ?? 'secondary';
+                         // Normalise the "§" section-symbol variant the AI
+                         // sometimes uses ("§59...") to the word form
+                         // ("Section 59...") so the column reads in plain
+                         // English rather than legal shorthand.
+                         $aiDesc = preg_replace('/§\s?(\d)/', 'Section $1', $aiDesc);
 
-                         $html  = '<div class="compliance-ai-cell">';
-                         $html .= '<div class="mb-1"><span class="badge badge-themeGrayLight me-1">AI</span><span class="badge badge-' . $color . '">' . e($sev) . '</span></div>';
-                         $html .= '<div class="mb-1">' . e($aiDesc) . '</div>';
+                         // Bold the statute reference when the AI text names
+                         // one (e.g. "Article 28 of the Employment Act
+                         // 2008"). Operates on the already-escaped string,
+                         // so this only wraps matched text in <strong>, it
+                         // never introduces unescaped input.
+                         $violationHtml = preg_replace(
+                              '/((?:Article|Section|Clause|Regulation)\s+\d+[A-Za-z]?(?:\s+of\s+the\s+[A-Za-z ]+?(?:Act|Regulation|Law)(?:\s+\d{4})?)?)/',
+                              '<strong>$1</strong>',
+                              e($aiDesc)
+                         );
+
+                         $html  = '<div class="cc-desc">';
+                         $html .= '<div class="cc-desc-text">' . $violationHtml . '</div>';
                          $rem   = trim((string) ($compliance->remediation_ai ?? ''));
                          if ($rem !== '') {
-                              $html .= '<div class="text-muted small"><strong>Suggested fix:</strong> ' . e($rem) . '</div>';
+                              $html .= '<div class="cc-fix">' . self::AI_SPARK_SVG . '<span><span class="cc-fix-label">Suggested fix:</span> ' . e($rem) . '</span></div>';
                          }
+                         $html .= '</div>';
                          return $html;
                     })
                     ->addColumn('status', function ($compliance) {
                          if($compliance->status =="")
                          {
                               $status = 'Breached';
-                              $color ="warning";
+                              $cls = 'cc-badge--warn';
 
                          }
                          elseif($compliance->status =="Breached")
                          {
                               $status = 'Breached';
-                              $color ="warning";
+                              $cls = 'cc-badge--warn';
 
                          }
-                         else 
+                         else
                          {
                               $status = 'Resolved';
-                              $color ="success";
+                              $cls = 'cc-badge--ok';
 
                          }
-                        
-                         return '<span class="badge badge-' . ($color) . '">' . $status . '</span>';
-                    
+
+                         return '<span class="cc-badge ' . $cls . '">' . $status . '</span>';
+
                     })
                     ->addColumn('action', function ($compliance) use ($edit_class) {  // Changed from 'actions' to 'action'
-                         $actions = '<div>';
+                         // No "Resolve" flow exists yet in this controller
+                         // (rows only auto-flip to Resolved after 30 stale
+                         // days — see resolveStaleBreaches()); keeping only
+                         // Dismiss per guardrail rather than wiring a button
+                         // to nothing.
+                         $actions = '<div class="cc-actions">';
                          if($edit_class != '') {
-                              $actions .= '<a href="javascript:void(0)" class="a-link">-</a>';
+                              $actions .= '<span class="cc-btn cc-btn--outline disabled">—</span>';
                          }else{
-                              $actions .= '<a href="javascript::void(0)" data-id="'.base64_encode($compliance->id).'" class="a-link dismmisal '.$edit_class.'">Dismiss</a>';
+                              $actions .= '<a href="javascript::void(0)" data-id="'.base64_encode($compliance->id).'" class="cc-btn cc-btn--outline dismmisal '.$edit_class.'">Dismiss</a>';
                          }
                          $actions .= '</div>';
                          return $actions;
                     })
-                    // Allow the AI-enriched description HTML (badge + remediation
-                    // block) through unescaped. The data we inject is already
-                    // run through e() inside editColumn('description'), so the
-                    // HTML the DataTable sees is safe.
-                    ->rawColumns(['employee_name','status', 'action', 'description'])
+                    // Allow the enriched HTML cells (avatar block, badges,
+                    // suggested-fix callout, action button) through
+                    // unescaped. All dynamic text inside is already run
+                    // through e() in each column closure, so the HTML the
+                    // DataTable sees is safe.
+                    ->rawColumns(['employee_name','status', 'action', 'description', 'reported_on', 'compliance_breached_name'])
                     // Stamp the compliance row id onto the <tr> as
                     // data-compliance-id so the post-regenerate JS can
                     // flash newly-processed rows green.

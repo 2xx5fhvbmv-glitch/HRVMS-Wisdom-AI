@@ -65,7 +65,7 @@
                                 </select>
                             </div>
                             <div class="col-xl-2 col-md-3 col-sm-4 col-6">
-                                <button class="btn btn-themeBlue btn-sm" id="clearFilter">Clear Filter</button>
+                                <button class="btn ta-btn-secondary btn-sm" id="clearFilter">Clear Filter</button>
                             </div>
                         
 
@@ -131,7 +131,7 @@
                         </button>
                     </div>
                     <div class="text-center mb-sm-4 mb-3">
-                        <a href="javascript:void(0)" class="btn btn-themeSkyblue btn-sm viewJobAdDownload">Download</a>
+                        <a href="javascript:void(0)" class="btn ta-btn-secondary btn-sm viewJobAdDownload">Download</a>
                     </div>
                     <div class="mb-sm-3 mb-2" id="viewJobAdLinkContainer" style="display:none;">
                         <h6>Job Advertisement Link:</h6>
@@ -139,7 +139,7 @@
                     </div>
                 </div>
                 <div class="modal-footer justify-content-center">
-                    <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray">Close</a>
+                    <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary">Close</a>
                 </div>
             </div>
         </div>
@@ -166,8 +166,8 @@
                     </div>
                 </div>
                 <div class="modal-footer justify-content-center">
-                    <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                    <button  class="btn btn-theme">Submit</button>
+                    <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Cancel</a>
+                    <button  class="btn ta-btn-primary">Submit</button>
                 </div>
 
             </div>
@@ -177,6 +177,7 @@
     @endsection
 
 @section('import-css')
+@include('resorts.talentacquisition._ta_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')

@@ -59,9 +59,9 @@
                                 </div>
                             </div>
                             <div class="card-footer text-end"> <!-- Footer for Save Form button -->
-                                <button id="update-form" class="btn btn-themeBlue btn-sm">Update Form</button>
+                                <button id="update-form" class="btn ta-btn-primary btn-sm">Update Form</button>
 
-                                <a href="{{ route('interview-assessment.index') }}" class="btn btn-themeSkyblue btn-sm">Cancel</a>
+                                <a href="{{ route('interview-assessment.index') }}" class="btn ta-btn-secondary btn-sm">Cancel</a>
                             </div>
 
                         </div>
@@ -73,6 +73,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts.talentacquisition._ta_buttons_v2_styles')
 <style>
     #ui-datepicker-div{
         display:none!important;

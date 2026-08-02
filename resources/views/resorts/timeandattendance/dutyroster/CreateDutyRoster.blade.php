@@ -754,6 +754,7 @@
     @endsection
 
 @section('import-css')
+@include('resorts.timeandattendance._taa_buttons_v2_styles')
 <style>
     /* Flatpickr custom styling for selected dates in multiple mode */
     .flatpickr-day.selected,

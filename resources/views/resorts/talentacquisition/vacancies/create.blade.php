@@ -381,14 +381,14 @@
                         <div class="card-footer row justify-content-between g-3">
                             <div class="col-auto">
                                 <div class="d-flex align-items-center">
-                                    <a href="javascript:void(0)" class="btn btn-themeBlue btn-sm" id="saveAsDraftBtn">Save As Draft</a>
+                                    <a href="javascript:void(0)" class="btn ta-btn-neutral btn-sm" id="saveAsDraftBtn">Save As Draft</a>
                                     <!-- <a href="#" class="text-theme text-underline fw-600 mx-sm-3 mx-2">View</a>
                                     <a href="#" class="text-theme text-underline fw-600">Download</a> -->
                                 </div>
                             </div>
 
                             <div class="col-auto ms-auto">
-                                <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                                <button type="submit" class="btn ta-btn-primary btn-sm">Submit</button>
                             </div>
                         </div>
                     </div>
@@ -399,6 +399,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts.talentacquisition._ta_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')

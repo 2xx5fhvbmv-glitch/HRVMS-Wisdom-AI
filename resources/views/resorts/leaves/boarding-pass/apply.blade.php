@@ -95,12 +95,13 @@
                 </div>
                 <div class="d-none d-xl-block" style="height: 126px;"></div>
                 <div class="card-footer text-end">
-                    <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                    <button type="submit" class="btn leave-btn-primary btn-sm">Submit</button>
                 </div>
             </div>
         </form>
     </div>
 </div>
+@include('resorts.leaves._leave_buttons_v2_styles')
 @endsection
 
 @section('import-css')

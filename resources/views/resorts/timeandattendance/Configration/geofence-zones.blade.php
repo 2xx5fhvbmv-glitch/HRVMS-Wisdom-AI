@@ -14,10 +14,10 @@
                 </div>
                 <div class="col-auto">
                     <div class="d-flex gap-2">
-                        <a href="{{ route('resort.timeandattendance.Configration') }}" class="btn btn-sm btn-themeGray">
+                        <a href="{{ route('resort.timeandattendance.Configration') }}" class="btn btn-sm taa-btn-secondary">
                             <i class="fa-solid fa-arrow-left"></i> Back to Configuration
                         </a>
-                        <button type="button" class="btn btn-sm btn-themeBlue" id="openAddZoneModal">
+                        <button type="button" class="btn btn-sm taa-btn-positive" id="openAddZoneModal">
                             <i class="fa-solid fa-plus"></i> Add New Zone
                         </button>
                     </div>
@@ -72,13 +72,13 @@
                                         <td><small class="text-muted">{{ $zone->created_at }}</small></td>
                                         <td>
                                             <div class="d-flex flex-nowrap gap-1">
-                                                <button class="btn btn-sm btn-outline-primary gfp-edit-zone" data-id="{{ $zone->id }}" title="Edit">
+                                                <button class="btn btn-sm taa-btn-secondary gfp-edit-zone" data-id="{{ $zone->id }}" title="Edit">
                                                     <i class="fa-solid fa-pen"></i>
                                                 </button>
-                                                <button class="btn btn-sm btn-outline-warning gfp-toggle-zone" data-id="{{ $zone->id }}" title="{{ $zone->status === 'active' ? 'Pause' : 'Activate' }}">
+                                                <button class="btn btn-sm taa-btn-attention gfp-toggle-zone" data-id="{{ $zone->id }}" title="{{ $zone->status === 'active' ? 'Pause' : 'Activate' }}">
                                                     <i class="fa-solid fa-{{ $zone->status === 'active' ? 'pause' : 'play' }}"></i>
                                                 </button>
-                                                <button class="btn btn-sm btn-outline-danger gfp-delete-zone" data-id="{{ $zone->id }}" title="Delete">
+                                                <button class="btn btn-sm taa-btn-critical gfp-delete-zone" data-id="{{ $zone->id }}" title="Delete">
                                                     <i class="fa-solid fa-trash"></i>
                                                 </button>
                                             </div>
@@ -114,16 +114,16 @@
                     <div class="col-lg-8">
                         <div id="zoneMap" style="width:100%; height:500px;"></div>
                         <div class="d-flex align-items-center gap-2 p-2 border-top bg-light">
-                            <button type="button" id="zf-tool-polygon" class="btn btn-sm btn-outline-primary">
+                            <button type="button" id="zf-tool-polygon" class="btn btn-sm taa-btn-secondary">
                                 <i class="fa-solid fa-draw-polygon"></i> Polygon
                             </button>
-                            <button type="button" id="zf-tool-circle" class="btn btn-sm btn-outline-primary">
+                            <button type="button" id="zf-tool-circle" class="btn btn-sm taa-btn-secondary">
                                 <i class="fa-regular fa-circle"></i> Circle
                             </button>
-                            <button type="button" id="zf-tool-undo" class="btn btn-sm btn-outline-secondary" disabled>
+                            <button type="button" id="zf-tool-undo" class="btn btn-sm taa-btn-secondary" disabled>
                                 <i class="fa-solid fa-undo"></i> Undo
                             </button>
-                            <button type="button" id="zf-tool-clear" class="btn btn-sm btn-outline-danger" disabled>
+                            <button type="button" id="zf-tool-clear" class="btn btn-sm taa-btn-secondary" disabled>
                                 <i class="fa-solid fa-trash"></i> Clear
                             </button>
                             <span id="zf-draw-status" class="text-muted small ms-auto"></span>
@@ -164,7 +164,7 @@
                             <div id="zf-coords-list" style="max-height:150px; overflow-y:auto; font-size:12px; background:#f8f9fa; border-radius:6px; padding:8px;"></div>
                         </div>
                         <hr>
-                        <button type="button" id="zf-save-zone" class="btn btn-theme w-100" disabled>
+                        <button type="button" id="zf-save-zone" class="btn taa-btn-primary w-100" disabled>
                             <i class="fa-solid fa-check"></i> Save Zone
                         </button>
                     </div>
@@ -181,6 +181,10 @@
     }
     .zf-color-dot:hover, .zf-color-dot.active { border-color: #333; }
 </style>
+@endsection
+
+@section('import-css')
+@include('resorts.timeandattendance._taa_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')
@@ -275,8 +279,8 @@ $(document).ready(function() {
     function zfActivateTool(tool) {
         zfClearDrawing();
         zfCurrentTool = tool;
-        $('#zf-tool-polygon').toggleClass('btn-primary', tool === 'polygon').toggleClass('btn-outline-primary', tool !== 'polygon');
-        $('#zf-tool-circle').toggleClass('btn-primary', tool === 'circle').toggleClass('btn-outline-primary', tool !== 'circle');
+        $('#zf-tool-polygon').toggleClass('taa-btn-primary', tool === 'polygon').toggleClass('taa-btn-secondary', tool !== 'polygon');
+        $('#zf-tool-circle').toggleClass('taa-btn-primary', tool === 'circle').toggleClass('taa-btn-secondary', tool !== 'circle');
 
         if (tool === 'polygon') {
             $('#zf-draw-status').text('Click on map to add points. Double-click or click first point to close.');
@@ -343,7 +347,7 @@ $(document).ready(function() {
         zfCurrentTool = null;
         zfMap.setOptions({ draggableCursor: null });
         $('#zf-draw-status').text('Polygon complete. Enter name and save.');
-        $('#zf-tool-polygon, #zf-tool-circle').removeClass('btn-primary').addClass('btn-outline-primary');
+        $('#zf-tool-polygon, #zf-tool-circle').removeClass('taa-btn-primary').addClass('taa-btn-secondary');
         zfRedrawPolygon();
     }
 
@@ -393,7 +397,7 @@ $(document).ready(function() {
         $('#zf-draw-status').text('Drag circle edge to adjust radius. Enter name and save.');
         zfCurrentTool = null;
         zfMap.setOptions({ draggableCursor: null });
-        $('#zf-tool-polygon, #zf-tool-circle').removeClass('btn-primary').addClass('btn-outline-primary');
+        $('#zf-tool-polygon, #zf-tool-circle').removeClass('taa-btn-primary').addClass('taa-btn-secondary');
         $('#zf-tool-undo, #zf-tool-clear').prop('disabled', false);
         zfUpdateCoordsDisplay();
         zfUpdateSaveBtn();
@@ -411,7 +415,7 @@ $(document).ready(function() {
         if (zfMap) zfMap.setOptions({ draggableCursor: null });
         $('#zf-draw-status').text('');
         $('#zf-tool-undo, #zf-tool-clear').prop('disabled', true);
-        $('#zf-tool-polygon, #zf-tool-circle').removeClass('btn-primary').addClass('btn-outline-primary');
+        $('#zf-tool-polygon, #zf-tool-circle').removeClass('taa-btn-primary').addClass('taa-btn-secondary');
         $('#zf-coords-info').hide();
         zfUpdateSaveBtn();
     }

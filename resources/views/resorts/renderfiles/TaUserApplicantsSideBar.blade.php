@@ -83,7 +83,7 @@
     <div>
         <!-- <a href="#" class="btn btn-themeBlue btn-sm">Send Message</a>
         <a href="#" class="btn btn-themeSkyblue btn-sm">Send Email</a> -->
-        <a href="#" class="btn btn-danger btn-sm closeSlider">close</a>
+        <a href="#" class="btn ta-btn-secondary btn-sm closeSlider">Close</a>
     </div>
 </div>
 <div class="userApplicants-body">
@@ -274,7 +274,7 @@
                     </table>
                 </div>
                 <div class="text-center mt-3">
-                    <a href="javascript:void(0)" class="btn btn-themeSkyblue btn-sm DownloadAllFiles" data-id="{{ base64_encode($Applicant_form_data->id) }}">Download All</a>
+                    <a href="javascript:void(0)" class="btn ta-btn-secondary btn-sm DownloadAllFiles" data-id="{{ base64_encode($Applicant_form_data->id) }}">Download All</a>
                 </div>
             </div>
             <div class="tab-pane fade" id="tabPane3" role="tabpanel" aria-labelledby="tab3" tabindex="0">
@@ -307,13 +307,13 @@
                                         aria-labelledby="headingOne" data-bs-parent="#accordionExample">
                                         <div class="accordion-body">
                                             @if($Applicant_form_data->ApplicantStatus =="Sortlisted By Wisdom AI" &&   $Applicant_form_data->As_ApprovedBy ==0 && $isHrDepartment)
-                                                <a href="javascript:void(0)" class="btn btn-themeSkyblue ApprovedOrSortListed btn-sm"
+                                                <a href="javascript:void(0)" class="btn ta-btn-primary ApprovedOrSortListed btn-sm"
                                                     data-Progress_ApplicantID="{{ base64_encode($Applicant_form_data->ApplicantID) }}"
                                                     data-Progress_ApplicantStatusID = "{{ $Applicant_form_data->ApplicantStatusID }}"
                                                     data-Progress_As_ApprovedBy = "{{ $Applicant_form_data->As_ApprovedBy }}"
                                                     data-Progress_Rank="Sortlisted" data-interviewRound="HRShortlisted" > HR Shortlisted
                                                 </a>
-                                                <a href="javascript:void(0)" class="btn btn-danger ApprovedOrSortListed btn-sm"
+                                                <a href="javascript:void(0)" class="btn ta-btn-critical ApprovedOrSortListed btn-sm"
                                                     data-Progress_ApplicantID="{{ base64_encode($Applicant_form_data->ApplicantID) }}"
                                                     data-Progress_ApplicantStatusID = "{{ $Applicant_form_data->ApplicantStatusID }}"
                                                     data-Progress_As_ApprovedBy = "{{ $Applicant_form_data->As_ApprovedBy }}"
@@ -468,7 +468,7 @@
                                                 @if($canAct)
                                                     @if(in_array($interviewer,$CompleteArray) && $hasMeetingLink)
 
-                                                        <a href="javascript:void(0)" class="btn btn-themeSkyblue ApprovedOrSortListed btn-sm"
+                                                        <a href="javascript:void(0)" class="btn ta-btn-primary ApprovedOrSortListed btn-sm"
                                                             data-Progress_ApplicantID="{{ base64_encode($Applicant_form_data->ApplicantID) }}"
                                                             data-Progress_ApplicantStatusID="{{ $Applicant_form_data->ApplicantStatusID }}"
                                                             data-Progress_As_ApprovedBy="{{ $CurrentRank }}"
@@ -482,11 +482,11 @@
                                                             data-Progress_ApplicantStatusID = "{{ $Applicant_form_data->ApplicantStatusID }}"
                                                             data-Progress_As_ApprovedBy = "{{ $Applicant_form_data->As_ApprovedBy }}"
                                                             data-Progress_Rank="Rejected" data-interviewRound ="{{$interviewer }}"
-                                                            class="btn btn-danger ApprovedOrSortListed btn-sm"
+                                                            class="btn ta-btn-critical ApprovedOrSortListed btn-sm"
                                                             > Rejected
                                                         </a>
                                                     @elseif(in_array($interviewer,$RoundArray))
-                                                        <a href="javascript:void(0)" class="btn btn-themeSkyblue ApprovedOrSortListed btn-sm"
+                                                        <a href="javascript:void(0)" class="btn ta-btn-primary ApprovedOrSortListed btn-sm"
                                                             data-Progress_ApplicantID="{{ base64_encode($Applicant_form_data->ApplicantID) }}"
                                                             data-Progress_ApplicantStatusID="{{ $Applicant_form_data->ApplicantStatusID }}"
                                                             data-Progress_As_ApprovedBy="{{ $CurrentRank }}"
@@ -498,11 +498,11 @@
                                                             data-Progress_ApplicantStatusID = "{{ $Applicant_form_data->ApplicantStatusID }}"
                                                             data-Progress_As_ApprovedBy = "{{ $Applicant_form_data->As_ApprovedBy }}"
                                                             data-Progress_Rank="Rejected" data-interviewRound ="{{$interviewer }}"
-                                                            class="btn btn-danger ApprovedOrSortListed btn-sm"
+                                                            class="btn ta-btn-critical ApprovedOrSortListed btn-sm"
                                                             > Rejected
                                                         </a>
                                                     @else
-                                                        <a href="javascript:void(0)" class="btn btn-themeSkyblue  btn-sm"> Please generate Interview Link</a>
+                                                        <a href="javascript:void(0)" class="btn ta-badge-muted btn-sm"> Please generate an interview link</a>
                                                     @endif
                                                 @else
                                                     <span class="text-muted small"><i class="fa-solid fa-lock me-1"></i>Waiting for {{ $interviewer == 'select' ? 'HR' : ($InterViewRound[$buttonRoundRank] ?? '') }} to act</span>
@@ -546,13 +546,13 @@
 
                                             @if($isHrDepartment)
                                                 @if(in_array($Applicant_form_data->ApplicantStatus, ['Selected', 'Offer Letter Rejected']))
-                                                    <a href="javascript:void(0)" class="btn btn-themeSkyblue btn-sm sendOfferLetterBtn"
+                                                    <a href="javascript:void(0)" class="btn ta-btn-attention btn-sm sendOfferLetterBtn"
                                                         data-id="{{ base64_encode($Applicant_form_data->ApplicantID) }}"
                                                         data-applicantstatusid="{{ base64_encode($Applicant_form_data->ApplicantStatusID) }}">
                                                         {{ $Applicant_form_data->ApplicantStatus == 'Offer Letter Rejected' ? 'Resend Offer Letter' : 'Send Offer Letter' }}
                                                     </a>
                                                 @elseif(in_array($Applicant_form_data->ApplicantStatus, ['Offer Letter Accepted', 'Contract Rejected']))
-                                                    <a href="javascript:void(0)" class="btn btn-themeSkyblue btn-sm sendContractBtn"
+                                                    <a href="javascript:void(0)" class="btn ta-btn-attention btn-sm sendContractBtn"
                                                         data-id="{{ base64_encode($Applicant_form_data->ApplicantID) }}"
                                                         data-applicantstatusid="{{ base64_encode($Applicant_form_data->ApplicantStatusID) }}">
                                                         {{ $Applicant_form_data->ApplicantStatus == 'Contract Rejected' ? 'Resend Contract' : 'Send Contract' }}
@@ -587,7 +587,7 @@
                                         <img src="{{ URL::asset('resorts_assets/images/textarea-icon.svg') }}" alt="icon">
                                     </div>
                                     <div>
-                                        <button type="submit" class="btn btn-themeSkyblue btn-sm">Submit</button>
+                                        <button type="submit" class="btn ta-btn-primary btn-sm">Submit</button>
                                     </div>
                                 </form>
 
@@ -601,7 +601,7 @@
                                         <textarea rows="4" name="Comment" class="form-control" placeholder="Type your comment here..."></textarea>
                                     </div>
                                     <div>
-                                        <button type="submit" class="btn btn-themeSkyblue btn-sm">Submit</button>
+                                        <button type="submit" class="btn ta-btn-primary btn-sm">Submit</button>
                                     </div>
                                 </form>
                             </div>
@@ -683,7 +683,7 @@
                                                 <div class="mb-2">
                                                     <a href="{{ $interview->MeetingLink}}" target="_blank" class="a-link">{{ $interview->MeetingLink}}</a>
                                                 </div>
-                                                <a href="{{ $interview->MeetingLink}}" target="_blank" class="btn btn-themeSkyblue btn-sm">Join The Interview</a>
+                                                <a href="{{ $interview->MeetingLink}}" target="_blank" class="btn ta-btn-attention btn-sm">Join the Interview</a>
                                             @else
                                                 <div class="mb-2">
                                                     <span class="text-muted"><i class="fa-solid fa-lock me-1"></i>Meeting link not available for your round</span>
@@ -1011,7 +1011,7 @@
 
                         @if($isHrDepartment)
                         <div class="mt-3 text-end">
-                            <button type="button" class="btn btn-themeSkyblue btn-sm saveSalaryAllocation">
+                            <button type="button" class="btn ta-btn-primary btn-sm saveSalaryAllocation">
                                 {{ isset($salaryAllocation) && $salaryAllocation ? 'Update' : 'Save' }} Salary Allocation
                             </button>
                         </div>

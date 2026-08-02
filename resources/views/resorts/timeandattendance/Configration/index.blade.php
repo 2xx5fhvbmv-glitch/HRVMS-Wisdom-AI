@@ -59,7 +59,7 @@
                                         </div>
                                         <!-- Export Button -->
                                         <div class="col-md-4 text-end">
-                                            <button type="submit" class="btn btn-themeBlue">Export Employees</button>
+                                            <button type="submit" class="btn taa-btn-secondary">Export Employees</button>
                                         </div>
                                     </div>
                                 </form>
@@ -71,7 +71,7 @@
                                     @csrf
                                     <div class="row g-3 align-items-center">
                                         <div class="col-md-4 mb-3">
-                                            <a href="{{ route('resort.timeandattendance.DownloadAttendanceTemplate') }}" class="btn btn-themeSkyblue btn-sm">
+                                            <a href="{{ route('resort.timeandattendance.DownloadAttendanceTemplate') }}" class="btn taa-btn-secondary btn-sm">
                                                 Download Template
                                             </a>
                                         </div>
@@ -79,7 +79,7 @@
                                             <small></small>
                                             {{-- <small id="error-message" class="text-themeDanger" >Only Excel files (.xls, .xlsx) are accepted.</small> --}}
                                             <div class="uploadFile-btn me-0">
-                                                <a href="javascript:void(0)" class="btn btn-themeBlue btn-sm"
+                                                <a href="javascript:void(0)" class="btn taa-btn-primary btn-sm"
                                                     onclick="document.getElementById('UploadImportattandance').click();">
                                                     Upload File
                                                 </a>
@@ -207,7 +207,7 @@
                             <form id="ShirfFrom" data-parsley-validate>
                                 @csrf()
                                 <div class="shift-main">
-                                    <a href="javascript:void(0)" class="btn btn-themeSkyblue btn-sm mb-3 add-shift">Add
+                                    <a href="javascript:void(0)" class="btn taa-btn-positive btn-sm mb-3 add-shift">Add
                                         Shift</a>
 
                                     <!-- Dynamic Shift Blocks -->
@@ -242,7 +242,7 @@
                                                     </div>
                                                     <div class="col-auto">
                                                         <a href="#"
-                                                            class="btn btn-themeBlue btn-sm btn-minus minus-shift"
+                                                            class="btn taa-btn-neutral btn-sm btn-minus minus-shift"
                                                             data-id="{{ $s->id }}">
                                                             <i class="fa-solid fa-minus"></i>
                                                         </a>
@@ -272,7 +272,7 @@
                                                 </div>
                                                 <div class="col-auto">
                                                     <a href="#"
-                                                        class="btn btn-themeBlue btn-sm btn-minus minus-shift"
+                                                        class="btn taa-btn-neutral btn-sm btn-minus minus-shift"
                                                         data-id="0">
                                                         <i class="fa-solid fa-minus"></i>
                                                     </a>
@@ -283,7 +283,7 @@
                                     </div>
                                 </div>
                                 <div class="card-footer text-end">
-                                    <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                                    <button type="submit" class="btn taa-btn-primary btn-sm">Submit</button>
                                 </div>
                             </form>
 
@@ -301,7 +301,7 @@
                             <div class="row g-md-3 g-2 align-items-center mb-3">
                                     <div class="col-md-4"><a
                                         href="{{ URL::asset('resorts_assets/Resort_holiday/ResrortHolidayFormat.xlsx') }}"
-                                        class="btn btn-themeSkyblue btn-sm">Download Template</a>
+                                        class="btn taa-btn-secondary btn-sm">Download Template</a>
                                     </div>
 
                                     <div class="col-md-4">
@@ -309,7 +309,7 @@
                                             <div class="uploadFile-btn me-0">
                                                 <form id="fileUploadForm" enctype="multipart/form-data" parsley-validate>
 
-                                                    <a href="#" class="btn btn-themeBlue btn-sm"
+                                                    <a href="#" class="btn taa-btn-primary btn-sm"
                                                         onclick="document.getElementById('fileUpload').click();">
                                                         Upload File
                                                     </a>
@@ -331,7 +331,7 @@
                             <div class="col-auto mb-3"><span style="font-size: 14px; font-weight: 600;">OR</span></div>
 
                             <div class="col-md-4 justify-content-end">
-                                <a href="javascript:void();" class="btn btn-themeSkyblue btn-sm AddPublicHolidays">Add Public
+                                <a href="javascript:void();" class="btn taa-btn-positive btn-sm AddPublicHolidays">Add Public
                                     Holidays</a>
                             </div>
 
@@ -398,13 +398,13 @@
                                                     </td>
                                                     <td>
                                                         <div class="d-flex flex-nowrap gap-1">
-                                                            <button class="btn btn-sm p-0 px-1 gf-edit-zone-config" data-id="{{ $zone->id }}" title="Edit">
+                                                            <button class="btn btn-sm p-0 px-1 taa-btn-secondary gf-edit-zone-config" data-id="{{ $zone->id }}" title="Edit">
                                                                 <i class="fa-solid fa-pen text-primary" style="font-size:11px;"></i>
                                                             </button>
-                                                            <button class="btn btn-sm p-0 px-1 gf-toggle-zone-config" data-id="{{ $zone->id }}" title="{{ $zone->status === 'active' ? 'Pause' : 'Activate' }}">
+                                                            <button class="btn btn-sm p-0 px-1 taa-btn-attention gf-toggle-zone-config" data-id="{{ $zone->id }}" title="{{ $zone->status === 'active' ? 'Pause' : 'Activate' }}">
                                                                 <i class="fa-solid fa-{{ $zone->status === 'active' ? 'pause' : 'play' }} text-warning" style="font-size:11px;"></i>
                                                             </button>
-                                                            <button class="btn btn-sm p-0 px-1 gf-delete-zone-config" data-id="{{ $zone->id }}" title="Delete">
+                                                            <button class="btn btn-sm p-0 px-1 taa-btn-critical gf-delete-zone-config" data-id="{{ $zone->id }}" title="Delete">
                                                                 <i class="fa-solid fa-trash text-danger" style="font-size:11px;"></i>
                                                             </button>
                                                         </div>
@@ -456,16 +456,16 @@
                             <!-- Drawing toolbar -->
                             <div class="col-md-12">
                                 <div class="d-flex align-items-center gap-2 mb-2">
-                                    <button type="button" id="btn-draw-polygon" class="btn btn-sm btn-themeBlue">
+                                    <button type="button" id="btn-draw-polygon" class="btn btn-sm taa-btn-secondary">
                                         <i class="fa-solid fa-draw-polygon"></i> Draw Polygon
                                     </button>
-                                    <button type="button" id="btn-clear-polygon" class="btn btn-sm btn-themeDanger" style="display:none;">
+                                    <button type="button" id="btn-clear-polygon" class="btn btn-sm taa-btn-secondary" style="display:none;">
                                         <i class="fa-solid fa-trash"></i> Clear Polygon
                                     </button>
-                                    <button type="button" id="btn-place-marker" class="btn btn-sm btn-themeGray">
+                                    <button type="button" id="btn-place-marker" class="btn btn-sm taa-btn-secondary">
                                         <i class="fa-solid fa-map-marker-alt"></i> Place Marker
                                     </button>
-                                    <button type="button" id="btn-locate-me" class="btn btn-sm btn-themeSkyblue">
+                                    <button type="button" id="btn-locate-me" class="btn btn-sm taa-btn-secondary">
                                         <i class="fa-solid fa-location-crosshairs"></i> Locate Me
                                     </button>
                                     <span id="draw-status" class="text-muted small ms-2"></span>
@@ -504,8 +504,8 @@
                     </div>
 
                     <div class="modal-footer justify-content-center">
-                        <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                        <button type="submit" class="btn btn-theme">Submit</button>
+                        <a href="#" data-bs-dismiss="modal" class="btn taa-btn-secondary ms-auto">Cancel</a>
+                        <button type="submit" class="btn taa-btn-primary">Submit</button>
                     </div>
                 </form>
             </div>
@@ -527,19 +527,19 @@
                             <div id="geofenceMap" style="width:100%; height:550px;"></div>
                             {{-- Drawing toolbar --}}
                             <div class="d-flex align-items-center gap-2 p-2 border-top bg-light">
-                                <button type="button" id="gf-tool-polygon" class="btn btn-sm btn-outline-primary">
+                                <button type="button" id="gf-tool-polygon" class="btn btn-sm taa-btn-secondary">
                                     <i class="fa-solid fa-draw-polygon"></i> Polygon
                                 </button>
-                                <button type="button" id="gf-tool-circle" class="btn btn-sm btn-outline-primary">
+                                <button type="button" id="gf-tool-circle" class="btn btn-sm taa-btn-secondary">
                                     <i class="fa-regular fa-circle"></i> Circle
                                 </button>
-                                <button type="button" id="gf-tool-undo" class="btn btn-sm btn-outline-secondary" disabled>
+                                <button type="button" id="gf-tool-undo" class="btn btn-sm taa-btn-secondary" disabled>
                                     <i class="fa-solid fa-undo"></i> Undo
                                 </button>
-                                <button type="button" id="gf-tool-clear" class="btn btn-sm btn-outline-danger" disabled>
+                                <button type="button" id="gf-tool-clear" class="btn btn-sm taa-btn-secondary" disabled>
                                     <i class="fa-solid fa-trash"></i> Clear
                                 </button>
-                                <button type="button" id="gf-tool-locate" class="btn btn-sm btn-outline-primary">
+                                <button type="button" id="gf-tool-locate" class="btn btn-sm taa-btn-secondary">
                                     <i class="fa-solid fa-location-crosshairs"></i> Locate Me
                                 </button>
                                 <span id="gf-draw-status" class="text-muted small ms-auto"></span>
@@ -580,10 +580,10 @@
                                     </div>
                                 </div>
                                 <div class="d-flex gap-2">
-                                    <button type="button" id="gf-save-zone" class="btn btn-sm btn-theme flex-fill" disabled>
+                                    <button type="button" id="gf-save-zone" class="btn btn-sm taa-btn-primary flex-fill" disabled>
                                         <i class="fa-solid fa-check"></i> Save Zone
                                     </button>
-                                    <button type="button" id="gf-cancel-edit" class="btn btn-sm btn-themeGray" style="display:none;">
+                                    <button type="button" id="gf-cancel-edit" class="btn btn-sm taa-btn-secondary" style="display:none;">
                                         Cancel
                                     </button>
                                 </div>
@@ -662,8 +662,8 @@
                     </div>
 
                     <div class="modal-footer justify-content-center">
-                        <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                        <button type="submit" class="btn btn-theme">Submit</button>
+                        <a href="#" data-bs-dismiss="modal" class="btn taa-btn-secondary ms-auto">Cancel</a>
+                        <button type="submit" class="btn taa-btn-primary">Submit</button>
                     </div>
                 </form>
             </div>
@@ -672,6 +672,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts.timeandattendance._taa_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')
@@ -939,7 +940,7 @@
                     <input type="time" class="form-control end-time" name="EndTime[]" required data-parsley-required-message="Please enter an end time">
                 </div>
                 <div class="col-auto">
-                    <a href="#" class="btn btn-themeBlue btn-sm btn-minus minus-shift">
+                    <a href="#" class="btn taa-btn-neutral btn-sm btn-minus minus-shift">
                         <i class="fa-solid fa-minus"></i>
                     </a>
                 </div>
@@ -1191,8 +1192,8 @@
             function setDrawingMode(active) {
                 isDrawingMode = active;
                 isMarkerMode = false;
-                $('#btn-draw-polygon').toggleClass('btn-themeBlue', !active).toggleClass('btn-theme', active);
-                $('#btn-place-marker').removeClass('btn-theme').addClass('btn-themeGray');
+                $('#btn-draw-polygon').toggleClass('taa-btn-secondary', !active).toggleClass('taa-btn-primary', active);
+                $('#btn-place-marker').removeClass('taa-btn-primary').addClass('taa-btn-secondary');
                 $('#draw-status').text(active ? 'Click on the map to add polygon points. Click "Draw Polygon" again to finish.' : '');
                 if (geoMap) geoMap.setOptions({ draggableCursor: active ? 'crosshair' : null });
             }
@@ -1200,8 +1201,8 @@
             function setMarkerMode(active) {
                 isMarkerMode = active;
                 isDrawingMode = false;
-                $('#btn-place-marker').toggleClass('btn-themeGray', !active).toggleClass('btn-theme', active);
-                $('#btn-draw-polygon').removeClass('btn-theme').addClass('btn-themeBlue');
+                $('#btn-place-marker').toggleClass('taa-btn-secondary', !active).toggleClass('taa-btn-primary', active);
+                $('#btn-draw-polygon').removeClass('taa-btn-primary').addClass('taa-btn-secondary');
                 $('#draw-status').text(active ? 'Click on the map to place the center marker.' : '');
                 if (geoMap) geoMap.setOptions({ draggableCursor: active ? 'pointer' : null });
             }
@@ -1575,9 +1576,9 @@
                             '<div class="d-flex align-items-center mt-1">' +
                                 '<small class="text-muted"><i class="fa-solid ' + shapeIcon + ' me-1"></i>' + shapeInfo + ' &middot; ' + zone.grace_period + ' min grace</small>' +
                                 '<div class="ms-auto">' +
-                                    '<button class="btn btn-sm p-0 px-1 gf-edit-zone" data-id="' + zone.id + '" title="Edit"><i class="fa-solid fa-pen text-primary" style="font-size:11px;"></i></button>' +
-                                    '<button class="btn btn-sm p-0 px-1 gf-toggle-zone" data-id="' + zone.id + '" title="' + (zone.status === 'active' ? 'Pause' : 'Activate') + '"><i class="fa-solid fa-' + (zone.status === 'active' ? 'pause' : 'play') + ' text-warning" style="font-size:11px;"></i></button>' +
-                                    '<button class="btn btn-sm p-0 px-1 gf-delete-zone" data-id="' + zone.id + '" title="Delete"><i class="fa-solid fa-trash text-danger" style="font-size:11px;"></i></button>' +
+                                    '<button class="btn btn-sm p-0 px-1 taa-btn-secondary gf-edit-zone" data-id="' + zone.id + '" title="Edit"><i class="fa-solid fa-pen" style="font-size:11px;"></i></button>' +
+                                    '<button class="btn btn-sm p-0 px-1 taa-btn-attention gf-toggle-zone" data-id="' + zone.id + '" title="' + (zone.status === 'active' ? 'Pause' : 'Activate') + '"><i class="fa-solid fa-' + (zone.status === 'active' ? 'pause' : 'play') + '" style="font-size:11px;"></i></button>' +
+                                    '<button class="btn btn-sm p-0 px-1 taa-btn-critical gf-delete-zone" data-id="' + zone.id + '" title="Delete"><i class="fa-solid fa-trash" style="font-size:11px;"></i></button>' +
                                 '</div>' +
                             '</div>' +
                         '</div>';
@@ -1591,8 +1592,8 @@
             function gfActivateTool(tool) {
                 gfClearDrawing();
                 gfCurrentTool = tool;
-                $('#gf-tool-polygon').toggleClass('btn-primary btn-outline-primary', tool !== 'polygon').toggleClass('btn-primary', tool === 'polygon');
-                $('#gf-tool-circle').toggleClass('btn-primary btn-outline-primary', tool !== 'circle').toggleClass('btn-primary', tool === 'circle');
+                $('#gf-tool-polygon').toggleClass('taa-btn-primary taa-btn-secondary', tool !== 'polygon').toggleClass('taa-btn-primary', tool === 'polygon');
+                $('#gf-tool-circle').toggleClass('taa-btn-primary taa-btn-secondary', tool !== 'circle').toggleClass('taa-btn-primary', tool === 'circle');
 
                 if (tool === 'polygon') {
                     $('#gf-draw-status').text('Click on the map to place polygon points. Double-click or click first point to close.');
@@ -1728,7 +1729,7 @@
                 gfMap && gfMap.setOptions({ draggableCursor: null });
                 $('#gf-draw-status').text('');
                 $('#gf-tool-undo, #gf-tool-clear').prop('disabled', true);
-                $('#gf-tool-polygon, #gf-tool-circle').removeClass('btn-primary').addClass('btn-outline-primary');
+                $('#gf-tool-polygon, #gf-tool-circle').removeClass('taa-btn-primary').addClass('taa-btn-secondary');
                 gfUpdateSaveButton();
             }
 

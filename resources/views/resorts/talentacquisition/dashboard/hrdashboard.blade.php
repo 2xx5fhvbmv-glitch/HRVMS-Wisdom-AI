@@ -20,7 +20,7 @@
                 </div>
                 <div class="col-auto">
                     <div class="d-flex justify-content-end">
-                        <a href="{{ route('resort.vacancies.create') }}" class="btn btn-theme @if(App\Helpers\Common::checkRouteWisePermission('resort.vacancies.FreshApplicant',config('settings.resort_permissions.create')) == false) d-none @endif">New Hire</a>
+                        <a href="{{ route('resort.vacancies.create') }}" class="btn ta-btn-accent @if(App\Helpers\Common::checkRouteWisePermission('resort.vacancies.FreshApplicant',config('settings.resort_permissions.create')) == false) d-none @endif">New Hire</a>
                     </div>
                 </div>
             </div>
@@ -397,42 +397,37 @@
             </div>
         </div>
         <div class="col-lg-3 col-md-6">
-            <div class="card card-wiINsight card-wiINsightTa ta-toprow-card" id="card-wiINsightTa">
+            <div class="card card-wiINsight card-wiINsightTa ta-toprow-card wai-narrative" id="card-wiINsightTa">
                 @php $taMeta = $taInsights['_meta'] ?? null; @endphp
-                <div class="card-title">
-                    <div class="row justify-content-between align-items-center g-md-3 g-1">
-                        <div class="col">
-                            <h3 class="text-nowrap">WAI Insights</h3>
-                        </div>
-                        <div class="col-auto text-end" style="font-size:12px;line-height:1.3;">
-                            @if($taMeta)
-                                <div class="text-muted">Updated {{ $taMeta['generated_at']->diffForHumans() }}</div>
-                                @if($taMeta['can_regenerate'])
-                                    <a href="?regenerate_insights=1" class="a-link">Regenerate</a>
-                                @else
-                                    <span class="text-muted" title="{{ $taMeta['next_available']->format('d M Y, H:i') }}">Regenerate {{ $taMeta['next_available']->diffForHumans() }}</span>
-                                @endif
+                <div class="wai-head">
+                    <h2>WAI Insights</h2>
+                    @if($taMeta)
+                        <div class="wai-head-meta">
+                            <span>Updated {{ $taMeta['generated_at']->diffForHumans() }}</span>
+                            @if($taMeta['can_regenerate'])
+                                <a href="?regenerate_insights=1">Regenerate</a>
+                            @else
+                                <span title="{{ $taMeta['next_available']->format('d M Y, H:i') }}">&middot; Regenerate {{ $taMeta['next_available']->diffForHumans() }}</span>
                             @endif
                         </div>
-                    </div>
+                    @endif
                 </div>
-                <div class="leaveUser-main">
+                <div class="leaveUser-main wai-narrative-body">
                     @foreach([['key'=>'rejection','modal'=>'taInsightRejectionModal'],['key'=>'funnel','modal'=>'taInsightFunnelModal'],['key'=>'acceptance','modal'=>'taInsightAcceptanceModal'],['key'=>'tth','modal'=>'taInsightTthModal'],['key'=>'demand','modal'=>'taInsightDemandModal']] as $tc)
-                    <div class="leaveUser-block">
-                        <div class="img">
-                            <img src="{{ URL::asset('resorts_assets/images/wisdom-ai-small.svg') }}" alt="image">
-                        </div>
-                        <div>
-                            <h6>{{ $taInsights[$tc['key']]['title'] ?? '' }}</h6>
-                            <p>{{ $taInsights[$tc['key']]['body'] ?? '' }}</p>
-                            @if(!empty($taInsights[$tc['key']]['recommendation']))
-                                <p class="mb-2" style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $taInsights[$tc['key']]['recommendation'] }}</p>
-                            @endif
-                            <div>
-                                <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#{{ $tc['modal'] }}" class="a-link">View Details</a>
+                        @php $hasRecommendation = !empty($taInsights[$tc['key']]['recommendation']); @endphp
+                        <div class="wai-row">
+                            <div class="wai-row-icon {{ $hasRecommendation ? 'is-flagged' : 'is-ok' }}">
+                                <i class="fa-solid {{ $hasRecommendation ? 'fa-triangle-exclamation' : 'fa-check' }}"></i>
+                            </div>
+                            <div class="wai-row-body">
+                                <h6>{{ $taInsights[$tc['key']]['title'] ?? '' }}</h6>
+                                <p class="wai-row-text">{{ $taInsights[$tc['key']]['body'] ?? '' }}</p>
+                                @if($hasRecommendation)
+                                    <p class="wai-row-recommendation"><strong>Recommendation:</strong> {{ $taInsights[$tc['key']]['recommendation'] }}</p>
+                                @endif
+                                <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#{{ $tc['modal'] }}" class="wai-row-link">View details &rarr;</a>
                             </div>
                         </div>
-                    </div>
                     @endforeach
                 </div>
             </div>
@@ -454,9 +449,9 @@
                 <div class="respond-main"></div>
             </div>
             <div class="modal-footer justify-content-center">
-                <a href="#respond-HoldModel" id="holdResponseModel" data-bs-toggle="modal"  data-bs-dismiss="modal" class="btn btn-themeSkyblue">On Hold</a>
-                <a href="#respond-rejectModal" id="RejectResponseModel" data-bs-toggle="modal" data-bs-dismiss="modal" class="btn btn-danger">Reject</a>
-                <a href="javascript:void(0)" id="ApprovedResponseModel" data-bs-toggle="modal" data-bs-dismiss="modal" class="btn btn-themeBlue">Approved</a>
+                <a href="#respond-HoldModel" id="holdResponseModel" data-bs-toggle="modal"  data-bs-dismiss="modal" class="btn ta-btn-attention">On Hold</a>
+                <a href="#respond-rejectModal" id="RejectResponseModel" data-bs-toggle="modal" data-bs-dismiss="modal" class="btn ta-btn-attention">Reject</a>
+                <a href="javascript:void(0)" id="ApprovedResponseModel" data-bs-toggle="modal" data-bs-dismiss="modal" class="btn ta-btn-positive">Approved</a>
             </div>
         </div>
     </div>
@@ -482,8 +477,8 @@
                     </div>
                 </div>
                 <div class="modal-footer justify-content-center">
-                    <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                    <button type="submit" class="btn btn-themeBlue">Submit</button>
+                    <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Cancel</a>
+                    <button type="submit" class="btn ta-btn-primary">Submit</button>
                 </div>
             </form>
 
@@ -508,8 +503,8 @@
                     <input type="hidden" id="Rejectio_ta_id" name="Rejectio_ta_id">
 
                     <div class="modal-footer justify-content-center">
-                        <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                        <button type="submit"  class="btn btn-themeBlue">Submit</button>
+                        <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Cancel</a>
+                        <button type="submit"  class="btn ta-btn-primary">Submit</button>
                     </div>
                 </form>
             </div>
@@ -528,7 +523,7 @@
                 <img src="{{ URL::asset('resorts_assets/images/check-circle.svg')}}" alt="icon">
                 <h4>submission confirmation</h4>
                 <p id="rejaction_msg"></p>
-                <a href="#" data-bs-dismiss="modal" class="btn btn-themeBlue">Close</a>
+                <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary">Close</a>
             </div>
 
         </div>
@@ -556,8 +551,8 @@
                     </div>
                 </div>
                 <div class="modal-footer justify-content-center">
-                    <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                    <button type="submit" class="btn btn-theme">Submit</button>
+                    <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Cancel</a>
+                    <button type="submit" class="btn ta-btn-primary">Submit</button>
                 </div>
             </form>
 
@@ -600,8 +595,8 @@
 
                 </div>
                 <div class="modal-footer justify-content-center">
-                    <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                    <button type="submit" class="btn btn-theme">Submit</button>
+                    <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Cancel</a>
+                    <button type="submit" class="btn ta-btn-primary">Submit</button>
 
                 </div>
             </form>
@@ -629,8 +624,8 @@
                 <input type="hidden" id="review_email_template_id" value="">
             </div>
             <div class="modal-footer justify-content-center">
-                <a href="javascript:void(0)" id="cancelPendingInterview" class="btn btn-themeGray ms-auto">Cancel</a>
-                <a href="javascript:void(0)" id="confirmSendInterviewEmail" class="btn btn-theme">Submit</a>
+                <a href="javascript:void(0)" id="cancelPendingInterview" class="btn ta-btn-secondary ms-auto">Cancel</a>
+                <a href="javascript:void(0)" id="confirmSendInterviewEmail" class="btn ta-btn-attention">Submit</a>
             </div>
 
         </div>
@@ -648,8 +643,8 @@
                 <p><strong>Are you sure?</strong></p>
             </div>
             <div class="modal-footer justify-content-center">
-                <a href="javascript:void(0)" id="cancelSlotNo" class="btn btn-themeGray ms-auto">No, Go Back</a>
-                <a href="javascript:void(0)" id="cancelSlotYes" class="btn btn-danger">Yes, Delete Slot</a>
+                <a href="javascript:void(0)" id="cancelSlotNo" class="btn ta-btn-secondary ms-auto">No, Go Back</a>
+                <a href="javascript:void(0)" id="cancelSlotYes" class="btn ta-btn-critical">Yes, Delete Slot</a>
             </div>
         </div>
     </div>
@@ -672,8 +667,8 @@
                     <input type="hidden" name="Interview_id" id="MeetingLink_Interview_id">
                 </div>
                 <div class="modal-footer">
-                    <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                    <button type="submit" class="btn btn-themeBlue">Submit</button>
+                    <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Cancel</a>
+                    <button type="submit" class="btn ta-btn-primary">Submit</button>
                 </div>
             </form>
         </div>
@@ -702,7 +697,7 @@
                     </button>
                 </div>
                 <div class="text-center mb-sm-4 mb-3">
-                    <a href="javascript:void(0)" class="DowloadAdvertisement btn btn-themeSkyblue btn-sm">Download</a>
+                    <a href="javascript:void(0)" class="DowloadAdvertisement btn ta-btn-secondary btn-sm">Download</a>
                 </div>
                 <div class="input-group mb-sm-4 mb-3">
                     <input type="text" class="form-control datepicker" name="link_Expiry_date" id="link_Expiry_date" placeholder="Expiry Date" />
@@ -722,8 +717,8 @@
             </div>
 
             <div class="modal-footer justify-content-center">
-                <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                <button  class="btn btn-theme JdSumit">Submit</button>
+                <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Cancel</a>
+                <button  class="btn ta-btn-primary JdSumit">Submit</button>
             </div>
 
         </div>
@@ -736,6 +731,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts.talentacquisition._ta_buttons_v2_styles')
 <style>
     /* WAI Insights — third column alongside Talent Pool & New Hire Requests.
        Fixed height (aligns with the 450px Talent Pool card) with the insight
@@ -745,12 +741,47 @@
         max-height: 450px !important;
         display: flex;
         flex-direction: column;
+        padding: 0;
+        overflow: hidden;
+        border-radius: 16px;
     }
     .card-wiINsightTa .leaveUser-main {
         flex: 1 1 auto;
         min-height: 0;
         overflow-y: auto;
     }
+
+    /* WAI Insights — same gradient header as the other WAI Insights cards
+       (Time and Attendance, Payroll). This card's own 5 checks (rejection,
+       funnel, acceptance, time-to-hire, demand) are narrative AI insights —
+       title + descriptive body + optional recommendation — not pass/fail
+       compliance counts, so no hero/count here either, same reasoning as
+       Payroll's version: icon is amber when there's a recommendation worth
+       acting on, teal tick when the insight is purely informational. */
+    .wai-narrative .wai-head { position: relative; overflow: hidden; padding: 17px 18px; flex-shrink: 0; }
+    .wai-narrative .wai-head::before {
+        content: ""; position: absolute; inset: 0; pointer-events: none;
+        background: linear-gradient(110deg, #014653 0%, #0e8a9e 40%, #7fa61e 70%, #e0ff02 100%);
+    }
+    .wai-narrative .wai-head::after {
+        content: ""; position: absolute; inset: 0; pointer-events: none;
+        background: linear-gradient(110deg, rgba(1,40,48,.35), transparent 55%);
+    }
+    .wai-narrative .wai-head h2 { position: relative; color: #fff; font-size: 15px; font-weight: 800; margin: 0; }
+    .wai-narrative .wai-head-meta { position: relative; margin-top: 4px; font-size: 11.5px; color: rgba(255,255,255,.75); display: flex; gap: 6px; }
+    .wai-narrative .wai-head-meta a { color: #fff; font-weight: 600; text-decoration: underline; }
+
+    .wai-narrative-body { padding: 16px; }
+    .wai-narrative .wai-row { display: flex; align-items: flex-start; gap: 12px; padding: 12px 2px; border-bottom: 1px solid #F2F6F6; }
+    .wai-narrative .wai-row:last-child { border-bottom: none; }
+    .wai-narrative .wai-row-icon { width: 32px; height: 32px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; margin-top: 2px; }
+    .wai-narrative .wai-row-icon.is-ok { background: #E9F7F0; color: #1F9D6B; }
+    .wai-narrative .wai-row-icon.is-flagged { background: #FBF0DC; color: #D98A00; }
+    .wai-narrative .wai-row-body { flex: 1 1 auto; min-width: 0; }
+    .wai-narrative .wai-row-body h6 { margin: 0 0 4px; font-size: 13.5px; font-weight: 700; color: #14232A; }
+    .wai-narrative .wai-row-text { margin: 0 0 4px; font-size: 12.5px; color: #5D6F75; line-height: 1.5; }
+    .wai-narrative .wai-row-recommendation { margin: 0 0 4px; font-size: 12.5px; color: #0e8a9e; line-height: 1.5; }
+    .wai-narrative .wai-row-link { display: inline-block; margin-top: 2px; font-size: 12px; font-weight: 600; color: #014653; }
     .th-upcoming-footer {
         display: flex;
         align-items: center;

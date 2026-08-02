@@ -56,7 +56,7 @@
                                         <input type="hidden" name="interviewee_id" id="interviewee_id" value="{{ $interviewee_id }}"/>
 
                                         <div id="form-render"></div>
-                                        <button type="submit" class="btn btn-themeBlue btn-sm mt-3">Submit</button>
+                                        <button type="submit" class="btn ta-btn-primary btn-sm mt-3">Submit</button>
                                     </form>
                                 </div>
                                 @else
@@ -74,6 +74,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts.talentacquisition._ta_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')

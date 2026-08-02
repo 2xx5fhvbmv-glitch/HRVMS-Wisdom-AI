@@ -19,7 +19,7 @@
                         </div>
                     </div>
                     {{-- <div class="col-auto ms-auto">
-                        <a href="{{ route('resort.ta.shortlistedapplicants') }}" class="btn btn-themeLightNew">Shortlisted Applicants To share Link</a>
+                        <a href="{{ route('resort.ta.shortlistedapplicants') }}" class="btn ta-btn-secondary">Shortlisted Applicants To share Link</a>
                     </div> --}}
                     <!-- <div class="col-auto">
                         <div class="d-flex justify-content-end">
@@ -81,6 +81,7 @@
     @endsection
 
 @section('import-css')
+@include('resorts.talentacquisition._ta_buttons_v2_styles')
 
 @endsection
 

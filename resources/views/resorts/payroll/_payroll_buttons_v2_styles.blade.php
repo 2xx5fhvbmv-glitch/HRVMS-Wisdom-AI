@@ -133,6 +133,22 @@
         box-shadow: 0 8px 18px -8px rgba(0,0,0,.35);
     }
 
+    /* The one true "we did it" moment — brand gradient. Payroll is mostly
+       too serious for this (see file header reasoning elsewhere in this
+       module), but a batch of transactions closing out — Mark Selected as
+       Paid — is the one genuine "this is settled" completion. Only ever
+       one of these per page. */
+    .payroll-btn-celebrate {
+        background: linear-gradient(135deg, #014653, #E0FF02);
+        color: #fff;
+    }
+    .payroll-btn-celebrate:hover {
+        background: linear-gradient(135deg, #013641, #c7e102);
+        color: #fff;
+        transform: translateY(-2px);
+        box-shadow: 0 10px 22px -8px rgba(1,70,83,.45);
+    }
+
     /* Saved, not final — Save as Draft. Its own neutral weight so it
        doesn't read as identical to Cancel or as heavy as the Primary
        Submit action. */
@@ -171,7 +187,8 @@
     .payroll-btn-accent:active,
     .payroll-btn-neutral:active,
     .payroll-btn-critical:active,
-    .payroll-btn-ghost:active {
+    .payroll-btn-ghost:active,
+    .payroll-btn-celebrate:active {
         transition-duration: .07s;
         transform: translateY(0) scale(.94);
         box-shadow: 0 1px 1px rgba(0,0,0,.04);

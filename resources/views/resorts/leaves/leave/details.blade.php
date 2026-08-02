@@ -51,7 +51,7 @@
                                 </div>
                             </div>
                             <div class="col-auto">
-                            <a href="{{ route('leave.history.download-pdf', ['empID' => base64_encode($empID)]) }}" class="btn btn-themeSkyblue btn-sm">Download PDF</a>
+                            <a href="{{ route('leave.history.download-pdf', ['empID' => base64_encode($empID)]) }}" class="btn leave-btn-secondary btn-sm">Download PDF</a>
 
                             </div>
                     </div>
@@ -277,20 +277,20 @@
                     @if($canApproveThisLeave ?? false)
                     <div class="card-footer bg-light border-top py-3">
                         <div class="d-flex flex-wrap align-items-center gap-2">
-                            <button class="btn btn-themeBlue btn-sm approve-btn @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.edit')) == false) d-none @endif" data-leave-id="{{$leaveDetail->id}}">Approve</button>
-                            <button class="btn btn-danger btn-sm reject-btn @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.edit')) == false) d-none @endif" data-leave-id="{{$leaveDetail->id}}">Reject</button>
+                            <button class="btn leave-btn-positive btn-sm approve-btn @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.edit')) == false) d-none @endif" data-leave-id="{{$leaveDetail->id}}">Approve</button>
+                            <button class="btn leave-btn-critical btn-sm reject-btn @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.edit')) == false) d-none @endif" data-leave-id="{{$leaveDetail->id}}">Reject</button>
                             {{-- Commented out per request — not needed for now.
                             <a href="#" class="btn btn-link btn-sm text-decoration-none" id="recommendDateBtn" data-leave-id="{{$leaveDetail->id}}">Recommend alternative date</a>
                             --}}
                             @if($available_rank == "HR")
-                                <button type="button" data-leave-id="{{$leaveDetail->id}}" id="sentEmailToTravelPartner" class="btn btn-themeSkyblue btn-sm ms-auto">Send Email To Travel Partner</button>
+                                <button type="button" data-leave-id="{{$leaveDetail->id}}" id="sentEmailToTravelPartner" class="btn leave-btn-secondary btn-sm ms-auto">Send Email to Travel Partner</button>
                             @endif
                         </div>
                     </div>
                     @elseif($available_rank == "HR")
                     <div class="card-footer bg-light border-top py-3">
                         <div class="d-flex justify-content-end">
-                            <button type="button" data-leave-id="{{$leaveDetail->id}}" id="sentEmailToTravelPartner" class="btn btn-themeSkyblue btn-sm">Send Email To Travel Partner</button>
+                            <button type="button" data-leave-id="{{$leaveDetail->id}}" id="sentEmailToTravelPartner" class="btn leave-btn-secondary btn-sm">Send Email to Travel Partner</button>
                         </div>
                     </div>
                     @endif
@@ -425,7 +425,7 @@
                             <label for="comments" class="form-label">Reason/Comments <span class="req_span">*</span></label>
                             <textarea class="form-control" id="comments" name="comments" rows="3" required></textarea>
                         </div>
-                        <button type="submit" class="btn btn-primary">Submit</button>
+                        <button type="submit" class="btn leave-btn-primary">Submit</button>
                     </form>
                 </div>
             </div>
@@ -442,8 +442,8 @@
                     <textarea id="rejectionReason" class="form-control" rows="3" placeholder="Enter a reason (optional)"></textarea>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" id="confirmRejectBtn" class="btn btn-danger">Reject</button>
+                    <button type="button" class="btn leave-btn-neutral" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" id="confirmRejectBtn" class="btn leave-btn-critical">Reject</button>
                 </div>
             </div>
         </div>
@@ -506,6 +506,7 @@
             </div>
         </div>
     </div>
+@include('resorts.leaves._leave_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -657,7 +658,7 @@
                     defaultContent: '',
                     render: function (data) {
                         var id = (data != null && data !== '') ? String(data) : '';
-                        return '<a href="#" class="btn btn-sm btn-link p-0 view-history-detail" data-leave-id="' + id + '" title="View"><i class="fa-regular fa-eye"></i></a>';
+                        return '<a href="#" class="eye-btn view-history-detail" data-leave-id="' + id + '" title="View"><i class="fa-regular fa-eye"></i></a>';
                     }
                 }
             ]

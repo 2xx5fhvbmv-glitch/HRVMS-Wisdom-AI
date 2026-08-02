@@ -39,7 +39,7 @@
                             <div class="col-xl-2 col-md-3 col-sm-4 col-6">
                                 <select class="form-select" id="complianceSelect">
                                     <option value="Approved" selected>Compliance Passed</option>
-                                    <option value="Rejected">Compliance  Rejeted</option>
+                                    <option value="Rejected">Compliance Rejected</option>
                                 </select>
                             </div>
                         </div>
@@ -90,8 +90,8 @@
                     <div class="modal-footer">
                         {{-- <a href="#" class="btn btn-themeBlue">Save As Draft</a>
                         <a href="#" class="a-link">View</a> --}}
-                        <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                        <button type="submit" class="btn btn-themeBlue">Submit</button>
+                        <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Cancel</a>
+                        <button type="submit" class="btn ta-btn-primary">Submit</button>
                     </div>
                 </form>
             </div>
@@ -117,7 +117,7 @@
 
                     </div>
                     <div class="modal-footer">
-                        <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
+                        <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Cancel</a>
                     </div>
                 </form>
             </div>
@@ -126,6 +126,7 @@
     @endsection
 
     @section('import-css')
+@include('resorts.talentacquisition._ta_buttons_v2_styles')
     @endsection
 
     @section('import-scripts')

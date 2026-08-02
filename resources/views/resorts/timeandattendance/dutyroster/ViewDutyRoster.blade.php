@@ -177,7 +177,7 @@
                                                                                             @endphp
                                                                                             @if(!empty($sectionData['employees']))
                                                                                                 @foreach ($sectionData['employees'] as $r)
-                                                                                                    <tr id="duty-roster-emp-{{ $r->emp_id }}">
+                                                                                                    <tr id="duty-roster-emp-{{ $r->emp_id }}" class="emp-collapsed">
                                                                                                         <td>
                                                                                                             <div class="createDuty-user d-flex justify-content-between align-items-center">
                                                                                                                 <div class="d-flex align-items-center">
@@ -303,7 +303,7 @@
                                                                                                                         <div class="createDuty-tableBlock dayoff-cell">
                                                                                                                             <div class="createDuty-dayoff">Day Off</div>
                                                                                                                             <p class="text-end mb-0 mt-1">
-                                                                                                                                <button class="editIcon-btn editdutyRoster"
+                                                                                                                                <button class="editIcon-btn taa-btn-secondary editdutyRoster"
                                                                                                                                         data-date="{{ date('d/m/Y', strtotime($h['date'])) }}"
                                                                                                                                         data-Shift_id="{{ $shiftData->Shift_id ?? '' }}"
                                                                                                                                         data-OverTime="00:00"
@@ -379,7 +379,7 @@
                                                                                                                                 <p class="ot-none">OT: 0 hr</p>
                                                                                                                             @endif
                                                                                                                             <p>
-                                                                                                                                <button class="editIcon-btn editdutyRoster"
+                                                                                                                                <button class="editIcon-btn taa-btn-secondary editdutyRoster"
                                                                                                                                         data-date="{{ date('d/m/Y', strtotime($h['date'])) }}"
                                                                                                                                         data-Shift_id="{{ $shiftData->Shift_id ?? '' }}"
                                                                                                                                         data-OverTime="{{ $displayOverTime }}"
@@ -400,7 +400,7 @@
                                                                                                                     <div class="createDuty-tableBlock createDuty-unassigned">
                                                                                                                         <div class="createDuty-empty">No Shift Assigned</div>
                                                                                                                         <p class="text-end mb-0 mt-1">
-                                                                                                                            <button class="editIcon-btn editdutyRoster"
+                                                                                                                            <button class="editIcon-btn taa-btn-secondary editdutyRoster"
                                                                                                                                     data-date="{{ date('d/m/Y', strtotime($h['date'])) }}"
                                                                                                                                     data-Shift_id=""
                                                                                                                                     data-OverTime="00:00"
@@ -570,7 +570,7 @@
                                                                         $departmentViewEmployees = [];
                                                                     @endphp
                                                                         @foreach ($deptData['employees'] as $r)
-                                                                            <tr id="duty-roster-emp-{{ $r->emp_id }}">
+                                                                            <tr id="duty-roster-emp-{{ $r->emp_id }}" class="emp-collapsed">
                                                                                 <td>
                                                                                     <div class="createDuty-user d-flex justify-content-between align-items-center">
                                                                                         <div class="d-flex align-items-center">
@@ -748,7 +748,7 @@
                                                                                                         <p class="ot-none">OT: 0 hr</p>
                                                                                                     @endif
                                                                                                     <p>
-                                                                                                        <button class="editIcon-btn editdutyRoster"
+                                                                                                        <button class="editIcon-btn taa-btn-secondary editdutyRoster"
                                                                                                                 data-date="{{ date('d/m/Y', strtotime($h['date'])) }}"
                                                                                                                 data-Shift_id="{{ $shiftData->Shift_id ?? '' }}"
                                                                                                                 data-OverTime="{{ $displayOverTime2 }}"
@@ -768,7 +768,7 @@
                                                                                             <div class="createDuty-tableBlock createDuty-unassigned">
                                                                                                 <div class="createDuty-empty">No Shift Assigned</div>
                                                                                                 <p class="text-end mb-0 mt-1">
-                                                                                                    <button class="editIcon-btn editdutyRoster"
+                                                                                                    <button class="editIcon-btn taa-btn-secondary editdutyRoster"
                                                                                                             data-date="{{ date('d/m/Y', strtotime($h['date'])) }}"
                                                                                                             data-Shift_id=""
                                                                                                             data-OverTime="00:00"
@@ -974,8 +974,8 @@
 
                     </div>
                     <div class="modal-footer justify-content-center">
-                        <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                        <button type="submit"   class="btn btn-theme" >Submit</button>
+                        <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn taa-btn-secondary ms-auto">Cancel</a>
+                        <button type="submit"   class="btn taa-btn-primary" >Submit</button>
                     </div>
                 </form>
             </div>
@@ -985,6 +985,7 @@
     @endsection
 
 @section('import-css')
+@include('resorts.timeandattendance._taa_buttons_v2_styles')
 <style>
     /* Day Off cell: show "Day Off" for whole column, no shift details */
     .createDuty-tableBlock.dayoff-cell {

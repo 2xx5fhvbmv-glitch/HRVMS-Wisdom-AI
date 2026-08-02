@@ -59,7 +59,7 @@
                             <input type="checkbox" class="form-check-input" id="payment-check-all" aria-label="Check all">
                             <label class="form-check-label small" for="payment-check-all">Check all</label>
                         </div>
-                        <button type="button" id="payment-bulk-paid-btn" class="btn payroll-btn-positive btn-sm">
+                        <button type="button" id="payment-bulk-paid-btn" class="btn payroll-btn-celebrate btn-sm">
                             <i class="fa-solid fa-check-double me-1"></i> Mark selected as Paid
                         </button>
                     </div>

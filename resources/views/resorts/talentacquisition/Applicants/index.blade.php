@@ -19,16 +19,12 @@
                         </div>
                     </div>
                     <div class="col-auto ms-auto">
-                        <a href="{{ route('resort.ta.shortlistedapplicants') }}" class="btn btn-themeLightNew">Shortlisted Applicants</a>
-                    </div>
-                    <div class="col-auto">
-                        <a href="{{route('resort.ta.UpcomingApplicants')}}" class="btn btn-themeLightNew">Upcoming Interviews</a>
-                    </div>
-                    <div class="col-auto">
-                        <a href="{{ route('resort.ta.RejectedApplicants') }}" class="btn btn-themeLightNew">Rejected Applications</a>
-                    </div>
-                    <div class="col-auto">
-                        <a href="{{ route('resort.ta.ReviewReminders') }}" class="btn btn-themeLightNew">Review Reminders</a>
+                        <div class="ta-tabnav">
+                            <a href="{{ route('resort.ta.shortlistedapplicants') }}">Shortlisted Applicants</a>
+                            <a href="{{route('resort.ta.UpcomingApplicants')}}">Upcoming Interviews</a>
+                            <a href="{{ route('resort.ta.RejectedApplicants') }}">Rejected Applications</a>
+                            <a href="{{ route('resort.ta.ReviewReminders') }}">Review Reminders</a>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -100,8 +96,8 @@
                         <input type="hidden" id="Applicant_id" name="Applicant_id">
 
                         <div class="modal-footer justify-content-center">
-                            <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                            <button type="submit"  class="btn btn-themeBlue">Submit</button>
+                            <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Cancel</a>
+                            <button type="submit"  class="btn ta-btn-primary">Submit</button>
                         </div>
                     </form>
                 </div>
@@ -125,13 +121,13 @@
                     </div>
                     <!-- <div class="text-center mb-2">
                         <a href="#shareMeetLink-modal" data-bs-toggle="modal" data-bs-dismiss="modal"
-                            class="btn btn-themeSkyblue btn-sm">Share
+                            class="btn ta-btn-secondary btn-sm">Share
                             Meeting Link</a>
                     </div> -->
                 </div>
                 <div class="modal-footer">
-                    <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                    <a href="#" class="btn btn-themeBlue">Submit</a>
+                    <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Cancel</a>
+                    <a href="#" class="btn ta-btn-primary">Submit</a>
                 </div>
             </div>
         </div>
@@ -155,8 +151,8 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                    <a href="#" data-bs-dismiss="modal" class="btn btn-themeBlue">Submit</a>
+                    <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Cancel</a>
+                    <a href="#" data-bs-dismiss="modal" class="btn ta-btn-primary">Submit</a>
                 </div>
             </div>
         </div>
@@ -188,8 +184,8 @@
                         </div>
                     </div>
                     <div class="modal-footer justify-content-center">
-                        <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                        <button type="submit" class="btn btn-theme">Submit</button>
+                        <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Cancel</a>
+                        <button type="submit" class="btn ta-btn-primary">Submit</button>
                     </div>
                 </form>
 
@@ -226,8 +222,8 @@
 
                     </div>
                     <div class="modal-footer justify-content-center">
-                        <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                        <button type="submit" class="btn btn-theme">Submit</button>
+                        <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Cancel</a>
+                        <button type="submit" class="btn ta-btn-primary">Submit</button>
 
                     </div>
                 </form>
@@ -253,8 +249,8 @@
                     <input type="hidden" id="review_email_template_id" value="">
                 </div>
                 <div class="modal-footer justify-content-center">
-                    <a href="javascript:void(0)" id="cancelPendingInterview" class="btn btn-themeGray ms-auto">Cancel</a>
-                    <a href="javascript:void(0)" id="confirmSendInterviewEmail" class="btn btn-theme">Submit</a>
+                    <a href="javascript:void(0)" id="cancelPendingInterview" class="btn ta-btn-secondary ms-auto">Cancel</a>
+                    <a href="javascript:void(0)" id="confirmSendInterviewEmail" class="btn ta-btn-attention">Submit</a>
                 </div>
 
             </div>
@@ -271,8 +267,8 @@
                     <p><strong>Are you sure?</strong></p>
                 </div>
                 <div class="modal-footer justify-content-center">
-                    <a href="javascript:void(0)" id="cancelSlotNo" class="btn btn-themeGray ms-auto">No, Go Back</a>
-                    <a href="javascript:void(0)" id="cancelSlotYes" class="btn btn-danger">Yes, Delete Slot</a>
+                    <a href="javascript:void(0)" id="cancelSlotNo" class="btn ta-btn-secondary ms-auto">No, Go Back</a>
+                    <a href="javascript:void(0)" id="cancelSlotYes" class="btn ta-btn-critical">Yes, Delete Slot</a>
                 </div>
             </div>
         </div>
@@ -299,8 +295,8 @@
                         <input type="hidden" id="EmailTemplate1" name="EmailTemplate">
                     </div>
                     <div class="modal-footer">
-                        <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                        <button type="submit" class="btn btn-themeBlue">Submit</button>
+                        <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Cancel</a>
+                        <button type="submit" class="btn ta-btn-primary">Submit</button>
                     </div>
                 </form>
             </div>
@@ -318,8 +314,8 @@
                     <p id="confirm-action-message">Are you sure you want to proceed?</p>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-themeGray" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-themeBlue" id="confirm-action-yes">Yes, Proceed</button>
+                    <button type="button" class="btn ta-btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn ta-btn-primary" id="confirm-action-yes">Yes, Proceed</button>
                 </div>
             </div>
         </div>
@@ -349,8 +345,8 @@
                     </div>
                     </div>
                     <div class="modal-footer">
-                        <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                        <button type="submit" class="btn btn-themeBlue">Submit</button>
+                        <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Cancel</a>
+                        <button type="submit" class="btn ta-btn-primary">Submit</button>
                     </div>
                 </form>
             </div>
@@ -364,7 +360,7 @@
             <div class="modal-header">
                     <h5 class="modal-title" id="staticBackdropLabel">Download File</h5>
                 
-                    <a href="" class="btn btn-smbtn-primary downloadLink" target="_blank"> Download</a>
+                    <a href="" class="btn ta-btn-secondary btn-sm downloadLink" target="_blank"> Download</a>
                 
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
@@ -377,7 +373,7 @@
                     
                     </div>
                     <div class="modal-footer">
-                        <a href="javascript:void(0)" id="document-dismiss" class="btn btn-themeGray ms-auto">Cancel</a>
+                        <a href="javascript:void(0)" id="document-dismiss" class="btn ta-btn-secondary ms-auto">Cancel</a>
                     </div>
     
             </div>
@@ -418,8 +414,8 @@
                         <input type="hidden" name="applicantstatusid" id="reject_applicantstatusid">
                     </div>
                     <div class="modal-footer">
-                        <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                        <button type="submit" class="btn btn-danger">Confirm Reject</button>
+                        <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Cancel</a>
+                        <button type="submit" class="btn ta-btn-critical">Confirm Reject</button>
                     </div>
                 </form>
             </div>
@@ -456,8 +452,8 @@
                         <input type="hidden" name="applicantstatusid" id="select_applicantstatusid">
                     </div>
                     <div class="modal-footer">
-                        <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                        <button type="submit" class="btn btn-success">Confirm Select</button>
+                        <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Cancel</a>
+                        <button type="submit" class="btn ta-btn-celebrate">Confirm Select</button>
                     </div>
                 </form>
             </div>
@@ -512,8 +508,8 @@
                         <input type="hidden" name="applicant_status_id" id="offerLetter_applicantstatusid">
                     </div>
                     <div class="modal-footer">
-                        <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                        <button type="submit" class="btn btn-themeBlue">Send Offer Letter</button>
+                        <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Cancel</a>
+                        <button type="submit" class="btn ta-btn-attention">Send Offer Letter</button>
                     </div>
                 </form>
             </div>
@@ -568,8 +564,8 @@
                         <input type="hidden" name="applicant_status_id" id="contract_applicantstatusid">
                     </div>
                     <div class="modal-footer">
-                        <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                        <button type="submit" class="btn btn-themeBlue">Send Contract</button>
+                        <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Cancel</a>
+                        <button type="submit" class="btn ta-btn-attention">Send Contract</button>
                     </div>
                 </form>
             </div>
@@ -588,7 +584,7 @@
                     <!-- filled by JS -->
                 </div>
                 <div class="modal-footer">
-                    <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Close</a>
+                    <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Close</a>
                 </div>
             </div>
         </div>
@@ -597,6 +593,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts.talentacquisition._ta_buttons_v2_styles')
 <style>
     .toast-bottom-right {
     bottom: 12px;
@@ -701,12 +698,12 @@
                                                 data-Resort_id="${response.data.Resort_id}"
                                                 data-ApplicantID="${response.data.ApplicantID}"
                                                 data-ApplicantStatus_id="${response.data.ApplicantStatus_id}"
-                                                class="btn btn-themeSkyblue btn-small SortlistedEmployee">Send Interview Invitation</a>`;
+                                                class="btn ta-btn-attention btn-small SortlistedEmployee">Send Interview Invitation</a>`;
                                         }
                                         else if(response.data.InterviewStatus == "Pending Review")
                                         {
                                             newTag =`<a href="javascript:void(0)"
-                                                class="btn btn-warning btn-small confirmPendingReview"
+                                                class="btn ta-btn-attention btn-small confirmPendingReview"
                                                 data-interview_id="${response.data.Interview_id}"
                                                 data-email_template_id="${response.data.EmailTemplateId || ''}"
                                                 >Confirm & Send</a>`;
@@ -718,7 +715,7 @@
                                         else if(response.data.InterviewStatus =="Slot Booked" && !isNaN(response.data.MeetingLink) )
                                         {
 
-                                            newTag =`<a class="btn btn-themeSkyblue btn-small ApplicantShareLink"
+                                            newTag =`<a class="btn ta-btn-secondary btn-small ApplicantShareLink"
                                             data-round="${response.data.round}"
                                                 data-rank_name="${response.data.rank_name}"
                                             data-interview_id="${response.data.Interview_id}" href="javascript:void(0)">Add Interview Link</a>`;
@@ -726,7 +723,7 @@
                                         }
                                         else
                                         {
-                                            newTag =`<a href="${response.data.MeetingLink}" target="_blank" class="btn btn-themeSkyblue btn-small"
+                                            newTag =`<a href="${response.data.MeetingLink}" target="_blank" class="btn ta-btn-secondary btn-small"
                                             data-rond="${response.data.round}"
                                             data-rank_name="${response.data.rank_name}"
                                             data-interview_id="${response.data.Interview_id}" href="javascript:void(0)">Start Interview  </a>`;
@@ -748,7 +745,7 @@
                                                     data-Resort_id="${response.data.Resort_id}"
                                                     data-ApplicantID="${response.data.ApplicantID}"
                                                     data-ApplicantStatus_id="${nrApplicantStatusId}"
-                                                    class="btn btn-themeSkyblue btn-small SortlistedEmployee">Send Interview Invitation</a>`;
+                                                    class="btn ta-btn-attention btn-small SortlistedEmployee">Send Interview Invitation</a>`;
                                                 if (nr.InterviewStatus == 'Invitation Rejected') {
                                                     nrStatusBadge = `<span class="badge bg-danger">Invitation Rejected</span>${nr.interviewRejectionReason ? `<div class="mt-1 p-1" style="background:#fff3f3; border-left:2px solid #dc3545; border-radius:3px; font-size:12px;"><strong>Reason:</strong> ${nr.interviewRejectionReason}</div>` : ''}`;
                                                 }
@@ -756,13 +753,13 @@
                                                 nrAction = `<span class="badge bg-info text-white">Invitation Sent - Awaiting Response</span>`;
                                                 nrStatusBadge = `<span class="badge bg-info text-white">Invitation Sent</span>`;
                                             } else if (nr.InterviewStatus == 'Slot Booked' && (!nr.MeetingLink || !isNaN(nr.MeetingLink))) {
-                                                nrAction = `<a class="btn btn-themeSkyblue btn-small ApplicantShareLink"
+                                                nrAction = `<a class="btn ta-btn-secondary btn-small ApplicantShareLink"
                                                     data-round="${nr.round}"
                                                     data-rank_name="${nr.rank_name}"
                                                     data-interview_id="${nr.Interview_id}" href="javascript:void(0)">Add Interview Link</a>`;
                                                 nrStatusBadge = `<span class="badge bg-warning text-dark">Slot Booked</span>`;
                                             } else if (nr.InterviewStatus == 'Slot Booked' && nr.MeetingLink) {
-                                                nrAction = `<a href="${nr.MeetingLink}" target="_blank" class="btn btn-themeSkyblue btn-small">Start Interview</a>`;
+                                                nrAction = `<a href="${nr.MeetingLink}" target="_blank" class="btn ta-btn-secondary btn-small">Start Interview</a>`;
                                                 nrStatusBadge = `<span class="badge bg-success">Ready</span>`;
                                             }
 
@@ -858,14 +855,14 @@
                                                     </div>` : ''}
                                                     @if($isHrDepartment)
                                                     ${response.data.applicantStatusRaw == 'Offer Letter Rejected' ? `<div class="mt-2">
-                                                        <a href="javascript:void(0)" class="btn btn-themeSkyblue btn-sm sendOfferLetterBtn"
+                                                        <a href="javascript:void(0)" class="btn ta-btn-attention btn-sm sendOfferLetterBtn"
                                                             data-id="${response.data.ApplicantID}"
                                                             data-applicantstatusid="${response.data.ApplicantStatus_id}">
                                                             Resend Offer Letter
                                                         </a>
                                                     </div>` : ''}
                                                     ${response.data.applicantStatusRaw == 'Contract Rejected' ? `<div class="mt-2">
-                                                        <a href="javascript:void(0)" class="btn btn-themeSkyblue btn-sm sendContractBtn"
+                                                        <a href="javascript:void(0)" class="btn ta-btn-attention btn-sm sendContractBtn"
                                                             data-id="${response.data.ApplicantID}"
                                                             data-applicantstatusid="${response.data.ApplicantStatus_id}">
                                                             Resend Contract
@@ -937,11 +934,11 @@
                                             data-Resort_id="${response.data.Resort_id}"
                                             data-ApplicantID="${response.data.ApplicantID}"
                                             data-ApplicantStatus_id="${response.data.ApplicantStatus_id}"
-                                            class="btn btn-themeSkyblue btn-small SortlistedEmployee">Send Interview Request</a>`;
+                                            class="btn ta-btn-attention btn-small SortlistedEmployee">Send Interview Request</a>`;
                                     }
                                     else if(response.data.InterviewStatus == "Pending Review") {
                                         newTag =`<a href="javascript:void(0)"
-                                            class="btn btn-warning btn-small confirmPendingReview"
+                                            class="btn ta-btn-attention btn-small confirmPendingReview"
                                             data-interview_id="${response.data.Interview_id}"
                                             data-email_template_id="${response.data.EmailTemplateId || ''}"
                                             >Confirm & Send</a>`;
@@ -950,13 +947,13 @@
                                         newTag =`<span class="badge bg-info text-white">Invitation Sent - Awaiting Response</span>`;
                                     }
                                     else if(response.data.InterviewStatus =="Slot Booked" && !isNaN(response.data.MeetingLink)) {
-                                        newTag =`<a class="btn btn-themeSkyblue btn-small ApplicantShareLink"
+                                        newTag =`<a class="btn ta-btn-secondary btn-small ApplicantShareLink"
                                         data-round="${response.data.round}"
                                             data-rank_name="${response.data.rank_name}"
                                         data-interview_id="${response.data.Interview_id}" href="javascript:void(0)">Add Interview Link</a>`;
                                     }
                                     else {
-                                        newTag =`<a href="${response.data.MeetingLink}" target="_blank" class="btn btn-themeSkyblue btn-small"
+                                        newTag =`<a href="${response.data.MeetingLink}" target="_blank" class="btn ta-btn-secondary btn-small"
                                         data-rond="${response.data.round}"
                                         data-rank_name="${response.data.rank_name}"
                                         data-interview_id="${response.data.Interview_id}" href="javascript:void(0)">Start Interview  </a>`;
@@ -975,7 +972,7 @@
                                                 data-Resort_id="${response.data.Resort_id}"
                                                 data-ApplicantID="${response.data.ApplicantID}"
                                                 data-ApplicantStatus_id="${nrApplicantStatusId}"
-                                                class="btn btn-themeSkyblue btn-small SortlistedEmployee">Send Interview Invitation</a>`;
+                                                class="btn ta-btn-attention btn-small SortlistedEmployee">Send Interview Invitation</a>`;
                                             if (nr.InterviewStatus == 'Invitation Rejected') {
                                                 nrStatusBadge = `<span class="badge bg-danger">Invitation Rejected</span>${nr.interviewRejectionReason ? `<div class="mt-1 p-1" style="background:#fff3f3; border-left:2px solid #dc3545; border-radius:3px; font-size:12px;"><strong>Reason:</strong> ${nr.interviewRejectionReason}</div>` : ''}`;
                                             }
@@ -983,13 +980,13 @@
                                             nrAction = `<span class="badge bg-info text-white">Invitation Sent - Awaiting Response</span>`;
                                             nrStatusBadge = `<span class="badge bg-info text-white">Invitation Sent</span>`;
                                         } else if (nr.InterviewStatus == 'Slot Booked' && (!nr.MeetingLink || !isNaN(nr.MeetingLink))) {
-                                            nrAction = `<a class="btn btn-themeSkyblue btn-small ApplicantShareLink"
+                                            nrAction = `<a class="btn ta-btn-secondary btn-small ApplicantShareLink"
                                                 data-round="${nr.round}"
                                                 data-rank_name="${nr.rank_name}"
                                                 data-interview_id="${nr.Interview_id}" href="javascript:void(0)">Add Interview Link</a>`;
                                             nrStatusBadge = `<span class="badge bg-warning text-dark">Slot Booked</span>`;
                                         } else if (nr.InterviewStatus == 'Slot Booked' && nr.MeetingLink) {
-                                            nrAction = `<a href="${nr.MeetingLink}" target="_blank" class="btn btn-themeSkyblue btn-small">Start Interview</a>`;
+                                            nrAction = `<a href="${nr.MeetingLink}" target="_blank" class="btn ta-btn-secondary btn-small">Start Interview</a>`;
                                             nrStatusBadge = `<span class="badge bg-success">Ready</span>`;
                                         }
 
@@ -1085,14 +1082,14 @@
                                                 </div>` : ''}
                                                 @if($isHrDepartment)
                                                 ${response.data.applicantStatusRaw == 'Offer Letter Rejected' ? `<div class="mt-2">
-                                                    <a href="javascript:void(0)" class="btn btn-themeSkyblue btn-sm sendOfferLetterBtn"
+                                                    <a href="javascript:void(0)" class="btn ta-btn-attention btn-sm sendOfferLetterBtn"
                                                         data-id="${response.data.ApplicantID}"
                                                         data-applicantstatusid="${response.data.ApplicantStatus_id}">
                                                         Resend Offer Letter
                                                     </a>
                                                 </div>` : ''}
                                                 ${response.data.applicantStatusRaw == 'Contract Rejected' ? `<div class="mt-2">
-                                                    <a href="javascript:void(0)" class="btn btn-themeSkyblue btn-sm sendContractBtn"
+                                                    <a href="javascript:void(0)" class="btn ta-btn-attention btn-sm sendContractBtn"
                                                         data-id="${response.data.ApplicantID}"
                                                         data-applicantstatusid="${response.data.ApplicantStatus_id}">
                                                         Resend Contract
@@ -1521,9 +1518,9 @@
             var isRejection = templateName.toLowerCase().indexOf('reject') !== -1;
 
             if (isRejection) {
-                $btn.text('Send Rejection Email').removeClass('btn-themeSkyblue').addClass('btn-danger');
+                $btn.text('Send Rejection Email').removeClass('ta-btn-attention').addClass('ta-btn-critical');
             } else {
-                $btn.text('Send Interview Invitation').removeClass('btn-danger').addClass('btn-themeSkyblue');
+                $btn.text('Send Interview Invitation').removeClass('ta-btn-critical').addClass('ta-btn-attention');
             }
         });
 
@@ -2169,9 +2166,9 @@
 
             // Change confirm button style for destructive actions
             if (Rank === "Rejected") {
-                $("#confirm-action-yes").removeClass("btn-themeBlue").addClass("btn-danger").text("Yes, Reject");
+                $("#confirm-action-yes").removeClass("ta-btn-primary").addClass("ta-btn-critical").text("Yes, Reject");
             } else {
-                $("#confirm-action-yes").removeClass("btn-danger").addClass("btn-themeBlue").text("Yes, Proceed");
+                $("#confirm-action-yes").removeClass("ta-btn-critical").addClass("ta-btn-primary").text("Yes, Proceed");
             }
 
             // Store data for the confirm callback

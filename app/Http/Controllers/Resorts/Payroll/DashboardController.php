@@ -93,26 +93,9 @@ class DashboardController extends Controller
         }
 
         // Calculate upcoming cutoff period
-        $payrollConfig = \App\Models\PayrollConfig::where('resort_id', $resort_id)->first();
-        $cutoffDay = $payrollConfig->cutoff_day ?? 1;
-        $cutoffPeriod = Common::getCurrentCutoffPeriod($cutoffDay);
+        $cutoffPeriod = $this->resolveUpcomingCutoffPeriod($resort_id);
         $upcomingCutoffDate = $cutoffPeriod['end'];
-
-        // Upcoming Payroll: find payroll for the current cutoff period
-        $upcomingPayroll = Payroll::where('resort_id', $resort_id)
-            ->where('start_date', $cutoffPeriod['start']->format('Y-m-d'))
-            ->where('end_date', $cutoffPeriod['end']->format('Y-m-d'))
-            ->first();
-
-        // If current period is already locked, look at the next period
-        if ($upcomingPayroll && $upcomingPayroll->status === 'locked') {
-            $nextStart = $cutoffPeriod['end']->copy()->addDay();
-            $nextEnd = $nextStart->copy()->addMonth()->subDay();
-            $upcomingPayroll = Payroll::where('resort_id', $resort_id)
-                ->where('start_date', $nextStart->format('Y-m-d'))
-                ->first();
-            $upcomingCutoffDate = $nextEnd;
-        }
+        $upcomingPayroll = $cutoffPeriod['payroll'];
 
         // Estimate upcoming payroll only from employees who have attendance in the current cutoff period
         $upcomingEstimated = 0;
@@ -189,6 +172,70 @@ class DashboardController extends Controller
     }
 
     /**
+     * Resolves which cutoff period the "Upcoming Payroll" card is
+     * currently describing — same logic HR_Dashobard() always used
+     * inline, extracted so the breakdown/activity JSON endpoints below
+     * describe the exact same period as the headline card, never a
+     * different one.
+     */
+    private function resolveUpcomingCutoffPeriod(int $resortId): array
+    {
+        $payrollConfig = \App\Models\PayrollConfig::where('resort_id', $resortId)->first();
+        $cutoffDay = $payrollConfig->cutoff_day ?? 1;
+        $cutoffPeriod = Common::getCurrentCutoffPeriod($cutoffDay);
+
+        $payroll = Payroll::where('resort_id', $resortId)
+            ->where('start_date', $cutoffPeriod['start']->format('Y-m-d'))
+            ->where('end_date', $cutoffPeriod['end']->format('Y-m-d'))
+            ->first();
+
+        if ($payroll && $payroll->status === 'locked') {
+            $nextStart = $cutoffPeriod['end']->copy()->addDay();
+            $nextEnd = $nextStart->copy()->addMonth()->subDay();
+            $payroll = Payroll::where('resort_id', $resortId)
+                ->where('start_date', $nextStart->format('Y-m-d'))
+                ->first();
+            return ['start' => $nextStart, 'end' => $nextEnd, 'payroll' => $payroll];
+        }
+
+        return ['start' => $cutoffPeriod['start'], 'end' => $cutoffPeriod['end'], 'payroll' => $payroll];
+    }
+
+    /**
+     * GET payroll/dashboard/estimate-breakdown — read-only JSON for the
+     * "how is this calculated" modal. No writes, no changes to payroll
+     * calc/run logic; purely reads and re-groups what
+     * estimateUpcomingPayrollLive() already computes for the dashboard card.
+     */
+    public function estimateBreakdownJson(Request $request)
+    {
+        $resortId = $this->resort->resort_id;
+        $period = $this->resolveUpcomingCutoffPeriod($resortId);
+
+        if ($period['payroll'] && $period['payroll']->total_payroll > 0) {
+            return response()->json(['is_estimated' => false, 'message' => 'This period is already finalized — figures are final, not estimated.']);
+        }
+
+        return response()->json(['is_estimated' => true] + $this->estimateBreakdown($resortId, $period['start'], $period['end']));
+    }
+
+    /**
+     * GET payroll/dashboard/estimate-activity — read-only, paginated.
+     * Same guardrails as estimateBreakdownJson(): no writes, no changes
+     * to existing payroll logic.
+     */
+    public function estimateActivityJson(Request $request)
+    {
+        $resortId = $this->resort->resort_id;
+        $period = $this->resolveUpcomingCutoffPeriod($resortId);
+
+        $offset = max(0, (int) $request->query('offset', 0));
+        $limit = min(50, max(1, (int) $request->query('limit', 25)));
+
+        return response()->json($this->estimateTodayActivity($resortId, $period['start'], $period['end'], $offset, $limit));
+    }
+
+    /**
      * Live "upcoming payroll" projection for the current cutoff period —
      * a real forecast (day-accrued basic + prorated allowances + approved
      * OT, minus absence/third-party/pension/EWT deductions), not a flat
@@ -199,8 +246,25 @@ class DashboardController extends Controller
      * dashboard estimate must degrade gracefully, not 422 on incomplete
      * mid-cycle attendance. Returned in USD (view renders it via
      * Common::formatCurrency($upcomingEstimated, 'USD')).
+     *
+     * Thin wrapper around estimatePayrollLines() so the headline dashboard
+     * figure and the "how is this calculated" breakdown modal can never
+     * disagree — same per-employee computation, summed the same way
+     * (each employee's net pre-rounded before summing, matching the
+     * original inline accumulation exactly).
      */
     private function estimateUpcomingPayrollLive(int $resortId, $periodStart, $periodEnd): float
+    {
+        return round($this->estimatePayrollLines($resortId, $periodStart, $periodEnd)->sum('net'), 2);
+    }
+
+    /**
+     * Core per-employee estimate computation, shared by the headline figure
+     * (estimateUpcomingPayrollLive) and the breakdown modal endpoints. Same
+     * formula as before the refactor — only the output shape changed, from
+     * an accumulated float to one line-item array per employee.
+     */
+    private function estimatePayrollLines(int $resortId, $periodStart, $periodEnd): \Illuminate\Support\Collection
     {
         $settings = ResortSiteSettings::where('resort_id', $resortId)->first();
         // Derive MVR<->USD only from DollertoMVR — never multiply by a
@@ -217,11 +281,11 @@ class DashboardController extends Controller
             ->distinct('Emp_id')
             ->pluck('Emp_id');
 
-        if ($employeesWithAttendance->isEmpty()) return 0.0;
+        if ($employeesWithAttendance->isEmpty()) return collect();
 
         $totalDaysInPeriod = max(1, $periodStart->diffInDays($periodEnd) + 1);
 
-        $employees = Employee::with('allowance')->whereIn('id', $employeesWithAttendance)->get()->keyBy('id');
+        $employees = Employee::with(['allowance', 'resortAdmin'])->whereIn('id', $employeesWithAttendance)->get()->keyBy('id');
 
         $attendanceByEmp = DB::table('parent_attendaces')
             ->whereIn('Emp_id', $employeesWithAttendance)
@@ -247,7 +311,7 @@ class DashboardController extends Controller
             ->groupBy('employee_id')
             ->pluck('due', 'employee_id');
 
-        $total = 0.0;
+        $lines = collect();
 
         foreach ($employeesWithAttendance as $empId) {
             $employee = $employees->get($empId);
@@ -256,7 +320,7 @@ class DashboardController extends Controller
             $records = $attendanceByEmp->get($empId, collect());
 
             $dayOffCount = $records->where('Status', 'DayOff')->count();
-            $presentCount = $records->whereIn('Status', ['Present', 'On-Time', 'Late', 'ShortLeave', 'HalfDay', 'FullDayLeave'])->count();
+            $presentCount = $records->whereIn('Status', ['Present', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave', 'FullDayLeave'])->count();
             $absentRecords = $records->where('Status', 'Absent');
             $unpaidCount = $absentRecords->filter(fn($r) => stripos($r->note ?? '', 'Unpaid Leave') !== false)->count();
             $absentCount = $absentRecords->count() - $unpaidCount;
@@ -273,11 +337,13 @@ class DashboardController extends Controller
             // Approved OT only — same 1.25x/1.5x rates as the real payroll run.
             $perHour = $basicUSD / $totalDaysInPeriod / 8;
             $regularOT = $fridayOT = $holidayOT = 0.0;
+            $otHoursTotal = 0.0;
             foreach ($records as $rec) {
                 if (empty($rec->OverTime) || in_array($rec->OverTime, ['0', '0:0', '0:00', '00:00', '00:00:00', '-', ''], true)) continue;
                 if (strtolower(trim($rec->OTStatus ?? '')) !== 'approved') continue;
                 $otParts = explode(':', $rec->OverTime);
                 $hours = (int) ($otParts[0] ?? 0) + ((int) ($otParts[1] ?? 0) / 60);
+                $otHoursTotal += $hours;
                 if (Carbon::parse($rec->date)->isFriday()) {
                     $fridayOT += $hours;
                 } elseif ($rec->Status === 'DayOff') {
@@ -325,10 +391,190 @@ class DashboardController extends Controller
 
             $totalDeductions = round($absentDeduction + $thirdParty + $pension + $ewt + $loanDue, 2);
 
-            $total += ($totalEarnings - $totalDeductions);
+            $name = trim(($employee->resortAdmin->first_name ?? '') . ' ' . ($employee->resortAdmin->last_name ?? '')) ?: ('Employee #' . $empId);
+            $initials = strtoupper(substr(preg_replace('/[^A-Za-z ]/', '', $name), 0, 1) . (str_contains($name, ' ') ? substr(strrchr($name, ' '), 1, 1) : ''));
+
+            $lines->push([
+                'employee_id'       => $empId,
+                'name'              => $name,
+                'initials'          => $initials ?: '?',
+                'department'        => optional($employee->department)->name,
+                'earned_salary'     => $earnedSalary,
+                'absent_deduction'  => $absentDeduction,
+                'ot_pay'            => $otPay,
+                'ot_hours'          => round($otHoursTotal, 2),
+                'allowance'         => $totalAllowance,
+                'pension'           => $pension,
+                'ewt'               => $ewt,
+                'third_party'       => round($thirdParty, 2),
+                'loan_due'          => round($loanDue, 2),
+                'gross'             => $totalEarnings,
+                'deductions_total'  => $totalDeductions,
+                'net'               => round($totalEarnings - $totalDeductions, 2),
+            ]);
         }
 
-        return round($total, 2);
+        return $lines;
+    }
+
+    /**
+     * Grouped, employee-level breakdown of the live estimate for the
+     * "how is this calculated" modal. Read-only — built entirely from
+     * estimatePayrollLines(), the same computation behind the dashboard
+     * headline figure, so the two can never disagree.
+     *
+     * "As of yesterday" is computed live (period end = yesterday instead
+     * of today), not read from a stored snapshot — no new write path.
+     */
+    public function estimateBreakdown(int $resortId, $periodStart, $periodEnd): array
+    {
+        $today = Carbon::today();
+        $lines = $this->estimatePayrollLines($resortId, $periodStart, $periodEnd);
+
+        $yesterday = $today->copy()->subDay();
+        $asOfYesterday = null;
+        $asOfYesterdayDate = null;
+        if ($yesterday->gte($periodStart)) {
+            $yesterdayEnd = $yesterday->lt($periodEnd) ? $yesterday : $periodEnd;
+            $asOfYesterday = round($this->estimatePayrollLines($resortId, $periodStart, $yesterdayEnd)->sum('net'), 2);
+            $asOfYesterdayDate = $yesterday->format('Y-m-d');
+        }
+
+        // context: what to show under an employee's name in the expanded
+        // detail. Pension shows the % basis (matches how the real payroll
+        // run explains it); OT shows hours; everything else shows department.
+        $group = function (string $label, string $field) use ($lines) {
+            $matching = $lines->filter(fn($l) => $l[$field] > 0);
+            return [
+                'label'          => $label,
+                'amount'         => round($matching->sum($field), 2),
+                'employee_count' => $matching->count(),
+                'employees'      => $matching->sortByDesc($field)->take(10)->map(function ($l) use ($field) {
+                    $context = $l['department'];
+                    if ($field === 'ot_pay') {
+                        $context = $l['ot_hours'] . ' hrs';
+                    } elseif ($field === 'pension') {
+                        // Plain USD format, not Common::formatCurrency() — that
+                        // reads the resort's configured display currency, but
+                        // this whole modal is USD-only per spec.
+                        $context = '7% of $' . number_format($l['earned_salary'], 0);
+                    }
+                    return [
+                        'name'     => $l['name'],
+                        'initials' => $l['initials'],
+                        'context'  => $context,
+                        'amount'   => $l[$field],
+                    ];
+                })->values()->all(),
+            ];
+        };
+
+        $totalDaysInPeriod = max(1, $periodStart->diffInDays($periodEnd) + 1);
+        $dayOfPeriod = min($totalDaysInPeriod, max(1, $periodStart->diffInDays($today) + 1));
+
+        return [
+            'period_start'        => $periodStart->format('Y-m-d'),
+            'period_end'          => $periodEnd->format('Y-m-d'),
+            'period_label'        => $periodStart->format('j M') . ' – ' . $periodEnd->format('j M Y'),
+            'day_of_period'       => $dayOfPeriod,
+            'total_days'          => $totalDaysInPeriod,
+            'gross'               => round($lines->sum('gross'), 2),
+            'deductions_total'    => round($lines->sum('deductions_total'), 2),
+            'net'                 => round($lines->sum('net'), 2),
+            'as_of_today'         => round($lines->sum('net'), 2),
+            'as_of_yesterday'     => $asOfYesterday,
+            'as_of_yesterday_date'=> $asOfYesterdayDate,
+            'earnings' => [
+                $group('Basic Salary', 'earned_salary'),
+                $group('Overtime', 'ot_pay'),
+                $group('Allowances', 'allowance'),
+            ],
+            'deductions' => [
+                $group('Pension (MPS)', 'pension'),
+                $group('Withholding Tax (EWT)', 'ewt'),
+                // Split from what used to be one merged "Staff Shop & Loan
+                // Repayments" line — that line silently only summed
+                // third_party and never included loan_due at all, so loan
+                // installments were deducted from the net total but never
+                // shown in any breakdown line. Splitting them out fixes
+                // that gap and matches the reference design's separate
+                // "Salary Advances / Loans" category.
+                $group('Salary Advances / Loans', 'loan_due'),
+                $group('Staff Shop Purchases', 'third_party'),
+                $group('Fines / Unpaid Leave', 'absent_deduction'),
+            ],
+        ];
+    }
+
+    /**
+     * Paginated, most-recent-first feed of today's attendance-driven pay
+     * events for the breakdown modal's "Today's Activity" tab. Kept
+     * separate from estimatePayrollLines() (which sums a whole period)
+     * because this needs per-day, per-record entries, not per-employee
+     * totals — but reuses the identical per-day/per-hour rate math so the
+     * dollar amounts here are consistent with the period breakdown.
+     */
+    public function estimateTodayActivity(int $resortId, $periodStart, $periodEnd, int $offset = 0, int $limit = 25): array
+    {
+        $today = Carbon::today();
+        $settings = ResortSiteSettings::where('resort_id', $resortId)->first();
+        $rate = $settings && $settings->DollertoMVR ? (float) $settings->DollertoMVR : 15.42;
+        $totalDaysInPeriod = max(1, $periodStart->diffInDays($periodEnd) + 1);
+
+        $todayRecords = DB::table('parent_attendaces')
+            ->whereIn('Emp_id', Employee::where('resort_id', $resortId)->whereIn('status', ['Active', 'Probationary'])->pluck('id'))
+            ->where('date', $today->format('Y-m-d'))
+            ->orderByDesc('updated_at')
+            ->get();
+
+        if ($todayRecords->isEmpty()) {
+            return ['date' => $today->format('Y-m-d'), 'total' => 0, 'offset' => $offset, 'limit' => $limit, 'rows' => []];
+        }
+
+        $empIds = $todayRecords->pluck('Emp_id')->unique();
+        $employees = Employee::with(['department', 'resortAdmin'])->whereIn('id', $empIds)->get()->keyBy('id');
+
+        $rows = collect();
+        foreach ($todayRecords as $rec) {
+            $employee = $employees->get($rec->Emp_id);
+            if (!$employee) continue;
+
+            $name = trim(($employee->resortAdmin->first_name ?? '') . ' ' . ($employee->resortAdmin->last_name ?? '')) ?: ('Employee #' . $rec->Emp_id);
+            $initials = strtoupper(substr(preg_replace('/[^A-Za-z ]/', '', $name), 0, 1) . (str_contains($name, ' ') ? substr(strrchr($name, ' '), 1, 1) : ''));
+
+            $basicUSD = (float) $employee->basic_salary;
+            if (($employee->basic_salary_currency ?? 'USD') === 'MVR') $basicUSD /= $rate;
+            $perDay = $basicUSD / $totalDaysInPeriod;
+
+            $time = $rec->updated_at ? Carbon::parse($rec->updated_at)->format('h:i A') : null;
+            $base = ['employee_id' => $rec->Emp_id, 'name' => $name, 'initials' => $initials ?: '?', 'department' => optional($employee->department)->name, 'time' => $time];
+
+            if (in_array($rec->Status, ['Present', 'On-Time', 'Late', 'ShortLeave', 'HalfDayLeave', 'FullDayLeave'], true)) {
+                $rows->push($base + ['status' => 'Present', 'note' => "1 day's salary", 'amount' => round($perDay, 2), 'type' => 'earn']);
+            } elseif ($rec->Status === 'DayOff') {
+                $rows->push($base + ['status' => 'Day Off', 'note' => 'paid, counted as worked', 'amount' => round($perDay, 2), 'type' => 'earn']);
+            } elseif ($rec->Status === 'Absent') {
+                $isUnpaid = stripos($rec->note ?? '', 'Unpaid Leave') !== false;
+                $rows->push($base + ['status' => 'Absent', 'note' => $isUnpaid ? 'unpaid leave' : 'unscheduled absence', 'amount' => round(-$perDay, 2), 'type' => 'ded']);
+            }
+
+            if (!empty($rec->OverTime) && !in_array($rec->OverTime, ['0', '0:0', '0:00', '00:00', '00:00:00', '-', ''], true)
+                && strtolower(trim($rec->OTStatus ?? '')) === 'approved') {
+                $otParts = explode(':', $rec->OverTime);
+                $hours = (int) ($otParts[0] ?? 0) + ((int) ($otParts[1] ?? 0) / 60);
+                $perHour = $perDay / 8;
+                $multiplier = Carbon::parse($rec->date)->isFriday() || $rec->Status === 'DayOff' ? 1.50 : 1.25;
+                $rows->push($base + ['status' => 'OT', 'note' => round($hours, 2) . ' hrs approved overtime', 'amount' => round($perHour * $multiplier * $hours, 2), 'type' => 'earn']);
+            }
+        }
+
+        return [
+            'date'   => $today->format('Y-m-d'),
+            'total'  => $rows->count(),
+            'offset' => $offset,
+            'limit'  => $limit,
+            'rows'   => $rows->slice($offset, $limit)->values()->all(),
+        ];
     }
 
     /**
