@@ -393,7 +393,7 @@
                         <h1>Dashboard</h1>
                     </div>
                 </div>
-                <div class="col-auto ms-auto"><a href="{{route('payroll.payslip.index')}}" class="btn btn-sm btn-theme @if(App\Helpers\Common::checkRouteWisePermission('payroll.run',config('settings.resort_permissions.view')) == false) d-none @endif">Share Payslips</a></div>
+                <div class="col-auto ms-auto"><a href="{{route('payroll.payslip.index')}}" class="btn btn-theme @if(App\Helpers\Common::checkRouteWisePermission('payroll.run',config('settings.resort_permissions.view')) == false) d-none @endif">Share Payslips</a></div>
                 @php
                     $currentEmployee = Auth::guard('resort-admin')->user()->GetEmployee ?? null;
                     $rankPos = $currentEmployee ? App\Helpers\Common::getEmployeeRankPosition($currentEmployee) : ['rank' => null];
