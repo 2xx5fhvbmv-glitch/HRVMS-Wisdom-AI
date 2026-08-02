@@ -128,6 +128,12 @@ class ExportEmployeeMainSheet implements FromArray, WithHeadings, WithTitle, Wit
 
                     // V: BloodGroup dropdown
                     $this->setDropdown($sheet, "V{$row}", "=BloodGroups");
+
+                    // W: Religion dropdown (maps to employees.religion enum('0','1'))
+                    $this->setDropdown($sheet, "W{$row}", "=Religions");
+
+                    // AB: PaymentMode dropdown
+                    $this->setDropdown($sheet, "AB{$row}", "=PaymentModes");
                 }
 
                 // Set fixed width for Division, Department, Position, Section columns to accommodate codes

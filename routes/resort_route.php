@@ -305,6 +305,8 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
 
     Route::post('/employee/import', ['App\Http\Controllers\Resorts\EmployeeController','ImportEmployee'])->name('resort.Depat_Position_Emp_Import');
     Route::get( '/employee/export', 'EmployeeController@exportRelatedDepartment')->name('resort.export.Employee');
+    Route::get('/import/status/{history}', ['App\Http\Controllers\Resorts\EmployeeController','importStatus'])->name('resort.import.status');
+    Route::get('/master-import', ['App\Http\Controllers\Resorts\MasterImportController','index'])->name('resort.masterimport.index');
     Route::get( '/attandanceHisotry/export/', ['App\Http\Controllers\Resorts\TimeAndAttendance\EmployeeController','attandanceHisotryExport']);
     /* salary */
     Route::get('/salary-increment/get-increment-details', 'SalaryIncrementController@getIncrementDetails')->name('employee.salaryincrement.get');

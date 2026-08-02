@@ -102,6 +102,73 @@
 <script>
 $(document).ready(function () {
 
+    // The upload now returns instantly with an import_history id; the actual
+    // row-by-row import runs in the background via a queued job. Poll the
+    // status endpoint until it's done/failed instead of waiting on the
+    // upload request itself. Pattern mirrors resorts.Visa.XpactSync's
+    // pollXpatSync().
+    function pollImportStatus(statusUrl, $btn) {
+        var tries = 0, maxTries = 100; // ~5 min ceiling at 3s
+        var iv = setInterval(function () {
+            tries++;
+            $.ajax({ url: statusUrl, type: 'GET' })
+                .done(function (res) {
+                    if (res && (res.status === 'queued' || res.status === 'processing')) {
+                        if (tries >= maxTries) {
+                            clearInterval(iv);
+                            $btn.prop('disabled', false).text('Submit');
+                            toastr.error('Still processing — please check back shortly.', 'Timeout', { positionClass: 'toast-bottom-right' });
+                        }
+                        return; // keep waiting
+                    }
+
+                    clearInterval(iv);
+                    $btn.prop('disabled', false).text('Submit');
+
+                    if (res && res.status === 'completed' && (!res.error_report || !res.error_report.length)) {
+                        toastr.success(res.created_count + ' employee(s) created, ' + res.updated_count + ' updated.', 'Success', { positionClass: 'toast-bottom-right' });
+                        $('#BudgetConfigFiles')[0].reset();
+                        $('#file-name-display').text('');
+                        $('#import-error-section').hide();
+                        $('#import-error-table tbody').empty();
+                        return;
+                    }
+
+                    if (res && res.status === 'failed' && (!res.error_report || !res.error_report.length)) {
+                        toastr.error(res.failure_message || 'Import failed.', 'Error', { positionClass: 'toast-bottom-right' });
+                        return;
+                    }
+
+                    var errors = (res && res.error_report) ? res.error_report : [];
+                    if (errors.length) {
+                        var tbody = $('#import-error-table tbody').empty();
+                        errors.forEach(function (err) {
+                            tbody.append(
+                                '<tr>' +
+                                '<td>' + err.row + '</td>' +
+                                '<td>' + (err.name || 'N/A') + '</td>' +
+                                '<td>' + (err.email || 'N/A') + '</td>' +
+                                '<td>' + (err.department || 'N/A') + '</td>' +
+                                '<td>' + (err.position || 'N/A') + '</td>' +
+                                '<td class="text-danger">' + err.error + '</td>' +
+                                '</tr>'
+                            );
+                        });
+                        $('#import-error-count').text(errors.length + ' error(s)');
+                        $('#import-error-section').show();
+                        toastr.error(errors.length + ' row(s) could not be imported. See details below.', 'Import Errors', { positionClass: 'toast-bottom-right' });
+                    }
+                })
+                .fail(function () {
+                    // transient network blip — keep polling until the ceiling
+                    if (tries >= maxTries) {
+                        clearInterval(iv);
+                        $btn.prop('disabled', false).text('Submit');
+                    }
+                });
+        }, 3000);
+    }
+
     // Trigger hidden file input when styled button is clicked
     $('.uploadFile-btn a').on('click', function () {
         $('#Employeefile').click();
@@ -137,7 +204,9 @@ $(document).ready(function () {
             $('#file-extension-error').hide();
 
             const $btn = $(form).find('[type="submit"]');
-            $btn.prop('disabled', true).text('Uploading...');
+            $btn.prop('disabled', true).text('Processing...');
+            $('#import-error-section').hide();
+            $('#import-error-table tbody').empty();
 
             const formData = new FormData(form);
 
@@ -148,16 +217,14 @@ $(document).ready(function () {
                 contentType: false,
                 processData: false,
                 success: function (response) {
-                    $btn.prop('disabled', false).text('Submit');
-                    if (response.success) {
-                        toastr.success(response.msg, 'Success', { positionClass: 'toast-bottom-right' });
-                        form.reset();
-                        $('#file-name-display').text('');
-                        $('#import-error-section').hide();
-                        $('#import-error-table tbody').empty();
-                    } else {
-                        toastr.error(response.msg, 'Error', { positionClass: 'toast-bottom-right' });
+                    // Upload accepted — the import runs in the background via
+                    // a queued job. Poll status_url instead of waiting here.
+                    if (response && response.processing && response.status_url) {
+                        pollImportStatus(response.status_url, $btn);
+                        return;
                     }
+                    $btn.prop('disabled', false).text('Submit');
+                    toastr.error('Unexpected response from server.', 'Error', { positionClass: 'toast-bottom-right' });
                 },
                 error: function (xhr) {
                     $btn.prop('disabled', false).text('Submit');

@@ -26,12 +26,20 @@ class EmployeeImport implements ToModel, WithHeadingRow
     const EMPLOYMENT_TYPES = ['Full-Time', 'Part-Time', 'Contract', 'Casual', 'Probationary', 'Internship', 'Temporary'];
     const MARITAL_STATUSES = ['Single', 'Married', 'Divorced', 'Widowed'];
     const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+    const PAYMENT_MODES = ['Cash', 'Bank'];
+    // employees.religion is a literal enum('0','1') — 0=non-muslim, 1=muslim
+    // (see the manual Add Employee form's <select>, values 0/1). Accept the
+    // same human-readable labels the manual UI shows, not raw digits only.
+    const RELIGION_MAP = ['non-muslim' => '0', 'muslim' => '1', '0' => '0', '1' => '1'];
 
     protected $resort;
-    protected $rowNumber = 0;
-    protected $errors = [];
     protected $rowCapReported = false;
 
+    // Public so the queued job (ImportEmployeesJob) can read final counts
+    // and per-row errors straight off the import instance after
+    // Excel::import() returns, without any session() involvement.
+    public $rowNumber = 0;
+    public $errors = [];
     public $created = 0;
     public $updated = 0;
 
@@ -69,7 +77,6 @@ class EmployeeImport implements ToModel, WithHeadingRow
             foreach ($validationErrors as $error) {
                 $this->errors[] = $error;
             }
-            session(['import_errors' => $this->errors]);
             return null;
         }
 
@@ -144,9 +151,29 @@ class EmployeeImport implements ToModel, WithHeadingRow
         $bloodGroup = $bloodGroup !== '' ? $bloodGroup : null;
 
         $nationality = ucfirst($row['nationality'] ?? '');
-        if ($nationality !== '' && !in_array($nationality, config('settings.nationalities') ?? [], true)) {
+        if (!in_array($nationality, config('settings.nationalities') ?? [], true)) {
             $this->addError($excelRowNumber, $row, "Nationality '{$nationality}' is not a recognized nationality.");
             return null;
+        }
+
+        // employees.payment_mode is enum('Cash','Bank') NOT NULL DEFAULT
+        // 'Cash' — omit the key entirely when blank so the DB applies its
+        // default instead of inserting an explicit NULL (which violates the
+        // NOT NULL constraint even though the column itself has a default).
+        $paymentMode = trim((string) ($row['paymentmode'] ?? ''));
+        if ($paymentMode !== '' && !in_array($paymentMode, self::PAYMENT_MODES, true)) {
+            $this->addError($excelRowNumber, $row, "PaymentMode '{$paymentMode}' is invalid. Allowed: " . implode(', ', self::PAYMENT_MODES));
+            return null;
+        }
+
+        $religion = null;
+        $religionRaw = strtolower(trim((string) ($row['religion'] ?? '')));
+        if ($religionRaw !== '') {
+            if (!isset(self::RELIGION_MAP[$religionRaw])) {
+                $this->addError($excelRowNumber, $row, "Religion '{$row['religion']}' is invalid. Allowed: Muslim, Non-Muslim.");
+                return null;
+            }
+            $religion = self::RELIGION_MAP[$religionRaw];
         }
 
         // Reporting manager is optional — resolved by email to an existing
@@ -251,7 +278,7 @@ class EmployeeImport implements ToModel, WithHeadingRow
             'Position_id' => $position->id,
             'Section_id' => $section->id ?? null,
             'resort_id' => $this->resort->resort_id,
-            'nationality' => $nationality ?: null,
+            'nationality' => $nationality,
             'is_employee' => 1,
             'rank' => $position->Rank,
             'main_rank' => $Rank,
@@ -262,44 +289,51 @@ class EmployeeImport implements ToModel, WithHeadingRow
             'employment_type' => $employmentType,
             'marital_status' => $maritalStatus,
             'blood_group' => $bloodGroup,
-            'religion' => $row['religion'] ?? null,
+            'religion' => $religion,
             'passport_number' => $row['passportnumber'] ?? null,
             'nid' => $row['nid'] ?? null,
             'present_address' => $presentAddress,
             'tin' => $row['tin'] ?? null,
             'contract_type' => $row['contracttype'] ?? null,
-            'payment_mode' => $row['paymentmode'] ?? null,
             'basic_salary' => $row['basicsalary'] ?? null,
             'basic_salary_currency' => $row['basicsalarycurrency'] ?? 'USD',
             'benefit_grid_level' => $row['benefitgridlevel'] ?? null,
-            'reporting_to' => $reportingToId,
             'probation_end_date' => $probationEndDate,
             'probation_status' => $probationStatus,
         ];
+        if ($paymentMode !== '') {
+            $employeeData['payment_mode'] = $paymentMode;
+        }
+        // employees.reporting_to is NOT NULL DEFAULT 0 — same trap as
+        // payment_mode: omit the key when blank so the DB default applies
+        // instead of an explicit NULL violating the constraint.
+        if ($reportingToId !== null) {
+            $employeeData['reporting_to'] = $reportingToId;
+        }
 
-        DB::transaction(function () use ($existingResortAdmin, $ResortAdmindata, $employeeData) {
-            if ($existingResortAdmin) {
-                $existingResortAdmin->update($ResortAdmindata);
-                $resortAdmin = $existingResortAdmin;
+        // Password/welcome-email only apply the first time this email is
+        // seen — decided here (not inside the shared helper) since that's
+        // the caller's upsert POLICY, not the mechanical persist step.
+        $password = null;
+        if (!$existingResortAdmin) {
+            $password = Common::generateUniquePassword(8);
+            $ResortAdmindata['password'] = Hash::make($password);
+        }
+
+        DB::transaction(function () use ($existingResortAdmin, $ResortAdmindata, $employeeData, $password) {
+            // Shared with the manual Add Employee wizard
+            // (People\Employee\EmployeeController::store()) — see
+            // Common::persistEmployeeProfile() for the single write path.
+            $profile = Common::persistEmployeeProfile($ResortAdmindata, $employeeData, $this->resort->resort_id, $existingResortAdmin);
+
+            if ($profile['employeeCreated']) {
+                $this->created++;
             } else {
-                $ResortAdmindata['resort_id'] = $this->resort->resort_id;
-                $password = Common::generateUniquePassword(8);
-                $ResortAdmindata['password'] = Hash::make($password);
-                $resortAdmin = ResortAdmin::create($ResortAdmindata);
-                $resortAdmin->sendResortemployee($this->resort->resort, $resortAdmin, $password);
+                $this->updated++;
             }
 
-            $employeeData['Admin_Parent_id'] = $resortAdmin->id;
-
-            $employee = Employee::where('Admin_Parent_id', $resortAdmin->id)->first();
-            if ($employee) {
-                $employee->update($employeeData);
-                $this->updated++;
-            } else {
-                $employeeData['Emp_id'] = Common::nextEmployeeId($this->resort->resort_id);
-                $employee = Employee::create($employeeData);
-                Common::CreateFirstTimeEmployeeFolders($this->resort->resort_id, $this->resort->resort->resort_id, $employee->Emp_id);
-                $this->created++;
+            if (!$existingResortAdmin) {
+                $profile['resortAdmin']->sendResortemployee($this->resort->resort, $profile['resortAdmin'], $password);
             }
         });
 
@@ -352,7 +386,6 @@ class EmployeeImport implements ToModel, WithHeadingRow
             'position' => $row['position'] ?? 'N/A',
             'error' => $error,
         ];
-        session(['import_errors' => $this->errors]);
     }
 
     /**
@@ -368,6 +401,7 @@ class EmployeeImport implements ToModel, WithHeadingRow
             'firstname' => 'First Name',
             'lastname' => 'Last Name',
             'email' => 'Email',
+            'nationality' => 'Nationality',
             'dob' => 'DOB',
             'joiningdate' => 'JoiningDate',
             'gender' => 'Gender',

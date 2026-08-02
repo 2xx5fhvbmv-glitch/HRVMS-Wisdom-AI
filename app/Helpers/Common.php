@@ -135,6 +135,52 @@ class Common
         return null;
     }
 
+    /**
+     * Single write path for "create or update an employee's core profile,"
+     * shared by the manual Add Employee wizard (People\Employee\
+     * EmployeeController::store()) and the Master Import bulk importer
+     * (App\Imports\EmployeeImport) so both go through the same mechanics
+     * instead of two copies that can drift. Callers own duplicate-handling
+     * POLICY (store() rejects duplicate emails before ever calling this;
+     * the importer upserts by resolving $existingResortAdmin itself) — this
+     * function only owns the mechanical writes: resolve/insert ResortAdmin,
+     * resolve/insert Employee, assign Emp_id, and provision the categorized
+     * folder row exactly once (guarded — Employee's own `created` hook may
+     * have already inserted it).
+     */
+    public static function persistEmployeeProfile(array $resortAdminData, array $employeeData, int $resortId, ?ResortAdmin $existingResortAdmin = null): array
+    {
+        if ($existingResortAdmin) {
+            $existingResortAdmin->update($resortAdminData);
+            $resortAdmin = $existingResortAdmin;
+        } else {
+            $resortAdminData['resort_id'] = $resortId;
+            $resortAdmin = ResortAdmin::create($resortAdminData);
+        }
+
+        $employeeData['Admin_Parent_id'] = $resortAdmin->id;
+
+        $employee = Employee::where('Admin_Parent_id', $resortAdmin->id)->first();
+        if ($employee) {
+            $employee->update($employeeData);
+            $employeeCreated = false;
+        } else {
+            $employeeData['Emp_id'] = self::nextEmployeeId($resortId);
+            $employee = Employee::create($employeeData);
+
+            $folderExists = FilemangementSystem::where('resort_id', $resortId)
+                ->where('Folder_Name', $employee->Emp_id)
+                ->where('Folder_Type', 'categorized')
+                ->exists();
+            if (!$folderExists) {
+                self::createFolderByName($resortId, $employee->Emp_id, 'categorized');
+            }
+            $employeeCreated = true;
+        }
+
+        return ['resortAdmin' => $resortAdmin, 'employee' => $employee, 'employeeCreated' => $employeeCreated];
+    }
+
     public static function isHrAdmin(): bool
 	{
 		
@@ -6914,6 +6960,24 @@ class Common
             return null;
         }
 
+        // Real push delivery. BASE_URL is unset in every env file in this
+        // repo (checked .env/.env.staging/.env.example), so the legacy
+        // /mob-send-notification leg below has always been a silent no-op
+        // for every one of this function's 30+ callers — that's the actual
+        // root cause behind "push notifications don't arrive" reports
+        // app-wide, not a per-module bug. sendPushNotificationForMobile()
+        // hits FCM directly and IS configured (FCM_PROJECT_ID etc. are set)
+        // — already used by SOS/Announcement/Maintenance and confirmed
+        // working there, so route every caller's push through it too.
+        try {
+            $deviceTokens = Employee::whereIn('id', (array) $sendto)->pluck('device_token')->filter();
+            if ($deviceTokens->isNotEmpty()) {
+                self::sendPushNotificationForMobile($deviceTokens, $title, $message, $module, null, null, null, null);
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('sendMobileNotification FCM push failed: ' . $e->getMessage());
+        }
+
         // BASE_URL is optional (unset on local/dev). Skip the outbound push
         // rather than calling Http::post() with a null base — Guzzle would
         // throw an invalid-URI exception and 500 the whole request.
@@ -7187,48 +7251,19 @@ class Common
             $originalName = $file->getClientOriginalName();
             $extension = strtolower($file->getClientOriginalExtension());
             $fileSizeMB = round($file->getSize() / 1024, 2);
-            $isImage = in_array($extension, ['jpg', 'jpeg', 'png']);
 
-            // DomPDF renders the embedded base64 image on a full HTML page,
-            // which needs many times the source file's size in memory (a
-            // ~2.5MB photo reproduced a real "Allowed memory size exhausted"
-            // fatal here, even with ini_set('memory_limit','-1') above —
-            // that override can itself be locked out by the server's PHP-FPM
-            // pool config (php_admin_value), which code can't ever raise).
-            // Skip the PDF conversion above a safe threshold and store the
-            // original image as-is rather than crash the whole request.
-            $skipPdfConversionThresholdBytes = 1.5 * 1024 * 1024; // 1.5MB
-            $isImage = $isImage && $file->getSize() <= $skipPdfConversionThresholdBytes;
-
-            // Convert image to PDF
-            if ($isImage) {
-                $tempImagePath = $file->store('temp', 'local');
-                $fullImagePath = storage_path('app/' . $tempImagePath);
-
-                if (file_exists($fullImagePath)) {
-                    $imageData = file_get_contents($fullImagePath);
-                    $mimeType = mime_content_type($fullImagePath);
-                    $base64Image = 'data:' . $mimeType . ';base64,' . base64_encode($imageData);
-
-                    $pdf = Pdf::loadView('resorts.FileManagment.scan', [
-                        'imageBase64' => $base64Image
-                    ])->setPaper('a4', 'portrait');
-
-                    $tempPdfPath = storage_path('app/temp/') . uniqid('pdf_') . '.pdf';
-                    $pdf->save($tempPdfPath);
-
-                    $fileContent = file_get_contents($tempPdfPath);
-                    $originalName = pathinfo($originalName, PATHINFO_FILENAME) . '.pdf';
-                    $extension = 'pdf';
-                    $fileSizeMB = round(strlen($fileContent) / 1024, 2);
-                } else {
-                    return ['status' => false, 'msg' => 'Failed to process image'];
-                }
-            } else {
-                $fileContent = file_get_contents($file->getRealPath());
-                if ($fileContent === false) {
-                    return ['status' => false, 'msg' => 'Failed to read file'];
-                }
+            // Images used to be force-converted to PDF here via dompdf
+            // (embed as base64 <img>, render to PDF) — dompdf's image
+            // backend can't decode CMYK-color-space JPEGs (a common
+            // camera/scan-app output) and silently renders a blank page
+            // instead of erroring, which is exactly the "color photos
+            // becoming blank PDFs" report. Store the original file as-is,
+            // same as every other file type. This is the shared upload path
+            // for every module's mobile attachments (Grievance, etc.), not
+            // just File Management, so this fixes all of them at once.
+            $fileContent = file_get_contents($file->getRealPath());
+            if ($fileContent === false) {
+                return ['status' => false, 'msg' => 'Failed to read file'];
             }
 
             $uniqueString = substr(md5(uniqid($originalName, true)), 0, 10);

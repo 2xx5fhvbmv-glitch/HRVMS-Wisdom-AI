@@ -322,6 +322,13 @@
                                         </div>
                                     </div>
                                 </div>
+                                <div class="text-center" id="{{ Route::currentRouteName() == 'resort.masterimport.index' ? 'caroselMenuActive' : '' }}">
+                                    <div class="btn-group">
+                                        <a class="{{ Route::currentRouteName() == 'resort.masterimport.index' ? 'active' : '' }}" href="{{ route('resort.masterimport.index') }}">
+                                            Master Import
+                                        </a>
+                                    </div>
+                                </div>
 
                             </div>
                         </div>
