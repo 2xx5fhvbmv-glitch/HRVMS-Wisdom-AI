@@ -84,7 +84,7 @@
                                                 @endif
                                                 <p>
                                                     @if($shiftData->Status!= 'DayOff')
-                                                        <button class="editIcon-btn editdutyRoster"
+                                                        <button class="editIcon-btn taa-btn-secondary editdutyRoster"
                                                                 data-date="{{ date('d/m/Y', strtotime($header['date'])) }}"
                                                                 data-Shift_id="{{ $shiftData->Shift_id ?? '' }}"
                                                                 data-OverTime="{{ $shiftData->OverTime ?? 0 }}"

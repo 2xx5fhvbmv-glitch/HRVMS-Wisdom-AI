@@ -60,7 +60,7 @@
                     </div>
 
                     <div>
-                          <a target="_blank" href="{{ route('resort.timeandattendance.employee.details', [ base64_encode($e->employee_id)]); }}" class="btn btn-themeSkyblue btn-sm" data-id="' . $row->id . '">Details</a>
+                          <a target="_blank" href="{{ route('resort.timeandattendance.employee.details', [ base64_encode($e->employee_id)]); }}" class="btn taa-btn-secondary btn-sm" data-id="' . $row->id . '">Details</a>
                     </div>
 
                 </div>

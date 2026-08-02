@@ -2107,14 +2107,14 @@ class TimeandAttendanceDashboardController extends Controller
                 if ($row->action_type == 'overtime_pending') {
                     $date = $row->date ?? date('Y-m-d');
                     return '<button type="button"
-                                class="btn btn-xs btn-warning update-overtime-status"
+                                class="btn btn-xs taa-btn-attention update-overtime-status"
                                 data-emp-id="' . $row->employee_id . '"
                                 data-date="' . $date . '"
                                 data-employee-name="' . htmlspecialchars($row->EmployeeName) . '">
                                 <i class="fa-solid fa-clock me-1"></i>Update
                             </button>';
                 } else {
-                    $buttonClass = $row->action_type == 'check_in' ? 'btn-danger' : 'btn-success';
+                    $buttonClass = $row->action_type == 'check_in' ? 'taa-btn-positive' : 'taa-btn-attention';
                     $buttonText = $row->action_type == 'check_in' ? 'Check-In' : 'Check-Out';
                     $icon = $row->action_type == 'check_in' ? 'fa-sign-in-alt' : 'fa-sign-out-alt';
                     $shiftDate = $row->shift_date ?? $row->date ?? date('Y-m-d');

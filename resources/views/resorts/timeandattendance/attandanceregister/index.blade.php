@@ -78,7 +78,7 @@
                         </div> -->
 
                         <div class="col-xl-2 col-md-3 col-sm-4 col-6">
-                            <button class="btn btn-themeBlue btn-sm" id="clearFilters">Clear Filter</button>
+                            <button class="btn taa-btn-secondary btn-sm" id="clearFilters">Clear Filter</button>
                         </div>
                         <div class="col-auto ms-auto">
                             <div class="view-toggle-group">
@@ -179,10 +179,10 @@
                         </div>
                         <div class="row g-2 justify-content-center mb-3">
                             <div class="col-auto">
-                                <button type="submit" class="btn btn-themeBlue btn-sm todoListApprove" data-button="approve"><i  class="fa-solid fa-check me-2"></i>Approved</button>
+                                <button type="submit" class="btn taa-btn-positive btn-sm todoListApprove" data-button="approve"><i  class="fa-solid fa-check me-2"></i>Approved</button>
                             </div>
                             <div class="col-auto">
-                                <button type="submit" class="btn btn-danger btn-sm todoListReject"  data-button="reject"><i class="fa-solid fa-xmark me-2"></i>Reject</button>
+                                <button type="submit" class="btn taa-btn-attention btn-sm todoListReject"  data-button="reject"><i class="fa-solid fa-xmark me-2"></i>Reject</button>
                             </div>
                         </div>
                      </form>
@@ -192,6 +192,7 @@
     </div>
     @endsection
     @section('import-css')
+    @include('resorts.timeandattendance._taa_buttons_v2_styles')
     <style>
         .view-toggle-group {
             display: inline-flex;

@@ -56,7 +56,7 @@
                                 </div>
                             </div>
                             <div class="col-auto">
-                                <button  type="submit" class="btn btn-themeSkyblue btn-sm">Download</button>
+                                <button  type="submit" class="btn taa-btn-secondary btn-sm">Download</button>
                             </div>
                           <input type="hidden" name="emp_id" value="{{ $employee->emp_id }}">
 
@@ -242,8 +242,8 @@
                                             </div>
                                             <div class="text-center">
                                                 @if($item->ParentAttd_id)
-                                                <a href="javascritp:void(0)" class="btn btn-themeBlue btn-sm LocationHistoryData" data-location ="{{ $item->InTime_Location }}" data-id="{{ $item->id }}"><i class="fa-regular fa-location-dot"></i></a>
-                                                <a href="javascritp:void(0)" class="btn btn-themeSkyblue btn-sm edit-row-btn" data-note="{{ $item->note }}" data-CheckInTime="{{ $item->CheckInTimeOne }}"  data-CheckOutTime="{{ $item->CheckOutTimeOne }}"  data-OverTime="{{ $item->OverTime }}" data-id="{{ base64_encode($item->Child_id) }}" data-ParentAttd_id="{{ base64_encode($item->ParentAttd_id) }}"  > Edit</a>
+                                                <a href="javascript:void(0)" class="btn taa-btn-secondary btn-sm LocationHistoryData" data-location ="{{ $item->InTime_Location }}" data-id="{{ $item->id }}"><i class="fa-regular fa-location-dot"></i></a>
+                                                <a href="javascript:void(0)" class="btn taa-btn-secondary btn-sm edit-row-btn" data-note="{{ $item->note }}" data-CheckInTime="{{ $item->CheckInTimeOne }}"  data-CheckOutTime="{{ $item->CheckOutTimeOne }}"  data-OverTime="{{ $item->OverTime }}" data-id="{{ base64_encode($item->Child_id) }}" data-ParentAttd_id="{{ base64_encode($item->ParentAttd_id) }}"  > Edit</a>
                                                 @else
                                                 <span class="text-muted small">No punch recorded</span>
                                                 @endif
@@ -321,8 +321,8 @@
 
                     </div>
                     <div class="modal-footer">
-                        <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                        <button type="submit" class="btn btn-themeBlue">Submit</button>
+                        <a href="#" data-bs-dismiss="modal" class="btn taa-btn-secondary ms-auto">Cancel</a>
+                        <button type="submit" class="btn taa-btn-primary">Submit</button>
                     </div>
                 </form>
             </div>
@@ -330,7 +330,7 @@
     </div>
     @endsection
     @section('import-css')
-
+    @include('resorts.timeandattendance._taa_buttons_v2_styles')
     @endsection
 
     @section('import-scripts')

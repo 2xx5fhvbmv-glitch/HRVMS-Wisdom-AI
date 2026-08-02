@@ -109,6 +109,9 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
          Route::get('payroll/hr-dashboard', 'Payroll\DashboardController@HR_Dashobard')->name('payroll.dashboard');
          Route::get('payroll/admin-dashboard', 'Payroll\DashboardController@admin_dashboard')->name('payroll.admindashboard');
          Route::get('payroll/drafts', 'Payroll\DashboardController@draftsList')->name('payroll.drafts.list');
+         // Read-only "how is this calculated" breakdown for the Estimated Payroll card — no writes.
+         Route::get('payroll/dashboard/estimate-breakdown', 'Payroll\DashboardController@estimateBreakdownJson')->name('payroll.dashboard.estimate-breakdown');
+         Route::get('payroll/dashboard/estimate-activity', 'Payroll\DashboardController@estimateActivityJson')->name('payroll.dashboard.estimate-activity');
          //Performance Module
          Route::get('performance/hr-dashboard', 'Performance\PerformanceDashboardController@HR_Dashobard')->name('Performance.Hrdashboard');
          Route::get('performance/hod-dashboard', 'Performance\PerformanceDashboardController@Hod_dashboard')->name('Performance.HODdashboard');

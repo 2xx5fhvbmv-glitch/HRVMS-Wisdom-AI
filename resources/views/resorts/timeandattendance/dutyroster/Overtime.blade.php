@@ -71,7 +71,7 @@
                                 <input type="text" class="form-control overtime" name="overtime" id="overtime" placeholder="Add Hours">
                             </div> -->
                             <div class="col-auto">
-                                <button type="button" class="btn btn-themeBlue btn-sm" id="clearOvertimeFilter" title="Clear filters and reload">
+                                <button type="button" class="btn taa-btn-secondary btn-sm" id="clearOvertimeFilter" title="Clear filters and reload">
                                     Clear filter
                                 </button>
                             </div>
@@ -80,7 +80,7 @@
                         <input type="hidden" name="TotalHoursInput" id="TotalHoursInput">
                         <!-- </div> -->
                         <hr class="mt-md-4 mt-3  mb-2">
-                        <div class="d-none"><button type="submit" class="btn btn-themeBlue btn-sm">Submit</button></div>
+                        <div class="d-none"><button type="submit" class="btn taa-btn-primary btn-sm">Submit</button></div>
                     </form>
 
                     <div class="card bg mt-4">
@@ -293,14 +293,14 @@
                         </div>
 
                         <div class="text-end mt-3">
-                            <button type="button" class="btn btn-sm btn-primary" id="addOvertimeEntry">
+                            <button type="button" class="btn btn-sm taa-btn-positive" id="addOvertimeEntry">
                                 <i class="fa fa-plus"></i> Add Entry
                             </button>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-dismiss="modal" data-bs-dismiss="modal">Close</button>
-                        <button type="submit" class="btn btn-primary">Save Changes</button>
+                        <button type="button" class="btn taa-btn-secondary" data-dismiss="modal" data-bs-dismiss="modal">Close</button>
+                        <button type="submit" class="btn taa-btn-primary">Save Changes</button>
                     </div>
                 </form>
             </div>
@@ -309,6 +309,7 @@
 
 @endsection
 @section('import-css')
+@include('resorts.timeandattendance._taa_buttons_v2_styles')
 <style>
     .overtime-cell {
         text-align: center;
@@ -913,7 +914,7 @@
             }
             entryHtml += '<div class="d-flex justify-content-between align-items-center mb-2">';
             entryHtml += '<h6 class="mb-0">Entry ' + entryNumber + '</h6>';
-            entryHtml += '<button type="button" class="btn btn-sm btn-danger remove-overtime-entry"><i class="fa fa-times"></i> Remove</button>';
+            entryHtml += '<button type="button" class="btn btn-sm taa-btn-neutral remove-overtime-entry"><i class="fa fa-times"></i> Remove</button>';
             entryHtml += '</div>';
             entryHtml += '<div class="row g-3">';
             entryHtml += '<div class="col-md-4">';

@@ -13,7 +13,7 @@
                     </div>
                 </div>
                 <div class="col-auto ms-auto">
-                    <a href="{{ route('offline-interview.create') }}" class="btn btn-themeSkyblue btn-sm">
+                    <a href="{{ route('offline-interview.create') }}" class="btn ta-btn-accent btn-sm">
                         <i class="fa-solid fa-plus"></i> New Offline Interview
                     </a>
                 </div>
@@ -60,6 +60,10 @@
         </div>
     </div>
 </div>
+@section('import-css')
+@include('resorts.talentacquisition._ta_buttons_v2_styles')
+@endsection
+
 @endsection
 
 @section('import-scripts')

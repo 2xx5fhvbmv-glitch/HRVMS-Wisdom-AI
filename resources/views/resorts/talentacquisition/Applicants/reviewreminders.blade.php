@@ -13,7 +13,7 @@
                         </div>
                     </div>
                     <div class="col-auto ms-auto">
-                        <a href="javascript:history.back()" class="btn btn-themeLightNew"><i class="fa-solid fa-arrow-left me-1"></i>Back</a>
+                        <a href="javascript:history.back()" class="btn ta-btn-ghost"><i class="fa-solid fa-arrow-left me-1"></i>Back</a>
                     </div>
                 </div>
             </div>
@@ -48,6 +48,10 @@
             </div>
         </div>
     </div>
+@section('import-css')
+@include('resorts.talentacquisition._ta_buttons_v2_styles')
+@endsection
+
 @endsection
 
 @section('import-scripts')

@@ -303,16 +303,16 @@ class ConfigrationController extends Controller
             return datatables()->of($ResortHoliday)
                 ->addColumn('action', function ($row) {
                     return '
-                        <div class="d-flex justify-content-start">
+                        <div class="d-flex justify-content-start gap-1">
                             <a href="javascript:void(0)"
-                                class="btn-lg-icon icon-bg-green me-1 edit-row-btn"
+                                class="btn-tableIcon taa-btn-secondary edit-row-btn"
                                 data-id="' . e($row->id) . '">
-                                <img src="' . asset('resorts_assets/images/edit.svg') .'" alt="Edit" data-id="' . e($row->id) . '" data-publicholidaydate="'. e($row->PublicHolidaydate) .'" data-publicholidescription="'. e($row->description) .'"   data-publicholidayname="'. e($row->PublicHolidayName) .'" data-holidayid="'. e($row->HolidayId) .'" class="img-fluid AddPublicHolidays" />
+                                <i class="fa-solid fa-pen AddPublicHolidays" data-id="' . e($row->id) . '" data-publicholidaydate="'. e($row->PublicHolidaydate) .'" data-publicholidescription="'. e($row->description) .'"   data-publicholidayname="'. e($row->PublicHolidayName) .'" data-holidayid="'. e($row->HolidayId) .'"></i>
                             </a>
                             <a href="javascript:void(0)"
-                                class="btn-lg-icon icon-bg-red delete-row-btn"
+                                class="btn-tableIcon taa-btn-critical delete-row-btn"
                                 data-id="' . e($row->id) . '">
-                                <img src="' . asset('resorts_assets/images/trash-red.svg') . '" alt="Delete" class="img-fluid" />
+                                <i class="fa-solid fa-trash"></i>
                             </a>
                         </div>
                     ';

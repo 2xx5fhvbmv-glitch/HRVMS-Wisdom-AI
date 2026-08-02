@@ -19,7 +19,7 @@
                         </div>
                     </div>
                     {{-- <div class="col-auto ms-auto">
-                        <a href="{{ route('resort.ta.shortlistedapplicants') }}" class="btn btn-themeLightNew">Shortlisted Applicants To share Link</a>
+                        <a href="{{ route('resort.ta.shortlistedapplicants') }}" class="btn ta-btn-secondary">Shortlisted Applicants To share Link</a>
                     </div> --}}
                     <!-- <div class="col-auto">
                         <div class="d-flex justify-content-end">
@@ -83,8 +83,8 @@
                         </div>
                     </div>
                     <div class="modal-footer justify-content-center">
-                        <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                        <button type="submit" class="btn btn-theme">Submit</button>
+                        <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Cancel</a>
+                        <button type="submit" class="btn ta-btn-primary">Submit</button>
                     </div>
                 </form>
 
@@ -114,8 +114,8 @@
 
                     </div>
                     <div class="modal-footer justify-content-center">
-                        <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                        <button type="submit" class="btn btn-theme">Submit</button>
+                        <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Cancel</a>
+                        <button type="submit" class="btn ta-btn-primary">Submit</button>
 
                     </div>
                 </form>
@@ -143,8 +143,8 @@
                     </div>
                 </div>
                 <div class="modal-footer justify-content-center">
-                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                    <a href="javascript:void(0)"  data-bs-dismiss="modal"class="btn btn-theme" >Submit</a>
+                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Cancel</a>
+                    <a href="javascript:void(0)"  data-bs-dismiss="modal"class="btn ta-btn-primary" >Submit</a>
                 </div>
 
             </div>
@@ -169,8 +169,8 @@
                         <input type="hidden" name="Interview_id" id="Interview_id">
                     </div>
                     <div class="modal-footer">
-                        <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                        <button type="submit" class="btn btn-themeBlue">Submit</button>
+                        <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Cancel</a>
+                        <button type="submit" class="btn ta-btn-primary">Submit</button>
                     </div>
                 </form>
             </div>
@@ -179,6 +179,7 @@
     @endsection
 
 @section('import-css')
+@include('resorts.talentacquisition._ta_buttons_v2_styles')
 
 @endsection
 

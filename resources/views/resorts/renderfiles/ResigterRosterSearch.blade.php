@@ -139,7 +139,7 @@
                                                             {{ $shiftData->differenceInHours }}
                                                         </p>
                                                         {{-- <a href="#" class="btn btn-themeSkyblue">Accept</a> --}}
-                                                            <a href="javascript:void(0)" class="btn btn-themeSkyblue CheckOutModel"
+                                                            <a href="javascript:void(0)" class="btn taa-btn-attention CheckOutModel"
                                                                     data-attendance_id="{{ $shiftData->Attd_id }}"
                                                                     data-shiftname="{{ $shiftData->ShiftName }}"
                                                                     data-todoshiftstime="{{ $shiftData->StartTime}}"
@@ -160,10 +160,10 @@
                                         @endif
 
                                         <div class="btn-block">
-                                            <a href="javascript:void(0)" class="btn-lg-icon icon-bg-blue LocationHistoryData" data-location="{{ $shiftData->InTime_Location }}"><i class="fa-regular fa-location-dot"></i></a>
+                                            <a href="javascript:void(0)" class="btn-lg-icon taa-btn-secondary LocationHistoryData" data-location="{{ $shiftData->InTime_Location }}"><i class="fa-regular fa-location-dot"></i></a>
 
                                             @if(isset($shiftData->ApprovedName) && $shiftData->ApprovedName != "")
-                                            <a href="javascript:void(0)" class="btn-lg-icon icon-bg-skyblue tt-hover"><i class="fa-regular fa-comment "></i>
+                                            <a href="javascript:void(0)" class="btn-lg-icon taa-btn-secondary tt-hover"><i class="fa-regular fa-comment "></i>
                                                 <span class="tt-main"><span class="tt-inner">OT Approved by
                                                         {{$shiftData->ApprovedName }}</span></span></a>
                                             @endif

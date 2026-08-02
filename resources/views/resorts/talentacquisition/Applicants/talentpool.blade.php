@@ -120,8 +120,8 @@
                         <input type="hidden" name="Interview_id" id="Interview_id">
                     </div>
                     <div class="modal-footer">
-                        <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                        <button type="submit" class="btn btn-themeBlue RevertBack d-none">Revert Back</button>
+                        <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Cancel</a>
+                        <button type="submit" class="btn ta-btn-secondary RevertBack d-none">Revert Back</button>
                     </div>
                 </form>
             </div>
@@ -147,8 +147,8 @@
                         <input type="hidden" name="applicant_id" id="consent_applicant_id">
                     </div>
                     <div class="modal-footer">
-                        <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                        <button type="submit" class="btn btn-themeBlue">Send Request</button>
+                        <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Cancel</a>
+                        <button type="submit" class="btn ta-btn-attention">Send Request</button>
                     </div>
                 </form>
             </div>
@@ -188,8 +188,8 @@
                         <input type="hidden" name="applicant_id" id="availability_applicant_id">
                     </div>
                     <div class="modal-footer">
-                        <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                        <button type="submit" class="btn btn-themeBlue">Send Email</button>
+                        <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Cancel</a>
+                        <button type="submit" class="btn ta-btn-attention">Send Email</button>
                     </div>
                 </form>
             </div>
@@ -209,7 +209,7 @@
                     <div class="ratio ratio-21x9" id="ViewModeOfFiles"></div>
                 </div>
                 <div class="modal-footer">
-                    <a href="javascript:void(0)" id="document-dismiss" class="btn btn-themeGray ms-auto">Cancel</a>
+                    <a href="javascript:void(0)" id="document-dismiss" class="btn ta-btn-secondary ms-auto">Cancel</a>
                 </div>
             </div>
         </div>
@@ -218,6 +218,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts.talentacquisition._ta_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')

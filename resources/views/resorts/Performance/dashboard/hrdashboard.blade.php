@@ -8,6 +8,52 @@
 @endif
 
 @section('content')
+<style>
+    /* WAI Insights — same gradient-header treatment as the other modules'
+       WAI Insights cards (Time and Attendance / Payroll / Talent Acquisition
+       / Leave). These are 3 narrative performance insights (title +
+       descriptive body + optional recommendation), not pass/fail counts,
+       so there's no hero/count figure — icon is amber when a recommendation
+       is present, teal tick otherwise. Card height matches its row neighbour
+       (Appraisal Pending Departments), which opts out of the row's default
+       stretch via .perf-appraisal-table-col so it doesn't get force-stretched
+       to this taller card's height. */
+    #card-wiINsightPerformance {
+        height: 450px !important;
+        max-height: 450px !important;
+        display: flex;
+        flex-direction: column;
+        padding: 0;
+        overflow: hidden;
+        border-radius: 16px;
+    }
+    #card-wiINsightPerformance .leaveUser-main { overflow-y: auto; flex: 1 1 auto; min-height: 0; }
+
+    .wai-narrative .wai-head { position: relative; overflow: hidden; padding: 17px 18px; flex-shrink: 0; }
+    .wai-narrative .wai-head::before {
+        content: ""; position: absolute; inset: 0; pointer-events: none;
+        background: linear-gradient(110deg, #014653 0%, #0e8a9e 40%, #7fa61e 70%, #e0ff02 100%);
+    }
+    .wai-narrative .wai-head::after {
+        content: ""; position: absolute; inset: 0; pointer-events: none;
+        background: linear-gradient(110deg, rgba(1,40,48,.35), transparent 55%);
+    }
+    .wai-narrative .wai-head h2 { position: relative; color: #fff; font-size: 15px; font-weight: 800; margin: 0; }
+    .wai-narrative .wai-head-meta { position: relative; margin-top: 4px; font-size: 11.5px; color: rgba(255,255,255,.75); display: flex; gap: 6px; }
+    .wai-narrative .wai-head-meta a { color: #fff; font-weight: 600; text-decoration: underline; }
+
+    .wai-narrative-body { padding: 16px; }
+    .wai-narrative .wai-row { display: flex; align-items: flex-start; gap: 12px; padding: 12px 2px; border-bottom: 1px solid #F2F6F6; }
+    .wai-narrative .wai-row:last-child { border-bottom: none; }
+    .wai-narrative .wai-row-icon { width: 32px; height: 32px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; margin-top: 2px; }
+    .wai-narrative .wai-row-icon.is-ok { background: #E9F7F0; color: #1F9D6B; }
+    .wai-narrative .wai-row-icon.is-flagged { background: #FBF0DC; color: #D98A00; }
+    .wai-narrative .wai-row-body { flex: 1 1 auto; min-width: 0; }
+    .wai-narrative .wai-row-body h6 { margin: 0 0 4px; font-size: 13.5px; font-weight: 700; color: #14232A; }
+    .wai-narrative .wai-row-text { margin: 0 0 4px; font-size: 12.5px; color: #5D6F75; line-height: 1.5; }
+    .wai-narrative .wai-row-recommendation { margin: 0 0 4px; font-size: 12.5px; color: #0e8a9e; line-height: 1.5; }
+    .wai-narrative .wai-row-link { display: inline-block; margin-top: 2px; font-size: 12px; font-weight: 600; color: #014653; }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
         <div class="page-hedding">
@@ -193,38 +239,34 @@
                         ['key' => 'throughput', 'fallback' => 'Self vs Manager Review Throughput',  'modal' => 'perfInsightThroughputModal'],
                     ];
                 @endphp
-                <div class="card card-wiINsightPayroll card-wiINsightperformance card-wiINsight">
-                    <div class="card-title">
-                        <div class="row justify-content-between align-items-start g-md-3 g-1">
-                            <div class="col">
-                                <h3 class="text-nowrap">WAI Insights</h3>
+                <div class="card wai-narrative" id="card-wiINsightPerformance">
+                    <div class="wai-head">
+                        <h2>WAI Insights</h2>
+                        @if($piMeta)
+                            <div class="wai-head-meta">
+                                <span>Updated {{ $piMeta['generated_at']->diffForHumans() }}</span>
+                                @if($piMeta['can_regenerate'])
+                                    <a href="?regenerate_insights=1">Regenerate</a>
+                                @else
+                                    <span title="{{ $piMeta['next_available']->format('d M Y, H:i') }}">&middot; Regenerate {{ $piMeta['next_available']->diffForHumans() }}</span>
+                                @endif
                             </div>
-                            @if($piMeta)
-                                <div class="col-auto text-end" style="font-size:12px;line-height:1.4;">
-                                    <div class="text-muted">Updated {{ $piMeta['generated_at']->diffForHumans() }}</div>
-                                    @if($piMeta['can_regenerate'])
-                                        <a href="?regenerate_insights=1" class="a-linkTheme">Regenerate</a>
-                                    @else
-                                        <span class="text-muted" title="{{ $piMeta['next_available']->format('d M Y, H:i') }}">Regenerate available {{ $piMeta['next_available']->diffForHumans() }}</span>
-                                    @endif
-                                </div>
-                            @endif
-                        </div>
+                        @endif
                     </div>
-                    <div class="leaveUser-main">
+                    <div class="leaveUser-main wai-narrative-body">
                         @foreach($piCards as $card)
-                            @php $c = $pi[$card['key']] ?? []; @endphp
-                            <div class="leaveUser-block">
-                                <div class="img">
-                                    <img src="{{ URL::asset('resorts_assets/images/wisdom-ai-small.svg') }}" alt="image">
+                            @php $c = $pi[$card['key']] ?? []; $hasRecommendation = !empty($c['recommendation']); @endphp
+                            <div class="wai-row">
+                                <div class="wai-row-icon {{ $hasRecommendation ? 'is-flagged' : 'is-ok' }}">
+                                    <i class="fa-solid {{ $hasRecommendation ? 'fa-triangle-exclamation' : 'fa-check' }}"></i>
                                 </div>
-                                <div>
+                                <div class="wai-row-body">
                                     <h6>{{ $c['title'] ?? $card['fallback'] }}</h6>
-                                    <p>{{ $c['body'] ?? '' }}</p>
-                                    @if(!empty($c['recommendation']))<p style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $c['recommendation'] }}</p>@endif
-                                </div>
-                                <div>
-                                    <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#{{ $card['modal'] }}" class="a-linkTheme">View Details</a>
+                                    <p class="wai-row-text">{{ $c['body'] ?? '' }}</p>
+                                    @if($hasRecommendation)
+                                        <p class="wai-row-recommendation"><strong>Recommendation:</strong> {{ $c['recommendation'] }}</p>
+                                    @endif
+                                    <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#{{ $card['modal'] }}" class="wai-row-link">View details &rarr;</a>
                                 </div>
                             </div>
                         @endforeach
