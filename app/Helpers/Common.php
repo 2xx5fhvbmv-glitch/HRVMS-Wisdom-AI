@@ -7447,6 +7447,36 @@ class Common
         return StorageHelper::temporaryUrl($path_path . '/' . $value);
     }
 
+    /**
+     * grivance_submission_models.Attachements holds EITHER a comma-joined
+     * list of plain filenames (web submission, GrivanceController::store())
+     * or a JSON array of {"Filename":..,"Child_id":..} (mobile submission,
+     * via AWSEmployeeFileUpload) — same dual-format situation as
+     * resolveMaintenanceAttachmentUrl(), but this column can hold several
+     * files at once, so this returns a list of [filename, url] pairs
+     * instead of a single url.
+     */
+    public static function resolveGrievanceAttachments($value, $basePath, $resortId)
+    {
+        if (empty($value)) return [];
+
+        $decoded = json_decode($value, true);
+        if (is_array($decoded)) {
+            return collect($decoded)->map(function ($item) use ($resortId) {
+                $url = null;
+                if (!empty($item['Child_id'])) {
+                    $aws = self::GetAWSFile($item['Child_id'], $resortId);
+                    if (!empty($aws['success'])) $url = $aws['NewURLshow'];
+                }
+                return ['filename' => $item['Filename'] ?? null, 'url' => $url];
+            })->values()->all();
+        }
+
+        return collect(explode(',', $value))->filter()->map(function ($filename) use ($basePath) {
+            return ['filename' => $filename, 'url' => StorageHelper::temporaryUrl($basePath . '/' . $filename)];
+        })->values()->all();
+    }
+
     public static function GetApplicantAWSFile($path)
     {
         // Read from config (env() returns null when prod runs

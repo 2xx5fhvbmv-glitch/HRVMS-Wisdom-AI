@@ -90,7 +90,11 @@ class ExportEmployeeDropdownSheet implements FromArray, WithTitle, WithEvents, W
         })->values()->toArray();
 
         $this->data['Genders'] = ['male', 'female', 'other'];
-        
+
+        $this->data['EmploymentTypes'] = ['Full-Time', 'Part-Time', 'Contract', 'Casual', 'Probationary', 'Internship', 'Temporary'];
+        $this->data['MaritalStatuses'] = ['Single', 'Married', 'Divorced', 'Widowed'];
+        $this->data['BloodGroups'] = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+
         $this->data['Nationalities'] = config('settings.nationalities') ?? [
             "Afghan",
 			"Albanian",

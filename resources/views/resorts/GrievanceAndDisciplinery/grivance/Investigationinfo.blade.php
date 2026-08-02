@@ -69,15 +69,9 @@
                                 </tr>
                                 <tr>
                                     <th>Attachements:</th>
-                                    <td>@if(isset($Grivance_Parent->Attachements) && !empty($Grivance_Parent->Attachements))
-                                            @foreach(explode(",",$Grivance_Parent->Attachements) as  $g)
-                                                
-                                            @php 
-                                                $Path = $path."/".$Grivance_Parent->Grivance_id."/".$g;
-                                            @endphp
-                                            <a target="_blank" href="{{URL::asset($Path)}}" >{{$g}}</a></br>
-                                            @endforeach
-                                        @endif
+                                    <td>@foreach(\App\Helpers\Common::resolveGrievanceAttachments($Grivance_Parent->Attachements, $path."/".$Grivance_Parent->Grivance_id, $Grivance_Parent->resort_id) as $att)
+                                            <a target="_blank" href="{{ $att['url'] }}">{{ $att['filename'] }}</a></br>
+                                        @endforeach
                                     </td>
                                 </tr>
                                 <tr>
@@ -153,36 +147,36 @@
                 </div>
                 @if(!empty($GrivanceSubmissionHistory))
                 <hr>
-                    <div class="row">
-                        <h3>History</h3>
-                        <hr>
-                        <div class="col-md-8">
-                            <table class="table  ">
-                                <thead>
+                    <h3>History</h3>
+                    <div class="table-responsive mb-4">
+                        <table class="table gr-history-table">
+                            <thead>
+                                <tr>
+                                    <th style="min-width:130px;">Follow-Up Action</th>
+                                    <th style="min-width:220px;">Follow-Up Description</th>
+                                    <th style="min-width:130px;">Investigation Stage</th>
+                                    <th style="min-width:320px;">Grievance Explanation Description</th>
+                                    <th style="min-width:150px;">Committee Member Name</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($GrivanceSubmissionHistory as $key => $value)
                                     <tr>
-                                        <th>FOLLOW-UP Action</th>
-                                        <th>Follow - up Description</th>
-                                        <th>Investigation Stage</th>
-                                        <th>Grievance Explination Description</th>
-                                        <th>Committee Member Name</th>
+                                        <td>{{ $value->follow_up_action }}</td>
+                                        <td>{{ $value->follow_up_description }}</td>
+                                        <td>{{ $value->investigation_stage }}</td>
+                                        <td>{{ $value->inves_find_recommendations }}</td>
+                                        <td>{{ $value->first_name }} {{ $value->last_name }} </td>
                                     </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach ($GrivanceSubmissionHistory as $key => $value)
-                                        <tr>
-                                            <td>{{ $value->follow_up_action }}</td>
-                                            <td>{{ $value->follow_up_description }}</td>
-                                            <td>{{ $value->investigation_stage }}</td>
-                                            <td>{{ $value->inves_find_recommendations }}</td>
-                                            <td>{{ $value->first_name }} {{ $value->last_name }} </td>
-                                            
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-                        <div class="col-md-4">
-                            <table class="table  ">
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+
+                    @if($GrivanceInvestigationModel && !empty($GrivanceInvestigationModel->investigation_files))
+                        <h6>Attachments</h6>
+                        <div class="table-responsive mb-4" style="max-width:400px;">
+                            <table class="table gr-history-table">
                                 <thead>
                                     <tr>
                                         <th>File Name</th>
@@ -190,21 +184,16 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @if($GrivanceInvestigationModel && !empty($GrivanceInvestigationModel))
-                                        @foreach (explode(',', $GrivanceInvestigationModel->investigation_files) as $f)
-                                            <tr>
-                                                <td>{{ $f }}</td>
-                                                <td><a target="_blank" href="{{ URL::asset($EveidanceFilePath.'/'. $f) }}">View</a>  </td>
-                                            </tr>
-                                            
-                                        @endforeach
-                                    @endif
-                                
+                                    @foreach (explode(',', $GrivanceInvestigationModel->investigation_files) as $f)
+                                        <tr>
+                                            <td>{{ $f }}</td>
+                                            <td><a target="_blank" href="{{ \App\Helpers\StorageHelper::temporaryUrl($EveidanceFilePath.'/'. $f) }}">View</a></td>
+                                        </tr>
+                                    @endforeach
                                 </tbody>
                             </table>
                         </div>
-                      
-                    </div>
+                    @endif
                 @endif
 
                 
@@ -279,6 +268,13 @@
 @endsection
 
 @section('import-css')
+<style>
+    .gr-history-table td, .gr-history-table th {
+        white-space: normal;
+        word-break: break-word;
+        vertical-align: top;
+    }
+</style>
 @endsection
 
 @section('import-scripts')
