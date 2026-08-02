@@ -671,21 +671,26 @@ class AccommodationController extends Controller
             if ($MaintanaceRequest) { // Ensure request exists before processing
                 $MaintanaceRequest->profileImg               =   Common::getResortUserPicture($MaintanaceRequest->Parentid);
                 // **Check & Assign Image Path**
+                // Image can be a plain filename (web upload) or a
+                // json_encode(['Filename'=>..,'Child_id'=>..]) value (mobile
+                // "raise request" upload via AWSEmployeeFileUpload) —
+                // resolveMaintenanceAttachmentUrl() handles both; the old
+                // URL::asset() here always produced a broken URL for the
+                // JSON case and only worked for the local disk otherwise.
                 if (!empty($MaintanaceRequest->Image)) {
-                    $path_path                              =   config('settings.MaintanceRequest') . '/' . $this->resort_id;
-                    $MaintanaceRequest->Image               =   URL::asset($path_path . '/' . $MaintanaceRequest->Image);
+                    $MaintanaceRequest->Image               =   Common::resolveMaintenanceAttachmentUrl($MaintanaceRequest->Image, $this->resort_id);
                 }
 
                 // **Check & Assign Video Path**
                 if (!empty($s->Video)) {
                     $path_path                              =   config('settings.MaintanceRequest') . '/' . $this->resort_id;
-                    $MaintanaceRequest->Video               =   URL::asset($path_path . '/' . $MaintanaceRequest->Video);
+                    $MaintanaceRequest->Video               =   \App\Helpers\StorageHelper::temporaryUrl($path_path . '/' . $MaintanaceRequest->Video);
                 }
 
                 // **Check & Assign Image Path**
                 if (!empty($MaintanaceRequest->Completed_Image )) {
                     $path_path                              =   config('settings.MaintanceRequest') . '/' . Auth::guard('api')->user()->resort->resort_id;
-                    $MaintanaceRequest->Completed_Image     =   URL::asset($path_path . '/' . $MaintanaceRequest->Completed_Image);
+                    $MaintanaceRequest->Completed_Image     =   \App\Helpers\StorageHelper::temporaryUrl($path_path . '/' . $MaintanaceRequest->Completed_Image);
                 }
 
                 $MaintanaceRequest->BuilidngData;

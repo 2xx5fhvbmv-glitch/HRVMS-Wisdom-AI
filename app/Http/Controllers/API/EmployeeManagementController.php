@@ -257,7 +257,15 @@ class EmployeeManagementController extends Controller
                                                                         'ra.last_name as employee_last_name',
                                                                         'ra.profile_picture as employee_profile_picture',
                                                                     )->groupBy('el.id')->get();
-                                                                    
+
+            $viewerEmployeeId = $this->reporting_to ?? null;
+            $leaveDetails = $leaveDetails->map(function ($item) use ($viewerEmployeeId) {
+                foreach (Common::buildLeaveApprovalFlow($item->id, $viewerEmployeeId) as $key => $value) {
+                    $item->{$key} = $value;
+                }
+                return $item;
+            });
+
             return response()->json(['success' => true, 'message' => 'Employee Leave Request Data', 'employees_leave_data' => $leaveDetails], 200);
         } catch (\Exception $e) {
             \Log::emergency("File: " . $e->getFile());

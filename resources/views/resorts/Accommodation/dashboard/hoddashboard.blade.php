@@ -197,7 +197,7 @@
     <div class="modal-dialog modal-dialog-centered modal-small modal-assign">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="staticBackdropLabel">Assign Task To HOD</h5>
+                <h5 class="modal-title" id="staticBackdropLabel">Assign Task To Staff</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form id="ForwardToHODForm">
@@ -353,6 +353,12 @@
                 type: 'GET',
                 data: function (d) {
                     d.ResortDepartment = $(".ResortDepartment").val();
+                },
+                // No error handler meant a failed request left the
+                // "Processing" overlay stuck forever with no feedback.
+                error: function (xhr) {
+                    $('.table-accomMainten').closest('.dataTables_wrapper').find('.dataTables_processing').hide();
+                    console.error('Maintenance request table failed to load', xhr);
                 }
             },
             columns: [
@@ -391,6 +397,10 @@
                 type: 'GET',
                 data: function (d) {
                     d.ResortDepartment = $(".ResortDepartment").val();
+                },
+                error: function (xhr) {
+                    $('.table-assignTask').closest('.dataTables_wrapper').find('.dataTables_processing').hide();
+                    console.error('Assigned task table failed to load', xhr);
                 }
             },
             columns: [
@@ -430,6 +440,10 @@
                     data: function (d)
                     {
                         d.Search =$(".Search").val();
+                    },
+                    error: function (xhr) {
+                        $('.OnHoldReq').closest('.dataTables_wrapper').find('.dataTables_processing').hide();
+                        console.error('On-hold task table failed to load', xhr);
                     }
                 },
                 columns: [

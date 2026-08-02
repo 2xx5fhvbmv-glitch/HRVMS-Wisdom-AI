@@ -92,6 +92,20 @@
                         <div class=" card-title">
                             <h3>Status</h3>
                         </div>
+                        @php
+                            // Each step's own reached/not-reached state, computed
+                            // once so the "Pending" marker below can reuse the
+                            // exact same condition as the active class instead
+                            // of duplicating it — previously every step printed
+                            // its label unconditionally with no visual
+                            // distinction beyond a dimmed opacity, so a
+                            // not-yet-reached step read as already done.
+                            $sentToHrActive = in_array('Open', $displayedStatuses) || in_array('Assinged', $displayedStatuses) || $MaintanaceRequest->Status == 'Open';
+                            $reviewActive = in_array('Assinged', $displayedStatuses);
+                            $inProgressActive = in_array('In-Progress', $displayedStatuses) || in_array('Resolved', $displayedStatuses) || in_array('Confirmed', $displayedStatuses);
+                            $resolvedAwaitingActive = in_array('Resolvedawaiting', $displayedStatuses) || in_array('Closed', $displayedStatuses);
+                            $confirmedActive = in_array('Closed', $displayedStatuses);
+                        @endphp
                         <ul class="manning-timeline text-start">
                             {{-- 1. Request Submitted --}}
                             <li class="active">
@@ -101,7 +115,7 @@
                             </li>
 
                             {{-- 2. Sent to HR --}}
-                            <li class="{{ in_array('Open', $displayedStatuses) || in_array('Assinged', $displayedStatuses) || $MaintanaceRequest->Status == 'Open' ? 'active' : '' }} {{ $MaintanaceRequest->Status == 'Rejected' ? 'text-danger' : '' }}">
+                            <li class="{{ $sentToHrActive ? 'active' : '' }} {{ $MaintanaceRequest->Status == 'Rejected' ? 'text-danger' : '' }}">
                                 <span>Sent to HR</span>
                                 @if($MaintanaceRequest->Status == 'Rejected')
                                     <small class="d-block text-danger">Rejected: {{ $MaintanaceRequest->RejactionReason ?? '' }}</small>
@@ -109,32 +123,45 @@
                                     <small class="d-block text-warning">On Hold: {{ $MaintanaceRequest->ReasonOnHold ?? '' }}</small>
                                 @elseif(in_array('Open', $displayedStatuses))
                                     <small class="d-block text-success">Approved</small>
+                                @else
+                                    <small class="d-block text-muted">Pending</small>
                                 @endif
                             </li>
 
                             {{-- 3. Engineering HOD/EXCOM Review & Assign --}}
-                            <li class="{{ in_array('Assinged', $displayedStatuses) ? 'active' : '' }}">
+                            <li class="{{ $reviewActive ? 'active' : '' }}">
                                 <span>Engineering Department Review</span>
-                                @if(in_array('Assinged', $displayedStatuses) && isset($displayedStatusesDetails['Assinged']))
+                                @if($reviewActive && isset($displayedStatusesDetails['Assinged']))
                                     @foreach($displayedStatusesDetails['Assinged'] as $detail)
                                         <small class="d-block text-muted">Assigned to {{ $detail[2] ?? '' }} on {{ $detail[0] ?? '' }}</small>
                                     @endforeach
+                                @else
+                                    <small class="d-block text-muted">Pending</small>
                                 @endif
                             </li>
 
                             {{-- 4. In Progress --}}
-                            <li class="{{ in_array('In-Progress', $displayedStatuses) || in_array('Resolved', $displayedStatuses) || in_array('Confirmed', $displayedStatuses) ? 'active' : '' }}">
+                            <li class="{{ $inProgressActive ? 'active' : '' }}">
                                 <span>In Progress</span>
+                                @unless($inProgressActive)
+                                    <small class="d-block text-muted">Pending</small>
+                                @endunless
                             </li>
 
                             {{-- 5. Resolved awaiting confirmation --}}
-                            <li class="{{ in_array('Resolvedawaiting', $displayedStatuses) || in_array('Closed', $displayedStatuses) ? 'active' : '' }}">
+                            <li class="{{ $resolvedAwaitingActive ? 'active' : '' }}">
                                 <span>Resolved Awaiting Confirmation</span>
+                                @unless($resolvedAwaitingActive)
+                                    <small class="d-block text-muted">Pending</small>
+                                @endunless
                             </li>
 
                             {{-- 6. Confirmed resolved --}}
-                            <li class="{{ in_array('Closed', $displayedStatuses) ? 'active' : '' }}">
+                            <li class="{{ $confirmedActive ? 'active' : '' }}">
                                 <span>Confirmed Resolved</span>
+                                @unless($confirmedActive)
+                                    <small class="d-block text-muted">Pending</small>
+                                @endunless
                             </li>
                         </ul>
 

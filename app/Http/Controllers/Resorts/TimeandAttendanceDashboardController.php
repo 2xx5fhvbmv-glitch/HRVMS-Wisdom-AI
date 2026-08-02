@@ -223,6 +223,7 @@ class TimeandAttendanceDashboardController extends Controller
                 'employees.id',
                 'employees.Admin_Parent_id',
                 'employees.rank',
+                'employees.benefit_grid_level',
                 'employees.joining_date',
                 'ra.first_name',
                 'ra.last_name'
@@ -279,7 +280,7 @@ class TimeandAttendanceDashboardController extends Controller
                 if (!$emp) {
                     continue;
                 }
-                $grade = Common::getEmpGrade($emp->rank);
+                $grade = Common::resolveEmpGrade($resortId, $emp->rank, $emp->benefit_grid_level);
                 $limit = (int) ($gridLimits[$grade] ?? 48);
                 if ($limit <= 0) {
                     $limit = 48;

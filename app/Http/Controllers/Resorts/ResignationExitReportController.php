@@ -375,7 +375,7 @@ class ResignationExitReportController extends Controller
     {
         if (!$row || $row->net_pay === null) return 'N/A';
         $net = (float) $row->net_pay;
-        return $net < 0 ? number_format(abs($net), 2) : 'N/A';
+        return $net < 0 ? Common::formatCurrency(abs($net)) : 'N/A';
     }
 
     private function departureFlags($raw): ?array

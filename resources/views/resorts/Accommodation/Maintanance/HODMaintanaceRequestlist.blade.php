@@ -89,7 +89,7 @@
     <div class="modal-dialog modal-dialog-centered modal-small modal-assign">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="staticBackdropLabel">Assign Task To HOD</h5>
+                <h5 class="modal-title" id="staticBackdropLabel">Assign Task To Staff</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form id="ForwardToHODForm">

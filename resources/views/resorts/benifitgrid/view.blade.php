@@ -29,7 +29,7 @@
                                 <ul class=" list-group">
                                     <li class="d-sm-flex align-items-center justify-content-between list-group-item">
                                         <p class="mb-sm-0 mb-1 fw-500">Employee Grade</p>
-                                        <span>{{ config('settings.eligibilty.'.$benefit_grid->emp_grade, $benefit_grid->emp_grade) }}</span>
+                                        <span>{{ optional(\App\Models\ResortBenefitGradeLevel::find($benefit_grid->emp_grade))->name ?? $benefit_grid->emp_grade }}</span>
                                     </li>
                                     <li class="d-sm-flex align-items-center justify-content-between list-group-item">
                                         <p class="mb-sm-0 mb-1 fw-500">Salary Period</p>

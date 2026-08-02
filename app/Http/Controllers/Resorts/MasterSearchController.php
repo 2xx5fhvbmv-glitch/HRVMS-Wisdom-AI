@@ -74,7 +74,21 @@ class MasterSearchController extends Controller
                             ->orWhere('passport_number', 'LIKE', "%{$search_key}%");
                         }
                     })->get();
-                    
+
+                // Resolve every matched employee's profile picture in one
+                // batched query instead of the view calling
+                // getResortUserPicture() per row (N+1 — 2 extra queries per
+                // employee for a potentially unbounded match set).
+                $employeePictures = Common::getResortUserPicturesBatch(
+                    $getEmployee->pluck('resortAdmin.id')->filter()->all()
+                );
+                foreach ($getEmployee as $employee) {
+                    $adminId = optional($employee->resortAdmin)->id;
+                    $employee->profile_picture_url = $adminId
+                        ? ($employeePictures[$adminId] ?? url(config('settings.default_picture')))
+                        : url(config('settings.default_picture'));
+                }
+
                 // Search vacancies
                 $getVacancy = Vacancies::with(['Getposition', 'Getdepartment'])
                     ->where('resort_id', $resort_id)

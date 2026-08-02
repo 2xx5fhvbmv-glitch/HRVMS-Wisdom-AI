@@ -77,7 +77,7 @@
 							<li>
 								<a target="_blank" href="{{ route('people.employees.details', base64_encode($employee->id)) }}" class="sr-item">
 									@if($hasPhoto)
-										<img class="sr-avatar" src="{{ App\Helpers\Common::getResortUserPicture($employee->resortAdmin->id) }}" alt="">
+										<img class="sr-avatar" src="{{ $employee->profile_picture_url }}" alt="">
 									@else
 										<span class="sr-avatar sr-avatar-initials" style="background:{{ $srAvatarColor($empName) }};">{{ $srInitials($empName) }}</span>
 									@endif

@@ -384,16 +384,19 @@ class StaffAccommodationController extends Controller
                                                                     ->orderBy("t1.id", "ASC")
                                                                     ->get(['t1.id','t1.Status','t1.date']);
             if (!empty($maintanaceRequest->Image)) {
-                $path_path                              =   config('settings.MaintanceRequest') . '/' . Auth::guard('api')->user()->resort->resort_id;
-                if (!file_exists($path_path)) {
-                        mkdir($path_path, 0777, true);
-                    }
-                $maintanaceRequest->Image               =   URL::asset($path_path . '/' . $maintanaceRequest->Image);
+                // Image can be a plain filename (web upload) or a
+                // json_encode(['Filename'=>..,'Child_id'=>..]) value (mobile
+                // "raise request" upload via AWSEmployeeFileUpload) —
+                // resolveMaintenanceAttachmentUrl() handles both; the old
+                // URL::asset() here always produced a broken URL for the
+                // JSON case (a literal JSON path segment) and only ever
+                // worked for the local disk otherwise.
+                $maintanaceRequest->Image               =   Common::resolveMaintenanceAttachmentUrl($maintanaceRequest->Image, Auth::guard('api')->user()->resort->resort_id);
             }
 
             if (!empty($maintanaceRequest->Completed_Image )) {
                 $path                              =   config('settings.MaintanceRequest') . '/' . Auth::guard('api')->user()->resort->resort_id;
-                $maintanaceRequest->Completed_Image     =   URL::asset($path . '/' . $maintanaceRequest->Completed_Image);
+                $maintanaceRequest->Completed_Image     =   \App\Helpers\StorageHelper::temporaryUrl($path . '/' . $maintanaceRequest->Completed_Image);
             }
                                                                                                             
             $displayedStatuses = ['data' => []];

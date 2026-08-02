@@ -169,6 +169,7 @@
                         </table>
                     </div>
                 </div>
+
             </div>
         </div>
     </div>
@@ -464,6 +465,7 @@ $(document).ready( function() {
         $('#addDepartmentForm').parsley();
         $('#addSectionForm').parsley();
         $('#addDivisionForm').parsley();
+
 
 
 

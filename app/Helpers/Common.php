@@ -1607,6 +1607,79 @@ class Common
 	}
 
     /**
+     * Batch version of getResortUserPicture() — resolves profile pictures
+     * for many ResortAdmin ids in one query instead of one per id. Same
+     * auth/route-context gate and same AWS/Wasabi + public-path fallback
+     * resolution per admin, just fetched together up front. Introduced to
+     * fix a real N+1 (search/index.blade.php called getResortUserPicture()
+     * once per matched employee inside an unbounded @foreach).
+     *
+     * @param  array  $userIds
+     * @param  int    $type  0 = profile_picture, 1 = signature_img
+     * @return array  [userId => url]
+     */
+    public static function getResortUserPicturesBatch(array $userIds, $type = 0): array
+    {
+        $defaultPicture = url(config('settings.default_picture'));
+        $userIds = array_values(array_unique(array_filter($userIds)));
+
+        if (empty($userIds)) {
+            return [];
+        }
+
+        $routePrefix = null;
+        try {
+            if (request()->route()) {
+                $routePrefix = request()->route()->getPrefix();
+            }
+        } catch (\Throwable $e) {
+            // Ignore when route is not available
+        }
+        $prefixMatch = $routePrefix === 'resort' || $routePrefix === '/resort';
+        $isResortContext = (Auth::guard('resort-admin')->check() && $prefixMatch) || Auth::guard('api')->check() || Auth::guard('shopkeeper')->check();
+
+        $result = array_fill_keys($userIds, $defaultPicture);
+        if (!$isResortContext) {
+            return $result;
+        }
+
+        $admins = ResortAdmin::whereIn('id', $userIds)->get();
+
+        foreach ($admins as $admin) {
+            $sourcePath = $type == 1 ? $admin->signature_img : $admin->profile_picture;
+            if (empty($sourcePath)) {
+                continue;
+            }
+
+            $aws = Self::GetApplicantAWSFile($sourcePath);
+            if ($aws['success'] == true) {
+                $result[$admin->id] = $aws['NewURLshow'];
+                continue;
+            }
+
+            if ($type == 1) {
+                continue; // signature has no public-path fallback in the single-id version either
+            }
+
+            if (strpos($sourcePath, 'http') === 0) {
+                $result[$admin->id] = $sourcePath;
+                continue;
+            }
+            $path = ltrim($sourcePath, '/');
+            if (file_exists(public_path($path))) {
+                $result[$admin->id] = asset($path);
+                continue;
+            }
+            $folder = config('settings.ResortProfile_folder', 'uploads/resortprofile');
+            if (file_exists(public_path($folder . '/' . basename($path)))) {
+                $result[$admin->id] = asset($folder . '/' . basename($path));
+            }
+        }
+
+        return $result;
+    }
+
+    /**
      * Resolve a ResortAdmin's profile picture without enforcing resort-route
      * context. Used in admin-side views (e.g. support chat) where the admin
      * legitimately needs to see the customer's avatar across tenants.
@@ -2842,6 +2915,28 @@ class Common
         if($flag =="weekly")
         {
 
+            // Batch all approved leave rows for this employee covering the
+            // whole week in one query instead of one EmployeeLeave query per
+            // day (previously up to 7+ queries per call, x10 paginated rows
+            // x N tabs on the duty-roster page).
+            $approvedWeekLeaves = EmployeeLeave::join('leave_categories as t4', 't4.id', '=', 'employees_leaves.leave_category_id')
+                ->where('employees_leaves.Emp_id', $Employee)
+                ->where('employees_leaves.status', 'Approved')
+                ->where('t4.resort_id', $resort_id)
+                ->whereDate('employees_leaves.from_date', '<=', $WeekendDate)
+                ->whereDate('employees_leaves.to_date', '>=', $WeekstartDate)
+                ->get(['t4.color', 't4.leave_type', 't4.leave_category', 'employees_leaves.total_days', 'employees_leaves.from_date', 'employees_leaves.to_date']);
+
+            $findApprovedLeaveForDate = function ($date) use ($approvedWeekLeaves) {
+                $target = Carbon::parse($date);
+                foreach ($approvedWeekLeaves as $leave) {
+                    if (Carbon::parse($leave->from_date)->lte($target) && Carbon::parse($leave->to_date)->gte($target)) {
+                        return $leave;
+                    }
+                }
+                return null;
+            };
+
             $DutyRoster = DutyRoster::join('duty_roster_entries as t2', 't2.Emp_id', '=', 'duty_rosters.Emp_id')
              ->join('shift_settings as t1','t1.id',"=","t2.Shift_id")
              ->whereBetween('t2.date',[$WeekstartDate, $WeekendDate])
@@ -2850,7 +2945,7 @@ class Common
             //  ->where('duty_rosters.Year','=',date('Y'))
              ->orderBy('t2.date','asc')
              ->get(['t2.Status','t2.id as Attd_id','t2.date','t2.Shift_id','t2.roster_id','duty_rosters.DayOfDate','t1.ShiftName','t2.OverTime','t1.StartTime','t1.EndTime','t2.DayWiseTotalHours'])
-             ->map(function ($roster) use ($resort_id, $Employee) {
+             ->map(function ($roster) use ($findApprovedLeaveForDate) {
                  if($roster->ShiftName =="First Shift")
                  {
                      $roster->ShiftNameColor = "createDuty-green";
@@ -2873,20 +2968,10 @@ class Common
                      $roster->DayOfDate = $roster->DayOfDate;
                  }
 
-                 // This branch never looked up leave at all (unlike the
-                 // Monthwise branch below) — an employee on approved leave
-                 // never saw it reflected on their own weekly duty roster
-                 // view, only whatever the raw attendance Status happened
-                 // to be (usually blank, since no shift was ever assigned).
-                 $employeeLeave = EmployeeLeave::join('leave_categories as t4', 't4.id', '=', 'employees_leaves.leave_category_id')
-                     ->where('employees_leaves.Emp_id', $Employee)
-                     ->where('employees_leaves.status', 'Approved')
-                     ->whereDate('employees_leaves.from_date', '<=', $roster->date)
-                     ->whereDate('employees_leaves.to_date', '>=', $roster->date)
-                     ->where('t4.resort_id', $resort_id)
-                     ->first(['t4.color', 't4.leave_type', 'employees_leaves.total_days', 'employees_leaves.from_date', 'employees_leaves.to_date']);
+                 $employeeLeave = $findApprovedLeaveForDate($roster->date);
 
                  $roster->LeaveType     = $employeeLeave->leave_type ?? $roster->Status;
+                 $roster->LeaveCategory = $employeeLeave->leave_category ?? null;
                  $roster->LeaveDays     = $employeeLeave->total_days ?? null;
                  $roster->LeaveFromDate = $employeeLeave->from_date ?? null;
                  $roster->LeaveToDate   = $employeeLeave->to_date ?? null;
@@ -2908,7 +2993,7 @@ class Common
                 while ($dateIterator->lte($weekEnd)) {
                     $date = $dateIterator->format('Y-m-d');
                     if (!in_array($date, $existingDates, true)) {
-                        $placeholderLeave = static::lookupApprovedLeaveForDate($resort_id, $Employee, $date);
+                        $placeholderLeave = $findApprovedLeaveForDate($date);
                         $DutyRoster->push((object)[
                             'Status'            => null,
                             'Attd_id'           => null,
@@ -2924,6 +3009,7 @@ class Common
                             'DayWiseTotalHours' => null,
                             'ShiftNameColor'    => null,
                             'LeaveType'         => $placeholderLeave->leave_type ?? null,
+                            'LeaveCategory'     => $placeholderLeave->leave_category ?? null,
                             'LeaveDays'         => $placeholderLeave->total_days ?? null,
                             'LeaveFromDate'     => $placeholderLeave->from_date ?? null,
                             'LeaveToDate'       => $placeholderLeave->to_date ?? null,
@@ -2938,7 +3024,8 @@ class Common
         }
         if($flag =="Monthwise")
         {
-                $LeaveCategory = LeaveCategory::where('resort_id', $resort_id)->get(['leave_type']);
+                $LeaveCategory = LeaveCategory::where('resort_id', $resort_id)->get(['leave_type', 'color']);
+                $leaveColorByType = $LeaveCategory->pluck('color', 'leave_type');
                 // Use the EMPLOYEE id to scope the entries — the previous
                 // filter `where('duty_rosters.id', '=', $duty_roster_id)`
                 // broke when the calling controller's groupBy('employees.id')
@@ -2959,8 +3046,40 @@ class Common
                     ->get([
                         't2.Status', 't2.id as Attd_id', 't2.Emp_id', 't2.date', 't2.Shift_id', 't2.roster_id', 'duty_rosters.DayOfDate',
                         't1.ShiftName', 't2.OverTime', 't1.StartTime', 't1.EndTime', 't2.DayWiseTotalHours'
-                    ])
-                    ->map(function ($roster)    use ($LeaveCategory,$resort_id) {
+                    ]);
+
+                // Batch all approved leave rows for every employee appearing
+                // in this result set in one query, instead of one
+                // EmployeeLeave query (plus a redundant leave_categories
+                // color query) per row — previously up to 2 extra queries
+                // per duty-roster-entry row for the whole visible month.
+                $monthEmpIds = $DutyRoster->pluck('Emp_id')->filter()->unique()->values();
+                if ($monthEmpIds->isEmpty() && !empty($Employee)) {
+                    $monthEmpIds = collect([$Employee]);
+                }
+                $approvedMonthLeaves = $monthEmpIds->isEmpty()
+                    ? collect()
+                    : EmployeeLeave::join('leave_categories as t4', 't4.id', '=', 'employees_leaves.leave_category_id')
+                        ->whereIn('employees_leaves.Emp_id', $monthEmpIds)
+                        ->where('employees_leaves.status', 'Approved')
+                        ->where('t4.resort_id', $resort_id)
+                        ->whereDate('employees_leaves.from_date', '<=', $endOfMonth)
+                        ->whereDate('employees_leaves.to_date', '>=', $startOfMonth)
+                        ->get(['employees_leaves.Emp_id', 't4.color', 't4.leave_type', 't4.leave_category', 'employees_leaves.total_days', 'employees_leaves.from_date', 'employees_leaves.to_date', 'employees_leaves.leave_category_id'])
+                        ->groupBy('Emp_id');
+
+                $findApprovedLeaveForEmpDate = function ($empId, $date) use ($approvedMonthLeaves) {
+                    $target = Carbon::parse($date);
+                    foreach ($approvedMonthLeaves->get($empId, collect()) as $leave) {
+                        if (Carbon::parse($leave->from_date)->lte($target) && Carbon::parse($leave->to_date)->gte($target)) {
+                            return $leave;
+                        }
+                    }
+                    return null;
+                };
+
+                $DutyRoster = $DutyRoster
+                    ->map(function ($roster)    use ($LeaveCategory, $leaveColorByType, $findApprovedLeaveForEmpDate) {
 
                         // Matches real shift names (e.g. "Morning Shift") via
                         // keyword lookup instead of exact-matching only the
@@ -2974,26 +3093,20 @@ class Common
                         }
 
                         // Get Employee Leave data
-                        $EmployeeLeave = EmployeeLeave::join('leave_categories as t4', 't4.id', '=', 'employees_leaves.leave_category_id')
-                            ->where('employees_leaves.Emp_id', $roster->Emp_id)
-                            ->where('employees_leaves.status', 'Approved')
-                            ->where(function ($query) use ($roster) {
-                                $query->whereDate('employees_leaves.from_date', '<=', $roster->date)
-                                    ->whereDate('employees_leaves.to_date', '>=', $roster->date);
-                            })
-                            ->first(['t4.color', 't4.leave_type', 'employees_leaves.total_days', 'employees_leaves.from_date', 'employees_leaves.to_date', 'employees_leaves.leave_category_id']);
+                        $EmployeeLeave = $findApprovedLeaveForEmpDate($roster->Emp_id, $roster->date);
 
                         $roster->LeaveType = $EmployeeLeave->leave_type ?? $roster->Status;
+                        $roster->LeaveCategory = $EmployeeLeave->leave_category ?? null;
                         $roster->LeaveDays = $EmployeeLeave->total_days ?? null;
                         $roster->LeaveFromDate = $EmployeeLeave->from_date ?? null;
                         $roster->LeaveToDate = $EmployeeLeave->to_date ?? null;
-                        $LeaveCategorycolur  = LeaveCategory::where('resort_id', $resort_id)->where("leave_type", $roster->Status)->first(['color']);
+                        $leaveCategoryColor = $leaveColorByType[$roster->Status] ?? null;
 
                         if (isset($roster->Status)) {
                             if (isset($EmployeeLeave->color)) {
                                 $roster->LeaveColor = $EmployeeLeave->color;
-                            } elseif (isset($LeaveCategorycolur->color)) {
-                                $roster->LeaveColor = $LeaveCategorycolur->color;
+                            } elseif ($leaveCategoryColor) {
+                                $roster->LeaveColor = $leaveCategoryColor;
                             } else {
 
                                 $roster->LeaveColor = "";
@@ -3042,7 +3155,7 @@ class Common
                 while ($dateIterator->lte($monthEnd)) {
                     $date = $dateIterator->format('Y-m-d');
                     if (!in_array($date, $existingDates, true)) {
-                        $placeholderLeave = static::lookupApprovedLeaveForDate($resort_id, $Employee, $date);
+                        $placeholderLeave = $findApprovedLeaveForEmpDate($Employee, $date);
                         $DutyRoster->push((object)[
                             'Status'            => null,
                             'Attd_id'           => null,
@@ -3058,6 +3171,7 @@ class Common
                             'DayWiseTotalHours' => null,
                             'ShiftNameColor'    => null,
                             'LeaveType'         => $placeholderLeave->leave_type ?? null,
+                            'LeaveCategory'     => $placeholderLeave->leave_category ?? null,
                             'LeaveDays'         => $placeholderLeave->total_days ?? null,
                             'LeaveFromDate'     => $placeholderLeave->from_date ?? null,
                             'LeaveToDate'       => $placeholderLeave->to_date ?? null,
@@ -4446,23 +4560,230 @@ class Common
         return self::pointInPolygon(['lat' => $lat, 'lng' => $lng], $vertices);
     }
 
-    public static function getEmpGrade($rank){
-        if($rank == 1 || $rank == 3 || $rank == 7 || $rank == 8){
-            $emp_grade = "1";
+    /**
+     * duty_rosters.geofence_zone_id holds a JSON-encoded array of zone ids
+     * (Assign Geo-Fence Zone is a multi-select checkbox list) — resolves it
+     * to the actual active ResortGeofence rows. Falls back to treating the
+     * raw value as a single legacy int id for any row saved before this was
+     * stored as JSON.
+     */
+    public static function resolveDutyRosterGeofences($rawValue)
+    {
+        if (empty($rawValue)) return collect();
+        $ids = json_decode($rawValue, true);
+        if (!is_array($ids)) $ids = [(int) $rawValue];
+        $ids = array_filter($ids);
+        if (empty($ids)) return collect();
+        return \App\Models\ResortGeofence::whereIn('id', $ids)->where('status', 'active')->get();
+    }
+
+    /**
+     * Resolves which Benefit Grid grade a rank currently belongs to, for
+     * this resort. Used to be a hardcoded rank -> fixed-key switch (1/2/4/5/6),
+     * which broke the moment Benefit Grid grades became resort-customizable
+     * (e.g. "HOD L1") — resort_benifit_grid.emp_grade now stores a
+     * resort_benefit_grade_levels id, not one of those old fixed keys, so
+     * every caller needs the CURRENT mapping for this resort, not a
+     * hardcoded guess. Returns null if this resort hasn't mapped this rank
+     * to any grade — callers should treat that as "no benefit grid for
+     * this rank" rather than falling back to a guess.
+     */
+    public static function getEmpGrade($resortId, $rank){
+        // Multiple grades can now share a rank (see resolveEmpGrade()) — when
+        // a rank matches more than one grade, orderBy('id') keeps this
+        // deterministic and picks the oldest/originally-assigned grade, so
+        // resorts that never create a second grid on a shared rank see zero
+        // behavior change.
+        return \App\Models\ResortBenefitGradeLevelRank::where('resort_id', $resortId)
+            ->where('rank', $rank)
+            ->orderBy('id')
+            ->value('grade_level_id');
+    }
+
+    /**
+     * Resolves the grade level to use for a SPECIFIC employee: their own
+     * explicit benefit_grid_level wins if it's still a real, active grade
+     * for this resort — otherwise falls back to the rank-based default
+     * (getEmpGrade()). The "still real and active" check is what makes it
+     * safe to trust benefit_grid_level again: it silently ignores rows
+     * poisoned by the pre-refactor backfill (2026_04_22_030000_backfill_employee_benefit_grid_level.php,
+     * which wrote raw rank ids like 1/2/6 into this column before
+     * resort_benefit_grade_levels existed) and any grade since renamed/deleted
+     * out from under the employee — both of which made trusting this
+     * column unsafe before. Every call site that resolves a grade FOR A
+     * SPECIFIC EMPLOYEE should use this instead of getEmpGrade() directly;
+     * getEmpGrade() alone is still correct for position-only lookups where
+     * no specific employee exists yet.
+     */
+    public static function resolveEmpGrade($resortId, $rank, $benefitGridLevel = null)
+    {
+        if (!empty($benefitGridLevel)) {
+            $stillValid = \App\Models\ResortBenefitGradeLevel::where('id', $benefitGridLevel)
+                ->where('resort_id', $resortId)
+                ->where('status', 'active')
+                ->exists();
+            if ($stillValid) {
+                return $benefitGridLevel;
+            }
         }
-        else if($rank == 4){
-            $emp_grade = "4";
+
+        return self::getEmpGrade($resortId, $rank);
+    }
+
+    /**
+     * Builds the standardized multi-step approval payload for a single
+     * Leave request, for mobile's timeline UI. Pure read-side — does not
+     * change how approve/reject is enforced (that stays in
+     * handleLeaveAction()), just normalizes what already exists into one
+     * consistent shape every Leave endpoint returns.
+     *
+     * overall_status is read directly off employees_leaves.status — never
+     * re-derived — so the clinic-staff-reject-doesn't-flip-parent rule and
+     * the HR/GM immediate-approve shortcut (both already correct in
+     * handleLeaveAction()) are reflected automatically with zero
+     * special-casing here.
+     *
+     * "Current step" = the first stage row, in submission order (ascending
+     * id — matches handleLeaveAction()'s own unordered ->first() pick made
+     * explicit), whose status is still Pending — but only meaningful while
+     * the parent itself is still Pending; a resolved parent means nothing
+     * is actionable regardless of any stage row left un-updated by a
+     * terminal-rank shortcut.
+     *
+     * @return array{approval_flow: object, can_approve: bool, can_reject: bool, current_pending_rank: ?string, overall_status: string}
+     */
+    public static function buildLeaveApprovalFlow(int $leaveId, ?int $viewerEmployeeId): array
+    {
+        $overallStatus = \App\Models\EmployeeLeave::where('id', $leaveId)->value('status') ?? 'Pending';
+
+        $stages = \App\Models\EmployeeLeaveStatus::where('leave_request_id', $leaveId)
+            ->orderBy('id')
+            ->get(['id', 'approver_id', 'approver_rank', 'status', 'comments', 'approved_at']);
+
+        $approvers = \App\Models\Employee::with(['resortAdmin', 'position'])
+            ->whereIn('id', $stages->pluck('approver_id')->filter()->unique())
+            ->get()
+            ->keyBy('id');
+
+        $rankConfig = config('settings.Position_Rank', []);
+
+        $currentStageId = null;
+        if ($overallStatus === 'Pending') {
+            $currentStage = $stages->firstWhere('status', 'Pending');
+            $currentStageId = $currentStage ? $currentStage->id : null;
         }
-        else if($rank == 2){
-            $emp_grade = "2";
+
+        $flow = [];
+        $currentPendingRank = null;
+        foreach ($stages->values() as $index => $stage) {
+            $isCurrentStep = $currentStageId !== null && $stage->id === $currentStageId;
+            $approver = $approvers->get($stage->approver_id);
+            $rankType = $rankConfig[$stage->approver_rank] ?? 'Unknown';
+
+            if ($isCurrentStep) {
+                $currentPendingRank = $rankType;
+            }
+
+            $flow[(string) $index] = [
+                'step'            => $index,
+                'approver_id'     => $stage->approver_id,
+                'name'            => $approver ? (trim(($approver->resortAdmin->first_name ?? '') . ' ' . ($approver->resortAdmin->last_name ?? '')) ?: null) : null,
+                'position'        => optional(optional($approver)->position)->position_title,
+                'rank_type'       => $rankType,
+                'status'          => $stage->status,
+                'comment'         => $stage->comments,
+                'approved_at'     => $stage->approved_at,
+                // Clinic-staff (rank 12) can comment/approve but a reject
+                // from them never flips the leave — never expose
+                // can_reject=true for that stage.
+                'can_approve'     => $isCurrentStep,
+                'can_reject'      => $isCurrentStep && (string) $stage->approver_rank !== '12',
+                'is_current_step' => $isCurrentStep,
+            ];
         }
-        else if($rank == 5){
-            $emp_grade = "5";
+
+        $viewerIsCurrentApprover = $currentStageId !== null
+            && $viewerEmployeeId !== null
+            && (string) optional($stages->firstWhere('id', $currentStageId))->approver_id === (string) $viewerEmployeeId;
+
+        return [
+            'approval_flow'         => (object) $flow,
+            'can_approve'           => $viewerIsCurrentApprover,
+            'can_reject'            => $viewerIsCurrentApprover,
+            'current_pending_rank'  => $currentPendingRank,
+            'overall_status'        => $overallStatus,
+        ];
+    }
+
+    /**
+     * Same contract as buildLeaveApprovalFlow(), for Island Pass. The real
+     * approval order is HOD -> HR -> SM — the highest-id (last-inserted)
+     * stage row acts FIRST, matching boardingPassApprovedAction()'s own
+     * orderBy('id','desc')->first() pick exactly. rank_type prefers
+     * approver_role (the functional stage) over approver_rank (personal
+     * rank, which can coincidentally also read "HOD" for an HR/SM
+     * approver) — falling back to approver_rank only for legacy rows that
+     * predate the approver_role column.
+     */
+    public static function buildIslandPassApprovalFlow(int $passId, ?int $viewerEmployeeId): array
+    {
+        $rawStatus = \App\Models\EmployeeTravelPass::where('id', $passId)->value('status') ?? 'Pending';
+        $overallStatus = $rawStatus === 'Cancel' ? 'Cancelled' : $rawStatus;
+
+        $stages = \App\Models\EmployeeTravelPassStatus::where('travel_pass_id', $passId)
+            ->orderBy('id', 'desc')
+            ->get(['id', 'approver_id', 'approver_rank', 'approver_role', 'status', 'comments', 'approved_at']);
+
+        $approvers = \App\Models\Employee::with(['resortAdmin', 'position'])
+            ->whereIn('id', $stages->pluck('approver_id')->filter()->unique())
+            ->get()
+            ->keyBy('id');
+
+        $rankConfig = config('settings.Position_Rank', []);
+
+        $currentStageId = null;
+        if ($overallStatus === 'Pending') {
+            $currentStage = $stages->firstWhere('status', 'Pending');
+            $currentStageId = $currentStage ? $currentStage->id : null;
         }
-        else{
-            $emp_grade = "6";
+
+        $flow = [];
+        $currentPendingRank = null;
+        foreach ($stages->values() as $index => $stage) {
+            $isCurrentStep = $currentStageId !== null && $stage->id === $currentStageId;
+            $approver = $approvers->get($stage->approver_id);
+            $rankType = $stage->approver_role ?: ($rankConfig[$stage->approver_rank] ?? 'Unknown');
+
+            if ($isCurrentStep) {
+                $currentPendingRank = $rankType;
+            }
+
+            $flow[(string) $index] = [
+                'step'            => $index,
+                'approver_id'     => $stage->approver_id,
+                'name'            => $approver ? (trim(($approver->resortAdmin->first_name ?? '') . ' ' . ($approver->resortAdmin->last_name ?? '')) ?: null) : null,
+                'position'        => optional(optional($approver)->position)->position_title,
+                'rank_type'       => $rankType,
+                'status'          => $stage->status,
+                'comment'         => $stage->comments,
+                'approved_at'     => $stage->approved_at,
+                'can_approve'     => $isCurrentStep,
+                'can_reject'      => $isCurrentStep,
+                'is_current_step' => $isCurrentStep,
+            ];
         }
-        return $emp_grade;
+
+        $viewerIsCurrentApprover = $currentStageId !== null
+            && $viewerEmployeeId !== null
+            && (string) optional($stages->firstWhere('id', $currentStageId))->approver_id === (string) $viewerEmployeeId;
+
+        return [
+            'approval_flow'         => (object) $flow,
+            'can_approve'           => $viewerIsCurrentApprover,
+            'can_reject'            => $viewerIsCurrentApprover,
+            'current_pending_rank'  => $currentPendingRank,
+            'overall_status'        => $overallStatus,
+        ];
     }
 
     /**
@@ -5127,6 +5448,28 @@ class Common
             return '-';
         }
         return 'MVR ' . number_format((float) $amount, $decimals);
+    }
+
+    /**
+     * Format an amount in whatever currency the REQUEST ITSELF was made in
+     * (e.g. payroll_advance.currency, where the employee explicitly picked
+     * MVR or USD as the unit they want the advance paid out in) — NO
+     * conversion, NO resort display-currency substitution. This is
+     * different from formatCurrency(): that helper assumes the amount is
+     * stored in a fixed source currency and converts it to whatever the
+     * resort displays; here the amount genuinely IS denominated in the
+     * requester's chosen currency, so showing anything other than that
+     * literal currency's own symbol would misrepresent the amount (128
+     * MVR shown as "$128" reads as $128, not the ~$8 it's actually worth).
+     */
+    public static function formatRequestCurrency($amount, $currency = 'USD', $decimals = 2)
+    {
+        if ($amount === null || $amount === '' || $amount === false) {
+            return '-';
+        }
+        $currency = strtoupper((string) $currency) === 'MVR' ? 'MVR' : 'USD';
+        $symbol = $currency === 'MVR' ? 'MVR' : '$';
+        return $symbol . ' ' . number_format((float) $amount, $decimals);
     }
 
     /**
@@ -6511,11 +6854,24 @@ class Common
                                             ->select('ra.first_name', 'ra.last_name')
                                             ->first();
 
+                                        // $employee was read with no null check — if the
+                                        // sender's Employee/ResortAdmin join ever fails to
+                                        // resolve (e.g. a stale/edited record), accessing
+                                        // ->first_name on null throws an uncaught \Error
+                                        // (not an \Exception), which skips the caller's
+                                        // catch block entirely and surfaces as a raw 500
+                                        // with no logged message — exactly the symptom
+                                        // reported for the Announcement "Congratulate"
+                                        // button, without a server log line to confirm it.
+                                        $senderName         =   $employee
+                                                                    ? trim($employee->first_name . ' ' . $employee->last_name)
+                                                                    : 'Someone';
+
                                         return [
                                             'id'            => $payload->id,
                                             'resortid'      => $payload->resort_id,
                                             'title'         => 'You have a new message',
-                                            'message'       => $employee->first_name . ' ' . $employee->last_name . ' says Congratulation',
+                                            'message'       => $senderName . ' says Congratulation',
                                             'status'        => $payload->status,
                                             'module'        => 'Announcement Wish',
                                             'sendto'        => $payload->employee_id,
@@ -7057,6 +7413,39 @@ class Common
         ];
     }
 
+    /**
+     * Resolves a maintanace_requests.Image/Completed_Image (or any column
+     * with the same dual convention) value into a real, viewable URL.
+     *
+     * The stored value comes from two genuinely different upload paths that
+     * both write into the same column:
+     *  - Web portal (MaintananceContorller::CreateMaintenanceRequest) stores
+     *    a plain filename under uploads/MaintanceRequest/{resort_id}/.
+     *  - Mobile app (StaffAccommodationController) stores
+     *    json_encode(['Filename'=>.., 'Child_id'=>ChildFileManagement id])
+     *    via AWSEmployeeFileUpload() — the real file lives wherever that
+     *    ChildFileManagement row's File_Path says, NOT under
+     *    uploads/MaintanceRequest/ at all.
+     * Every render call site used to blindly concatenate the raw column
+     * value into a path, which for the mobile/JSON case produced a URL
+     * with a literal `{"Filename":"...","Child_id":123}` path segment —
+     * always 404/SignatureDoesNotMatch, never viewable.
+     */
+    public static function resolveMaintenanceAttachmentUrl($value, $resortId)
+    {
+        if (empty($value)) {
+            return null;
+        }
+
+        $decoded = json_decode($value, true);
+        if (is_array($decoded) && !empty($decoded['Child_id'])) {
+            $aws = self::GetAWSFile($decoded['Child_id'], $resortId);
+            return $aws['success'] ? $aws['NewURLshow'] : null;
+        }
+
+        $path_path = config('settings.MaintanceRequest') . '/' . $resortId;
+        return StorageHelper::temporaryUrl($path_path . '/' . $value);
+    }
 
     public static function GetApplicantAWSFile($path)
     {

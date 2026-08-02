@@ -648,7 +648,8 @@ class EmployeeController extends Controller
                 'entitled_overtime' => $request->entitle_overtime ? 'yes' : 'no',
                 'entitled_public_holiday' => $request->entitle_public_holiday ? 'yes' : 'no',
                 'ewt_status' => $request->ewt_status ? 'yes' : 'no',
-                'pension' => $request->pension ?? null
+                'pension' => $request->pension ?? null,
+                'benefit_grid_level' => $request->benefit_grid_level ?: null,
             ]);
 
             $fileManagement = FilemangementSystem::where('resort_id', $this->resort->resort_id)->where('Folder_Name',$employee->Emp_id)->where('Folder_Type', 'categorized')->first();
@@ -1785,14 +1786,20 @@ class EmployeeController extends Controller
 
 
         $position = ResortPosition::find($request->Position_id);
-        $grade = Common::getEmpGrade($position->Rank);
+        $employee = Employee::findOrFail($request->employee_id);
+
+        // Resolve the grade using the level HR is actively choosing on this
+        // same form (falls back to the position's rank default when no
+        // valid override is set) — previously resolved from rank alone,
+        // before benefit_grid_level was even set from the request below, so
+        // the level being picked here never actually affected the
+        // entitlement flags computed from it.
+        $grade = Common::resolveEmpGrade($this->resort->resort_id, $position->Rank, $request->benefit_grid_level);
 
         $benefitGrid = ResortBenifitGrid::where('resort_id', $this->resort->resort_id)
             ->where('emp_grade', $grade)
             ->where('status', 'active')
             ->first();
-
-        $employee = Employee::findOrFail($request->employee_id);
 
         // ---------- Capture old values for the audit log -----------------
         // Snapshot the existing field values BEFORE mutating the model so
@@ -2438,25 +2445,49 @@ class EmployeeController extends Controller
 
         $positionId = $request->position_id;
         $position = ResortPosition::find($positionId);
-        $grade = Common::getEmpGrade($position->Rank);
 
-        $benefitGrid = ResortBenifitGrid::where('resort_id', $this->resort->resort_id)
+        // A rank can now map to more than one grade (e.g. "HOD L1" and
+        // "HOD L2" both rank=HOD) — return every active grid that matches,
+        // not just one. orderBy('id') keeps the first/default entry stable
+        // (oldest grade for this rank), matching Common::getEmpGrade()'s own
+        // fallback order.
+        $matchingGradeIds = \App\Models\ResortBenefitGradeLevelRank::where('resort_id', $this->resort->resort_id)
+            ->where('rank', $position->Rank)
+            ->orderBy('id')
+            ->pluck('grade_level_id');
+
+        $grids = ResortBenifitGrid::where('resort_id', $this->resort->resort_id)
             ->where('status', 'active')
-            ->where('emp_grade', $grade)
-            ->first();
+            ->whereIn('emp_grade', $matchingGradeIds)
+            ->get()
+            ->sortBy(fn ($g) => array_search($g->emp_grade, $matchingGradeIds->all()))
+            ->values();
 
-        if (!$benefitGrid) {
+        if ($grids->isEmpty()) {
             return response()->json(['success' => false, 'message' => 'No benefit grid found for this position.'], 404);
         }
 
+        $first = $grids->first();
         return response()->json([
             'success' => true,
-            'benfitGrid_emp_id' => $benefitGrid->emp_grade,
+            // Back-compat single-grid fields, populated from the first
+            // (default) match — unchanged shape/values for every rank that
+            // only ever has one grid.
+            'benfitGrid_emp_id' => $first->emp_grade,
             'position_rank' => $position->Rank,
-            'emp_grade_name' => config('settings.Position_Rank')[$benefitGrid->emp_grade] ?? null,
-            'service' => $benefitGrid->service_charge == 1 ? 'yes' : 'no',
-            'overtime' => $benefitGrid->overtime,
-            'holiday_overtime' => $benefitGrid->paid_worked_public_holiday_and_friday == 1 ? 'yes' : 'no',
+            'emp_grade_name' => optional(\App\Models\ResortBenefitGradeLevel::find($first->emp_grade))->name,
+            'service' => $first->service_charge == 1 ? 'yes' : 'no',
+            'overtime' => $first->overtime,
+            'holiday_overtime' => $first->paid_worked_public_holiday_and_friday == 1 ? 'yes' : 'no',
+            // Full option list — the JS renders these as real <option>s and
+            // only auto-selects when there's exactly one.
+            'options' => $grids->map(fn ($g) => [
+                'emp_grade' => $g->emp_grade,
+                'name' => optional(\App\Models\ResortBenefitGradeLevel::find($g->emp_grade))->name,
+                'service' => $g->service_charge == 1 ? 'yes' : 'no',
+                'overtime' => $g->overtime,
+                'holiday_overtime' => $g->paid_worked_public_holiday_and_friday == 1 ? 'yes' : 'no',
+            ])->values(),
         ]);
     }
 
@@ -2480,7 +2511,7 @@ class EmployeeController extends Controller
         }
         return response()->json([
             'success'         => true,
-            'emp_grade_name'  => config('settings.Position_Rank')[$benefitGrid->emp_grade] ?? null,
+            'emp_grade_name'  => optional(\App\Models\ResortBenefitGradeLevel::find($benefitGrid->emp_grade))->name,
             'service'         => $benefitGrid->service_charge == 1 ? 'yes' : 'no',
             'overtime'        => $benefitGrid->overtime,
             'holiday_overtime'=> $benefitGrid->paid_worked_public_holiday_and_friday == 1 ? 'yes' : 'no',

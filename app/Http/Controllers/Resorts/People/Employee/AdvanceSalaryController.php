@@ -116,7 +116,13 @@ class AdvanceSalaryController extends Controller
                     return $payroll_data->employee->position->position_title ?? 'N/A';
                 })
                 ->editColumn('request_amount', function ($payroll_data) {
-                    return Common::formatCurrency($payroll_data->request_amount, 'USD');
+                    // The employee picks MVR or USD as the currency they
+                    // want the advance IN (payroll_advance.currency) — this
+                    // is not a "stored in USD, display in resort currency"
+                    // value, so it must show its own literal currency, not
+                    // run through formatCurrency()'s resort-display
+                    // conversion (which always hardcoded '$' here).
+                    return Common::formatRequestCurrency($payroll_data->request_amount, $payroll_data->currency ?: 'USD');
                 })
                 ->addColumn('department', function ($payroll_data) {
                     return $payroll_data->employee->department->name ?? 'N/A';
@@ -376,6 +382,46 @@ class AdvanceSalaryController extends Controller
     }
 
 
+    // HR is the resort's single point of contact for a loan request, so it
+    // stays looped in on every stage's outcome (its own, Finance's, GM's) —
+    // not only notified when it's the one acting.
+    private function notifyHR($payrollAdvance, $title, $message)
+    {
+        $hrEmployeeIds = Common::getResortHrEmployeeIds($this->resort->resort_id);
+        foreach ($hrEmployeeIds as $hrId) {
+            event(new ResortNotificationEvent(Common::nofitication(
+                $this->resort->resort_id,
+                10,
+                $title,
+                $message,
+                0,
+                $hrId,
+                'People'
+            )));
+        }
+    }
+
+    // In-app bell (ResortNotificationEvent above) doesn't reach the mobile
+    // app — only Common::sendMobileNotification does the actual push.
+    // skipDbInsert=true: the bell row is already written via the
+    // nofitication() call alongside this one, so this only fires the push.
+    private function notifyEmployeePush($payrollAdvance, $title, $message, $pageId)
+    {
+        Common::sendMobileNotification(
+            $this->resort->resort_id,
+            2,
+            null,
+            null,
+            $title,
+            $message,
+            'People',
+            [$payrollAdvance->employee_id],
+            $payrollAdvance->id,
+            true,
+            $pageId
+        );
+    }
+
     // Update Status Handler
     public function updateStatus(Request $request){
 
@@ -388,6 +434,8 @@ class AdvanceSalaryController extends Controller
         $isHR = ($available_rank === "HR"); 
 
         if($payrollAdvance){
+            $employeeName = $payrollAdvance->employee->resortAdmin->full_name ?? 'the employee';
+
             if($request->action_by == 'hr' && $payrollAdvance->hr_status == 'Pending'){
 
                 if($payrollAdvance->guarantor->status == 'Pending'){
@@ -448,6 +496,10 @@ class AdvanceSalaryController extends Controller
                     'People'
                     )));
 
+                    $this->notifyEmployeePush($payrollAdvance, $payrollAdvance->request_type . ' Approved', "Your {$payrollAdvance->request_type} request for amount {$payrollAdvance->request_amount} has been approved by HR.", 'advance-salary-hr-approved');
+
+                    $this->notifyHR($payrollAdvance, $payrollAdvance->request_type . ' Approved (HR)', "HR approved {$employeeName}'s {$payrollAdvance->request_type} request for amount {$payrollAdvance->request_amount}.");
+
                 } elseif($request->status == 'Rejected'){
                     $payrollAdvance->update([
                     'hr_status' => 'Rejected',
@@ -466,6 +518,8 @@ class AdvanceSalaryController extends Controller
                         $payrollAdvance->employee_id,
                         'People'
                     )));
+
+                    $this->notifyHR($payrollAdvance, $payrollAdvance->request_type . ' Rejected (HR)', "HR rejected {$employeeName}'s {$payrollAdvance->request_type} request for amount {$payrollAdvance->request_amount}. Reason: {$request->reject_reason}");
 
                 }
             }elseif($request->action_by == 'finance' && $payrollAdvance->finance_status == 'Pending'){
@@ -510,6 +564,9 @@ class AdvanceSalaryController extends Controller
                     'People'
                     )));
 
+                    $this->notifyEmployeePush($payrollAdvance, $payrollAdvance->request_type . ' Approved', "Your {$payrollAdvance->request_type} request for amount {$payrollAdvance->request_amount} has been approved by Finance.", 'advance-salary-finance-approved');
+
+                    $this->notifyHR($payrollAdvance, $payrollAdvance->request_type . ' Approved (Finance)', "Finance approved {$employeeName}'s {$payrollAdvance->request_type} request for amount {$payrollAdvance->request_amount}.");
 
                 } elseif($request->status == 'Rejected'){
                     $payrollAdvance->update([
@@ -528,6 +585,8 @@ class AdvanceSalaryController extends Controller
                         $payrollAdvance->employee_id,
                         'People'
                     )));
+
+                    $this->notifyHR($payrollAdvance, $payrollAdvance->request_type . ' Rejected (Finance)', "Finance rejected {$employeeName}'s {$payrollAdvance->request_type} request for amount {$payrollAdvance->request_amount}. Reason: {$request->reject_reason}");
 
                 }
             }elseif($request->action_by == 'gm' && $payrollAdvance->gm_status == 'Pending'){
@@ -559,6 +618,21 @@ class AdvanceSalaryController extends Controller
                         'status' => 'Approved',
                         'gm_action_date' => Carbon::now(),
                     ]);
+
+                    event(new ResortNotificationEvent(Common::nofitication(
+                    $this->resort->resort_id,
+                    10,
+                    $payrollAdvance->request_type .' Approved',
+                    " Your ".$payrollAdvance->request_type." request  for amount " . $payrollAdvance->request_amount . " has been Approved.",
+                    0,
+                    $payrollAdvance->employee_id,
+                    'People'
+                    )));
+
+                    $this->notifyEmployeePush($payrollAdvance, $payrollAdvance->request_type . ' Fully Approved', "Your {$payrollAdvance->request_type} request for amount {$payrollAdvance->request_amount} has been fully approved.", 'advance-salary-fully-approved');
+
+                    $this->notifyHR($payrollAdvance, $payrollAdvance->request_type . ' Approved (GM)', "GM approved {$employeeName}'s {$payrollAdvance->request_type} request for amount {$payrollAdvance->request_amount}.");
+
                 } elseif($request->status == 'Rejected'){
                     $payrollAdvance->update([
                     'gm_status' => 'Rejected',
@@ -579,6 +653,8 @@ class AdvanceSalaryController extends Controller
                     $payrollAdvance->employee_id,
                     'People'
                     )));
+
+                    $this->notifyHR($payrollAdvance, $payrollAdvance->request_type . ' Rejected (GM)', "GM rejected {$employeeName}'s {$payrollAdvance->request_type} request for amount {$payrollAdvance->request_amount}. Reason: {$request->reject_reason}");
                 }
             }
 

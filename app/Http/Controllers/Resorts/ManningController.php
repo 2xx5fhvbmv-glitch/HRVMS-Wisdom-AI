@@ -52,7 +52,6 @@ class ManningController extends Controller
         $resort_sections = ResortSection::where('status', 'active')->where('resort_id',$resort_id)->get();
         $resort_positions = ResortPosition::where('status', 'active')->where('resort_id',$resort_id)->get();
 
-
         return view('resorts.manning.index')->with(
             compact(
             'page_title',

@@ -136,6 +136,10 @@ class BoardingPassController extends Controller
                         $pass->current_status_label =   'Pending by ' . ($pendingStage->rank_type ?: $pendingStage->approver_rank);
                     }
                 }
+
+                foreach (Common::buildIslandPassApprovalFlow($pass->id, $employeeId) as $key => $value) {
+                    $pass->{$key} = $value;
+                }
             }
             $dahsboardArr                           =   [
                 'departed_count'                    =>  $EmployeeTravelDepartedCount,
@@ -517,6 +521,10 @@ class BoardingPassController extends Controller
                 $pass->transportation              =   $pass->DepartureResortTransportation->transportation_option
                                                         ?? $pass->ArrivalResortTransportation->transportation_option
                                                         ?? null;
+
+                foreach (Common::buildIslandPassApprovalFlow($pass->id, $this->user->GetEmployee->id) as $key => $value) {
+                    $pass->{$key} = $value;
+                }
             }
 
             // Replace profile_picture with url
@@ -661,6 +669,10 @@ class BoardingPassController extends Controller
                 $pass->transportation              =   $pass->DepartureResortTransportation->transportation_option
                                                         ?? $pass->ArrivalResortTransportation->transportation_option
                                                         ?? null;
+
+                foreach (Common::buildIslandPassApprovalFlow($pass->id, $this->user->GetEmployee->id) as $key => $value) {
+                    $pass->{$key} = $value;
+                }
             }
 
             // Replace profile_picture with url
@@ -787,6 +799,10 @@ class BoardingPassController extends Controller
                 $pass->transportation              =   $pass->DepartureResortTransportation->transportation_option
                                                         ?? $pass->ArrivalResortTransportation->transportation_option
                                                         ?? null;
+
+                foreach (Common::buildIslandPassApprovalFlow($pass->id, $this->user->GetEmployee->id) as $key => $value) {
+                    $pass->{$key} = $value;
+                }
             }
 
             // Replace profile_picture with url
@@ -887,6 +903,11 @@ class BoardingPassController extends Controller
                 }
             }
 
+            $approvalFlowData = Common::buildIslandPassApprovalFlow($passId, $currentEmployeeId);
+            foreach ($approvalFlowData as $key => $value) {
+                $EmployeeTravelPassView->{$key} = $value;
+            }
+
             $emp = $EmployeeTravelPassView->employee;
             $resortAdmin = $emp ? $emp->resortAdmin : null;
             $profilePicture = '';
@@ -927,7 +948,7 @@ class BoardingPassController extends Controller
                 $reason = null;
             }
 
-            $viewDisplay = [
+            $viewDisplay = array_merge([
                 'employee' => [
                     'name' => $employeeName,
                     'designation' => $designation,
@@ -936,7 +957,7 @@ class BoardingPassController extends Controller
                 ],
                 'travel_segments' => $travelSegments,
                 'reason' => $reason,
-            ];
+            ], $approvalFlowData);
 
             return response()->json([
                 'success' => true,
@@ -998,10 +1019,10 @@ class BoardingPassController extends Controller
 
                 if (!$employeeTravelPassStatus) {
                     // All approvals are completed
-                    return response()->json([
+                    return response()->json(array_merge([
                         'success'                   =>  true,
                         'message'                   =>  'This travel pass has already been fully approved.',
-                    ], 200);
+                    ], Common::buildIslandPassApprovalFlow((int) $passId, $currentApproverId)), 200);
                 }
 
             $rankConfig                             =   config('settings.Position_Rank');
@@ -1019,19 +1040,19 @@ class BoardingPassController extends Controller
                                                             ->orderBy('id', 'desc')
                                                             ->first();
             if ($ownStatusRow && $ownStatusRow->status !== 'Pending') {
-                return response()->json([
+                return response()->json(array_merge([
                     'status'                        =>  false,
                     'already_actioned'              =>  true,
                     'pass_status'                   =>  $employeeTravelPasses->status,
                     'message'                       =>  'You have already ' . strtolower($ownStatusRow->status) . ' this request. It is now awaiting action from the ' . $lastApproverRank . '.',
-                ], 200);
+                ], Common::buildIslandPassApprovalFlow((int) $passId, $currentApproverId)), 200);
             }
 
             if ($employeeTravelPassStatus && $employeeTravelPassStatus->approver_id != $currentApproverId) {
-                return response()->json([
+                return response()->json(array_merge([
                     'status'                        =>  false,
                     'message'                       =>  "You cannot $actionname this request. It is currently awaiting action from the $lastApproverRank.",
-                ], 200);
+                ], Common::buildIslandPassApprovalFlow((int) $passId, $currentApproverId)), 200);
             }
 
             if($request->arrival_time || $request->departure_time) {
@@ -1099,26 +1120,26 @@ class BoardingPassController extends Controller
                     );
                 }
 
-                return response()->json([
+                return response()->json(array_merge([
                     'status'                        =>  true,
                     'isAssigned'                    =>  true,
                     'pass_status'                   =>  $employeeTravelPasses->fresh()->status,
                     'all_approved'                  =>  (bool) $allApproved,
                     'message'                       =>  'Boarding pass approved successfully.',
-                ]);
+                ], Common::buildIslandPassApprovalFlow((int) $passId, $currentApproverId)));
             } elseif ($action === 'Rejected') {
                 $employeeTravelPasses->status       =   "Rejected";
                 $employeeTravelPasses->save();
 
-                return response()->json([
+                return response()->json(array_merge([
                     'status'                        =>  true,
                     'message'                       =>  'Boarding Pass Rejected.',
-                ], 200);
+                ], Common::buildIslandPassApprovalFlow((int) $passId, $currentApproverId)), 200);
             } else {
-                return response()->json([
+                return response()->json(array_merge([
                     'status'                        =>  false,
                     'message'                       =>  'Invalid action.',
-                ], 200);
+                ], Common::buildIslandPassApprovalFlow((int) $passId, $currentApproverId)), 200);
             }
 
         } catch (\Exception $e) {

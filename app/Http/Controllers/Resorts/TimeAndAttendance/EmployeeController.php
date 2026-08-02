@@ -308,7 +308,8 @@ class EmployeeController extends Controller
             ], $attendanceCols))
             ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
             ->join('resort_positions as t2', 't2.id', '=', 'employees.Position_id')
-            ->where('t1.resort_id', $this->resort->resort_id);
+            ->where('t1.resort_id', $this->resort->resort_id)
+            ->where('employees.status', 'Active');
 
             $employeeRankPosition = Common::getEmployeeRankPosition($this->resort->getEmployee);
             // getEmployeeRankPosition()'s 'position' key is only ever set to
@@ -415,7 +416,8 @@ class EmployeeController extends Controller
         ], $attendanceCols))
         ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
         ->join('resort_positions as t2', 't2.id', '=', 'employees.Position_id')
-        ->where('t1.resort_id', $this->resort->resort_id);
+        ->where('t1.resort_id', $this->resort->resort_id)
+        ->where('employees.status', 'Active');
 
         $employeeRankPosition = Common::getEmployeeRankPosition($this->resort->getEmployee);
         // See the identical fix/comment in index() above — bare
@@ -536,7 +538,8 @@ class EmployeeController extends Controller
             ], $attendanceCols))
             ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
             ->join('resort_positions as t2', 't2.id', '=', 'employees.Position_id')
-            ->where('t1.resort_id', $this->resort->resort_id);
+            ->where('t1.resort_id', $this->resort->resort_id)
+            ->where('employees.status', 'Active');
 
             // Raw rank=3 assumed HR/full-access and everyone else got
             // subordinate-chain-only scoping, with no department-scoped
@@ -690,6 +693,7 @@ class EmployeeController extends Controller
                 'employees.Emp_id as Emp_Code',
                 'employees.rank',
                 'employees.religion',
+                'employees.benefit_grid_level',
                 't2.position_title',
                 't2.code as PositionCode',
                 'employees.Dept_id',
@@ -742,22 +746,7 @@ class EmployeeController extends Controller
 
 
             $rank = $employee->rank;
-
-            if($rank == 1 || $rank == 3 || $rank == 7 || $rank == 8){
-                $emp_grade = "1";
-            }
-            else if($rank == 4){
-                $emp_grade = "4";
-            }
-            else if($rank == 2){
-                $emp_grade = "2";
-            }
-            else if($rank == 5){
-                $emp_grade = "5";
-            }
-            else{
-                $emp_grade = "6";
-            }
+            $emp_grade = Common::resolveEmpGrade($this->resort->resort_id, $rank, $employee->benefit_grid_level);
 
             // Get the viewed employee's gender (from their resort_admin record)
             $empGender = \App\Models\ResortAdmin::where('id', $employee->Parentid)->value('gender') ?? '';
@@ -1188,6 +1177,7 @@ class EmployeeController extends Controller
                     'employees.Emp_id as Emp_Code',
                     'employees.rank',
                     'employees.religion',
+                    'employees.benefit_grid_level',
                     't2.position_title',
                     't2.code as PositionCode',
                     'employees.Dept_id',
@@ -1240,22 +1230,7 @@ class EmployeeController extends Controller
 
 
                 $rank = $employee->rank;
-
-                if($rank == 1 || $rank == 3 || $rank == 7 || $rank == 8){
-                    $emp_grade = "1";
-                }
-                else if($rank == 4){
-                    $emp_grade = "4";
-                }
-                else if($rank == 2){
-                    $emp_grade = "2";
-                }
-                else if($rank == 5){
-                    $emp_grade = "5";
-                }
-                else{
-                    $emp_grade = "6";
-                }
+                $emp_grade = Common::resolveEmpGrade($this->resort->resort_id, $rank, $employee->benefit_grid_level);
 
                 $benefit_grid = ResortBenifitGrid::where('emp_grade', $emp_grade)
                         ->where('resort_id', $this->resort->resort_id)
@@ -1773,6 +1748,7 @@ class EmployeeController extends Controller
                 'employees.Emp_id as Emp_Code',
                 'employees.rank',
                 'employees.religion',
+                'employees.benefit_grid_level',
                 't2.position_title',
                 't2.code as PositionCode',
             ], $detailCols))
@@ -1822,22 +1798,7 @@ class EmployeeController extends Controller
 
 
             $rank = $employee->rank;
-
-            if($rank == 1 || $rank == 3 || $rank == 7 || $rank == 8){
-                $emp_grade = "1";
-            }
-            else if($rank == 4){
-                $emp_grade = "4";
-            }
-            else if($rank == 2){
-                $emp_grade = "2";
-            }
-            else if($rank == 5){
-                $emp_grade = "5";
-            }
-            else{
-                $emp_grade = "6";
-            }
+            $emp_grade = Common::resolveEmpGrade($this->resort->resort_id, $rank, $employee->benefit_grid_level);
 
             // Get the viewed employee's gender (from their resort_admin record)
             $empGender = \App\Models\ResortAdmin::where('id', $employee->Parentid)->value('gender') ?? '';
