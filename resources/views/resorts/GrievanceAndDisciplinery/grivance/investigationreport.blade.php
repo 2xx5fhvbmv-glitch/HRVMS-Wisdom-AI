@@ -100,8 +100,7 @@
                                                 Not A Applicable
                                             </span>
                                         @endif</h6>
-                                  @if(in_array($auth_id, $GrivanceKeys) || 
-                                        (!in_array($auth_id, $GrivanceKeys) && $Grivance_Parent->Grivance_Submission_Type != "Yes" && $Grivance_Parent->Grivance_Submission_Type != "No"))                            <div class="d-flex align-items-center mb-md-2 mb-1">
+                                  @if($canViewIdentity)                            <div class="d-flex align-items-center mb-md-2 mb-1">
                                 <div class="img-circle me-2">
 
                                     <img src="{{  Common::getResortUserPicture( $Grivance_Parent->Parentid)}}" alt="image">
@@ -393,9 +392,13 @@
                                     </div>
                                 </div>
                             @endif
-                            @if(!isset($Grivance_Parent->Request_Identity_Disclosure)  && !isset($Grivance_Parent->Gm_Decision))
+                            @if($Grivance_Parent->Grivance_Submission_Type == "Yes" && !$canViewIdentity && in_array($auth_id, $GrivanceKeys) && !isset($Grivance_Parent->Gm_Decision))
                                 <div class="col-lg-4 col-sm-6 align-self-end">
-                                    <a href="javascript:void(0)" @if($Grivance_Parent->Assigned=="No") disabled @endif class="btn btn-themeSkyblue RequestIdentity" data-id="{{ $Grivance_Parent->id}}">Request Identity Disclosure</a>
+                                    @if($Grivance_Parent->Request_Identity_Disclosure == 'Requested')
+                                        <span class="text-muted">Identity disclosure requested — awaiting response</span>
+                                    @else
+                                        <a href="javascript:void(0)" @if($Grivance_Parent->Assigned=="No") disabled @endif class="btn btn-themeSkyblue RequestIdentity" data-id="{{ $Grivance_Parent->id}}">Request Identity Disclosure</a>
+                                    @endif
                                 </div>
                             @endif
 

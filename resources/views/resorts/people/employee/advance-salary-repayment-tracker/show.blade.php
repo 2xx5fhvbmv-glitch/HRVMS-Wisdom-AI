@@ -160,28 +160,57 @@
                              <thead>
                                 <tr>
                                     <th>Month/Date</th>
+                                    <th>Principal</th>
+                                    <th>Interest Rate</th>
                                     <th>Schedule Amount</th>
                                     <th>Remark</th>
                                     <th>Action</th>
                                 </tr>
-                            </thead> 
+                            </thead>
                             <tbody>
 
                                @foreach($payrollAdvance->payrollRecoverySchedule as $schedule)
-                                
+
                                 <tr>
                                     <td>{{Carbon\Carbon::parse($schedule->repayment_date)->format('F Y')}}</td>
-                                    <td>{{$schedule->amount}}</td>
+                                    <td>{{ Common::formatRequestCurrency($schedule->amount - ($schedule->interest_amount ?? 0), $payrollAdvance->currency ?: 'USD') }}</td>
+                                    <td>{{ $schedule->interest !== null ? rtrim(rtrim(number_format($schedule->interest, 2), '0'), '.') . '%' : '-' }}</td>
+                                    <td>{{ Common::formatRequestCurrency($schedule->amount, $payrollAdvance->currency ?: 'USD') }}</td>
                                     <td>{{$schedule->remark ?? ''}}</td>
                                     <td><a href="javascript:void(0);" class="a-link me-md-2 me-1 edit-row-btn @if(Common::checkRouteWisePermission('people.advance-salary-repayment-tracker.index',config('settings.resort_permissions.edit')) == false) d-none @endif" data-id="{{$schedule->id}}">Edit</a>
                                         <a href="javascript:void(0);" class="a-linkTheme @if(Common::checkRouteWisePermission('people.advance-salary-repayment-tracker.index',config('settings.resort_permissions.edit')) == false) d-none @endif" id="addNote">Add Note</a>
                                     </td>
                                 </tr>
                                @endforeach
-                              
+
+                                @php
+                                    $scheduleCurrency = $payrollAdvance->currency ?: 'USD';
+                                    $scheduleInterestTotal = $payrollAdvance->payrollRecoverySchedule->sum('interest_amount');
+                                    $scheduleAmountTotal = $payrollAdvance->payrollRecoverySchedule->sum('amount');
+                                    $schedulePrincipalTotal = $scheduleAmountTotal - $scheduleInterestTotal;
+                                @endphp
+                                <tr>
+                                    <th>Principal Total</th>
+                                    <th>{!! Common::formatRequestCurrency($schedulePrincipalTotal, $scheduleCurrency) !!}</th>
+                                    <th></th>
+                                    <th></th>
+                                    <th></th>
+                                    <th></th>
+                                </tr>
+                                <tr>
+                                    <th>Interest Total</th>
+                                    <th></th>
+                                    <th></th>
+                                    <th>{!! Common::formatRequestCurrency($scheduleInterestTotal, $scheduleCurrency) !!}</th>
+                                    <th></th>
+                                    <th></th>
+                                </tr>
                                 <tr>
                                     <th>Total</th>
-                                    <th>{!! Common::formatCurrency($payrollAdvance->payrollRecoverySchedule->sum('amount'), 'USD') !!}</th>
+                                    <th></th>
+                                    <th></th>
+                                    <th>{!! Common::formatRequestCurrency($scheduleAmountTotal, $scheduleCurrency) !!}</th>
+                                    <th></th>
                                     <th></th>
                                 </tr>
                             </tbody>
@@ -199,15 +228,15 @@
                                 <tr>
                                     <th>Payroll Month</th>
                                     <th>Deducted Amount</th>
-                                    <th>Payroll Cycle</th>
+                                    {{-- <th>Payroll Cycle</th> --}}
                                     <th>Status</th>
                                     <th>Action</th>
                                 </tr>
                                 @foreach($payrollAdvance->payrollRecoverySchedule as $schedule)
                                 <tr>
                                     <td>{{Carbon\Carbon::parse($schedule->repayment_date)->format('F Y')}}</td>
-                                    <td>{{$schedule->amount}}</td>
-                                    <td>{{Carbon\Carbon::parse($schedule->repayment_date)->addMonth()->format('F Y')}}</td>
+                                    <td>{{ Common::formatRequestCurrency($schedule->amount, $payrollAdvance->currency ?: 'USD') }}</td>
+                                    {{-- <td>{{Carbon\Carbon::parse($schedule->repayment_date)->addMonth()->format('F Y')}}</td> --}}
                                     <td>
                                         @if($schedule->status == 'Paid')
                                             <span class="badge badge-themeSuccess">Completed</span>

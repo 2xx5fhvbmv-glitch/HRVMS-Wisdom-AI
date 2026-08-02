@@ -20,21 +20,33 @@
                 <div class=" row g-md-4 g-3 mb-4">
                     <div class="col-sm-6">
                         <div class="form-group mb-2">
-                            <label  class="form-label" for="emp-grade-select">Select Employee Grade <span class="req_span">*</span></label>
+                            <label  class="form-label" for="emp-grade-select">Employee Grade <span class="req_span">*</span></label>
 
-                            <select id="emp-grade-select" class="form-select select2t-none" name="emp_grade" 
-                            data-parsley-errors-container="#div-emp_grade" 
+                            <input type="text" id="emp-grade-select" class="form-control" name="emp_grade"
+                            value="{{ $currentGradeName ?? '' }}"
+                            placeholder="e.g. HOD L1"
+                            data-parsley-errors-container="#div-emp_grade"
                             required
-                            data-parsley-required-message="Please Select Employee Grade"
+                            data-parsley-required-message="Please enter an Employee Grade"
                             @if(isset($isViewMode) && $isViewMode) disabled @endif>
-                                <option value="">Select Employee Grade</option>
-                                @if(!empty($emp_grade))
-                                    @foreach ($emp_grade as $key => $value)
-                                        <option value="{{ $key }}" @if($benefit_grid->emp_grade == $key) selected @endif>{{ $value }}</option>
-                                    @endforeach
-                                @endif
-                            </select>
                             <div id="div-emp_grade"></div>
+                            <small class="text-muted">Type a new grade name (e.g. "HOD L1") or the name of an existing one.</small>
+                        </div>
+                    </div>
+                    <div class="col-sm-6">
+                        <div class="form-group mb-2">
+                            <label class="form-label" for="grade-ranks-select">Applies to Rank(s) <span class="req_span">*</span></label>
+                            <select id="grade-ranks-select" name="ranks[]" multiple class="form-select select2t-none"
+                            data-parsley-errors-container="#div-ranks"
+                            required
+                            data-parsley-required-message="Please select at least one rank"
+                            @if(isset($isViewMode) && $isViewMode) disabled @endif>
+                                @foreach($rankConfig ?? [] as $rankValue => $rankLabel)
+                                    <option value="{{ $rankValue }}" @if(in_array($rankValue, $currentGradeRanks ?? [])) selected @endif>{{ $rankLabel }}</option>
+                                @endforeach
+                            </select>
+                            <div id="div-ranks"></div>
+                            <small class="text-muted">A rank can only belong to one grade at a time — selecting it here moves it off whatever grade currently holds it.</small>
                         </div>
                     </div>
                     <div class="col-sm-6">
@@ -187,6 +199,7 @@
                         </div>
                 </div>
 
+                {{--
                 <div class="row g-md-4 g-3 mb-4">
                     <!-- Existing fields... -->
                     <div class="col-sm-12 mt-3">
@@ -206,7 +219,6 @@
                                 </div>
                             </div>
                         </div>
-                        {{-- <h5>Custom Leave Types</h5> --}}
                         <div id="customLeaveContainer"></div>
                     </div>
                 </div>
@@ -221,6 +233,7 @@
                         </div>
                     @endforeach
                 @endif
+                --}}
                 
                 <div class="row g-md-4 g-3 mb-4">                   
                     <div class="col-xxl-4  col-sm-6">
@@ -853,7 +866,6 @@
     $(document).ready(function(){
         $("#addBenifitGridForm").parsley();
 
-
         $("#effective_date").datepicker({
             dateFormat: 'dd-mm-yy'
         });
@@ -861,17 +873,11 @@
         $("#effective_date").datepicker("setDate",currentDate);
         var formSubmitted = false; // Flag to track form submission
 
-        $('#emp-grade-select').on('change', function () {
-            let empGrade = $(this).val(); // Get selected employee grade
-
-            if (empGrade) {
+        function fetchEligibleLeaves(payload) {
                 $.ajax({
                     url: '{{ route('leaves.getEligible') }}', // Your defined route
                     method: 'POST',
-                    data: {
-                        emp_grade: empGrade,
-                        _token: '{{ csrf_token() }}' // Include CSRF token for security
-                    },
+                    data: Object.assign({ _token: '{{ csrf_token() }}' }, payload),
                     success: function (response) {
                         if (response.success) {
                             let container = $('#Leave-categories');
@@ -946,7 +952,7 @@
                             `;
                             container.append(bonusHtml);
 
-                            $('.select2t-none').select2(); // Reinitialize select2
+                            $('.select2t-none').select2();
                         } else {
                             alert('No leave categories found.');
                         }
@@ -957,31 +963,49 @@
                         alert('An error occurred while fetching eligible leaves.');
                     }
                 });
+        }
+
+        function clearEligibleLeaves() {
+            $('#Leave-categories').empty();
+            $('#leave-category-select').empty().append('<option value="">Select Leave Category</option>');
+        }
+
+        $('#emp-grade-select').on('change', function () {
+            let empGrade = $(this).val();
+            if (empGrade) {
+                fetchEligibleLeaves({ emp_grade: empGrade });
             } else {
-                // Clear the leave category dropdown if no grade is selected
-                $('#leave-category-select').empty().append('<option value="">Select Leave Category</option>');
+                clearEligibleLeaves();
             }
         });
 
-        $('#addBenifitGridForm').submit(function(e) {
-            e.preventDefault();
+        // Leave eligibility is keyed by RANK (leave_categories.eligibility),
+        // not the grade name — the rank multi-select is what should drive
+        // this preview. Split out of the grade text field when "Applies to
+        // Rank(s)" was added; this listener was missing entirely, so
+        // picking a rank here never refreshed the Leave and Holiday Policy
+        // section.
+        $('#grade-ranks-select').on('change', function () {
+            let ranks = $(this).val(); // array of selected rank values, or null
+            if (ranks && ranks.length) {
+                fetchEligibleLeaves({ ranks: ranks });
+            } else {
+                clearEligibleLeaves();
+            }
+        });
 
-            if (formSubmitted) return; // Prevent multiple form submissions
-
-            var form = $(this);
-            var dataString = form.serialize();
+        function submitBenifitGridForm() {
+            var form = $('#addBenifitGridForm');
             var url = form.attr('action');
 
-            // Initialize Parsley validation
             form.parsley();
 
-            // Check if the form is valid
             if (form.parsley().isValid()) {
                 formSubmitted = true;
                 $.ajax({
                     url: url,
                     type: "POST",
-                    data: $('#addBenifitGridForm').serialize(),
+                    data: form.serialize(),
                     success: function(response) {
                         if(response.success == true) {
                             toastr.success(response.msg, "Success", {
@@ -1004,6 +1028,17 @@
                     positionClass: 'toast-bottom-right'
                 });
             }
+        }
+
+        $('#addBenifitGridForm').submit(function(e) {
+            e.preventDefault();
+
+            if (formSubmitted) return; // Prevent multiple form submissions
+
+            // emp_grade is now the typed grade NAME (e.g. "HOD L1") — the
+            // controller resolves/creates the matching resort_benefit_grade_levels
+            // row server-side, so nothing extra needs to happen here.
+            submitBenifitGridForm();
         });
 
          $('#overtime-select').on('change', function() {
@@ -1026,7 +1061,11 @@
     </script>
     <script>
         let customLeaveIndex = 0; // To track the index of custom leaves
-        document.getElementById('addCustomLeave').addEventListener('click', function() {
+        // Custom Leave Types section is commented out above — guard so this
+        // doesn't throw on a missing element and break every handler after
+        // it in this same <script> block (custom-benefits, custom-discount).
+        const addCustomLeaveBtn = document.getElementById('addCustomLeave');
+        if (addCustomLeaveBtn) addCustomLeaveBtn.addEventListener('click', function() {
             customLeaveIndex++;
             const customLeaveHtml = `
                 <div class="row custom-leave" id="custom-leave-${customLeaveIndex}">

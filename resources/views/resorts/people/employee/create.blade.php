@@ -1682,15 +1682,29 @@
                         data: { position_id: positionId },
                         success: function (res) {
                             if (!res) return;
-                            lockStep2Field(
-                                $('#benefit_grid_level'),
-                                res.benfitGrid_emp_id,
-                                res.emp_grade_name
-                            );
                             $('#position_rank').val(res.position_rank || '');
-                            $('#entitle_service_charge').prop('checked', res.service === 'yes');
-                            $('#entitle_public_holiday').prop('checked', res.holiday_overtime === 'yes');
-                            $('#entitle_overtime').prop('checked', res.overtime === 'yes');
+                            let opts = res.options || [];
+                            if (opts.length === 1) {
+                                // Single, unambiguous grade for this rank —
+                                // lock as before.
+                                lockStep2Field(
+                                    $('#benefit_grid_level'),
+                                    res.benfitGrid_emp_id,
+                                    res.emp_grade_name
+                                );
+                                $('#entitle_service_charge').prop('checked', res.service === 'yes');
+                                $('#entitle_public_holiday').prop('checked', res.holiday_overtime === 'yes');
+                                $('#entitle_overtime').prop('checked', res.overtime === 'yes');
+                            } else if (opts.length > 1) {
+                                // Multiple grades share this rank — populate
+                                // the options but leave the field enabled;
+                                // HR must actually pick one.
+                                let html = '<option value="">Select Benefit Grid Level</option>';
+                                opts.forEach(function (o) {
+                                    html += `<option value="${o.emp_grade}">${o.name}</option>`;
+                                });
+                                $('#benefit_grid_level').html(html).trigger('change.select2');
+                            }
                         }
                     });
                 }
@@ -3199,15 +3213,25 @@
                         position_id: positionId
                     },
                     success: function(res) {
-                        console.log(res);
-                        let html = '<option></option>';
-                        html +=
-                            `<option value="${res.benfitGrid_emp_id}" selected>${res.emp_grade_name}</option>`;
-                        $('#entitle_service_charge').prop('checked', res.service === 'yes');
-                        $('#entitle_public_holiday').prop('checked', res
-                            .holiday_overtime === 'yes');
-                        $('#entitle_overtime').prop('checked', res.overtime === 'yes');
+                        let opts = res.options || [];
+                        let html = '<option value="">Select Benefit Grid Level</option>';
+                        opts.forEach(function(o) {
+                            let sel = opts.length === 1 ? ' selected' : '';
+                            html += `<option value="${o.emp_grade}"${sel}>${o.name}</option>`;
+                        });
                         $('#position_rank').val(res.position_rank);
+
+                        // Multiple grades can now share this rank — only
+                        // auto-fill the entitlement switches when there's a
+                        // single, unambiguous match (today's behavior).
+                        // With more than one, HR must actually pick a level;
+                        // the switches follow via the #benefit_grid_level
+                        // change handler above once they do.
+                        if (opts.length === 1) {
+                            $('#entitle_service_charge').prop('checked', opts[0].service === 'yes');
+                            $('#entitle_public_holiday').prop('checked', opts[0].holiday_overtime === 'yes');
+                            $('#entitle_overtime').prop('checked', opts[0].overtime === 'yes');
+                        }
 
                         $('#benefit_grid_level').html(html).trigger('change');
                     }

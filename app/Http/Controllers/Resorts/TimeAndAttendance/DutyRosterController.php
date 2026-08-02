@@ -197,14 +197,29 @@ class DutyRosterController extends Controller
 
         // try
         // {
+            // resort_benifit_grid.emp_grade stores a resort_benefit_grade_levels
+            // id (see ResortBenefitGradeLevelRank), not a raw rank number, so it
+            // can no longer be joined directly against employees.rank — resolve
+            // the employee's grade level via the rank-mapping table first, same
+            // as every other Common::getEmpGrade() call site.
             $employees = Employee::join('resort_admins as t1',"t1.id","=","employees.Admin_Parent_id")
                                     ->join('resort_positions as t2',"t2.id","=","employees.Position_id")
-                                    ->join('resort_benifit_grid as t3',"t3.emp_grade","=","employees.rank")
                                     ->where("employees.id",$id)
                                     ->where('t1.status','Active')
                                     ->where('employees.status','Active')
                                     ->where('t1.resort_id',$this->resort->resort_id)
-                                    ->first(['t3.overtime','t1.id as Parentid','employees.rank','t1.first_name','t1.last_name','t1.profile_picture','employees.*','t2.position_title']);
+                                    ->first(['t1.id as Parentid','employees.rank','t1.first_name','t1.last_name','t1.profile_picture','employees.*','t2.position_title']);
+
+            $overtime = null;
+            if ($employees) {
+                $gradeLevelId = Common::resolveEmpGrade($this->resort->resort_id, $employees->rank, $employees->benefit_grid_level);
+                if ($gradeLevelId) {
+                    $overtime = \App\Models\ResortBenifitGrid::where('resort_id', $this->resort->resort_id)
+                        ->where('emp_grade', $gradeLevelId)
+                        ->value('overtime');
+                }
+                $employees->overtime = $overtime;
+            }
 
             $currentDay = Carbon::now()->format('Y-m-d');
             $currentMonthEnd = Carbon::now()->endOfMonth()->format('Y-m-d');
@@ -716,6 +731,30 @@ class DutyRosterController extends Controller
         }
 
 
+    }
+
+    /**
+     * Re-assign the geofence zone(s) on an existing duty_rosters row — the
+     * only way to change it today is re-creating the roster from scratch;
+     * this lets HR/HOD change it from view-duty-roster the same way they
+     * already change Shift/Overtime.
+     */
+    public function UpdateDutyRosterGeofence(Request $request)
+    {
+        $request->validate([
+            'roster_id' => 'required|integer|exists:duty_rosters,id',
+            'geofence_zone_ids' => 'nullable|array',
+            'geofence_zone_ids.*' => 'integer|exists:resort_geofences,id',
+        ]);
+
+        try {
+            DutyRoster::where('id', $request->roster_id)->update([
+                'geofence_zone_id' => !empty($request->geofence_zone_ids) ? json_encode($request->geofence_zone_ids) : null,
+            ]);
+            return response()->json(['success' => true, 'message' => 'Geofence zone updated successfully']);
+        } catch (\Exception $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
     }
 
     public function DutyRosterSearch(Request $request)
@@ -1724,8 +1763,10 @@ class DutyRosterController extends Controller
         // Get public holidays (including Fridays)
         $publicHolidays = $this->getPublicHolidays($resort_id, $startOfMonth->format('Y-m-d'), $endOfMonth->format('Y-m-d'));
 
+        $geofenceZones = \App\Models\ResortGeofence::where('resort_id', $resort_id)->where('status', 'active')->orderBy('name')->get();
+
         $page_title = 'View Duty Roster';
-        return view('resorts.timeandattendance.dutyroster.ViewDutyRoster',compact('headers','WeekstartDate','WeekendDate','monthwiseheaders','headers','Rosterdata','groupedRosterData','resort_id','ResortPosition','ResortDepartment','employees','ShiftSettings','startOfMonth','endOfMonth','page_title','LeaveCategory','publicHolidays'));
+        return view('resorts.timeandattendance.dutyroster.ViewDutyRoster',compact('headers','WeekstartDate','WeekendDate','monthwiseheaders','headers','Rosterdata','groupedRosterData','resort_id','ResortPosition','ResortDepartment','employees','ShiftSettings','startOfMonth','endOfMonth','page_title','LeaveCategory','publicHolidays','geofenceZones'));
 
     }
 

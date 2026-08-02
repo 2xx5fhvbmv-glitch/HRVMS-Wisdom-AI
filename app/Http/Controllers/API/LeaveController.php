@@ -299,7 +299,7 @@ class LeaveController extends Controller
                 }
 
                 // Get the employee grade and leave balances
-                $emp_grade                              =   Common::getEmpGrade($rank);
+                $emp_grade                              =   Common::resolveEmpGrade($resortId, $rank, $employee->benefit_grid_level);
 
                 // Fetch the benefit grid (allocated days) for the employee's grade and rank
                 $benefit_grid                           =   DB::table('resort_benifit_grid as rbg')
@@ -587,80 +587,152 @@ class LeaveController extends Controller
                     }
                 }
 
+                // Approval chain per the documented leave-approval-flow spec
+                // (same rules already implemented correctly in
+                // Resorts/Leave/LeaveController.php's leaveAdd() — ported
+                // here so mobile submissions follow the same rules instead
+                // of the old broken version: a tautological rank check
+                // that always added an extra approver regardless of rank,
+                // an undefined $resortId (typo for $user->resort_id) that
+                // silently made every EXCOM/HOD/HR/GM lookup below it
+                // resolve nothing, and no GM step at all for Manager/HOD.
+                //
+                // Line Worker (6) / Supervisor (5) -> Reporting Manager only (1 approval)
+                // Manager (4) -> HOD or EXCOM -> then GM (2 approvals)
+                // HOD (2) -> EXCOM -> then GM (2 approvals)
+                // EXCOM (1) -> GM only (1 approval)
+                // GM (8) -> HR dept EXCOM, else HR dept HOD, else any EXCOM (1 approval)
                 $directReportingManagerId               =   $employee->reporting_to;
+                $directReportingManager                 =   $directReportingManagerId
+                                                                ? Employee::select('id', 'rank', 'reporting_to')->where('resort_id', $user->resort_id)->find($directReportingManagerId)
+                                                                : null;
 
-                if($rank != "1" || $rank != "3" || $rank != "8") { // If not EXCOM, HR, or GM
-                    $directReporting                        =   Employee::where('id', $directReportingManagerId)
-                                                                    ->where('resort_id',$user->resort_id)
-                                                                    ->where('Dept_id', $employee->Dept_id)
-                                                                    ->first();
-                    if ($directReporting) {
-                        $approvalFlow->push($directReporting); // First approver: Supervisor/Manager
+                // Line Worker/Supervisor: reporting_to can point straight at
+                // the HOD in departments with no Supervisor layer, skipping
+                // the intended approver level — look for an actual
+                // Supervisor/Manager in the applicant's own department first.
+                if (
+                    in_array($rank, ['5', '6'], true)
+                    && (!$directReportingManager || !in_array((string) $directReportingManager->rank, ['4', '5'], true))
+                ) {
+                    $deptSupervisorOrManager             =   Employee::select('id', 'rank', 'reporting_to')
+                                                                ->where('resort_id', $user->resort_id)
+                                                                ->where('Dept_id', $employee->Dept_id)
+                                                                ->where('id', '!=', $emp_id)
+                                                                ->whereIn('rank', ['5', '4'])
+                                                                ->orderByRaw("FIELD(rank, '5', '4')")
+                                                                ->first();
+                    if ($deptSupervisorOrManager) {
+                        $directReportingManager          =   $deptSupervisorOrManager;
                     }
                 }
 
-                // Helper to get EXCOM, HOD, HR
-                $getApprover                            =   function($deptId, $rank,$resortId) {
-                                                                return Employee::select('id', 'rank')
-                                                                    ->where('resort_id',$resortId)
-                                                                    ->where('Dept_id', $deptId)
-                                                                    ->where('rank', $rank)
-                                                                    ->first();
-                                                            };
+                $approvalIds                             =   $approvalFlow->pluck('id')->toArray();
 
-                $getHR                                  =   function($resortId) {
-                                                                // Raw rank=3 excluded HR employees whose actual rank
-                                                                // isn't literally 3 (e.g. HR-department HOD/EXCOM).
-                                                                return Employee::select('id', 'rank')->whereIn('id', Common::getResortHrEmployeeIds($resortId))->first();
-                                                            };
-
-                $getGM                                  =   function($resortId) {
-                                                                return Employee::select('id', 'rank')->where('rank', 8)->where('resort_id',$resortId)->first();
-                                                            };
-
-
-                // Line worked and supervisor applied leave
-                if($rank === "6" || $rank === "5") {
-
-                    $findEXCOM                          =   $getApprover($employee->Dept_id, 1,$resortId);
-                    if ($findEXCOM) {
-                        $approvalFlow->push($findEXCOM); // Only EXCOM approves
-                    } else {
-                        $findHOD                    =   $getApprover($employee->Dept_id, 2,$resortId);
-                        if ($findHOD) {
-                            $approvalFlow->push($findHOD); // Only HOD approves if EXCOM not found
+                if ($rank === '8') {
+                    // GM leave: HR dept EXCOM, else HR dept HOD, else any EXCOM
+                    $hrDeptId                            =   ResortDepartment::where('resort_id', $user->resort_id)
+                                                                ->where('name', 'Human Resources')->value('id');
+                    $gmApproverFound                     =   false;
+                    if ($hrDeptId) {
+                        $hrExcom                          =   Employee::select('id', 'rank')
+                                                                ->where('resort_id', $user->resort_id)
+                                                                ->where('Dept_id', $hrDeptId)
+                                                                ->where('rank', 1)
+                                                                ->where('id', '!=', $emp_id)
+                                                                ->first();
+                        if ($hrExcom && !in_array($hrExcom->id, $approvalIds)) {
+                            $approvalFlow->push($hrExcom);
+                            $approvalIds[]                = $hrExcom->id;
+                            $gmApproverFound              = true;
                         }
                     }
-
-                    if ($findHR = $getHR($resortId)) {
-                        $approvalFlow->push($findHR); // Only HR approves
+                    if (!$gmApproverFound && $hrDeptId) {
+                        $hrHod                            =   Employee::select('id', 'rank')
+                                                                ->where('resort_id', $user->resort_id)
+                                                                ->where('Dept_id', $hrDeptId)
+                                                                ->where('rank', 2)
+                                                                ->where('id', '!=', $emp_id)
+                                                                ->first();
+                        if ($hrHod && !in_array($hrHod->id, $approvalIds)) {
+                            $approvalFlow->push($hrHod);
+                            $approvalIds[]                = $hrHod->id;
+                            $gmApproverFound              = true;
+                        }
                     }
-                }
-
-                // MGR applied leave
-                if ($rank === "4") {
-
-                    $findEXCOM                          =   $getApprover($employee->Dept_id, 1,$resortId);
-                    if ($findEXCOM) {
-                        $approvalFlow->push($findEXCOM); // Only EXCOM approves
+                    if (!$gmApproverFound) {
+                        $anyExcom                         =   Employee::select('id', 'rank')
+                                                                ->where('resort_id', $user->resort_id)
+                                                                ->where('rank', 1)
+                                                                ->where('id', '!=', $emp_id)
+                                                                ->first();
+                        if ($anyExcom && !in_array($anyExcom->id, $approvalIds)) {
+                            $approvalFlow->push($anyExcom);
+                        }
                     }
-
-                    if ($findHR = $getHR($resortId)) {
-                        $approvalFlow->push($findHR); // Only HR approves
+                } elseif ($rank === '1') {
+                    // EXCOM leave: GM only
+                    $gmApprover                          =   Employee::select('id', 'rank')
+                                                                ->where('resort_id', $user->resort_id)
+                                                                ->where('rank', 8)
+                                                                ->where('id', '!=', $emp_id)
+                                                                ->first();
+                    if ($gmApprover && !in_array($gmApprover->id, $approvalIds)) {
+                        $approvalFlow->push($gmApprover);
                     }
-                }
-
-                // HOD and GM applied leave
-                if ($rank === "2" || $rank === "8") {
-                    if ($findHR = $getHR($resortId)) {
-                        $approvalFlow->push($findHR); // Only HR approves
+                } elseif ($rank === '2') {
+                    // HOD leave: EXCOM (reporting manager, with fallback) -> then GM
+                    if ($directReportingManager && $directReportingManager->rank) {
+                        $approvalFlow->push($directReportingManager);
+                        $approvalIds[]                    = $directReportingManager->id;
+                    } else {
+                        $excomApprover                    =   Employee::select('id', 'rank')
+                                                                ->where('resort_id', $user->resort_id)
+                                                                ->where('rank', 1)
+                                                                ->where('id', '!=', $emp_id)
+                                                                ->first();
+                        if ($excomApprover && !in_array($excomApprover->id, $approvalIds)) {
+                            $approvalFlow->push($excomApprover);
+                            $approvalIds[]                = $excomApprover->id;
+                        }
                     }
-                }
-
-                // EXCOM & HR applied leave
-                if ($rank === "1" || $rank === "3") {
-                    if ($findGM = $getGM($resortId)) {
-                        $approvalFlow->push($findGM); // Only GM approves
+                    $gmApprover                          =   Employee::select('id', 'rank')
+                                                                ->where('resort_id', $user->resort_id)
+                                                                ->where('rank', 8)
+                                                                ->where('id', '!=', $emp_id)
+                                                                ->first();
+                    if ($gmApprover && !in_array($gmApprover->id, $approvalIds)) {
+                        $approvalFlow->push($gmApprover);
+                    }
+                } elseif ($rank === '4') {
+                    // Manager leave: HOD/EXCOM (reporting manager, with fallback) -> then GM
+                    if ($directReportingManager && $directReportingManager->rank) {
+                        $approvalFlow->push($directReportingManager);
+                        $approvalIds[]                    = $directReportingManager->id;
+                    } else {
+                        $hodApprover                      =   Employee::select('id', 'rank')
+                                                                ->where('resort_id', $user->resort_id)
+                                                                ->where('Dept_id', $employee->Dept_id)
+                                                                ->where('rank', 2)
+                                                                ->where('id', '!=', $emp_id)
+                                                                ->first();
+                        if ($hodApprover && !in_array($hodApprover->id, $approvalIds)) {
+                            $approvalFlow->push($hodApprover);
+                            $approvalIds[]                = $hodApprover->id;
+                        }
+                    }
+                    $gmApprover                          =   Employee::select('id', 'rank')
+                                                                ->where('resort_id', $user->resort_id)
+                                                                ->where('rank', 8)
+                                                                ->where('id', '!=', $emp_id)
+                                                                ->first();
+                    if ($gmApprover && !in_array($gmApprover->id, $approvalIds)) {
+                        $approvalFlow->push($gmApprover);
+                    }
+                } else {
+                    // Line Worker (6) / Supervisor (5) / others: reporting manager only
+                    if ($directReportingManager && $directReportingManager->rank) {
+                        $approvalFlow->push($directReportingManager);
                     }
                 }
 
@@ -737,7 +809,7 @@ class LeaveController extends Controller
                 }
 
                 $rank                                   =   $employee->rank;
-                $emp_grade                              =   Common::getEmpGrade($rank);
+                $emp_grade                              =   Common::resolveEmpGrade($resort_id, $rank, $employee->benefit_grid_level);
                 $benefit_grid                           =   Common::getBenefitGrid($emp_grade, $resort_id);
 
                 if (!$benefit_grid) {
@@ -1091,7 +1163,7 @@ class LeaveController extends Controller
             // with this instead of leaving it blank.
             $leaveData['default_destination']           =   $employee->leave_destination;
 
-            $emp_grade                                  =   Common::getEmpGrade($user->GetEmployee->rank);
+            $emp_grade                                  =   Common::resolveEmpGrade($user->resort_id, $user->GetEmployee->rank, $user->GetEmployee->benefit_grid_level);
 
             $benefit_grids                              =   DB::table('resort_benifit_grid as rbg')
                                                                 ->join('resort_benefit_grid_child as rbgc', 'rbg.id', '=', 'rbgc.benefit_grid_id')
@@ -1300,6 +1372,9 @@ class LeaveController extends Controller
                                                                     ];
                                                                 })->values();
 
+                foreach (Common::buildLeaveApprovalFlow($leaveRequest->id, $emp_id) as $key => $value) {
+                    $leaveRequest->{$key} = $value;
+                }
             }
 
             if ($myLeaveRequest) {
@@ -1320,6 +1395,10 @@ class LeaveController extends Controller
                 $myLeaveRequest->approve_data           =   $approveData;
                 $myLeaveRequest->from_date              =   Carbon::parse($myLeaveRequest->from_date)->format('Y-m-d');
                 $myLeaveRequest->to_date                =   Carbon::parse($myLeaveRequest->to_date)->format('Y-m-d');
+
+                foreach (Common::buildLeaveApprovalFlow($myLeaveRequest->id, $emp_id) as $key => $value) {
+                    $myLeaveRequest->{$key} = $value;
+                }
             }
 
             //Leave Request data end here
@@ -1358,6 +1437,10 @@ class LeaveController extends Controller
                                                                             'rank_type'         => $role,
                                                                         ];
                                                                     })->values();
+
+                                                                foreach (Common::buildLeaveApprovalFlow($item->id, $emp_id) as $key => $value) {
+                                                                    $item->{$key} = $value;
+                                                                }
 
                                                                 return $item;
                                                             });
@@ -1452,6 +1535,7 @@ class LeaveController extends Controller
                                                                 'el.*',
                                                                 'e.Emp_id as employee_id',
                                                                 'e.rank',
+                                                                'e.benefit_grid_level',
                                                                 'els.status as leave_status',
                                                                 'els.approver_rank',
                                                                 'els.approver_id',
@@ -1482,7 +1566,7 @@ class LeaveController extends Controller
 
                 if ($leaveDetail) {
                     // Fetch total leave allocation for the employee
-                    $emp_grade                          =   Common::getEmpGrade($leaveDetail->rank);
+                    $emp_grade                          =   Common::resolveEmpGrade($resortId, $leaveDetail->rank, $leaveDetail->benefit_grid_level);
                     $benefit_grid                       =   DB::table('resort_benifit_grid as rbg')
                                                                     ->join('resort_benefit_grid_child as rbgc', 'rbg.id', '=', 'rbgc.benefit_grid_id')
                                                                     ->where('rbg.emp_grade', $emp_grade)
@@ -1628,7 +1712,7 @@ class LeaveController extends Controller
 
 
             // Group data by 'id'
-            $leaveRequests                              =   $leaveRequests->groupBy('id')->map(function ($group) {
+            $leaveRequests                              =   $leaveRequests->groupBy('id')->map(function ($group) use ($employee) {
                 // Use the first record as the base
                 $base                                   =   $group->first();
 
@@ -1653,6 +1737,10 @@ class LeaveController extends Controller
 
                 // Add approve_data to the base record
                 $base->approve_data                     =   $approveData;
+
+                foreach (Common::buildLeaveApprovalFlow($base->id, $employee->id) as $key => $value) {
+                    $base->{$key} = $value;
+                }
 
                 return $base;
             })->values();
@@ -1935,6 +2023,7 @@ class LeaveController extends Controller
                     'el.*',
                     'e.Emp_id as employee_id',
                     'e.rank',
+                    'e.benefit_grid_level',
                     'els.status as leave_status',
                     'els.approver_rank',
                     'els.approver_id',
@@ -1958,7 +2047,7 @@ class LeaveController extends Controller
                     foreach ($combineLeaveDetails as $leaveDetail) {
 
                         // Fetch total leave allocation for the employee
-                        $emp_grade          = Common::getEmpGrade($leaveDetail->rank);
+                        $emp_grade          = Common::resolveEmpGrade($user->resort_id, $leaveDetail->rank, $leaveDetail->benefit_grid_level);
                         $benefit_grid       = DB::table('resort_benifit_grid as rbg')
                             ->join('resort_benefit_grid_child as rbgc', 'rbg.id', '=', 'rbgc.benefit_grid_id')
                             ->where('rbg.emp_grade', $emp_grade)
@@ -2187,7 +2276,7 @@ class LeaveController extends Controller
                 }
 
                 // Get the employee grade and leave balances
-                $emp_grade                              =   Common::getEmpGrade($rank);
+                $emp_grade                              =   Common::resolveEmpGrade($user->resort_id, $rank, $employee->benefit_grid_level);
 
                 // Fetch the benefit grid (allocated days) for the employee's grade and rank
                 $benefit_grid                           =   DB::table('resort_benifit_grid as rbg')
@@ -2538,6 +2627,7 @@ class LeaveController extends Controller
     private function getUpcomingLeaveRequest($resort_id, $emp_id, $available_rank,$emp_rank)
     {
         $isHOD                                          = ($available_rank === "HOD");
+        $leaveRequest                                   =   collect();
 
         if($emp_rank == 1 || $emp_rank == 3 || $emp_rank == 8) {
 
@@ -2607,7 +2697,7 @@ class LeaveController extends Controller
         }
 
         // Group data by 'id'
-        $finalData                                      =   $leaveRequest->groupBy('id')->map(function ($group) {
+        $finalData                                      =   $leaveRequest->groupBy('id')->map(function ($group) use ($emp_id) {
             // Use the first record as the base
             $base                                       =   $group->first();
 
@@ -2633,6 +2723,10 @@ class LeaveController extends Controller
 
             // Clear duplicate fields in the base record
             unset($base->approver_rank, $base->approver_id);
+
+            foreach (Common::buildLeaveApprovalFlow($base->id, $emp_id) as $key => $value) {
+                $base->{$key} = $value;
+            }
 
             return $base;
         })->values();
@@ -3153,7 +3247,7 @@ class LeaveController extends Controller
                 $baseUrl                =   url('/');
 
                 // Group data by 'id'
-                $leaveDetails       = $leaveDetails->groupBy('id')->map(function ($group) {
+                $leaveDetails       = $leaveDetails->groupBy('id')->map(function ($group) use ($empId) {
 
 
                     // Use the first record as the base
@@ -3182,6 +3276,10 @@ class LeaveController extends Controller
                     $base->attachments                  = self::resolveLeaveAttachmentUrl($base->attachments);
                     // Clear duplicate fields in the base record
                     unset($base->approver_rank, $base->approver_id);
+
+                    foreach (Common::buildLeaveApprovalFlow($base->id, $empId) as $key => $value) {
+                        $base->{$key} = $value;
+                    }
 
                     return $base;
                 })->values(); // Re-index the collection
@@ -3268,6 +3366,7 @@ class LeaveController extends Controller
                     'el.*',
                     'e.Emp_id as employee_id',
                     'e.rank',
+                    'e.benefit_grid_level',
                     // Main employee details
                     'ra.first_name as employee_first_name',
                     'ra.last_name as employee_last_name',
@@ -3332,7 +3431,7 @@ class LeaveController extends Controller
 
                 if ($leaveDetail) {
                     // Fetch total leave allocation for the employee
-                    $emp_grade      = Common::getEmpGrade($leaveDetail->rank);
+                    $emp_grade      = Common::resolveEmpGrade($resortId, $leaveDetail->rank, $leaveDetail->benefit_grid_level);
                     // Was missing a resort_id scope entirely — summed
                     // every resort's benefit grid at this emp_grade, not
                     // just this resort's, massively inflating the total
@@ -3401,15 +3500,16 @@ class LeaveController extends Controller
                         return $item;
                     });
 
+                    // Full chain, not filtered to the viewer's own row — a
+                    // timeline needs every stage, and per-stage
+                    // can_approve/can_reject (from approval_flow below)
+                    // already tell the viewer whether THEY can act.
+                    $leaveDetail->approve_data  =   $approveData->values();
 
-                    // Filter only if approver_id matches emp_id
-                    $filteredApproveData    =   $approveData->where('approver_id', $emp_id);
+                    foreach (Common::buildLeaveApprovalFlow($leaveDetail->id, $emp_id) as $key => $value) {
+                        $leaveDetail->{$key} = $value;
+                    }
 
-                    // Attach approve_data to the main island pass object
-                    // $leaveDetail->approve_data      = $approveData;
-
-                    // If emp_id is found, assign filtered data, otherwise assign an empty array
-                    $leaveDetail->approve_data  =   $filteredApproveData->isNotEmpty() ? $filteredApproveData->values() : [];
                     if ($isHOD) {
                         $leaveDetail->already_emp_leave = $alreadyEmpLeaveQuery;
                     }
@@ -3664,13 +3764,18 @@ class LeaveController extends Controller
                     'etps.approver_rank',
                     'etps.approver_id',
                     'etps.approved_at',
+                    // etp.* (selected above) already has its own `status`
+                    // column (the parent pass's overall status) — without
+                    // aliasing this, $item->status below silently read that
+                    // instead of the per-stage status.
+                    'etps.status as stage_status',
                 )
                 ->orderBy('etp.id', 'desc') // Order by ID descending
                 ->get();
 
 
             // Group data by 'id'
-            $islandPassQuery  = $islandPassQuery->groupBy('id')->map(function ($group) {
+            $islandPassQuery  = $islandPassQuery->groupBy('id')->map(function ($group) use ($emp_id) {
                 // Use the first record as the base
                 $base           = $group->first();
                 // Collect approver details for the grouped records
@@ -3684,7 +3789,7 @@ class LeaveController extends Controller
                         'approver_rank' => $item->approver_rank,
                         'approver_id'   => $item->approver_id,
                         'rank_type'     => $role,
-                        'status'        => $item->status,
+                        'status'        => $item->stage_status,
                     ];
                 })->unique()->values();
 
@@ -3693,6 +3798,15 @@ class LeaveController extends Controller
                 // Clear duplicate fields in the base record
                 unset($base->approver_rank, $base->approver_id);
                 $base->profile_picture  = Common::getResortUserPicture($base->Admin_Parent_id);
+
+                // Built from its own independent, unfiltered stage query —
+                // unlike approve_data above (which, on islandPassViewHOD,
+                // only ever contains the viewer's own row because of that
+                // method's approver_id-filtered join), this always reflects
+                // the FULL chain regardless of how the base query is scoped.
+                foreach (Common::buildIslandPassApprovalFlow($base->id, $emp_id) as $key => $value) {
+                    $base->{$key} = $value;
+                }
 
                 return $base;
             })->values();
@@ -3740,6 +3854,11 @@ class LeaveController extends Controller
                     'etps.approver_rank',
                     'etps.approver_id',
                     'etps.approved_at',
+                    // etp.* (selected above) already has its own `status`
+                    // column (the parent pass's overall status) — without
+                    // aliasing this, $item->status below silently read that
+                    // instead of the per-stage status.
+                    'etps.status as stage_status',
                 )
                 ->where('etp.resort_id', $resort_id)
                 // Approvers are assigned per-pass in employee_travel_pass_status
@@ -3753,7 +3872,7 @@ class LeaveController extends Controller
                 ->get();
 
             // Group data by 'id'
-            $islandPassQuery  = $islandPassQuery->groupBy('id')->map(function ($group) {
+            $islandPassQuery  = $islandPassQuery->groupBy('id')->map(function ($group) use ($emp_id) {
                 // Use the first record as the base
                 $base           = $group->first();
                 // Collect approver details for the grouped records
@@ -3767,7 +3886,7 @@ class LeaveController extends Controller
                         'approver_rank' => $item->approver_rank,
                         'approver_id'   => $item->approver_id,
                         'rank_type'     => $role,
-                        'status'        => $item->status,
+                        'status'        => $item->stage_status,
                     ];
                 })->unique()->values();
 
@@ -3776,6 +3895,15 @@ class LeaveController extends Controller
                 // Clear duplicate fields in the base record
                 unset($base->approver_rank, $base->approver_id);
                 $base->profile_picture  = Common::getResortUserPicture($base->Admin_Parent_id);
+
+                // Built from its own independent, unfiltered stage query —
+                // unlike approve_data above (which, on islandPassViewHOD,
+                // only ever contains the viewer's own row because of that
+                // method's approver_id-filtered join), this always reflects
+                // the FULL chain regardless of how the base query is scoped.
+                foreach (Common::buildIslandPassApprovalFlow($base->id, $emp_id) as $key => $value) {
+                    $base->{$key} = $value;
+                }
 
                 return $base;
             })->values();
@@ -3824,6 +3952,11 @@ class LeaveController extends Controller
                     'etps.approver_rank',
                     'etps.approver_id',
                     'etps.approved_at',
+                    // etp.* (selected above) already has its own `status`
+                    // column (the parent pass's overall status) — without
+                    // aliasing this, $item->status below silently read that
+                    // instead of the per-stage status.
+                    'etps.status as stage_status',
                 )
                 ->where('etp.resort_id', $resort_id)
                 // Same fix as islandPassViewHOD() above — approver_id (from
@@ -3908,10 +4041,10 @@ class LeaveController extends Controller
             $actionname                                 =   ($action == "Rejected") ? "reject" : "approve";
 
             if ($lastStatus && $lastStatus->approver_id != $currentApproverId) {
-                return response()->json([
+                return response()->json(array_merge([
                     'status'                            =>  false,
                     'message'                           =>  "You cannot $actionname this request. The request must first be approved by the $lastApproverRank.",
-                ], 200);
+                ], Common::buildLeaveApprovalFlow($leaveId, $currentApproverId)), 200);
             }
 
             EmployeeLeaveStatus::where('leave_request_id', $leave->id)->where('approver_id', $currentApproverId)->update([
@@ -3978,10 +4111,10 @@ class LeaveController extends Controller
                     );
                 }
 
-                return response()->json([
+                return response()->json(array_merge([
                     'status'                            =>  true,
                     'message'                           =>  'Leave approved successfully.',
-                ]);
+                ], Common::buildLeaveApprovalFlow($leave->id, $currentApproverId)));
 
             } else if ($action === 'Rejected') {
 
@@ -4006,15 +4139,15 @@ class LeaveController extends Controller
                     'leave-rejected',
                 );
 
-                return response()->json([
+                return response()->json(array_merge([
                     'status'                            =>  true,
                     'message'                           =>  'Leave Rejected.',
-                ], 200);
+                ], Common::buildLeaveApprovalFlow($leave->id, $currentApproverId)), 200);
             } else {
-                return response()->json([
+                return response()->json(array_merge([
                     'status'                            =>  false,
                     'message'                           =>  'Invalid action.',
-                ], 200);
+                ], Common::buildLeaveApprovalFlow($leaveId, $currentApproverId)), 200);
             }
         } catch (\Exception $e) {
             \Log::emergency("File: " . $e->getFile());

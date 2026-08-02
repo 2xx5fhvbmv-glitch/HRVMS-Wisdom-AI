@@ -70,6 +70,7 @@ class EmployeeController extends Controller
                     'e.resort_id',
                     'e.rank',
                     'e.religion',
+                    'e.benefit_grid_level',
                     'e.joining_date',
                     'ra.first_name as employee_first_name',
                     'ra.last_name as employee_last_name',
@@ -99,24 +100,8 @@ class EmployeeController extends Controller
                         $religion = "muslim";
                     }
 
-                    // $emp_grade      = Common::getEmpGrade($value->rank);
                     $rank      = $value->rank;
-
-                    if($rank == 1 || $rank == 3 || $rank == 7 || $rank == 8){
-                        $emp_grade = "1";
-                    }
-                    else if($rank == 4){
-                        $emp_grade = "4";
-                    }
-                    else if($rank == 2){
-                        $emp_grade = "2";
-                    }
-                    else if($rank == 5){
-                        $emp_grade = "5";
-                    }
-                    else{
-                        $emp_grade = "6";
-                    }
+                    $emp_grade = Common::resolveEmpGrade($resortId, $rank, $value->benefit_grid_level);
 
                     $benefit_grid = ResortBenifitGrid::where('emp_grade', $emp_grade)
                                                     ->where('resort_id', $resortId)
@@ -201,22 +186,7 @@ class EmployeeController extends Controller
             }
 
             $rank           = $profile->rank;
-
-                if($rank == 1 || $rank == 3 || $rank == 7 || $rank == 8){
-                    $emp_grade = "1";
-                }
-                else if($rank == 4){
-                    $emp_grade = "4";
-                }
-                else if($rank == 2){
-                    $emp_grade = "2";
-                }
-                else if($rank == 5){
-                    $emp_grade = "5";
-                }
-                else{
-                    $emp_grade = "6";
-                }
+            $emp_grade = Common::resolveEmpGrade($resortId, $rank, $profile->benefit_grid_level);
 
                 $benefit_grid = ResortBenifitGrid::where('emp_grade', $emp_grade)
                 ->where('resort_id', $resortId)

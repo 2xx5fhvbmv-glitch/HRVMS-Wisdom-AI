@@ -10,6 +10,7 @@ use DateTime;
 use Validator;
 use Carbon\Carbon;
 use App\Helpers\Common;
+use App\Helpers\StorageHelper;
 use App\Models\Employee;
 use App\Models\EscalationDay;
 use App\Models\BuildingModel;
@@ -157,11 +158,16 @@ class MaintananceContorller extends Controller
         DB::beginTransaction();
         try {
         // Handle image upload
+        // Was a raw ->move() to a plain filesystem path (uploads/MaintanceRequest/...)
+        // that never existed under public/ and never touched the configured
+        // storage disk — files landed outside the web root entirely and were
+        // never viewable, on local OR on Wasabi (STORAGE_DRIVER=wasabi in
+        // prod). StorageHelper routes through the correct disk either way.
         if ($request->hasFile('Image')) {
             $imageFile = $request->file('Image');
             $imageName = time() . '_' . $imageFile->getClientOriginalName();
 
-            $imageFile->move($path_path, $imageName);
+            StorageHelper::put($path_path . '/' . $imageName, file_get_contents($imageFile->getRealPath()));
             $collection['Image'] = $imageName;
         }
 
@@ -169,7 +175,7 @@ class MaintananceContorller extends Controller
         if ($request->hasFile('Video')) {
             $videoFile = $request->file('Video');
             $videoName = time() . '_' . $videoFile->getClientOriginalName();
-            $videoFile->move($path_path, $videoName);
+            StorageHelper::put($path_path . '/' . $videoName, file_get_contents($videoFile->getRealPath()));
             $collection['Video'] = $videoName;
         }
      
@@ -907,14 +913,17 @@ class MaintananceContorller extends Controller
                                                 </div>';
             if(  $MaintanaceRequest->Image)
             {
-                $path_path = config('settings.MaintanceRequest') . '/' . Auth::guard('resort-admin')->user()->resort->resort_id;
-
-                $MaintanaceRequest->Image = '<img width="150px"; src="'.URL::asset($path_path.'/'.$MaintanaceRequest->Image).'" alt="user">';
+                // Image can be either a plain filename (web upload) or a
+                // json_encode(['Filename'=>..,'Child_id'=>..]) value (mobile
+                // upload via AWSEmployeeFileUpload) — resolveMaintenanceAttachmentUrl()
+                // handles both instead of blindly concatenating a path.
+                $imageUrl = Common::resolveMaintenanceAttachmentUrl($MaintanaceRequest->Image, Auth::guard('resort-admin')->user()->resort->resort_id);
+                $MaintanaceRequest->Image = $imageUrl ? '<img width="150px"; src="'.$imageUrl.'" alt="user">' : null;
             }
             if ($MaintanaceRequest->Video)
             {
                 $path_path = config('settings.MaintanceRequest') . '/' . Auth::guard('resort-admin')->user()->resort->resort_id;
-                $MaintanaceRequest->Video = '<iframe src="' . URL::asset($path_path . '/' . $MaintanaceRequest->Video) . '"frameborder="0" allowfullscreen></iframe>';
+                $MaintanaceRequest->Video = '<iframe src="' . StorageHelper::temporaryUrl($path_path . '/' . $MaintanaceRequest->Video) . '"frameborder="0" allowfullscreen></iframe>';
             }
             return view('resorts.Accommodation.Maintanance.MaintanaceReqDetails',compact('displayedStatusesDetails','MaintanaceRequestChild','AssingAccommodation','MaintanaceRequest','page_title','displayedStatuses'));
 
@@ -1197,14 +1206,17 @@ class MaintananceContorller extends Controller
                                                 </div>';
             if(  $MaintanaceRequest->Image)
             {
-                $path_path = config('settings.MaintanceRequest') . '/' . Auth::guard('resort-admin')->user()->resort->resort_id;
-
-                $MaintanaceRequest->Image = '<img width="150px"; src="'.URL::asset($path_path.'/'.$MaintanaceRequest->Image).'" alt="user">';
+                // Image can be either a plain filename (web upload) or a
+                // json_encode(['Filename'=>..,'Child_id'=>..]) value (mobile
+                // upload via AWSEmployeeFileUpload) — resolveMaintenanceAttachmentUrl()
+                // handles both instead of blindly concatenating a path.
+                $imageUrl = Common::resolveMaintenanceAttachmentUrl($MaintanaceRequest->Image, Auth::guard('resort-admin')->user()->resort->resort_id);
+                $MaintanaceRequest->Image = $imageUrl ? '<img width="150px"; src="'.$imageUrl.'" alt="user">' : null;
             }
             if ($MaintanaceRequest->Video)
             {
                 $path_path = config('settings.MaintanceRequest') . '/' . Auth::guard('resort-admin')->user()->resort->resort_id;
-                $MaintanaceRequest->Video = '<iframe src="' . URL::asset($path_path . '/' . $MaintanaceRequest->Video) . '"frameborder="0" allowfullscreen></iframe>';
+                $MaintanaceRequest->Video = '<iframe src="' . StorageHelper::temporaryUrl($path_path . '/' . $MaintanaceRequest->Video) . '"frameborder="0" allowfullscreen></iframe>';
             }
             return view('resorts.Accommodation.Maintanance.MaintanaceReqDetails',compact('displayedStatusesDetails','MaintanaceRequestChild','AssingAccommodation','MaintanaceRequest','page_title','displayedStatuses'));
 

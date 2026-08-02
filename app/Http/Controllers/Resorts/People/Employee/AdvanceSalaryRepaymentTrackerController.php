@@ -96,6 +96,9 @@ class AdvanceSalaryRepaymentTrackerController extends Controller
                 ->addColumn('department', function ($payroll_data) {
                     return $payroll_data->employee->department->name;
                 })
+                ->editColumn('request_amount', function ($payroll_data) {
+                    return Common::formatRequestCurrency($payroll_data->request_amount, $payroll_data->currency ?: 'USD');
+                })
                 ->addColumn('last_payment', function ($payroll_data) {
                     $last_payment = $payroll_data->payrollRecoverySchedule->where('status','Paid')->last();
                     if ($last_payment) {

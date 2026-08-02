@@ -333,7 +333,7 @@
                                                                     @if(!empty($r->geofence_zone_id))
                                                                         @php
                                                                             $zoneIds = json_decode($r->geofence_zone_id, true) ?? [];
-                                                                            $zones = \App\Models\ResortGeofence::whereIn('id', $zoneIds)->get();
+                                                                            $zones = $geofenceZones->whereIn('id', $zoneIds);
                                                                         @endphp
                                                                         @foreach($zones as $zone)
                                                                             <span class="badge me-1" style="background:{{ $zone->color }}22; color:{{ $zone->color }}; border:1px solid {{ $zone->color }}; font-size:10px;">
@@ -360,14 +360,17 @@
                                                                 $currentDate = isset($header['full_date']) ? $header['full_date']->format('Y-m-d') : date('Y-m-d', strtotime($header['date']));
                                                                 $isPublicHoliday = isset($publicHolidays) && in_array($currentDate, $publicHolidays);
                                                                 $shiftData = $RosterInternalData->firstWhere('date', $currentDate);
-                                                                
-                                                                // Check for leave on this date
-                                                                $employeeLeave = \App\Models\EmployeeLeave::join('leave_categories as t4', 't4.id', '=', 'employees_leaves.leave_category_id')
-                                                                    ->where('employees_leaves.emp_id', $r->emp_id)
-                                                                    ->where('employees_leaves.status', 'Approved')
-                                                                    ->whereDate('employees_leaves.from_date', '<=', $currentDate)
-                                                                    ->whereDate('employees_leaves.to_date', '>=', $currentDate)
-                                                                    ->first(['t4.color', 't4.leave_type', 't4.leave_category', 'employees_leaves.from_date', 'employees_leaves.to_date']);
+
+                                                                // Common::GetRosterdata() already resolved approved-leave
+                                                                // data for this date (batched, not per-day) — reuse it
+                                                                // instead of re-querying EmployeeLeave here per row per day.
+                                                                $employeeLeave = ($shiftData && !empty($shiftData->LeaveFromDate))
+                                                                    ? (object) [
+                                                                        'color' => $shiftData->LeaveColor ?? null,
+                                                                        'leave_type' => $shiftData->LeaveType ?? null,
+                                                                        'leave_category' => $shiftData->LeaveCategory ?? null,
+                                                                    ]
+                                                                    : null;
                                                                 
                                                                 $toatalHoursForDay = 0;
                                                                 if ($shiftData && !$employeeLeave)
@@ -541,14 +544,17 @@
                                                             }
                                                             $isPublicHoliday = isset($publicHolidays) && in_array($formattedDate, $publicHolidays);
                                                             $shiftData = $RosterInternalDataMonth->firstWhere('date', $formattedDate);
-                                                            
-                                                            // Check for leave on this date
-                                                            $employeeLeave = \App\Models\EmployeeLeave::join('leave_categories as t4', 't4.id', '=', 'employees_leaves.leave_category_id')
-                                                                ->where('employees_leaves.emp_id', $r->emp_id)
-                                                                ->where('employees_leaves.status', 'Approved')
-                                                                ->whereDate('employees_leaves.from_date', '<=', $formattedDate)
-                                                                ->whereDate('employees_leaves.to_date', '>=', $formattedDate)
-                                                                ->first(['t4.color', 't4.leave_type', 't4.leave_category', 'employees_leaves.from_date', 'employees_leaves.to_date']);
+
+                                                            // Common::GetRosterdata() already resolved approved-leave
+                                                            // data for this date (batched, not per-day) — reuse it
+                                                            // instead of re-querying EmployeeLeave here per row per day.
+                                                            $employeeLeave = ($shiftData && !empty($shiftData->LeaveFromDate))
+                                                                ? (object) [
+                                                                    'color' => $shiftData->LeaveColor ?? null,
+                                                                    'leave_type' => $shiftData->LeaveType ?? null,
+                                                                    'leave_category' => $shiftData->LeaveCategory ?? null,
+                                                                ]
+                                                                : null;
 
                                                             $toatalHoursForDay = 0;
                                                             $startTime = null;

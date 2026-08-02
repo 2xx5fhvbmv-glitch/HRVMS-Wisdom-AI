@@ -677,9 +677,13 @@ class PayrollController extends Controller
                 // Already settled via F&F — exclude from SC pool.
                 continue;
             }
-            // Check employee's emp_grade and find matching benefit grid
+            // Employee's own benefit_grid_level wins when it's still a real,
+            // active grade for this resort (resolveEmpGrade() guards against
+            // stale/poisoned values); otherwise falls back to the rank-based
+            // default grade mapping.
+            $empGrade = Common::resolveEmpGrade($resortId, $employee->rank, $employee->benefit_grid_level);
             $grid = ResortBenifitGrid::where('resort_id', $resortId)
-                ->where('emp_grade', $employee->benefit_grid_level)
+                ->where('emp_grade', $empGrade)
                 ->where('service_charge', 1)
                 ->where('status', 'Active') // Ensure the grid is active
                 ->first();
@@ -757,7 +761,7 @@ class PayrollController extends Controller
                 foreach ($payroll_service_charges as $payroll) 
                 {
                     $employee           =  Employee::where('id', $payroll->employee_id)->where('resort_id', $this->resort->resort_id)->first();
-                    $grade              =  Common::getEmpGrade($employee->rank);
+                    $grade              =  Common::resolveEmpGrade($this->resort->resort_id, $employee->rank, $employee->benefit_grid_level);
                     $resortBenifitsGrid =  ResortBenifitGrid::where('resort_id', $this->resort->resort_id)->where('emp_grade', $grade)->where('service_charge', '1')->where('status','Active')->first();
                     
                     if($resortBenifitsGrid && $payroll->service_charge_amount > 0)
@@ -1074,10 +1078,15 @@ class PayrollController extends Controller
                 $staffshoptAmount = $deduction->staff_shop;
 
                 if ($advanceLoanAmount > 0) {
+                    // Match fetchAdvanceRecovery()'s filter exactly (status='Pending',
+                    // same date window) — that's what the advance_loan figure was
+                    // summed from, so every row it summed must close out here, not
+                    // just one. A prior limit(1) left a second same-period
+                    // installment (e.g. loan + separate salary advance) stuck
+                    // Pending forever even though it was already deducted.
                     PayrollRecoverySchedule::where('employee_id', $employeeId)
-                        ->where('status', 'pending')
+                        ->where('status', 'Pending')
                         ->whereBetween('repayment_date', [$payroll->start_date, $payroll->end_date])
-                        ->limit(1) // in case of partial deduction logic
                         ->update([
                             'status' => 'Paid',
                         ]);
@@ -2148,7 +2157,8 @@ class PayrollController extends Controller
                     })
                     ->first();
 
-                $resort_benefitGrid = ResortBenifitGrid::where('resort_id', $this->resort->resort_id)->where('emp_grade', $employee->benefit_grid_level)->where('status','Active')->first();
+                $empGradeForLeave = Common::resolveEmpGrade($this->resort->resort_id, $employee->rank, $employee->benefit_grid_level);
+                $resort_benefitGrid = ResortBenifitGrid::where('resort_id', $this->resort->resort_id)->where('emp_grade', $empGradeForLeave)->where('status','Active')->first();
                 if ($paidLeave && $resort_benefitGrid) {
                     $benefitGrid = ResortBenifitGridChild::where('benefit_grid_id', optional($resort_benefitGrid)->id)
                         ->where('leave_cat_id', $paidLeave->leave_category_id)

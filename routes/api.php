@@ -340,6 +340,7 @@ use Illuminate\Support\Facades\Route;
 		Route::get('incident/dashboard', [App\Http\Controllers\API\IncidentController::class, 'incidentDashboard']);
 		Route::get('incident/incident-detail/{incident_id}', [App\Http\Controllers\API\IncidentController::class, 'incidentDetails']);
 		Route::post('incident/incident-calender', [App\Http\Controllers\API\IncidentController::class, 'incidentCalender']);
+		Route::get('incident/statement-request/{incident_id}', [App\Http\Controllers\API\IncidentController::class, 'getStatementRequest']);
 		Route::post('incident/incident-statement', [App\Http\Controllers\API\IncidentController::class, 'provideStatement']);
 		Route::get('incident/insights/{incident_id}', [App\Http\Controllers\API\IncidentController::class, 'getPreventiveInsights']);
 
@@ -380,6 +381,7 @@ use Illuminate\Support\Facades\Route;
 		Route::post('grievance/grievance-store', [App\Http\Controllers\API\GrievanceController::class, 'GrievanceStore']);
 		Route::post('grievance/informal-resolution', [App\Http\Controllers\API\GrievanceController::class, 'InformalResolution']);
 		Route::get('grievance/my-grievances', [App\Http\Controllers\API\GrievanceController::class, 'myGrievances']);
+		Route::post('grievance/identity-disclosure-respond', [App\Http\Controllers\API\GrievanceController::class, 'respondIdentityDisclosure']);
 		Route::get('grievance/{id}', [App\Http\Controllers\API\GrievanceController::class, 'grievanceDetail']);
 
 

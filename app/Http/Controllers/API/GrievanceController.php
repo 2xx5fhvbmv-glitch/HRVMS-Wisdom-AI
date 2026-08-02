@@ -133,7 +133,6 @@ class GrievanceController extends Controller
         $validator = Validator::make($request->all(), [
             'Grivance_Cat_id'                               =>  'required',
             'Grivance_Sub_cat'                              =>  'required',
-            'Employee_id'                                   =>  'required',
             'date'                                          =>  'required|date',
             'Grivance_description'                          =>  'required',
             'Grivance_date_time'                            =>  'required|date_format:Y-m-d H:i:s',
@@ -168,7 +167,11 @@ class GrievanceController extends Controller
                 'Grivance_id'                                   =>  Common::getGriveanceID(),
                 'Grivance_Cat_id'                               =>  $request->Grivance_Cat_id,
                 'Grivance_Sub_cat'                              =>  $request->Grivance_Sub_cat,
-                'Employee_id'                                   =>  $request->Employee_id,
+                // The submitter is always the authenticated employee, never
+                // client-supplied — a stale/wrong Employee_id in the request
+                // body previously attributed the grievance to someone else
+                // (e.g. GR-0003 recorded as Priya Sharma when Rani Khan filed it).
+                'Employee_id'                                   =>  $this->user->GetEmployee->id,
                 'status'                                        =>  'pending',
                 'date'                                          =>  date('Y-m-d',strtotime($request->date)),
                 'Grivance_description'                          =>  $request->Grivance_description,
@@ -207,9 +210,10 @@ class GrievanceController extends Controller
                 GrivanceSubmissionWitness::create(["Witness_id" => $v,"G_S_Parent_id" => $GrivanceSubmission->id,'Wintness_Status'=>'Active']);
             }
 
-            // Send mobile notification to HR employee
-                $hrEmployee = Common::FindResortHR($this->user);
-                if ($hrEmployee) {
+            // Send mobile notification to all of HR (rank 3) plus the
+            // HR department's HOD/EXCOM (rank 1/2) — not just one HR manager.
+                $hrEmployeeIds = Common::getResortHrEmployeeIds($this->resort_id);
+                if (!empty($hrEmployeeIds)) {
                     Common::sendMobileNotification(
                         $this->resort_id,
                         2,
@@ -218,7 +222,7 @@ class GrievanceController extends Controller
                         'Grievance Submission',
                         'A grievance submission has been sent by ' . $this->user->first_name . ' ' . $this->user->last_name . '.',
                         'Employee Grievance',
-                        [$hrEmployee->id],
+                        $hrEmployeeIds,
                         $GrivanceSubmission->id,
                         false,
                         'grievance-submission',
@@ -321,6 +325,21 @@ class GrievanceController extends Controller
     }
 
     /**
+     * Pending "who submitted this?" request from a key-personnel committee
+     * member — null once there's nothing awaiting the grievant's response.
+     */
+    private function resolveIdentityDisclosure($g): ?array
+    {
+        if ($g->Grivance_Submission_Type !== "Yes" || $g->Request_Identity_Disclosure !== 'Requested') {
+            return null;
+        }
+        $requester = Employee::with('resortAdmin:id,first_name,last_name')->find($g->Identity_Disclosure_Requested_By);
+        return [
+            'requested_by' => $requester ? trim(optional($requester->resortAdmin)->first_name . ' ' . optional($requester->resortAdmin)->last_name) : null,
+        ];
+    }
+
+    /**
      * GET resort/grievance/my-grievances
      * Every grievance the current user has submitted (created_by is the
      * only field guaranteed to reflect the actual reporter — Employee_id
@@ -374,6 +393,7 @@ class GrievanceController extends Controller
                     'resolved_informally' => $g->grievance_informally,
                     'witness_count'       => $witnessCounts[$g->id] ?? 0,
                     'has_attachments'     => $hasAttachments,
+                    'identity_disclosure_request' => $this->resolveIdentityDisclosure($g),
                 ];
             });
 
@@ -470,9 +490,80 @@ class GrievanceController extends Controller
                 'gm_decision'            => $g->Gm_Decision,
                 'gm_reason'              => $g->Gm_Resoan,
                 'rejection_reason'       => $g->Rejection_reason,
+                'identity_disclosure_request' => $this->resolveIdentityDisclosure($g),
             ];
 
             return response()->json(['status' => true, 'message' => 'Grievance detail fetched successfully', 'data' => $data], 200);
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::emergency("Message: " . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    /**
+     * POST resort/grievance/identity-disclosure-respond
+     * The grievant answers a pending "who submitted this?" request. Approve
+     * grants that key person permanent access (added to Identity_Disclosed_To);
+     * reject just clears the pending request so they can be asked again later.
+     */
+    public function respondIdentityDisclosure(Request $request)
+    {
+        if (!$this->user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'id'     => 'required',
+            'action' => 'required|in:approve,reject',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
+        }
+
+        try {
+            $g = GrivanceSubmissionModel::where('resort_id', $this->resort_id)
+                ->where('created_by', $this->user->id)
+                ->where('id', $request->id)
+                ->first();
+
+            if (!$g) {
+                return response()->json(['success' => false, 'message' => 'Grievance not found.'], 404);
+            }
+
+            if ($g->Request_Identity_Disclosure !== 'Requested') {
+                return response()->json(['success' => false, 'message' => 'No pending identity disclosure request.'], 400);
+            }
+
+            $requesterId = $g->Identity_Disclosure_Requested_By;
+            $approved    = $request->action === 'approve';
+
+            if ($approved) {
+                $disclosedTo   = $g->Identity_Disclosed_To ?? [];
+                $disclosedTo[] = $requesterId;
+                $g->Identity_Disclosed_To = array_values(array_unique($disclosedTo));
+            }
+            $g->Request_Identity_Disclosure = null;
+            $g->Identity_Disclosure_Requested_By = null;
+            $g->save();
+
+            if ($requesterId) {
+                Common::sendMobileNotification(
+                    $this->resort_id,
+                    2,
+                    null,
+                    null,
+                    'Identity Disclosure ' . ($approved ? 'Approved' : 'Declined'),
+                    'Your request to view the submitter of grievance ' . $g->Grivance_id . ' was ' . ($approved ? 'approved.' : 'declined.'),
+                    'Grievance Identity Disclosure Response',
+                    [$requesterId],
+                    $g->id,
+                );
+            }
+
+            return response()->json(['status' => true, 'message' => 'Response recorded successfully.'], 200);
         } catch (\Exception $e) {
             \Log::emergency("File: " . $e->getFile());
             \Log::emergency("Line: " . $e->getLine());
