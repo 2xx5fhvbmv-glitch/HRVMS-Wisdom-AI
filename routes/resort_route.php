@@ -570,6 +570,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::post('/time-and-attendance/duty-roster-and-leave', 'TimeAndAttendance\DutyRosterController@DutyRosterandLeave')->name('resort.timeandattendance.DutyRosterandLeave');
     Route::post('/time-and-attendance/store-duty-roster', 'TimeAndAttendance\DutyRosterController@StoreDutyRoster')->name('resort.timeandattendance.StoreDutyRoster');
     Route::post('/time-and-attendance/update-duty-roster', 'TimeAndAttendance\DutyRosterController@UpdateDutyRoster')->name('resort.timeandattendance.UpdateDutyRoster');
+    Route::post('/time-and-attendance/update-duty-roster-geofence', 'TimeAndAttendance\DutyRosterController@UpdateDutyRosterGeofence')->name('resort.timeandattendance.UpdateDutyRosterGeofence');
     Route::get('/time-and-attendance/view-duty-roster', 'TimeAndAttendance\DutyRosterController@ViewDutyRoster')->name('resort.timeandattendance.ViewDutyRoster');
     Route::get('/time-and-attendance/roster-occupied-dates', 'TimeAndAttendance\DutyRosterController@RosterOccupiedDates')->name('resort.timeandattendance.RosterOccupiedDates');
 

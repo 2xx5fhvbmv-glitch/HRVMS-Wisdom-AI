@@ -37,10 +37,16 @@ class GrivanceSubmissionModel extends Model
                             'outcome_type',
                             'action_taken',
                             'Request_Identity_Disclosure',
+                            'Identity_Disclosure_Requested_By',
+                            'Identity_Disclosed_To',
                             'Gm_Decision',
                             'Rejection_reason',
                             'RequestforStatment'
                         ];
+
+        protected $casts = [
+            'Identity_Disclosed_To' => 'array',
+        ];
                 
         public static function boot(){
             parent::boot();

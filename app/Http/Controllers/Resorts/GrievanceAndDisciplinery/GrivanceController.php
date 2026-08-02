@@ -386,8 +386,15 @@ class GrivanceController extends Controller
         $EveidanceFilePath = config('settings.GrievanceSubmission').'/'.$this->resort->resort->resort_id;
         $path = config('settings.GrivanceAttachments').'/'.$this->resort->resort->resort_id; 
         $GrivanceKeys = GrivanceKeyPerson::where('resort_id',$this->resort->resort_id)->get()->pluck('emp_ids')->toArray();
-        $auth_id  = $this->resort->id;
-        return view('resorts.GrievanceAndDisciplinery.grivance.investigationreport',compact('auth_id','GrivanceKeys','EveidanceFilePath','GrivanceInvestigationModel','flag','GrivanceSubmissionHistory','ActionStore','FilePath','page_title','Grivance_Parent','GrievanceCommitteeMemberParent','path'));
+        // GrivanceKeys holds Employee ids (see KeyPersonnel()), so the
+        // viewer must be compared by employee id, not resort_admins id —
+        // comparing admin id let the wrong person's identity check pass/fail.
+        $auth_id  = $assinged_id;
+        $identityDisclosedTo = is_array($Grivance_Parent->Identity_Disclosed_To ?? null)
+            ? $Grivance_Parent->Identity_Disclosed_To
+            : (json_decode($Grivance_Parent->Identity_Disclosed_To ?? '[]', true) ?: []);
+        $canViewIdentity = $Grivance_Parent->Grivance_Submission_Type != "Yes" || in_array($auth_id, $identityDisclosedTo);
+        return view('resorts.GrievanceAndDisciplinery.grivance.investigationreport',compact('auth_id','GrivanceKeys','canViewIdentity','EveidanceFilePath','GrivanceInvestigationModel','flag','GrivanceSubmissionHistory','ActionStore','FilePath','page_title','Grivance_Parent','GrievanceCommitteeMemberParent','path'));
     }
 
     public function InvestigationReportStore(Request $request)
@@ -680,18 +687,60 @@ class GrivanceController extends Controller
         $path = config('settings.GrivanceAttachments').'/'.$this->resort->resort->resort_id; 
 
         $GrivanceKeys = GrivanceKeyPerson::where('resort_id',$this->resort->resort_id)->get()->pluck('emp_ids')->toArray();
-        $auth_id  = $this->resort->id;
-        return view('resorts.GrievanceAndDisciplinery.grivance.Investigationinfo',compact('GrivanceKeys','auth_id','rankKey','path','EveidanceFilePath','GrivanceInvestigationModel','flag','GrivanceSubmissionHistory','ActionStore','FilePath','page_title','Grivance_Parent','GrievanceCommitteeMemberParent'));
+        // GrivanceKeys holds Employee ids (see KeyPersonnel()), so the
+        // viewer must be compared by employee id, not resort_admins id.
+        $auth_id  = $assinged_id;
+        $identityDisclosedTo = is_array($Grivance_Parent->Identity_Disclosed_To ?? null)
+            ? $Grivance_Parent->Identity_Disclosed_To
+            : (json_decode($Grivance_Parent->Identity_Disclosed_To ?? '[]', true) ?: []);
+        $canViewIdentity = $Grivance_Parent->Grivance_Submission_Type != "Yes" || in_array($auth_id, $identityDisclosedTo);
+        return view('resorts.GrievanceAndDisciplinery.grivance.Investigationinfo',compact('GrivanceKeys','auth_id','canViewIdentity','rankKey','path','EveidanceFilePath','GrivanceInvestigationModel','flag','GrivanceSubmissionHistory','ActionStore','FilePath','page_title','Grivance_Parent','GrievanceCommitteeMemberParent'));
 
     }
     public function RequestIdentity(Request $request)
     {
-        $id= $request->id;
-        GrivanceSubmissionModel::where('id',$id)->update(['Request_Identity_Disclosure'=>"Yes"]);
+        $id = $request->id;
+        $requesterId = isset($this->resort->GetEmployee) ? $this->resort->GetEmployee->id : null;
+        $GrivanceKeys = GrivanceKeyPerson::where('resort_id',$this->resort->resort_id)->get()->pluck('emp_ids')->toArray();
+
+        if (!$requesterId || !in_array($requesterId, $GrivanceKeys)) {
+            return response()->json(['success' => false, 'message' => 'Only designated key personnel can request identity disclosure.'], 403);
+        }
+
+        $grievance = GrivanceSubmissionModel::find($id);
+        if (!$grievance || $grievance->Grivance_Submission_Type != "Yes") {
+            return response()->json(['success' => false, 'message' => 'Grievance not found or not confidential.'], 404);
+        }
+
+        $disclosedTo = $grievance->Identity_Disclosed_To ?? [];
+        if (in_array($requesterId, $disclosedTo)) {
+            return response()->json(['success' => false, 'message' => 'You already have access to this identity.'], 400);
+        }
+
+        $grievance->update([
+            'Request_Identity_Disclosure'          => 'Requested',
+            'Identity_Disclosure_Requested_By'     => $requesterId,
+        ]);
+
+        $requesterName = trim(($this->resort->first_name ?? '') . ' ' . ($this->resort->last_name ?? ''));
+        $msg   = $requesterName . ' wants to know who submitted grievance ' . $grievance->Grivance_id . '. Please respond in the mobile app.';
+        $title = 'Identity Disclosure Request';
+        Common::sendMobileNotification(
+            $this->resort->resort_id,
+            2,
+            null,
+            null,
+            $title,
+            $msg,
+            'Grievance Identity Disclosure Request',
+            [$grievance->Employee_id],
+            $grievance->id,
+        );
+
         return response()->json([
             'success' => true,
             'message' => 'Grievance Identity Disclosure Requested Successfully',
-        
+
         ], 200);
     }
 

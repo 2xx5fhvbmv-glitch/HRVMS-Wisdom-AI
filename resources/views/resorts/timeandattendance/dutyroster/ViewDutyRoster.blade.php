@@ -190,17 +190,22 @@
                                                                                                                             <span class="badge badge-white">{{ $r->Emp_id }}</span>
                                                                                                                         </p>
                                                                                                                         <span>{{ ucfirst($r->position_title) }}</span>
-                                                                                                                    @if(!empty($r->geofence_zone_id))
-                                                                                                                        @php
-                                                                                                                            $zoneIds = json_decode($r->geofence_zone_id, true) ?? [];
-                                                                                                                            $zones = \App\Models\ResortGeofence::whereIn('id', $zoneIds)->get();
-                                                                                                                        @endphp
+                                                                                                                    @php
+                                                                                                                        $zoneIds = !empty($r->geofence_zone_id) ? (json_decode($r->geofence_zone_id, true) ?: []) : [];
+                                                                                                                        $zones = !empty($zoneIds) ? \App\Models\ResortGeofence::whereIn('id', $zoneIds)->get() : collect();
+                                                                                                                    @endphp
+                                                                                                                    @if($zones->count())
                                                                                                                         <div class="mt-1">
                                                                                                                         @foreach($zones as $zone)
                                                                                                                             <span class="badge me-1" style="background:{{ $zone->color }}22; color:{{ $zone->color }}; border:1px solid {{ $zone->color }}; font-size:9px;">
                                                                                                                                 <i class="fa-solid fa-{{ $zone->shape_type === 'circle' ? 'circle' : 'draw-polygon' }} me-1"></i>{{ $zone->name }}
                                                                                                                             </span>
                                                                                                                         @endforeach
+                                                                                                                            <a href="javascript:void(0)" class="editIcon-btn editGeofenceZone" data-roster_id="{{ $r->duty_roster_id }}" data-zone_ids="{{ json_encode($zoneIds) }}" title="Change geo-fence zone"><i class="fa-solid fa-pen fa-2xs"></i></a>
+                                                                                                                        </div>
+                                                                                                                    @elseif(isset($geofenceZones) && $geofenceZones->count())
+                                                                                                                        <div class="mt-1">
+                                                                                                                            <a href="javascript:void(0)" class="editGeofenceZone" data-roster_id="{{ $r->duty_roster_id }}" data-zone_ids="[]"><small class="text-muted"><i class="fa-solid fa-plus fa-2xs"></i> Assign zone</small></a>
                                                                                                                         </div>
                                                                                                                     @endif
                                                                                                                 </div>
@@ -583,17 +588,22 @@
                                                                                                     <span class="badge badge-white">{{ $r->Emp_id }}</span>
                                                                                                 </p>
                                                                                                 <span>{{ ucfirst($r->position_title) }}</span>
-                                                                                                @if(!empty($r->geofence_zone_id))
-                                                                                                    @php
-                                                                                                        $zoneIds = json_decode($r->geofence_zone_id, true) ?? [];
-                                                                                                        $zones = \App\Models\ResortGeofence::whereIn('id', $zoneIds)->get();
-                                                                                                    @endphp
+                                                                                                @php
+                                                                                                    $zoneIds = !empty($r->geofence_zone_id) ? (json_decode($r->geofence_zone_id, true) ?: []) : [];
+                                                                                                    $zones = !empty($zoneIds) ? \App\Models\ResortGeofence::whereIn('id', $zoneIds)->get() : collect();
+                                                                                                @endphp
+                                                                                                @if($zones->count())
                                                                                                     <div class="mt-1">
                                                                                                     @foreach($zones as $zone)
                                                                                                         <span class="badge me-1" style="background:{{ $zone->color }}22; color:{{ $zone->color }}; border:1px solid {{ $zone->color }}; font-size:9px;">
                                                                                                             <i class="fa-solid fa-{{ $zone->shape_type === 'circle' ? 'circle' : 'draw-polygon' }} me-1"></i>{{ $zone->name }}
                                                                                                         </span>
                                                                                                     @endforeach
+                                                                                                        <a href="javascript:void(0)" class="editIcon-btn editGeofenceZone" data-roster_id="{{ $r->duty_roster_id }}" data-zone_ids="{{ json_encode($zoneIds) }}" title="Change geo-fence zone"><i class="fa-solid fa-pen fa-2xs"></i></a>
+                                                                                                    </div>
+                                                                                                @elseif(isset($geofenceZones) && $geofenceZones->count())
+                                                                                                    <div class="mt-1">
+                                                                                                        <a href="javascript:void(0)" class="editGeofenceZone" data-roster_id="{{ $r->duty_roster_id }}" data-zone_ids="[]"><small class="text-muted"><i class="fa-solid fa-plus fa-2xs"></i> Assign zone</small></a>
                                                                                                     </div>
                                                                                                 @endif
                                                                                             </div>
@@ -976,6 +986,41 @@
                     <div class="modal-footer justify-content-center">
                         <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
                         <button type="submit"   class="btn btn-theme" >Submit</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="editGeofenceZone-modal" tabindex="-1" aria-labelledby="editGeofenceZoneLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editGeofenceZoneLabel">Assign Geo-Fence Zone</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="UpdateDutyRosterGeofence">
+                    @csrf
+                    <div class="modal-body">
+                        @if(isset($geofenceZones) && $geofenceZones->count())
+                        <div class="drc-zone-list">
+                            @foreach($geofenceZones as $zone)
+                            <label class="drc-zone-row gf-zone-item">
+                                <input type="checkbox" name="geofence_zone_ids[]" value="{{ $zone->id }}" class="drc-zone-checkbox edit-gf-zone-checkbox">
+                                <span class="drc-zone-dot" style="background:{{ $zone->color }};"></span>
+                                <span class="drc-zone-name">{{ $zone->name }}</span>
+                            </label>
+                            @endforeach
+                        </div>
+                        <small class="text-muted">Employee can only check in/out inside selected zones.</small>
+                        @else
+                        <p class="small text-muted mb-0">No active zones configured.</p>
+                        @endif
+                        <input type="hidden" id="EditGeofenceRosterId" name="roster_id">
+                    </div>
+                    <div class="modal-footer justify-content-center">
+                        <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
+                        <button type="submit" class="btn btn-theme">Submit</button>
                     </div>
                 </form>
             </div>
@@ -1931,6 +1976,41 @@
             $("#ShiftOverTime").attr('data-DayWiseTotalHours', DayWiseTotalHours);
             calculateTotalTime(overtime,DayWiseTotalHours,flag="Modal");
 
+        });
+
+        $(document).on("click", ".editGeofenceZone", function() {
+            var rosterId = $(this).data('roster_id');
+            var zoneIds = $(this).data('zone_ids') || [];
+            $("#EditGeofenceRosterId").val(rosterId);
+            $(".edit-gf-zone-checkbox").prop('checked', false);
+            zoneIds.forEach(function(id) {
+                $(".edit-gf-zone-checkbox[value='" + id + "']").prop('checked', true);
+            });
+            $("#editGeofenceZone-modal").modal('show');
+        });
+
+        $('#UpdateDutyRosterGeofence').on('submit', function(e) {
+            e.preventDefault();
+            var formData = new FormData(this);
+            $.ajax({
+                url: "{{ route('resort.timeandattendance.UpdateDutyRosterGeofence') }}",
+                type: "POST",
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    if (response.success) {
+                        toastr.success(response.message, "Success", { positionClass: 'toast-bottom-right' });
+                        $("#editGeofenceZone-modal").modal('hide');
+                        setTimeout(function() { window.location.reload(); }, 1500);
+                    } else {
+                        toastr.error(response.message, "error", { positionClass: 'toast-bottom-right' });
+                    }
+                },
+                error: function() {
+                    toastr.error("Something went wrong", "error", { positionClass: 'toast-bottom-right' });
+                }
+            });
         });
 
         $('#UpdateDutyRoster').validate({
