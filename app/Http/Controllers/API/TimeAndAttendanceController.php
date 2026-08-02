@@ -2075,8 +2075,15 @@ class TimeAndAttendanceController extends Controller
             // this, but GPS drift near a zone boundary can fire a false
             // "enter" just outside it, and the server is the one source
             // of truth manual check-in also relies on (resolveGeofenceCheck).
+            // Same "take the latest roster row" rule as myGeofenceZone() —
+            // an employee can accumulate several duty_rosters rows over
+            // time, and a bare ->first() here picked the oldest one, which
+            // routinely has no zone (or a stale one), while myGeofenceZone
+            // (used for the app's own within-zone indicator) always looked
+            // at the latest — the two endpoints silently disagreed.
             $rosterData = DutyRoster::where('resort_id', $user->resort_id)
                 ->where('Emp_id', $employee->id)
+                ->orderByDesc('id')
                 ->first();
             $geofenceCheck = $this->resolveGeofenceCheck($locationPayload, $rosterData);
             if ($geofenceCheck['within'] !== true) {

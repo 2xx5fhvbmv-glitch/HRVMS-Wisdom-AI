@@ -341,10 +341,13 @@ class GrievanceController extends Controller
 
     /**
      * GET resort/grievance/my-grievances
-     * Every grievance the current user has submitted (created_by is the
-     * only field guaranteed to reflect the actual reporter — Employee_id
-     * on the row is set from a caller-supplied value and isn't reliable
-     * for "who filed this").
+     * Every grievance the current user has submitted (created_by, auto-set
+     * by the model from the authenticated session, is the only field
+     * guaranteed to reflect the actual reporter — GrievanceStore() now
+     * hardcodes Employee_id to the authenticated employee's own id too, so
+     * on mobile-submitted rows the two are always the same person; this
+     * comment used to say Employee_id was still caller-supplied, which is
+     * no longer true).
      */
     public function myGrievances(Request $request)
     {

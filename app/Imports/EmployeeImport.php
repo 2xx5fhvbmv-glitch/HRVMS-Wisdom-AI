@@ -10,20 +10,30 @@ use App\Models\ResortAdmin;
 use App\Models\ResortDivision;
 use App\Models\ResortPosition;
 use App\Models\ResortSection;
-use Illuminate\Support\Str;
+use Carbon\Carbon;
 use App\Helpers\Common;
 use Hash;
 use DB;
 use App\Models\ResortDepartment;
 use App\Models\Position;
 
-
 class EmployeeImport implements ToModel, WithHeadingRow
 {
-    protected $departmentId;
-    protected $positionId;
+    // Master Import cap. Larger files should be split — this keeps the
+    // synchronous upload request bounded instead of timing out mid-file.
+    const MAX_ROWS = 500;
+
+    const EMPLOYMENT_TYPES = ['Full-Time', 'Part-Time', 'Contract', 'Casual', 'Probationary', 'Internship', 'Temporary'];
+    const MARITAL_STATUSES = ['Single', 'Married', 'Divorced', 'Widowed'];
+    const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+
     protected $resort;
     protected $rowNumber = 0;
+    protected $errors = [];
+    protected $rowCapReported = false;
+
+    public $created = 0;
+    public $updated = 0;
 
     public function __construct()
     {
@@ -39,189 +49,310 @@ class EmployeeImport implements ToModel, WithHeadingRow
     {
         $this->rowNumber++;
         $excelRowNumber = $this->rowNumber + $this->startRow() - 1;
-        
-        // Keep track of errors
-        static $errors = [];
 
         // Silently skip completely empty rows (template padding rows)
         if ($this->isRowEmpty($row)) {
             return null;
         }
 
+        if ($this->rowNumber > self::MAX_ROWS) {
+            if (!$this->rowCapReported) {
+                $this->addError($excelRowNumber, $row, 'Import capped at ' . self::MAX_ROWS . ' rows. Remaining rows were skipped — split the file and upload the rest separately.');
+                $this->rowCapReported = true;
+            }
+            return null;
+        }
+
         // Validate required fields
         $validationErrors = $this->validateRequiredFields($row, $excelRowNumber);
         if (!empty($validationErrors)) {
-            $errors = array_merge($errors, $validationErrors);
-            session(['import_errors' => $errors]);
+            foreach ($validationErrors as $error) {
+                $this->errors[] = $error;
+            }
+            session(['import_errors' => $this->errors]);
             return null;
         }
 
         $division = $row['division'] ?? '';
-        $divisionname = preg_replace("/\s*\(.*?\)/", "", $division);
+        $divisionname = $this->stripCode($division);
 
-        // Get the department
         $division = ResortDivision::where('name', $divisionname)
             ->where('status', 'active')
             ->where('resort_id', $this->resort->resort_id)
             ->first();
-            
+
         if (!$division) {
-            $errors[] = [
-                'row' => $excelRowNumber,
-                'name' => trim(($row['firstname'] ?? '') . ' ' . ($row['lastname'] ?? '')),
-                'email' => $row['email'] ?? 'N/A',
-                'department' => $row['department'] ?? 'N/A',
-                'position' => $row['position'] ?? 'N/A',
-                'error' => "Division '{$divisionname}' does not match with the internal link."
-            ];
-            session(['import_errors' => $errors]);
+            $this->addError($excelRowNumber, $row, "Division '{$divisionname}' does not match with the internal link.");
             return null;
         }
 
-        $department = ResortDepartment::where('name', preg_replace("/\s*\(.*?\)/", "", $row['department'] ?? ''))
+        $department = ResortDepartment::where('name', $this->stripCode($row['department'] ?? ''))
             ->where('status', 'active')
             ->where('division_id', $division->id)
             ->where('resort_id', $this->resort->resort_id)
             ->first();
-        
+
         if (!$department) {
-            $errors[] = [
-                'row' => $excelRowNumber,
-                'name' => trim(($row['firstname'] ?? '') . ' ' . ($row['lastname'] ?? '')),
-                'email' => $row['email'] ?? 'N/A',
-                'department' => $row['department'] ?? 'N/A',
-                'position' => $row['position'] ?? 'N/A',
-                'error' => "Department '" . ($row['department'] ?? 'N/A') . "' does not match with the internal link."
-            ];
-            session(['import_errors' => $errors]);
+            $this->addError($excelRowNumber, $row, "Department '" . ($row['department'] ?? 'N/A') . "' does not match with the internal link.");
             return null;
         }
 
-        $position = ResortPosition::where('position_title', $row['position'] ?? '')
-            ->where('status', 'active') 
+        // NOTE: the export template's Position/Section dropdowns show
+        // "Title (code)" — the previous version of this import only
+        // stripped the "(code)" suffix for division/department, so any
+        // row using the dropdown-selected position/section value always
+        // failed to resolve. Strip it here too.
+        $position = ResortPosition::where('position_title', $this->stripCode($row['position'] ?? ''))
+            ->where('status', 'active')
             ->where('resort_id', $this->resort->resort_id)
             ->where('dept_id', $department->id)
             ->first();
 
         if (!$position) {
-            $errors[] = [
-                'row' => $excelRowNumber,
-                'name' => trim(($row['firstname'] ?? '') . ' ' . ($row['lastname'] ?? '')),
-                'email' => $row['email'] ?? 'N/A',
-                'department' => $row['department'] ?? 'N/A',
-                'position' => $row['position'] ?? 'N/A',
-                'error' => "Position '" . ($row['position'] ?? 'N/A') . "' does not match with the internal link."
-            ];
-            session(['import_errors' => $errors]);
+            $this->addError($excelRowNumber, $row, "Position '" . ($row['position'] ?? 'N/A') . "' does not match with the internal link.");
             return null;
-        } else {
-            $Rank = Common::GetResortPositionWiseRank($position->id, $position->Rank, $this->resort->resort_id);
         }
 
-        $section = ResortSection::where('name', $row['section'] ?? '')
+        $Rank = Common::GetResortPositionWiseRank($position->id, $position->Rank, $this->resort->resort_id);
+
+        $section = ResortSection::where('name', $this->stripCode($row['section'] ?? ''))
             ->where('status', 'active')
             ->where('resort_id', $this->resort->resort_id)
             ->first();
 
-        // Process the employee data
-        if (!empty($row['firstname']) && !empty($row['lastname']) && !empty($row['email'])) {
-            $parts = explode(' ', $this->resort->resort->resort_name);
-            $initials = $this->resort->resort->resort_prefix;
-            $existingResortAdmin = ResortAdmin::where('email', $row['email'])->first();
+        // Optional enum fields — validate the value when given, otherwise
+        // fall back to the same defaults employees.* columns already carry.
+        $employmentType = trim((string) ($row['employmenttype'] ?? ''));
+        if ($employmentType !== '' && !in_array($employmentType, self::EMPLOYMENT_TYPES, true)) {
+            $this->addError($excelRowNumber, $row, "EmploymentType '{$employmentType}' is invalid. Allowed: " . implode(', ', self::EMPLOYMENT_TYPES));
+            return null;
+        }
+        $employmentType = $employmentType !== '' ? $employmentType : 'Full-Time';
 
-            // License cap — resorts.no_of_users. Only rows that would CREATE
-            // a new employee count; re-imports updating an existing employee
-            // pass through. Checked before the ResortAdmin is created so no
-            // login record or welcome email leaks for a blocked row.
-            $hasEmployee = $existingResortAdmin
-                && Employee::where('Admin_Parent_id', $existingResortAdmin->id)->exists();
-            if (!$hasEmployee) {
-                $limitError = Common::employeeLimitError($this->resort->resort_id);
-                if ($limitError) {
-                    $errors[] = [
-                        'row' => $excelRowNumber,
-                        'name' => trim(($row['firstname'] ?? '') . ' ' . ($row['lastname'] ?? '')),
-                        'email' => $row['email'] ?? 'N/A',
-                        'department' => $row['department'] ?? 'N/A',
-                        'position' => $row['position'] ?? 'N/A',
-                        'error' => $limitError
-                    ];
-                    session(['import_errors' => $errors]);
-                    return null;
-                }
+        $maritalStatus = trim((string) ($row['maritalstatus'] ?? ''));
+        if ($maritalStatus !== '' && !in_array($maritalStatus, self::MARITAL_STATUSES, true)) {
+            $this->addError($excelRowNumber, $row, "MaritalStatus '{$maritalStatus}' is invalid. Allowed: " . implode(', ', self::MARITAL_STATUSES));
+            return null;
+        }
+        $maritalStatus = $maritalStatus !== '' ? $maritalStatus : 'Single';
+
+        $bloodGroup = trim((string) ($row['bloodgroup'] ?? ''));
+        if ($bloodGroup !== '' && !in_array($bloodGroup, self::BLOOD_GROUPS, true)) {
+            $this->addError($excelRowNumber, $row, "BloodGroup '{$bloodGroup}' is invalid. Allowed: " . implode(', ', self::BLOOD_GROUPS));
+            return null;
+        }
+        $bloodGroup = $bloodGroup !== '' ? $bloodGroup : null;
+
+        $nationality = ucfirst($row['nationality'] ?? '');
+        if ($nationality !== '' && !in_array($nationality, config('settings.nationalities') ?? [], true)) {
+            $this->addError($excelRowNumber, $row, "Nationality '{$nationality}' is not a recognized nationality.");
+            return null;
+        }
+
+        // Reporting manager is optional — resolved by email to an existing
+        // employee in this resort (self-relation employees.reporting_to).
+        $reportingToId = null;
+        $reportingEmail = trim((string) ($row['reportingmanageremail'] ?? ''));
+        if ($reportingEmail !== '') {
+            $reportingAdmin = ResortAdmin::where('email', $reportingEmail)
+                ->where('resort_id', $this->resort->resort_id)
+                ->first();
+            $reportingEmployee = $reportingAdmin
+                ? Employee::where('Admin_Parent_id', $reportingAdmin->id)->first()
+                : null;
+            if (!$reportingEmployee) {
+                $this->addError($excelRowNumber, $row, "ReportingManagerEmail '{$reportingEmail}' does not match an existing employee in this resort.");
+                return null;
             }
+            $reportingToId = $reportingEmployee->id;
+        }
 
-            $password = Common::generateUniquePassword(8);
-            $hashedPassword = Hash::make($password);
+        $dob = $this->parseDate($row['dob'] ?? null);
+        if ($dob === false) {
+            $this->addError($excelRowNumber, $row, "DOB '" . ($row['dob'] ?? '') . "' is not a valid date.");
+            return null;
+        }
 
-            $Access_position = Position::where('status', 'Active')->where('id', $position->Position_access)->first();
-            if (isset($Access_position) && in_array($Access_position->position_title, ['Director Of Human Resources', 'Human Resources Manager'])) {
-                $Access_position = $Access_position->id;
-            } else {
-                $Access_position = null; 
+        $joiningDate = $this->parseDate($row['joiningdate'] ?? null);
+        if ($joiningDate === false) {
+            $this->addError($excelRowNumber, $row, "JoiningDate '" . ($row['joiningdate'] ?? '') . "' is not a valid date.");
+            return null;
+        }
+
+        // Same probation derivation as the manual Add Employee wizard
+        // (People\Employee\EmployeeController::store()): only Probationary
+        // hires get a probation window, everyone else is Confirmed.
+        $isProbationary = ($employmentType === 'Probationary');
+        $probationEndDate = $isProbationary
+            ? Carbon::parse($joiningDate)->addMonths(3)->format('Y-m-d')
+            : null;
+        $probationStatus = $isProbationary ? 'Active' : 'Confirmed';
+
+        $gender = strtolower(trim((string) ($row['gender'] ?? '')));
+        $title = $gender === 'male' ? 'Mr.' : 'Ms.';
+
+        $presentAddress = collect([
+            $row['address1'] ?? null,
+            $row['address2'] ?? null,
+            $row['city'] ?? null,
+            $row['state'] ?? null,
+            $row['zipcode'] ?? null,
+            $row['country'] ?? null,
+        ])->filter(fn($v) => !is_null($v) && trim((string) $v) !== '')->implode(', ');
+
+        $existingResortAdmin = ResortAdmin::where('email', $row['email'])->first();
+
+        // License cap — resorts.no_of_users. Only rows that would CREATE
+        // a new employee count; re-imports updating an existing employee
+        // pass through. Checked before the ResortAdmin is created so no
+        // login record or welcome email leaks for a blocked row.
+        $hasEmployee = $existingResortAdmin
+            && Employee::where('Admin_Parent_id', $existingResortAdmin->id)->exists();
+        if (!$hasEmployee) {
+            $limitError = Common::employeeLimitError($this->resort->resort_id);
+            if ($limitError) {
+                $this->addError($excelRowNumber, $row, $limitError);
+                return null;
             }
+        }
 
-            $ResortAdmindata = [
-                'first_name' => $row['firstname'],
-                'last_name' => $row['lastname'],
-                'middle_name' => $row['middlename'] ?? null,
-                'email' => $row['email'],
-                'gender' => $row['gender'] ?? null,
-                'type' => 'sub',
-                'role_id' => 0,
-                'is_master_admin' => 0,
-                'is_employee' => 1,
-                'address_line_1' => $row['address1'] ?? null,
-                'address_line_2' => $row['address2'] ?? null,
-                'country' => $row['country'] ?? null,
-                'state' => $row['state'] ?? null,
-                'city' => $row['city'] ?? null,
-                'zip' => $row['zipcode'] ?? null,
-                'profile_picture' => 0,
-                'status' => 'Active',
-                'personal_phone' => $row['personalphoneno'] ?? null,
-                'Position_access' => $Access_position
-            ];
-               
+        $Access_position = Position::where('status', 'Active')->where('id', $position->Position_access)->first();
+        if (isset($Access_position) && in_array($Access_position->position_title, ['Director Of Human Resources', 'Human Resources Manager'])) {
+            $Access_position = $Access_position->id;
+        } else {
+            $Access_position = null;
+        }
+
+        $ResortAdmindata = [
+            'first_name' => $row['firstname'],
+            'last_name' => $row['lastname'],
+            'middle_name' => $row['middlename'] ?? null,
+            'email' => $row['email'],
+            'gender' => $gender,
+            'type' => 'sub',
+            'role_id' => 0,
+            'is_master_admin' => 0,
+            'is_employee' => 1,
+            'address_line_1' => $row['address1'] ?? null,
+            'address_line_2' => $row['address2'] ?? null,
+            'country' => $row['country'] ?? null,
+            'state' => $row['state'] ?? null,
+            'city' => $row['city'] ?? null,
+            'zip' => $row['zipcode'] ?? null,
+            'profile_picture' => 0,
+            'status' => 'Active',
+            'personal_phone' => $row['personalphoneno'] ?? null,
+            'Position_access' => $Access_position,
+        ];
+
+        $employeeData = [
+            'division_id' => $division->id,
+            'Dept_id' => $department->id,
+            'Position_id' => $position->id,
+            'Section_id' => $section->id ?? null,
+            'resort_id' => $this->resort->resort_id,
+            'nationality' => $nationality ?: null,
+            'is_employee' => 1,
+            'rank' => $position->Rank,
+            'main_rank' => $Rank,
+            'status' => 'Active',
+            'title' => $title,
+            'dob' => $dob,
+            'joining_date' => $joiningDate,
+            'employment_type' => $employmentType,
+            'marital_status' => $maritalStatus,
+            'blood_group' => $bloodGroup,
+            'religion' => $row['religion'] ?? null,
+            'passport_number' => $row['passportnumber'] ?? null,
+            'nid' => $row['nid'] ?? null,
+            'present_address' => $presentAddress,
+            'tin' => $row['tin'] ?? null,
+            'contract_type' => $row['contracttype'] ?? null,
+            'payment_mode' => $row['paymentmode'] ?? null,
+            'basic_salary' => $row['basicsalary'] ?? null,
+            'basic_salary_currency' => $row['basicsalarycurrency'] ?? 'USD',
+            'benefit_grid_level' => $row['benefitgridlevel'] ?? null,
+            'reporting_to' => $reportingToId,
+            'probation_end_date' => $probationEndDate,
+            'probation_status' => $probationStatus,
+        ];
+
+        DB::transaction(function () use ($existingResortAdmin, $ResortAdmindata, $employeeData) {
             if ($existingResortAdmin) {
                 $existingResortAdmin->update($ResortAdmindata);
-                $ResortAdmin = $existingResortAdmin;
+                $resortAdmin = $existingResortAdmin;
             } else {
                 $ResortAdmindata['resort_id'] = $this->resort->resort_id;
-                $ResortAdmindata['password'] = $hashedPassword;
-                $ResortAdmin = ResortAdmin::create($ResortAdmindata);
-                $ResortAdmin->sendResortemployee($this->resort->resort, $ResortAdmin, $password);
+                $password = Common::generateUniquePassword(8);
+                $ResortAdmindata['password'] = Hash::make($password);
+                $resortAdmin = ResortAdmin::create($ResortAdmindata);
+                $resortAdmin->sendResortemployee($this->resort->resort, $resortAdmin, $password);
             }
 
-            $employeeData = [
-                'Admin_Parent_id' => $ResortAdmin->id,
-                'name' => $row['firstname'],
-                'division_id' => $division->id,
-                'Dept_id' => $department->id,
-                'Position_id' => $position->id ?? null,
-                'Section_id' => $section->id ?? null, 
-                'resort_id' => $this->resort->resort_id,
-                'personal_phone' => $row['personalphoneno'] ?? null,
-                'nationality' => ucfirst($row['nationality'] ?? ''),
-                'is_employee' => 1,
-                'rank' => $position->Rank,
-                'main_rank' => $Rank,
-                'status' => 'Active',
-            ];
-            
-            $Employee = Employee::where('Admin_Parent_id', $ResortAdmin->id)->first();
-            if ($Employee) {
-                $Employee->update($employeeData);
+            $employeeData['Admin_Parent_id'] = $resortAdmin->id;
+
+            $employee = Employee::where('Admin_Parent_id', $resortAdmin->id)->first();
+            if ($employee) {
+                $employee->update($employeeData);
+                $this->updated++;
             } else {
-                $employeeData['Emp_id'] = $initials . '-' . Common::GetLastEmpId($this->resort->resort_id);
-                $Employee = Employee::create($employeeData);
-                $folderName = Common::CreateFirstTimeEmployeeFolders($this->resort->resort_id, $this->resort->resort->resort_id, $Employee->Emp_id);
+                $employeeData['Emp_id'] = Common::nextEmployeeId($this->resort->resort_id);
+                $employee = Employee::create($employeeData);
+                Common::CreateFirstTimeEmployeeFolders($this->resort->resort_id, $this->resort->resort->resort_id, $employee->Emp_id);
+                $this->created++;
             }
-            
-            DB::commit();
-        }
-        
+        });
+
         return null;
+    }
+
+    private function stripCode($value): string
+    {
+        return trim(preg_replace('/\s*\(.*?\)/', '', (string) $value));
+    }
+
+    /**
+     * Accepts an Excel date serial number, a d/m/Y string, or anything else
+     * Carbon can parse. Returns a Y-m-d string, null when blank, or false
+     * when the value is present but unparseable (caller reports the error).
+     */
+    private function parseDate($value)
+    {
+        if (is_null($value) || trim((string) $value) === '') {
+            return null;
+        }
+
+        if (is_numeric($value)) {
+            try {
+                return \PhpOffice\PhpSpreadsheet\Shared\Date::excelToDateTimeObject($value)->format('Y-m-d');
+            } catch (\Exception $e) {
+                return false;
+            }
+        }
+
+        $value = trim((string) $value);
+        try {
+            return Carbon::createFromFormat('d/m/Y', $value)->format('Y-m-d');
+        } catch (\Exception $e) {
+            try {
+                return Carbon::parse($value)->format('Y-m-d');
+            } catch (\Exception $e2) {
+                return false;
+            }
+        }
+    }
+
+    private function addError(int $excelRowNumber, array $row, string $error): void
+    {
+        $this->errors[] = [
+            'row' => $excelRowNumber,
+            'name' => trim(($row['firstname'] ?? '') . ' ' . ($row['lastname'] ?? '')) ?: 'N/A',
+            'email' => $row['email'] ?? 'N/A',
+            'department' => $row['department'] ?? 'N/A',
+            'position' => $row['position'] ?? 'N/A',
+            'error' => $error,
+        ];
+        session(['import_errors' => $this->errors]);
     }
 
     /**
@@ -232,18 +363,21 @@ class EmployeeImport implements ToModel, WithHeadingRow
         $errors = [];
         $requiredFields = [
             'division' => 'Division',
-            'department' => 'Department', 
+            'department' => 'Department',
             'position' => 'Position',
             'firstname' => 'First Name',
             'lastname' => 'Last Name',
-            'email' => 'Email'
+            'email' => 'Email',
+            'dob' => 'DOB',
+            'joiningdate' => 'JoiningDate',
+            'gender' => 'Gender',
         ];
 
         $missingFields = [];
-        
+
         foreach ($requiredFields as $field => $fieldName) {
             $value = $row[$field] ?? null;
-            if (is_null($value) || trim((string)$value) === '') {
+            if (is_null($value) || trim((string) $value) === '') {
                 $missingFields[] = $fieldName;
             }
         }
@@ -255,7 +389,7 @@ class EmployeeImport implements ToModel, WithHeadingRow
                 'email' => $row['email'] ?? 'N/A',
                 'department' => $row['department'] ?? 'N/A',
                 'position' => $row['position'] ?? 'N/A',
-                'error' => 'Missing required fields: ' . implode(', ', $missingFields)
+                'error' => 'Missing required fields: ' . implode(', ', $missingFields),
             ];
         }
 
@@ -267,7 +401,7 @@ class EmployeeImport implements ToModel, WithHeadingRow
                 'email' => $row['email'],
                 'department' => $row['department'] ?? 'N/A',
                 'position' => $row['position'] ?? 'N/A',
-                'error' => 'Invalid email format: ' . $row['email']
+                'error' => 'Invalid email format: ' . $row['email'],
             ];
         }
 
@@ -280,14 +414,14 @@ class EmployeeImport implements ToModel, WithHeadingRow
     private function isRowEmpty(array $row): bool
     {
         $requiredFields = ['division', 'department', 'position', 'firstname', 'lastname', 'email'];
-        
+
         foreach ($requiredFields as $field) {
             $value = $row[$field] ?? null;
-            if (!is_null($value) && trim((string)$value) !== '') {
+            if (!is_null($value) && trim((string) $value) !== '') {
                 return false; // Row has data
             }
         }
-        
+
         return true; // Row is empty
     }
 }

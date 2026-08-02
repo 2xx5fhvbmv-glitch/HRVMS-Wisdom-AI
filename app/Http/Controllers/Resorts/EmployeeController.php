@@ -197,7 +197,8 @@ class EmployeeController extends Controller
 
         try {
             // Import using full path
-            Excel::import(new EmployeeImport(), $fullPath);
+            $import = new EmployeeImport();
+            Excel::import($import, $fullPath);
 
             $importErrors = session('import_errors');
 
@@ -211,7 +212,7 @@ class EmployeeController extends Controller
 
             return response()->json([
                 'success' => true,
-                'msg' => "Employee Stored successfully"
+                'msg' => "{$import->created} employee(s) created, {$import->updated} updated."
             ]);
         } catch (\Exception $e) {
             return response()->json([

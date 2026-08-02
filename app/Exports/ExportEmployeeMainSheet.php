@@ -35,6 +35,13 @@ class ExportEmployeeMainSheet implements FromArray, WithHeadings, WithTitle, Wit
             'FirstName', 'MiddleName', 'LastName',
             'Email', 'Gender', 'PersonalPhoneNo', 'Address1', 'Address2',
             'Country', 'State', 'City', 'Zipcode', 'Nationality',
+            // Appended after Nationality — the AfterSheet loop below hardcodes
+            // A/B/C/D (division/department/section/position), I (gender), and
+            // Q (nationality) as absolute column letters that must match these
+            // heading positions, so new columns must not be inserted earlier.
+            'DOB', 'JoiningDate', 'EmploymentType', 'MaritalStatus', 'BloodGroup',
+            'Religion', 'PassportNumber', 'NID', 'TIN', 'ContractType', 'PaymentMode',
+            'BasicSalary', 'BasicSalaryCurrency', 'BenefitGridLevel', 'ReportingManagerEmail',
         ];
     }
 
@@ -54,46 +61,57 @@ class ExportEmployeeMainSheet implements FromArray, WithHeadings, WithTitle, Wit
                 $dataRows = 250;
                 $startRow = 2;
 
+                // Hidden helper columns are placed right after the LAST visible
+                // heading (count($this->headings()) + 1..+4), computed instead
+                // of hardcoded — so appending new visible columns above never
+                // collides with them again.
+                $headingCount = count($this->headings());
+                $colDivId = Coordinate::stringFromColumnIndex($headingCount + 1);   // was 'T'
+                $colDeptId = Coordinate::stringFromColumnIndex($headingCount + 2);  // was 'U'
+                $colDivName = Coordinate::stringFromColumnIndex($headingCount + 3); // was 'V'
+                $colDeptName = Coordinate::stringFromColumnIndex($headingCount + 4);// was 'W'
+                $lastHelperCol = $colDeptName;
+
                 // Add helper columns (hidden) for lookups
-                $sheet->setCellValue('T1', 'DivisionID');
-                $sheet->setCellValue('U1', 'DepartmentID');
-                $sheet->setCellValue('V1', 'DivisionName');
-                $sheet->setCellValue('W1', 'DepartmentName');
-                $sheet->getColumnDimension('T')->setVisible(false);
-                $sheet->getColumnDimension('U')->setVisible(false);
-                $sheet->getColumnDimension('V')->setVisible(false);
-                $sheet->getColumnDimension('W')->setVisible(false);
+                $sheet->setCellValue("{$colDivId}1", 'DivisionID');
+                $sheet->setCellValue("{$colDeptId}1", 'DepartmentID');
+                $sheet->setCellValue("{$colDivName}1", 'DivisionName');
+                $sheet->setCellValue("{$colDeptName}1", 'DepartmentName');
+                $sheet->getColumnDimension($colDivId)->setVisible(false);
+                $sheet->getColumnDimension($colDeptId)->setVisible(false);
+                $sheet->getColumnDimension($colDivName)->setVisible(false);
+                $sheet->getColumnDimension($colDeptName)->setVisible(false);
 
                 for ($row = $startRow; $row <= $dataRows + $startRow - 1; $row++) {
                     // A: Division dropdown (shows name and code)
                     $this->setDropdown($sheet, "A{$row}", "=Divisions");
 
-                    // V: Extract Division Name from display (helper column)
+                    // Extract Division Name from display (helper column)
                     $divNameFormula = "=IF(A{$row}=\"\",\"\",A{$row})";
-                    $sheet->setCellValue("V{$row}", $divNameFormula);
+                    $sheet->setCellValue("{$colDivName}{$row}", $divNameFormula);
 
-                    // T: Division ID lookup (hidden column)
-                    $divLookup = "=IF(V{$row}=\"\",\"\",VLOOKUP(V{$row},DivisionMap_Name:DivisionMap_ID,2,FALSE))";
-                    $sheet->setCellValue("T{$row}", $divLookup);
+                    // Division ID lookup (hidden column)
+                    $divLookup = "=IF({$colDivName}{$row}=\"\",\"\",VLOOKUP({$colDivName}{$row},DivisionMap_Name:DivisionMap_ID,2,FALSE))";
+                    $sheet->setCellValue("{$colDivId}{$row}", $divLookup);
 
                     // B: Department dropdown based on Division ID (shows name and code)
-                    $deptFormula = "=IF(T{$row}=\"\",\"\",INDIRECT(T{$row}&\"_depts\"))";
+                    $deptFormula = "=IF({$colDivId}{$row}=\"\",\"\",INDIRECT({$colDivId}{$row}&\"_depts\"))";
                     $this->setDropdown($sheet, "B{$row}", $deptFormula);
 
-                    // W: Extract Department Name from display (helper column)
+                    // Extract Department Name from display (helper column)
                     $deptNameFormula = "=IF(B{$row}=\"\",\"\",B{$row})";
-                    $sheet->setCellValue("W{$row}", $deptNameFormula);
+                    $sheet->setCellValue("{$colDeptName}{$row}", $deptNameFormula);
 
-                    // U: Department ID lookup (hidden column)
-                    $deptLookup = "=IF(W{$row}=\"\",\"\",VLOOKUP(W{$row},DepartmentMap_Name:DepartmentMap_ID,2,FALSE))";
-                    $sheet->setCellValue("U{$row}", $deptLookup);
+                    // Department ID lookup (hidden column)
+                    $deptLookup = "=IF({$colDeptName}{$row}=\"\",\"\",VLOOKUP({$colDeptName}{$row},DepartmentMap_Name:DepartmentMap_ID,2,FALSE))";
+                    $sheet->setCellValue("{$colDeptId}{$row}", $deptLookup);
 
                     // C: Section dropdown based on Department ID (shows name and code)
-                    $sectionFormula = "=IF(U{$row}=\"\",\"\",IF(ISERROR(INDIRECT(U{$row}&\"_sections\")),\"\",INDIRECT(U{$row}&\"_sections\")))";
+                    $sectionFormula = "=IF({$colDeptId}{$row}=\"\",\"\",IF(ISERROR(INDIRECT({$colDeptId}{$row}&\"_sections\")),\"\",INDIRECT({$colDeptId}{$row}&\"_sections\")))";
                     $this->setDropdown($sheet, "C{$row}", $sectionFormula);
 
                     // D: Position dropdown based on Department ID (shows name and code)
-                    $positionFormula = "=IF(U{$row}=\"\",\"\",IF(ISERROR(INDIRECT(U{$row}&\"_positions\")),\"\",INDIRECT(U{$row}&\"_positions\")))";
+                    $positionFormula = "=IF({$colDeptId}{$row}=\"\",\"\",IF(ISERROR(INDIRECT({$colDeptId}{$row}&\"_positions\")),\"\",INDIRECT({$colDeptId}{$row}&\"_positions\")))";
                     $this->setDropdown($sheet, "D{$row}", $positionFormula);
 
                     // I: Gender dropdown
@@ -101,6 +119,15 @@ class ExportEmployeeMainSheet implements FromArray, WithHeadings, WithTitle, Wit
 
                     // Q: Nationality dropdown
                     $this->setDropdown($sheet, "Q{$row}", "=Nationalities");
+
+                    // T: EmploymentType dropdown
+                    $this->setDropdown($sheet, "T{$row}", "=EmploymentTypes");
+
+                    // U: MaritalStatus dropdown
+                    $this->setDropdown($sheet, "U{$row}", "=MaritalStatuses");
+
+                    // V: BloodGroup dropdown
+                    $this->setDropdown($sheet, "V{$row}", "=BloodGroups");
                 }
 
                 // Set fixed width for Division, Department, Position, Section columns to accommodate codes
@@ -109,9 +136,12 @@ class ExportEmployeeMainSheet implements FromArray, WithHeadings, WithTitle, Wit
                 $sheet->getColumnDimension('C')->setWidth(25); // Section (name + code)
                 $sheet->getColumnDimension('D')->setWidth(25); // Position (name + code)
 
-                // Auto-size remaining visible columns (excluding the fixed-width columns)
-                foreach (range('E', 'S') as $columnID) {
-                    $sheet->getColumnDimension($columnID)->setAutoSize(true);
+                // Auto-size remaining visible columns (excluding the fixed-width columns).
+                // NOTE: PHP's range() only handles single-character alpha bounds —
+                // with 30+ columns the last one is 2 letters (e.g. "AF"), so walk
+                // column INDEXES and convert each back to a letter instead.
+                for ($i = Coordinate::columnIndexFromString('E'); $i <= $headingCount; $i++) {
+                    $sheet->getColumnDimension(Coordinate::stringFromColumnIndex($i))->setAutoSize(true);
                 }
 
                 // Protect the sheet but allow selecting unlocked cells
@@ -119,10 +149,12 @@ class ExportEmployeeMainSheet implements FromArray, WithHeadings, WithTitle, Wit
                 $sheet->getProtection()->setSort(false);
                 $sheet->getProtection()->setInsertRows(false);
                 $sheet->getProtection()->setDeleteRows(false);
-                
+
                 // Unlock data entry cells (including hidden helper columns)
+                $lastHelperColIndex = Coordinate::columnIndexFromString($lastHelperCol);
                 for ($row = $startRow; $row <= $dataRows + $startRow - 1; $row++) {
-                    foreach (range('A', 'W') as $col) {
+                    for ($i = Coordinate::columnIndexFromString('A'); $i <= $lastHelperColIndex; $i++) {
+                        $col = Coordinate::stringFromColumnIndex($i);
                         $sheet->getStyle("{$col}{$row}")->getProtection()->setLocked(false);
                     }
                 }
