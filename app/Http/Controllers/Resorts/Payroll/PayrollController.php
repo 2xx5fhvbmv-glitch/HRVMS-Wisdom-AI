@@ -214,7 +214,6 @@ class PayrollController extends Controller
         // resort and leak its employees into the payroll list.
         $resort_id = $this->resort->resort_id;
         $isChecked = $request->isChecked;
-        // Only show employees who have attendance data in the payroll period
         $startDate = $request->startDate;
         $endDate = $request->endDate;
 
@@ -224,11 +223,15 @@ class PayrollController extends Controller
             ->whereIn('status', ['Active', 'Probationary','Resigned'])
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds));
 
-        if ($startDate && $endDate) {
-            $query->whereHas('EmployeeAttandance', function($q) use ($startDate, $endDate) {
-                $q->whereBetween('date', [$startDate, $endDate]);
-            });
-        }
+        // Was requiring a whereHas('EmployeeAttandance', whereBetween date)
+        // match — meant to only show employees with attendance data in the
+        // period, but attendance rows are sparse/inconsistently logged
+        // across the workforce (most employees have zero rows for any given
+        // period), so this intersection filter silently excluded almost the
+        // entire eligible headcount instead of just flagging the gap —
+        // "always the same ~4 employees" regardless of real headcount.
+        // Payroll eligibility is status-based (Active/Probationary/Resigned
+        // above), not attendance-based — dropped the filter entirely.
 
         if ($request->searchTerm) {
             $query->where(function ($q) use ($request) {
