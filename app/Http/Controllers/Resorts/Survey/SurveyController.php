@@ -294,10 +294,53 @@ class SurveyController extends Controller
                 }
             }
 
+            // This is also how a drafted survey gets published (Status flips
+            // Draft -> Publish here) — previously this loop never notified
+            // anyone at all, so participants had no way to learn about a
+            // survey that had just gone live via an edit rather than the
+            // initial create flow.
+            $notifyParticipants = $request->Status === 'Publish';
+            $notificationTitle = ' Survey Request';
+            $notificationMessage = "Survey  request for **'{$survey->Surevey_title}'** has been submitted for feedback.
+                                    **Dates:** {$startDate} to {$endDate}
+                                    **Please  participants.";
             foreach ($Emp_id as $e) {
                 $employeeId = (int) base64_decode($e);
                 if ($employeeId <= 0) continue;
                 SurveyEmployee::create(["Emp_id" => $employeeId, "Parent_survey_id" => (int) $survey->id]);
+
+                if ($notifyParticipants) {
+                    try {
+                        event(new ResortNotificationEvent(Common::nofitication(
+                            $this->resort->resort_id,
+                            10,
+                            $notificationTitle,
+                            $notificationMessage,
+                            0,
+                            $employeeId,
+                            'Survey'
+                        )));
+                    } catch (\Exception $notificationException) {
+                        \Log::warning('Survey notification failed for employee ' . $employeeId . ': ' . $notificationException->getMessage());
+                    }
+                    try {
+                        Common::sendMobileNotification(
+                            $this->resort->resort_id,
+                            2,
+                            null,
+                            null,
+                            trim($notificationTitle),
+                            $notificationMessage,
+                            'Survey',
+                            [$employeeId],
+                            $survey->id,
+                            true,
+                            'survey-assigned',
+                        );
+                    } catch (\Exception $pushException) {
+                        \Log::warning('Survey mobile push failed for employee ' . $employeeId . ': ' . $pushException->getMessage());
+                    }
+                }
             }
 
             DB::commit();
@@ -470,6 +513,30 @@ class SurveyController extends Controller
                         )));
                     } catch (\Exception $notificationException) {
                         \Log::warning('Survey notification failed for employee ' . $employeeId . ': ' . $notificationException->getMessage());
+                    }
+
+                    // nofitication(type=10) above only pushes over the
+                    // websocket/real-time service (NOTIFICATION_URL) — it
+                    // never reaches the mobile app via FCM, so employees got
+                    // no push when assigned a new survey. skipDbInsert=true
+                    // reuses the ResortNotification row nofitication() just
+                    // created instead of inserting a duplicate.
+                    try {
+                        Common::sendMobileNotification(
+                            $this->resort->resort_id,
+                            2,
+                            null,
+                            null,
+                            trim($notificationTitle),
+                            $notificationMessage,
+                            'Survey',
+                            [$employeeId],
+                            $survey->id,
+                            true,
+                            'survey-assigned',
+                        );
+                    } catch (\Exception $pushException) {
+                        \Log::warning('Survey mobile push failed for employee ' . $employeeId . ': ' . $pushException->getMessage());
                     }
                 }
             DB::commit();

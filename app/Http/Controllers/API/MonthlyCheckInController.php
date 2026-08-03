@@ -355,36 +355,38 @@ class MonthlyCheckInController extends Controller
             $baseQuery                                      =   MonthlyCheckingModel::join('employees as t1', 't1.id', '=', 'monthly_checking_models.emp_id')
                                                                     ->join('resort_admins as t2', 't2.id', '=', 't1.Admin_Parent_id')
                                                                     ->join("resort_positions as rp", "rp.id", "=", "t1.Position_id")
-                                                                    ->leftjoin("training_schedules as t5", "t5.training_id", "=", "monthly_checking_models.tranining_id")
                                                                     ->where('monthly_checking_models.emp_id',$employee_id)
                                                                     ->select([
                                                                         'monthly_checking_models.id',
-                                                                        'monthly_checking_models.start_time', 
+                                                                        'monthly_checking_models.start_time',
                                                                         'monthly_checking_models.end_time',
                                                                         'monthly_checking_models.date_discussion',
                                                                         'monthly_checking_models.Meeting_Place',
                                                                         'monthly_checking_models.created_by',
                                                                         'monthly_checking_models.status',
-                                                                        't2.first_name', 
+                                                                        't2.first_name',
                                                                         't2.last_name',
-                                                                        'rp.position_title',
-                                                                        't5.created_by as manager_id' 
+                                                                        'rp.position_title'
                                                                     ]);
             $pendingAcknowledgements                        =   (clone $baseQuery)
                                                                     ->whereIn('monthly_checking_models.status',['Pending','Rescheduled'])
                                                                     ->get()->map(function($item){
-                                                                        $createdByName          =   Employee::join('resort_admins as t2', 't2.id', '=', 'employees.Admin_Parent_id')
-                                                                                                    ->where('t2.id',$item->created_by)->first();
-                                                                    
-                                                                        $item->meeting_with     =   $createdByName->first_name.' '.$createdByName->last_name;
-
-                                                                        $managerCreatedByName   =   Employee::join('resort_admins as ra', 'ra.id', '=', 'employees.Admin_Parent_id')
+                                                                        // The manager IS whoever conducted/created this check-in
+                                                                        // (monthly_checking_models.created_by) — same person
+                                                                        // "meeting_with" resolves below. This used to look up
+                                                                        // manager_id via an unrelated training_schedules join,
+                                                                        // which was null whenever the check-in had no linked
+                                                                        // training, leaving manager_name/position empty.
+                                                                        $managerRecord          =   Employee::join('resort_admins as ra', 'ra.id', '=', 'employees.Admin_Parent_id')
                                                                                                     ->join("resort_positions as rp", "rp.id", "=", "employees.Position_id")
-                                                                                                    ->where('ra.id',$item->manager_id)
+                                                                                                    ->where('ra.id',$item->created_by)
+                                                                                                    ->select('ra.first_name', 'ra.last_name', 'rp.position_title')
                                                                                                     ->first();
-                                                                        $item->manager_name     =   $managerCreatedByName ? $managerCreatedByName->first_name . ' ' . $managerCreatedByName->last_name : '';
-                                                                        $item->position         =   $managerCreatedByName ? $managerCreatedByName->position_title : '';
-                                                                        $item->manager_profile  =   Common::getResortUserPicture($item->manager_id);
+                                                                        $item->meeting_with     =   $managerRecord ? $managerRecord->first_name . ' ' . $managerRecord->last_name : '';
+                                                                        $item->manager_id       =   $item->created_by;
+                                                                        $item->manager_name     =   $managerRecord ? $managerRecord->first_name . ' ' . $managerRecord->last_name : '';
+                                                                        $item->position         =   $managerRecord ? $managerRecord->position_title : '';
+                                                                        $item->manager_profile  =   Common::getResortUserPicture($item->created_by);
                                                                         return $item;
                                                                     });
 

@@ -3492,6 +3492,93 @@ class Common
         });
     }
 
+    /**
+     * A day covered by an APPROVED leave with no punch was falling through
+     * every path: the main register query inner-joins parent_attendaces (no
+     * punch row = not in the result), and getAbsentRegisterEntries() above
+     * explicitly excludes leave-covered dates (it only backfills genuine
+     * absences) — so a leave date range with no punch simply vanished from
+     * the register instead of showing a leave marker.
+     */
+    private static function getLeaveRegisterEntries($resortId, $empId, $startDate, $endDate)
+    {
+        $rows = DB::select("
+            SELECT el.from_date, el.to_date, lc.leave_type, lc.color
+            FROM employees_leaves el
+            JOIN leave_categories lc ON lc.id = el.leave_category_id
+            WHERE el.Emp_id = ?
+            AND el.resort_id = ?
+            AND el.status = 'Approved'
+            AND el.from_date <= ?
+            AND el.to_date >= ?
+        ", [$empId, $resortId, $endDate, $startDate]);
+
+        $entries = collect();
+        foreach ($rows as $row) {
+            $rangeStart = max($row->from_date, $startDate);
+            $rangeEnd = min($row->to_date, $endDate);
+            $existingPunchDates = DB::table('parent_attendaces')
+                ->where('Emp_id', $empId)
+                ->where('resort_id', $resortId)
+                ->whereBetween('date', [$rangeStart, $rangeEnd])
+                ->pluck('date')
+                ->map(fn($d) => \Carbon\Carbon::parse($d)->format('Y-m-d'))
+                ->all();
+
+            $cursor = \Carbon\Carbon::parse($rangeStart);
+            $end = \Carbon\Carbon::parse($rangeEnd);
+            while ($cursor->lte($end)) {
+                $dateStr = $cursor->format('Y-m-d');
+                if (!in_array($dateStr, $existingPunchDates, true)) {
+                    $entries->push((object) [
+                        'date' => $dateStr,
+                        'Status' => 'On Leave',
+                        'Emp_id' => $empId,
+                        'Shift_id' => null,
+                        'ShiftName' => null,
+                        'StartTime' => null,
+                        'EndTime' => null,
+                        'StartTimeShow' => null,
+                        'EndTimeShow' => null,
+                        'CheckingTime' => null,
+                        'CheckingOutTime' => null,
+                        'CheckInTime' => null,
+                        'CheckOutTime' => null,
+                        'OverTime' => null,
+                        'DayWiseTotalHours' => null,
+                        'note' => null,
+                        'DayOfDate' => null,
+                        'InternalStatus' => null,
+                        'InTime_Location' => null,
+                        'OutTime_Location' => null,
+                        'InTime_Latitude' => null,
+                        'InTime_Longitude' => null,
+                        'InTime_Accuracy' => null,
+                        'OutTime_Latitude' => null,
+                        'OutTime_Longitude' => null,
+                        'OutTime_Accuracy' => null,
+                        'InTime_GeofenceName' => null,
+                        'OutTime_GeofenceName' => null,
+                        'Attd_id' => null,
+                        'OTStatus' => null,
+                        'OTstatus' => null,
+                        'OTApproved_By' => null,
+                        'ApprovedName' => '',
+                        'differenceInHours' => null,
+                        'msg' => null,
+                        'LeaveData' => [],
+                        'LeaveFirstName' => substr($row->leave_type ?? 'On Leave', 0, 1),
+                        'LeaveColor' => $row->color ?? '',
+                        'LeaveType' => $row->leave_type ?? 'On Leave',
+                    ]);
+                }
+                $cursor->addDay();
+            }
+        }
+
+        return $entries;
+    }
+
     public static function GetAttandanceRegister($resort_id,$duty_roster_id,$Employee,$WeekstartDate, $WeekendDate,$startOfMonth,$endOfMonth,$flag)
     {
         // Cache key to avoid duplicate queries for same employee/flag
@@ -3630,7 +3717,8 @@ class Common
             });
 
             $absentEntries = self::getAbsentRegisterEntries($resort_id, $Employee, $WeekstartDate, $WeekendDate);
-            $DutyRoster = $DutyRoster->concat($absentEntries)->sortBy('date')->values();
+            $leaveEntries = self::getLeaveRegisterEntries($resort_id, $Employee, $WeekstartDate, $WeekendDate);
+            $DutyRoster = $DutyRoster->concat($absentEntries)->concat($leaveEntries)->sortBy('date')->values();
         }
 
         if($flag =="Monthwise")
@@ -3783,7 +3871,8 @@ class Common
                     });
 
             $absentEntries = self::getAbsentRegisterEntries($resort_id, $Employee, $startOfMonth->format('Y-m-d'), $endOfMonth->format('Y-m-d'));
-            $DutyRoster = $DutyRoster->concat($absentEntries)->sortBy('date')->values();
+            $leaveEntries = self::getLeaveRegisterEntries($resort_id, $Employee, $startOfMonth->format('Y-m-d'), $endOfMonth->format('Y-m-d'));
+            $DutyRoster = $DutyRoster->concat($absentEntries)->concat($leaveEntries)->sortBy('date')->values();
         }
         self::$attendanceCache[$cacheKey] = $DutyRoster;
         return $DutyRoster;
@@ -7304,6 +7393,11 @@ class Common
                     [
                         'Folder_unique_id' => substr(md5(uniqid($SubFolder, true)), 0, 10),
                         'Folder_Type'      => 'categorized',
+                        // Flags this as a backend attachment folder (Maintenance
+                        // Request, Grievance, Request, Housekeeping, etc.), not
+                        // one the employee created themselves — My Drive hides
+                        // these so employees only see their own folders/files.
+                        'is_system_generated' => true,
                     ]
                 );
                 if ($parentPath->wasRecentlyCreated) {
@@ -7468,7 +7562,11 @@ class Common
      */
     public static function resolveMaintenanceAttachmentUrl($value, $resortId)
     {
-        if (empty($value)) {
+        // json_encode(null) produces the literal string "null" (not a real SQL
+        // NULL) — existing rows written before this was fixed at the source
+        // still have that value stored; empty() doesn't catch a non-empty
+        // 4-character string, so it must be checked explicitly.
+        if (empty($value) || $value === 'null') {
             return null;
         }
 

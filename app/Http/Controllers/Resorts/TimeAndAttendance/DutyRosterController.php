@@ -603,6 +603,26 @@ class DutyRosterController extends Controller
                             ]);
                         }
                     }
+
+                    // Employees previously got no in-app or push notification
+                    // at all when a new duty roster/shift was created for them.
+                    try {
+                        Common::sendMobileNotification(
+                            $resort_id,
+                            2,
+                            null,
+                            null,
+                            'New Duty Roster Assigned',
+                            'A new duty roster has been assigned to you starting ' . Carbon::parse($hiddenInput)->format('d M Y') . '.',
+                            'DutyRoster',
+                            [$Employee],
+                            $DutyRoster->id,
+                            false,
+                            'duty-roster-created',
+                        );
+                    } catch (\Exception $notificationException) {
+                        \Log::warning('Duty roster notification failed for employee ' . $Employee . ': ' . $notificationException->getMessage());
+                    }
                 }
             }
 

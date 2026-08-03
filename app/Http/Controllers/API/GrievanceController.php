@@ -184,9 +184,16 @@ class GrievanceController extends Controller
             ]);
 
             $imagePaths = [];
-            if ($request->hasFile('Attachments')) {
+            // Mobile actually posts the files as "attachments" (lowercase) —
+            // hasFile()/file() are case-sensitive, so checking only
+            // 'Attachments' silently skipped this entire block for every
+            // real mobile submission (grievance-store still returned success
+            // with nothing to error on), which is why an uploaded file never
+            // came back in the detail GET despite the store call succeeding.
+            $attachmentFiles = $request->file('Attachments') ?? $request->file('attachments');
+            if ($attachmentFiles) {
 
-                foreach ($request->file('Attachments') as $file) {
+                foreach ($attachmentFiles as $file) {
 
                     $SubFolder      =   "GrivanceAttachments";
                     $status         =   Common::AWSEmployeeFileUpload($this->resort_id,$file, $this->user->GetEmployee->Emp_id,$SubFolder,true);

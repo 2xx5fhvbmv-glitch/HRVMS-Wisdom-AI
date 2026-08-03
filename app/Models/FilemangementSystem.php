@@ -19,7 +19,8 @@ class FilemangementSystem extends Model
         'Folder_unique_id',
         'UnderON',
         'Folder_Name',
-        'Folder_Type',	
+        'Folder_Type',
+        'is_system_generated',
         'created_by',
         'modified_by',
     ];

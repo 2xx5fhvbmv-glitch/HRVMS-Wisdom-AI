@@ -170,7 +170,7 @@ class SurveyController extends Controller
             }
 
             $parent->EmployeeName                       =   ucfirst($parent->first_name . ' ' .  $parent->last_name);
-            $parent->profileImg                         =   Common::getResortUserPicture($parent->Parentid);
+            $parent->profileImg                         =   Common::getResortUserPicture($parent->ParentId);
             // Privacy hints for the mobile client so it can render the right
             // banner before the participant starts answering.
             $parent->privacy_type                       =   $parent->survey_privacy_type ?? 'Neutral';
@@ -193,6 +193,15 @@ class SurveyController extends Controller
                     'sq.Question_Complusory',
                     'se.id as sur_emp_id'
                 )
+                // Previously nothing here reflected whether THIS employee had
+                // actually answered a question — sur_emp_id is just the
+                // assignment row id, identical before and after answering,
+                // which made "Questions Answered" read as fully answered
+                // (e.g. "1 of 1") the moment the survey was opened. A
+                // correlated subquery (not a join) avoids row fan-out if a
+                // question was ever answered more than once, and also lets
+                // the client resume/prefill a previously saved answer.
+                ->selectRaw('(SELECT sr.Emp_Ans FROM survey_results sr WHERE sr.Question_id = sq.id AND sr.Survey_emp_ta_id = se.id ORDER BY sr.id DESC LIMIT 1) as previous_answer')
                 ->get()
                 ->filter(function ($q) {
                     return $q->survey_que_id !== null; // exclude nulls from leftJoin when no questions
@@ -201,13 +210,16 @@ class SurveyController extends Controller
                     $question->survey_que_id = (int) $question->survey_que_id;
                     $question->sur_emp_id = (int) $question->sur_emp_id;
                     $question->Total_Option_Json = $question->Total_Option_Json ? json_decode($question->Total_Option_Json) : null;
+                    $question->is_answered = $question->previous_answer !== null;
                     return $question;
                 })
                 ->values();
             $totalQuestionCount = $surveyQuestionAnsData->count();
+            $answeredQuestionCount = $surveyQuestionAnsData->where('is_answered', true)->count();
             $surveyData = [
                 'parent_data' => $parent,
                 'total_question_count' => (int) $totalQuestionCount,
+                'answered_question_count' => (int) $answeredQuestionCount,
                 'survey_question_data' => $surveyQuestionAnsData,
             ];
             return response()->json(['success' => true, 'message' => 'Surveys Employee Dashboard', 'survey_data' => $surveyData], 200);
@@ -262,18 +274,25 @@ class SurveyController extends Controller
         DB::beginTransaction();
         try {
 
-            $surveyResults = [];
+            // Was a plain bulk insert — resubmitting the same question (e.g.
+            // resuming a survey after leaving mid-way) created a second
+            // duplicate row instead of updating the first, and there was no
+            // way to prefill a previously saved answer on reopen. Upserting
+            // per question fixes both: same question answered twice just
+            // updates in place, and employeeSurveyQuestions() can now read
+            // it back to resume where the employee left off.
             foreach ($request->parent_survey_id as $index => $parentSurveyId) {
-                $surveyResults[] = [
-                    'Parent_survey_id' => (int) $parentSurveyId,
-                    'Survey_emp_ta_id' => (int) $request->survey_emp_ta_id[$index],
-                    'Question_id' => (int) $request->question_id[$index],
-                    'Emp_Ans' => $request->emp_ans[$index],
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ];
+                SurveyResult::updateOrCreate(
+                    [
+                        'Parent_survey_id' => (int) $parentSurveyId,
+                        'Survey_emp_ta_id' => (int) $request->survey_emp_ta_id[$index],
+                        'Question_id' => (int) $request->question_id[$index],
+                    ],
+                    [
+                        'Emp_Ans' => $request->emp_ans[$index],
+                    ]
+                );
             }
-            SurveyResult::insert($surveyResults);
 
             $survEmp = SurveyResult::where('Parent_survey_id', $request->parent_survey_id[0])
                 ->where('Survey_emp_ta_id', $request->survey_emp_ta_id[0])
@@ -344,6 +363,86 @@ class SurveyController extends Controller
           
         } catch (\Exception $e) {
             DB::rollBack();
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    /**
+     * Completed surveys previously couldn't be reopened at all — only a
+     * duration value was shown, with no way to see the questions, the
+     * employee's own submitted answers, or when it was completed. Modeled
+     * on the admin-side GetSurveyResults() per-question join pattern
+     * (Resorts/Survey/SurveyController.php), scoped to this employee only.
+     */
+    public function employeeSurveyResponses($surveyId)
+    {
+        if (!$this->user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        try {
+            $employee = $this->user->getEmployee ?? $this->user->GetEmployee ?? null;
+            if (!$employee || !isset($employee->id)) {
+                $employee = Employee::where('Admin_Parent_id', $this->user->id)->first();
+            }
+            if (!$employee || !isset($employee->id)) {
+                return response()->json(['success' => false, 'message' => 'Employee not found'], 200);
+            }
+            $employee_id = (int) $employee->id;
+            $id = (int) base64_decode($surveyId);
+            if ($id <= 0) {
+                return response()->json(['success' => false, 'message' => 'Invalid survey'], 200);
+            }
+
+            $surveyEmployee = SurveyEmployee::where('Parent_survey_id', $id)
+                ->where('Emp_id', $employee_id)
+                ->first();
+            if (!$surveyEmployee) {
+                return response()->json(['success' => false, 'message' => 'Survey not found or you are not a participant'], 200);
+            }
+            if ($surveyEmployee->emp_status !== 'yes') {
+                return response()->json(['success' => false, 'message' => 'This survey has not been completed yet'], 200);
+            }
+
+            $parent = ParentSurvey::where('id', $id)
+                ->where('resort_id', $this->resort_id)
+                ->first(['Surevey_title', 'Start_date', 'End_date']);
+            if (!$parent) {
+                return response()->json(['success' => false, 'message' => 'Survey not found'], 200);
+            }
+
+            $questions = SurveyQuestion::where('Parent_survey_id', $id)->orderBy('id')->get(['id', 'Question_Text', 'Question_Type']);
+
+            $responses = $questions->map(function ($q) use ($id, $surveyEmployee) {
+                $result = SurveyResult::where('Parent_survey_id', $id)
+                    ->where('Survey_emp_ta_id', $surveyEmployee->id)
+                    ->where('Question_id', $q->id)
+                    ->first();
+                return [
+                    'question_id'   => (int) $q->id,
+                    'question_text' => $q->Question_Text,
+                    'question_type' => $q->Question_Type,
+                    'answer'        => $result->Emp_Ans ?? null,
+                ];
+            })->values();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Survey responses fetched successfully',
+                'data'    => [
+                    'survey_title'         => $parent->Surevey_title,
+                    'start_date'           => $parent->Start_date,
+                    'end_date'             => $parent->End_date,
+                    'completion_date'      => $surveyEmployee->updated_at ? $surveyEmployee->updated_at->format('Y-m-d') : null,
+                    'completion_time'      => $surveyEmployee->updated_at ? $surveyEmployee->updated_at->format('h:i A') : null,
+                    'completion_duration'  => $surveyEmployee->Complete_time,
+                    'responses'            => $responses,
+                ],
+            ]);
+        } catch (\Exception $e) {
             \Log::emergency("File: " . $e->getFile());
             \Log::emergency("Line: " . $e->getLine());
             \Log::error($e->getMessage());
