@@ -1395,11 +1395,11 @@ class VacancyController extends Controller
 
               ->addColumn('action', function ($row) use ($canSeeAction) {
                 $route = route("resort.ta.Applicants", base64_encode($row->vacancy_id));
-                $actions = '<a href="'.$route.'" class="btn btn-sm btn-themeBlue me-1" data-bs-toggle="tooltip" data-bs-placement="top" title="View Applicants"><i class="fa-solid fa-eye"></i></a>';
+                $actions = '<a href="'.$route.'" class="btn btn-sm ta-btn-secondary me-1" data-bs-toggle="tooltip" data-bs-placement="top" title="View Applicants"><i class="fa-solid fa-eye"></i></a>';
 
                 if ($canSeeAction) {
-                    $actions .= '<a href="javascript:void(0)" class="btn btn-sm btn-theme ExtendJobLink" data-ExpiryDate="'.$row->ExpiryDate.'" data-ApplicationId="'.$row->ApplicationId.'" data-bs-toggle="tooltip" data-bs-placement="top" title="Extend The Job Ad Link"><i class="fa-solid fa-link"></i></a>
-                            <a href="javascript:void(0)" class="btn btn-sm btn-info viewJobAd ms-1" data-position="'.$row->positionTitle.'" data-joblink="'.htmlspecialchars($row->jobAdLink ?? '', ENT_QUOTES, 'UTF-8').'" data-alljobimages=\''.htmlspecialchars($row->allJobAdImages, ENT_QUOTES, 'UTF-8').'\' data-bs-toggle="tooltip" data-bs-placement="top" title="View Job Advertisement"><i class="fa-solid fa-image"></i></a>';
+                    $actions .= '<a href="javascript:void(0)" class="btn btn-sm ta-btn-attention ExtendJobLink" data-ExpiryDate="'.$row->ExpiryDate.'" data-ApplicationId="'.$row->ApplicationId.'" data-bs-toggle="tooltip" data-bs-placement="top" title="Extend The Job Ad Link"><i class="fa-solid fa-link"></i></a>
+                            <a href="javascript:void(0)" class="btn btn-sm ta-btn-secondary viewJobAd ms-1" data-position="'.$row->positionTitle.'" data-joblink="'.htmlspecialchars($row->jobAdLink ?? '', ENT_QUOTES, 'UTF-8').'" data-alljobimages=\''.htmlspecialchars($row->allJobAdImages, ENT_QUOTES, 'UTF-8').'\' data-bs-toggle="tooltip" data-bs-placement="top" title="View Job Advertisement"><i class="fa-solid fa-image"></i></a>';
                 }
 
                 return $actions;
@@ -1567,6 +1567,7 @@ class VacancyController extends Controller
                     $NewVacancies->getCollection()->transform(function ($vacancy) use ($gridAllJobAdImages, $resort_id) {
                         $vacancy->image = !empty($gridAllJobAdImages) ? $gridAllJobAdImages[0] : null;
                         $vacancy->allJobAdImages = $gridAllJobAdImages;
+                        $vacancy->ExpiryDate = $vacancy->link_Expiry_date ? Carbon::parse($vacancy->link_Expiry_date)->format('d M Y') : null;
                         return $vacancy;
                     });
 
@@ -2027,26 +2028,26 @@ class VacancyController extends Controller
 
                         if ($row->InterviewStatus == "Slot Booked")
                         {
-                            $sendInterviewBtn = '<a href="'.htmlspecialchars($row->MeetingLink, ENT_QUOTES, 'UTF-8').'" target="_blank" class="btn btn-sm btn-success me-1" data-bs-toggle="tooltip" data-bs-placement="top" title="Start Interview"><i class="fa-solid fa-video"></i></a>';
+                            $sendInterviewBtn = '<a href="'.htmlspecialchars($row->MeetingLink, ENT_QUOTES, 'UTF-8').'" target="_blank" class="btn btn-sm ta-btn-attention me-1" data-bs-toggle="tooltip" data-bs-placement="top" title="Start Interview"><i class="fa-solid fa-video"></i></a>';
                         }
                         elseif ($row->InterviewStatus == "Pending Review")
                         {
-                            $sendInterviewBtn = '<a href="javascript:void(0)" class="btn btn-sm btn-warning me-1" data-bs-toggle="tooltip" data-bs-placement="top" title="Pending Review - Email Not Sent Yet"><i class="fa-solid fa-hourglass-half"></i></a>';
+                            $sendInterviewBtn = '<a href="javascript:void(0)" class="btn btn-sm ta-badge-muted me-1" data-bs-toggle="tooltip" data-bs-placement="top" title="Pending Review - Email Not Sent Yet"><i class="fa-solid fa-hourglass-half"></i></a>';
                         }
                         elseif ($row->InterviewStatus == "Invitation Sent")
                         {
-                            $sendInterviewBtn = '<a href="javascript:void(0)" class="btn btn-sm btn-info me-1" data-bs-toggle="tooltip" data-bs-placement="top" title="Invitation Sent - Awaiting Response"><i class="fa-solid fa-clock"></i></a>';
+                            $sendInterviewBtn = '<a href="javascript:void(0)" class="btn btn-sm ta-badge-muted me-1" data-bs-toggle="tooltip" data-bs-placement="top" title="Invitation Sent - Awaiting Response"><i class="fa-solid fa-clock"></i></a>';
                         }
                         elseif ($row->InterviewStatus == "Invitation Rejected")
                         {
-                            $sendInterviewBtn = '<a href="javascript:void(0)" class="btn btn-sm btn-danger me-1" data-bs-toggle="tooltip" data-bs-placement="top" title="Invitation Declined by Candidate"><i class="fa-solid fa-xmark"></i></a>';
+                            $sendInterviewBtn = '<a href="javascript:void(0)" class="btn btn-sm ta-badge-muted me-1" data-bs-toggle="tooltip" data-bs-placement="top" title="Invitation Declined by Candidate"><i class="fa-solid fa-xmark"></i></a>';
                         }
                         else
                         {
-                            $sendInterviewBtn = '<a href="javascript:void(0)" class="btn btn-sm btn-warning me-1" data-bs-toggle="tooltip" data-bs-placement="top" title="No Slot Found"><i class="fa-solid fa-calendar-xmark"></i></a>';
+                            $sendInterviewBtn = '<a href="javascript:void(0)" class="btn btn-sm ta-badge-muted me-1" data-bs-toggle="tooltip" data-bs-placement="top" title="No Slot Found"><i class="fa-solid fa-calendar-xmark"></i></a>';
                         }
 
-                        return $sendInterviewBtn . '<a href="javascript:void(0)" class="btn btn-sm btn-themeBlue userApplicants-btn" data-id="'.$ApplicantStatus_id.'" data-bs-toggle="tooltip" data-bs-placement="top" title="View Applicant"><i class="fa-solid fa-eye"></i></a>';
+                        return $sendInterviewBtn . '<a href="javascript:void(0)" class="btn btn-sm ta-btn-secondary userApplicants-btn" data-id="'.$ApplicantStatus_id.'" data-bs-toggle="tooltip" data-bs-placement="top" title="View Applicant"><i class="fa-solid fa-eye"></i></a>';
                     })
 
                         ->rawColumns(['Applicants','Action', 'Stage', 'rank_name', 'Required'])

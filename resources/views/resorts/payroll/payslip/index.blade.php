@@ -99,8 +99,8 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                <a href="#" class="btn btn-themeBlue" id="sharePayslipBtn">Submit</a>
+                <a href="#" data-bs-dismiss="modal" class="btn payroll-btn-secondary ms-auto">Cancel</a>
+                <a href="#" class="btn payroll-btn-primary" id="sharePayslipBtn">Submit</a>
             </div>
         </div>
     </div>
@@ -132,8 +132,8 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                <a href="#" class="btn btn-themeBlue" id="viewPayslipBtn">Submit</a>
+                <a href="#" data-bs-dismiss="modal" class="btn payroll-btn-secondary ms-auto">Cancel</a>
+                <a href="#" class="btn payroll-btn-secondary" id="viewPayslipBtn">Submit</a>
 
             </div>
         </div>
@@ -142,6 +142,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts.payroll._payroll_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')
@@ -313,8 +314,8 @@
                 {
                     data: 'action',
                     render: function(data, type, row) {
-                        return `<a href="#share-modal" data-bs-toggle="modal" data-id='${row.id}' class="btn btn-themeSkyblueLight btn-small mb-2">Share</a> 
-                        <a href="#view-modal" data-bs-toggle="modal" data-id='${row.id}' class="btn btn-themeBlue btn-small">View Payslip</a>`;
+                        return `<a href="#share-modal" data-bs-toggle="modal" data-id='${row.id}' class="btn payroll-btn-secondary btn-small mb-2">Share</a>
+                        <a href="#view-modal" data-bs-toggle="modal" data-id='${row.id}' class="btn payroll-btn-secondary btn-small">View Payslip</a>`;
                     }
                 },
                 { data: 'created_at', visible: false, searchable: false }

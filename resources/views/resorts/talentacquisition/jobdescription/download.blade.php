@@ -78,7 +78,7 @@
                         align-right: revert;
                         margin-left: 86%;
                         margin-top: 15%;">
-            <button id="printButton">Print Content</button>
+            <button id="printButton" style="background:#014653;color:#fff;border:none;border-radius:6px;padding:8px 16px;font-family:'Poppins',sans-serif;cursor:pointer;">Print Content</button>
 
         </div>
 

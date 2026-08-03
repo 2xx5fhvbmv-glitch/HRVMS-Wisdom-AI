@@ -14,7 +14,7 @@
                     </div>
                 </div>
                 <div class="col-auto">
-                    <a href="{{ route('shopkeepers.index') }}" class="btn btn-themeSkyblue btn-sm"><i class="fa-solid fa-arrow-left me-1"></i> Back to Shopkeepers</a>
+                    <a href="{{ route('shopkeepers.index') }}" class="btn payroll-btn-accent btn-sm"><i class="fa-solid fa-arrow-left me-1"></i> Back to Shopkeepers</a>
                 </div>
             </div>
         </div>
@@ -49,7 +49,7 @@
                         </div>
                     </div>
                     <div class="col-auto">
-                        <button type="button" id="payment-download-btn" class="btn btn-themeSkyblue btn-sm">
+                        <button type="button" id="payment-download-btn" class="btn payroll-btn-secondary btn-sm">
                             <i class="fa-solid fa-download me-1"></i> Download
                         </button>
                     </div>
@@ -59,7 +59,7 @@
                             <input type="checkbox" class="form-check-input" id="payment-check-all" aria-label="Check all">
                             <label class="form-check-label small" for="payment-check-all">Check all</label>
                         </div>
-                        <button type="button" id="payment-bulk-paid-btn" class="btn btn-theme btn-sm">
+                        <button type="button" id="payment-bulk-paid-btn" class="btn payroll-btn-celebrate btn-sm">
                             <i class="fa-solid fa-check-double me-1"></i> Mark selected as Paid
                         </button>
                     </div>
@@ -91,6 +91,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts.payroll._payroll_buttons_v2_styles')
 <style>
     /* Prevent search icon and browser clear (X) from overlapping */
     .card-header .input-group .form-control.search {

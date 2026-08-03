@@ -122,7 +122,7 @@
                             @endif
                             @if($employeeRankPosition['position'] == 'GM')
                                 {{-- <button type="submit" class="btn btn-theme SendToCorporateOffice" >Send To Corporate Office</button> --}}
-                                <button type="submit" class="btn wfp-btn-positive SendToCorporateOffice" >Approve Budget</button>
+                                <button type="submit" class="btn wfp-btn-celebrate SendToCorporateOffice" >Approve Budget</button>
                                 {{-- Revise Budget was removed from this page per explicit
                                      decision: revisions now happen only on View Budget. --}}
                             @endif

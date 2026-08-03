@@ -151,42 +151,37 @@
 
             {{-- WAI Insights — AI-narrated survey metrics (took the Participation Rate slot) --}}
             <div class="col-xl-3 col-sm-6 @if(Common::checkRouteWisePermission('Survey.Surveylist',config('settings.resort_permissions.view')) == false) d-none @endif">
-                <div class="card card-wiINsight card-wiINsightSurvey h-100" id="card-wiINsightSurvey">
+                <div class="card card-wiINsightSurvey wai-narrative h-100" id="card-wiINsightSurvey">
                     @php $sMeta = $surveyInsights['_meta'] ?? null; @endphp
-                    <div class="card-title">
-                        <div class="row justify-content-between align-items-center g-md-3 g-1">
-                            <div class="col">
-                                <h3 class="text-nowrap">WAI Insights</h3>
-                            </div>
-                            <div class="col-auto text-end" style="font-size:12px;line-height:1.3;">
-                                @if($sMeta)
-                                    <div class="text-muted">Updated {{ $sMeta['generated_at']->diffForHumans() }}</div>
-                                    @if($sMeta['can_regenerate'])
-                                        <a href="?regenerate_insights=1" class="a-link">Regenerate</a>
-                                    @else
-                                        <span class="text-muted" title="{{ $sMeta['next_available']->format('d M Y, H:i') }}">Regenerate {{ $sMeta['next_available']->diffForHumans() }}</span>
-                                    @endif
+                    <div class="wai-head">
+                        <h2>WAI Insights</h2>
+                        @if($sMeta)
+                            <div class="wai-head-meta">
+                                <span>Updated {{ $sMeta['generated_at']->diffForHumans() }}</span>
+                                @if($sMeta['can_regenerate'])
+                                    <a href="?regenerate_insights=1">Regenerate</a>
+                                @else
+                                    <span title="{{ $sMeta['next_available']->format('d M Y, H:i') }}">&middot; Regenerate {{ $sMeta['next_available']->diffForHumans() }}</span>
                                 @endif
                             </div>
-                        </div>
+                        @endif
                     </div>
-                    <div class="leaveUser-main">
+                    <div class="leaveUser-main wai-narrative-body">
                         @foreach([['key'=>'participation','modal'=>'surveyInsightParticipationModal'],['key'=>'activity','modal'=>'surveyInsightActivityModal'],['key'=>'sentiment','modal'=>'surveyInsightSentimentModal'],['key'=>'hotspots','modal'=>'surveyInsightHotspotsModal']] as $sc)
-                        <div class="leaveUser-block">
-                            <div class="img">
-                                <img src="{{ URL::asset('resorts_assets/images/wisdom-ai-small.svg') }}" alt="image">
-                            </div>
-                            <div>
-                                <h6>{{ $surveyInsights[$sc['key']]['title'] ?? '' }}</h6>
-                                <p>{{ $surveyInsights[$sc['key']]['body'] ?? '' }}</p>
-                                @if(!empty($surveyInsights[$sc['key']]['recommendation']))
-                                    <p class="mb-2" style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $surveyInsights[$sc['key']]['recommendation'] }}</p>
-                                @endif
-                                <div>
-                                    <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#{{ $sc['modal'] }}" class="a-link">View Details</a>
+                            @php $hasRecommendation = !empty($surveyInsights[$sc['key']]['recommendation']); @endphp
+                            <div class="wai-row">
+                                <div class="wai-row-icon {{ $hasRecommendation ? 'is-flagged' : 'is-ok' }}">
+                                    <i class="fa-solid {{ $hasRecommendation ? 'fa-triangle-exclamation' : 'fa-check' }}"></i>
+                                </div>
+                                <div class="wai-row-body">
+                                    <h6>{{ $surveyInsights[$sc['key']]['title'] ?? '' }}</h6>
+                                    <p class="wai-row-text">{{ $surveyInsights[$sc['key']]['body'] ?? '' }}</p>
+                                    @if($hasRecommendation)
+                                        <p class="wai-row-recommendation"><strong>Recommendation:</strong> {{ $surveyInsights[$sc['key']]['recommendation'] }}</p>
+                                    @endif
+                                    <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#{{ $sc['modal'] }}" class="wai-row-link">View details &rarr;</a>
                                 </div>
                             </div>
-                        </div>
                         @endforeach
                     </div>
                 </div>
@@ -489,19 +484,49 @@
 
 @section('import-css')
 <style>
-    /* WAI Insights — survey card in the Participation Rate slot. Fixed height
-       with the insight list scrolling inside the narrow column. */
+    /* WAI Insights — same gradient-header treatment as the other modules'
+       WAI Insights cards. Narrative (title + body + optional recommendation),
+       not pass/fail counts, so no hero — icon is amber when a recommendation
+       is present, teal tick otherwise. Fixed height, list scrolls inside. */
     .card-wiINsightSurvey {
         height: 100% !important;
         max-height: 420px !important;
         display: flex;
         flex-direction: column;
+        padding: 0;
+        overflow: hidden;
+        border-radius: 16px;
     }
     .card-wiINsightSurvey .leaveUser-main {
         flex: 1 1 auto;
         min-height: 0;
         overflow-y: auto;
     }
+
+    .wai-narrative .wai-head { position: relative; overflow: hidden; padding: 17px 18px; flex-shrink: 0; }
+    .wai-narrative .wai-head::before {
+        content: ""; position: absolute; inset: 0; pointer-events: none;
+        background: linear-gradient(110deg, #014653 0%, #0e8a9e 40%, #7fa61e 70%, #e0ff02 100%);
+    }
+    .wai-narrative .wai-head::after {
+        content: ""; position: absolute; inset: 0; pointer-events: none;
+        background: linear-gradient(110deg, rgba(1,40,48,.35), transparent 55%);
+    }
+    .wai-narrative .wai-head h2 { position: relative; color: #fff; font-size: 15px; font-weight: 800; margin: 0; }
+    .wai-narrative .wai-head-meta { position: relative; margin-top: 4px; font-size: 11.5px; color: rgba(255,255,255,.75); display: flex; gap: 6px; }
+    .wai-narrative .wai-head-meta a { color: #fff; font-weight: 600; text-decoration: underline; }
+
+    .wai-narrative-body { padding: 16px; }
+    .wai-narrative .wai-row { display: flex; align-items: flex-start; gap: 12px; padding: 12px 2px; border-bottom: 1px solid #F2F6F6; }
+    .wai-narrative .wai-row:last-child { border-bottom: none; }
+    .wai-narrative .wai-row-icon { width: 32px; height: 32px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; margin-top: 2px; }
+    .wai-narrative .wai-row-icon.is-ok { background: #E9F7F0; color: #1F9D6B; }
+    .wai-narrative .wai-row-icon.is-flagged { background: #FBF0DC; color: #D98A00; }
+    .wai-narrative .wai-row-body { flex: 1 1 auto; min-width: 0; }
+    .wai-narrative .wai-row-body h6 { margin: 0 0 4px; font-size: 13.5px; font-weight: 700; color: #14232A; }
+    .wai-narrative .wai-row-text { margin: 0 0 4px; font-size: 12.5px; color: #5D6F75; line-height: 1.5; }
+    .wai-narrative .wai-row-recommendation { margin: 0 0 4px; font-size: 12.5px; color: #0e8a9e; line-height: 1.5; }
+    .wai-narrative .wai-row-link { display: inline-block; margin-top: 2px; font-size: 12px; font-weight: 600; color: #014653; }
 
     /* Truncate long department / survey names in the chart legend pills.
        Full text remains in the title attribute so hover shows it. */

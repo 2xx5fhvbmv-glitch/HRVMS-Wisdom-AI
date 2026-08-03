@@ -86,8 +86,8 @@ class OfflineInterviewController extends Controller
                     $continueLabel = in_array($row->wizard_status, ['Draft', 'In Progress'], true) ? 'Continue' : 'View';
                     return '
                         <div class="d-flex align-items-center gap-2">
-                            <a href="' . route('offline-interview.create', ['id' => $id]) . '" class="btn-tableIcon btnIcon-skyblue" title="' . $continueLabel . '"><i class="fa-regular fa-eye"></i></a>
-                            <a href="javascript:void(0)" class="btn-tableIcon btnIcon-danger offline-iv-delete" data-id="' . $row->id . '" title="Delete"><i class="fa-solid fa-trash"></i></a>
+                            <a href="' . route('offline-interview.create', ['id' => $id]) . '" class="btn-tableIcon ta-btn-secondary" title="' . $continueLabel . '"><i class="fa-regular fa-eye"></i></a>
+                            <a href="javascript:void(0)" class="btn-tableIcon ta-btn-critical offline-iv-delete" data-id="' . $row->id . '" title="Delete"><i class="fa-solid fa-trash"></i></a>
                         </div>';
                 })
                 ->rawColumns(['status', 'actions'])

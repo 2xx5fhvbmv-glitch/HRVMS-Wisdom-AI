@@ -652,7 +652,7 @@ class EmployeeController extends Controller
             ->addColumn('Action', function ($row) use ($edit_class) {
                 $id = base64_encode($row->employee_id);
                 $route = route('resort.timeandattendance.employee.details', [ $id]);
-                return '<a target="_blank" href="'.$route.'" class="btn btn-themeSkyblue btn-sm '.$edit_class.'"  data-id="' . $row->id . '">View Details</a>';
+                return '<a target="_blank" href="'.$route.'" class="btn taa-btn-secondary btn-sm '.$edit_class.'"  data-id="' . $row->id . '">View Details</a>';
             })
             ->rawColumns(['Applicant', 'Position', 'Leave', 'Absent', 'Present', 'Dayoff', 'TotalWorkingDay', 'TotalDayOffs', 'Action'])
             ->make(true);
@@ -1697,13 +1697,13 @@ class EmployeeController extends Controller
                             // Synthesized Absent row — nothing was punched, no location/edit target.
                             return '<span class="text-muted small">No punch recorded</span>';
                         }
-                        return '<a href="#" class="btn-lg-icon icon-bg-skyblue LocationHistoryData" data-location="' . $row->InTime_Location . '" data-id="' . $row->id . '">
+                        return '<a href="#" class="btn-tableIcon taa-btn-secondary LocationHistoryData" data-location="' . $row->InTime_Location . '" data-id="' . $row->id . '">
                             <i class="fa-regular fa-location-dot"></i>
                         </a>
-                        <a href="#" class="btn-lg-icon icon-bg-green edit-row-btn '.$edit_class.'" data-note="' . $row->note . '" data-checkinTime="' . $row->CheckInTimeOne . '"
+                        <a href="#" class="btn-tableIcon taa-btn-secondary edit-row-btn '.$edit_class.'" data-note="' . $row->note . '" data-checkinTime="' . $row->CheckInTimeOne . '"
                             data-checkouttime="' . $row->CheckOutTimeOne . '" data-overtime="' . $row->OverTime . '" data-id="' . base64_encode($row->Child_id) . '"
                             data-ParentAttd_id="' . base64_encode($row->ParentAttd_id) . '" data-bs-toggle="modal">
-                            <img src="' . URL::asset('resorts_assets/images/edit.svg') . '" icon>
+                            <i class="fa-solid fa-pen"></i>
                         </a>';
                     })
                     ->addColumn('sort_date', function ($row) {
@@ -1999,12 +1999,12 @@ class EmployeeController extends Controller
                         // punched, so there's no location/edit target.
                         $h->Action = '<span class="text-muted small">No punch recorded</span>';
                     } else {
-                        $h->Action = '<a href="#" class="btn-lg-icon icon-bg-skyblue LocationHistoryData"
+                        $h->Action = '<a href="#" class="btn-tableIcon taa-btn-secondary LocationHistoryData"
                                 data-location="' . $h->InTime_Location . '"
                                 data-id="' . $h->id . '">
                                     <i class="fa-regular fa-location-dot"></i>
                                 </a>
-                                <a href="#" class="btn-lg-icon icon-bg-green edit-row-btn ' . $edit_class . '"
+                                <a href="#" class="btn-tableIcon taa-btn-secondary edit-row-btn ' . $edit_class . '"
                                 data-note="' . $h->note . '"
                                 data-checkinTime="' . $h->CheckInTime . '"
                                 data-checkouttime="' . $h->CheckOutTimeOne . '"
@@ -2012,7 +2012,7 @@ class EmployeeController extends Controller
                                 data-id="' . base64_encode($h->Child_id) . '"
                                 data-ParentAttd_id="' . base64_encode($h->ParentAttd_id) . '"
                                 data-bs-toggle="modal">
-                                    <img src="' . asset('resorts_assets/images/edit.svg') . '" alt="Edit Icon">
+                                    <i class="fa-solid fa-pen"></i>
                                 </a>';
                     }
 

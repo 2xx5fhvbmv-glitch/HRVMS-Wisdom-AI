@@ -20,8 +20,44 @@
         max-height: 512px !important;
         display: flex;
         flex-direction: column;
+        padding: 0;
+        overflow: hidden;
+        border-radius: 16px;
     }
     #card-wiINsightPayroll .leaveUser-main { overflow-y: auto; flex: 1 1 auto; min-height: 0; }
+
+    /* WAI Insights — same gradient header as Time and Attendance's WAI
+       Insights card. The content underneath stays its own shape though:
+       these are 4 narrative payroll insights (title + descriptive body +
+       optional recommendation), not pass/fail compliance counts, so there's
+       no hero and no big count figure here — forcing this text into that
+       count-card format would just throw the actual content away. Icon is
+       amber when there's a recommendation worth acting on, teal tick when
+       the insight is purely informational. */
+    .wai-narrative .wai-head { position: relative; overflow: hidden; padding: 17px 18px; flex-shrink: 0; }
+    .wai-narrative .wai-head::before {
+        content: ""; position: absolute; inset: 0; pointer-events: none;
+        background: linear-gradient(110deg, #014653 0%, #0e8a9e 40%, #7fa61e 70%, #e0ff02 100%);
+    }
+    .wai-narrative .wai-head::after {
+        content: ""; position: absolute; inset: 0; pointer-events: none;
+        background: linear-gradient(110deg, rgba(1,40,48,.35), transparent 55%);
+    }
+    .wai-narrative .wai-head h2 { position: relative; color: #fff; font-size: 15px; font-weight: 800; margin: 0; }
+    .wai-narrative .wai-head-meta { position: relative; margin-top: 4px; font-size: 11.5px; color: rgba(255,255,255,.75); display: flex; gap: 6px; }
+    .wai-narrative .wai-head-meta a { color: #fff; font-weight: 600; text-decoration: underline; }
+
+    .wai-narrative-body { padding: 16px; }
+    .wai-narrative .wai-row { display: flex; align-items: flex-start; gap: 12px; padding: 12px 2px; border-bottom: 1px solid #F2F6F6; }
+    .wai-narrative .wai-row:last-child { border-bottom: none; }
+    .wai-narrative .wai-row-icon { width: 32px; height: 32px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; margin-top: 2px; }
+    .wai-narrative .wai-row-icon.is-ok { background: #E9F7F0; color: #1F9D6B; }
+    .wai-narrative .wai-row-icon.is-flagged { background: #FBF0DC; color: #D98A00; }
+    .wai-narrative .wai-row-body { flex: 1 1 auto; min-width: 0; }
+    .wai-narrative .wai-row-body h6 { margin: 0 0 4px; font-size: 13.5px; font-weight: 700; color: #14232A; }
+    .wai-narrative .wai-row-text { margin: 0 0 4px; font-size: 12.5px; color: #5D6F75; line-height: 1.5; }
+    .wai-narrative .wai-row-recommendation { margin: 0 0 4px; font-size: 12.5px; color: #0e8a9e; line-height: 1.5; }
+    .wai-narrative .wai-row-link { display: inline-block; margin-top: 2px; font-size: 12px; font-weight: 600; color: #014653; }
 
     /* ---- Payroll Overview card (redesigned Payroll Expenses chart) ----
        border-radius matches the site-wide .card default (25px) — same
@@ -393,7 +429,7 @@
                         <h1>Dashboard</h1>
                     </div>
                 </div>
-                <div class="col-auto ms-auto"><a href="{{route('payroll.payslip.index')}}" class="btn btn-theme @if(App\Helpers\Common::checkRouteWisePermission('payroll.run',config('settings.resort_permissions.view')) == false) d-none @endif">Share Payslips</a></div>
+                <div class="col-auto ms-auto"><a href="{{route('payroll.payslip.index')}}" class="btn btn-sm payroll-btn-accent @if(App\Helpers\Common::checkRouteWisePermission('payroll.run',config('settings.resort_permissions.view')) == false) d-none @endif">Share Payslips</a></div>
                 @php
                     $currentEmployee = Auth::guard('resort-admin')->user()->GetEmployee ?? null;
                     $rankPos = $currentEmployee ? App\Helpers\Common::getEmployeeRankPosition($currentEmployee) : ['rank' => null];
@@ -417,7 +453,7 @@
                     $canRunPayroll = $isSupervisor || $isFinanceLead;
                 @endphp
                 @if($canRunPayroll)
-                <div class="col-auto"><a href="{{route('payroll.run')}}" class="btn btn-theme" onclick="localStorage.removeItem('currentStep');localStorage.removeItem('payroll_id');localStorage.removeItem('selectedEmployees');localStorage.removeItem('selectedEmployeesIds');localStorage.removeItem('deductions');">Run Payroll</a></div>
+                <div class="col-auto"><a href="{{route('payroll.run')}}" class="btn payroll-btn-accent" onclick="localStorage.removeItem('currentStep');localStorage.removeItem('payroll_id');localStorage.removeItem('selectedEmployees');localStorage.removeItem('selectedEmployeesIds');localStorage.removeItem('deductions');">Run Payroll</a></div>
                 @endif
             </div>
         </div>
@@ -430,9 +466,6 @@
                             <p class="mb-0  fw-500">Total Employees</p>
                             <strong>{{$total_employees}}</strong>
                         </div>
-                        <a href="#">
-                            <img src="assets/images/arrow-right-circle.svg" alt="" class="img-fluid">
-                        </a>
                     </div>
                 </div>
             </div>
@@ -443,9 +476,6 @@
                             <p class="mb-0  fw-500">Paid Employees</p>
                             <strong>{{$total_paid_employees}} <small>/{{$total_employees}}</small></strong>
                         </div>
-                        <a href="#">
-                            <img src="assets/images/arrow-right-circle.svg" alt="" class="img-fluid">
-                        </a>
                     </div>
                 </div>
             </div>
@@ -479,7 +509,10 @@
                                 @else
                                     {!! Common::formatCurrency($upcomingEstimated ?? 0, 'USD') !!}
                                     @if($isEstimated ?? false)
-                                        <small class="text-muted d-block" style="font-size: 11px;">(Estimated)</small>
+                                        <small class="text-muted d-block" style="font-size: 11px;">
+                                            (Estimated)
+                                            <button type="button" id="estimateBreakdownInfoBtn" class="peb-info-btn" aria-label="View payroll breakdown" data-bs-toggle="modal" data-bs-target="#payrollBreakdownModal"><i>i</i></button>
+                                        </small>
                                     @endif
                                 @endif
                             </strong>
@@ -599,46 +632,41 @@
                             @endforeach
                         </select>
                     </div>
-                    <a href="#" class="btn btn-themeBlue @if(App\Helpers\Common::checkRouteWisePermission('payroll.run',config('settings.resort_permissions.view')) == false) d-none @endif" id="viewPayroll">View Payroll</a>
+                    <a href="#" class="btn payroll-btn-secondary @if(App\Helpers\Common::checkRouteWisePermission('payroll.run',config('settings.resort_permissions.view')) == false) d-none @endif" id="viewPayroll">View Payroll</a>
                 </div>
             </div>
             <div class="col-xl-6 col-md-6 @if(App\Helpers\Common::checkRouteWisePermission('payroll.run',config('settings.resort_permissions.view')) == false) d-none @endif">
-                <div class="card card-wiINsightPayroll" id="card-wiINsightPayroll" >
+                <div class="card card-wiINsightPayroll wai-narrative" id="card-wiINsightPayroll" >
                     @php $meta = $payrollInsights['_meta'] ?? null; @endphp
-                    <div class=" card-title">
-                        <div class="row justify-content-between align-items-center g-md-3 g-1">
-                            <div class="col">
-                                <h3 class="text-nowrap">WAI Insights</h3>
-                            </div>
-                            <div class="col-auto text-end" style="font-size:12px;line-height:1.3;">
-                                @if($meta)
-                                    <div class="text-muted">Updated {{ $meta['generated_at']->diffForHumans() }}</div>
-                                    @if($meta['can_regenerate'])
-                                        <a href="?regenerate_insights=1" class="a-linkTheme">Regenerate</a>
-                                    @else
-                                        <span class="text-muted" title="{{ $meta['next_available']->format('d M Y, H:i') }}">Regenerate {{ $meta['next_available']->diffForHumans() }}</span>
-                                    @endif
+                    <div class="wai-head">
+                        <h2>WAI Insights</h2>
+                        @if($meta)
+                            <div class="wai-head-meta">
+                                <span>Updated {{ $meta['generated_at']->diffForHumans() }}</span>
+                                @if($meta['can_regenerate'])
+                                    <a href="?regenerate_insights=1">Regenerate</a>
+                                @else
+                                    <span title="{{ $meta['next_available']->format('d M Y, H:i') }}">&middot; Regenerate {{ $meta['next_available']->diffForHumans() }}</span>
                                 @endif
                             </div>
-                        </div>
+                        @endif
                     </div>
-                    <div class="leaveUser-main">
+                    <div class="leaveUser-main wai-narrative-body">
                         @foreach([['key'=>'trend','modal'=>'payrollInsightTrendModal'],['key'=>'overtime','modal'=>'payrollInsightOvertimeModal'],['key'=>'expat','modal'=>'payrollInsightExpatModal'],['key'=>'allowance','modal'=>'payrollInsightAllowanceModal']] as $pc)
-                        <div class="leaveUser-block">
-                            <div class="img">
-                                <img src="{{ URL::asset('resorts_assets/images/wisdom-ai-small.svg') }}" alt="image">
-                            </div>
-                            <div>
-                                <h6>{{ $payrollInsights[$pc['key']]['title'] ?? '' }}</h6>
-                                <p>{{ $payrollInsights[$pc['key']]['body'] ?? '' }}</p>
-                                @if(!empty($payrollInsights[$pc['key']]['recommendation']))
-                                    <p class="mb-2" style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $payrollInsights[$pc['key']]['recommendation'] }}</p>
-                                @endif
-                                <div>
-                                    <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#{{ $pc['modal'] }}" class="a-linkTheme">View Details</a>
+                            @php $hasRecommendation = !empty($payrollInsights[$pc['key']]['recommendation']); @endphp
+                            <div class="wai-row">
+                                <div class="wai-row-icon {{ $hasRecommendation ? 'is-flagged' : 'is-ok' }}">
+                                    <i class="fa-solid {{ $hasRecommendation ? 'fa-triangle-exclamation' : 'fa-check' }}"></i>
+                                </div>
+                                <div class="wai-row-body">
+                                    <h6>{{ $payrollInsights[$pc['key']]['title'] ?? '' }}</h6>
+                                    <p class="wai-row-text">{{ $payrollInsights[$pc['key']]['body'] ?? '' }}</p>
+                                    @if($hasRecommendation)
+                                        <p class="wai-row-recommendation"><strong>Recommendation:</strong> {{ $payrollInsights[$pc['key']]['recommendation'] }}</p>
+                                    @endif
+                                    <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#{{ $pc['modal'] }}" class="wai-row-link">View details &rarr;</a>
                                 </div>
                             </div>
-                        </div>
                         @endforeach
                     </div>
                 </div>
@@ -733,7 +761,7 @@
                                                     <td>{{ \Carbon\Carbon::flexible($draft->created_at)->format('d M Y') }}</td>
                                                     <td><span class="badge badge-themeGray">{{ ucfirst($draft->status) }}</span></td>
                                                     <td>
-                                                        <a href="{{ route('payroll.run') }}?resume={{ $draft->id }}" class="btn btn-sm btn-themeBlue" onclick="localStorage.setItem('payroll_id','{{ $draft->id }}');localStorage.setItem('currentStep','7');">
+                                                        <a href="{{ route('payroll.run') }}?resume={{ $draft->id }}" class="btn btn-sm payroll-btn-secondary" onclick="localStorage.setItem('payroll_id','{{ $draft->id }}');localStorage.setItem('currentStep','7');">
                                                             <i class="fa-solid fa-eye"></i> View
                                                         </a>
                                                     </td>
@@ -796,12 +824,12 @@
                                                     </td>
                                                     <td>
                                                         @if($ap->has_rejection && $ap->status === 'draft')
-                                                            <a href="{{ route('payroll.run') }}?resume={{ $ap->id }}" class="btn btn-sm btn-themeBlue"
+                                                            <a href="{{ route('payroll.run') }}?resume={{ $ap->id }}" class="btn btn-sm payroll-btn-primary"
                                                                onclick="localStorage.setItem('payroll_id','{{ $ap->id }}');localStorage.setItem('currentStep','1');">
                                                                 <i class="fa-solid fa-pen-to-square"></i> Edit & Resubmit
                                                             </a>
                                                         @else
-                                                            <a href="{{ route('payroll.run') }}?resume={{ $ap->id }}&viewonly=1" class="btn btn-sm btn-themeBlue"
+                                                            <a href="{{ route('payroll.run') }}?resume={{ $ap->id }}&viewonly=1" class="btn btn-sm payroll-btn-secondary"
                                                                onclick="localStorage.setItem('payroll_id','{{ $ap->id }}');localStorage.setItem('currentStep','7');">
                                                                 <i class="fa-solid fa-eye"></i> View
                                                             </a>
@@ -838,7 +866,7 @@
                                                     <td class="text-end">{!! Common::formatCurrency($lp->total_payroll ?? 0, 'USD') !!}</td>
                                                     <td>{{ \Carbon\Carbon::flexible($lp->updated_at)->format('d M Y, h:i A') }}</td>
                                                     <td>
-                                                        <a href="{{ route('payroll.view', ['payroll_id' => base64_encode($lp->id)]) }}" class="btn btn-sm btn-themeBlue">
+                                                        <a href="{{ route('payroll.view', ['payroll_id' => base64_encode($lp->id)]) }}" class="btn btn-sm payroll-btn-secondary">
                                                             <i class="fa-solid fa-eye"></i> View
                                                         </a>
                                                     </td>
@@ -1088,49 +1116,209 @@
         </div>
     </div>
 </div>
-<!-- Modal -->
-<div class="modal fade" id="assign-modal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-small modal-assign">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="staticBackdropLabel">Payroll Components</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <div class="mb-3">
-                    <label for="basic_salary" class="form-label">Total Basic Salary</label>
-                    <input type="text" id="basic_salary" class="form-control" value="54,415.20">
-                </div>
-                <div class="mb-3">
-                    <label for="service_charge" class="form-label">Service Charge Values</label>
-                    <input type="text" id="service_charge" class="form-control" value="145.00">
-                </div>
-                <div class="mb-3">
-                    <label for="normal_ot" class="form-label">Normal OT</label>
-                    <input type="text" id="normal_ot" class="form-control" value="{{ Common::GetResortCurrencySymbol() }} 1,110.00 (120 Hrs)">
-                </div>
-                <div>
-                    <label for="holiday_ot" class="form-label">Holiday OT</label>
-                    <input type="text" id="holiday_ot" class="form-control" value="{{ Common::GetResortCurrencySymbol() }} 142.00 (70Hrs)">
-                </div>
-
-            </div>
-            <div class="modal-footer">
-                <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                <a href="#" class="btn btn-themeBlue">Submit</a>
-            </div>
-        </div>
-    </div>
-</div>
 
 @include('resorts.payroll.dashboard._insight_modals')
+@include('resorts.payroll.dashboard._estimate_breakdown_modal')
 @endsection
 
 @section('import-css')
+@include('resorts.payroll._payroll_buttons_v2_styles')
+@include('resorts.payroll.dashboard._estimate_breakdown_styles')
 @endsection
 
 @section('import-scripts')
 <script>
+    // ===== Payroll Estimate Breakdown modal (read-only) =====
+    // Fetches from payroll.dashboard.estimate-breakdown / estimate-activity
+    // (both GET, no writes) and renders client-side. Nothing here touches
+    // payroll calculation logic, write paths, or the existing routes above.
+    (function () {
+        var breakdownUrl = "{{ route('payroll.dashboard.estimate-breakdown') }}";
+        var activityUrl = "{{ route('payroll.dashboard.estimate-activity') }}";
+        var breakdownLoaded = false;
+        var activityOffset = 0;
+        var activityLimit = 25;
+        var activityLoading = false;
+
+        function money(n) {
+            var v = Number(n) || 0;
+            var sign = v < 0 ? '-' : '';
+            return sign + '$' + Math.abs(v).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+        }
+
+        function escapeHtml(s) {
+            return $('<div>').text(s == null ? '' : s).html();
+        }
+
+        function renderLineGroup($container, items, sign) {
+            $container.empty();
+            items.forEach(function (item, idx) {
+                var amtClass = sign === '+' ? 'peb-earn' : 'peb-ded';
+                var amtDisplay = (sign === '+' ? '' : '−') + money(Math.abs(item.amount));
+                var $line = $('<div class="peb-line"></div>');
+                var $head = $(
+                    '<div class="peb-line-head">' +
+                        '<div class="peb-line-main">' +
+                            '<div class="peb-line-name">' + escapeHtml(item.label) + '</div>' +
+                            '<div class="peb-line-count">' + item.employee_count + ' employee' + (item.employee_count === 1 ? '' : 's') + '</div>' +
+                        '</div>' +
+                        '<div class="peb-line-right">' +
+                            '<div class="peb-line-amt ' + amtClass + '">' + amtDisplay + '</div>' +
+                        '</div>' +
+                        '<span class="peb-chevron">›</span>' +
+                    '</div>'
+                );
+                var $detail = $('<div class="peb-line-detail"></div>');
+                (item.employees || []).forEach(function (emp) {
+                    var ctx = emp.context ? ' <span class="peb-emp-ctx">&middot; ' + escapeHtml(emp.context) + '</span>' : '';
+                    $detail.append(
+                        '<div class="peb-emp-row">' +
+                            '<span class="peb-emp-avatar">' + escapeHtml(emp.initials) + '</span>' +
+                            '<span class="peb-emp-name">' + escapeHtml(emp.name) + ctx + '</span>' +
+                            '<span class="peb-emp-amt">' + money(emp.amount) + '</span>' +
+                        '</div>'
+                    );
+                });
+                if (item.employee_count > (item.employees || []).length) {
+                    $detail.append('<div class="peb-view-all">View all ' + item.employee_count + ' &rarr;</div>');
+                } else if (!item.employees || item.employees.length === 0) {
+                    $detail.append('<div class="peb-view-all peb-empty-line">No employees in this category yet.</div>');
+                }
+                $line.append($head).append($detail);
+                $head.on('click', function () { $line.toggleClass('open'); });
+                $container.append($line);
+            });
+        }
+
+        function loadBreakdown() {
+            $('#pebBreakdownLoading').removeClass('d-none');
+            $('#pebBreakdownError').addClass('d-none');
+            $('#pebBreakdownContent').addClass('d-none');
+
+            $.get(breakdownUrl).done(function (data) {
+                $('#pebBreakdownLoading').addClass('d-none');
+
+                if (data && data.is_estimated === false) {
+                    $('#pebBreakdownError').removeClass('d-none').text(data.message || 'This period is already finalized.');
+                    return;
+                }
+
+                $('#pebPeriodLabel').text('Estimated Payroll · ' + data.period_label);
+                $('#pebCycleLabel').text('Day ' + data.day_of_period + ' of ' + data.total_days);
+                $('#pebCycleFill').css('width', Math.min(100, (data.day_of_period / data.total_days * 100)) + '%');
+                $('#pebToday').text(money(data.as_of_today));
+                $('#pebNet').text(money(data.net));
+                $('#pebFootCaption').text('Computed from live payroll data · refreshed today, ' + moment().format('h:mm A') + '. Estimate until the run is finalized.');
+
+                if (data.as_of_yesterday !== null && data.as_of_yesterday !== undefined) {
+                    $('#pebYesterday').text(money(data.as_of_yesterday));
+                    $('#pebYesterdayDate').text(moment(data.as_of_yesterday_date).format('D MMM') + ', end of day');
+                    var delta = data.as_of_today - data.as_of_yesterday;
+                    var $delta = $('#pebDelta').removeClass('down');
+                    if (Math.abs(delta) >= 0.01) {
+                        var pct = data.as_of_yesterday !== 0 ? (delta / Math.abs(data.as_of_yesterday) * 100) : null;
+                        var pctText = pct !== null ? ' (' + Math.abs(pct).toFixed(1) + '%)' : '';
+                        $delta.text((delta >= 0 ? '▲ ' : '▼ ') + money(Math.abs(delta)) + pctText + ' vs. yesterday');
+                        if (delta < 0) $delta.addClass('down');
+                    } else {
+                        $delta.text('No change vs. yesterday');
+                    }
+                } else {
+                    $('#pebYesterday').text('—');
+                    $('#pebYesterdayDate').text('period just started');
+                    $('#pebDelta').removeClass('down').text('');
+                }
+
+                $('#pebEarnTotal').text(money(data.gross));
+                $('#pebDedTotal').text('−' + money(data.deductions_total));
+                renderLineGroup($('#pebEarningsList'), data.earnings, '+');
+                renderLineGroup($('#pebDeductionsList'), data.deductions, '-');
+
+                $('#pebBreakdownContent').removeClass('d-none');
+                breakdownLoaded = true;
+            }).fail(function () {
+                $('#pebBreakdownLoading').addClass('d-none');
+                $('#pebBreakdownError').removeClass('d-none').text('Could not load the breakdown right now. Try again in a moment.');
+            });
+        }
+
+        function renderActivityRows(rows) {
+            var $list = $('#pebActivityList');
+            rows.forEach(function (row) {
+                var pillClass = row.status === 'Present' ? 'present' : (row.status === 'Absent' ? 'absent' : (row.status === 'OT' ? 'ot' : 'dayoff'));
+                var dept = row.department ? ' <span class="peb-a-dept">&middot; ' + escapeHtml(row.department) + '</span>' : '';
+                var amtClass = row.type === 'earn' ? 'peb-earn' : 'peb-ded';
+                var time = row.time ? row.time + ' · ' : '';
+                $list.append(
+                    '<div class="peb-activity-row">' +
+                        '<span class="peb-a-avatar">' + escapeHtml(row.initials) + '</span>' +
+                        '<div class="peb-a-main">' +
+                            '<div class="peb-a-name">' + escapeHtml(row.name) + dept + '<span class="peb-status-pill ' + pillClass + '">' + escapeHtml(row.status) + '</span></div>' +
+                            '<div class="peb-a-meta">' + time + escapeHtml(row.note) + '</div>' +
+                        '</div>' +
+                        '<div class="peb-a-amt ' + amtClass + '">' + money(row.amount) + '</div>' +
+                    '</div>'
+                );
+            });
+        }
+
+        function loadActivity(reset) {
+            if (activityLoading) return;
+            activityLoading = true;
+            if (reset) {
+                activityOffset = 0;
+                $('#pebActivityList').empty();
+                $('#pebActivityEmpty').addClass('d-none');
+                $('#pebActivityError').addClass('d-none');
+                $('#pebActivityLoading').removeClass('d-none');
+            }
+            $('#pebActivityLoadMore').prop('disabled', true);
+
+            $.get(activityUrl, { offset: activityOffset, limit: activityLimit }).done(function (data) {
+                $('#pebActivityLoading').addClass('d-none');
+                activityLoading = false;
+                $('#pebActivityLoadMore').prop('disabled', false);
+
+                $('#pebActivityCount').text(data.total ? '(' + data.total + ')' : '');
+
+                if (data.total === 0) {
+                    $('#pebActivityEmpty').removeClass('d-none');
+                    $('#pebActivityLoadMoreWrap').addClass('d-none');
+                    return;
+                }
+
+                renderActivityRows(data.rows);
+                activityOffset += data.rows.length;
+
+                if (activityOffset < data.total) {
+                    $('#pebActivityLoadMoreWrap').removeClass('d-none');
+                    $('#pebActivityCountText').text('Showing ' + activityOffset + ' of ' + data.total);
+                } else {
+                    $('#pebActivityLoadMoreWrap').addClass('d-none');
+                }
+            }).fail(function () {
+                activityLoading = false;
+                $('#pebActivityLoading').addClass('d-none');
+                $('#pebActivityLoadMore').prop('disabled', false);
+                $('#pebActivityError').removeClass('d-none').text('Could not load activity right now. Try again in a moment.');
+            });
+        }
+
+        $('#payrollBreakdownModal').on('show.bs.modal', function () {
+            if (!breakdownLoaded) loadBreakdown();
+        });
+
+        $('#peb-tab-activity').on('shown.bs.tab', function () {
+            if ($('#pebActivityList').children().length === 0 && !activityLoading) {
+                loadActivity(true);
+            }
+        });
+
+        $('#pebActivityLoadMore').on('click', function () {
+            loadActivity(false);
+        });
+    })();
+
     document.getElementById('viewPayroll').addEventListener('click', function () {
         let selectedMonth = document.getElementById('month').value;
         let selectedYear = document.getElementById('year').value;

@@ -72,7 +72,7 @@
                                         </select>
                                     </div>
                                     <div class="col-lg-3 col-sm-6 align-items-left">
-                                        <button  type="button" class="btn btn-themeSkyblue btn-sm add-btn AddMore">Add More</button>
+                                        <button  type="button" class="btn ta-btn-secondary btn-sm add-btn AddMore">Add More</button>
                                     </div>
                             </div>
                             <div id="options-container"></div>
@@ -88,7 +88,7 @@
                         <div class="videoQuestions-block mb-3">
                             <div class=" mb-2 d-flex justify-content-between align-items-center">
                                 <h6>Language 1</h6>
-                                <a href="#" class="btn btn-themeSkyblue btn-sm addVideo-btn">Add More</a>
+                                <a href="#" class="btn ta-btn-secondary btn-sm addVideo-btn">Add More</a>
                             </div>
                             <div class="row  AppendVideoHerer g-md-4 g-3">
                                 <div class=" col-sm-6">
@@ -120,7 +120,7 @@
                         <input type="hidden" id="incrementVideo" value="2">
 
                         <div class="card-footer text-end">
-                            <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                            <button type="submit" class="btn ta-btn-primary btn-sm">Submit</button>
                         </div>
                 </div>
             </form>
@@ -129,6 +129,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts.talentacquisition._ta_buttons_v2_styles')
     <style>
         .talentAc-block .title h5{
             font-size: 14px;
@@ -286,7 +287,7 @@
                      $(".AppendHerer").append(` <div class="talentAc-block" id="remove_id_${nos}">
                                                     <div class="title mb-2">
                                                         <h5>QUESTION ${nos}</h5>
-                                                        <button type="button" class="btn btn-danger btn-sm remove-btn"  data-id="${nos}">Remove</button>
+                                                        <button type="button" class="btn ta-btn-critical btn-sm remove-btn"  data-id="${nos}">Remove</button>
                                                     </div> ${appendstring}
                                                 </div>`);
                             nos++
@@ -333,7 +334,7 @@
                 let AppendVideoHerer =`  <div class="videoQuestions-block mb-3" id="Video_remove_id_${nos1}">
                                             <div class=" mb-2 d-flex justify-content-between align-items-center">
                                             <h6>Language ${nos1}</h6>
-                                                    <button type="button" class="btn btn-danger removeVideo-btn btn-sm " data-id="${nos1}" >Remove</button>                                                </div>
+                                                    <button type="button" class="btn ta-btn-critical removeVideo-btn btn-sm " data-id="${nos1}" >Remove</button>                                                </div>
                                                 <div class="row   g-md-4 g-3">
                                                     <div class=" col-sm-6">
                                                         <select class="form-select" name="language[]" id="Language_${nos1}" aria-label="Default select example">

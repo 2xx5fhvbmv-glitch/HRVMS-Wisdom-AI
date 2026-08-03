@@ -1,43 +1,183 @@
 @php
     $waiInsights = $waiInsights ?? [];
-    $waiRows = [
-        ['key' => 'weekly_hours', 'label' => "Employees who's number of Weekly Working Hours Exceeded"],
-        ['key' => 'overtime',     'label' => 'Excessive Overtime Hours'],
-        ['key' => 'no_break',     'label' => 'Mandatory Break Not Taken'],
-        ['key' => 'day_off',      'label' => 'Accumulated Day-Off Balances Exceeding Limits'],
+
+    // Check definitions — the only place that names a check. Add/remove/
+    // rename a check here and the card, hero, and modal all follow with
+    // zero other changes. `label` is a lowercase sentence fragment so it
+    // can be reused as-is inside the hero sentence ("N employees over
+    // their {label}") and title-cased for the row name — one string
+    // driving both, per the "no hard-coded issue names" requirement.
+    // ponytail: critical_threshold is a placeholder (no real severe-breach
+    // policy exists yet in getWaiInsights()) — swap in real business
+    // thresholds per check once they're defined.
+    $waiCheckDefs = [
+        ['key' => 'weekly_hours', 'label' => 'weekly hours limit',           'threshold' => 0, 'critical_threshold' => 20],
+        ['key' => 'overtime',     'label' => 'overtime hours limit',        'threshold' => 0, 'critical_threshold' => 20],
+        ['key' => 'no_break',     'label' => 'mandatory break requirement', 'threshold' => 0, 'critical_threshold' => 20],
+        ['key' => 'day_off',      'label' => 'day-off balance limit',       'threshold' => 0, 'critical_threshold' => 20],
     ];
+
+    // Reshape into the render-ready checks array. Purely a view-layer
+    // derivation of status from count vs. threshold — getWaiInsights()'s
+    // own counting/query logic is untouched.
+    $waiChecks = array_map(function ($def) use ($waiInsights) {
+        $count     = $waiInsights[$def['key']]['count'] ?? 0;
+        $employees = $waiInsights[$def['key']]['employees'] ?? [];
+
+        if ($count > $def['critical_threshold']) {
+            $status = 'critical';
+        } elseif ($count > $def['threshold']) {
+            $status = 'flagged';
+        } else {
+            $status = 'clear';
+        }
+
+        return array_merge($def, [
+            'count'     => $count,
+            'employees' => $employees,
+            'status'    => $status,
+        ]);
+    }, $waiCheckDefs);
+
+    $waiFlagged = array_values(array_filter($waiChecks, fn ($c) => $c['status'] !== 'clear'));
+    $waiClear   = array_values(array_filter($waiChecks, fn ($c) => $c['status'] === 'clear'));
+
+    // Hero = highest severity first, then highest count.
+    $waiHeroList = $waiFlagged;
+    usort($waiHeroList, function ($a, $b) {
+        $rank = ['critical' => 1, 'flagged' => 0];
+        $bySeverity = $rank[$b['status']] <=> $rank[$a['status']];
+        return $bySeverity !== 0 ? $bySeverity : ($b['count'] <=> $a['count']);
+    });
+    $waiHero        = $waiHeroList[0] ?? null;
+    $waiFlaggedCount = count($waiFlagged);
+
+    // Rows render flagged-first, clear checks below.
+    $waiSortedChecks = array_merge($waiFlagged, $waiClear);
 @endphp
 
 <style>
-    /* Match the leave module's WAI Insights card: fixed shell, scrolling list. */
-    .card-wiINsight { display: flex; flex-direction: column; }
-    .card-wiINsight .leaveUser-main { flex: 1 1 auto; min-height: 0; overflow-y: auto; }
-    .card-wiINsight .wai-count { font-size: 20px; font-weight: 600; line-height: 1; }
+    /* These tokens don't exist anywhere else in the app yet — scoped here
+       rather than added to :root so they can't collide with a future
+       global token system before one exists. */
+    .card-wiINsight {
+        --teal: #014653; --teal-2: #035b6c; --teal-mid: #0e8a9e; --lime: #e0ff02;
+        --ink: #14232a; --muted: #5d6f75; --faint: #9fadb2; --line: #eaf0f0; --line-2: #f2f6f6;
+        --ok: #1f9d6b; --ok-bg: #e9f7f0; --warn: #d98a00; --warn-bg: #fff6e5; --err: #e5573f; --err-bg: #fdeeeb;
+    }
+    .card-wiINsight { display: flex; flex-direction: column; padding: 0; overflow: hidden; border-radius: 16px; }
+
+    .wai-head { position: relative; overflow: hidden; padding: 17px 18px; }
+    .wai-head::before {
+        content: ""; position: absolute; inset: 0; pointer-events: none;
+        background: linear-gradient(110deg, #014653 0%, #0e8a9e 40%, #7fa61e 70%, #e0ff02 100%);
+    }
+    .wai-head::after {
+        content: ""; position: absolute; inset: 0; pointer-events: none;
+        background: linear-gradient(110deg, rgba(1,40,48,.35), transparent 55%);
+    }
+    .wai-head h2 { position: relative; color: #fff; font-size: 15px; font-weight: 800; margin: 0; }
+
+    .wai-body { padding: 16px; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+
+    .wai-hero {
+        border-radius: 14px;
+        padding: 14px 16px;
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        margin-bottom: 14px;
+    }
+    .wai-hero.is-alert {
+        background: linear-gradient(150deg, #fbeeeb, #fdf4f2);
+        border: 1px solid #f4d9d2;
+    }
+    .wai-hero.is-clear {
+        background: linear-gradient(150deg, #eef8f2, #f3faf6);
+        border: 1px solid #d7ecdf;
+    }
+    .wai-hero-count { font-size: 28px; font-weight: 800; color: var(--err); line-height: 1; flex-shrink: 0; }
+    .wai-hero-icon { font-size: 22px; color: var(--ok); flex-shrink: 0; }
+    .wai-hero-text { flex: 1 1 auto; min-width: 0; }
+    .wai-hero-text p { margin: 0; font-size: 13.5px; color: var(--ink); line-height: 1.4; }
+    .wai-hero-text small { color: var(--muted); font-size: 12px; }
+    .wai-hero-link { display: inline-block; margin-top: 6px; font-size: 13px; font-weight: 600; color: var(--err); }
+    .wai-hero-link:hover { color: var(--err); }
+
+    .wai-row { display: flex; align-items: flex-start; gap: 12px; padding: 10px 2px; border-bottom: 1px solid var(--line-2); }
+    .wai-row:last-child { border-bottom: none; }
+    .wai-row-icon {
+        width: 32px; height: 32px; border-radius: 9px;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 14px; flex-shrink: 0;
+        align-self: flex-start;
+    }
+    .wai-row-icon.is-ok { background: var(--ok-bg); color: var(--ok); }
+    .wai-row-icon.is-flagged { background: var(--err-bg); color: var(--err); }
+    .wai-row-body { flex: 1 1 auto; min-width: 0; }
+    .wai-row-body h6 { margin: 0; font-size: 13.5px; font-weight: 600; color: var(--ink); }
+    .wai-row-status { font-size: 12px; margin-top: 2px; }
+    .wai-row-status.is-clear { color: var(--faint); }
+    .wai-row-status.is-flagged { color: var(--err); }
+    .wai-row-status a { display: block; margin-top: 2px; font-size: 12px; font-weight: 600; color: var(--teal); }
+    .wai-row-count { font-size: 18px; font-weight: 800; flex-shrink: 0; }
+    .wai-row-count.is-clear { color: var(--faint); font-weight: 400; }
+    .wai-row-count.is-flagged { color: var(--err); }
 </style>
 
 <div class="card card-wiINsight" @if(!empty($cardId)) id="{{ $cardId }}" @endif>
-    <div class="card-title d-flex justify-content-between align-items-start">
-        <h3>WAI Insights</h3>
+    <div class="wai-head">
+        <h2>WAI Insights</h2>
     </div>
-    <div class="leaveUser-main">
-        @foreach ($waiRows as $row)
-            @php $insight = $waiInsights[$row['key']] ?? ['count' => 0, 'employees' => []]; @endphp
-            <div class="leaveUser-block">
-                <div class="img">
-                    <img src="{{ URL::asset('resorts_assets/images/wisdom-ai-small.svg') }}" alt="image">
+
+    <div class="wai-body">
+        @if ($waiHero)
+            <div class="wai-hero is-alert">
+                <div class="wai-hero-count">{{ $waiHero['count'] }}</div>
+                <div class="wai-hero-text">
+                    @if ($waiFlaggedCount > 1)
+                        <p><strong>{{ $waiFlaggedCount }} checks need attention.</strong></p>
+                        <small>Most urgent: {{ $waiHero['count'] }} employees over their {{ $waiHero['label'] }}.</small>
+                    @else
+                        <p>{{ $waiHero['count'] }} employees over their {{ $waiHero['label'] }}.</p>
+                    @endif
+                    <a href="javascript:void(0)" class="wai-hero-link wai-view-all"
+                       data-wai-key="{{ $waiHero['key'] }}" data-wai-title="{{ ucfirst($waiHero['label']) }}"
+                       data-bs-toggle="modal" data-bs-target="#waiInsightModal">Review &rarr;</a>
                 </div>
-                <div class="flex-grow-1">
-                    <h6>{{ $row['label'] }}</h6>
-                    <p class="mb-0">{{ $insight['count'] }} {{ $insight['count'] == 1 ? 'employee' : 'employees' }} flagged</p>
-                    @if ($insight['count'] > 0)
-                        <a href="javascript:void(0)" class="a-linkTheme wai-view-all"
-                           data-wai-key="{{ $row['key'] }}" data-wai-title="{{ $row['label'] }}"
-                           data-bs-toggle="modal" data-bs-target="#waiInsightModal">View Details</a>
+            </div>
+        @else
+            <div class="wai-hero is-clear">
+                <i class="fa-solid fa-circle-check wai-hero-icon"></i>
+                <div class="wai-hero-text">
+                    <p>All checks passing this week.</p>
+                </div>
+            </div>
+        @endif
+
+        @foreach ($waiSortedChecks as $check)
+            <div class="wai-row">
+                @if ($check['status'] === 'critical')
+                    <div class="wai-row-icon is-flagged"><i class="fa-solid fa-xmark"></i></div>
+                @elseif ($check['status'] === 'flagged')
+                    <div class="wai-row-icon is-flagged"><i class="fa-solid fa-triangle-exclamation"></i></div>
+                @else
+                    <div class="wai-row-icon is-ok"><i class="fa-solid fa-check"></i></div>
+                @endif
+                <div class="wai-row-body">
+                    <h6>{{ ucfirst($check['label']) }}</h6>
+                    @if ($check['status'] === 'clear')
+                        <div class="wai-row-status is-clear">All clear</div>
+                    @else
+                        <div class="wai-row-status is-flagged">
+                            {{ $check['count'] }} {{ $check['count'] == 1 ? 'employee' : 'employees' }} flagged
+                            <a href="javascript:void(0)" class="wai-view-all"
+                               data-wai-key="{{ $check['key'] }}" data-wai-title="{{ ucfirst($check['label']) }}"
+                               data-bs-toggle="modal" data-bs-target="#waiInsightModal">View details &rarr;</a>
+                        </div>
                     @endif
                 </div>
-                <div class="text-end">
-                    <span class="wai-count {{ $insight['count'] > 0 ? 'text-danger' : 'text-muted' }}">{{ sprintf('%02d', $insight['count']) }}</span>
-                </div>
+                <div class="wai-row-count {{ $check['status'] === 'clear' ? 'is-clear' : 'is-flagged' }}">{{ $check['count'] }}</div>
             </div>
         @endforeach
     </div>

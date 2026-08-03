@@ -84,9 +84,9 @@
                         </div>
                     </div>
                     <div class="modal-footer justify-content-end">
-                        <a href="#" class="btn btn-sm btn-danger " data-bs-dismiss="modal" aria-label="Close">Cancel</a>
+                        <a href="#" class="btn btn-sm leave-btn-neutral" data-bs-dismiss="modal" aria-label="Close">Cancel</a>
 
-                        <button type="submit" class="btn btn-sm btn-theme">Submit</button>
+                        <button type="submit" class="btn btn-sm leave-btn-critical">Submit</button>
                     </div>
             </form>
 
@@ -159,6 +159,7 @@
             </div>
         </div>
     </div>
+@include('resorts.leaves._leave_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -243,8 +244,8 @@ $(document).ready(function () {
                         </div>
                     </td>
                     <td class="py-1">
-                        <a href="javascript:void(0)" class="btn  btn-sm btn-theme update-row-btn_agent" data-flag="Approved" data-id="${id}">Submit</a>
-                        <a href="javascript:void(0)" class="btn btn-sm btn-danger Cancel">Reset</a>
+                        <a href="javascript:void(0)" class="btn  btn-sm leave-btn-positive update-row-btn_agent" data-flag="Approved" data-id="${id}">Submit</a>
+                        <a href="javascript:void(0)" class="btn btn-sm leave-btn-neutral Cancel">Reset</a>
                        '
                     </td>
                 `;

@@ -19,7 +19,7 @@
                     </div>
                 </div>
                 <div class="col-auto ms-auto">
-                    <a href="#" class="btn btn-theme" id="printPayslip" onclick="printPaySlip()">Print</a>
+                    <a href="#" class="btn payroll-btn-secondary" id="printPayslip" onclick="printPaySlip()">Print</a>
                 </div>
             </div>
         </div>
@@ -255,7 +255,7 @@
 @endsection
 
 @section('import-css')
-
+@include('resorts.payroll._payroll_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')

@@ -286,7 +286,7 @@
                                         <input type="text" class="form-control amount-unit" placeholder="Amount Unit" readonly>
                                     </div>
                                     <div class="col-xl-3 col-auto align-self-end">
-                                        <a href="#" class="btn btn-themeSkyblue btn-sm add-fullFinal add-deduction">Add More</a>
+                                        <a href="#" class="btn payroll-btn-positive btn-sm add-fullFinal add-deduction">Add More</a>
                                     </div>
                                 </div>
                             </div>
@@ -311,7 +311,7 @@
                                      breakdown stashed at last render, discarding HR edits + any
                                      manually-added rows. Disabled until #payable-leaves has a
                                      stash (i.e. after the first employee fetch). --}}
-                                <button type="button" class="btn btn-sm btn-outline-secondary ms-2"
+                                <button type="button" class="btn btn-sm payroll-btn-secondary ms-2"
                                         id="reset-payable-leaves"
                                         title="Reset rows to the values calculated by the system">
                                     <i class="fa-solid fa-rotate-left me-1"></i>Reset to original
@@ -320,7 +320,7 @@
                                      record settlement items that aren't in the leave grid (extra
                                      PH credits, day-off carry, ad-hoc adjustments). The row's
                                      Days field is editable and rolls into the totals. --}}
-                                <button type="button" class="btn btn-sm btn-themeSkyblue ms-2"
+                                <button type="button" class="btn btn-sm payroll-btn-positive ms-2"
                                         id="add-payable-leave-row">
                                     <i class="fa-solid fa-plus me-1"></i>Add row
                                 </button>
@@ -392,7 +392,7 @@
                         <input type="hidden" name="payment_mode" id="payment_mode"/>
 
                         <div class="card-footer text-end">
-                            <button type="submit" class="btn btn-themeBlue  @if(Common::checkRouteWisePermission('payslip.fullandfinalsettlement',config('settings.resort_permissions.create')) == false) d-none @endif">Submit</button>
+                            <button type="submit" class="btn payroll-btn-primary  @if(Common::checkRouteWisePermission('payslip.fullandfinalsettlement',config('settings.resort_permissions.create')) == false) d-none @endif">Submit</button>
                         </div>
                     </form>
                 </div>
@@ -402,6 +402,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts.payroll._payroll_buttons_v2_styles')
 <style>
     select.parsley-error + .select2 .select2-selection {
     border-color: #dc3545 !important; /* red border */
@@ -1440,7 +1441,7 @@
                          <input type="text" class="form-control amount-unit" name="amount_unit[]" placeholder="Amount Unit" redaonly>
                      </div>
                     <div class="col-xl-3 col-auto align-self-end">
-                        <a href="#" class="btn btn-danger btn-sm remove-deduction">Remove</a>
+                        <a href="#" class="btn payroll-btn-secondary btn-sm remove-deduction">Remove</a>
                     </div>
                 </div>
             </div>

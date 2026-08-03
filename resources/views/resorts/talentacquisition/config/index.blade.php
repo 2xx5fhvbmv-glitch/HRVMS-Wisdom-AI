@@ -79,7 +79,7 @@
                                     <div class="col-auto">
                                         {{-- <div class="uploadFile-block">
                                             <div class="uploadFile-btn me-0">
-                                                <a href="#" class="btn btn-themeBlue btn-sm">Upload File</a>
+                                                <a href="#" class="btn ta-btn-primary btn-sm">Upload File</a>
                                                 <input type="file" id="uploadFile">
                                             </div>
                                         </div> --}}
@@ -88,7 +88,7 @@
                                         {{-- <span>OR</span> --}}
                                     </div>
                                     <div class="jobdiscriptionForm" >
-                                        <a href="#jobDesEdit-modal" disabled data-bs-toggle="modal" class=" jobDesEdit_Button btn btn-themeSkyblue btn-sm @if(App\Helpers\Common::checkRouteWisePermission('resort.ta.jobdescription.index',config('settings.resort_permissions.create')) == false) d-none @endif">
+                                        <a href="#jobDesEdit-modal" disabled data-bs-toggle="modal" class=" jobDesEdit_Button btn ta-btn-primary btn-sm @if(App\Helpers\Common::checkRouteWisePermission('resort.ta.jobdescription.index',config('settings.resort_permissions.create')) == false) d-none @endif">
                                             Create Job Description
                                         </a>
                                         @if(App\Helpers\Common::checkRouteWisePermission('resort.ta.jobdescription.index',config('settings.resort_permissions.create')) == false)
@@ -118,7 +118,7 @@
                                     </div>
                                 </div>
                             </div>
-                            <div><a href="{{route('interview-assessment.create')}}" class="btn btn-themeSkyblue btn-sm @if(App\Helpers\Common::checkRouteWisePermission('interview-assessment.index',config('settings.resort_permissions.create')) == false) d-none @endif">Build Interview Assessment Form</a>
+                            <div><a href="{{route('interview-assessment.create')}}" class="btn ta-btn-secondary btn-sm @if(App\Helpers\Common::checkRouteWisePermission('interview-assessment.index',config('settings.resort_permissions.create')) == false) d-none @endif">Build Interview Assessment Form</a>
                             </div>
 
                         </div>
@@ -151,7 +151,7 @@
                                             </select>
                                         </div>
                                         <div class="col-sm-auto">
-                                            <button type="submit" class="btn btn-themeSkyblue btn-sm">Submit</button>
+                                            <button type="submit" class="btn ta-btn-primary btn-sm">Submit</button>
                                         </div>
                                     </div>
                                 </form>
@@ -179,7 +179,7 @@
                                         </div>
                                     </div>
                                     <div class="col-lg-12">
-                                        <button type="submit" class="btn btn-themeSkyblue AddAgent mt-3">Save</button>
+                                        <button type="submit" class="btn ta-btn-primary AddAgent mt-3">Save</button>
                                     </div>
                                 </div>
                             </form>
@@ -194,7 +194,7 @@
                                         <h3><i class="fa-solid fa-file-word me-2 text-primary"></i>Offer Letter Templates</h3>
                                     </div>
                                     <div class="col-auto">
-                                        <a href="{{ route('resort.ta.offerLetterTemplates.index') }}" class="btn btn-theme">
+                                        <a href="{{ route('resort.ta.offerLetterTemplates.index') }}" class="btn ta-btn-secondary">
                                             <i class="fa-solid fa-arrow-right me-1"></i> Manage Templates
                                         </a>
                                     </div>
@@ -211,7 +211,7 @@
                                         <h3><i class="fa-solid fa-file-contract me-2 text-primary"></i>Employment Contract Templates</h3>
                                     </div>
                                     <div class="col-auto">
-                                        <a href="{{ route('resort.ta.contractTemplates.index') }}" class="btn btn-theme">
+                                        <a href="{{ route('resort.ta.contractTemplates.index') }}" class="btn ta-btn-secondary">
                                             <i class="fa-solid fa-arrow-right me-1"></i> Manage Templates
                                         </a>
                                     </div>
@@ -256,7 +256,7 @@
                                         </div>
                                         @endif
                                         <div class="card-footer text-end">
-                                            <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                                            <button type="submit" class="btn ta-btn-primary btn-sm">Submit</button>
                                         </div>
                                     </div>
                                 </form>
@@ -268,7 +268,7 @@
                                         <div>
                                             <img src="{{ URL::asset('resorts_assets/images/help-circle.svg')}}" alt="icon">
                                             <h5>Add Questionnaire For Interview</h5>
-                                            <a href="{{ route('resort.ta.add.Questionnaire') }}" class="btn btn-themeSkyblue btn-sm">Add Questions</a>
+                                            <a href="{{ route('resort.ta.add.Questionnaire') }}" class="btn ta-btn-secondary btn-sm">Add Questions</a>
                                         </div>
                                         <a href="{{ route('resort.ta.Questionnaire') }}" class="a-link">View All Questions</a>
                                     </div>
@@ -305,7 +305,7 @@
                                             <div class="col-lg-4">
 
 
-                                                <button  class="btn btn-themeSkyblue AddAgent mt-3">Submit</button>
+                                                <button  class="btn ta-btn-primary AddAgent mt-3">Submit</button>
 
                                             </div>
 
@@ -358,7 +358,7 @@
                                                 </div>
                                             </div>
                                             <div class="col-lg-4">
-                                                <button class="btn btn-themeSkyblue AddSource mt-3">Submit</button>
+                                                <button class="btn ta-btn-primary AddSource mt-3">Submit</button>
                                             </div>
                                         </div>
                                     </form>
@@ -399,7 +399,7 @@
                                                 </div>
                                             </div>
                                             <div class="col-lg-4">
-                                                <button class="btn btn-themeSkyblue AddProvider mt-3">Submit</button>
+                                                <button class="btn ta-btn-primary AddProvider mt-3">Submit</button>
                                             </div>
                                         </div>
                                     </form>
@@ -587,8 +587,8 @@
                     <div class="modal-footer">
                         {{-- <a href="#" class="btn btn-themeBlue">Save As Draft</a>
                         <a href="#" class="a-link">View</a> --}}
-                        <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                        <button type="submit" class="btn btn-themeBlue">Submit</button>
+                        <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Cancel</a>
+                        <button type="submit" class="btn ta-btn-primary">Submit</button>
                     </div>
                 </form>
             </div>
@@ -597,6 +597,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts.talentacquisition._ta_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')
@@ -1217,7 +1218,7 @@ $(document).ready(function()
                                     </div>
                                 </td>
                                 <td class="py-1">
-                                    <a href="#" class="btn btn-theme update-row-btn_agent" data-agent-id="${agentId}">Submit</a>
+                                    <a href="#" class="btn ta-btn-secondary update-row-btn_agent" data-agent-id="${agentId}">Submit</a>
                                 </td>
                             </tr>
                         </form>

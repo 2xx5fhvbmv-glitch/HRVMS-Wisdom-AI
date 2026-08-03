@@ -75,7 +75,7 @@
                                             <input type="hidden" id="total_days" name="total_days"/>
                                         </div>
                                     </div>
-                                    <a href="#" class="btn btn-themeSkyblue btn-sm mb-3 append-add" id="rowAdder">Add Another Leave</a>
+                                    <a href="#" class="btn leave-btn-accent btn-sm mb-3 append-add" id="rowAdder">Add Another Leave</a>
                                     <div id="newinput"></div>
                                 </div>
                                 <div class="row align-items-end g-4 mb-4">
@@ -239,7 +239,7 @@
                                         <label for="uploadFile" class="form-label">UPLOAD DOCUMENTS<span class="red-mark attachment-required-mark d-none">*</span></label>
                                         <div class="uploadFile-block">
                                             <div class="uploadFile-btn">
-                                                <button type="button" class="btn btn-themeBlue btn-sm" onclick="document.getElementById('uploadFile').click();">Upload File</button>
+                                                <button type="button" class="btn leave-btn-accent btn-sm" onclick="document.getElementById('uploadFile').click();">Upload File</button>
                                                 <input type="file" id="uploadFile" name="attachments" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.heic,.heif,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,image/jpeg,image/png,image/heic,image/heif">
                                             </div>
                                             <div class="uploadFile-text">PNG, JPEG, PDF, Word — max 5 MB</div>
@@ -254,7 +254,7 @@
                                          "(Exceeds balance!)" in the right-side summary card). --}}
                                     <div class="d-flex align-items-center justify-content-end gap-2">
                                         <small id="submit-disabled-reason" class="text-danger d-none me-2"></small>
-                                        <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                                        <button type="submit" class="btn leave-btn-primary btn-sm">Submit</button>
                                     </div>
                                 </div>
                             </div>
@@ -274,6 +274,7 @@
             </div>
         </div>
     </div>
+@include('resorts.leaves._leave_buttons_v2_styles')
 @endsection
 
 @section('import-css')

@@ -57,7 +57,7 @@
                                 </div>
                             </div>
                             <div class="card-footer text-end"> <!-- Footer for Save Form button -->
-                                <button id="save-form" class="btn btn-themeBlue btn-sm">Save Form</button>
+                                <button id="save-form" class="btn ta-btn-primary btn-sm">Save Form</button>
                             </div>
                         </div>
                     </div>
@@ -68,6 +68,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts.talentacquisition._ta_buttons_v2_styles')
 <style>
     #ui-datepicker-div{
         display:none!important;

@@ -9,13 +9,14 @@
 
     @section('content')
     <div class="body-wrapper pb-5">
-        <div class="container-fluid">
+        <div class="container-fluid compliance-page">
                <div class="page-hedding">
                     <div class="row  g-3">
                          <div class="col-auto">
                          <div class="page-title">
                               <span>People</span>
                               <h1>{{ $page_title }}</h1>
+                              <p class="cc-subtitle">Active breaches across all modules</p>
                          </div>
                          </div>
                          {{-- Action bar: Run rules engine + AI anomaly scan + bulk re-enrich.
@@ -23,8 +24,8 @@
                               the rules-engine run since they all create/modify rows. --}}
                          <div class="col-auto ms-auto d-flex gap-2 flex-wrap @if(App\Helpers\Common::checkRouteWisePermission('people.compliance.index',config('settings.resort_permissions.create')) == false) d-none @endif">
                               <a class="btn btn-theme" href="{{route('people.compliance.run')}}">Run Compliance Check Now</a>
-                              <button type="button" class="btn btn-themeBlue" id="ai-anomaly-scan-btn" title="Run an AI-only anomaly scan that catches issues the rule-based engine can't (salary outliers, ratio drifts, etc.)">
-                                  <i class="fa-solid fa-wand-magic-sparkles me-1"></i>Run AI Anomaly Scan
+                              <button type="button" class="btn btn-themeBlue cc-ai-btn" id="ai-anomaly-scan-btn" title="Run an AI-only anomaly scan that catches issues the rule-based engine can't (salary outliers, ratio drifts, etc.)">
+                                  @include('resorts.renderfiles.ai_spark', ['class' => 'me-1'])Run AI Anomaly Scan
                               </button>
                               <button type="button" class="btn btn-themeGray" id="ai-regenerate-btn" title="Re-run the AI explanation + remediation on the next batch of 15 breached compliance rows. Picks never-enriched rows first, then the oldest enrichments. Click again for the next batch.">
                                   <i class="fa-solid fa-rotate me-1"></i>Regenerate AI
@@ -33,8 +34,31 @@
                     </div>
                </div>
 
+            {{-- Summary strip — counts over the full active-breach dataset
+                 (not affected by the filter chips below), computed in
+                 ComplianceController::index() from the same base scope the
+                 table itself uses. --}}
+            <div class="cc-summary-strip">
+                <div class="cc-summary-card cc-summary-card--crit">
+                    <div class="cc-summary-value">{{ $complianceSummary['critical'] }}</div>
+                    <div class="cc-summary-label">Critical breaches</div>
+                </div>
+                <div class="cc-summary-card">
+                    <div class="cc-summary-value">{{ $complianceSummary['employees'] }}</div>
+                    <div class="cc-summary-label">Employees affected</div>
+                </div>
+                <div class="cc-summary-card">
+                    <div class="cc-summary-value">{{ $complianceSummary['rules'] }}</div>
+                    <div class="cc-summary-label">Rules breached</div>
+                </div>
+                <div class="cc-summary-card">
+                    <div class="cc-summary-value">{{ $complianceSummary['modules'] }}</div>
+                    <div class="cc-summary-label">Modules involved</div>
+                </div>
+            </div>
+
             <div>
-                <div class="card">
+                <div class="card cc-table-card">
                     <div class="card-header">
                         <div class="row g-md-3 g-2 align-items-center">
                               <div class="col-xl-3 col-lg-5 col-md-7 col-sm-8 ">
@@ -48,13 +72,28 @@
                                    <a id="compliance-download-btn" href="{{route('people.compliance.download')}}" class="btn btn-theme me-2">Download</a>
                               </div>
                         </div>
+                        {{-- Filter chips — generated from the same dataset,
+                             no hard-coded rule/module names. Clicking one
+                             re-queries the server-side DataTable with the
+                             matching filter param. --}}
+                        <div class="cc-chips" id="cc-chip-bar">
+                            <button type="button" class="cc-chip is-active" data-filter-type="" data-filter-value="">All <span class="cc-chip-count">{{ $complianceChips['all'] }}</span></button>
+                            <button type="button" class="cc-chip cc-chip--crit" data-filter-type="severity" data-filter-value="Critical">Critical <span class="cc-chip-count">{{ $complianceChips['critical'] }}</span></button>
+                            @foreach($complianceChips['rules'] as $ruleName => $cnt)
+                                <button type="button" class="cc-chip" data-filter-type="compliance_breached_name" data-filter-value="{{ $ruleName }}">{{ $ruleName }} <span class="cc-chip-count">{{ $cnt }}</span></button>
+                            @endforeach
+                            @foreach($complianceChips['modules'] as $moduleName => $cnt)
+                                <button type="button" class="cc-chip" data-filter-type="module_name" data-filter-value="{{ $moduleName }}">{{ $moduleName }} <span class="cc-chip-count">{{ $cnt }}</span></button>
+                            @endforeach
+                        </div>
                     </div>
+                    <div class="cc-table-scroll">
                     <table id="table-exitclearance-form" class="table table-exitclearance-form w-100">
                         <thead>
                             <tr>
                                 <th>No</th>
                                 <th>Module Name</th>
-                                <th>Compliance Breached</th>
+                                <th>Rule Breached</th>
                                 <th>Employee Id</th>
                                 <th>Employee Name</th>
                                 <th>Description</th>
@@ -66,6 +105,7 @@
                         <tbody>
                         </tbody>
                     </table>
+                    </div>
                 </div>
             </div>
 
@@ -98,6 +138,213 @@
 
     @section('import-css')
     <style>
+        /* Brand tokens — scoped to this page only, since no global
+           CSS-variable system exists yet in this app. */
+        .compliance-page {
+            --teal:#014653; --teal-2:#035b6c; --teal-3:#e6f0f1; --teal-soft:#f4f8f8; --lime:#e0ff02;
+            --ink:#14232a; --muted:#5d6f75; --faint:#93a4a9; --line:#e2ebec; --line-2:#eef3f3;
+            --warn:#d98a00; --warn-bg:#fff6e5; --err:#e5573f; --crit:#c0392b; --crit-bg:#fbe9e6;
+        }
+
+        .compliance-page .cc-subtitle {
+            margin: 2px 0 0;
+            font-size: 13px;
+            color: var(--muted);
+        }
+
+        /* ---- Summary strip ---- */
+        .compliance-page .cc-summary-strip {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 14px;
+            margin-bottom: 16px;
+        }
+        .compliance-page .cc-summary-card {
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: 14px;
+            padding: 14px 16px;
+        }
+        .compliance-page .cc-summary-value {
+            font-size: 26px;
+            font-weight: 800;
+            color: var(--ink);
+            line-height: 1.2;
+        }
+        .compliance-page .cc-summary-card--crit .cc-summary-value {
+            color: var(--crit);
+        }
+        .compliance-page .cc-summary-label {
+            font-size: 12.5px;
+            color: var(--muted);
+            margin-top: 2px;
+        }
+
+        /* ---- Filter chips (live inside the card-header, under search/download) ---- */
+        .compliance-page .cc-chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 14px;
+        }
+        .compliance-page .cc-chip {
+            border: 1px solid var(--line);
+            background: #fff;
+            color: var(--ink);
+            font-size: 12.5px;
+            font-weight: 600;
+            padding: 6px 14px;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: background-color .15s, color .15s, border-color .15s;
+        }
+        .compliance-page .cc-chip:hover { border-color: var(--teal-2); }
+        .compliance-page .cc-chip.is-active {
+            background: var(--teal);
+            border-color: var(--teal);
+            color: #fff;
+        }
+        .compliance-page .cc-chip--crit.is-active { background: var(--crit); border-color: var(--crit); }
+        .compliance-page .cc-chip-count {
+            opacity: .75;
+            margin-left: 2px;
+        }
+
+        /* ---- Search + table shell ---- */
+        .compliance-page .cc-table-card { border-radius: 14px; overflow: hidden; }
+        .compliance-page .input-group .form-control.search {
+            background: #fff;
+            border: 1px solid var(--line);
+            border-radius: 11px 0 0 11px;
+        }
+        .compliance-page .input-group .fa-search {
+            border: 1px solid var(--line);
+            border-left: none;
+            border-radius: 0 11px 11px 0;
+            background: #fff;
+            color: var(--faint);
+        }
+        .compliance-page .cc-table-scroll { overflow-x: auto; }
+
+        /* !important overrides the site-wide .table thead th rule
+           (padding: 0 10px 12px !important in default.css), which was
+           squashing this header down to a sliver with no visible band. */
+        #table-exitclearance-form thead th,
+        .compliance-page .dataTables_scrollHead th {
+            background: var(--teal-soft) !important;
+            color: var(--ink);
+            text-transform: uppercase;
+            font-size: 12px;
+            letter-spacing: .4px;
+            font-weight: 800;
+            padding: 10px !important;
+        }
+        #table-exitclearance-form tbody tr {
+            background: #fff;
+            border-bottom: 1px solid var(--line-2);
+        }
+        #table-exitclearance-form tbody tr:hover { background: var(--teal-soft); }
+
+        #table-exitclearance-form tbody td:nth-child(1) { color: var(--faint); white-space: nowrap; }
+        #table-exitclearance-form tbody td:nth-child(2) { color: var(--teal); font-weight: 600; }
+        #table-exitclearance-form tbody td:nth-child(4) { color: var(--muted); }
+
+        /* ---- Rule Breached cell (rule name + severity badge) ---- */
+        .cc-rule-name { font-weight: 700; color: var(--ink); }
+        .cc-rule-badge { margin-top: 4px; }
+
+        /* ---- Employee Name cell ---- */
+        .cc-emp { display: flex; align-items: flex-start; gap: 10px; }
+        .cc-emp-avatar {
+            flex: 0 0 auto;
+            width: 30px; height: 30px;
+            border-radius: 50%;
+            background: var(--teal-soft);
+            border: 1px solid var(--line);
+            color: var(--teal);
+            font-size: 11.5px;
+            font-weight: 700;
+            display: flex; align-items: center; justify-content: center;
+            overflow: hidden;
+        }
+        .cc-emp-avatar img { width: 100%; height: 100%; object-fit: cover; }
+        .cc-emp-info { min-width: 0; }
+        .cc-emp-name { font-weight: 700; color: var(--ink); }
+        .cc-emp-role { font-size: 11.5px; color: var(--faint); margin-top: 1px; }
+
+        /* ---- Description cell ---- */
+        .cc-desc { min-width: 220px; }
+        .cc-desc-text { color: var(--ink); font-size: 13px; line-height: 1.5; margin-top: 4px; }
+        .cc-fix {
+            display: flex;
+            align-items: flex-start;
+            gap: 6px;
+            background: var(--teal-soft);
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 8px 10px;
+            margin-top: 8px;
+            font-size: 12.5px;
+            color: var(--ink);
+        }
+        .cc-fix .ai-spark { color: var(--teal); margin-top: 2px; }
+        .cc-fix-label { font-weight: 600; color: var(--teal); }
+
+        /* ---- Shared AI sparkle glyph ---- */
+        .ai-spark {
+            width: 14px;
+            height: 14px;
+            flex-shrink: 0;
+            vertical-align: -2px;
+            animation: aiTwinkle 2.4s ease-in-out infinite;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .ai-spark { animation: none; }
+        }
+        @keyframes aiTwinkle {
+            0%, 100% { opacity: .85; }
+            50% { opacity: 1; }
+        }
+        /* Dark/teal button background — spark reads in lime instead of teal. */
+        .cc-ai-btn .ai-spark { color: var(--lime); }
+
+        /* ---- Reported On cell ---- */
+        .cc-reported { font-size: 13px; color: var(--ink); }
+        .cc-muted { color: var(--faint); font-size: 12px; }
+
+        /* ---- Badges (severity + status) ---- */
+        .cc-badge {
+            display: inline-block;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: .2px;
+            padding: 3px 10px;
+            border-radius: 20px;
+        }
+        .cc-badge--crit { background: var(--crit-bg); color: var(--crit); }
+        .cc-badge--warn { background: var(--warn-bg); color: var(--warn); }
+        .cc-badge--ok   { background: #e9f7f0; color: #1f9d6b; }
+
+        /* ---- Action cell ---- */
+        .cc-actions { display: flex; flex-direction: column; gap: 6px; align-items: flex-start; }
+        .cc-btn {
+            display: inline-block;
+            font-size: 12.5px;
+            font-weight: 700;
+            padding: 6px 14px;
+            border-radius: 11px;
+            cursor: pointer;
+            text-align: center;
+        }
+        .cc-btn--outline {
+            background: #fff;
+            border: 1px solid var(--line);
+            color: var(--muted);
+        }
+        .cc-btn--outline:hover { border-color: var(--teal-2); color: var(--teal-2); }
+        .cc-btn--outline.disabled { color: var(--faint); cursor: default; }
+        .cc-btn--outline.disabled:hover { border-color: var(--line); color: var(--faint); }
+
         /* Single visual marker for freshly AI-regenerated rows: a small
            "NEW AI" pill in the first cell. Class `ai-fresh-row` is set
            by the backend on any row whose ai_generated_at is < 30 min
@@ -142,6 +389,18 @@
                $('.card-header a[href*="people.compliance.download"]').attr('href', downloadUrl);
           }
 
+          // Filter chips — clicking one re-runs ComplianceIndex() (the same
+          // full destroy/rebuild the search box already triggers on every
+          // keystroke) with the chip's filter param folded into the
+          // DataTable's ajax.data callback below.
+          $(document).on('click', '.cc-chip', function() {
+               $('.cc-chip').removeClass('is-active');
+               $(this).addClass('is-active');
+               complianceFilter.type = $(this).data('filter-type') || '';
+               complianceFilter.value = $(this).data('filter-value') || '';
+               ComplianceIndex();
+          });
+
           $(document).on('click', '.dismmisal', function(e) {
                e.preventDefault();
                var complianceId = $(this).data('id');
@@ -150,7 +409,7 @@
                     text: "You want to dismiss this compliance?",
                     icon: 'warning',
                     showCancelButton: true,
-                    confirmButtonColor: '#3085d6',
+                    confirmButtonColor: '#014653',
                     cancelButtonColor: '#d33',
                     confirmButtonText: 'Yes, dismiss it!'
                }).then((result) => {
@@ -180,6 +439,10 @@
      });
 
      var viewForm;
+     // Active filter-chip selection — persists across ComplianceIndex()
+     // rebuilds (chip clicks destroy/rebuild the table the same way the
+     // search box already does on every keystroke).
+     var complianceFilter = { type: '', value: '' };
      function ComplianceIndex()
      {
           if ($.fn.DataTable.isDataTable('#table-exitclearance-form')) {
@@ -216,6 +479,9 @@
                     data: function(d) {
                          var searchTerm = $('.search').val();
                          d.searchTerm = searchTerm;
+                         if (complianceFilter.type) {
+                              d[complianceFilter.type] = complianceFilter.value;
+                         }
                     }
                },
           columns: [

@@ -62,6 +62,7 @@
     @endsection
 
     @section('import-css')
+    @include('resorts.talentacquisition._ta_buttons_v2_styles')
     @endsection
 
     @section('import-scripts')

@@ -45,9 +45,9 @@
                             </select>
                         </div>
 
-                        <div class="col-auto ms-auto">
-                            <a href="#" class="btn btn-grid active"><img src="{{ URL::asset('resorts_assets/images/grid.svg')}}" alt="icon"></a>
-                            <a href="#" class="btn btn-list "><img src="{{ URL::asset('resorts_assets/images/list.svg')}}" alt="icon"></a>
+                        <div class="col-auto ms-auto leave-tabnav">
+                            <a href="#" class="btn-grid active"><img src="{{ URL::asset('resorts_assets/images/grid.svg')}}" alt="icon"></a>
+                            <a href="#" class="btn-list "><img src="{{ URL::asset('resorts_assets/images/list.svg')}}" alt="icon"></a>
                         </div>
                     </div>
                 </div>
@@ -140,9 +140,9 @@
                                                 <p><a href="{{ route('leave.details', ['leave_id' => base64_encode($request->id)]) }}" class="a-link">View Leave Balance</a></p>
                                             </div>
                                             <div class="btn-block">
-                                                <a href="{{ route('leave.details', ['leave_id' => base64_encode($request->id)]) }}" class="btn btn-themeSkyblue btn-sm">View</a>
-                                                <button class="btn btn-themeBlue btn-sm approve-btn" data-leave-id="{{ $request->id }}">Approve</button>
-                                                <button class="btn btn-danger btn-sm reject-btn" data-leave-id="{{ $request->id }}">Reject</button>
+                                                <a href="{{ route('leave.details', ['leave_id' => base64_encode($request->id)]) }}" class="btn leave-btn-secondary btn-sm">View</a>
+                                                <button class="btn leave-btn-positive btn-sm approve-btn" data-leave-id="{{ $request->id }}">Approve</button>
+                                                <button class="btn leave-btn-critical btn-sm reject-btn" data-leave-id="{{ $request->id }}">Reject</button>
                                             </div>
                                         </div>
                                     </div>
@@ -189,9 +189,9 @@
                                                 <p><span class="text-lightblue">{{$request -> available_balance}}</span> Leaves Available</p>
                                             </div>
                                             <div class="btn-block">
-                                                <a href="{{ route('leave.details', ['leave_id' => base64_encode($request->id)]) }}" class="btn btn-themeSkyblue btn-sm">View</a>
-                                                <button class="btn btn-themeBlue btn-sm approve-btn" data-leave-id="{{ $request->id }}">Approve</button>
-                                                <button class="btn btn-danger btn-sm reject-btn" data-leave-id="{{ $request->id }}">Reject</button>
+                                                <a href="{{ route('leave.details', ['leave_id' => base64_encode($request->id)]) }}" class="btn leave-btn-secondary btn-sm">View</a>
+                                                <button class="btn leave-btn-positive btn-sm approve-btn" data-leave-id="{{ $request->id }}">Approve</button>
+                                                <button class="btn leave-btn-critical btn-sm reject-btn" data-leave-id="{{ $request->id }}">Reject</button>
                                             </div>
                                         </div>
                                     </div>
@@ -210,6 +210,7 @@
             </div>
         </div>
     </div>
+@include('resorts.leaves._leave_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -394,9 +395,9 @@
                                         <p><span class="text-lightblue">${request.available_balance}</span> Leaves Available</p>
                                     </div>
                                     <div class="btn-block">
-                                       <a href="/resort/leave/details/${btoa(request.id)}" class="btn btn-themeSkyblue btn-sm">View</a>
-                                        <button class="btn btn-themeBlue btn-sm approve-btn" data-leave-id="${request.id}">Approve</button>
-                                        <button class="btn btn-danger btn-sm reject-btn" data-leave-id="${request.id}">Reject</button>
+                                       <a href="/resort/leave/details/${btoa(request.id)}" class="btn leave-btn-secondary btn-sm">View</a>
+                                        <button class="btn leave-btn-positive btn-sm approve-btn" data-leave-id="${request.id}">Approve</button>
+                                        <button class="btn leave-btn-critical btn-sm reject-btn" data-leave-id="${request.id}">Reject</button>
                                     </div>
                                 </div>
                             </div>`;

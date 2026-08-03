@@ -180,7 +180,7 @@
                                     </p>
                                     @if($todo->action_type == 'overtime_pending')
                                         <button type="button" 
-                                            class="btn btn-xs btn-warning update-overtime-status" 
+                                            class="btn btn-xs taa-btn-attention update-overtime-status" 
                                             data-emp-id="{{ $todo->employee_id }}"
                                             data-date="{{ $todo->date }}"
                                             data-employee-name="{{ $todo->EmployeeName }}">
@@ -188,7 +188,7 @@
                                         </button>
                                     @else
                                         <button type="button" 
-                                            class="btn btn-sm {{ $todo->action_type == 'check_in' ? 'btn-danger' : 'btn-success' }} manual-check-action" 
+                                            class="btn btn-sm {{ $todo->action_type == 'check_in' ? 'taa-btn-positive' : 'taa-btn-attention' }} manual-check-action" 
                                             data-roster-id="{{ $todo->roster_id }}"
                                             data-action="{{ $todo->action_type }}"
                                             data-date="{{ $todo->shift_date }}"
@@ -222,8 +222,8 @@
                                 <h3>Duty Roster</h3>
                             </div>
                             <div class="col-auto">
-                                <a href="{{route('resort.timeandattendance.ViewDutyRoster')}}" class="btn btn-themeSkyblue btn-sm me-2">View All Duty Roster</a>
-                                <a href="{{route('resort.timeandattendance.CreateDutyRoster')}}" class="btn btn-themeSkyblue btn-sm">Create Duty Roster</a>
+                                <a href="{{route('resort.timeandattendance.ViewDutyRoster')}}" class="btn taa-btn-secondary btn-sm me-2">View All Duty Roster</a>
+                                <a href="{{route('resort.timeandattendance.CreateDutyRoster')}}" class="btn taa-btn-primary btn-sm">Create Duty Roster</a>
                             </div>
                         </div>
                     </div>
@@ -325,10 +325,10 @@
                     </div>
                     <div class="row g-2 justify-content-center mb-3">
                         <div class="col-auto">
-                            <button type="submit" class="btn btn-themeBlue btn-sm todoListApprove" data-button="approve"><i  class="fa-solid fa-check me-2"></i>Approved</button>
+                            <button type="submit" class="btn taa-btn-positive btn-sm todoListApprove" data-button="approve"><i  class="fa-solid fa-check me-2"></i>Approved</button>
                         </div>
                         <div class="col-auto">
-                            <button type="submit" class="btn btn-danger btn-sm todoListReject"  data-button="reject"><i class="fa-solid fa-xmark me-2"></i>Reject</button>
+                            <button type="submit" class="btn taa-btn-attention btn-sm todoListReject"  data-button="reject"><i class="fa-solid fa-xmark me-2"></i>Reject</button>
                         </div>
                     </div>
 
@@ -395,14 +395,14 @@
                     </div>
                     
                     <div class="text-end mt-3">
-                        <button type="button" class="btn btn-sm btn-primary" id="addOvertimeEntry">
+                        <button type="button" class="btn btn-sm taa-btn-positive" id="addOvertimeEntry">
                             <i class="fa fa-plus"></i> Add Entry
                         </button>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="submit" class="btn btn-primary">Save Changes</button>
+                    <button type="button" class="btn taa-btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="submit" class="btn taa-btn-primary">Save Changes</button>
                 </div>
             </form>
         </div>
@@ -411,6 +411,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts.timeandattendance._taa_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')
@@ -731,7 +732,7 @@
         }
         entryHtml += '<div class="d-flex justify-content-between align-items-center mb-2">';
         entryHtml += '<h6 class="mb-0">Entry ' + entryNumber + '</h6>';
-        entryHtml += '<button type="button" class="btn btn-sm btn-danger remove-overtime-entry"><i class="fa fa-times"></i> Remove</button>';
+        entryHtml += '<button type="button" class="btn btn-sm taa-btn-neutral remove-overtime-entry"><i class="fa fa-times"></i> Remove</button>';
         entryHtml += '</div>';
         entryHtml += '<div class="row g-3">';
         entryHtml += '<div class="col-md-4">';
@@ -888,7 +889,7 @@
             `,
             icon: 'question',
             showCancelButton: true,
-            confirmButtonColor: action === 'check_in' ? '#dc3545' : '#28a745',
+            confirmButtonColor: action === 'check_in' ? '#2E9E5B' : '#D98A00',
             cancelButtonColor: '#6c757d',
             confirmButtonText: `Yes, ${actionText}`,
             cancelButtonText: 'Cancel',
@@ -915,11 +916,12 @@
                     },
                     success: function(response) {
                         if (response.success) {
-                            Swal.fire(
-                                'Success!',
-                                response.message,
-                                'success'
-                            ).then(() => {
+                            Swal.fire({
+                                title: 'Success!',
+                                text: response.message,
+                                icon: 'success',
+                                confirmButtonColor: '#2E9E5B'
+                            }).then(() => {
                                 window.location.reload();
                             });
                         } else {

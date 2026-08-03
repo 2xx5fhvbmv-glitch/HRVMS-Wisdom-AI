@@ -14,7 +14,7 @@
                 </div>
                 <div class="col-auto">
                     <div class="d-flex justify-content-end">
-                        <a href="{{ route('resort.ta.configration') }}" class="btn btn-theme">Back to Configuration</a>
+                        <a href="{{ route('resort.ta.configration') }}" class="btn ta-btn-secondary">Back to Configuration</a>
                     </div>
                 </div>
             </div>
@@ -47,7 +47,7 @@
                         <input type="file" class="form-control" name="template_file" accept=".docx" required>
                     </div>
                     <div class="col-lg-4 d-flex align-items-end">
-                        <button type="submit" class="btn btn-themeSkyblue">
+                        <button type="submit" class="btn ta-btn-primary">
                             <i class="fa-solid fa-upload me-1"></i> Upload Template
                         </button>
                     </div>
@@ -102,6 +102,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts.talentacquisition._ta_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')

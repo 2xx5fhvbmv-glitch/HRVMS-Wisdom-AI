@@ -326,9 +326,9 @@ class ApplicantsController extends Controller
             return datatables()->of($Applicant_form_data)
             ->addColumn('action', function ($row) use ($isHrUser) {
                 $id = base64_encode($row->id);
-                $actions = '<a href="javascript:void(0)" class="btn btn-sm btn-themeBlue me-1 userApplicants-btn" data-id="'.$row->applicant_id.'" data-bs-toggle="tooltip" data-bs-placement="top" title="View Applicant"><i class="fa-solid fa-eye"></i></a>
-                        <a href="javascript:void(0)" class="btn btn-sm btn-theme ApplicantsNotes" data-notes="'.$row->Notes.'" data-id="'.$id.'" data-bs-toggle="tooltip" data-bs-placement="top" title="Notes"><i class="fa-solid fa-note-sticky"></i></a>
-                        <a href="javascript:void(0)" class="btn btn-sm btn-themeNeon waiInsightsBtn" data-id="'.$id.'" data-bs-toggle="tooltip" data-bs-placement="top" title="WAI Insights — CV vs Job Description"><i class="fa-solid fa-robot"></i></a>';
+                $actions = '<a href="javascript:void(0)" class="btn btn-sm ta-btn-secondary me-1 userApplicants-btn" data-id="'.$row->applicant_id.'" data-bs-toggle="tooltip" data-bs-placement="top" title="View Applicant"><i class="fa-solid fa-eye"></i></a>
+                        <a href="javascript:void(0)" class="btn btn-sm ta-btn-secondary ApplicantsNotes" data-notes="'.$row->Notes.'" data-id="'.$id.'" data-bs-toggle="tooltip" data-bs-placement="top" title="Notes"><i class="fa-solid fa-note-sticky"></i></a>
+                        <a href="javascript:void(0)" class="btn btn-sm ta-btn-accent waiInsightsBtn" data-id="'.$id.'" data-bs-toggle="tooltip" data-bs-placement="top" title="WAI Insights — CV vs Job Description"><i class="fa-solid fa-robot"></i></a>';
 
                 // Show Selected/Rejected buttons when final round is complete (only for HR)
                 if ($isHrUser) {
@@ -2329,11 +2329,11 @@ class ApplicantsController extends Controller
 
                 return '
                 <div class="d-inline-flex gap-1 flex-nowrap white-space-nowrap" style="white-space:nowrap;">
-                    <a class="btn btn-sm btn-outline-primary userApplicants-btn" href="javascript:void(0)" data-id="'.$row->applicant_id.'" title="View Profile"><i class="fa-solid fa-eye"></i></a>
-                    <a class="btn btn-sm btn-outline-info RejactionReason '.$reject_class.'" data-Rank="'.$row->As_ApprovedBy.'" data-applicant_status_id="'.$row->applicant_status_id.'" data-Comments="'.htmlspecialchars($row->Comments ?? '', ENT_QUOTES).'" href="javascript:void(0)" data-id="'.$row->applicant_id.'" title="Rejection Reason"><i class="fa-solid fa-circle-info"></i></a>
-                    <a class="btn btn-sm btn-outline-secondary sendConsentRequestBtn" data-id="'.$id.'" href="javascript:void(0)" title="Send Consent Request"><i class="fa-solid fa-file-shield"></i></a>
-                    <a class="btn btn-sm btn-outline-success checkAvailabilityBtn" data-id="'.$id.'" href="javascript:void(0)" title="Check Availability"><i class="fa-solid fa-calendar-check"></i></a>
-                    <a class="btn btn-sm btn-outline-danger destoryApplicant '.$delete_class.'" data-location="'.$row->id.'" data-id="'.$row->id.'" href="javascript:void(0)" title="Delete"><i class="fa-solid fa-trash"></i></a>
+                    <a class="btn btn-sm ta-btn-secondary userApplicants-btn" href="javascript:void(0)" data-id="'.$row->applicant_id.'" title="View Profile"><i class="fa-solid fa-eye"></i></a>
+                    <a class="btn btn-sm ta-btn-secondary RejactionReason '.$reject_class.'" data-Rank="'.$row->As_ApprovedBy.'" data-applicant_status_id="'.$row->applicant_status_id.'" data-Comments="'.htmlspecialchars($row->Comments ?? '', ENT_QUOTES).'" href="javascript:void(0)" data-id="'.$row->applicant_id.'" title="Rejection Reason"><i class="fa-solid fa-circle-info"></i></a>
+                    <a class="btn btn-sm ta-btn-attention sendConsentRequestBtn" data-id="'.$id.'" href="javascript:void(0)" title="Send Consent Request"><i class="fa-solid fa-file-shield"></i></a>
+                    <a class="btn btn-sm ta-btn-attention checkAvailabilityBtn" data-id="'.$id.'" href="javascript:void(0)" title="Check Availability"><i class="fa-solid fa-calendar-check"></i></a>
+                    <a class="btn btn-sm ta-btn-critical destoryApplicant '.$delete_class.'" data-location="'.$row->id.'" data-id="'.$row->id.'" href="javascript:void(0)" title="Delete"><i class="fa-solid fa-trash"></i></a>
                 </div>';
             })
             ->addColumn('details-control', function ($row) {

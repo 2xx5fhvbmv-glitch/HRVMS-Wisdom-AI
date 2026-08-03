@@ -66,8 +66,8 @@
                 <textarea class="form-control" rows="7" placeholder="Reason for Rejection"></textarea>
             </div>
             <div class="modal-footer justify-content-center">
-                <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                <a href="#" class="btn btn-themeBlue">Submit</a>
+                <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Cancel</a>
+                <a href="#" class="btn ta-btn-primary">Submit</a>
             </div>
 
         </div>
@@ -76,6 +76,7 @@
     @endsection
 
 @section('import-css')
+@include('resorts.talentacquisition._ta_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')

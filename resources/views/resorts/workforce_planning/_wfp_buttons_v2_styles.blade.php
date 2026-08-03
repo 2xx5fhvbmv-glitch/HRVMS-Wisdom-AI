@@ -153,6 +153,20 @@
         box-shadow: 0 8px 18px -8px rgba(20,35,42,.25);
     }
 
+    /* The one true "we did it" moment — brand gradient, reserved for a
+       final, whole-cycle completion (e.g. Approve Budget), not routine
+       positives. Only ever one of these per page. */
+    .wfp-btn-celebrate {
+        background: linear-gradient(135deg, #014653, #E0FF02);
+        color: #fff;
+    }
+    .wfp-btn-celebrate:hover {
+        background: linear-gradient(135deg, #013641, #c7e102);
+        color: #fff;
+        transform: translateY(-2px);
+        box-shadow: 0 10px 22px -8px rgba(1,70,83,.45);
+    }
+
     /* Press feedback — declared after every :hover rule above on purpose
        (see file header). Wins the simultaneous hover+active tie so the
        button actually shrinks back down while the mouse is held down.
@@ -171,6 +185,7 @@
     .wfp-btn-accent:active,
     .wfp-btn-neutral:active,
     .wfp-btn-critical:active,
+    .wfp-btn-celebrate:active,
     .wfp-icon-positive:active {
         transition-duration: .07s;
         transform: translateY(0) scale(.94);

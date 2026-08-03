@@ -37,11 +37,11 @@
                             <p class="mb-0 small text-muted">Period: {{ \Carbon\Carbon::parse($monthStartingDate)->format('d M Y') }} – {{ \Carbon\Carbon::parse($monthEndingDate)->format('d M Y') }}</p>
                         </div>
                         <div class="col-auto">
-                        <a href="{{ route('resort.export.attandanceHisotry') }}?start_date={{ urlencode($monthStartingDate) }}&end_date={{ urlencode($monthEndingDate) }}&id={{ urlencode($employee->emp_id) }}" class="btn btn-themeSkyblue btn-sm" target="_blank" rel="noopener">
+                        <a href="{{ route('resort.export.attandanceHisotry') }}?start_date={{ urlencode($monthStartingDate) }}&end_date={{ urlencode($monthEndingDate) }}&id={{ urlencode($employee->emp_id) }}" class="btn taa-btn-secondary btn-sm" target="_blank" rel="noopener">
                             Export CSV
                         </a>
 
-                            <a href="#" class="btn btn-themeSkyblue btn-sm" id="printButton">Print</a>
+                            <a href="#" class="btn taa-btn-secondary btn-sm" id="printButton">Print</a>
                         </div>
                     </div>
                 </div>
@@ -143,7 +143,7 @@
 
     @endsection
     @section('import-css')
-
+    @include('resorts.timeandattendance._taa_buttons_v2_styles')
     @endsection
 
     @section('import-scripts')

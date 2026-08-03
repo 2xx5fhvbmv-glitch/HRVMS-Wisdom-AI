@@ -14,7 +14,7 @@
                     </div>
                     <div class="col-auto">
                         <div class="d-flex justify-content-end">
-                            <a href="{{ route('resort.ta.configration') }}" class="btn btn-theme">Back to Configuration</a>
+                            <a href="{{ route('resort.ta.configration') }}" class="btn ta-btn-secondary">Back to Configuration</a>
                         </div>
                     </div>
                 </div>
@@ -53,6 +53,7 @@
     @endsection
 
     @section('import-css')
+@include('resorts.talentacquisition._ta_buttons_v2_styles')
     @endsection
 
     @section('import-scripts')

@@ -52,7 +52,7 @@
                             </select>
                         </div>
                         <div class="col-xl-2 col-md-3 col-sm-4 col-6">
-                            <button class="btn btn-themeBlue btn-sm" id="clearFilter">Clear Filter</button>
+                            <button class="btn taa-btn-secondary btn-sm" id="clearFilter">Clear Filter</button>
                         </div>
 
                         <div class="col-auto ms-auto">
@@ -152,7 +152,7 @@
                                             </div>
                                         </div>
                                         <div>
-                                            <a target="_blank" href="{{route('resort.timeandattendance.employee.details', [ base64_encode($e->employee_id) ]);}}" class="btn btn-themeSkyblue btn-sm edit_class" data-id="' . $row->id . '">View Details</a>
+                                            <a target="_blank" href="{{route('resort.timeandattendance.employee.details', [ base64_encode($e->employee_id) ]);}}" class="btn taa-btn-secondary btn-sm edit_class" data-id="' . $row->id . '">View Details</a>
                                         </div>
 
                                     </div>
@@ -178,7 +178,7 @@
 
     @endsection
     @section('import-css')
-
+    @include('resorts.timeandattendance._taa_buttons_v2_styles')
     @endsection
 
     @section('import-scripts')

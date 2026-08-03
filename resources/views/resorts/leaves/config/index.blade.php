@@ -46,7 +46,7 @@
                                                 @error('end_date')<span class="text-danger small">{{ $message }}</span>@enderror
                                             </div>
                                             <div class="col-md-4 d-flex align-items-end">
-                                                <button type="submit" class="btn btn-themeBlue">Export Employees</button>
+                                                <button type="submit" class="btn leave-btn-accent">Export Employees</button>
                                             </div>
                                         </div>
                                     </form>
@@ -55,18 +55,18 @@
                                     <h5 class="mb-3">Import Leave</h5>
                                     <div class="row g-3 align-items-center">
                                         <div class="col-md-4">
-                                            <a href="{{ route('leave.template.download') }}" class="btn btn-themeSkyblue btn-sm">Download Template</a>
+                                            <a href="{{ route('leave.template.download') }}" class="btn leave-btn-accent btn-sm">Download Template</a>
                                         </div>
                                         <div class="col-md-4">
                                             <form id="ImportLeaveDataForm" class="d-inline">
                                                 @csrf
                                                 <div class="uploadFile-btn me-0">
-                                                    <a href="javascript:void(0)" class="btn btn-themeBlue btn-sm" onclick="document.getElementById('UploadImportleave').click();">Upload File</a>
+                                                    <a href="javascript:void(0)" class="btn leave-btn-accent btn-sm" onclick="document.getElementById('UploadImportleave').click();">Upload File</a>
                                                     <input type="file" id="UploadImportleave" name="UploadImportleave" accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" style="opacity: 0; position: absolute; z-index: -1;" onchange="displayImportFileName()">
                                                     <div id="fileNameImportFile" style="margin-top: 10px; color: #333;"></div>
                                                     <small class="text-muted d-block mt-1">Only .xlsx files are accepted</small>
                                                 </div>
-                                                <button type="submit" class="btn btn-themeBlue btn-sm d-none" id="ImportLeaveDataFormSubmit">Submit</button>
+                                                <button type="submit" class="btn leave-btn-primary btn-sm d-none" id="ImportLeaveDataFormSubmit">Submit</button>
                                             </form>
                                         </div>
                                     </div>
@@ -94,7 +94,7 @@
                                             @endforeach
                                             </div>
                                             <div class="card-footer text-end">
-                                                <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                                                <button type="submit" class="btn leave-btn-primary btn-sm">Submit</button>
                                             </div>
 
                                     @else
@@ -160,7 +160,7 @@
                                             </div>
                                         </div>
                                         <div class="col-lg-4">
-                                            <button  class="btn btn-themeSkyblue AddAgent mt-3">Submit</button>
+                                            <button  class="btn leave-btn-accent AddAgent mt-3">Submit</button>
                                         </div>
                                     </div>
                                 </form>
@@ -195,6 +195,7 @@
                                                 <h6 class="themeDiffColor" style="color: {{ $category->color}}">{{$category->leave_type}}</h6>
                                                 <div class="d-flex align-items-center">
                                                     <a href="#editLeave-modal"
+                                                    class="btn-lg-icon icon-bg-green"
                                                     data-bs-toggle="modal"
                                                     data-leave-id="{{ $category->id }}"
                                                     data-leave-type="{{ $category->leave_type }}"
@@ -212,7 +213,7 @@
                                                     data-leave-category="{{ $category->leave_category }}">
                                                         <img src="{{ URL::asset('resorts_assets/images/edit.svg')}}" alt="icon">
                                                     </a>
-                                                    <a href="#" data-leave-id="{{ $category->id }}" class="ms-md-2 ms-1 delete-leave-btn"><img src="{{ URL::asset('resorts_assets/images/trash-red.svg')}}" alt="icon"></a>
+                                                    <a href="#" data-leave-id="{{ $category->id }}" class="btn-lg-icon icon-bg-red ms-md-2 ms-1 delete-leave-btn"><img src="{{ URL::asset('resorts_assets/images/trash-red.svg')}}" alt="icon"></a>
                                                 </div>
                                             </div>
                                             <p>{{$category->number_of_days}} Days</p>
@@ -350,7 +351,7 @@
                                 </div>
                             </div>
                             <div class="card-footer mt-4 text-end">
-                                <button type="submit" class="btn btn-themeBlue btn-sm" id="submit">Submit</button>
+                                <button type="submit" class="btn leave-btn-accent btn-sm" id="submit">Submit</button>
                             </div>
                         </form>
                     </div>
@@ -487,13 +488,14 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                    <button type="submit" class="btn btn-themeBlue btn-sm" id="submit">Submit</button>
+                    <a href="#" data-bs-dismiss="modal" class="btn leave-btn-neutral ms-auto">Cancel</a>
+                    <button type="submit" class="btn leave-btn-primary btn-sm" id="submit">Submit</button>
                 </div>
             </div>
         </form>
     </div>
 </div>
+@include('resorts.leaves._leave_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -786,13 +788,13 @@
             var main_id = $(this).data('center-id');
 
             Swal.fire({
-                title: 'Sure want to delete?',
+                title: 'Are you sure you want to delete?',
                 text: 'This cannot be undone',
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonText: 'Yes',
                 cancelButtonText: 'No',
-                confirmButtonColor: "#DD6B55"
+                confirmButtonColor: "#FF2400"
             }).then((result) => {
                 if (result.isConfirmed)
                 {
@@ -830,13 +832,13 @@
             var main_id = $(this).data('leave-id');
 
             Swal.fire({
-                title: 'Sure want to delete?',
+                title: 'Are you sure you want to delete?',
                 text: 'This cannot be undone',
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonText: 'Yes',
                 cancelButtonText: 'No',
-                confirmButtonColor: "#DD6B55"
+                confirmButtonColor: "#FF2400"
             }).then((result) => {
                 if (result.isConfirmed) {
                     $.ajax({
@@ -887,7 +889,7 @@
                         </div>
                     </td>
                     <td class="py-1">
-                        <a href="#" class="btn btn-theme update-row-btn_agent" data-agent-id="${agentId}">Submit</a>
+                        <a href="#" class="btn leave-btn-primary update-row-btn_agent" data-agent-id="${agentId}">Submit</a>
                     </td>
                 `;
 

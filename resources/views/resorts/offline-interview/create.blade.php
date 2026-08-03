@@ -39,7 +39,7 @@
                     </div>
                 </div>
                 <div class="col-auto ms-auto">
-                    <a href="{{ route('offline-interview.index') }}" class="btn btn-themeGrayLight btn-sm">
+                    <a href="{{ route('offline-interview.index') }}" class="btn ta-btn-ghost btn-sm">
                         <i class="fa-solid fa-arrow-left"></i> Back to list
                     </a>
                 </div>
@@ -81,7 +81,7 @@
                                         <th></th>
                                         <th>Position</th>
                                         <th>Department</th>
-                                        <th>No. of position</th>
+                                        <th>No. of Positions</th>
                                         <th>Applicant</th>
                                         <th>Open Slots</th>
                                         <th>Application Date</th>
@@ -137,7 +137,7 @@
                         </div>
                     </div>
                     <div class="card-footer text-end px-3 pb-3">
-                        <button type="button" class="btn btn-themeSkyblue btn-sm step-next" data-from-step="1" id="vacancyNextBtn" disabled>Continue to Applicant Information</button>
+                        <button type="button" class="btn ta-btn-primary btn-sm step-next" data-from-step="1" id="vacancyNextBtn" disabled>Continue to Applicant Information</button>
                     </div>
                 </fieldset>
 
@@ -252,9 +252,9 @@
                         </div>
                     </div>
                     <div class="card-footer text-end px-3 pb-3">
-                        <button type="button" class="btn btn-themeGrayLight btn-sm me-2 step-prev" data-from-step="2">Back</button>
-                        <button type="button" class="btn btn-themeGrayLight btn-sm me-2 step-save-draft" data-from-step="2">Save As Draft</button>
-                        <button type="button" class="btn btn-themeSkyblue btn-sm step-next" data-from-step="2">Next</button>
+                        <button type="button" class="btn ta-btn-secondary btn-sm me-2 step-prev" data-from-step="2">Back</button>
+                        <button type="button" class="btn ta-btn-neutral btn-sm me-2 step-save-draft" data-from-step="2">Save As Draft</button>
+                        <button type="button" class="btn ta-btn-primary btn-sm step-next" data-from-step="2">Next</button>
                     </div>
                 </fieldset>
 
@@ -277,9 +277,9 @@
                         @endif
                     </div>
                     <div class="card-footer text-end px-3 pb-3">
-                        <button type="button" class="btn btn-themeGrayLight btn-sm me-2 step-prev" data-from-step="3">Back</button>
-                        <button type="button" class="btn btn-themeGrayLight btn-sm me-2 step-save-draft" data-from-step="3">Save As Draft</button>
-                        <button type="button" class="btn btn-themeSkyblue btn-sm step-next" data-from-step="3">Next</button>
+                        <button type="button" class="btn ta-btn-secondary btn-sm me-2 step-prev" data-from-step="3">Back</button>
+                        <button type="button" class="btn ta-btn-neutral btn-sm me-2 step-save-draft" data-from-step="3">Save As Draft</button>
+                        <button type="button" class="btn ta-btn-primary btn-sm step-next" data-from-step="3">Next</button>
                     </div>
                 </fieldset>
 
@@ -342,9 +342,9 @@
                         </div>
                     </div>
                     <div class="card-footer text-end px-3 pb-3">
-                        <button type="button" class="btn btn-themeGrayLight btn-sm me-2 step-prev" data-from-step="4">Back</button>
-                        <button type="button" class="btn btn-themeGrayLight btn-sm me-2 step-save-draft" data-from-step="4">Save As Draft</button>
-                        <button type="button" class="btn btn-themeSkyblue btn-sm step-next" data-from-step="4">Next</button>
+                        <button type="button" class="btn ta-btn-secondary btn-sm me-2 step-prev" data-from-step="4">Back</button>
+                        <button type="button" class="btn ta-btn-neutral btn-sm me-2 step-save-draft" data-from-step="4">Save As Draft</button>
+                        <button type="button" class="btn ta-btn-primary btn-sm step-next" data-from-step="4">Next</button>
                     </div>
                 </fieldset>
 
@@ -385,14 +385,18 @@
                         </div>
                     </div>
                     <div class="card-footer text-end px-3 pb-3">
-                        <button type="button" class="btn btn-themeGrayLight btn-sm me-2 step-prev" data-from-step="5">Back</button>
-                        <button type="button" class="btn btn-themeSkyblue btn-sm" id="oiSubmit">Submit</button>
+                        <button type="button" class="btn ta-btn-secondary btn-sm me-2 step-prev" data-from-step="5">Back</button>
+                        <button type="button" class="btn ta-btn-celebrate btn-sm" id="oiSubmit">Submit</button>
                     </div>
                 </fieldset>
             </form>
         </div>
     </div>
 </div>
+@section('import-css')
+@include('resorts.talentacquisition._ta_buttons_v2_styles')
+@endsection
+
 @endsection
 
 @section('import-scripts')
