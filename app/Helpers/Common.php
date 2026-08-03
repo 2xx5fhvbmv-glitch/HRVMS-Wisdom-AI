@@ -8251,9 +8251,19 @@ class Common
 
     public static function FCMTokenPushNotification()
     {
-        $pri_key = env('FCM_PRIVATE_KEY');
+        // Was env(), not config() — silently returns null in production
+        // whenever `php artisan config:cache` has run (Laravel stops reading
+        // .env entirely once the config cache exists). Routed through
+        // config/services.php's 'fcm' block instead, same pattern already
+        // used for every other credential in this file.
+        $pri_key = config('services.fcm.private_key');
+        if (empty($pri_key) || empty(config('services.fcm.service_account_email')) || empty(config('services.fcm.project_id'))) {
+            \Log::error('FCM credentials missing (services.fcm.project_id/service_account_email/private_key) — push notification not sent.');
+            return null;
+        }
+
         $payload = [
-            'iss' => env('FCM_SERVICE_ACCOUNT_EMAIL'),
+            'iss' => config('services.fcm.service_account_email'),
             'scope' => 'https://www.googleapis.com/auth/firebase.messaging',
             'aud' => 'https://oauth2.googleapis.com/token',
             'exp' => time() + 3600,
@@ -8265,7 +8275,15 @@ class Common
         $jwtPayload = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode(json_encode($payload)));
 
         $signature = '';
-        openssl_sign($jwtHeader . '.' . $jwtPayload, $signature, $pri_key, OPENSSL_ALGO_SHA256);
+        // Return value was never checked — a malformed/empty private key
+        // makes openssl_sign() fail silently, leaving $signature empty and
+        // producing a JWT with a bogus signature that Google rejects with no
+        // indication anywhere except a generic downstream FCM log line.
+        $signed = openssl_sign($jwtHeader . '.' . $jwtPayload, $signature, $pri_key, OPENSSL_ALGO_SHA256);
+        if (!$signed) {
+            \Log::error('FCM JWT signing failed — FCM_PRIVATE_KEY is malformed or unreadable by openssl_sign().');
+            return null;
+        }
         $base64UrlSignature = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($signature));
 
         $jwt = $jwtHeader.'.'. $jwtPayload.'.'.$base64UrlSignature;
@@ -8283,9 +8301,13 @@ class Common
         $response = curl_exec($ch);
         curl_close($ch);
 
-        $acc_token = json_decode($response, true)['access_token'];
-        return $acc_token;
+        $decoded = json_decode($response, true);
+        if (!isset($decoded['access_token'])) {
+            \Log::error('FCM OAuth token request failed: ' . ($response ?: 'no response'));
+            return null;
+        }
 
+        return $decoded['access_token'];
     }
 
      public static function sendPushNotificationForMobile($deviceTokens, $title, $body, $module, $status, $sound,$custom_sound_channel,$mass)
@@ -8298,7 +8320,14 @@ class Common
         $tokens = array_unique($tokens);
 
         $token = Common::FCMTokenPushNotification();
-        $url = 'https://fcm.googleapis.com/v1/projects/' . env('FCM_PROJECT_ID') . '/messages:send';
+        if (!$token) {
+            // FCMTokenPushNotification() already logged the specific reason
+            // (missing credentials / signing failure / OAuth error) — fail
+            // clean here instead of sending every device an "Authorization:
+            // Bearer " request with an empty token.
+            return [['status' => false, 'message' => 'FCM auth token unavailable, see log for cause']];
+        }
+        $url = 'https://fcm.googleapis.com/v1/projects/' . config('services.fcm.project_id') . '/messages:send';
         $responses = [];
 
         foreach ($tokens as $deviceToken) {

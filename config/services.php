@@ -36,6 +36,24 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Firebase Cloud Messaging (mobile push notifications)
+    |--------------------------------------------------------------------------
+    | Common::FCMTokenPushNotification()/sendPushNotificationForMobile() used
+    | to call env('FCM_...') directly instead of going through here — env()
+    | outside a config/*.php file returns null after `php artisan
+    | config:cache` (a completely standard deploy step, since Laravel stops
+    | reading .env at all once the config cache exists), silently breaking
+    | every push notification with no visible error beyond an FCM 401 in the
+    | log. Routing through config() here fixes that regardless of caching.
+    */
+    'fcm' => [
+        'project_id' => env('FCM_PROJECT_ID'),
+        'service_account_email' => env('FCM_SERVICE_ACCOUNT_EMAIL'),
+        'private_key' => env('FCM_PRIVATE_KEY'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | OpenRouter (Wisdom AI chatbot)
     |--------------------------------------------------------------------------
     | Powers the in-app "Wisdom AI" HR assistant. The model is an
