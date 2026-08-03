@@ -140,6 +140,15 @@ class BoardingPassController extends Controller
                 foreach (Common::buildIslandPassApprovalFlow($pass->id, $employeeId) as $key => $value) {
                     $pass->{$key} = $value;
                 }
+
+                // Nothing told the mobile client when Modify/Cancel should be
+                // hidden — it kept showing both after approval or
+                // cancellation. Both actions are only valid while the pass
+                // is still fully Pending (matches boardingPassUpdate's
+                // hasApproved/Cancel guard and boardingPassCancel's matching
+                // guard above).
+                $pass->can_modify                  =   ($pass->overall_status === 'Pending');
+                $pass->can_cancel                  =   ($pass->overall_status === 'Pending');
             }
             $dahsboardArr                           =   [
                 'departed_count'                    =>  $EmployeeTravelDepartedCount,
@@ -560,6 +569,90 @@ class BoardingPassController extends Controller
         }
     }
 
+    /**
+     * HOD-requested filterable list (all/pending/approved/rejected) — none
+     * of the existing endpoints covered this: boardingHODDashboard's
+     * pass_request is hardcoded to the pending queue only, and there was no
+     * HOD-facing history view at all, so a cancelled pass had nowhere to
+     * show up once it left the pending queue.
+     */
+    public function boardingHODListByStatus(Request $request)
+    {
+        if (!Auth::guard('api')->check()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $status = strtolower($request->input('status', 'all'));
+        $statusMap = [
+            'pending'   => 'Pending',
+            'approved'  => 'Approved',
+            'rejected'  => 'Rejected',
+            'cancelled' => 'Cancel',
+            'canceled'  => 'Cancel',
+        ];
+        if ($status !== 'all' && !isset($statusMap[$status])) {
+            return response()->json(['success' => false, 'message' => 'Invalid status filter. Use all, pending, approved, rejected, or cancelled.'], 400);
+        }
+
+        try {
+            $employeeId = $this->user->GetEmployee->id;
+
+            $query = EmployeeTravelPass::with([
+                    'employeeTravelPassStatusData' => function ($q) {
+                        $q->orderBy('id', 'desc');
+                    },
+                    'employee:id,Admin_Parent_id',
+                    'employee.resortAdmin:id,first_name,last_name,profile_picture',
+                    'DepartureResortTransportation:id,resort_id,transportation_option',
+                    'ArrivalResortTransportation:id,resort_id,transportation_option',
+                ])
+                ->whereIn('employee_id', $this->underEmp_id)
+                ->where('resort_id', $this->resort_id);
+
+            if ($status !== 'all') {
+                $query->where('status', $statusMap[$status]);
+            }
+
+            $passes = $query->orderBy('created_at', 'desc')->get();
+
+            $rankConfig = config('settings.Position_Rank');
+            foreach ($passes as $pass) {
+                foreach ($pass->employeeTravelPassStatusData as $item) {
+                    if ($item->approver_role) {
+                        $item->rank_type = $item->approver_role;
+                    } else {
+                        $role = ucfirst(strtolower($item->approver_rank ?? ''));
+                        $item->rank_type = $rankConfig[$role] ?? '';
+                    }
+                }
+                $pass->transportation = $pass->DepartureResortTransportation->transportation_option
+                    ?? $pass->ArrivalResortTransportation->transportation_option
+                    ?? null;
+
+                foreach (Common::buildIslandPassApprovalFlow($pass->id, $employeeId) as $key => $value) {
+                    $pass->{$key} = $value;
+                }
+
+                $resortAdmin = $pass->employee->resortAdmin ?? null;
+                if ($resortAdmin) {
+                    $resortAdmin->profile_picture = Common::getResortUserPicture($resortAdmin->id);
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'HOD Island Pass list fetched successfully',
+                'status_filter' => $status,
+                'data' => $passes,
+            ], 200);
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
     public function boardingHRDashboard()
     {
         if (!Auth::guard('api')->check()) {
@@ -957,7 +1050,13 @@ class BoardingPassController extends Controller
                 ],
                 'travel_segments' => $travelSegments,
                 'reason' => $reason,
-            ], $approvalFlowData);
+            ], $approvalFlowData, [
+                // Same Pending-only rule as boardingEmpDashboard's can_modify/
+                // can_cancel — Modify/Cancel must disappear once approved or
+                // cancelled.
+                'can_modify' => (($approvalFlowData['overall_status'] ?? null) === 'Pending'),
+                'can_cancel' => (($approvalFlowData['overall_status'] ?? null) === 'Pending'),
+            ]);
 
             return response()->json([
                 'success' => true,
@@ -1926,10 +2025,26 @@ class BoardingPassController extends Controller
         try {
             $user                                   =   Auth::guard('api')->user();
             $employee                               =   $user->GetEmployee;
+
+            // Only checked per-stage approval status before — a pass that was
+            // emergency-cancelled while still fully Pending (no stage ever
+            // reached Approved) had nothing here blocking it from still being
+            // modified.
+            $travelPass                             =   EmployeeTravelPass::find($data['pass_id']);
+            if (!$travelPass) {
+                DB::rollBack();
+                return response()->json(['status' => false, 'message' => 'Travel pass not found.'], 200);
+            }
+            if ($travelPass->status === 'Cancel') {
+                DB::rollBack();
+                return response()->json(['status' => false, 'message' => 'Update not allowed. This travel pass has been cancelled.'], 200);
+            }
+
             $EmployeeTravelPassStatus               =   EmployeeTravelPassStatus::where('travel_pass_id',$data['pass_id'])->get();
             $hasApproved                            =   $EmployeeTravelPassStatus->contains('status', 'Approved');
 
             if ($hasApproved) {
+                DB::rollBack();
                 return response()->json([
                     "status"                        =>  false,
                     'message'                       =>  'Update not allowed. This travel pass has already been approved by an approver.'
@@ -1996,6 +2111,21 @@ class BoardingPassController extends Controller
                 return response()->json([
                     'status'                        =>  false,
                     'message'                       =>  'This travel pass has already been cancelled.'
+                ], 200);
+            }
+
+            // Employee self-cancel is only meant for a still-Pending request —
+            // once any stage has approved it, cancellation must go through
+            // the HOD's Emergency Cancel flow instead. Previously nothing
+            // here stopped a plain self-cancel on an already-approved pass.
+            $alreadyApproved                            =   EmployeeTravelPassStatus::where('travel_pass_id', $passId)
+                                                                ->where('status', 'Approved')
+                                                                ->exists();
+            if ($alreadyApproved) {
+                DB::rollBack();
+                return response()->json([
+                    'status'                        =>  false,
+                    'message'                       =>  'This travel pass has already been approved and can no longer be self-cancelled.'
                 ], 200);
             }
 

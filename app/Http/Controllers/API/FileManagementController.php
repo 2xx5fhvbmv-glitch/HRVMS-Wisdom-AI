@@ -175,6 +175,12 @@ class FileManagementController extends Controller
         $subfolders = FilemangementSystem::where('resort_id', $folder->resort_id)
             ->where('UnderON', $folder->id)
             ->where('Folder_Type', 'categorized')
+            // Module-generated attachment folders (Maintenance Request,
+            // Grievance, Request, Housekeeping, etc.) are parented under the
+            // employee's own root with the same shape as a real folder —
+            // hide them from My Drive, which should only show what the
+            // employee actually created or was explicitly shared.
+            ->where('is_system_generated', false)
             ->withSum('children as file_count_sum', 'File_Size')
             ->withCount('children as file_count')
             ->orderBy('Folder_Name')

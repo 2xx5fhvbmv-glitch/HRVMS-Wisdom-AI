@@ -137,10 +137,8 @@ class PayrollController extends Controller
                                                             ->where('psc.employee_id',$employee_id)
                                                             ->where('pr.employee_id',$employee_id)
                                                             ->where('pd.employee_id',$employee_id)
-                                                            ->whereMonth('payroll.start_date', '01')
-                                                            ->whereYear('payroll.start_date', '2025')
-                                                            // ->whereMonth('payroll.start_date', $lastMonth)
-                                                            // ->whereYear('payroll.start_date', $currentYear)
+                                                            ->whereMonth('payroll.start_date', $lastMonth)
+                                                            ->whereYear('payroll.start_date', $currentYear)
                                                             ->select(
                                                                 'payroll.*',
                                                                 'ra.first_name',

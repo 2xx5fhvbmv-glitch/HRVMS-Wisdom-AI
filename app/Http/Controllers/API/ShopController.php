@@ -66,11 +66,18 @@ class ShopController extends Controller
             // Full pending-consent list for the "Received Consent Requests" section —
             // previously only fetched a single row (->first()) and stashed it under
             // the unrelated "scan_qr" key, so the itemized list never rendered.
-            $pendingConsentList                             =   Payment::with(['shopKeeper:id,name','product:id,name'])
+            // payments has no currency column of its own — price is always in
+            // whatever currency the purchased product is priced in
+            // (products.currency_type), which wasn't being selected at all.
+            $pendingConsentList                             =   Payment::with(['shopKeeper:id,name','product:id,name,currency_type'])
                                                                     ->where('emp_id', $employeeId)
                                                                     ->where('status','Pending Consent')
                                                                     ->orderBy("created_at", "DESC")
-                                                                    ->get();
+                                                                    ->get()
+                                                                    ->map(function ($payment) {
+                                                                        $payment->currency = $payment->product->currency_type ?? 'USD';
+                                                                        return $payment;
+                                                                    });
 
             $shopArr                                        =   [
                 'total_amount_spent'                        =>  (int)$totalSpentThisMonth,
@@ -143,11 +150,19 @@ class ShopController extends Controller
             $consentRequestId                               =   base64_decode($consentRequestId);
             $employeeId                                     =   $this->user->GetEmployee->id;
 
-            $pendingConsentview                             =   Payment::with(['shopKeeper:id,name','product:id,name'])
-                                                                    ->select('id', 'shopkeeper_id', 'quantity', 'price', 'status', 'product_id') // Only fetch needed fields
+            // The explicit column select here previously omitted
+            // purchased_date entirely, which is why the consent popup showed
+            // "N/A" for Date of Purchase even though the dashboard endpoint
+            // (a plain unrestricted select) had it all along. Also missing
+            // currency — same fix as employeeDashboard's list above.
+            $pendingConsentview                             =   Payment::with(['shopKeeper:id,name','product:id,name,currency_type'])
+                                                                    ->select('id', 'shopkeeper_id', 'quantity', 'price', 'status', 'product_id', 'purchased_date')
                                                                     ->where('emp_id', $employeeId)
                                                                     ->where('id',$consentRequestId)
                                                                     ->first();
+            if ($pendingConsentview) {
+                $pendingConsentview->currency = $pendingConsentview->product->currency_type ?? 'USD';
+            }
 
             $response['status']                             =   true;
             $response['message']                            =   "Pending consents data retrieved successfully.";

@@ -996,7 +996,15 @@ class EmployeeController extends Controller
         );
         $TotalSum=0;
         $TotalSum = $leave_categories->sum('ThisYearOfused_days');
-        return  view('resorts.timeandattendance.employee.Employeesdetails',compact('AttendanceHistroy','leave_categories','page_title','employee','TotalSum'));
+        // The daterangepicker's default range must match the payroll
+        // cutoff period computed above — it was hardcoded to calendar
+        // month-to-date in the view instead, and since the JS always sends
+        // whatever's in that field as start_date/end_date on every request
+        // (initial load, filter, print, export), it permanently shadowed
+        // AttandanceHisotry()'s own correct cutoff-based fallback.
+        $cutoffRangeStart = $cutoffPeriod['start']->format('d/m/Y');
+        $cutoffRangeEnd = min($cutoffPeriod['end'], $currentDate)->format('d/m/Y');
+        return  view('resorts.timeandattendance.employee.Employeesdetails',compact('AttendanceHistroy','leave_categories','page_title','employee','TotalSum','cutoffRangeStart','cutoffRangeEnd'));
     }
 
     public function HistoryUpdate(Request $request)
