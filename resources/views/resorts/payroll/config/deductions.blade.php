@@ -13,7 +13,7 @@
                     </div>
                 </div>
                 <div class="col-auto">
-                    <a href="{{ route('payroll.configration') }}" class="btn btn-themeSkyblue btn-sm">Back to Configuration</a>
+                    <a href="{{ route('payroll.configration') }}" class="btn payroll-btn-secondary btn-sm">Back to Configuration</a>
                 </div>
             </div>
         </div>
@@ -30,7 +30,7 @@
                                     </div>
                                 </div>
                                 <div class="col-xl-2 col-md-3 col-sm-4 col-6">
-                                    <button class="btn btn-themeBlue btn-sm" id="clearFilter">Clear Filter</button>
+                                    <button class="btn payroll-btn-secondary btn-sm" id="clearFilter">Clear Filter</button>
                                 </div>
                             </div>
                         </div>
@@ -106,8 +106,8 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-themeBlue">Update</button>
+                    <button type="button" class="btn payroll-btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn payroll-btn-positive">Update</button>
                 </div>
             </form>
         </div>
@@ -116,6 +116,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts.payroll._payroll_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')

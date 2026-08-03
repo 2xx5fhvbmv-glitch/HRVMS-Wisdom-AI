@@ -23,9 +23,9 @@
                 <div class="respond-main"></div>
             </div>
             <div class="modal-footer justify-content-center">
-                <a href="#respond-HoldModel" id="holdResponseModel" data-bs-toggle="modal"  data-bs-dismiss="modal" class="btn btn-themeSkyblue">On Hold</a>
-                <a href="#respond-rejectModal" id="RejectResponseModel" data-bs-toggle="modal" data-bs-dismiss="modal" class="btn btn-danger">Reject</a>
-                <a href="javascript:void(0)" id="ApprovedResponseModel" data-bs-toggle="modal" data-bs-dismiss="modal" class="btn btn-themeBlue">Approved</a>
+                <a href="#respond-HoldModel" id="holdResponseModel" data-bs-toggle="modal"  data-bs-dismiss="modal" class="btn ta-btn-attention">On Hold</a>
+                <a href="#respond-rejectModal" id="RejectResponseModel" data-bs-toggle="modal" data-bs-dismiss="modal" class="btn ta-btn-attention">Reject</a>
+                <a href="javascript:void(0)" id="ApprovedResponseModel" data-bs-toggle="modal" data-bs-dismiss="modal" class="btn ta-btn-positive">Approved</a>
             </div>
         </div>
     </div>
@@ -49,8 +49,8 @@
                     </div>
                 </div>
                 <div class="modal-footer justify-content-center">
-                    <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                    <button type="submit" class="btn btn-themeBlue">Submit</button>
+                    <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Cancel</a>
+                    <button type="submit" class="btn ta-btn-primary">Submit</button>
                 </div>
             </form>
         </div>
@@ -71,8 +71,8 @@
                 </div>
                 <input type="hidden" id="Rejectio_ta_id" name="Rejectio_ta_id">
                 <div class="modal-footer justify-content-center">
-                    <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                    <button type="submit"  class="btn btn-themeBlue">Submit</button>
+                    <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Cancel</a>
+                    <button type="submit"  class="btn ta-btn-primary">Submit</button>
                 </div>
             </form>
         </div>
@@ -89,7 +89,7 @@
                 <img src="{{ URL::asset('resorts_assets/images/check-circle.svg')}}" alt="icon">
                 <h4>submission confirmation</h4>
                 <p id="rejaction_msg"></p>
-                <a href="#" data-bs-dismiss="modal" class="btn btn-themeBlue">Close</a>
+                <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary">Close</a>
             </div>
         </div>
     </div>

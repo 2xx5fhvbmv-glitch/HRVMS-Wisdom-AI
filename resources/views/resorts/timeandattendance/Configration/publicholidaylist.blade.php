@@ -79,8 +79,8 @@
                     </div>
 
                     <div class="modal-footer justify-content-center">
-                        <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                        <button type="submit" class="btn btn-theme">Submit</button>
+                        <a href="#" data-bs-dismiss="modal" class="btn taa-btn-secondary ms-auto">Cancel</a>
+                        <button type="submit" class="btn taa-btn-primary">Submit</button>
                     </div>
                 </form>
             </div>
@@ -89,6 +89,7 @@
     @endsection
 
 @section('import-css')
+@include('resorts.timeandattendance._taa_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')

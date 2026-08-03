@@ -65,11 +65,11 @@
                         </div>
 
                         <div class="col-xl-2 col-md-3 col-sm-4 col-6">
-                            <button class="btn btn-themeBlue btn-sm" id="clearFilter">Clear Filter</button>
+                            <button class="btn leave-btn-neutral btn-sm" id="clearFilter">Clear Filter</button>
                         </div>
-                        <div class="col-auto ms-auto">
-                            <a href="javascript:void(0);" class="btn btn-grid active"><img src="{{ URL::asset('resorts_assets/images/grid.svg')}}" alt="icon"></a>
-                            <a href="javascript:void(0);" class="btn btn-list "><img src="{{ URL::asset('resorts_assets/images/list.svg')}}" alt="icon"></a>
+                        <div class="col-auto ms-auto leave-tabnav">
+                            <a href="javascript:void(0);" class="btn-grid active"><img src="{{ URL::asset('resorts_assets/images/grid.svg')}}" alt="icon"></a>
+                            <a href="javascript:void(0);" class="btn-list "><img src="{{ URL::asset('resorts_assets/images/list.svg')}}" alt="icon"></a>
                         </div>
                     </div>
                 </div>
@@ -167,10 +167,10 @@
                                                 <span class="badge {{ $request->status_class ?? 'badge-themeWarning' }}">{{ $request->status_text ?? 'Pending' }}</span>
                                             </div>
                                             <div class="btn-block">
-                                                <a href="{{ route('leave.details', ['leave_id' => base64_encode($request->id)]) }}" class="btn btn-themeSkyblue btn-sm @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.view')) == false) d-none @endif">View</a>
+                                                <a href="{{ route('leave.details', ['leave_id' => base64_encode($request->id)]) }}" class="btn leave-btn-secondary btn-sm @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.view')) == false) d-none @endif">View</a>
                                                 @if($request->can_approve ?? false)
-                                                    <button class="btn btn-themeBlue btn-sm approve-btn @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.edit')) == false) d-none @endif" data-leave-id="{{ $request->id }}">Approve</button>
-                                                    <button class="btn btn-danger btn-sm reject-btn @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.edit')) == false) d-none @endif" data-leave-id="{{ $request->id }}">Reject</button>
+                                                    <button class="btn leave-btn-positive btn-sm approve-btn @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.edit')) == false) d-none @endif" data-leave-id="{{ $request->id }}">Approve</button>
+                                                    <button class="btn leave-btn-critical btn-sm reject-btn @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.edit')) == false) d-none @endif" data-leave-id="{{ $request->id }}">Reject</button>
                                                 @endif
                                             </div>
                                         </div>
@@ -221,10 +221,10 @@
                                                 <span class="badge {{ $request->status_class ?? 'badge-themeWarning' }}">{{ $request->status_text ?? 'Pending' }}</span>
                                             </div>
                                             <div class="btn-block">
-                                                <a href="{{ route('leave.details', ['leave_id' => base64_encode($request->id)]) }}" class="btn btn-themeSkyblue btn-sm @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.view')) == false) d-none @endif">View</a>
+                                                <a href="{{ route('leave.details', ['leave_id' => base64_encode($request->id)]) }}" class="btn leave-btn-secondary btn-sm @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.view')) == false) d-none @endif">View</a>
                                                 @if($request->can_approve ?? false)
-                                                    <button class="btn btn-themeBlue btn-sm approve-btn @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.edit')) == false) d-none @endif" data-leave-id="{{ $request->id }}">Approve</button>
-                                                    <button class="btn btn-danger btn-sm reject-btn @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.edit')) == false) d-none @endif" data-leave-id="{{ $request->id }}">Reject</button>
+                                                    <button class="btn leave-btn-positive btn-sm approve-btn @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.edit')) == false) d-none @endif" data-leave-id="{{ $request->id }}">Approve</button>
+                                                    <button class="btn leave-btn-critical btn-sm reject-btn @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.edit')) == false) d-none @endif" data-leave-id="{{ $request->id }}">Reject</button>
                                                 @endif
                                             </div>
                                         </div>
@@ -253,12 +253,13 @@
                     <textarea id="rejectionReason" class="form-control" rows="3" placeholder="Enter a reason (optional)"></textarea>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" id="confirmRejectBtn" class="btn btn-danger">Reject</button>
+                    <button type="button" class="btn leave-btn-neutral" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" id="confirmRejectBtn" class="btn leave-btn-critical">Reject</button>
                 </div>
             </div>
         </div>
     </div>
+@include('resorts.leaves._leave_buttons_v2_styles')
 @endsection
 
 @section('import-css')

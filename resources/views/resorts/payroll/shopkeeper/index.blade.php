@@ -38,7 +38,7 @@
                                 </div>
                                                                             
                                 <div class="col-xl-2 col-md-3 col-sm-4 col-6">
-                                    <button class="btn btn-themeBlue btn-sm" id="clearFilter">Clear Filter</button>
+                                    <button class="btn payroll-btn-secondary btn-sm" id="clearFilter">Clear Filter</button>
                                 </div>
                                 
                             </div>
@@ -52,7 +52,7 @@
                                 </div>
                                 <div class="col-auto">
                                     <div class="d-flex justify-content-sm-end align-items-center">
-                                        <a href="{{route('shopkeepers.create')}}" class="btn btn-sm btn-theme @if(App\Helpers\Common::checkRouteWisePermission('shopkeepers.create',config('settings.resort_permissions.create')) == false) d-none @endif">
+                                        <a href="{{route('shopkeepers.create')}}" class="btn btn-sm payroll-btn-primary @if(App\Helpers\Common::checkRouteWisePermission('shopkeepers.create',config('settings.resort_permissions.create')) == false) d-none @endif">
                                             Add New
                                         </a>
                                     </div>
@@ -80,6 +80,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts.payroll._payroll_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')
@@ -160,7 +161,7 @@
             </td>
             <td class="py-1"></td>
             <td class="py-1">
-                <a href="#" class="btn btn-theme update-row-btn" data-shopkeeper-id="${shopkeeperId}">Submit</a>
+                <a href="#" class="btn payroll-btn-positive update-row-btn" data-shopkeeper-id="${shopkeeperId}">Submit</a>
             </td>
         `;
 
@@ -197,7 +198,7 @@
                         <td class="text-nowrap">${updatedEmail}</td>
                         <td class="text-nowrap">${updatedContact}</td>
                         <td class="text-nowrap">
-                            <a href="${viewMoreUrl}" class="btn btn-themeSkyblue btn-sm">View more</a>
+                            <a href="${viewMoreUrl}" class="btn payroll-btn-secondary btn-sm">View more</a>
                         </td>
                         <td class="text-nowrap">
                             <div class="d-flex align-items-center">

@@ -20,7 +20,7 @@
                 </div>
                 <div class="col-auto">
                     <div class="d-flex justify-content-end">
-                        <a href="{{route('resort.vacancies.create')}}" class="btn btn-theme @if(App\Helpers\Common::checkRouteWisePermission('resort.vacancies.FreshApplicant',config('settings.resort_permissions.create')) == false) d-none @endif">New Hire</a>
+                        <a href="{{route('resort.vacancies.create')}}" class="btn ta-btn-accent @if(App\Helpers\Common::checkRouteWisePermission('resort.vacancies.FreshApplicant',config('settings.resort_permissions.create')) == false) d-none @endif">New Hire</a>
                     </div>
                 </div>
             </div>
@@ -94,7 +94,7 @@
                                                 <td>{{ $draft->Total_position_required }}</td>
                                                 <td>{{ $draft->created_at ? \Carbon\Carbon::flexible($draft->created_at)->format('d M Y') : 'N/A' }}</td>
                                                 <td>
-                                                    <a href="{{ route('resort.vacancies.edit', $draft->id) }}" class="btn btn-sm btn-themeBlue">Edit</a>
+                                                    <a href="{{ route('resort.vacancies.edit', $draft->id) }}" class="btn btn-sm ta-btn-secondary">Edit</a>
                                                 </td>
                                             </tr>
                                         @endforeach
@@ -490,6 +490,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts.talentacquisition._ta_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')

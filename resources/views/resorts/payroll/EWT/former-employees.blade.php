@@ -55,7 +55,7 @@
                             </select>
                         </div>
                         <div class="col-auto ms-auto">
-                            <a href="#" class="a-link">View Former Employees</a>
+                            <a href="{{route('payroll.ewt.index')}}" class="a-link">View Active Employees</a>
                         </div>
                     </div>
                 </div>

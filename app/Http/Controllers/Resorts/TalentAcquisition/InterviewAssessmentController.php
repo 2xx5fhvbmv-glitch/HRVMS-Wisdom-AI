@@ -81,10 +81,8 @@ class InterviewAssessmentController extends Controller
 
                 $edit_url = route('interview-assessment.edit', $row->id);
                 // $delete_url = route('interview-assessment.delete', $row->id);
-                $editimg = asset('resorts_assets/images/edit.svg');
-                $deleteimg = asset('resorts_assets/images/trash-red.svg');
-                return "<a href='$edit_url' class='edit-row-btn $edit_class'><img src='$editimg' alt='Edit'></a>
-                        <a href='#' class='delete-row-btn $delete_class' data-id='$row->id'><img src='$deleteimg' alt='Delete'></a>";
+                return "<a href='$edit_url' class='btn-tableIcon ta-btn-secondary edit-row-btn $edit_class' title='Edit'><i class='fa-solid fa-pen'></i></a>
+                        <a href='#' class='btn-tableIcon ta-btn-critical delete-row-btn $delete_class' data-id='$row->id' title='Delete'><i class='fa-solid fa-trash'></i></a>";
             })
             ->addColumn('Position', function ($row) {
                 return $row->Position;

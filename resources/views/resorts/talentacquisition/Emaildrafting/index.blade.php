@@ -20,7 +20,7 @@
                     </div>
                     <div class="col-auto">
                         <div class="d-flex justify-content-end">
-                            <a href="Javascritp:void(0)" class="btn btn-theme EmailFreshModal">Add Email Template</a>
+                            <a href="Javascritp:void(0)" class="btn ta-btn-accent EmailFreshModal">Add Email Template</a>
                         </div>
                     </div>
                 </div>
@@ -33,17 +33,13 @@
                     @if($emailTamplate)
                         @foreach ($emailTamplate as  $e)
                             <div class="col-xl-3 col-md-4 col-sm-6">
-                                <div class="emailDrafting-block ">
-                                    <div class="ratio cover overlay-block">
-                                        <img src="{{ $resortImg }}" alt="image">
-                                        <div class="overlay">
-                                            <a href="javascript:void(0)"
-                                                class="btn btn-themeSkyblue btn-sm edit-modal"  data-id="{{ $e->id }}" data-id="{{ $e->id }}">Edit</a>
-                                        </div>
-
-                                    </div>
-                                    <h5 id="template_id_{{ $e->id }}">{{ $e->TempleteName }}</h5>
-
+                                <div class="emailDrafting-block d-flex align-items-center gap-2 p-3" style="border:1px solid #E3E0D6;border-radius:12px;">
+                                    <span class="d-inline-flex align-items-center justify-content-center rounded-circle flex-shrink-0" style="width:40px;height:40px;background:rgba(1,70,83,.08);color:#014653;">
+                                        <i class="fa-solid fa-envelope"></i>
+                                    </span>
+                                    <h5 id="template_id_{{ $e->id }}" class="mb-0 text-truncate flex-fill">{{ $e->TempleteName }}</h5>
+                                    <a href="javascript:void(0)"
+                                        class="btn ta-btn-secondary btn-sm edit-modal flex-shrink-0" data-id="{{ $e->id }}">Edit</a>
                                 </div>
                             </div>
                         @endforeach
@@ -104,16 +100,16 @@
                     <div class="placeholders">
                         <strong>Available Placeholders:</strong>
                         <ul>
-                            <li><code class="insert-placeholder" data-placeholder="@{{user_name}}">@{{candidate_name}}</code> - The name of the candidate</li>
-                            <li><code class="insert-placeholder" data-placeholder="@{{position_title}}">@{{position_title}}</code> - The Position Title</li>
+                            <li><code class="insert-placeholder" data-placeholder="@{{candidate_name}}">@{{candidate_name}}</code> - The name of the candidate</li>
+                            <li><code class="insert-placeholder" data-placeholder="@{{position_title}}">@{{position_title}}</code> - The position title</li>
                             <li><code class="insert-placeholder" data-placeholder="@{{resort_name}}">@{{resort_name}}</code> - The name of the resort</li>
-                            <li><code class="insert-placeholder" data-placeholder="@{{interview_type}}">@{{interview_type}}</code> - The user's Interview type</li>
-                            <li><code class="insert-placeholder" data-placeholder="@{{interview_date}}">@{{interview_date}}</code> - The user's Interview date</li>
-                            <li><code class="insert-placeholder" data-placeholder="@{{interview_time}}">@{{interview_time}}</code> - The user's Interview time</li>
-                            <li><code class="insert-placeholder" data-placeholder="@{{interview_link}}">@{{interview_link}}</code> - The user's Interview Link</li>
-                            <li><code class="insert-placeholder" data-placeholder="@{{interview_round}}">@{{interview_round}}</code> - The user's Interview Round</li>
-                            <li><code class="insert-placeholder" data-placeholder="@{{department}}">@{{department}}</code> - The Department Name</li>
-                            <li><code class="insert-placeholder" data-placeholder="@{{completion_date}}">@{{completion_date}}</code> - Completion Date</li>
+                            <li><code class="insert-placeholder" data-placeholder="@{{interview_type}}">@{{interview_type}}</code> - The user's interview type</li>
+                            <li><code class="insert-placeholder" data-placeholder="@{{interview_date}}">@{{interview_date}}</code> - The user's interview date</li>
+                            <li><code class="insert-placeholder" data-placeholder="@{{interview_time}}">@{{interview_time}}</code> - The user's interview time</li>
+                            <li><code class="insert-placeholder" data-placeholder="@{{interview_link}}">@{{interview_link}}</code> - The user's interview link</li>
+                            <li><code class="insert-placeholder" data-placeholder="@{{interview_round}}">@{{interview_round}}</code> - The user's interview round</li>
+                            <li><code class="insert-placeholder" data-placeholder="@{{department}}">@{{department}}</code> - The department name</li>
+                            <li><code class="insert-placeholder" data-placeholder="@{{completion_date}}">@{{completion_date}}</code> - The completion date</li>
 
                         </ul>
                     </div>
@@ -121,8 +117,8 @@
 
                 <div class="modal-footer">
                     <!-- <a href="#" class="btn btn-themeBlue">Preview</a> -->
-                    <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                    <button class="btn btn-themeBlue">Submit</button>
+                    <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Cancel</a>
+                    <button class="btn ta-btn-primary">Submit</button>
                 </div>
                 </form>
             </div>
@@ -131,6 +127,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts.talentacquisition._ta_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')

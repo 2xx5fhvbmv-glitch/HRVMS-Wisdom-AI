@@ -51,7 +51,7 @@
                                 </div>
                             </div>
                             <div class="card-footer text-end">
-                                <button type="submit" class="checkprogress btn btn-themeBlue btn-sm">Submit</button>
+                                <button type="submit" class="checkprogress btn payroll-btn-primary btn-sm">Submit</button>
                             </div>
                         </form>
                     </div>
@@ -88,7 +88,7 @@
                                             <td>{{ $shopkeeper->email }}</td>
                                             <td>{{ $shopkeeper->contact_no }}</td>
                                             <td>
-                                                <a href="{{ route('resort.shopkeeper.payments', $shopkeeper->id) }}" class="btn btn-sm btn-themeBlue">
+                                                <a href="{{ route('resort.shopkeeper.payments', $shopkeeper->id) }}" class="btn btn-sm payroll-btn-secondary">
                                                     <i class="fa-solid fa-eye"></i>
                                                 </a>
                                             </td>
@@ -110,6 +110,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts.payroll._payroll_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')

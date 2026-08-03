@@ -20,7 +20,7 @@
                 </div>
                 <div class="col-auto">
                     <div class="d-flex justify-content-end">
-                        <a href="{{ route('resort.vacancies.create') }}" class="btn btn-theme">New Hire</a>
+                        <a href="{{ route('resort.vacancies.create') }}" class="btn ta-btn-accent">New Hire</a>
                     </div>
                 </div>
             </div>
@@ -270,9 +270,9 @@
                 <div class="respond-main"></div>
             </div>
             <div class="modal-footer justify-content-center">
-                <a href="#respond-HoldModel" id="holdResponseModel" data-bs-toggle="modal"  data-bs-dismiss="modal" class="btn btn-themeSkyblue">On Hold</a>
-                <a href="#respond-rejectModal" id="RejectResponseModel" data-bs-toggle="modal" data-bs-dismiss="modal" class="btn btn-danger">Reject</a>
-                <a href="javascript:void(0)" id="ApprovedResponseModel" data-bs-toggle="modal" data-bs-dismiss="modal" class="btn btn-themeBlue">Approved</a>
+                <a href="#respond-HoldModel" id="holdResponseModel" data-bs-toggle="modal"  data-bs-dismiss="modal" class="btn ta-btn-attention">On Hold</a>
+                <a href="#respond-rejectModal" id="RejectResponseModel" data-bs-toggle="modal" data-bs-dismiss="modal" class="btn ta-btn-attention">Reject</a>
+                <a href="javascript:void(0)" id="ApprovedResponseModel" data-bs-toggle="modal" data-bs-dismiss="modal" class="btn ta-btn-positive">Approved</a>
             </div>
         </div>
     </div>
@@ -298,8 +298,8 @@
                     </div>
                 </div>
                 <div class="modal-footer justify-content-center">
-                    <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                    <button type="submit" class="btn btn-themeBlue">Submit</button>
+                    <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Cancel</a>
+                    <button type="submit" class="btn ta-btn-primary">Submit</button>
                 </div>
             </form>
 
@@ -324,8 +324,8 @@
                     <input type="hidden" id="Rejectio_ta_id" name="Rejectio_ta_id">
 
                     <div class="modal-footer justify-content-center">
-                        <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                        <button type="submit"  class="btn btn-themeBlue">Submit</button>
+                        <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Cancel</a>
+                        <button type="submit"  class="btn ta-btn-primary">Submit</button>
                     </div>
                 </form>
             </div>
@@ -344,7 +344,7 @@
                 <img src="{{ URL::asset('resorts_assets/images/check-circle.svg')}}" alt="icon">
                 <h4>submission confirmation</h4>
                 <p id="rejaction_msg"></p>
-                <a href="#" data-bs-dismiss="modal" class="btn btn-themeBlue">Close</a>
+                <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary">Close</a>
             </div>
 
         </div>
@@ -372,8 +372,8 @@
                     </div>
                 </div>
                 <div class="modal-footer justify-content-center">
-                    <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                    <button type="submit" class="btn btn-theme">Submit</button>
+                    <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Cancel</a>
+                    <button type="submit" class="btn ta-btn-primary">Submit</button>
                 </div>
             </form>
 
@@ -416,8 +416,8 @@
 
                 </div>
                 <div class="modal-footer justify-content-center">
-                    <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                    <button type="submit" class="btn btn-theme">Submit</button>
+                    <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Cancel</a>
+                    <button type="submit" class="btn ta-btn-primary">Submit</button>
 
                 </div>
             </form>
@@ -444,8 +444,8 @@
                 </div>
             </div>
             <div class="modal-footer justify-content-center">
-                <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                <a href="javascript:void(0)"  data-bs-dismiss="modal"class="btn btn-theme" >Submit</a>
+                <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Cancel</a>
+                <a href="javascript:void(0)"  data-bs-dismiss="modal"class="btn ta-btn-primary" >Submit</a>
             </div>
 
         </div>
@@ -469,8 +469,8 @@
                     <input type="hidden" name="Interview_id" id="MeetingLink_Interview_id">
                 </div>
                 <div class="modal-footer">
-                    <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                    <button type="submit" class="btn btn-themeBlue">Submit</button>
+                    <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Cancel</a>
+                    <button type="submit" class="btn ta-btn-primary">Submit</button>
                 </div>
             </form>
         </div>
@@ -492,7 +492,7 @@
                     <img id="JobAdvertisementImage" alt="image">
                 </div>
                 <div class="text-center mb-sm-4 mb-3">
-                    <a href="javascript:void(0)" class="DowloadAdvertisement btn btn-themeSkyblue btn-sm">Download</a>
+                    <a href="javascript:void(0)" class="DowloadAdvertisement btn ta-btn-secondary btn-sm">Download</a>
                 </div>
                 <div class="input-group mb-sm-4 mb-3">
                     <input type="text" class="form-control datepicker" name="link_Expiry_date" id="link_Expiry_date" placeholder="Expiry Date" />
@@ -512,8 +512,8 @@
             </div>
 
             <div class="modal-footer justify-content-center">
-                <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                <button  class="btn btn-theme JdSumit">Submit</button>
+                <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Cancel</a>
+                <button  class="btn ta-btn-primary JdSumit">Submit</button>
             </div>
 
         </div>
@@ -525,6 +525,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts.talentacquisition._ta_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')

@@ -81,10 +81,10 @@ class PaymentConsentController extends Controller
                 })
                 ->addColumn('action', function ($payment) {
                     if( $payment->status == 'Pending Consent') {
-                        return '<a href="#" class="btn btn-theme btn-sm consent-payment" data-id="'.base64_encode($payment->id).'">Confirm</a>';
+                        return '<a href="#" class="btn payroll-btn-positive btn-sm consent-payment" data-id="'.base64_encode($payment->id).'">Confirm</a>';
                     }
                     else{
-                        return '<a href="#" class="btn btn-theme btn-sm consent-payment disabled" data-id="'.base64_encode($payment->id).'">Confirm</a>';
+                        return '<a href="#" class="btn payroll-btn-positive btn-sm consent-payment disabled" data-id="'.base64_encode($payment->id).'">Confirm</a>';
                     }
                 })
                ->escapeColumns([])
