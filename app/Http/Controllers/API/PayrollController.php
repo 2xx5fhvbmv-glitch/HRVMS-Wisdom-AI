@@ -125,18 +125,29 @@ class PayrollController extends Controller
             $lastMonth                                  = Carbon::now()->subMonth()->format('m'); // Example: "03" for March
             $currentYear                                = Carbon::now()->format('Y'); // Example: "2025"
 
+            // payroll_deductions/payroll_reviews/payroll_service_charges don't
+            // necessarily have a row for every employee in every payroll run
+            // (e.g. no service charge for non-tipped departments) — these
+            // used to be INNER JOINs, so any employee missing even one of
+            // those three rows for the period got $payroll = null and every
+            // field silently defaulted to 0 below, even though their payroll
+            // genuinely ran. Left-joined instead; every field already has a
+            // '?? 0' fallback for a genuinely missing value.
             $payroll                                    = Payroll::join('payroll_employees as pe','pe.payroll_id','=','payroll.id')
                                                             ->join('employees as e','e.id','=','pe.employee_id')
                                                             ->join('resort_admins as ra','ra.id','=','e.Admin_Parent_id')
                                                             ->join('resort_positions as rp','rp.id','=','e.Position_id')
                                                             ->join('resort_departments as rd','rd.id','=','e.Dept_id')
-                                                            ->join('payroll_deductions as pd','pd.payroll_id','=','payroll.id')
-                                                            ->join('payroll_reviews as pr','pr.payroll_id','=','payroll.id')
-                                                            ->join('payroll_service_charges as psc','psc.payroll_id','=','payroll.id')
+                                                            ->leftJoin('payroll_deductions as pd', function($j) use ($employee_id) {
+                                                                $j->on('pd.payroll_id','=','payroll.id')->where('pd.employee_id',$employee_id);
+                                                            })
+                                                            ->leftJoin('payroll_reviews as pr', function($j) use ($employee_id) {
+                                                                $j->on('pr.payroll_id','=','payroll.id')->where('pr.employee_id',$employee_id);
+                                                            })
+                                                            ->leftJoin('payroll_service_charges as psc', function($j) use ($employee_id) {
+                                                                $j->on('psc.payroll_id','=','payroll.id')->where('psc.employee_id',$employee_id);
+                                                            })
                                                             ->where('pe.employee_id',$employee_id)
-                                                            ->where('psc.employee_id',$employee_id)
-                                                            ->where('pr.employee_id',$employee_id)
-                                                            ->where('pd.employee_id',$employee_id)
                                                             ->whereMonth('payroll.start_date', $lastMonth)
                                                             ->whereYear('payroll.start_date', $currentYear)
                                                             ->select(
@@ -169,7 +180,7 @@ class PayrollController extends Controller
 
                 $earningsTotal                          =   ($payroll->earnings_basic ?? 0) + ($payroll->service_charge_amount ?? 0) + ($payroll->earnings_allowance ?? 0);
 
-                $totalAmount                            =   ($payroll->earnings_basic ?? 0)+ ($payroll->service_charge_amount ?? 0) + ($payroll->earnings_allowance ?? 0 ) - ($payroll->total_deduction ?? 0);
+                $totalAmount                            =   ($payroll->earnings_basic ?? 0)+ ($payroll->service_charge_amount ?? 0) + ($payroll->earnings_allowance ?? 0 ) - ($payroll->total_deductions ?? 0);
 
                 $payrollNetSalary                           =   ($payroll->earnings_allowance ?? 0) + ($payroll->earnings_basic ?? 0) - ($payroll->total_deductions ?? 0);
                 $data = [
@@ -183,7 +194,13 @@ class PayrollController extends Controller
                     'pension'                           => [
                     'employee_pension'                  => round($payroll->pension ?? 0,2),
                     'employer_pension'                  => round($payroll->pension ?? 0,2),
-                    'pension_percentage'                => isset($employee->contribution) ? $employee->contribution . '%' : '7%',
+                    // No per-employee/per-resort pension rate is stored
+                    // anywhere in the schema (checked — same dead
+                    // '$employee->contribution' reference, always falling
+                    // back to this same hardcoded value, exists in the web
+                    // Pension module too) — a real configurable rate needs a
+                    // new settings field, not a query fix.
+                    'pension_percentage'                => '7%',
                     ],
                     'city_ledger'                       => round($payroll->city_ledger ?? 0, 2),
                     'payslip_details'                   => [
@@ -233,15 +250,22 @@ class PayrollController extends Controller
                                                                
             $employee->profile_picture                  =   Common::getResortUserPicture($employee->parentId);
              
-            // Fetch Last Month's Payroll Data
+            // Fetch Last Month's Payroll Data. payroll_time_and_attandance /
+            // payroll_reviews / payroll_deductions don't necessarily have a
+            // row for every employee in every run — was INNER JOIN, so a
+            // missing row on any one of the three silently dropped this to
+            // "no payroll data" even though the employee's payroll ran fine.
             $payrollNetSalAndOT                         =   Payroll::join('payroll_employees as pe','pe.payroll_id','=','payroll.id')
-                                                            ->join('payroll_time_and_attandance as ptaa','ptaa.payroll_id','=','payroll.id')
-                                                            ->join('payroll_reviews as pr','pr.payroll_id','=','payroll.id')
-                                                            ->join('payroll_deductions as pd','pd.payroll_id','=','payroll.id')
+                                                            ->leftJoin('payroll_time_and_attandance as ptaa', function($j) use ($employee_id) {
+                                                                $j->on('ptaa.payroll_id','=','payroll.id')->where('ptaa.employee_id',$employee_id);
+                                                            })
+                                                            ->leftJoin('payroll_reviews as pr', function($j) use ($employee_id) {
+                                                                $j->on('pr.payroll_id','=','payroll.id')->where('pr.employee_id',$employee_id);
+                                                            })
+                                                            ->leftJoin('payroll_deductions as pd', function($j) use ($employee_id) {
+                                                                $j->on('pd.payroll_id','=','payroll.id')->where('pd.employee_id',$employee_id);
+                                                            })
                                                             ->where('pe.employee_id',$employee_id)
-                                                            ->where('ptaa.employee_id',$employee_id)
-                                                            ->where('pr.employee_id',$employee_id)
-                                                            ->where('pd.employee_id',$employee_id)
                                                             ->whereMonth('payroll.start_date', $lastMonth)
                                                             ->whereYear('payroll.start_date', $currentYear)
                                                             ->select(
@@ -259,15 +283,25 @@ class PayrollController extends Controller
         
             $payrollNetSalAndOT->net_salary = round(($payrollNetSalAndOT->earnings_allowance ?? 0) + ($payrollNetSalAndOT->earnings_basic ?? 0) - ($payrollNetSalAndOT->total_deductions ?? 0), 2);
                                                             
+            // This is the actual "View All Payslips" list — was INNER JOIN
+            // on deductions/reviews/service_charges, so any payroll period
+            // missing even one of those three rows for this employee (e.g.
+            // no service charge for a non-tipped role) was silently dropped
+            // from the whole list, not just shown with a zero — reported as
+            // "no payslips are available" and "March payroll data is not
+            // displayed despite being included in payroll".
             $payroll                                    =   Payroll::join('payroll_employees as pe','pe.payroll_id','=','payroll.id')
                                                             ->join('employees as e','e.id','=','pe.employee_id')
-                                                            ->join('payroll_deductions as pd','pd.payroll_id','=','payroll.id')
-                                                            ->join('payroll_reviews as pr','pr.payroll_id','=','payroll.id')
-                                                            ->join('payroll_service_charges as psc','psc.payroll_id','=','payroll.id')
+                                                            ->leftJoin('payroll_deductions as pd', function($j) use ($employee_id) {
+                                                                $j->on('pd.payroll_id','=','payroll.id')->where('pd.employee_id',$employee_id);
+                                                            })
+                                                            ->leftJoin('payroll_reviews as pr', function($j) use ($employee_id) {
+                                                                $j->on('pr.payroll_id','=','payroll.id')->where('pr.employee_id',$employee_id);
+                                                            })
+                                                            ->leftJoin('payroll_service_charges as psc', function($j) use ($employee_id) {
+                                                                $j->on('psc.payroll_id','=','payroll.id')->where('psc.employee_id',$employee_id);
+                                                            })
                                                             ->where('pe.employee_id',$employee_id)
-                                                            ->where('psc.employee_id',$employee_id)
-                                                            ->where('pr.employee_id',$employee_id)
-                                                            ->where('pd.employee_id',$employee_id)
                                                             ->whereYear('payroll.start_date', $year)
                                                             ->select(
                                                                 'payroll.id',  'payroll.resort_id', 'payroll.start_date',
@@ -319,19 +353,25 @@ class PayrollController extends Controller
        
         try {
              
-            // Fetch Last Month's Payroll Data
+            // Fetch Last Month's Payroll Data. Same INNER-JOIN-drops-rows
+            // bug as payrollDashboard()/paySlipList() — left-joined so a
+            // missing deductions/reviews/service_charge row for a given
+            // month doesn't hide that month's payslip entirely.
             $payroll                                    =   Payroll::join('payroll_employees as pe','pe.payroll_id','=','payroll.id')
                                                                 ->join('employees as e','e.id','=','pe.employee_id')
                                                                 ->join('resort_admins as ra','ra.id','=','e.Admin_Parent_id')
                                                                 ->join('resort_positions as rp','rp.id','=','e.Position_id')
                                                                 ->join('resort_departments as rd','rd.id','=','e.Dept_id')
-                                                                ->join('payroll_deductions as pd','pd.payroll_id','=','payroll.id')
-                                                                ->join('payroll_reviews as pr','pr.payroll_id','=','payroll.id')
-                                                                ->join('payroll_service_charges as psc','psc.payroll_id','=','payroll.id')
-                                                                ->where('pe.employee_id',$employee_id)
-                                                                ->where('psc.employee_id',$employee_id)
-                                                                ->where('pr.employee_id',$employee_id)
-                                                                ->where('pd.employee_id',$employee_id);
+                                                                ->leftJoin('payroll_deductions as pd', function($j) use ($employee_id) {
+                                                                    $j->on('pd.payroll_id','=','payroll.id')->where('pd.employee_id',$employee_id);
+                                                                })
+                                                                ->leftJoin('payroll_reviews as pr', function($j) use ($employee_id) {
+                                                                    $j->on('pr.payroll_id','=','payroll.id')->where('pr.employee_id',$employee_id);
+                                                                })
+                                                                ->leftJoin('payroll_service_charges as psc', function($j) use ($employee_id) {
+                                                                    $j->on('psc.payroll_id','=','payroll.id')->where('psc.employee_id',$employee_id);
+                                                                })
+                                                                ->where('pe.employee_id',$employee_id);
                                                                 if($month) {
                                                                     $payroll->whereMonth('payroll.start_date', $month);
                                                                 }
@@ -348,7 +388,7 @@ class PayrollController extends Controller
                 return response()->json(['success' => false, 'error' => 'Payroll data not found'], 200);
             }
                                                         
-            $totalAmount                                =   ($payroll->earnings_basic ?? 0) + ($payroll->service_charge_amount ?? 0) + ($payroll->earnings_allowance ?? 0) - ($payroll->total_deduction);
+            $totalAmount                                =   ($payroll->earnings_basic ?? 0) + ($payroll->service_charge_amount ?? 0) + ($payroll->earnings_allowance ?? 0) - ($payroll->total_deductions ?? 0);
             $earningtotalAmount                         =   ($payroll->earnings_basic ?? 0) + ($payroll->earnings_allowance?? 0);
             $payrollNetSalary                           =   ($payroll->earnings_allowance ?? 0) + ($payroll->earnings_basic ?? 0) - ($payroll->total_deductions ?? 0);
            
@@ -424,19 +464,25 @@ class PayrollController extends Controller
        
         try {
              
-            // Fetch Last Month's Payroll Data
+            // Fetch Last Month's Payroll Data. Same INNER-JOIN-drops-rows
+            // bug as payrollDashboard()/paySlipList() — left-joined so a
+            // missing deductions/reviews/service_charge row for a given
+            // month doesn't hide that month's payslip entirely.
             $payroll                                    =   Payroll::join('payroll_employees as pe','pe.payroll_id','=','payroll.id')
                                                                 ->join('employees as e','e.id','=','pe.employee_id')
                                                                 ->join('resort_admins as ra','ra.id','=','e.Admin_Parent_id')
                                                                 ->join('resort_positions as rp','rp.id','=','e.Position_id')
                                                                 ->join('resort_departments as rd','rd.id','=','e.Dept_id')
-                                                                ->join('payroll_deductions as pd','pd.payroll_id','=','payroll.id')
-                                                                ->join('payroll_reviews as pr','pr.payroll_id','=','payroll.id')
-                                                                ->join('payroll_service_charges as psc','psc.payroll_id','=','payroll.id')
-                                                                ->where('pe.employee_id',$employee_id)
-                                                                ->where('psc.employee_id',$employee_id)
-                                                                ->where('pr.employee_id',$employee_id)
-                                                                ->where('pd.employee_id',$employee_id);
+                                                                ->leftJoin('payroll_deductions as pd', function($j) use ($employee_id) {
+                                                                    $j->on('pd.payroll_id','=','payroll.id')->where('pd.employee_id',$employee_id);
+                                                                })
+                                                                ->leftJoin('payroll_reviews as pr', function($j) use ($employee_id) {
+                                                                    $j->on('pr.payroll_id','=','payroll.id')->where('pr.employee_id',$employee_id);
+                                                                })
+                                                                ->leftJoin('payroll_service_charges as psc', function($j) use ($employee_id) {
+                                                                    $j->on('psc.payroll_id','=','payroll.id')->where('psc.employee_id',$employee_id);
+                                                                })
+                                                                ->where('pe.employee_id',$employee_id);
                                                                 if($month) {
                                                                     $payroll->whereMonth('payroll.start_date', $month);
                                                                 }
@@ -456,7 +502,7 @@ class PayrollController extends Controller
             
        
                                                         
-            $totalAmount                                =   ($payroll->earnings_basic ?? 0) + ($payroll->service_charge_amount ?? 0) + ($payroll->earnings_allowance ?? 0) - ($payroll->total_deduction);
+            $totalAmount                                =   ($payroll->earnings_basic ?? 0) + ($payroll->service_charge_amount ?? 0) + ($payroll->earnings_allowance ?? 0) - ($payroll->total_deductions ?? 0);
             $earningtotalAmount                         =   ($payroll->earnings_basic ?? 0) + ($payroll->earnings_allowance?? 0);
             $payrollNetSalary                           =   ($payroll->earnings_allowance ?? 0) + ($payroll->earnings_basic ?? 0) - ($payroll->total_deductions ?? 0);
            

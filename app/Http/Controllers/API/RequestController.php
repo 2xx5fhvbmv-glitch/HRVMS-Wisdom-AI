@@ -274,14 +274,21 @@ class RequestController extends Controller
                 }
 
             DB::commit();
-            
+
             if (!$PayrollAdvance) {
                 return response()->json(['status' => false, 'message' => 'SOS not found']);
             }
+            $PayrollAdvance->load(['guarantors', 'PayrollAdvanceAttachment']);
+            // PayrollAdvanceAttachment (the raw relation, loaded above for
+            // compatibility) only carries the un-resolved Child_id — no
+            // usable URL, so the app can't display/download the file it
+            // just uploaded. requestDashboard()/salaryAdvanceDetails() both
+            // already resolve this properly; do the same here.
+            $PayrollAdvance->attachments = $this->resolveAttachments($PayrollAdvance->PayrollAdvanceAttachment);
             return response()->json([
                 'success'                               =>  true,
                 'message'                               =>  "Request Send Successfully.",
-                'data'                                  =>  $PayrollAdvance->load(['guarantors', 'PayrollAdvanceAttachment'])
+                'data'                                  =>  $PayrollAdvance
             ], 200);
 
         } catch (\Exception $e) {
