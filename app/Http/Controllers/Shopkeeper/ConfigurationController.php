@@ -15,6 +15,7 @@ use App\Helpers\Common;
 use App\Models\Product;
 use App\Models\Shopkeeper;
 use Illuminate\Support\Str;
+use SimpleSoftwareIO\QrCode\Facades\QrCode;
 
 use Illuminate\Support\Facades\Storage;
 use DB;
@@ -131,8 +132,24 @@ class ConfigurationController extends Controller
             'name' => $product->name,
             'price' => $product->price,
             'currency_type' => $product->currency_type ?? 'USD',
-            'qr_code' => $product->qr_code ? base64_encode($product->qr_code) : null, // Return Base64 QR code
+            'qr_code' => $product->qr_code ? 'data:image/svg+xml;base64,' . base64_encode($product->qr_code) : null,
         ]);
+    }
+
+    /**
+     * QR encodes base64_encode((string) $product->id) — same convention as
+     * PaymentController's consent QR — so it must be generated AFTER the
+     * product exists and has a real id. Previously the client generated the
+     * QR itself, before save, encoding a human-readable "name - price"
+     * string with no id in it at all — a scanned product QR had nothing a
+     * mobile client could actually look up (see
+     * ShopController::productDetails()).
+     */
+    private function generateProductQr(Product $product): string
+    {
+        // 'svg' needs no imagick (only GD is installed on this server),
+        // same reasoning as the payment QR above.
+        return QrCode::format('svg')->size(256)->generate(base64_encode((string) $product->id));
     }
 
     public function store(Request $request)
@@ -141,7 +158,6 @@ class ConfigurationController extends Controller
             'products.*.product_name' => 'required|string|max:255',
             'products.*.product_price' => 'required|numeric',
             'products.*.currency_type' => 'required|in:USD,MVR',
-            'products.*.qr_code' => 'required|string',
         ]);
 
         // Check for existing products
@@ -152,7 +168,7 @@ class ConfigurationController extends Controller
             $exists = Product::where('shopkeeper_id', $shopkeeper_id)
                             ->where('name', $product['product_name'])
                             ->exists();
-            
+
             if ($exists) {
                 $existingProducts[] = $product['product_name'];
             }
@@ -169,13 +185,14 @@ class ConfigurationController extends Controller
 
         // Create products if none exist
         foreach ($validatedData['products'] as $product) {
-            Product::create([
+            $created = Product::create([
                 'shopkeeper_id' => $shopkeeper_id,
                 'name' => $product['product_name'],
                 'price' => $product['product_price'],
                 'currency_type' => $product['currency_type'] ?? 'USD',
-                'qr_code' => base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $product['qr_code'])),
             ]);
+            $created->qr_code = $this->generateProductQr($created);
+            $created->save();
         }
 
         return response()->json(['success' => true, 'message' => 'Products added successfully!']);
@@ -210,7 +227,6 @@ class ConfigurationController extends Controller
             'name' => 'required|string|max:255',
             'price' => 'required|numeric',
             'currency_type' => 'required|in:USD,MVR',
-            'qr_code' => 'required|string', // Ensure QR code is passed
         ]);
 
         $product = Product::findOrFail($id);
@@ -218,22 +234,15 @@ class ConfigurationController extends Controller
         $product->price = $request->price;
         $product->currency_type = $request->currency_type;
 
-        // Save the QR code from the frontend (base64 string)
-        $qrCodeBase64 = $request->qr_code;
-
-        // Ensure QR code exists and is a valid string
-        if (empty($qrCodeBase64)) {
-            return response()->json([
-                'success' => false,
-                'msg' => 'QR Code is required.'
-            ], 400);
+        // The product's id never changes on edit, so the QR (which only
+        // ever encodes that id) doesn't need touching here — was requiring
+        // and re-storing a client-generated image on every edit for no
+        // reason, and that image encoded a stale name/price label anyway
+        // (see generateProductQr()). Backfill any product that still has no
+        // real QR yet (e.g. was created before this fix landed).
+        if (empty($product->qr_code)) {
+            $product->qr_code = $this->generateProductQr($product);
         }
-
-        // Decode the Base64 string and save the image
-        $qrCodeImage = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $qrCodeBase64));
-
-        // Save the QR code image as binary
-        $product->qr_code = $qrCodeImage;
 
         $product->save();
 
@@ -312,7 +321,6 @@ class ConfigurationController extends Controller
             'products.*.product_name' => 'required|string|max:255',
             'products.*.product_price' => 'required|numeric',
             'products.*.currency_type' => 'nullable|in:USD,MVR',
-            'products.*.qr_code' => 'required|string',
         ]);
 
         $shopkeeper_id = $this->shopkeeper->id;
@@ -320,31 +328,31 @@ class ConfigurationController extends Controller
         $created = 0;
 
         foreach ($validated['products'] as $product) {
-            // Decode QR image from base64
-            $qrImage = base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $product['qr_code']));
-            
             // Check if product with same name exists
             $existingProduct = Product::where('shopkeeper_id', $shopkeeper_id)
                                       ->where('name', $product['product_name'])
                                       ->first();
-                                      
+
             $currencyType = $product['currency_type'] ?? 'USD';
             if ($existingProduct) {
-                // Update existing product
+                // Update existing product — id (and so its QR) doesn't change.
                 $existingProduct->price = $product['product_price'];
                 $existingProduct->currency_type = $currencyType;
-                $existingProduct->qr_code = $qrImage;
+                if (empty($existingProduct->qr_code)) {
+                    $existingProduct->qr_code = $this->generateProductQr($existingProduct);
+                }
                 $existingProduct->save();
                 $updated++;
             } else {
-                // Create new product
-                Product::create([
+                // Create new product, then generate its QR from the real id.
+                $newProduct = Product::create([
                     'shopkeeper_id' => $shopkeeper_id,
                     'name' => $product['product_name'],
                     'price' => $product['product_price'],
                     'currency_type' => $currencyType,
-                    'qr_code' => $qrImage,
                 ]);
+                $newProduct->qr_code = $this->generateProductQr($newProduct);
+                $newProduct->save();
                 $created++;
             }
         }

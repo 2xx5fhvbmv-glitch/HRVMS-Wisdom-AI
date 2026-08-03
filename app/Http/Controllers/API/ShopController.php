@@ -113,6 +113,11 @@ class ShopController extends Controller
         }
 
         try {
+            // The scanned QR encodes base64_encode((string) $product->id)
+            // (see Shopkeeper\ConfigurationController::generateProductQr) —
+            // same convention as the other base64-id "view" endpoints in
+            // this app (e.g. consentRequestview).
+            $productId                                      =   base64_decode($productId);
             $product                                        =   DB::table('products as p')
                                                                     ->join('shopkeepers as sk', 'sk.id', '=', 'p.shopkeeper_id')
                                                                     ->where('p.id', $productId)

@@ -621,6 +621,14 @@ class StaffAccommodationController extends Controller
         // **Set Profile Image**
         $row->profileImg                                    =   Common::getResortUserPicture($row->Parentid);
 
+        // Was passed through raw (plain filename, JSON blob, or the literal
+        // string "null") — every other maintenance-request read path
+        // (staffMaintenanceReqList, viewMaintenanceRequest) already resolves
+        // this, but the dashboard's own preview list never did.
+        if (!empty($row->Image)) {
+            $row->Image = Common::resolveMaintenanceAttachmentUrl($row->Image, $row->resort_id);
+        }
+
         // **Get Inventory Item Name**
         $row->EffectedAmenity                               =   ucfirst($inventoryItems[$row->item_id] ?? 'N/A');
 

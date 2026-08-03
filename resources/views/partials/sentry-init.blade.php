@@ -16,13 +16,20 @@
     src="https://browser.sentry-cdn.com/10.68.0/bundle.min.js"
     integrity="sha384-wlMK49+ZQZv/XNgqTODJLX2f9EKTANs/KbJKkutCktQh4/gXMXcLdKVnYzCo/0ck"
     crossorigin="anonymous"
+    defer
 ></script>
 <script>
-    if (typeof Sentry !== 'undefined') {
-        Sentry.init({
-            dsn: @json(env('SENTRY_JS_DSN')),
-            environment: @json(env('APP_ENV')),
-        });
-    }
+    // The SDK tag above is `defer`, so it hasn't necessarily run yet at this
+    // point in the document — defer has no effect on this inline script
+    // (no `src`), so it would otherwise race the SDK load. Deferred scripts
+    // are guaranteed to finish before DOMContentLoaded, so wait for that.
+    document.addEventListener('DOMContentLoaded', function () {
+        if (typeof Sentry !== 'undefined') {
+            Sentry.init({
+                dsn: @json(env('SENTRY_JS_DSN')),
+                environment: @json(env('APP_ENV')),
+            });
+        }
+    });
 </script>
 @endif
