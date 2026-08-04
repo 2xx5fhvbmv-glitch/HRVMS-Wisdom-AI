@@ -7059,6 +7059,9 @@ class Common
         // — already used by SOS/Announcement/Maintenance and confirmed
         // working there, so route every caller's push through it too.
         try {
+            // sendPushNotificationForMobile() decodes/flattens each raw
+            // device_token value itself now (one employee can have several
+            // devices) — no need to do it twice here.
             $deviceTokens = Employee::whereIn('id', (array) $sendto)->pluck('device_token')->filter();
             if ($deviceTokens->isNotEmpty()) {
                 self::sendPushNotificationForMobile($deviceTokens, $title, $message, $module, null, null, null, null);
@@ -8249,6 +8252,61 @@ class Common
         return $fileManagement;
     }
 
+    /**
+     * employees.device_token stores a JSON-encoded array of FCM tokens — an
+     * employee can be logged into the app on more than one device, and
+     * overwriting a single scalar value on every login/add-device-token call
+     * silently killed push delivery to whichever device logged in first.
+     * Decodes that into a flat array of token strings. Also accepts a bare
+     * single-token string (non-JSON) for backward compatibility with any
+     * pre-existing legacy value.
+     */
+    public static function decodeDeviceTokens($raw): array
+    {
+        if (empty($raw)) {
+            return [];
+        }
+        $decoded = json_decode($raw, true);
+        if (is_array($decoded)) {
+            return array_values(array_filter($decoded));
+        }
+        return [$raw];
+    }
+
+    /**
+     * Adds $token to $employee's device token list if not already present.
+     * Used at login and by add-device-token — never overwrites another
+     * device's token.
+     */
+    public static function addDeviceToken($employee, $token): void
+    {
+        if (!$employee || empty($token)) {
+            return;
+        }
+        $tokens = self::decodeDeviceTokens($employee->device_token);
+        if (!in_array($token, $tokens, true)) {
+            $tokens[] = $token;
+        }
+        $employee->device_token = json_encode(array_values($tokens));
+        $employee->save();
+    }
+
+    /**
+     * Removes $token from $employee's device token list (e.g. on logout) —
+     * leaves any other device's token untouched, unlike the old behavior of
+     * nulling the whole column on any single device logging out.
+     */
+    public static function removeDeviceToken($employee, $token): void
+    {
+        if (!$employee) {
+            return;
+        }
+        $tokens = self::decodeDeviceTokens($employee->device_token);
+        $tokens = array_values(array_filter($tokens, fn($t) => $t !== $token));
+        $employee->device_token = $tokens ? json_encode($tokens) : null;
+        $employee->save();
+    }
+
     public static function FCMTokenPushNotification()
     {
         // Was env(), not config() — silently returns null in production
@@ -8314,6 +8372,19 @@ class Common
     {
         // Convert to array if it's a collection
         $tokens = is_array($deviceTokens) ? $deviceTokens : $deviceTokens->toArray();
+
+        // Every caller (14+ across the app) passes a raw employees.device_token
+        // column value per employee, e.g. [$employee->device_token] or a plain
+        // pluck('device_token') collection — one entry per employee, not per
+        // device. Now that the column stores a JSON-encoded array (an
+        // employee can be logged in on more than one device), decode+flatten
+        // here once so every existing caller gets multi-device push for free
+        // without having to be rewritten individually.
+        $tokens = collect($tokens)
+            ->flatMap(fn($raw) => self::decodeDeviceTokens($raw))
+            ->unique()
+            ->values()
+            ->all();
 
         // Remove nulls and duplicates
         $tokens = array_filter($tokens);

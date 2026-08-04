@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use App\Models\ResortAdmin;
 use App\Models\Employee;
+use App\Helpers\Common;
 use Illuminate\Foundation\Auth\SendsPasswordResetEmails;
 use Validator;
 use Illuminate\Support\Facades\Password;
@@ -79,6 +80,17 @@ class Logincontroller extends Controller
             $tokenResult                            =   $resortAdmin->createToken('ResortAdminToken');
             $token                                  =   $tokenResult->accessToken;
 
+            // Was never captured at login at all — the app had to remember
+            // to call the separate add-device-token endpoint afterward, and
+            // if it didn't (or that call failed), push notifications had
+            // nothing to send to. Optional here since some callers may still
+            // follow up with add-device-token separately; appends rather
+            // than overwrites so a second device logging in doesn't kill
+            // push to the first.
+            if ($request->filled('device_token')) {
+                Common::addDeviceToken($employee, $request->device_token);
+            }
+
             return response()->json([
                 'success'                           =>  true,
                 'message'                           =>  'User Login Successfully',
@@ -118,9 +130,14 @@ class Logincontroller extends Controller
 
              $employee                               =   Employee::where('Admin_Parent_id', $resort_admin->id)->first();
              if($employee) {
-                        // Clear the device token for the employee
-                        $employee->device_token = NULL;
-                        $employee->save();
+                        // Used to null the whole column — with multiple
+                        // devices now supported, that would also kill push
+                        // to every OTHER device this employee is still
+                        // logged into. Only remove the token for the
+                        // specific device logging out.
+                        if ($request->filled('device_token')) {
+                            Common::removeDeviceToken($employee, $request->device_token);
+                        }
              }
             return response()->json(['success'      => true, 'message' => 'User Logout Successfully'], 200);
         } catch (\Exception $e) {
@@ -187,8 +204,10 @@ class Logincontroller extends Controller
                 ], 404);
             }
 
-            // Update the device_token
-            $employee->device_token = $request->device_token;
+            // Was a raw overwrite — logging in on a second device silently
+            // wiped the first device's token and killed push to it. Appends
+            // instead (Common::addDeviceToken saves the employee itself).
+            Common::addDeviceToken($employee, $request->device_token);
             $employee->latitude = $request->latitude ?? null; // Set latitude if provided, otherwise null
             $employee->longitude = $request->longitude ?? null; // Set longitude if provided, otherwise null
             $employee->save();
