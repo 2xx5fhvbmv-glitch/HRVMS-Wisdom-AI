@@ -80,10 +80,6 @@
                                             <option value="MVR">MVR</option>
                                         </select>
                                     </div>
-                                    <div class="col">
-                                        <label class="form-label">QR CODE<span class="red-mark">*</span></label><br>
-                                        <div class="qr-code-container"></div>
-                                    </div>
                                     <!-- <div class="col-auto d-flex align-items-center">
                                         <a href="#" class="btn btn-danger btn-sm remove-prodConfig">Remove</a>
                                     </div> -->
@@ -166,62 +162,38 @@
                 contentType: false,
                 processData: false,
                 success: function (response) {
-                    const productsData = [];
-                    let done = 0;
+                    // QR is now generated server-side from each product's
+                    // real id once it's saved (see
+                    // ConfigurationController::generateProductQr) — a QR
+                    // built here, before the product even has an id, could
+                    // only ever encode a "name - price" label, which is
+                    // useless for the mobile scan-to-view-product flow.
+                    const productsData = response.products.map(product => ({
+                        product_name: product.product_name,
+                        product_price: product.product_price,
+                        currency_type: product.currency_type || 'USD',
+                    }));
 
-                    response.products.forEach((product, index) => {
-                        // Create temp DOM to render QR
-                        let tempContainer = document.createElement('div');
-                        tempContainer.id = `qr-${index}`;
-                        document.body.appendChild(tempContainer);
-
-                        new QRCode(tempContainer, {
-                            text: product.product_name + ' - $' + product.product_price,
-                            width: 60,
-                            height: 60,
-                            correctLevel: QRCode.CorrectLevel.L, // Lower error correction = more data space
-                            version: 10 // Increase this if still not enough (1–40)
-                        });
-
-                        setTimeout(() => {
-                            const canvas = tempContainer.querySelector('canvas');
-                            const qrBase64 = canvas ? canvas.toDataURL() : '';
-                            
-                            productsData.push({
-                                product_name: product.product_name,
-                                product_price: product.product_price,
-                                currency_type: product.currency_type || 'USD',
-                                qr_code: qrBase64,
+                    $.ajax({
+                        url: "{{ route('shopkeeper.products.import.submit') }}",
+                        method: "POST",
+                        data: {
+                            _token: "{{ csrf_token() }}",
+                            products: productsData,
+                        },
+                        success: function (res) {
+                            toastr.success(res.message, "Success", {
+                                positionClass: 'toast-bottom-right'
                             });
-
-                            document.body.removeChild(tempContainer); // Clean up
-
-                            done++;
-                            if (done === response.products.length) {
-                                // All QR codes ready, submit to DB
-                                $.ajax({
-                                    url: "{{ route('shopkeeper.products.import.submit') }}",
-                                    method: "POST",
-                                    data: {
-                                        _token: "{{ csrf_token() }}",
-                                        products: productsData,
-                                    },
-                                    success: function (res) {
-                                        toastr.success(res.message, "Success", {
-                                            positionClass: 'toast-bottom-right'
-                                        });
-                                        setTimeout(() => {
-                                            window.location.href = "{{ route('shopkeeper.products') }}";
-                                        }, 2000);
-                                    },
-                                    error: function () {
-                                        toastr.error("Saving products failed.", "Error", {
-                                            positionClass: 'toast-bottom-right'
-                                        });
-                                    }
-                                });
-                            }
-                        }, 2000);
+                            setTimeout(() => {
+                                window.location.href = "{{ route('shopkeeper.products') }}";
+                            }, 2000);
+                        },
+                        error: function () {
+                            toastr.error("Saving products failed.", "Error", {
+                                positionClass: 'toast-bottom-right'
+                            });
+                        }
                     });
                 },
                 error: function () {
@@ -247,51 +219,9 @@
         const addMoreBtn = document.querySelector('.add-prodConfig');
         const productForm = document.querySelector('#productForm');
 
-        // QR Code Generation Function
-        function generateQRCode(text, containerElement) {
-            if (!containerElement) {
-                console.warn('QR Code container element is null or undefined.');
-                return;
-            }
-
-            console.log('Generating QR Code for:', text);
-
-            try {
-                containerElement.innerHTML = ''; // Clear any existing QR code
-                new QRCode(containerElement, {
-                    text: text,
-                    width: 128,
-                    height: 128,
-                    colorDark: "#000000",
-                    colorLight: "#ffffff",
-                });
-                console.log('QR Code generated successfully for:', text);
-            } catch (error) {
-                console.error('Error in generateQRCode:', error);
-            }
-        }
-
-        // Attach event listeners to a product row
-        function attachEventListeners(row) {
-            const productNameInput = row.querySelector('.product_name');
-            const productPriceInput = row.querySelector('.product_price');
-            const qrContainer = row.querySelector('.qr-code-container');
-
-            if (!qrContainer) {
-                console.error('QR Code container not found in row:', row);
-                return;
-            }
-
-            [productNameInput, productPriceInput].forEach(input => {
-                input.addEventListener('input', function () {
-                    const productName = productNameInput.value.trim();
-                    const productPrice = productPriceInput.value.trim();
-                    if (productName && productPrice) {
-                        generateQRCode(`${productName} - ${currencySymbol} ${productPrice}`, qrContainer);
-                    }
-                });
-            });
-        }
+        // QR is generated server-side after save, from the product's real
+        // id (see ConfigurationController::generateProductQr) — no
+        // client-side generation needed anymore.
 
         // Add More Fields
         addMoreBtn.addEventListener('click', function (e) {
@@ -314,17 +244,10 @@
                         <option value="MVR">MVR</option>
                     </select>
                 </div>
-                <div class="col">
-                    <label class="form-label">QR CODE<span class="red-mark">*</span></label><br>
-                    <div class="qr-code-container"></div>
-                </div>
                 <div class="col-auto d-flex align-items-center">
                     <a href="#" class="btn btn-danger btn-sm remove-prodConfig">Remove</a>
                 </div></div>
             `;
-
-            // Attach event listeners for the new row
-            attachEventListeners(newRow);
 
             // Append the new row
             productsMain.appendChild(newRow);
@@ -363,18 +286,12 @@
                 const productPrice = row.querySelector('.product_price').value.trim();
                 const currencySelect = row.querySelector('.product_currency');
                 const currencyType = currencySelect ? currencySelect.value : 'USD';
-                const qrContainer = row.querySelector('.qr-code-container');
-
-                // Convert QR container to Base64 image
-                const qrCanvas = qrContainer.querySelector('canvas');
-                const qrCodeBase64 = qrCanvas ? qrCanvas.toDataURL() : null;
 
                 if (productName && productPrice) {
                     productsData.push({
                         product_name: productName,
                         product_price: productPrice,
                         currency_type: currencyType,
-                        qr_code: qrCodeBase64,
                     });
                 }
             });
@@ -423,11 +340,6 @@
             });
         });
 
-        // Attach event listeners to the default first row
-        const initialRow = document.querySelector('.product-row');
-        if (initialRow) {
-            attachEventListeners(initialRow);
-        }
     });
 </script>
 @endsection

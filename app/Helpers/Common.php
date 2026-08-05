@@ -135,6 +135,52 @@ class Common
         return null;
     }
 
+    /**
+     * Single write path for "create or update an employee's core profile,"
+     * shared by the manual Add Employee wizard (People\Employee\
+     * EmployeeController::store()) and the Master Import bulk importer
+     * (App\Imports\EmployeeImport) so both go through the same mechanics
+     * instead of two copies that can drift. Callers own duplicate-handling
+     * POLICY (store() rejects duplicate emails before ever calling this;
+     * the importer upserts by resolving $existingResortAdmin itself) — this
+     * function only owns the mechanical writes: resolve/insert ResortAdmin,
+     * resolve/insert Employee, assign Emp_id, and provision the categorized
+     * folder row exactly once (guarded — Employee's own `created` hook may
+     * have already inserted it).
+     */
+    public static function persistEmployeeProfile(array $resortAdminData, array $employeeData, int $resortId, ?ResortAdmin $existingResortAdmin = null): array
+    {
+        if ($existingResortAdmin) {
+            $existingResortAdmin->update($resortAdminData);
+            $resortAdmin = $existingResortAdmin;
+        } else {
+            $resortAdminData['resort_id'] = $resortId;
+            $resortAdmin = ResortAdmin::create($resortAdminData);
+        }
+
+        $employeeData['Admin_Parent_id'] = $resortAdmin->id;
+
+        $employee = Employee::where('Admin_Parent_id', $resortAdmin->id)->first();
+        if ($employee) {
+            $employee->update($employeeData);
+            $employeeCreated = false;
+        } else {
+            $employeeData['Emp_id'] = self::nextEmployeeId($resortId);
+            $employee = Employee::create($employeeData);
+
+            $folderExists = FilemangementSystem::where('resort_id', $resortId)
+                ->where('Folder_Name', $employee->Emp_id)
+                ->where('Folder_Type', 'categorized')
+                ->exists();
+            if (!$folderExists) {
+                self::createFolderByName($resortId, $employee->Emp_id, 'categorized');
+            }
+            $employeeCreated = true;
+        }
+
+        return ['resortAdmin' => $resortAdmin, 'employee' => $employee, 'employeeCreated' => $employeeCreated];
+    }
+
     public static function isHrAdmin(): bool
 	{
 		
@@ -3446,6 +3492,93 @@ class Common
         });
     }
 
+    /**
+     * A day covered by an APPROVED leave with no punch was falling through
+     * every path: the main register query inner-joins parent_attendaces (no
+     * punch row = not in the result), and getAbsentRegisterEntries() above
+     * explicitly excludes leave-covered dates (it only backfills genuine
+     * absences) — so a leave date range with no punch simply vanished from
+     * the register instead of showing a leave marker.
+     */
+    private static function getLeaveRegisterEntries($resortId, $empId, $startDate, $endDate)
+    {
+        $rows = DB::select("
+            SELECT el.from_date, el.to_date, lc.leave_type, lc.color
+            FROM employees_leaves el
+            JOIN leave_categories lc ON lc.id = el.leave_category_id
+            WHERE el.Emp_id = ?
+            AND el.resort_id = ?
+            AND el.status = 'Approved'
+            AND el.from_date <= ?
+            AND el.to_date >= ?
+        ", [$empId, $resortId, $endDate, $startDate]);
+
+        $entries = collect();
+        foreach ($rows as $row) {
+            $rangeStart = max($row->from_date, $startDate);
+            $rangeEnd = min($row->to_date, $endDate);
+            $existingPunchDates = DB::table('parent_attendaces')
+                ->where('Emp_id', $empId)
+                ->where('resort_id', $resortId)
+                ->whereBetween('date', [$rangeStart, $rangeEnd])
+                ->pluck('date')
+                ->map(fn($d) => \Carbon\Carbon::parse($d)->format('Y-m-d'))
+                ->all();
+
+            $cursor = \Carbon\Carbon::parse($rangeStart);
+            $end = \Carbon\Carbon::parse($rangeEnd);
+            while ($cursor->lte($end)) {
+                $dateStr = $cursor->format('Y-m-d');
+                if (!in_array($dateStr, $existingPunchDates, true)) {
+                    $entries->push((object) [
+                        'date' => $dateStr,
+                        'Status' => 'On Leave',
+                        'Emp_id' => $empId,
+                        'Shift_id' => null,
+                        'ShiftName' => null,
+                        'StartTime' => null,
+                        'EndTime' => null,
+                        'StartTimeShow' => null,
+                        'EndTimeShow' => null,
+                        'CheckingTime' => null,
+                        'CheckingOutTime' => null,
+                        'CheckInTime' => null,
+                        'CheckOutTime' => null,
+                        'OverTime' => null,
+                        'DayWiseTotalHours' => null,
+                        'note' => null,
+                        'DayOfDate' => null,
+                        'InternalStatus' => null,
+                        'InTime_Location' => null,
+                        'OutTime_Location' => null,
+                        'InTime_Latitude' => null,
+                        'InTime_Longitude' => null,
+                        'InTime_Accuracy' => null,
+                        'OutTime_Latitude' => null,
+                        'OutTime_Longitude' => null,
+                        'OutTime_Accuracy' => null,
+                        'InTime_GeofenceName' => null,
+                        'OutTime_GeofenceName' => null,
+                        'Attd_id' => null,
+                        'OTStatus' => null,
+                        'OTstatus' => null,
+                        'OTApproved_By' => null,
+                        'ApprovedName' => '',
+                        'differenceInHours' => null,
+                        'msg' => null,
+                        'LeaveData' => [],
+                        'LeaveFirstName' => substr($row->leave_type ?? 'On Leave', 0, 1),
+                        'LeaveColor' => $row->color ?? '',
+                        'LeaveType' => $row->leave_type ?? 'On Leave',
+                    ]);
+                }
+                $cursor->addDay();
+            }
+        }
+
+        return $entries;
+    }
+
     public static function GetAttandanceRegister($resort_id,$duty_roster_id,$Employee,$WeekstartDate, $WeekendDate,$startOfMonth,$endOfMonth,$flag)
     {
         // Cache key to avoid duplicate queries for same employee/flag
@@ -3584,7 +3717,8 @@ class Common
             });
 
             $absentEntries = self::getAbsentRegisterEntries($resort_id, $Employee, $WeekstartDate, $WeekendDate);
-            $DutyRoster = $DutyRoster->concat($absentEntries)->sortBy('date')->values();
+            $leaveEntries = self::getLeaveRegisterEntries($resort_id, $Employee, $WeekstartDate, $WeekendDate);
+            $DutyRoster = $DutyRoster->concat($absentEntries)->concat($leaveEntries)->sortBy('date')->values();
         }
 
         if($flag =="Monthwise")
@@ -3737,7 +3871,8 @@ class Common
                     });
 
             $absentEntries = self::getAbsentRegisterEntries($resort_id, $Employee, $startOfMonth->format('Y-m-d'), $endOfMonth->format('Y-m-d'));
-            $DutyRoster = $DutyRoster->concat($absentEntries)->sortBy('date')->values();
+            $leaveEntries = self::getLeaveRegisterEntries($resort_id, $Employee, $startOfMonth->format('Y-m-d'), $endOfMonth->format('Y-m-d'));
+            $DutyRoster = $DutyRoster->concat($absentEntries)->concat($leaveEntries)->sortBy('date')->values();
         }
         self::$attendanceCache[$cacheKey] = $DutyRoster;
         return $DutyRoster;
@@ -6914,6 +7049,27 @@ class Common
             return null;
         }
 
+        // Real push delivery. BASE_URL is unset in every env file in this
+        // repo (checked .env/.env.staging/.env.example), so the legacy
+        // /mob-send-notification leg below has always been a silent no-op
+        // for every one of this function's 30+ callers — that's the actual
+        // root cause behind "push notifications don't arrive" reports
+        // app-wide, not a per-module bug. sendPushNotificationForMobile()
+        // hits FCM directly and IS configured (FCM_PROJECT_ID etc. are set)
+        // — already used by SOS/Announcement/Maintenance and confirmed
+        // working there, so route every caller's push through it too.
+        try {
+            // sendPushNotificationForMobile() decodes/flattens each raw
+            // device_token value itself now (one employee can have several
+            // devices) — no need to do it twice here.
+            $deviceTokens = Employee::whereIn('id', (array) $sendto)->pluck('device_token')->filter();
+            if ($deviceTokens->isNotEmpty()) {
+                self::sendPushNotificationForMobile($deviceTokens, $title, $message, $module, null, null, null, null);
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('sendMobileNotification FCM push failed: ' . $e->getMessage());
+        }
+
         // BASE_URL is optional (unset on local/dev). Skip the outbound push
         // rather than calling Http::post() with a null base — Guzzle would
         // throw an invalid-URI exception and 500 the whole request.
@@ -7187,48 +7343,19 @@ class Common
             $originalName = $file->getClientOriginalName();
             $extension = strtolower($file->getClientOriginalExtension());
             $fileSizeMB = round($file->getSize() / 1024, 2);
-            $isImage = in_array($extension, ['jpg', 'jpeg', 'png']);
 
-            // DomPDF renders the embedded base64 image on a full HTML page,
-            // which needs many times the source file's size in memory (a
-            // ~2.5MB photo reproduced a real "Allowed memory size exhausted"
-            // fatal here, even with ini_set('memory_limit','-1') above —
-            // that override can itself be locked out by the server's PHP-FPM
-            // pool config (php_admin_value), which code can't ever raise).
-            // Skip the PDF conversion above a safe threshold and store the
-            // original image as-is rather than crash the whole request.
-            $skipPdfConversionThresholdBytes = 1.5 * 1024 * 1024; // 1.5MB
-            $isImage = $isImage && $file->getSize() <= $skipPdfConversionThresholdBytes;
-
-            // Convert image to PDF
-            if ($isImage) {
-                $tempImagePath = $file->store('temp', 'local');
-                $fullImagePath = storage_path('app/' . $tempImagePath);
-
-                if (file_exists($fullImagePath)) {
-                    $imageData = file_get_contents($fullImagePath);
-                    $mimeType = mime_content_type($fullImagePath);
-                    $base64Image = 'data:' . $mimeType . ';base64,' . base64_encode($imageData);
-
-                    $pdf = Pdf::loadView('resorts.FileManagment.scan', [
-                        'imageBase64' => $base64Image
-                    ])->setPaper('a4', 'portrait');
-
-                    $tempPdfPath = storage_path('app/temp/') . uniqid('pdf_') . '.pdf';
-                    $pdf->save($tempPdfPath);
-
-                    $fileContent = file_get_contents($tempPdfPath);
-                    $originalName = pathinfo($originalName, PATHINFO_FILENAME) . '.pdf';
-                    $extension = 'pdf';
-                    $fileSizeMB = round(strlen($fileContent) / 1024, 2);
-                } else {
-                    return ['status' => false, 'msg' => 'Failed to process image'];
-                }
-            } else {
-                $fileContent = file_get_contents($file->getRealPath());
-                if ($fileContent === false) {
-                    return ['status' => false, 'msg' => 'Failed to read file'];
-                }
+            // Images used to be force-converted to PDF here via dompdf
+            // (embed as base64 <img>, render to PDF) — dompdf's image
+            // backend can't decode CMYK-color-space JPEGs (a common
+            // camera/scan-app output) and silently renders a blank page
+            // instead of erroring, which is exactly the "color photos
+            // becoming blank PDFs" report. Store the original file as-is,
+            // same as every other file type. This is the shared upload path
+            // for every module's mobile attachments (Grievance, etc.), not
+            // just File Management, so this fixes all of them at once.
+            $fileContent = file_get_contents($file->getRealPath());
+            if ($fileContent === false) {
+                return ['status' => false, 'msg' => 'Failed to read file'];
             }
 
             $uniqueString = substr(md5(uniqid($originalName, true)), 0, 10);
@@ -7269,6 +7396,11 @@ class Common
                     [
                         'Folder_unique_id' => substr(md5(uniqid($SubFolder, true)), 0, 10),
                         'Folder_Type'      => 'categorized',
+                        // Flags this as a backend attachment folder (Maintenance
+                        // Request, Grievance, Request, Housekeeping, etc.), not
+                        // one the employee created themselves — My Drive hides
+                        // these so employees only see their own folders/files.
+                        'is_system_generated' => true,
                     ]
                 );
                 if ($parentPath->wasRecentlyCreated) {
@@ -7433,7 +7565,11 @@ class Common
      */
     public static function resolveMaintenanceAttachmentUrl($value, $resortId)
     {
-        if (empty($value)) {
+        // json_encode(null) produces the literal string "null" (not a real SQL
+        // NULL) — existing rows written before this was fixed at the source
+        // still have that value stored; empty() doesn't catch a non-empty
+        // 4-character string, so it must be checked explicitly.
+        if (empty($value) || $value === 'null') {
             return null;
         }
 
@@ -7445,6 +7581,36 @@ class Common
 
         $path_path = config('settings.MaintanceRequest') . '/' . $resortId;
         return StorageHelper::temporaryUrl($path_path . '/' . $value);
+    }
+
+    /**
+     * grivance_submission_models.Attachements holds EITHER a comma-joined
+     * list of plain filenames (web submission, GrivanceController::store())
+     * or a JSON array of {"Filename":..,"Child_id":..} (mobile submission,
+     * via AWSEmployeeFileUpload) — same dual-format situation as
+     * resolveMaintenanceAttachmentUrl(), but this column can hold several
+     * files at once, so this returns a list of [filename, url] pairs
+     * instead of a single url.
+     */
+    public static function resolveGrievanceAttachments($value, $basePath, $resortId)
+    {
+        if (empty($value)) return [];
+
+        $decoded = json_decode($value, true);
+        if (is_array($decoded)) {
+            return collect($decoded)->map(function ($item) use ($resortId) {
+                $url = null;
+                if (!empty($item['Child_id'])) {
+                    $aws = self::GetAWSFile($item['Child_id'], $resortId);
+                    if (!empty($aws['success'])) $url = $aws['NewURLshow'];
+                }
+                return ['filename' => $item['Filename'] ?? null, 'url' => $url];
+            })->values()->all();
+        }
+
+        return collect(explode(',', $value))->filter()->map(function ($filename) use ($basePath) {
+            return ['filename' => $filename, 'url' => StorageHelper::temporaryUrl($basePath . '/' . $filename)];
+        })->values()->all();
     }
 
     public static function GetApplicantAWSFile($path)
@@ -8086,11 +8252,76 @@ class Common
         return $fileManagement;
     }
 
+    /**
+     * employees.device_token stores a JSON-encoded array of FCM tokens — an
+     * employee can be logged into the app on more than one device, and
+     * overwriting a single scalar value on every login/add-device-token call
+     * silently killed push delivery to whichever device logged in first.
+     * Decodes that into a flat array of token strings. Also accepts a bare
+     * single-token string (non-JSON) for backward compatibility with any
+     * pre-existing legacy value.
+     */
+    public static function decodeDeviceTokens($raw): array
+    {
+        if (empty($raw)) {
+            return [];
+        }
+        $decoded = json_decode($raw, true);
+        if (is_array($decoded)) {
+            return array_values(array_filter($decoded));
+        }
+        return [$raw];
+    }
+
+    /**
+     * Adds $token to $employee's device token list if not already present.
+     * Used at login and by add-device-token — never overwrites another
+     * device's token.
+     */
+    public static function addDeviceToken($employee, $token): void
+    {
+        if (!$employee || empty($token)) {
+            return;
+        }
+        $tokens = self::decodeDeviceTokens($employee->device_token);
+        if (!in_array($token, $tokens, true)) {
+            $tokens[] = $token;
+        }
+        $employee->device_token = json_encode(array_values($tokens));
+        $employee->save();
+    }
+
+    /**
+     * Removes $token from $employee's device token list (e.g. on logout) —
+     * leaves any other device's token untouched, unlike the old behavior of
+     * nulling the whole column on any single device logging out.
+     */
+    public static function removeDeviceToken($employee, $token): void
+    {
+        if (!$employee) {
+            return;
+        }
+        $tokens = self::decodeDeviceTokens($employee->device_token);
+        $tokens = array_values(array_filter($tokens, fn($t) => $t !== $token));
+        $employee->device_token = $tokens ? json_encode($tokens) : null;
+        $employee->save();
+    }
+
     public static function FCMTokenPushNotification()
     {
-        $pri_key = env('FCM_PRIVATE_KEY');
+        // Was env(), not config() — silently returns null in production
+        // whenever `php artisan config:cache` has run (Laravel stops reading
+        // .env entirely once the config cache exists). Routed through
+        // config/services.php's 'fcm' block instead, same pattern already
+        // used for every other credential in this file.
+        $pri_key = config('services.fcm.private_key');
+        if (empty($pri_key) || empty(config('services.fcm.service_account_email')) || empty(config('services.fcm.project_id'))) {
+            \Log::error('FCM credentials missing (services.fcm.project_id/service_account_email/private_key) — push notification not sent.');
+            return null;
+        }
+
         $payload = [
-            'iss' => env('FCM_SERVICE_ACCOUNT_EMAIL'),
+            'iss' => config('services.fcm.service_account_email'),
             'scope' => 'https://www.googleapis.com/auth/firebase.messaging',
             'aud' => 'https://oauth2.googleapis.com/token',
             'exp' => time() + 3600,
@@ -8102,7 +8333,15 @@ class Common
         $jwtPayload = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode(json_encode($payload)));
 
         $signature = '';
-        openssl_sign($jwtHeader . '.' . $jwtPayload, $signature, $pri_key, OPENSSL_ALGO_SHA256);
+        // Return value was never checked — a malformed/empty private key
+        // makes openssl_sign() fail silently, leaving $signature empty and
+        // producing a JWT with a bogus signature that Google rejects with no
+        // indication anywhere except a generic downstream FCM log line.
+        $signed = openssl_sign($jwtHeader . '.' . $jwtPayload, $signature, $pri_key, OPENSSL_ALGO_SHA256);
+        if (!$signed) {
+            \Log::error('FCM JWT signing failed — FCM_PRIVATE_KEY is malformed or unreadable by openssl_sign().');
+            return null;
+        }
         $base64UrlSignature = str_replace(['+', '/', '='], ['-', '_', ''], base64_encode($signature));
 
         $jwt = $jwtHeader.'.'. $jwtPayload.'.'.$base64UrlSignature;
@@ -8120,9 +8359,13 @@ class Common
         $response = curl_exec($ch);
         curl_close($ch);
 
-        $acc_token = json_decode($response, true)['access_token'];
-        return $acc_token;
+        $decoded = json_decode($response, true);
+        if (!isset($decoded['access_token'])) {
+            \Log::error('FCM OAuth token request failed: ' . ($response ?: 'no response'));
+            return null;
+        }
 
+        return $decoded['access_token'];
     }
 
      public static function sendPushNotificationForMobile($deviceTokens, $title, $body, $module, $status, $sound,$custom_sound_channel,$mass)
@@ -8130,12 +8373,32 @@ class Common
         // Convert to array if it's a collection
         $tokens = is_array($deviceTokens) ? $deviceTokens : $deviceTokens->toArray();
 
+        // Every caller (14+ across the app) passes a raw employees.device_token
+        // column value per employee, e.g. [$employee->device_token] or a plain
+        // pluck('device_token') collection — one entry per employee, not per
+        // device. Now that the column stores a JSON-encoded array (an
+        // employee can be logged in on more than one device), decode+flatten
+        // here once so every existing caller gets multi-device push for free
+        // without having to be rewritten individually.
+        $tokens = collect($tokens)
+            ->flatMap(fn($raw) => self::decodeDeviceTokens($raw))
+            ->unique()
+            ->values()
+            ->all();
+
         // Remove nulls and duplicates
         $tokens = array_filter($tokens);
         $tokens = array_unique($tokens);
 
         $token = Common::FCMTokenPushNotification();
-        $url = 'https://fcm.googleapis.com/v1/projects/' . env('FCM_PROJECT_ID') . '/messages:send';
+        if (!$token) {
+            // FCMTokenPushNotification() already logged the specific reason
+            // (missing credentials / signing failure / OAuth error) — fail
+            // clean here instead of sending every device an "Authorization:
+            // Bearer " request with an empty token.
+            return [['status' => false, 'message' => 'FCM auth token unavailable, see log for cause']];
+        }
+        $url = 'https://fcm.googleapis.com/v1/projects/' . config('services.fcm.project_id') . '/messages:send';
         $responses = [];
 
         foreach ($tokens as $deviceToken) {

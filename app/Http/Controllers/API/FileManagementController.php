@@ -175,6 +175,12 @@ class FileManagementController extends Controller
         $subfolders = FilemangementSystem::where('resort_id', $folder->resort_id)
             ->where('UnderON', $folder->id)
             ->where('Folder_Type', 'categorized')
+            // Module-generated attachment folders (Maintenance Request,
+            // Grievance, Request, Housekeeping, etc.) are parented under the
+            // employee's own root with the same shape as a real folder —
+            // hide them from My Drive, which should only show what the
+            // employee actually created or was explicitly shared.
+            ->where('is_system_generated', false)
             ->withSum('children as file_count_sum', 'File_Size')
             ->withCount('children as file_count')
             ->orderBy('Folder_Name')
@@ -419,6 +425,22 @@ class FileManagementController extends Controller
                 'file-management-upload',
             );
         }
+
+        // HR got notified above, but the uploader never got any
+        // confirmation their own file actually went through.
+        Common::sendMobileNotification(
+            $resortId,
+            2,
+            null,
+            null,
+            'File Uploaded',
+            'Your document has been uploaded successfully.',
+            'File Management',
+            [$emp->id],
+            $fileRecord->id,
+            false,
+            'file-management-upload',
+        );
 
         return response()->json([
             'success' => true,

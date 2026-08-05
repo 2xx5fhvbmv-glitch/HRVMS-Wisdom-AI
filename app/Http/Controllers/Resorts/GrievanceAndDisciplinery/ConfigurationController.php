@@ -43,6 +43,7 @@ use App\Models\GrievanceCommitteeMemberParent;
 use App\Exports\DisciplineryCodeOfConduct;
 use App\Models\GrivanceKeyPerson;
 use App\Models\DisciplinaryEmailmodel;
+use App\Events\ResortNotificationEvent;
 class ConfigurationController extends Controller
 {
 
@@ -3288,6 +3289,8 @@ class ConfigurationController extends Controller
                 {
                     GrievanceCommitteeMemberChild::create(['Parent_id'=>$parent_id->id,'resort_id'=>$this->resort->resort_id,"Committee_Member_Id"=>$g]);
 
+                    $msg = 'You have been assigned to the "'.$request->Grivance_CommitteeName.'" grievance committee.';
+                    event(new ResortNotificationEvent(Common::nofitication($this->resort->resort_id, 10, 'Grievance Committee', $msg, 0, $g, 'Grievance And Disciplinery ')));
                 }
             }
             DB::commit();
@@ -3408,6 +3411,7 @@ class ConfigurationController extends Controller
 
                 if( count($assign_members)> 0)
                 {
+                    $previousMemberIds = GrievanceCommitteeMemberChild::where('Parent_id',$id)->pluck('Committee_Member_Id')->toArray();
 
                     GrievanceCommitteeMemberChild::where("Parent_id",$id)->delete();
 
@@ -3416,6 +3420,16 @@ class ConfigurationController extends Controller
                         'Parent_id' =>  $id,
                         'Committee_Member_Id' => $m,
                     ]);
+
+                    // Only notify members who are actually new to the
+                    // committee — this replaces the whole roster on every
+                    // save, so re-notifying everyone each edit would spam
+                    // existing members who didn't just get assigned.
+                    foreach(array_diff($assign_members, $previousMemberIds) as $m)
+                    {
+                        $msg = 'You have been assigned to the "'.$CommitteeName.'" grievance committee.';
+                        event(new ResortNotificationEvent(Common::nofitication($this->resort->resort_id, 10, 'Grievance Committee', $msg, 0, $m, 'Grievance And Disciplinery ')));
+                    }
                 }
             DB::commit();
                 return response()->json([

@@ -24,7 +24,6 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use Aws\S3\Exception\S3Exception;
 use Exception;
-use Barryvdh\DomPDF\Facade\Pdf;
 class FileManageController extends Controller
 {
         protected $resort;
@@ -338,40 +337,15 @@ class FileManageController extends Controller
                     $originalName = $file->getClientOriginalName();
                     $extension = strtolower($file->getClientOriginalExtension());
                     $fileSizeMB = round($file->getSize() / 1024, 2); // Convert to KB
-                    $isImage = in_array($extension, ['jpg', 'jpeg', 'png']);
-        
-                    if ($isImage) {
-                        // Store the file temporarily
-                        $tempImagePath = $file->store('temp', 'local'); 
-                        $fullImagePath = storage_path('app/' . $tempImagePath);
-                    
-                        // Get mime type and convert to base64
-                        if (file_exists($fullImagePath)) {
-                            $imageData = file_get_contents($fullImagePath);
-                            $mimeType = mime_content_type($fullImagePath);
-                            $base64Image = 'data:' . $mimeType . ';base64,' . base64_encode($imageData);
-                            
-                            // Generate PDF with base64 image - use proper configuration
-                            $pdf = Pdf::loadView('resorts.FileManagment.scan', [
-                                'imageBase64' => $base64Image
-                            ])->setPaper('a4', 'portrait');
-                            
-                            // Save PDF to temporary file
-                            $tempPdfPath = storage_path('app/temp/') . uniqid('pdf_') . '.pdf';
-                            $pdf->save($tempPdfPath);
-                            
-                            // Use the PDF file for further processing
-                            $fileContent = file_get_contents($tempPdfPath);
-                            $originalName = pathinfo($originalName, PATHINFO_FILENAME) . '.pdf';
-                            $extension = 'pdf';
-                            $fileSizeMB = round(strlen($fileContent) / 1024, 2);
-                        } else {
-                            throw new \Exception("Temporary image file not found");
-                        }
-                    } else {
-                        // For non-image files, use the original file
-                        $fileContent = file_get_contents($file->getRealPath());
-                    }
+
+                    // Images used to be force-converted to PDF here via
+                    // dompdf (embed as base64 <img>, render to PDF). dompdf's
+                    // image backend can't decode CMYK-color-space JPEGs (a
+                    // common camera/scan-app output) and silently renders a
+                    // blank page instead of erroring — that's the "color
+                    // photos becoming blank PDFs" report. Store the original
+                    // file as-is, same as every other file type.
+                    $fileContent = file_get_contents($file->getRealPath());
         
                     $uniqueString = substr(md5(uniqid($originalName, true)), 0, 10);
                     $newFileName = $uniqueString . '.' . $extension . '.enc'; // Add .enc extension to indicate encrypted
@@ -393,9 +367,7 @@ class FileManageController extends Controller
                         $key = hash('sha256', env('ENCRYPTION_KEY'), true); // AES-256 key
                         $iv = random_bytes(16); // Generate IV (16 bytes for AES-256-CBC)
         
-                        // For image files that were converted to PDF, use the PDF content
-                        // For other files, use the original file content
-                        $dataToEncrypt = $isImage ? $fileContent : file_get_contents($file->getRealPath());
+                        $dataToEncrypt = $fileContent;
                         // dd($path,$dataToEncrypt);
                         // Encrypt the file content
                         $encrypted = $iv . openssl_encrypt(
@@ -449,17 +421,6 @@ class FileManageController extends Controller
                             "file_path" => $path
                         ]);
         
-                        // Clean up temporary files
-                        if ($isImage) {
-                            if (file_exists($fullImagePath)) {
-                                unlink($fullImagePath);
-                            }
-                            if (file_exists($tempPdfPath)) {
-                                unlink($tempPdfPath);
-                            }
-                        }
-        
-                  
                 }
 
                 // Notify HR — no code path notified anyone when an employee
@@ -479,6 +440,24 @@ class FileManageController extends Controller
                         ($this->resort->GetEmployee->resortAdmin->full_name ?? $this->resort->full_name ?? 'An employee') . ' uploaded a file.',
                         'File Management',
                         $hrEmployeeIds,
+                        $fileRecord->id,
+                        false,
+                        'file-management-upload',
+                    );
+                }
+
+                // HR got notified above, but the uploader never got any
+                // confirmation their own file actually went through.
+                if ($uploaderEmpId) {
+                    Common::sendMobileNotification(
+                        $this->resort->resort_id,
+                        2,
+                        null,
+                        null,
+                        'File Uploaded',
+                        'Your document has been uploaded successfully.',
+                        'File Management',
+                        [$uploaderEmpId],
                         $fileRecord->id,
                         false,
                         'file-management-upload',

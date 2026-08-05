@@ -16,8 +16,7 @@
      <link> in <head>, so the browser blocked all rendering on an external
      CDN round-trip before it could even start fetching stylesheets. Error
      tracking doesn't need to be live in the first instant of page load, so
-     defer it and init on window.load instead — same behavior, off the
-     critical rendering path. --}}
+     defer it instead — same behavior, off the critical rendering path. --}}
 <script
     src="https://browser.sentry-cdn.com/10.68.0/bundle.min.js"
     integrity="sha384-wlMK49+ZQZv/XNgqTODJLX2f9EKTANs/KbJKkutCktQh4/gXMXcLdKVnYzCo/0ck"
@@ -25,7 +24,11 @@
     defer
 ></script>
 <script>
-    window.addEventListener('load', function () {
+    // The SDK tag above is `defer`, so it hasn't necessarily run yet at this
+    // point in the document — defer has no effect on this inline script
+    // (no `src`), so it would otherwise race the SDK load. Deferred scripts
+    // are guaranteed to finish before DOMContentLoaded, so wait for that.
+    document.addEventListener('DOMContentLoaded', function () {
         if (typeof Sentry !== 'undefined') {
             Sentry.init({
                 dsn: @json(env('SENTRY_JS_DSN')),

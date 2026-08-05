@@ -90,7 +90,15 @@ class ExportEmployeeDropdownSheet implements FromArray, WithTitle, WithEvents, W
         })->values()->toArray();
 
         $this->data['Genders'] = ['male', 'female', 'other'];
-        
+
+        $this->data['EmploymentTypes'] = ['Full-Time', 'Part-Time', 'Contract', 'Casual', 'Probationary', 'Internship', 'Temporary'];
+        $this->data['MaritalStatuses'] = ['Single', 'Married', 'Divorced', 'Widowed'];
+        $this->data['BloodGroups'] = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
+        // employees.religion is literally enum('0','1') — these labels are
+        // what EmployeeImport maps back to '0'/'1' (see RELIGION_MAP).
+        $this->data['Religions'] = ['Muslim', 'Non-Muslim'];
+        $this->data['PaymentModes'] = ['Cash', 'Bank'];
+
         $this->data['Nationalities'] = config('settings.nationalities') ?? [
             "Afghan",
 			"Albanian",

@@ -1,6 +1,9 @@
 # Grievance Module API
 
 For the mobile team. Controller: `app/Http/Controllers/API/GrievanceController.php`.
+Identity disclosure request/respond flow (separate, confidential-grievance-only)
+is documented in [`mobile-grievance-identity-disclosure.md`](mobile-grievance-identity-disclosure.md) —
+this doc covers everything else.
 
 ## Terminology note: "Offense" vs "Subcategory"
 
@@ -14,15 +17,22 @@ binds to anymore — the real, working field on that form is
 `#Grivance_Sub_cat` ("Select Grievance Subcategory"). There is no second,
 distinct offense value anywhere in the schema for this module.
 
+## Lookup endpoints (populate the create-grievance form)
+
+| Endpoint | Params | Returns |
+|---|---|---|
+| `GET grievance/get-grievance-cat` | none | All `grievance_categories` for the resort |
+| `POST grievance/get-grievance-sub-cat` | `Grievance_Cat_id` (required) | Subcategories for that category — **note the spelling**: this field is `Grievance_Cat_id` (correct English spelling, matches `grievance_subcategories`' own column), which is *different* from the submit endpoint's `Grivance_Cat_id` (missing the "e", matches `grivance_submission_models`' column). Easy to mix up — send the exact name for each endpoint. |
+| `POST grievance/get-employee-details` | `emp_id` (required) | Department/position/supervisor for that employee id — a generic lookup utility, not tied to grievance submission itself |
+
 ## POST grievance/grievance-store — submit a grievance
 
 Multipart form (for `Attachments[]`).
 
 | Field | Rule | Notes |
 |---|---|---|
-| `Grivance_Cat_id` | required | FK → `grievance_categories.id` |
+| `Grivance_Cat_id` | required | FK → `grievance_categories.id` (note spelling — see table above) |
 | `Grivance_Sub_cat` | required | FK → `grievance_subcategories.id` ("Offense"/"Subcategory", see above) |
-| `Employee_id` | required | The employee the grievance is **about**, not the submitter. Submitter is `created_by`, taken from the authenticated user automatically. |
 | `date` | required, date | |
 | `Grivance_description` | required | Main description |
 | `Grivance_date_time` | required, `Y-m-d H:i:s` | When the incident occurred |
@@ -33,6 +43,19 @@ Multipart form (for `Attachments[]`).
 | `grievance_informally` | required, `Yes`\|`No` | Whether the employee already tried informal resolution before filing this formal grievance |
 | `Attachments[]` | optional, files | Uploaded via `Common::AWSEmployeeFileUpload`, stored as JSON `[{Filename, Child_id}]` on `Attachements` (column name is misspelled in the DB, not a typo here) |
 
+**Do not send `Employee_id`.** It used to be a client-supplied field
+("who this grievance concerns") but was hardcoded server-side to the
+authenticated employee's own id after a bug where a spoofed/wrong
+`Employee_id` in the request body attributed a grievance to the wrong
+person (e.g. GR-0003 recorded as Priya Sharma when Rani Khan actually
+filed it). There's currently no way to file a grievance "about" a specific
+colleague from mobile — every mobile-submitted grievance is definitionally
+about the submitter's own situation. (The web portal still has a manual
+employee picker for HR to file on someone's behalf — that path is
+unaffected.) The `employee`/`supervisor` fields in the GET responses below
+are therefore always the submitter's own department/position/supervisor,
+shown for HR's routing context, not "the accused."
+
 **Code quirk worth knowing:** the confidential/anonymous logic checks
 `$request->Confidential == "option1"` first, then `$request->Anonymous ==
 "option2"` (a *different* field name) as the elseif — so to get `"No"`
@@ -41,7 +64,11 @@ Multipart form (for `Attachments[]`).
 exactly `option1`) with no `Anonymous` field falls through to
 `"NotApplicable"`.
 
-Response: `{"status": true, "message": "Grievance Created Successfully"}`
+Response: `{"success": true, "message": "Grievance Created Successfully"}`
+
+On submit, HR (all rank-3 employees plus the HR department's HOD/EXCOM) get
+a push + in-app notification automatically — nothing mobile needs to do
+for that.
 
 Every field submitted here is now returned by the GET endpoints below —
 see the field-by-field mapping.
@@ -62,7 +89,6 @@ Response: `{"success": true, "message": "Response recorded successfully.", "data
 
 ## GET grievance/my-grievances — listing
 
-Now returns everything submitted, not just id/category/status:
 ```json
 {"status": true, "data": [
   {
@@ -78,11 +104,15 @@ Now returns everything submitted, not just id/category/status:
     "confidential": "NotApplicable",
     "resolved_informally": "No",
     "witness_count": 1,
-    "has_attachments": false
+    "has_attachments": false,
+    "identity_disclosure_request": null
   }
 ]}
 ```
-`employee`/`supervisor` are `null` if the employee record can't be resolved.
+`employee`/`supervisor` are `null` if the employee record can't be resolved
+(see the Employee_id note above — this is always the submitter's own info).
+`identity_disclosure_request` is non-null only for a confidential grievance
+with a pending "who submitted this?" ask — see the identity-disclosure doc.
 
 ## GET grievance/{id} — detail
 
@@ -100,8 +130,17 @@ Same fields as listing, plus the full witness/attachment/outcome data:
   "attachments": [{"filename": "...", "url": "..."}],
   "has_attachments": true,
   "outcome_type": null, "action_taken": null,
-  "gm_decision": null, "gm_reason": null, "rejection_reason": null
+  "gm_decision": null, "gm_reason": null, "rejection_reason": null,
+  "identity_disclosure_request": null
 }}
 ```
 `outcome_type`/`action_taken`/`gm_decision`/`gm_reason`/`rejection_reason`
 are only populated once HR/GM has completed the review — `null` until then.
+
+Both `my-grievances` and `grievance/{id}` only ever return grievances where
+`created_by` matches the authenticated user — you cannot fetch someone
+else's grievance through either endpoint.
+
+## POST grievance/identity-disclosure-respond
+
+See [`mobile-grievance-identity-disclosure.md`](mobile-grievance-identity-disclosure.md) for the full request-side flow, push payload, and this endpoint's contract.

@@ -137,6 +137,12 @@ use Illuminate\Support\Facades\Route;
 			Route::get('resort/islandpass-requestview/{pass_id}', [App\Http\Controllers\API\LeaveController::class, 'islandPassRequestViewHODAndHR']);
 			Route::post('resort/hod-upcoming-employee-leave-list', [App\Http\Controllers\API\LeaveController::class, 'hodUpcomingEmployeeLeaveList']);
 			Route::get('resort/hod-who-is-on-leave', [App\Http\Controllers\API\LeaveController::class, 'hodWhoIsOnLeave']);
+
+			// GM also needs the To-Do List (same 403-for-GM gap as leave-dashboard-hod
+			// above) — kept in this GM-inclusive group rather than added to the whole
+			// HOD Middleware group below, which covers Accommodation/Employee
+			// Management/Boarding Pass routes not part of this report.
+			Route::get('timeandattendance/todo-list', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'mobileTodoList']);
 		});
 
 		//HOD Middleware
@@ -151,7 +157,6 @@ use Illuminate\Support\Facades\Route;
 			Route::post('timeandattendance/hod-view-duty-roster', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'hodViewDutyRoster']);
 			Route::get('timeandattendance/under-emp-hod', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'underEmpHOD']);
 			Route::get('timeandattendance/duty-roster-employee-list', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'dutyRosterEmployeeList']);
-			Route::get('timeandattendance/todo-list', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'mobileTodoList']);
 			Route::post('timeandattendance/pre-planned-ot', [App\Http\Controllers\API\TimeAndAttendanceController::class, 'mobilePrePlannedOT']);
 			//Accommodation HOD
 			Route::post('accommodation/hod-housekeeping-dashboard', [App\Http\Controllers\API\AccommodationController::class, 'hodHouseKeepingDashboard']);
@@ -167,6 +172,7 @@ use Illuminate\Support\Facades\Route;
 
 			//Boarding Pass
 			Route::get('boarding/boarding-hod-dashboard', [App\Http\Controllers\API\BoardingPassController::class, 'boardingHODDashboard']);
+			Route::get('boarding/boarding-hod-list', [App\Http\Controllers\API\BoardingPassController::class, 'boardingHODListByStatus']);
 
 		});
 
@@ -298,6 +304,7 @@ use Illuminate\Support\Facades\Route;
 		Route::get('survey/survey-emp-dashboard', [App\Http\Controllers\API\SurveyController::class, 'employeeSurveyDashboard']);
 		Route::get('survey/survey-emp-quetions/{survey_id}', [App\Http\Controllers\API\SurveyController::class, 'employeeSurveyQuestions']);
 		Route::post('survey/survey-emp-quetions-store', [App\Http\Controllers\API\SurveyController::class, 'employeeQuestionsAnsStore']);
+		Route::get('survey/survey-emp-responses/{survey_id}', [App\Http\Controllers\API\SurveyController::class, 'employeeSurveyResponses']);
 
 		//Chat
 		Route::get('chat/check-connection/{user_id}', [App\Http\Controllers\API\EmployeeChatController::class, 'checkConnection']);
