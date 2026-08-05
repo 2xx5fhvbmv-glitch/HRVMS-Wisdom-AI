@@ -26,6 +26,7 @@ use Illuminate\Support\Facades\Route;
 		Route::get('on-boarding/get-onboarding-virtual-facility', [App\Http\Controllers\API\OnBoardingController::class, 'getOnboardingVirtualFacility']);
 
 		Route::post('add-device-token', [App\Http\Controllers\API\LoginController::class, 'addDeviceToken']);
+		Route::post('remove-device-token', [App\Http\Controllers\API\LoginController::class, 'removeDeviceToken']);
 		Route::post('logout', [App\Http\Controllers\API\LoginController::class, 'apiLogout'])->name('api.resort.logout');
 
 		//Employees

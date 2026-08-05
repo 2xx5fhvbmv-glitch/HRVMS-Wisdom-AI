@@ -184,9 +184,7 @@ class Logincontroller extends Controller
     public function addDeviceToken(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'emp_id'                                =>  'required', // Employee ID
-            'device_token'                          =>  'required', // Device token to be added
-            
+            'device_token'                          =>  'required',
         ]);
 
         if ($validator->fails()) {
@@ -194,8 +192,15 @@ class Logincontroller extends Controller
         }
 
         try {
-            // Find the employee by Emp_id
-            $employee                               =   Employee::where('Emp_id', $request->emp_id)->first();
+            // Was looking the employee up by a client-supplied emp_id in the
+            // request body instead of the authenticated user this Bearer
+            // token actually belongs to (this route already sits behind
+            // auth:api) — any logged-in user could register a device token
+            // against ANY other employee's account just by passing a
+            // different emp_id, and would then receive that employee's push
+            // notifications. Identity now comes from the token, not the body.
+            $resortAdmin                            =   Auth::guard('api')->user();
+            $employee                               =   Employee::where('Admin_Parent_id', $resortAdmin->id)->first();
 
             if (!$employee) {
                 return response()->json([
@@ -214,7 +219,48 @@ class Logincontroller extends Controller
 
             return response()->json([
                 'success'                       =>  true,
-                'message'                       => 'Device token updated successfully',
+                'message'                       => 'Device token registered successfully',
+            ], 200);
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error: ' . $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Deregisters one device's FCM token (e.g. on logout, or when the app
+     * gets a new token from Firebase and wants the old one gone) without
+     * requiring a full logout — apiLogout only removes a token as a
+     * side-effect of revoking the session token entirely.
+     */
+    public function removeDeviceToken(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'device_token'                          =>  'required',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'message' => $validator->errors()], 422);
+        }
+
+        try {
+            $resortAdmin                            =   Auth::guard('api')->user();
+            $employee                               =   Employee::where('Admin_Parent_id', $resortAdmin->id)->first();
+
+            if (!$employee) {
+                return response()->json([
+                    'success'                       =>  false,
+                    'message'                       =>  'Employee not found',
+                ], 404);
+            }
+
+            Common::removeDeviceToken($employee, $request->device_token);
+
+            return response()->json([
+                'success'                       =>  true,
+                'message'                       => 'Device token deregistered successfully',
             ], 200);
         } catch (\Exception $e) {
             \Log::emergency("File: " . $e->getFile());
