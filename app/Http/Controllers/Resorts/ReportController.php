@@ -32,8 +32,8 @@ class ReportController extends Controller
             ->addColumn('action', function ($row)
             {
                 $viewRoute = route('reports.show', base64_encode($row->id));
-                return '<a target="_blank" href="'. $viewRoute .'" class="btn btn-success btn-sm me-1" title="View"><i class="fa fa-eye"></i></a>'
-                    . '<button type="button" class="btn btn-danger btn-sm report-delete-btn" data-id="'. $row->id .'" title="Delete"><i class="fa fa-trash"></i></button>';
+                return '<a target="_blank" href="'. $viewRoute .'" class="btn eb-btn-secondary btn-sm me-1" title="View"><i class="fa fa-eye"></i></a>'
+                    . '<button type="button" class="btn eb-btn-critical btn-sm report-delete-btn" data-id="'. $row->id .'" title="Delete"><i class="fa fa-trash"></i></button>';
             })
             ->editColumn('name', function ($row) 
             {

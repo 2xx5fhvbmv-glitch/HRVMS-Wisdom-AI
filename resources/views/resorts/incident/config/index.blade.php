@@ -43,14 +43,14 @@
                                         </div>
                                         
                                         <div class="col-12">
-                                            <a href="#" class="btn btn-themeSkyblue btn-sm blockAdd-btn">Add
+                                            <a href="#" class="btn eb-btn-accent btn-sm blockAdd-btn">Add
                                                 More</a>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                             <div class="card-footer text-end">
-                                <button type="submit" class="btn btn-themeBlue">Submit</button>
+                                <button type="submit" class="btn eb-btn-primary">Submit</button>
                             </div>
                         </form>
                     </div>
@@ -99,13 +99,13 @@
                                             <div class="priority-error"></div>
                                         </div>
                                         <div class="col-12">
-                                            <a href="#" class="btn btn-themeSkyblue btn-sm blockAdd-btn" id="add-subCategory">Add More</a>
+                                            <a href="#" class="btn eb-btn-accent btn-sm blockAdd-btn" id="add-subCategory">Add More</a>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                             <div class="card-footer text-end">
-                                <button type="submit" class="btn btn-themeBlue">Submit</button>
+                                <button type="submit" class="btn eb-btn-primary">Submit</button>
                             </div>
                         </form>
                     </div>
@@ -161,7 +161,7 @@
                                 </div>
                             </div>
                             <div class="card-footer text-end">
-                                <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                                <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                             </div>
                         </form>
                     </div>
@@ -197,14 +197,14 @@
                                             </div>
                                         </div>
                                         <div class="col-12 col-md-3">
-                                            <a href="#" class="btn btn-themeSkyblue btn-sm blockAdd-btn" id="add-followup-actions">Add More</a>
+                                            <a href="#" class="btn eb-btn-accent btn-sm blockAdd-btn" id="add-followup-actions">Add More</a>
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
                             <div class="card-footer text-end">
-                                <button type="submit" class="btn btn-themeBlue">Submit</button>
+                                <button type="submit" class="btn eb-btn-primary">Submit</button>
                             </div>
                         </form>
                     </div>
@@ -232,13 +232,13 @@
                                             data-parsley-maxlength="255" >
                                         </div>
                                         <div class="col-12">
-                                            <a href="#" class="btn btn-themeSkyblue btn-sm blockAdd-btn" id="add-outcome-type">Add More</a>
+                                            <a href="#" class="btn eb-btn-accent btn-sm blockAdd-btn" id="add-outcome-type">Add More</a>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                             <div class="card-footer text-end">
-                                <button type="submit" class="btn btn-themeBlue">Submit</button>
+                                <button type="submit" class="btn eb-btn-primary">Submit</button>
                             </div>
                         </form>
                     </div>
@@ -276,7 +276,7 @@
                                 </select>
                             </div>
                         </div>
-                        <div class="card-footer text-end"><a href="#" class="btn btn-themeBlue btn-sm">Submit</a>
+                        <div class="card-footer text-end"><a href="#" class="btn eb-btn-primary btn-sm">Submit</a>
                         </div>
                     </div> -->
                   
@@ -306,7 +306,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="card-footer text-end"><a href="#" class="btn btn-themeBlue btn-sm">Submit</a>
+                        <div class="card-footer text-end"><a href="#" class="btn eb-btn-primary btn-sm">Submit</a>
                         </div>
                     </div> -->
                 </div>
@@ -342,13 +342,13 @@
                                         <div class="members-error"></div>
                                         </div>
                                         <div class="col-12">
-                                            <a href="#" id="addCommittee" class="btn btn-themeSkyblue btn-sm blockAdd-btn">Add More</a>
+                                            <a href="#" id="addCommittee" class="btn eb-btn-accent btn-sm blockAdd-btn">Add More</a>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                             <div class="card-footer text-end">
-                                <button type="submit" class="btn btn-themeBlue btn-sm CommitteeSubmit" id="CommitteeSubmit">Submit</button>
+                                <button type="submit" class="btn eb-btn-primary btn-sm CommitteeSubmit" id="CommitteeSubmit">Submit</button>
                             </div>
                         </form>
                     </div>
@@ -359,10 +359,10 @@
                         </div>
                         <div class="row g-2 mb-md-4 mb-3">
                             <div class="col-12">
-                                <a href="#" class="btn btn-themeSkyblue btn-sm">Create Investigation Templates/Forms</a>
+                                <a href="#" class="btn eb-btn-accent btn-sm">Create Investigation Templates/Forms</a>
                             </div>
                         </div>
-                        <div class="card-footer text-end"><a href="#" class="btn btn-themeBlue btn-sm">Submit</a>
+                        <div class="card-footer text-end"><a href="#" class="btn eb-btn-primary btn-sm">Submit</a>
                         </div>
                     </div> -->
                     <!-- <div class="card mb-30">
@@ -380,7 +380,7 @@
                                 <input type="text" class="form-control" placeholder="Set Rule">
                             </div>
                         </div>
-                        <div class="card-footer text-end"><a href="#" class="btn btn-themeBlue btn-sm">Submit</a>
+                        <div class="card-footer text-end"><a href="#" class="btn eb-btn-primary btn-sm">Submit</a>
                         </div>
                     </div> -->
 
@@ -462,7 +462,7 @@
                                 </div>
                             </div>
                             <div class="card-footer text-end">
-                                <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                                <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                             </div>
                         </form>
                     </div>
@@ -490,7 +490,7 @@
                                 </div>
                             </div>
                             <div class="card-footer text-end">
-                                <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                                <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                             </div>
                         </form>
                     </div>
@@ -507,7 +507,7 @@
                                 <input type="text" class="form-control" placeholder="Sub Category">
                             </div>
                         </div>
-                        <div class="card-footer text-end"><a href="#" class="btn btn-themeBlue btn-sm">Submit</a>
+                        <div class="card-footer text-end"><a href="#" class="btn eb-btn-primary btn-sm">Submit</a>
                         </div>
                     </div> -->
 
@@ -543,7 +543,7 @@
                                 </div>
                             </div>
                             <div class="card-footer text-end">
-                                <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                                <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                             </div>
                         </form>
                     </div>
@@ -571,13 +571,13 @@
                                             data-parsley-maxlength="255" >
                                         </div>
                                         <div class="col-12">
-                                            <a href="#" class="btn btn-themeSkyblue btn-sm blockAdd-btn" id="add-action-taken">Add More</a>
+                                            <a href="#" class="btn eb-btn-accent btn-sm blockAdd-btn" id="add-action-taken">Add More</a>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                             <div class="card-footer text-end">
-                                <button type="submit" class="btn btn-themeBlue">Submit</button>
+                                <button type="submit" class="btn eb-btn-primary">Submit</button>
                             </div>
                         </form>
                     </div>
@@ -585,6 +585,7 @@
             </div>
         </div>
     </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -642,7 +643,7 @@
                         <div class="priority-error-${uniqueId}"></div>
                     </div>
                     <div class="col-12">
-                        <a href="#" class="btn btn-danger btn-sm remove-btn" id="remove-subCategory">Remove</a>
+                        <a href="#" class="btn eb-btn-critical btn-sm remove-btn" id="remove-subCategory">Remove</a>
                     </div>
                 </div>
             `;
@@ -717,7 +718,7 @@
                             <div class="members-error-${uniqueId}"></div>
                         </div>
                         <div class="col-12 text-end">
-                            <a href="#" id="removeCommittee" class="btn btn-danger btn-sm remove-btn">Remove</a>
+                            <a href="#" id="removeCommittee" class="btn eb-btn-critical btn-sm remove-btn">Remove</a>
                         </div>
                     </div>
                 </div>`;
@@ -954,7 +955,7 @@
                         </div>
                     </div>
                     <div class="col-12 col-md-3">
-                        <a href="#" class="btn btn-danger btn-sm remove-followup-action mt-2">Remove</a>
+                        <a href="#" class="btn eb-btn-critical btn-sm remove-followup-action mt-2">Remove</a>
                     </div>
                 </div>
             `;
@@ -1012,7 +1013,7 @@
                         data-parsley-maxlength="255" >
                     </div>
                     <div class="col-12">
-                        <a href="#" class="btn btn-danger btn-sm remove-btn" id="remove-outcome-type">Remove</a>
+                        <a href="#" class="btn eb-btn-critical btn-sm remove-btn" id="remove-outcome-type">Remove</a>
                     </div>
                 </div>
             `;
@@ -1077,7 +1078,7 @@
                         data-parsley-maxlength="255" >
                     </div>
                     <div class="col-12">
-                        <a href="#" class="btn btn-danger btn-sm remove-btn" id="remove-action-taken">Remove</a>
+                        <a href="#" class="btn eb-btn-critical btn-sm remove-btn" id="remove-action-taken">Remove</a>
                     </div>
                 </div>
             `;
@@ -1144,7 +1145,7 @@
                                data-parsley-maxlength="255">
                     </div>
                     <div class="col-12">
-                        <a href="#" class="btn btn-danger btn-sm remove-btn">Remove</a>
+                        <a href="#" class="btn eb-btn-critical btn-sm remove-btn">Remove</a>
                     </div>
                 </div>
             `;

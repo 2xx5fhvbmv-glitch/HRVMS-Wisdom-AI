@@ -146,7 +146,7 @@
                 </div>
                 <div class="d-flex align-items-center justify-content-between">
                     <!-- <a href="#" class="a-link">Save as Draft</a> -->
-                    <button type="button" class="btn btn-themeBlue btn-sm SubmitEmployee">Submit</button>
+                    <button type="button" class="btn eb-btn-primary btn-sm SubmitEmployee">Submit</button>
                 </div>
             </div>
 
@@ -154,6 +154,7 @@
         </div>
     </div>
 
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')

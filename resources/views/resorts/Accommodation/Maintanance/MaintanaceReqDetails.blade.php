@@ -278,12 +278,13 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
+                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Cancel</a>
                 </div>
                 </form>
             </div>
         </div>
     </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')

@@ -99,6 +99,7 @@
 
     </div>
 </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')

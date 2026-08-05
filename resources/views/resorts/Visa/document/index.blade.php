@@ -90,7 +90,7 @@
                                 <div class="file-error-message error text-center"></div>
                             </div>
                             <hr class="hr-footer">
-                            <a href="javascript:void(0);" class=" btn btn-themeBlue btn-sm float-end next ">Next</a>
+                            <a href="javascript:void(0);" class=" btn eb-btn-primary btn-sm float-end next ">Next</a>
                         </fieldset>
                         <fieldset>
                             <div class="mb-md-5 mb-3">
@@ -102,8 +102,8 @@
                             </div>
                             <div class="d-none d-md-block" style="height: 104px;"></div>
                             <hr class="hr-footer">
-                            <a href="javascript:void(0);" class="btn btn-themeBlue btn-sm float-end next">Next</a>
-                            <a href="javascript:void(0);" class="btn btn-themeSkyblue btn-sm float-end previous me-2">Back</a>
+                            <a href="javascript:void(0);" class="btn eb-btn-primary btn-sm float-end next">Next</a>
+                            <a href="javascript:void(0);" class="btn eb-btn-secondary btn-sm float-end previous me-2">Back</a>
                         </fieldset>
                         <fieldset>
                             <div class=" mb-md-5 mb-3">
@@ -136,8 +136,8 @@
                                  commented out below — step 3 is now the final step, so it carries the
                                  Submit button (handler unchanged; the employee details are completed
                                  in the separate final stage). --}}
-                            <button type="submit" class="btn btn-themeBlue btn-sm float-end" id="SubmitVisaform">Submit</button>
-                            <a href="javascript:void(0);" class=" btn btn-themeSkyblue btn-sm float-end previous me-2">Back</a>
+                            <button type="submit" class="btn eb-btn-primary btn-sm float-end" id="SubmitVisaform">Submit</button>
+                            <a href="javascript:void(0);" class=" btn eb-btn-secondary btn-sm float-end previous me-2">Back</a>
                         </fieldset>
 
 
@@ -151,7 +151,7 @@
                                         <div class="col-lg-4 col-md-8 col-sm"><input type="text" class="form-control"
                                                 id="total-ser" placeholder="$12,726">
                                         </div>
-                                        <div class="col-auto"><a href="#" class="btn btn-themeSkyblue">Edit</a>
+                                        <div class="col-auto"><a href="#" class="btn eb-btn-secondary">Edit</a>
                                         </div>
                                     </div>
                                 </div>
@@ -159,8 +159,8 @@
                             </div>
                             <div class="d-none d-md-block" style="height: 327px;"></div>
                             <hr class="hr-footer">
-                            <a href=" # " class=" btn btn-themeBlue btn-sm float-end next ">Next</a>
-                            <a href=" # " class=" btn btn-themeSkyblue btn-sm float-end previous me-2">Back</a>
+                            <a href=" # " class=" btn eb-btn-primary btn-sm float-end next ">Next</a>
+                            <a href=" # " class=" btn eb-btn-secondary btn-sm float-end previous me-2">Back</a>
                         </fieldset> -->
 
                         {{-- ===== Steps 4-7 (Database Creation / Employment / Education / Experience) removed from this wizard; completed in the final stage ===== --}}
@@ -595,8 +595,8 @@
                                         </div>
                                         <div class="col-lg-1 col-sm-12 d-flex align-items-end">
                                             <div class="d-flex gap-2 w-100">
-                                                <a href="javascript:void(0);" class="btn btn-themeSkyblue btn-sm blockAdd-btn w-100">Add</a>
-                                                <a href="javascript:void(0);" class="btn btn-danger btn-sm remove-btn w-100" style="display:none;">Remove</a>
+                                                <a href="javascript:void(0);" class="btn eb-btn-accent btn-sm blockAdd-btn w-100">Add</a>
+                                                <a href="javascript:void(0);" class="btn eb-btn-critical btn-sm remove-btn w-100" style="display:none;">Remove</a>
                                             </div>
                                         </div>
                                     </div>
@@ -604,8 +604,8 @@
                             </div>
                             </div>
                             <hr class="hr-footer">
-                            <a href=" # " class=" btn btn-themeBlue btn-sm float-end next ">Next</a>
-                            <a href=" # " class=" btn btn-themeSkyblue btn-sm float-end previous me-2">Back</a>
+                            <a href=" # " class=" btn eb-btn-primary btn-sm float-end next ">Next</a>
+                            <a href=" # " class=" btn eb-btn-secondary btn-sm float-end previous me-2">Back</a>
                         </fieldset>
                         <fieldset>
                             <div class="mt-2">
@@ -881,8 +881,8 @@
 
                                                 </div>
                                                 <div class="col-1 d-flex align-items-end">
-                                                    <a href="javascript:void(0);" class="btn btn-themeSkyblue btn-sm allowanceAdd-btn">Add</a>
-                                                    <a href="javascript:void(0);" class="btn btn-danger btn-sm allowanceRemove-btn ms-1" style="display:none;">Remove</a>
+                                                    <a href="javascript:void(0);" class="btn eb-btn-accent btn-sm allowanceAdd-btn">Add</a>
+                                                    <a href="javascript:void(0);" class="btn eb-btn-critical btn-sm allowanceRemove-btn ms-1" style="display:none;">Remove</a>
                                                 </div>
                                             </div>
                                         </div>
@@ -894,7 +894,7 @@
                                             <h3>Bank Details</h3>
                                         </div>
                                         <div>
-                                            <a href="javascript:void(0);" class="btn btn-themeSkyblue btn-sm bankAdd-btn">Add</a>
+                                            <a href="javascript:void(0);" class="btn eb-btn-accent btn-sm bankAdd-btn">Add</a>
                                         </div>
                                     </div>
                                 </div>
@@ -962,14 +962,14 @@
 
                                         <div class="col-lg-4 col-sm-6 d-flex align-items-end">
                                         
-                                            <a href="javascript:void(0);" class="btn btn-danger btn-sm bankRemove-btn ms-2" style="display:none;">Remove</a>
+                                            <a href="javascript:void(0);" class="btn eb-btn-critical btn-sm bankRemove-btn ms-2" style="display:none;">Remove</a>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                             <hr class="hr-footer ">
-                            <a href=" # " class=" btn btn-themeBlue btn-sm float-end next ">Next</a>
-                            <a href=" # " class=" btn btn-themeSkyblue btn-sm float-end previous me-2">Back</a>
+                            <a href=" # " class=" btn eb-btn-primary btn-sm float-end next ">Next</a>
+                            <a href=" # " class=" btn eb-btn-secondary btn-sm float-end previous me-2">Back</a>
                         </fieldset>
                         
                         <fieldset>
@@ -980,15 +980,15 @@
                                             <div class="col-12 d-flex justify-content-between align-items-center mb-2">
                                                 <label class="form-label mb-0 fw-bold">Education / Qualification</label>
                                                 <div class="d-flex gap-2">
-                                                    <a href="javascript:void(0);" class="btn btn-themeSkyblue btn-sm education-add-btn">Add</a>
-                                                    <a href="javascript:void(0);" class="btn btn-danger btn-sm education-remove-btn" style="display:none;">Remove</a>
+                                                    <a href="javascript:void(0);" class="btn eb-btn-accent btn-sm education-add-btn">Add</a>
+                                                    <a href="javascript:void(0);" class="btn eb-btn-critical btn-sm education-remove-btn" style="display:none;">Remove</a>
                                                 </div>
                                             </div>
                                             <div class="col-12">
                                                 <label class="form-label">DOCUMENT UPLOAD / CERTIFICATE ATTACHMENT <span class="req_span">*</span></label>
                                                 <div class="uploadFile-block">
                                                     <div class="uploadFile-btn">
-                                                        <a href="javascript:void(0);" class="btn btn-themeSkyblue btn-sm">Upload File</a>
+                                                        <a href="javascript:void(0);" class="btn eb-btn-accent btn-sm">Upload File</a>
                                                         <input type="file" class="education-upload-input" name="education[0][document]" required
                                                             data-parsley-required-message="Please upload your education certificate.">
                                                     </div>
@@ -1042,8 +1042,8 @@
                                 </div>
                             </div>
                             <hr class="hr-footer ">
-                            <a href=" # " class=" btn btn-themeBlue btn-sm float-end next ">Next</a>
-                            <a href=" # " class=" btn btn-themeSkyblue btn-sm float-end previous me-2">Back</a>
+                            <a href=" # " class=" btn eb-btn-primary btn-sm float-end next ">Next</a>
+                            <a href=" # " class=" btn eb-btn-secondary btn-sm float-end previous me-2">Back</a>
                         </fieldset>
                         <fieldset>
                              <div class="mt-2">
@@ -1054,7 +1054,7 @@
                                                 <label class="form-label">DOCUMENT UPLOAD / CERTIFICATE ATTACHMENT <span class="req_span">*</span></label>
                                                 <div class="uploadFile-block">
                                                     <div class="uploadFile-btn">
-                                                        <a href="javascript:void(0);" class="btn btn-themeSkyblue btn-sm">Upload File</a>
+                                                        <a href="javascript:void(0);" class="btn eb-btn-accent btn-sm">Upload File</a>
                                                         <input type="file" class="uploadFile" name="experience[0][document]" required data-parsley-required-message="Please upload your experience certificate.">
                                                     </div>
                                                     <div class="certificate-file-name mt-2 text-center text-dark fw-bold"></div>
@@ -1117,8 +1117,8 @@
                                                     data-parsley-pattern-message="Please enter a valid contact number (10-15 digits).">
                                             </div>
                                             <div class="col-12">
-                                                <a href="javascript:void(0);" class="btn btn-themeSkyblue btn-sm blockAdd-btn">Add More</a>
-                                                <a href="javascript:void(0);" class="btn btn-danger btn-sm remove-btn" style="display:none;">Remove</a>
+                                                <a href="javascript:void(0);" class="btn eb-btn-accent btn-sm blockAdd-btn">Add More</a>
+                                                <a href="javascript:void(0);" class="btn eb-btn-critical btn-sm remove-btn" style="display:none;">Remove</a>
                                             </div>
                                         </div>
                                     </div>
@@ -1126,8 +1126,8 @@
                                 <input type="hidden" name="MergerFile" id="MergerFile">
                         </div>
                             <hr class="hr-footer ">
-                            <button type="submit" class="btn btn-themeBlue btn-sm float-end " style="margin-right: 10px;" id="SubmitVisaform">Submit</button>
-                            <a href=" # " class=" btn btn-themeSkyblue btn-sm float-end previous me-2">Back</a>
+                            <button type="submit" class="btn eb-btn-primary btn-sm float-end " style="margin-right: 10px;" id="SubmitVisaform">Submit</button>
+                            <a href=" # " class=" btn eb-btn-secondary btn-sm float-end previous me-2">Back</a>
                         </fieldset>
                         --}}
                     </form>
@@ -1135,6 +1135,7 @@
         </div>
     </div>
 </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -3175,7 +3176,7 @@
                 <div class="photo-preview-container mt-4" style="width:30%;">
                     <h4>Photo Preview</h4>
                     <img src="${photoUrl}" style="width: 100%; height: auto; border: 1px solid #ddd; border-radius: 8px;" />
-                    <a href="${photoUrl}" download="Whitened_Photo.jpg" class="btn btn-themeBlue btn-sm mt-3">Download Photo</a>
+                    <a href="${photoUrl}" download="Whitened_Photo.jpg" class="btn eb-btn-secondary btn-sm mt-3">Download Photo</a>
                 </div>
             `);
         } else {

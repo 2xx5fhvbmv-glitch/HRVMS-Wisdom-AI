@@ -178,7 +178,7 @@ class SupportController extends Controller
                                 <i class="fas fa-comments"></i>
                             </a>';
                 $buttons .= '<a href="'.$view_url.'" title="View Ticket" class="btn-lg-icon icon-bg-skyblue">
-                                <img src="'.asset('resorts_assets/images/eye.svg').'" alt="icon">
+                                <i class="fas fa-eye"></i>
                             </a>';
 
                 /*

@@ -29,7 +29,7 @@
                     </div>
                     <div class="col-auto">
                         <div class="dropdown d-inline-block me-1">
-                            <button class="btn btn-sm btn-themeSkyblue dropdown-toggle" type="button" id="predefinedReportsDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                            <button class="btn eb-btn-secondary dropdown-toggle" type="button" id="predefinedReportsDropdown" data-bs-toggle="dropdown" aria-expanded="false">
                                 Predefined Reports
                             </button>
                             <ul class="dropdown-menu" aria-labelledby="predefinedReportsDropdown">
@@ -55,7 +55,7 @@
                                 <li><a class="dropdown-item" href="{{ route('resort.report.resignation_exit.index') }}">Resignation & Exit Clearance Reports</a></li>
                             </ul>
                         </div>
-                        <a href="{{ route('reports.create') }}" class="btn btn-sm btn-theme @if(Common::checkRouteWisePermission('resort.report.index',config('settings.resort_permissions.create')) == false) d-none @endif">Custom Report</a>
+                        <a href="{{ route('reports.create') }}" class="btn eb-btn-accent @if(Common::checkRouteWisePermission('resort.report.index',config('settings.resort_permissions.create')) == false) d-none @endif">Custom Report</a>
                     </div>
                 </div>  
             </div>  
@@ -86,6 +86,7 @@
         </div>
     </div>
 </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')

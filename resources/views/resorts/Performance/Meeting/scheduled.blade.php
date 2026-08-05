@@ -15,7 +15,7 @@
                 </div>
                 <div class="col-auto">
                     <div class="d-flex justify-content-end gap-2">
-                        <a href="{{ route('Performance.Meeting.index') }}" class="btn btn-theme">
+                        <a href="{{ route('Performance.Meeting.index') }}" class="btn perf-btn-accent">
                             <i class="fa-solid fa-plus me-1"></i> Create Meeting
                         </a>
                     </div>
@@ -63,11 +63,12 @@
             <div class="modal-body" id="meetingDetailBody">
             </div>
             <div class="modal-footer">
-                <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray">Close</a>
+                <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn perf-btn-neutral">Close</a>
             </div>
         </div>
     </div>
 </div>
+@include('resorts.Performance._performance_buttons_v2_styles')
 @endsection
 
 @section('import-css')

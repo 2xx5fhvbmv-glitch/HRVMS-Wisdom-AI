@@ -95,7 +95,7 @@
                     </div>
               
                     <div class="card-footer">
-                        <button type="submit" class="btn btn-sm btn-success "> Submit</button>
+                        <button type="submit" class="btn eb-btn-primary btn-sm"> Submit</button>
                     </div>
                 </form>
             </div>
@@ -103,6 +103,7 @@
 
         </div>
     </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')

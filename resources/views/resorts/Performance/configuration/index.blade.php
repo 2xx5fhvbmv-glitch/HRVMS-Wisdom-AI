@@ -71,7 +71,7 @@
                                 </div>
                             </div>
                             <div class="mt-3">
-                                <button type="button" class="btn btn-themeSkyblue FormTemplate w-100" data-flag="simple" disabled>
+                                <button type="button" class="btn perf-btn-accent FormTemplate w-100" data-flag="simple" disabled>
                                     <i class="fa-solid fa-plus me-1"></i> Create Template
                                 </button>
                             </div>
@@ -109,7 +109,7 @@
                             </div>
 
                             <div class="d-flex gap-2 mt-3">
-                                <button type="submit" class="btn btn-themeBlue w-100">
+                                <button type="submit" class="btn perf-btn-primary w-100">
                                     <i class="fa-regular fa-save me-1"></i> Save Template
                                 </button>
                             </div>
@@ -174,7 +174,7 @@
                         </div>
                         <p class="text-muted">Mid-year performance appraisal form for regular reviews.</p>
                         <div class="mt-auto">
-                            <button type="button" class="btn btn-themeSkyblue w-100" data-flag="ProfessionalForm" id="ProfessionalForm">
+                            <button type="button" class="btn perf-btn-accent w-100" data-flag="ProfessionalForm" id="ProfessionalForm">
                                 <i class="fa-solid fa-plus me-1"></i> Create Template
                             </button>
                         </div>
@@ -190,7 +190,7 @@
                         </div>
                         <p class="text-muted">Probationary review form for new hires within 90 days.</p>
                         <div class="mt-auto">
-                            <button type="button" class="btn btn-themeSkyblue w-100" data-flag="nintyDayForm" id="nintyDayForm">
+                            <button type="button" class="btn perf-btn-accent w-100" data-flag="nintyDayForm" id="nintyDayForm">
                                 <i class="fa-solid fa-plus me-1"></i> Create Template
                             </button>
                         </div>
@@ -207,7 +207,7 @@
                         </div>
                         <p class="text-muted">Yearly performance appraisal form for end-of-year reviews.</p>
                         <div class="mt-auto">
-                            <button type="button" class="btn btn-themeSkyblue w-100" data-flag="annualAppraisal" id="annualAppraisal">
+                            <button type="button" class="btn perf-btn-accent w-100" data-flag="annualAppraisal" id="annualAppraisal">
                                 <i class="fa-solid fa-plus me-1"></i> Create Template
                             </button>
                         </div>
@@ -223,7 +223,7 @@
                         </div>
                         <p class="text-muted">Action plan for employees requiring performance improvement.</p>
                         <div class="mt-auto">
-                            <button type="button" class="btn btn-themeSkyblue w-100" data-flag="pipForm" id="pipForm">
+                            <button type="button" class="btn perf-btn-accent w-100" data-flag="pipForm" id="pipForm">
                                 <i class="fa-solid fa-plus me-1"></i> Create Template
                             </button>
                         </div>
@@ -239,7 +239,7 @@
                         </div>
                         <p class="text-muted">Career growth and skill development planning form.</p>
                         <div class="mt-auto">
-                            <button type="button" class="btn btn-themeSkyblue w-100" data-flag="pdpForm" id="pdpForm">
+                            <button type="button" class="btn perf-btn-accent w-100" data-flag="pdpForm" id="pdpForm">
                                 <i class="fa-solid fa-plus me-1"></i> Create Template
                             </button>
                         </div>
@@ -278,13 +278,14 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                    <button type="button" id="save-form" class="btn btn-themeBlue">Submit</button>
+                    <a href="#" data-bs-dismiss="modal" class="btn perf-btn-neutral ms-auto">Cancel</a>
+                    <button type="button" id="save-form" class="btn perf-btn-primary">Submit</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
+@include('resorts.Performance._performance_buttons_v2_styles')
 @endsection
 
 @section('import-css')

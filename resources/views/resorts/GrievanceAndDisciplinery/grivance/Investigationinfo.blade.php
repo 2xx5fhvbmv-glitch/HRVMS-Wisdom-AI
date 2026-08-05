@@ -269,13 +269,14 @@
                     </div>
                     
                     <div class="card-footer mt-3 text-end">
-                        <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                        <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                     </div>
                 </form>
             @endif
         </div>
     </div>
 </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')

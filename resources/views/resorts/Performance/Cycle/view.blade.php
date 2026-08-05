@@ -13,10 +13,10 @@
                     </div>
                 </div>
                 <div class="col-auto d-flex gap-2">
-                    <a href="{{ route('Performance.cycle.analytics', base64_encode($cycle->id)) }}" class="btn btn-theme">
+                    <a href="{{ route('Performance.cycle.analytics', base64_encode($cycle->id)) }}" class="btn perf-btn-secondary">
                         View Analytics
                     </a>
-                    <a href="{{ route('Performance.cycle') }}" class="btn btn-themeGray">
+                    <a href="{{ route('Performance.cycle') }}" class="btn perf-btn-secondary">
                         <i class="fa-solid fa-arrow-left me-1"></i> Back
                     </a>
                 </div>
@@ -30,7 +30,7 @@
                     <div class="small text-muted">Reviewers see "No template was assigned" until a template is selected.</div>
                 </div>
                 @if($canFixTemplate ?? false)
-                    <button type="button" class="btn btn-themeBlue btn-sm" data-bs-toggle="modal" data-bs-target="#attachTemplateModal">
+                    <button type="button" class="btn perf-btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#attachTemplateModal">
                         <i class="fa-solid fa-link me-1"></i> Attach Template
                     </button>
                 @endif
@@ -139,7 +139,7 @@
                                     @if($p->self_status === 'completed')
                                         <a href="{{ route('Performance.Review.showSelf', ['id' => base64_encode($p->child_id)]) }}"
                                            target="_blank"
-                                           class="btn btn-themeBlue btn-sm mb-1"
+                                           class="btn perf-btn-secondary btn-sm mb-1"
                                            title="View self review">
                                             <i class="fa-solid fa-eye"></i> Self
                                         </a>
@@ -147,7 +147,7 @@
                                     @if($p->manager_status === 'completed')
                                         <a href="{{ route('Performance.Review.showManager', ['id' => base64_encode($p->child_id)]) }}"
                                            target="_blank"
-                                           class="btn btn-themeSkyblue btn-sm"
+                                           class="btn perf-btn-secondary btn-sm"
                                            title="View manager review">
                                             <i class="fa-solid fa-eye"></i> Manager
                                         </a>
@@ -193,14 +193,15 @@
                     @endif
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-themeGray btn-sm" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-themeBlue btn-sm" {{ empty($availableTemplates) ? 'disabled' : '' }}>Attach</button>
+                    <button type="button" class="btn perf-btn-neutral btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn perf-btn-primary btn-sm" {{ empty($availableTemplates) ? 'disabled' : '' }}>Attach</button>
                 </div>
             </div>
         </form>
     </div>
 </div>
 @endif
+@include('resorts.Performance._performance_buttons_v2_styles')
 @endsection
 
 @section('import-css')

@@ -13,7 +13,7 @@
                     </div>
                 </div>
                 <div class="col-auto">
-                    <a href="{{ route('Performance.kpi.KpiList') }}" class="btn btn-themeBlue btn-sm">
+                    <a href="{{ route('Performance.kpi.KpiList') }}" class="btn perf-btn-secondary btn-sm">
                         <i class="fa-solid fa-arrow-left"></i> Back
                     </a>
                 </div>
@@ -97,7 +97,7 @@
                                     </div>
                                 </div>
                                 <div class="col-sm-6 d-flex align-items-end {{ $idx === 0 ? 'd-none' : '' }} remove-col">
-                                    <a href="#" class="btn btn-danger btn-sm responseGoal-remove">Remove</a>
+                                    <a href="#" class="btn perf-btn-neutral btn-sm responseGoal-remove">Remove</a>
                                 </div>
                             </div>
                         </div>
@@ -105,7 +105,7 @@
                 </div>
 
                 <div class="md-mb-4 mb-3">
-                    <a href="#" class="btn btn-themeSkyblue btn-sm responseGoal-add">Add More</a>
+                    <a href="#" class="btn perf-btn-accent btn-sm responseGoal-add">Add More</a>
                 </div>
 
                 {{-- Actual section hidden for now
@@ -150,7 +150,7 @@
                 --}}
 
                 <div class="card-footer text-end">
-                    <button type="submit" class="btn btn-themeBlue btn-sm">
+                    <button type="submit" class="btn perf-btn-primary btn-sm">
                         {{ $isRevision ? 'Re-submit Response' : 'Send' }}
                     </button>
                 </div>
@@ -158,6 +158,7 @@
         </div>
     </div>
 </div>
+@include('resorts.Performance._performance_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')

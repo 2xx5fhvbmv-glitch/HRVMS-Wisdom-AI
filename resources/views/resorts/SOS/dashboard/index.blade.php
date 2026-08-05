@@ -81,14 +81,15 @@
             <div class="modal-body">
                 <h4>Is This A Drill Or Real?</h4>
                 <div>
-                    <a href="JavaScript:void(0);" class="btn btn-themeBlue btn-sm me-md-4 me-2 mark-sos-status" data-type="Drilled">Drill SOS</a>
-                    <a href="JavaScript:void(0);" class="btn btn-themeGray btn-sm mark-sos-status" data-type="Real">Real SOS</a>
+                    <a href="JavaScript:void(0);" class="btn eb-btn-neutral btn-sm me-md-4 me-2 mark-sos-status" data-type="Drilled">Drill SOS</a>
+                    <a href="JavaScript:void(0);" class="btn eb-btn-critical btn-sm mark-sos-status" data-type="Real">Real SOS</a>
                 </div>
             </div>
         </div>
     </div>
 </div>
 
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')

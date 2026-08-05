@@ -23,11 +23,11 @@
                               The two AI buttons are gated behind the same permission as
                               the rules-engine run since they all create/modify rows. --}}
                          <div class="col-auto ms-auto d-flex gap-2 flex-wrap @if(App\Helpers\Common::checkRouteWisePermission('people.compliance.index',config('settings.resort_permissions.create')) == false) d-none @endif">
-                              <a class="btn btn-theme" href="{{route('people.compliance.run')}}">Run Compliance Check Now</a>
-                              <button type="button" class="btn btn-themeBlue cc-ai-btn" id="ai-anomaly-scan-btn" title="Run an AI-only anomaly scan that catches issues the rule-based engine can't (salary outliers, ratio drifts, etc.)">
+                              <a class="btn eb-btn-primary" href="{{route('people.compliance.run')}}">Run Compliance Check Now</a>
+                              <button type="button" class="btn eb-btn-accent cc-ai-btn" id="ai-anomaly-scan-btn" title="Run an AI-only anomaly scan that catches issues the rule-based engine can't (salary outliers, ratio drifts, etc.)">
                                   @include('resorts.renderfiles.ai_spark', ['class' => 'me-1'])Run AI Anomaly Scan
                               </button>
-                              <button type="button" class="btn btn-themeGray" id="ai-regenerate-btn" title="Re-run the AI explanation + remediation on the next batch of 15 breached compliance rows. Picks never-enriched rows first, then the oldest enrichments. Click again for the next batch.">
+                              <button type="button" class="btn eb-btn-accent" id="ai-regenerate-btn" title="Re-run the AI explanation + remediation on the next batch of 15 breached compliance rows. Picks never-enriched rows first, then the oldest enrichments. Click again for the next batch.">
                                   <i class="fa-solid fa-rotate me-1"></i>Regenerate AI
                               </button>
                          </div>
@@ -69,7 +69,7 @@
                               </div>
 
                               <div class="col-auto ms-auto">
-                                   <a id="compliance-download-btn" href="{{route('people.compliance.download')}}" class="btn btn-theme me-2">Download</a>
+                                   <a id="compliance-download-btn" href="{{route('people.compliance.download')}}" class="btn eb-btn-secondary me-2">Download</a>
                               </div>
                         </div>
                         {{-- Filter chips — generated from the same dataset,
@@ -128,13 +128,14 @@
                     Are you sure?
                 </div>
                 <div class="modal-footer justify-content-end">
-                    <button type="button" class="btn btn-sm btn-themeGray me-2" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-sm btn-themeBlue" id="ai-confirm-modal-confirm">Confirm</button>
+                    <button type="button" class="btn eb-btn-neutral btn-sm me-2" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn eb-btn-primary btn-sm" id="ai-confirm-modal-confirm">Confirm</button>
                 </div>
             </div>
         </div>
     </div>
-    @endsection
+    @include('resorts._emotional_buttons_v2_styles')
+@endsection
 
     @section('import-css')
     <style>
@@ -652,7 +653,7 @@
             'Typical run time: 15–25 seconds.'
         );
         $('#ai-confirm-modal-confirm').text('Yes, regenerate next 15')
-            .removeClass('btn-themeBlue').addClass('btn-themeGray')
+            .removeClass('eb-btn-primary').addClass('eb-btn-accent')
             .data('action', 'regenerate');
         var modal = new bootstrap.Modal(document.getElementById('ai-confirm-modal'));
         modal.show();
@@ -668,7 +669,7 @@
             'Typical run time: <strong>up to 60 seconds</strong>. Up to 20 anomalies per scan. Existing rows are NOT modified.'
         );
         $('#ai-confirm-modal-confirm').text('Yes, run scan')
-            .removeClass('btn-themeGray').addClass('btn-themeBlue')
+            .removeClass('eb-btn-accent').addClass('eb-btn-primary')
             .data('action', 'scan');
         var modal = new bootstrap.Modal(document.getElementById('ai-confirm-modal'));
         modal.show();

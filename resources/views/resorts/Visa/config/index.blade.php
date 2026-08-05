@@ -70,8 +70,8 @@
                             </div>
 
                             <div class="card-footer text-end">
-                                <a href="javascript::void(0)" class="btn btn-themeSkyblue btn-sm blockAdd-Nationality">Add Nationality</a>
-                                <button type="submit" class="btn btn-themeBlue btn-sm SubmitNationality">Submit</button>
+                                <a href="javascript::void(0)" class="btn eb-btn-accent btn-sm blockAdd-Nationality">Add Nationality</a>
+                                <button type="submit" class="btn eb-btn-primary btn-sm SubmitNationality">Submit</button>
                             </div>
                         </form>
 
@@ -208,7 +208,7 @@
                                 </div>
                             </div>
                             <div class="card-footer text-end">
-                                <button class="btn btn-themeBlue btn-sm">Submit</button>
+                                <button class="btn eb-btn-primary btn-sm">Submit</button>
                             </div>
                         </form>
                     </div>
@@ -233,7 +233,7 @@
                                         </div>
                                     </div>
                                     <div class="card-footer text-end">
-                                        <button class="btn btn-themeBlue btn-sm" type="submit">Submit</button>
+                                        <button class="btn eb-btn-primary btn-sm" type="submit">Submit</button>
                                     </div>
                                 </form>
                                 <hr>
@@ -325,7 +325,7 @@
                                 </div>
                             </div>
                             <div class="card-footer text-end">
-                                <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                                <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                             </div>
                         </form>
 
@@ -369,7 +369,7 @@
                                 </div>
                             </div>
                             <div class="card-footer text-end">
-                                <button type='submit' class="btn btn-themeBlue btn-sm">Submit</button>
+                                <button type='submit' class="btn eb-btn-primary btn-sm">Submit</button>
                             </div>
                         </form>
                     </div>
@@ -390,7 +390,7 @@
                                         </div>
                                     </div>
                                     <div class="card-footer text-end">
-                                        <button class="btn btn-themeBlue btn-sm" type="submit">Submit</button>
+                                        <button class="btn eb-btn-primary btn-sm" type="submit">Submit</button>
                                     </div>
                                 </form>
                                 <hr>
@@ -455,8 +455,8 @@
                             </div>
                             <input type="hidden" name="documentCount" id="documentCount"  value="1">
                             <div class="card-footer text-end">
-                                        <a href="javascript:void(0)" class="btn btn-themeSkyblue btn-sm AddmoreDocumentType blockAdd-btn">Add More</a>
-                                        <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                                        <a href="javascript:void(0)" class="btn eb-btn-accent btn-sm AddmoreDocumentType blockAdd-btn">Add More</a>
+                                        <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                             </div>
                         </form>
                     </div> --}}
@@ -478,7 +478,7 @@
                     <div class="modal-body">
                     <div class="row">
                         <div class=col-md-12>
-                            <a href="{{route('visa.natioanlity.export')}}"class="btn btn-sm btn-themeSkyblue">Example Export</a>
+                            <a href="{{route('visa.natioanlity.export')}}"class="btn eb-btn-secondary">Example Export</a>
                         </div>
                         <div class="col-md-12">
                             <label for="txt" class="form-label">UPLOAD DOCUMENT <span class="red-mark">*</span></label>
@@ -489,13 +489,14 @@
                     </div>
                     </div>
                     <div class="modal-footer">
-                        <a href="javascript:vpid(0)" id="close-crop-btn" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Close</a>
-                        <button type="submit" class="btn btn-themeBlue">Submit</button>
+                        <a href="javascript:vpid(0)" id="close-crop-btn" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Close</a>
+                        <button type="submit" class="btn eb-btn-primary">Submit</button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -601,7 +602,7 @@ $(document).on("click",".blockAdd-Nationality",function(){
                                         </div>
                                         
                                         <div class="col-sm-2">
-                                            <input type="button" value="Remove" style="margin-top:33px;" class="btn btn-danger btn-sm RemoveNationality" data-id="${count}">
+                                            <input type="button" value="Remove" style="margin-top:33px;" class="btn eb-btn-critical btn-sm RemoveNationality" data-id="${count}">
                                         </div>
                                         <input type="hidden" name="id" id="NationalityCount" value="1">
                                     </div>`); 
@@ -1028,7 +1029,7 @@ $("#DocumentSegmentationForm").on("submit", function(e)
                         </div>
                     </td>
                     <td class="py-1">
-                        <a href="javascript:void(0)" class="btn btn-theme update-row-btn_cat" data-cat-id="${Main_id}">Submit</a>
+                        <a href="javascript:void(0)" class="btn eb-btn-primary update-row-btn_cat" data-cat-id="${Main_id}">Submit</a>
                     </td>
                 `;
 
@@ -1255,7 +1256,7 @@ $("#DocumentSegmentationForm").on("submit", function(e)
                         </div>
                     </td>
                     <td class="py-1">
-                        <a href="javascript:void(0)" class="btn btn-theme update-row-btn_cat" data-cat-id="${Main_id}">Submit</a>
+                        <a href="javascript:void(0)" class="btn eb-btn-primary update-row-btn_cat" data-cat-id="${Main_id}">Submit</a>
                     </td>
                 `;
 
@@ -1328,7 +1329,7 @@ $("#DocumentSegmentationForm").on("submit", function(e)
                                                     <input type="text" name="DocumentName[]" id="txt" class="form-control"required data-parsley-required-message="Please enter document type" placeholder="1000">
                                                 </div>
                                                 <div class="col-sm-2">
-                                                    <input type="button" style="margin-top: 33px;" value="Remove" class="btn btn-danger btn-sm RemovedocumentType" data-id="${count}" fdprocessedid="qi65s">
+                                                    <input type="button" style="margin-top: 33px;" value="Remove" class="btn eb-btn-critical btn-sm RemovedocumentType" data-id="${count}" fdprocessedid="qi65s">
                                                 </div>
                                             </div>`);
                 $("#documentCount").val(count);

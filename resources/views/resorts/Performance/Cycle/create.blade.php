@@ -69,7 +69,7 @@
                             <div class="d-none d-md-block" style="height: 170px;"></div>
                         </div>
                         <hr class="hr-footer">
-                        <a href=" # " class=" btn btn-themeBlue btn-sm float-end next ">Next</a>
+                        <a href=" # " class=" btn perf-btn-primary btn-sm float-end next ">Next</a>
                     </fieldset>
                     <fieldset data-parsley-group="block-1">
                         <div class="mt-md-4 mt-2 mb-md-4 mb-3 pb-md-2  text-center">
@@ -144,8 +144,8 @@
 
                                 </div>
                                 <div class="col-auto">
-                                    <button type="button" class="btn btn-themeBlue FilterEmployees">Submit</button>
-                                    <button type="button" class="btn btn-themeGray ms-2 ResetFilters">Reset</button>
+                                    <button type="button" class="btn perf-btn-primary FilterEmployees">Submit</button>
+                                    <button type="button" class="btn perf-btn-neutral ms-2 ResetFilters">Reset</button>
                                 </div>
                             </div>
                         </div>
@@ -176,8 +176,8 @@
                             </table>
                         </div>
                         <hr class="hr-footer border-0">
-                        <a href=" # " class=" btn btn-themeBlue btn-sm float-end next ">Next</a>
-                        <a href=" # " class=" btn btn-themeSkyblue btn-sm float-end previous me-2">Back</a>
+                        <a href=" # " class=" btn perf-btn-primary btn-sm float-end next ">Next</a>
+                        <a href=" # " class=" btn perf-btn-secondary btn-sm float-end previous me-2">Back</a>
                     </fieldset>
 
                     <fieldset data-parsley-group="block-2">
@@ -196,8 +196,8 @@
 
                         <div class="d-md-block d-none" style="height: 274px;"></div>
                         <hr class="hr-footer ">
-                        <a href=" # " class=" btn btn-themeBlue btn-sm float-end next ">Next</a>
-                        <a href=" # " class=" btn btn-themeSkyblue btn-sm float-end previous me-2">Back</a>
+                        <a href=" # " class=" btn perf-btn-primary btn-sm float-end next ">Next</a>
+                        <a href=" # " class=" btn perf-btn-secondary btn-sm float-end previous me-2">Back</a>
                     </fieldset>
                     <fieldset data-parsley-group="block-3">
                         <div class="mt-md-4 mt-2 mb-md-4 mb-3 pb-md-2  text-center">
@@ -252,8 +252,8 @@
                         <div class="mb-3 Selected_Review_type" >
                         </div>
                         <hr class="hr-footer">
-                        <a href=" # " class=" btn btn-themeBlue btn-sm float-end next ">Next</a>
-                        <a href=" # " class=" btn btn-themeSkyblue btn-sm float-end previous me-2">Back</a>
+                        <a href=" # " class=" btn perf-btn-primary btn-sm float-end next ">Next</a>
+                        <a href=" # " class=" btn perf-btn-secondary btn-sm float-end previous me-2">Back</a>
                     </fieldset>
 
 
@@ -323,8 +323,8 @@
                             </div>
                         </div>
                          <hr class="hr-footer border-0">
-                        <button type="submit" class=" btn btn-themeBlue btn-sm SubmitCycle float-end" id="SubmitCycle">Submit</button>
-                        <a href=" # " class=" btn btn-themeSkyblue btn-sm float-end previous me-2">Back</a>
+                        <button type="submit" class=" btn perf-btn-primary btn-sm SubmitCycle float-end" id="SubmitCycle">Submit</button>
+                        <a href=" # " class=" btn perf-btn-secondary btn-sm float-end previous me-2">Back</a>
                     </fieldset>
 
                         <input type="hidden" name="step_four_start_date_self_hidden" id="step_four_start_date_self_hidden">
@@ -340,6 +340,7 @@
         </div>
     </div>
 </div>
+@include('resorts.Performance._performance_buttons_v2_styles')
 @endsection
 
 @section('import-css')

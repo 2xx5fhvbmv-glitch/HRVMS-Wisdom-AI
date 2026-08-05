@@ -68,6 +68,7 @@
             </div>
         </div>
     </div>
+@include('resorts.Learning._learning_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -237,8 +238,8 @@
         $row.data('original-action', $actionCell.html());
 
         $actionCell.html(`
-            <button class="btn btn-sm btn-success update-row-btn" data-schedule-id="${scheduleId}">Update</button>
-            <button class="btn btn-sm btn-secondary cancel-row-btn" data-schedule-id="${scheduleId}">Cancel</button>
+            <button class="btn btn-sm lnd-btn-positive update-row-btn" data-schedule-id="${scheduleId}">Update</button>
+            <button class="btn btn-sm lnd-btn-neutral cancel-row-btn" data-schedule-id="${scheduleId}">Cancel</button>
         `);
 
         // Store original values for cancel
@@ -316,8 +317,8 @@
             $row.find("td:last-child").html(originalAction);
         } else {
             $row.find("td:last-child").html(`
-                <a href="javascript:void(0)" class="btn-lg-icon icon-bg-green me-1 edit-row-btn" data-schedule-id="${scheduleId}">
-                    <img src="{{ asset('resorts_assets/images/edit.svg') }}" alt="Edit" class="img-fluid">
+                <a href="javascript:void(0)" class="btn-tableIcon btnIcon-yellow me-1 edit-row-btn" title="Edit" data-schedule-id="${scheduleId}">
+                    <i class="fa-solid fa-pen-to-square"></i>
                 </a>
             `);
         }

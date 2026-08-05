@@ -254,7 +254,7 @@
                                 <input type="text" value="{{ isset($GrivanceInvestigationModel->resolution_date) ? $GrivanceInvestigationModel->resolution_date :'' }} " @if($Grivance_Parent->Assigned=="No" || isset($GrivanceInvestigationModel->resolution_date)) readonly @else required data-parsley-required-message="Anticipated resolution date is required" data-parsley-greaterThan="#inves_date" data-parsley-greaterThan-message="Resolution date must be after the investigation start date" @endif class="form-control datepicker" id="exp_date" name="resolution_date" placeholder="Choose Date">
                             </div>
                             <div class="col-lg-4 col-sm-4">
-                                <a href="javascript:void(0)" class="btn btn-themeBlue AddMoreGrivance">Add More</a>
+                                <a href="javascript:void(0)" class="btn eb-btn-accent AddMoreGrivance">Add More</a>
                             </div>
                         <div class="row appendHere">
                             <input type="hidden" name="counts" value="1" id="counts">
@@ -281,7 +281,7 @@
                             </div>
                             @if($Grivance_Parent->RequestforStatment !="Yes")
                                 <div class="col-lg-2 col-sm-6 mt-4  d-none" id="RequestForStatement">
-                                    <a href="javascript:void(0)" class="btn btn-themeBlue RequestForStatement" data-id="{{$Grivance_Parent->Grivance_id}}">Request For Statement</a>
+                                    <a href="javascript:void(0)" class="btn eb-btn-accent RequestForStatement" data-id="{{$Grivance_Parent->Grivance_id}}">Request For Statement</a>
                                 </div>
                             @endif
                             <div class="col-lg-4 col-sm-6">
@@ -380,7 +380,7 @@
                                     <label class="form-label">FILE UPLOAD</label>
                                     <div class="uploadFile-block">
                                         <div class="uploadFile-btn">
-                                            <a href="#" class="btn btn-themeBlue btn-sm">Upload File</a>
+                                            <a href="#" class="btn eb-btn-accent btn-sm">Upload File</a>
                                             <input type="file" 
                                             id="uploadFile" 
                                             multiple 
@@ -397,7 +397,7 @@
                                     @if($Grivance_Parent->Request_Identity_Disclosure == 'Requested')
                                         <span class="text-muted">Identity disclosure requested — awaiting response</span>
                                     @else
-                                        <a href="javascript:void(0)" @if($Grivance_Parent->Assigned=="No") disabled @endif class="btn btn-themeSkyblue RequestIdentity" data-id="{{ $Grivance_Parent->id}}">Request Identity Disclosure</a>
+                                        <a href="javascript:void(0)" @if($Grivance_Parent->Assigned=="No") disabled @endif class="btn eb-btn-accent RequestIdentity" data-id="{{ $Grivance_Parent->id}}">Request Identity Disclosure</a>
                                     @endif
                                 </div>
                             @endif
@@ -406,7 +406,7 @@
                     @endif
                 
                     <div class="card-footer text-end">
-                        <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                        <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                     </div>
                 </form>
 
@@ -431,7 +431,7 @@
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h5 class="mb-0">Appeals</h5>
                     @if($canFileAppeal)
-                        <button type="button" class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#fileAppealModal">
+                        <button type="button" class="btn eb-btn-accent btn-sm" data-bs-toggle="modal" data-bs-target="#fileAppealModal">
                             <i class="fa fa-gavel me-1"></i> File Appeal
                         </button>
                     @else
@@ -483,14 +483,15 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-warning">Submit Appeal</button>
+                    <button type="button" class="btn eb-btn-neutral" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn eb-btn-primary">Submit Appeal</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 @endif
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -767,8 +768,8 @@ $(document).on("click",".RequestForStatement",function() {
                         <textarea class="form-control" id="resol_notes" name="resolution_note[]" @if($Grivance_Parent->Assigned=="No") readonly @else required data-parsley-required-message="Resolution notes are required" data-parsley-minlength="20" data-parsley-minlength-message="Please provide at least 20 characters of resolution notes" @endif placeholder="Type Here..." rows="4"></textarea>
                     </div>
                     <div class="col-1 mt-3 Remove_c_${counts}">
-                        <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-row-btn" data-id="${counts}" >
-                            <img src="{{asset("resorts_assets/images/trash-red.svg")}}" alt="Delete" class="img-fluid">
+                        <a href="javascript:void(0)" class="btn-tableIcon eb-icon-critical delete-row-btn" data-id="${counts}" >
+                            <i class="fa-regular fa-trash-can"></i>
                         </a>
                     </div>`;
                    

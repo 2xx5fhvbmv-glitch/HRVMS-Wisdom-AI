@@ -49,9 +49,9 @@
                                 </div>
                             </div>
                             <div class="card-footer text-end"> <!-- Footer for Save Form button -->
-                                <button id="update-form" class="btn btn-themeBlue btn-sm">Update Form</button>
+                                <button id="update-form" class="btn lnd-btn-primary btn-sm">Update Form</button>
 
-                                <a href="{{ route('feedback-form.index') }}" class="btn btn-themeSkyblue btn-sm">Cancel</a>
+                                <a href="{{ route('feedback-form.index') }}" class="btn lnd-btn-neutral btn-sm">Cancel</a>
                             </div>
 
                         </div>
@@ -60,6 +60,7 @@
             </div>
         </div>
     </div>
+@include('resorts.Learning._learning_buttons_v2_styles')
 @endsection
 
 @section('import-css')

@@ -54,6 +54,7 @@
     .wai-narrative .wai-row-recommendation { margin: 0 0 4px; font-size: 12.5px; color: #0e8a9e; line-height: 1.5; }
     .wai-narrative .wai-row-link { display: inline-block; margin-top: 2px; font-size: 12px; font-weight: 600; color: #014653; }
 </style>
+@include('resorts.Performance._performance_buttons_v2_styles')
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
         <div class="page-hedding">
@@ -437,7 +438,7 @@
                             <div class="text-center py-4 text-muted">
                                 <i class="fa-regular fa-calendar-xmark" style="font-size:40px;"></i>
                                 <p class="mt-2">No performance cycles created yet</p>
-                                <a href="{{ route('Performance.create') }}" class="btn btn-themeSkyblue btn-sm">
+                                <a href="{{ route('Performance.create') }}" class="btn perf-btn-hero btn-sm">
                                     <i class="fa-solid fa-plus me-1"></i> Create Your First Cycle
                                 </a>
                             </div>
@@ -476,8 +477,8 @@
 
             </div>
             <div class="modal-footer">
-                <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                <a href="#" class="btn btn-themeBlue">Submit</a>
+                <a href="#" data-bs-dismiss="modal" class="btn perf-btn-neutral ms-auto">Cancel</a>
+                <a href="#" class="btn perf-btn-primary">Submit</a>
             </div>
         </div>
     </div>

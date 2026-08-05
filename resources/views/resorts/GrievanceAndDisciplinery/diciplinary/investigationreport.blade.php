@@ -252,7 +252,7 @@
                                 <input type="text" value="{{ isset($GrivanceInvestigationModel->resolution_date) ? $GrivanceInvestigationModel->resolution_date :'' }} " @if($Disciplinary_parent->Assigned=="No" || isset($GrivanceInvestigationModel->resolution_date)) readonly @else required data-parsley-required-message="Anticipated resolution date is required" data-parsley-greaterThan="#inves_date" data-parsley-greaterThan-message="Resolution date must be after the investigation start date" @endif class="form-control datepicker" id="exp_date" name="resolution_date" placeholder="Choose Date">
                             </div>
                             <div class="col-lg-4 col-sm-4">
-                                <a href="javascript:void(0)" class="btn btn-themeBlue AddMoreGrivance">Add More</a>
+                                <a href="javascript:void(0)" class="btn eb-btn-accent AddMoreGrivance">Add More</a>
                             </div>
                         <div class="row appendHere">
                             <input type="hidden" name="counts" value="1" id="counts">
@@ -282,7 +282,7 @@
                                 <input type="text" class="form-control" placeholder="Type Here" name="follow_up_description[]" id="follow_up_description" @if($Disciplinary_parent->Assigned=="No") disabled @else required data-parsley-required-message="Additional follow-up information is required" @endif>
                             </div>
                                 <div class="col-lg-2 col-sm-6 mt-4  d-none" id="RequestForStatement">
-                                    <a href="javascript:void(0)" class="btn btn-themeBlue RequestForStatement" data-id="{{$Disciplinary_parent->Disciplinary_id}}">Request For Statement</a>
+                                    <a href="javascript:void(0)" class="btn eb-btn-accent RequestForStatement" data-id="{{$Disciplinary_parent->Disciplinary_id}}">Request For Statement</a>
                                 </div>
                             <div class="col-lg-4 col-sm-6">
                                 <label for="inves_stage" class="form-label">INVESTIGATION STAGE</label>
@@ -348,7 +348,7 @@
                                  <label class="form-label">FILE UPLOAD</label>
                                     <div class="uploadFile-block">
                                         <div class="uploadFile-btn">
-                                            <a href="#" class="btn btn-themeBlue btn-sm">Upload File</a>
+                                            <a href="#" class="btn eb-btn-accent btn-sm">Upload File</a>
                                             <input 
                                                 type="file" 
                                                 id="uploadFile" 
@@ -374,7 +374,7 @@
                     @endif
                 
                     <div class="card-footer text-end">
-                        <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                        <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                     </div>
                 </form>
                 </div>
@@ -382,6 +382,7 @@
         </div>
     </div>
 </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -657,8 +658,8 @@ $(document).on("click",".RequestForStatement",function() {
                 </div>
 
                 <div class="col-1 mt-3 Remove_c_${counts}">
-                    <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-row-btn" data-id="${counts}">
-                        <img src="{{asset("resorts_assets/images/trash-red.svg")}}" alt="Delete" class="img-fluid">
+                    <a href="javascript:void(0)" class="btn-tableIcon eb-icon-critical delete-row-btn" data-id="${counts}">
+                        <i class="fa-regular fa-trash-can"></i>
                     </a>
                 </div>`;
 

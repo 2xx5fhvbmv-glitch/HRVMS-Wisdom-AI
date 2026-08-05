@@ -14,11 +14,11 @@
                 </div>
                 <div class="col-auto d-flex gap-2">
                     @if($canEditResponse ?? false)
-                        <a href="{{ route('Performance.kpi.respond', $kpi->id) }}" class="btn btn-themeSkyblue btn-sm">
+                        <a href="{{ route('Performance.kpi.respond', $kpi->id) }}" class="btn perf-btn-secondary btn-sm">
                             <i class="fa-solid fa-pen-to-square"></i> Edit Response
                         </a>
                     @endif
-                    <a href="{{ route('Performance.kpi.KpiList') }}" class="btn btn-themeBlue btn-sm">
+                    <a href="{{ route('Performance.kpi.KpiList') }}" class="btn perf-btn-secondary btn-sm">
                         <i class="fa-solid fa-arrow-left"></i> Back
                     </a>
                 </div>
@@ -238,7 +238,7 @@
                                         <td>{{ $child->created_at ? $child->created_at->format('d M Y, h:i A') : '-' }}</td>
                                         @if($canAddActual ?? false)
                                             <td>
-                                                <button class="btn btn-danger btn-sm delete-actual-btn" data-id="{{ $child->id }}">Remove</button>
+                                                <button class="btn perf-btn-critical btn-sm delete-actual-btn" data-id="{{ $child->id }}">Remove</button>
                                             </td>
                                         @endif
                                     </tr>
@@ -343,18 +343,18 @@
                                                   placeholder="Add any remarks for this entry (optional)"></textarea>
                                     </div>
                                     <div class="col-sm-6 d-flex align-items-end d-none remove-col">
-                                        <a href="#" class="btn btn-danger btn-sm actualKpi-remove">Remove</a>
+                                        <a href="#" class="btn perf-btn-neutral btn-sm actualKpi-remove">Remove</a>
                                     </div>
                                 </div>
                             </div>
                         </div>
 
                         <div class="md-mb-4 mb-3">
-                            <a href="#" class="btn btn-themeSkyblue btn-sm actualKpi-add {{ $isRejected ? 'disabled' : '' }}">Add More</a>
+                            <a href="#" class="btn perf-btn-accent btn-sm actualKpi-add {{ $isRejected ? 'disabled' : '' }}">Add More</a>
                         </div>
 
                         <div class="text-end">
-                            <button type="submit" class="btn btn-themeBlue btn-sm" {{ $isRejected ? 'disabled' : '' }}>
+                            <button type="submit" class="btn perf-btn-primary btn-sm" {{ $isRejected ? 'disabled' : '' }}>
                                 Save Actual Entries
                             </button>
                         </div>
@@ -392,6 +392,7 @@
         @endif
     </div>
 </div>
+@include('resorts.Performance._performance_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')
@@ -459,7 +460,7 @@ $(document).ready(function () {
             title: 'Remove this actual entry?',
             icon: 'warning',
             showCancelButton: true,
-            confirmButtonColor: '#d33',
+            confirmButtonColor: '#FF2400',
             confirmButtonText: 'Yes, remove'
         }).then((result) => {
             if (!result.isConfirmed) return;

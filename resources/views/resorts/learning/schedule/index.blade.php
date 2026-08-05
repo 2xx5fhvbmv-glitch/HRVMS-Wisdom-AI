@@ -148,7 +148,7 @@
                         </div>
 
                         <div class="card-footer text-end">
-                            <button type="submit" class="btn btn-themeBlue btn-sm">Schedule Learning</button>
+                            <button type="submit" class="btn lnd-btn-primary btn-sm">Schedule Learning</button>
                         </div>
                     </div>
                 </form>
@@ -156,6 +156,7 @@
 
         </div>
     </div>
+@include('resorts.Learning._learning_buttons_v2_styles')
 @endsection
 
 @section('import-css')

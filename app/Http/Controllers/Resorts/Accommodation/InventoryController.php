@@ -97,8 +97,8 @@ class InventoryController extends Controller
                 $id = base64_encode($row->id);
                 return '
                     <div class="d-flex align-items-center">
-                        <a href="javascript:void(0)" class="btn-lg-icon icon-bg-green me-1 edit-row-btn '.$edit_class.'" data-cat-id="' . e($id) . '">
-                            <img src="' . asset("resorts_assets/images/edit.svg") . '" alt="Edit" class="img-fluid">
+                        <a href="javascript:void(0)" class="btn-tableIcon btnIcon-yellow me-1 edit-row-btn '.$edit_class.'" data-cat-id="' . e($id) . '">
+                            <i class="fa-solid fa-pen-to-square"></i>
                         </a>
                       </div>';
             })
@@ -384,9 +384,9 @@ class InventoryController extends Controller
                         // Per-room items are assigned to the room, not individual employees
                         $ak->action = '<span class="badge badge-themeBlue">Room Assigned</span>';
                     } elseif ($AssingAccommodation->count() == 0) {
-                        $ak->action = '<button type="button" data-flag="assign" data-available-id="'.base64_encode($ak->Available_Acc_id).'" data-item-id="'.base64_encode($ak->id).'" data-resort-id="'.base64_encode($this->resort->resort_id).'" data-room-type="'.base64_encode($ak->RoomType).'" class="btn btn-sm btn-themeSkyblueLight assign-employee-btn '.$edit_class.'">Please Assign Employee</button>';
+                        $ak->action = '<button type="button" data-flag="assign" data-available-id="'.base64_encode($ak->Available_Acc_id).'" data-item-id="'.base64_encode($ak->id).'" data-resort-id="'.base64_encode($this->resort->resort_id).'" data-room-type="'.base64_encode($ak->RoomType).'" class="btn btn-sm eb-btn-accent assign-employee-btn '.$edit_class.'">Please Assign Employee</button>';
                     } else {
-                        $ak->action = '<button type="button" data-flag="unassign" data-resort_id="'.base64_encode($this->resort->resort_id).'" data-item="'.base64_encode($ak->id).'"  data-id="' . base64_encode($ak->Available_Acc_id) . '" class="btn btn-sm btn-danger unassign '.$edit_class.'">Unassign</button>';
+                        $ak->action = '<button type="button" data-flag="unassign" data-resort_id="'.base64_encode($this->resort->resort_id).'" data-item="'.base64_encode($ak->id).'"  data-id="' . base64_encode($ak->Available_Acc_id) . '" class="btn btn-sm eb-btn-critical unassign '.$edit_class.'">Unassign</button>';
                     }
                     
                     $ak->AssignedTo = $assignAccomdationdata;

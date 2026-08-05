@@ -45,7 +45,7 @@
                 </div>
 
                 <a href="{{ route('Performance.employees.details', base64_encode($employee->id)) }}"
-                   class="btn btn-theme btn-sm w-100 mt-2">View Details</a>
+                   class="btn perf-btn-primary btn-sm w-100 mt-2">View Details</a>
             </div>
         </div>
     @endforeach

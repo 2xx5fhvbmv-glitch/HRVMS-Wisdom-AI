@@ -13,8 +13,8 @@
                     </div>
                 </div>
                 <div class="col-auto">
-                    <a href="{{ route('resort.accommodation.AccommodationMaster') }}" class="btn btn-themeSkyblue me-2">View Master</a>
-                    <a href="{{ route('resort.accommodation.config.index') }}" class="btn btn-theme">Back to Configuration</a>
+                    <a href="{{ route('resort.accommodation.AccommodationMaster') }}" class="btn eb-btn-secondary me-2">View Master</a>
+                    <a href="{{ route('resort.accommodation.config.index') }}" class="btn eb-btn-secondary">Back to Configuration</a>
                 </div>
             </div>
         </div>
@@ -147,13 +147,14 @@
                 <input type="hidden" id="editAccommodationId">
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-themeGray" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-themeBlue" id="saveEditAccommodation">Save</button>
+                <button type="button" class="btn eb-btn-neutral" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn eb-btn-primary" id="saveEditAccommodation">Save</button>
             </div>
         </div>
     </div>
 </div>
 
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')

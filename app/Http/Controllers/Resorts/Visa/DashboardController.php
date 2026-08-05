@@ -282,11 +282,12 @@ class DashboardController extends Controller
                                         <div>
                                             <div class="d-flex align-items-center">
                                                 <a href="javascript:void(0)"
-                                                class="edit-visa-wallet me-2"
+                                                class="btn-tableIcon btnIcon-yellow edit-visa-wallet me-2"
+                                                title="Edit"
                                                 data-amt="' . base64_encode($VisaWallet->Xpact_Amt) . '"
                                                 data-name="' . base64_encode($VisaWallet->Xpact_WalletName) . '"
                                                 data-id="' . base64_encode($VisaWallet->id) . '">
-                                                    <img src="' . URL::asset('resorts_assets/images/edit.svg') . '" alt="icon">
+                                                    <i class="fa-solid fa-pen-to-square"></i>
                                                 </a>
                                             </div>
                                             <h6>' . e($VisaWallet->Xpact_WalletName) . '</h6>
