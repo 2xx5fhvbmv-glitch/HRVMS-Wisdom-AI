@@ -122,9 +122,6 @@ class PayrollController extends Controller
                 }
             }
        
-            $lastMonth                                  = Carbon::now()->subMonth()->format('m'); // Example: "03" for March
-            $currentYear                                = Carbon::now()->format('Y'); // Example: "2025"
-
             // payroll_deductions/payroll_reviews/payroll_service_charges don't
             // necessarily have a row for every employee in every payroll run
             // (e.g. no service charge for non-tipped departments) — these
@@ -141,15 +138,33 @@ class PayrollController extends Controller
                                                             ->leftJoin('payroll_deductions as pd', function($j) use ($employee_id) {
                                                                 $j->on('pd.payroll_id','=','payroll.id')->where('pd.employee_id',$employee_id);
                                                             })
-                                                            ->leftJoin('payroll_reviews as pr', function($j) use ($employee_id) {
+                                                            // Was a left join — several of an employee's payroll_employees
+                                                            // rows are just roster entries with earnings never actually
+                                                            // calculated (no payroll_reviews row at all yet), so picking
+                                                            // "the latest period" alone could still land on an
+                                                            // unprocessed one and show 0. Requiring the review row to
+                                                            // exist means this always lands on the latest period that
+                                                            // was genuinely processed. Deductions/service-charge stay
+                                                            // left-joined — those can legitimately be absent even for a
+                                                            // fully processed period (e.g. no service charge for a
+                                                            // non-tipped role).
+                                                            ->join('payroll_reviews as pr', function($j) use ($employee_id) {
                                                                 $j->on('pr.payroll_id','=','payroll.id')->where('pr.employee_id',$employee_id);
                                                             })
                                                             ->leftJoin('payroll_service_charges as psc', function($j) use ($employee_id) {
                                                                 $j->on('psc.payroll_id','=','payroll.id')->where('psc.employee_id',$employee_id);
                                                             })
                                                             ->where('pe.employee_id',$employee_id)
-                                                            ->whereMonth('payroll.start_date', $lastMonth)
-                                                            ->whereYear('payroll.start_date', $currentYear)
+                                                            // Was hardcoded to exactly last calendar month — if payroll
+                                                            // for that specific month hasn't been run yet (a common lag;
+                                                            // e.g. today is in August but the latest processed payroll
+                                                            // run only covers 26 Mar-25 Apr), this matched nothing and
+                                                            // every field on the dashboard silently showed 0 even though
+                                                            // the employee's payslip history (a separate endpoint) has
+                                                            // real data. Show whatever the most recently processed
+                                                            // payroll period actually is instead of demanding an exact
+                                                            // month match.
+                                                            ->orderBy('payroll.start_date', 'desc')
                                                             ->select(
                                                                 'payroll.*',
                                                                 'ra.first_name',
@@ -230,8 +245,6 @@ class PayrollController extends Controller
         
         $employee_id                                    =   $this->user->GetEmployee->id;
         $year                                           =   $request->year ?? Carbon::now()->format('Y');
-        $lastMonth                                      =   Carbon::now()->subMonth()->format('m');
-        $currentYear                                    =   Carbon::now()->format('Y');
 
         try {
              // Fetch Employee Details
@@ -259,15 +272,24 @@ class PayrollController extends Controller
                                                             ->leftJoin('payroll_time_and_attandance as ptaa', function($j) use ($employee_id) {
                                                                 $j->on('ptaa.payroll_id','=','payroll.id')->where('ptaa.employee_id',$employee_id);
                                                             })
-                                                            ->leftJoin('payroll_reviews as pr', function($j) use ($employee_id) {
+                                                            // Inner join, not left — several payroll_employees rows are
+                                                            // roster-only with earnings never calculated (no
+                                                            // payroll_reviews row yet); requiring it here means "latest
+                                                            // period" (below) always lands on one that was genuinely
+                                                            // processed, same reasoning as payrollDashboard().
+                                                            ->join('payroll_reviews as pr', function($j) use ($employee_id) {
                                                                 $j->on('pr.payroll_id','=','payroll.id')->where('pr.employee_id',$employee_id);
                                                             })
                                                             ->leftJoin('payroll_deductions as pd', function($j) use ($employee_id) {
                                                                 $j->on('pd.payroll_id','=','payroll.id')->where('pd.employee_id',$employee_id);
                                                             })
                                                             ->where('pe.employee_id',$employee_id)
-                                                            ->whereMonth('payroll.start_date', $lastMonth)
-                                                            ->whereYear('payroll.start_date', $currentYear)
+                                                            // Same "exactly last calendar month" bug as payrollDashboard()
+                                                            // — shows the most recently processed period instead of
+                                                            // demanding an exact match, so this header snapshot doesn't
+                                                            // go blank while the list right below it (queried by year
+                                                            // only) has real rows for the same employee.
+                                                            ->orderBy('payroll.start_date', 'desc')
                                                             ->select(
                                                                 'payroll.id', 'ptaa.total_ot', 'pr.earnings_allowance',
                                                                 'pr.earnings_basic', 'pd.total_deductions'

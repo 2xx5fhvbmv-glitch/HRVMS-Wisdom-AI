@@ -75,7 +75,17 @@ class SurveyController extends Controller
                 ")->first();
 
             // Get all the surveys with their question count (one row per survey for this employee); match parent_surveys.resort_id to user's resort
+            // Creator name/position weren't included at all on this listing
+            // endpoint — only the per-survey detail endpoint
+            // (employeeSurveyQuestions) had them. Same join pattern as that
+            // endpoint (t2=resort_admins, t1=employees, rp=resort_positions
+            // via parent_surveys.created_by), left-joined so a survey never
+            // disappears from the list if its creator's admin/employee/
+            // position record is ever missing.
             $surveyQuestionData = ParentSurvey::join('survey_employees as se', 'se.Parent_survey_id', '=', 'parent_surveys.id')
+                ->leftJoin('resort_admins as t2', 't2.id', '=', 'parent_surveys.created_by')
+                ->leftJoin('employees as t1', 't1.Admin_Parent_id', '=', 't2.id')
+                ->leftJoin('resort_positions as rp', 'rp.id', '=', 't1.Position_id')
                 ->where('se.Emp_id', $employee_id)
                 ->where('parent_surveys.resort_id', $this->resort_id)
                 ->whereIn('parent_surveys.Status', ['Publish', 'OnGoing', 'Complete'])
@@ -90,6 +100,10 @@ class SurveyController extends Controller
                     'se.id as sur_emp_id',
                     'se.Complete_time',
                     'se.emp_status',
+                    't2.id as creator_admin_id',
+                    't2.first_name as creator_first_name',
+                    't2.last_name as creator_last_name',
+                    'rp.position_title as creator_position',
                     \DB::raw('(SELECT COUNT(*) FROM survey_questions WHERE Parent_survey_id = parent_surveys.id) as surveyQuetioncount')
                 )
                 ->get()
@@ -99,6 +113,9 @@ class SurveyController extends Controller
                     $row->survey_id = (int) $row->id;
                     $row->survey_id_encoded = base64_encode($row->id);
                     $row->sur_emp_id = (int) ($row->sur_emp_id ?? 0);
+                    $row->created_by_name = trim(($row->creator_first_name ?? '') . ' ' . ($row->creator_last_name ?? '')) ?: null;
+                    $row->created_by_role = $row->creator_position;
+                    $row->created_by_photo = $row->creator_admin_id ? Common::getResortUserPicture($row->creator_admin_id) : null;
                     return $row;
                 });
 

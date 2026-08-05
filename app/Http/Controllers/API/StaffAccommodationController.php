@@ -84,7 +84,18 @@ class StaffAccommodationController extends Controller
                                                                     ->orderBy('maintanace_requests.created_at', 'desc')
                                                                     ->whereNotIn("maintanace_requests.Status", ['ResolvedAwaiting'])
                                                                     ->take(2)
-                                                                    ->get(['maintanace_requests.*']);
+                                                                    ->get(['maintanace_requests.*'])
+                                                                    // Third duplicate path returning raw Image values
+                                                                    // unresolved (viewMaintenanceRequest and
+                                                                    // staffMaintenanceReqList already went through
+                                                                    // resolveMaintenanceAttachmentUrl — this dashboard
+                                                                    // card list didn't).
+                                                                    ->map(function ($row) {
+                                                                        if (!empty($row->Image)) {
+                                                                            $row->Image = Common::resolveMaintenanceAttachmentUrl($row->Image, $this->resort_id);
+                                                                        }
+                                                                        return $row;
+                                                                    });
             
             $completeMaintananceReqQuery                    =   MaintanaceRequest::join("employees as t3", "t3.id", "=", "maintanace_requests.Raised_By")
                                                                     ->join("resort_admins as t1", "t1.id", "=", "t3.Admin_Parent_id")
