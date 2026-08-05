@@ -184,9 +184,16 @@ class GrievanceController extends Controller
             ]);
 
             $imagePaths = [];
-            if ($request->hasFile('Attachments')) {
+            // Mobile actually posts the files as "attachments" (lowercase) —
+            // hasFile()/file() are case-sensitive, so checking only
+            // 'Attachments' silently skipped this entire block for every
+            // real mobile submission (grievance-store still returned success
+            // with nothing to error on), which is why an uploaded file never
+            // came back in the detail GET despite the store call succeeding.
+            $attachmentFiles = $request->file('Attachments') ?? $request->file('attachments');
+            if ($attachmentFiles) {
 
-                foreach ($request->file('Attachments') as $file) {
+                foreach ($attachmentFiles as $file) {
 
                     $SubFolder      =   "GrivanceAttachments";
                     $status         =   Common::AWSEmployeeFileUpload($this->resort_id,$file, $this->user->GetEmployee->Emp_id,$SubFolder,true);
@@ -341,10 +348,13 @@ class GrievanceController extends Controller
 
     /**
      * GET resort/grievance/my-grievances
-     * Every grievance the current user has submitted (created_by is the
-     * only field guaranteed to reflect the actual reporter — Employee_id
-     * on the row is set from a caller-supplied value and isn't reliable
-     * for "who filed this").
+     * Every grievance the current user has submitted (created_by, auto-set
+     * by the model from the authenticated session, is the only field
+     * guaranteed to reflect the actual reporter — GrievanceStore() now
+     * hardcodes Employee_id to the authenticated employee's own id too, so
+     * on mobile-submitted rows the two are always the same person; this
+     * comment used to say Employee_id was still caller-supplied, which is
+     * no longer true).
      */
     public function myGrievances(Request $request)
     {

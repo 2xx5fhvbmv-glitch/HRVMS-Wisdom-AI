@@ -7,6 +7,7 @@ use Auth;
 use Carbon\Carbon;
 use App\Models\Resort;
 use App\Helpers\Common;
+use App\Helpers\StorageHelper;
 use App\Models\Employee;
 use App\Models\ActionStore;
 use App\Models\OffensesModel;
@@ -149,12 +150,12 @@ class GrivanceController extends Controller
                 }
                 elseif($row->SentToGM == "No")
                 {
-                    $string='<a target="_blank" href="'. route('GrievanceAndDisciplinery.config.Investigationinfo',$id) .'" class="btn-tableIcon btnIcon-blue me-1 edit-row-btn '.$edit_class.'" data-cat-id="' . e($id) . '">
+                    $string='<a target="_blank" title="View Report" href="'. route('GrievanceAndDisciplinery.config.Investigationinfo',$id) .'" class="btn-tableIcon btnIcon-blue me-1 edit-row-btn '.$edit_class.'" data-cat-id="' . e($id) . '">
                     <i class="fas fa-info"></i>
                     </a>
-                    <a target="_blank" href="'. route('GrievanceAndDisciplinery.config.Investigation',$id) .'" class="btn-tableIcon btnIcon-blue me-1 edit-row-btn '.$delete_class.'" data-cat-id="' . e($id) . '">
+                    <a target="_blank" title="Investigation Workspace" href="'. route('GrievanceAndDisciplinery.config.Investigation',$id) .'" class="btn-tableIcon btnIcon-blue me-1 edit-row-btn '.$delete_class.'" data-cat-id="' . e($id) . '">
                     <i class="fas fa-balance-scale"></i>
-                    </a>';          
+                    </a>';
                 }
                 else
                 {
@@ -313,7 +314,7 @@ class GrivanceController extends Controller
             foreach($request->Attachments as $file)
             {
                 $newsimg = $file->getClientOriginalName();
-                $file->move($Path, $newsimg);
+                StorageHelper::put($Path.'/'.$newsimg, file_get_contents($file->getRealPath()));
                 $collection[]= $newsimg;
             }
             GrivanceSubmissionModel::where('Grivance_id', $GrivanceSubmission->Grivance_id)
@@ -324,9 +325,28 @@ class GrivanceController extends Controller
             foreach($request->witness_id as $v)
             {
                 GrivanceSubmissionWitness::create(["Witness_id" => base64_decode($v),"G_S_Parent_id" => $GrivanceSubmission->id,'Wintness_Status'=>'Active']);
-            } 
+            }
         }
-       
+
+        // Web submission path never notified HR at all (mobile's
+        // GrievanceStore() already does via the same helper) — HR only
+        // found out about a new grievance by manually checking the list.
+        $hrEmployeeIds = Common::getResortHrEmployeeIds($this->resort->resort_id);
+        if (!empty($hrEmployeeIds)) {
+            Common::sendMobileNotification(
+                $this->resort->resort_id,
+                2,
+                null,
+                null,
+                'Grievance Submission',
+                'A grievance submission has been sent.',
+                'Employee Grievance',
+                $hrEmployeeIds,
+                $GrivanceSubmission->id,
+                false,
+                'grievance-submission',
+            );
+        }
 
         return response()->json([
             'success' => true,
@@ -382,9 +402,9 @@ class GrivanceController extends Controller
 
         $GrievanceCommitteeMemberParent = GrievanceCommitteeMemberParent::where('resort_id',$this->resort->resort_id)->get();
         $ActionStore = ActionStore::where('resort_id',$this->resort->resort_id)->get();
-        
+
         $EveidanceFilePath = config('settings.GrievanceSubmission').'/'.$this->resort->resort->resort_id;
-        $path = config('settings.GrivanceAttachments').'/'.$this->resort->resort->resort_id; 
+        $path = config('settings.GrivanceAttachments').'/'.$this->resort->resort->resort_id;
         $GrivanceKeys = GrivanceKeyPerson::where('resort_id',$this->resort->resort_id)->get()->pluck('emp_ids')->toArray();
         // GrivanceKeys holds Employee ids (see KeyPersonnel()), so the
         // viewer must be compared by employee id, not resort_admins id —
@@ -394,7 +414,16 @@ class GrivanceController extends Controller
             ? $Grivance_Parent->Identity_Disclosed_To
             : (json_decode($Grivance_Parent->Identity_Disclosed_To ?? '[]', true) ?: []);
         $canViewIdentity = $Grivance_Parent->Grivance_Submission_Type != "Yes" || in_array($auth_id, $identityDisclosedTo);
-        return view('resorts.GrievanceAndDisciplinery.grivance.investigationreport',compact('auth_id','GrivanceKeys','canViewIdentity','EveidanceFilePath','GrivanceInvestigationModel','flag','GrivanceSubmissionHistory','ActionStore','FilePath','page_title','Grivance_Parent','GrievanceCommitteeMemberParent','path'));
+
+        // No committee exists yet before the first assignment — anyone
+        // with access to this page can do that initial assignment. Once
+        // a committee has been assigned, only its own members may see or
+        // edit Assign To / investigation dates / findings.
+        $isCommitteeMember = true;
+        if ($Grivance_Parent->Assigned !== 'No' && !empty($GrivanceInvestigationModel->Committee_id)) {
+            $isCommitteeMember = in_array($GrivanceInvestigationModel->Committee_id, Common::PartOfCommitteeMember($assinged_id, $this->resort->resort_id));
+        }
+        return view('resorts.GrievanceAndDisciplinery.grivance.investigationreport',compact('auth_id','GrivanceKeys','canViewIdentity','EveidanceFilePath','GrivanceInvestigationModel','flag','GrivanceSubmissionHistory','ActionStore','FilePath','page_title','Grivance_Parent','GrievanceCommitteeMemberParent','path','isCommitteeMember'));
     }
 
     public function InvestigationReportStore(Request $request)
@@ -454,6 +483,18 @@ class GrivanceController extends Controller
         }
         elseif($request->flag =="EditModeForCommittee")
         {
+            // Frontend hides these fields from non-committee-members, but a
+            // direct POST would otherwise bypass that — same membership
+            // check as InvestigationReport() gates the view with.
+            $callerEmployeeId = isset($this->resort->GetEmployee) ? $this->resort->GetEmployee->id : 0;
+            $gr = GrivanceSubmissionModel::find($request->Grievant_form_id);
+            $investigation = GrivanceInvestigationModel::where('Grievance_s_id', $request->Grievant_form_id)->first();
+            if ($gr && $gr->Assigned !== 'No' && !empty($investigation->Committee_id)) {
+                $memberOfCommittees = Common::PartOfCommitteeMember($callerEmployeeId, $this->resort->resort_id);
+                if (!in_array($investigation->Committee_id, $memberOfCommittees)) {
+                    return response()->json(['success' => false, 'message' => 'You are not part of the assigned investigation committee for this grievance.'], 403);
+                }
+            }
 
             DB::beginTransaction();
             try
@@ -550,7 +591,7 @@ class GrivanceController extends Controller
             if(isset($file)) {
                 foreach($file as $f) {
                     $FilePath = config('settings.GrievanceSubmission').'/'.$this->resort->resort->resort_id;
-                    $f->move($FilePath, $f->getClientOriginalName());
+                    StorageHelper::put($FilePath.'/'.$f->getClientOriginalName(), file_get_contents($f->getRealPath()));
                     $Files[] = $f->getClientOriginalName();
                 }
             }
@@ -670,9 +711,9 @@ class GrivanceController extends Controller
                                                         ->first(['t7.Category_Name as CatName','t6.Sub_Category_Name as SubCatName','t5.ActionName','t2.personal_phone','t2.id as Parentid','t2.first_name','t2.last_name','t2.profile_picture','grivance_submission_models.*','t3.name as DepartmentName','t4.position_title as PositiontName']);
             $flag="CommitteeMode";
             $GrivanceSubmissionHistory =[];
-            $GrivanceSubmissionHistory =  GrivanceInvestigationModel::join('grivance_investigation_child_models as t1',"t1.investigation_p_id","=","grivance_investigation_models.Grievance_s_id")
-                                                                ->join('employees as t2',"t2.id","=","t1.Committee_member_id")   
-                                                                ->join('resort_admins as t3',"t3.id","=","t2.Admin_Parent_id")   
+            $GrivanceSubmissionHistory =  GrivanceInvestigationModel::join('grivance_investigation_child_models as t1',"t1.investigation_p_id","=","grivance_investigation_models.id")
+                                                                ->join('employees as t2',"t2.id","=","t1.Committee_member_id")
+                                                                ->join('resort_admins as t3',"t3.id","=","t2.Admin_Parent_id")
                                                                 ->where('grivance_investigation_models.Grievance_s_id',$id)
                                                                 ->get(['t3.first_name','t3.last_name','grivance_investigation_models.*','t1.*']);
       

@@ -124,15 +124,9 @@
                                     <tr>
                                         <th>Attachements:</th>
                                         <td>
-                                            @if(isset($Grivance_Parent->Attachements) && !empty($Grivance_Parent->Attachements))
-                                                @foreach(explode(",",$Grivance_Parent->Attachements) as  $g)
-                                                    
-                                                @php 
-                                                    $Path = $path."/".$Grivance_Parent->Grivance_id."/".$g;
-                                                @endphp
-                                                <a target="_blank" href="{{URL::asset($Path)}}" >{{$g}}</a></br>
-                                                @endforeach
-                                            @endif
+                                            @foreach(\App\Helpers\Common::resolveGrievanceAttachments($Grivance_Parent->Attachements, $path."/".$Grivance_Parent->Grivance_id, $Grivance_Parent->resort_id) as $att)
+                                                <a target="_blank" href="{{ $att['url'] }}">{{ $att['filename'] }}</a></br>
+                                            @endforeach
                                         </td>
                                     </tr>
                                 </table>
@@ -142,36 +136,36 @@
                 </div>
                 @if(!empty($GrivanceSubmissionHistory) &&  $GrivanceSubmissionHistory->isNotEmpty())
                     <hr>
-                    <div class="row">
-                        <h3>History</h3>
-                        <hr>
-                        <div class="col-md-8">
-                            <table class="table  ">
-                                <thead>
+                    <h3>History</h3>
+                    <div class="table-responsive mb-4">
+                        <table class="table gr-history-table">
+                            <thead>
+                                <tr>
+                                    <th style="min-width:130px;">Follow-Up Action</th>
+                                    <th style="min-width:220px;">Follow-Up Description</th>
+                                    <th style="min-width:130px;">Investigation Stage</th>
+                                    <th style="min-width:320px;">Grievance Explanation Description</th>
+                                    <th style="min-width:150px;">Committee Member Name</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($GrivanceSubmissionHistory as $key => $value)
                                     <tr>
-                                        <th>FOLLOW-UP Action</th>
-                                        <th>Follow - up Description</th>
-                                        <th>Investigation Stage</th>
-                                        <th>Grievance Explination Description</th>
-                                        <th>Committee Member Name</th>
+                                        <td>{{ $value->follow_up_action }}</td>
+                                        <td>{!! $value->follow_up_description !!}</td>
+                                        <td>{{ $value->investigation_stage }}</td>
+                                        <td>{!! $value->inves_find_recommendations !!}</td>
+                                        <td>{{ $value->first_name }} {{ $value->last_name }} </td>
                                     </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach ($GrivanceSubmissionHistory as $key => $value)
-                                        <tr>
-                                            <td>{{ $value->follow_up_action }}</td>
-                                            <td>{!! $value->follow_up_description !!}</td>
-                                            <td>{{ $value->investigation_stage }}</td>
-                                            <td>{!! $value->inves_find_recommendations !!}</td>
-                                            <td>{{ $value->first_name }} {{ $value->last_name }} </td>
-                                            
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-                        <div class="col-md-4">
-                            <table class="table  ">
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+
+                    @if($GrivanceInvestigationModel && !empty($GrivanceInvestigationModel->investigation_files))
+                        <h6>Attachments</h6>
+                        <div class="table-responsive mb-4" style="max-width:400px;">
+                            <table class="table gr-history-table">
                                 <thead>
                                     <tr>
                                         <th>File Name</th>
@@ -179,21 +173,16 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    @if($GrivanceInvestigationModel)
-                                        @foreach (explode(',', $GrivanceInvestigationModel->investigation_files) as $f)
-                                            <tr>
-                                                <td>{{ $f }}</td>
-                                                <td><a target="_blank" href="{{ URL::asset($EveidanceFilePath.'/'. $f) }}">View</a>  </td>
-                                            </tr>
-                                            
-                                        @endforeach
-                                    @endif
-                                
+                                    @foreach (explode(',', $GrivanceInvestigationModel->investigation_files) as $f)
+                                        <tr>
+                                            <td>{{ $f }}</td>
+                                            <td><a target="_blank" href="{{ \App\Helpers\StorageHelper::temporaryUrl($EveidanceFilePath.'/'. $f) }}">View</a></td>
+                                        </tr>
+                                    @endforeach
                                 </tbody>
                             </table>
                         </div>
-                      
-                    </div>
+                    @endif
                 @endif
             </div>
                 @if(isset($Grivance_Parent->Gm_Decision) && !empty($Grivance_Parent->Gm_Decision))
@@ -221,6 +210,7 @@
                 @endif
                 <form id="investigationReportSubmit" data-parsley-validate>
                     @csrf
+                    @if($isCommitteeMember)
                     <div class="grieInvAssign-main">
                         <div class="grieInvAssign-block">
                             <div class="row align-items-end g-xl-4 g-3 mb-md-4 mb-3">
@@ -239,10 +229,14 @@
                             </div>
                         </div>
                     </div>
-                
+                    @else
+                    <div class="alert alert-warning">You are not part of the assigned investigation committee for this grievance.</div>
+                    @endif
+
                     <input type="hidden" name="Grievant_form_id" value="{{ $Grivance_Parent->id}}">
                     <input type="hidden" value="{{ ($Grivance_Parent->Assigned =='No') ? 'AssignToComittee':'EditModeForCommittee' }}" name="flag">
                     @if($Grivance_Parent->Assigned !="DeliverToHr" ||  $Grivance_Parent->status !="resolved")
+                        @if($isCommitteeMember)
                         <div class="row g-xl-4 g-3 mb-md-4 mb-3">
                             <div class="col-lg-4 col-sm-6">
                                 <label for="inves_date" class="form-label">INVESTIGATION START DATE</label>
@@ -256,11 +250,11 @@
                             <div class="col-lg-4 col-sm-4">
                                 <a href="javascript:void(0)" class="btn eb-btn-accent AddMoreGrivance">Add More</a>
                             </div>
-                        <div class="row appendHere">
+                        <div class="row g-xl-4 g-3 mb-md-4 mb-3 appendHere">
                             <input type="hidden" name="counts" value="1" id="counts">
                             <div class="col-12">
                                 <label for="inves_find" class="form-label">INVESTIGATION FINDINGS AND RECOMMENDATIONS</label>
-                                <textarea class="form-control" @if($Grivance_Parent->Assigned=="No") readonly @else required data-parsley-required-message="Investigation findings are required" data-parsley-minlength="20" data-parsley-minlength-message="Please provide at least 20 characters of detailed findings" @endif id="inves_find" name="inves_find_recommendations[]" placeholder="Add detailed notes, observations, or findings as the investigation progresses" rows="4"></textarea>
+                                <textarea class="form-control gr-investigation-editor" @if($Grivance_Parent->Assigned=="No") readonly @else required data-parsley-required-message="Investigation findings are required" data-parsley-minlength="20" data-parsley-minlength-message="Please provide at least 20 characters of detailed findings" @endif id="inves_find" name="inves_find_recommendations[]" placeholder="Add detailed notes, observations, or findings as the investigation progresses" rows="4"></textarea>
                             </div>
                             <div class="col-lg-4 col-sm-6 mt-1">
                                 <label for="followup_actions" class="form-label">FOLLOW-UP ACTIONS</label>
@@ -276,11 +270,12 @@
                                     <option value="GatherPhysicalEvidence">Gather Physical Evidence</option>
                                 </select>
                             </div>
-                            <div class="col-lg-6 col-sm-6 mt-4">
+                            <div class="col-lg-6 col-sm-6 mt-1">
+                                <label for="follow_up_description" class="form-label">&nbsp;</label>
                                 <input type="text" class="form-control" placeholder="Type Here" name="follow_up_description[]" id="follow_up_description" @if($Grivance_Parent->Assigned=="No") disabled @else required data-parsley-required-message="Additional follow-up information is required" @endif>
                             </div>
                             @if($Grivance_Parent->RequestforStatment !="Yes")
-                                <div class="col-lg-2 col-sm-6 mt-4  d-none" id="RequestForStatement">
+                                <div class="col-lg-2 col-sm-6 mt-1  d-none" id="RequestForStatement">
                                     <a href="javascript:void(0)" class="btn eb-btn-accent RequestForStatement" data-id="{{$Grivance_Parent->Grivance_id}}">Request For Statement</a>
                                 </div>
                             @endif
@@ -297,9 +292,12 @@
 
                             <div class="col-12">
                                 <label for="resol_notes" class="form-label">RESOLUTION NOTES</label>
-                                <textarea class="form-control" id="resol_notes" name="resolution_note[]" @if($Grivance_Parent->Assigned=="No") readonly @else required data-parsley-required-message="Resolution notes are required" data-parsley-minlength="20" data-parsley-minlength-message="Please provide at least 20 characters of resolution notes" @endif placeholder="Type Here..." rows="4"></textarea>
+                                <textarea class="form-control" id="resol_notes" name="resolution_note[]" @if($Grivance_Parent->Assigned=="No") readonly @endif placeholder="Type Here..." rows="4"></textarea>
                             </div>
                         </div>
+                        @else
+                        <div class="alert alert-warning">You are not part of the assigned investigation committee for this grievance.</div>
+                        @endif
 
                             @if($Grivance_Parent->Assigned == "Yes")
                                 <div class="col-lg-4 col-sm-6">
@@ -389,6 +387,7 @@
                                             @if($Grivance_Parent->Assigned=="No") disabled @else data-parsley-max-file-size="5" data-parsley-fileextension="pdf,png,jpg,jpeg,gif,svg,webp,heic,heif" data-parsley-fileextension-message="Only PDF and image files are allowed" @endif>
                                         </div>
                                         <div class="uploadFile-text">PNG, JPEG, PDF</div>
+                                        <div class="uploadFile-selected small text-muted mt-1"></div>
                                     </div>
                                 </div>
                             @endif
@@ -413,6 +412,9 @@
         </div>
     </div>
 
+    {{-- Appeals panel — commented out for now, per request. Re-enable by
+         removing this @if(false)/@endif wrapper. --}}
+    @if(false)
     {{-- Appeals panel: shows existing appeals for this grievance + lets the
          submitter or HR file a new one. Only one *active* appeal can exist
          at a time per grievance (controller enforces this). --}}
@@ -491,10 +493,18 @@
     </div>
 </div>
 @endif
+@endif
 @include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
+<style>
+    .gr-history-table td, .gr-history-table th {
+        white-space: normal;
+        word-break: break-word;
+        vertical-align: top;
+    }
+</style>
 @endsection
 
 @section('import-scripts')
@@ -573,12 +583,25 @@ $(document).ready(function() {
 
     $("#investigationReportSubmit").parsley();
 
+    $(".gr-investigation-editor").each(function() {
+        CKEDITOR.replace(this.id);
+    });
+
             $('#investigationReportSubmit').on('submit', function(e)
             {
                 e.preventDefault();
-               
+
+                // Sync CKEditor content back into its textarea before
+                // Parsley validates and FormData reads the raw DOM value —
+                // CKEditor only does this itself on a native form submit,
+                // which never fires here since this handler already
+                // preventDefault()s and posts via ajax.
+                for (var instance in CKEDITOR.instances) {
+                    CKEDITOR.instances[instance].updateElement();
+                }
+
                 let form = $(this);
-                if (form.parsley().isValid()) 
+                if (form.parsley().isValid())
                 {
                     let formData = new FormData(this);
                     $.ajax({
@@ -736,8 +759,8 @@ $(document).on("click",".RequestForStatement",function() {
         counts = counts+1;
         var string=`<hr class="mt-2 Remove_c_${counts}">
                     <div class="col-12  Remove_c_${counts}">
-                        <label for="inves_find" class="form-label">INVESTIGATION FINDINGS AND RECOMMENDATIONS</label>
-                        <textarea class="form-control" @if($Grivance_Parent->Assigned=="No") readonly @else required data-parsley-required-message="Investigation findings are required" data-parsley-minlength="20" data-parsley-minlength-message="Please provide at least 20 characters of detailed findings" @endif id="inves_find" name="inves_find_recommendations[]" placeholder="Add detailed notes, observations, or findings as the investigation progresses" rows="4"></textarea>
+                        <label for="inves_find_${counts}" class="form-label">INVESTIGATION FINDINGS AND RECOMMENDATIONS</label>
+                        <textarea class="form-control gr-investigation-editor" @if($Grivance_Parent->Assigned=="No") readonly @else required data-parsley-required-message="Investigation findings are required" data-parsley-minlength="20" data-parsley-minlength-message="Please provide at least 20 characters of detailed findings" @endif id="inves_find_${counts}" name="inves_find_recommendations[]" placeholder="Add detailed notes, observations, or findings as the investigation progresses" rows="4"></textarea>
                     </div>
                     <div class="col-lg-4 col-sm-6  Remove_c_${counts}">
                         <label for="followup_actions" class="form-label">FOLLOW-UP ACTIONS</label>
@@ -765,7 +788,7 @@ $(document).on("click",".RequestForStatement",function() {
                     </div>
                     <div class="col-11 Remove_c_${counts}">
                         <label for="resol_notes" class="form-label">RESOLUTION NOTES</label>
-                        <textarea class="form-control" id="resol_notes" name="resolution_note[]" @if($Grivance_Parent->Assigned=="No") readonly @else required data-parsley-required-message="Resolution notes are required" data-parsley-minlength="20" data-parsley-minlength-message="Please provide at least 20 characters of resolution notes" @endif placeholder="Type Here..." rows="4"></textarea>
+                        <textarea class="form-control" id="resol_notes" name="resolution_note[]" @if($Grivance_Parent->Assigned=="No") readonly @endif placeholder="Type Here..." rows="4"></textarea>
                     </div>
                     <div class="col-1 mt-3 Remove_c_${counts}">
                         <a href="javascript:void(0)" class="btn-tableIcon eb-icon-critical delete-row-btn" data-id="${counts}" >
@@ -775,6 +798,7 @@ $(document).on("click",".RequestForStatement",function() {
                    
             $(".appendHere").append(string);
             $("#counts").val(counts)
+            CKEDITOR.replace('inves_find_'+counts);
             $('#action_taken_'+counts).select2({
                 placeholder: 'Select Action ',
                 minimumResultsForSearch: -1,
@@ -798,9 +822,17 @@ $(document).on("click",".RequestForStatement",function() {
 
 
     });
+    $(document).on("change","#uploadFile",function(){
+        var names = Array.from(this.files).map(f => f.name);
+        $(".uploadFile-selected").text(names.length ? 'Selected: ' + names.join(', ') : '');
+    });
+
     $(document).on("click",".delete-row-btn",function(){
 
         var location = $(this).data("id");
+        if (CKEDITOR.instances['inves_find_'+location]) {
+            CKEDITOR.instances['inves_find_'+location].destroy(true);
+        }
         $(".Remove_c_"+location).remove();
         $("#counts").val(parseInt( $("#counts").val())-1);
     });

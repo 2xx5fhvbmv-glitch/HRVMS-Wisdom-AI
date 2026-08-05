@@ -42,11 +42,12 @@
                                     <div>
                                         <!-- Hidden input field to attach the calendar to -->
                                             @php
-                                                use Carbon\Carbon;
-
-                                                $firstDay = Carbon::now()->startOfMonth()->format('d/m/Y');
-                                                $lastDay = Carbon::now()->format('d/m/Y'); // Today (default: 1st of month to today)
-                                                $currentMonthRange = $firstDay . '-' . $lastDay;
+                                                // Default range must be the payroll cutoff period
+                                                // (computed in EmployeeController@EmployeeDetails),
+                                                // not calendar month-to-date — this field's value is
+                                                // sent as start_date/end_date on every request this
+                                                // page makes (history table, filters, print, export).
+                                                $currentMonthRange = $cutoffRangeStart . '-' . $cutoffRangeEnd;
                                             @endphp
 
                                             <input type="text" class="form-control" name="hiddenInput" id="hiddenInput" value="{{ $currentMonthRange }}">
@@ -347,8 +348,8 @@
 
         $("#hiddenInput").daterangepicker({
             autoApply: true,
-            startDate: moment().startOf('month'),
-            endDate: moment(),
+            startDate: moment('{{ $cutoffRangeStart }}', 'DD/MM/YYYY'),
+            endDate: moment('{{ $cutoffRangeEnd }}', 'DD/MM/YYYY'),
             opens: 'right',
             parentEl: '#datapicker',
             alwaysShowCalendars: true,

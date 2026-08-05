@@ -19,6 +19,7 @@ use App\Models\BreakNotification;
 use App\Models\DutyRoster;
 use App\Models\DutyRosterEntry;
 use App\Models\EmployeeOvertime;
+use App\Models\PayrollConfig;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Storage;
 use App\Helpers\Common;
@@ -176,6 +177,24 @@ class TimeAndAttendanceController extends Controller
             $timeAttendanceData['total_absent_days']        =   $totalAbsentDays;
             $timeAttendanceData['total_leave_days']         =   $totalLeaveDays;
             $timeAttendanceData['total_overtime']           =   $totalOvertime;
+
+            // Only a total_leave_days count existed — nothing told the
+            // employee (or their HOD viewing the same dashboard data) they
+            // were currently on an approved leave right now, e.g. maternity
+            // leave spanning weeks with no other indicator on this screen.
+            $currentLeave                                    =   DB::table('employees_leaves as el')
+                                                                    ->join('leave_categories as lc', 'lc.id', '=', 'el.leave_category_id')
+                                                                    ->where('el.emp_id', $emp_id)
+                                                                    ->where('el.resort_id', $resort_id)
+                                                                    ->where('el.status', 'Approved')
+                                                                    ->where('el.from_date', '<=', $today)
+                                                                    ->where('el.to_date', '>=', $today)
+                                                                    ->select('lc.leave_type', 'el.to_date')
+                                                                    ->first();
+            $timeAttendanceData['current_leave_status']     =   $currentLeave
+                                                                    ? ($currentLeave->leave_type . ' until ' . Carbon::parse($currentLeave->to_date)->format('d M Y'))
+                                                                    : null;
+            $timeAttendanceData['is_on_leave']               =   (bool) $currentLeave;
 
             $todayAttendance                                =   Employee::join('resort_admins as t1', "t1.id", "=", "employees.Admin_Parent_id")
                                                                     ->join('duty_rosters as t2', "t2.Emp_id", "=", "employees.id")
@@ -376,7 +395,21 @@ class TimeAndAttendanceController extends Controller
             if ($rosterEntry) {
                 $duty_roster_id                             =   $rosterEntry->roster_id;
                 if ($filter === 'weekly') {
-                    $timeAttendanceData                    =   Common::GetRosterdata($resort_id, $duty_roster_id, $emp_id, $WeekstartDate, $WeekendDate, $startOfMonth, $endOfMonth, 'weekly');
+                    // "weekly" had no way to page to a different week (no
+                    // offset/date param read anywhere above), so it always
+                    // meant "current calendar week only" — a roster block
+                    // spanning multiple weeks (e.g. 13 Jul-31 Jul) had every
+                    // day outside the current week silently hidden with no
+                    // way to ever see them. Use the specific roster's own
+                    // full assigned span instead of the calendar week so the
+                    // whole block always renders regardless of today's date.
+                    $rosterSpan                            =   DutyRosterEntry::where('roster_id', $duty_roster_id)
+                        ->where('resort_id', $resort_id)
+                        ->selectRaw('MIN(date) as min_date, MAX(date) as max_date')
+                        ->first();
+                    $rangeStart                             =   $rosterSpan && $rosterSpan->min_date ? Carbon::parse($rosterSpan->min_date) : $WeekstartDate;
+                    $rangeEnd                               =   $rosterSpan && $rosterSpan->max_date ? Carbon::parse($rosterSpan->max_date) : $WeekendDate;
+                    $timeAttendanceData                    =   Common::GetRosterdata($resort_id, $duty_roster_id, $emp_id, $rangeStart, $rangeEnd, $startOfMonth, $endOfMonth, 'weekly');
                 } else {
                     $timeAttendanceData                    =   Common::GetRosterdata($resort_id, $duty_roster_id, $emp_id, $WeekstartDate, $WeekendDate, $startOfMonth, $endOfMonth, 'Monthwise');
                 }
@@ -2075,9 +2108,28 @@ class TimeAndAttendanceController extends Controller
             // this, but GPS drift near a zone boundary can fire a false
             // "enter" just outside it, and the server is the one source
             // of truth manual check-in also relies on (resolveGeofenceCheck).
+            // Same "take the latest roster row" rule as myGeofenceZone() —
+            // an employee can accumulate several duty_rosters rows over
+            // time, and a bare ->first() here picked the oldest one, which
+            // routinely has no zone (or a stale one), while myGeofenceZone
+            // (used for the app's own within-zone indicator) always looked
+            // at the latest — the two endpoints silently disagreed. Also
+            // prefers the latest row that actually has a zone set (see
+            // myGeofenceZone) so a later zone-less roster block doesn't
+            // shadow a real zone still configured on an earlier one.
             $rosterData = DutyRoster::where('resort_id', $user->resort_id)
                 ->where('Emp_id', $employee->id)
+                ->whereNotNull('geofence_zone_id')
+                ->where('geofence_zone_id', '!=', '')
+                ->where('geofence_zone_id', '!=', '0')
+                ->orderByDesc('id')
                 ->first();
+            if (!$rosterData) {
+                $rosterData = DutyRoster::where('resort_id', $user->resort_id)
+                    ->where('Emp_id', $employee->id)
+                    ->orderByDesc('id')
+                    ->first();
+            }
             $geofenceCheck = $this->resolveGeofenceCheck($locationPayload, $rosterData);
             if ($geofenceCheck['within'] !== true) {
                 return response()->json([
@@ -2152,11 +2204,27 @@ class TimeAndAttendanceController extends Controller
             // An employee can accumulate many duty_rosters template rows
             // over time (one per schedule range) — take the latest one so
             // an old/superseded roster's zone (or lack of one) doesn't win
-            // over their current assignment.
+            // over their current assignment. But if the latest block simply
+            // didn't have a zone re-selected when it was created (e.g. next
+            // week's roster was added without repeating the geofence
+            // choice), that blank row shadowed a real zone still configured
+            // on an earlier block — prefer the latest row that actually has
+            // a zone set, and only fall back to the plain latest row if none
+            // of them do.
             $rosterData = DutyRoster::where('resort_id', $user->resort_id)
                 ->where('Emp_id', $employee->id)
+                ->whereNotNull('geofence_zone_id')
+                ->where('geofence_zone_id', '!=', '')
+                ->where('geofence_zone_id', '!=', '0')
                 ->orderByDesc('id')
                 ->first();
+
+            if (!$rosterData) {
+                $rosterData = DutyRoster::where('resort_id', $user->resort_id)
+                    ->where('Emp_id', $employee->id)
+                    ->orderByDesc('id')
+                    ->first();
+            }
 
             $zones = $rosterData ? Common::resolveDutyRosterGeofences($rosterData->geofence_zone_id) : collect();
 
@@ -3576,13 +3644,22 @@ class TimeAndAttendanceController extends Controller
                 return response()->json(['success' => false, 'message' => 'Employee not found'], 404);
             }
 
-            // Get current month dates
-            $startOfMonth = Carbon::now()->startOfMonth();
-            $endOfMonth = Carbon::now()->endOfMonth();
+            // Was always the 1st-to-last-day calendar month, ignoring the
+            // resort's configured Payroll Cut-Off period entirely — the web
+            // portal's Attendance Register (AttandanceRegisterController.php)
+            // already computes the real period this way; mobile never read
+            // PayrollConfig at all. Cutoff day = last day of period, period
+            // starts the day after last month's cutoff (e.g. cutoff 25,
+            // viewing March 2026 -> 26 Feb 2026 to 25 Mar 2026).
+            $cutoffDay = PayrollConfig::where('resort_id', $resort_id)->value('cutoff_day') ?? 1;
+            $baseDate = Carbon::now()->startOfMonth();
+            $prevMonth = $baseDate->copy()->subMonthNoOverflow();
+            $startOfMonth = $prevMonth->copy()->day(min($cutoffDay, $prevMonth->daysInMonth))->addDay();
+            $endOfMonth = $baseDate->copy()->day(min($cutoffDay, $baseDate->daysInMonth));
             $WeekstartDate = Carbon::now()->startOfWeek();
             $WeekendDate = Carbon::now()->endOfWeek();
 
-            // Get attendance register data for the month
+            // Get attendance register data for the cutoff period
             $RosterInternalDataMonth = Common::GetAttandanceRegister(
                 $resort_id,
                 $employee->duty_roster_id,
@@ -3594,14 +3671,12 @@ class TimeAndAttendanceController extends Controller
                 "Monthwise"
             );
 
-            // Get all days of current month
-            $year = now()->year;
-            $month = now()->month;
-            $totalDays = Carbon::createFromDate($year, $month, 1)->daysInMonth;
+            // Get all days of the cutoff period
+            $totalDays = $startOfMonth->diffInDays($endOfMonth) + 1;
 
             $monthDays = [];
-            for ($day = 1; $day <= $totalDays; $day++) {
-                $date = Carbon::createFromDate($year, $month, $day);
+            for ($day = 0; $day < $totalDays; $day++) {
+                $date = $startOfMonth->copy()->addDays($day);
                 $dateString = $date->format('Y-m-d');
                 $dayName = $date->format('D');
                 $isWeekend = in_array($dayName, ['Sat', 'Sun']);
@@ -3611,7 +3686,11 @@ class TimeAndAttendanceController extends Controller
 
                 $dayData = [
                     'date' => $dateString,
-                    'day' => str_pad($day, 2, '0', STR_PAD_LEFT),
+                    // A cutoff period spans two different calendar months
+                    // (e.g. 26 Feb - 25 Mar), so the loop index alone isn't a
+                    // real day-of-month once the period crosses that
+                    // boundary — read it off the actual date instead.
+                    'day' => $date->format('d'),
                     'day_name' => $dayName,
                     // For UI layouts that show the day number and month name
                     // stacked (date on top, month below) instead of a single
@@ -3754,8 +3833,13 @@ class TimeAndAttendanceController extends Controller
             $response['message'] = 'Employee month data retrieved successfully.';
             $response['employee_info'] = $employeeInfo;
             $response['month_data'] = $monthDays;
-            $response['month'] = $month;
-            $response['year'] = $year;
+            // Labeled by the cutoff period's end date, matching the web
+            // portal's convention (a period ending 25 Mar is "March"'s
+            // register even though it starts in February).
+            $response['month'] = $endOfMonth->month;
+            $response['year'] = $endOfMonth->year;
+            $response['period_start'] = $startOfMonth->format('Y-m-d');
+            $response['period_end'] = $endOfMonth->format('Y-m-d');
 
             return response()->json($response);
         } catch (\Exception $e) {
@@ -4045,12 +4129,24 @@ class TimeAndAttendanceController extends Controller
             $rankPosition = Common::getEmployeeRankPosition($employee);
             $positionName = $rankPosition['position'] ?? '';
             $rankName     = $rankPosition['rank'] ?? '';
-            $isGM    = ($positionName === 'GM') || ($rankName === 'GM');
+            $isGM    = ($rank == 8 || $rank === '8') || ($positionName === 'GM') || ($rankName === 'GM');
+            $isHR    = ($rank == 3 || $rank === '3');
             $isEXCOM = ($positionName === 'EXCOM') || ($rankName === 'EXCOM') || $rank == 1 || $rank === '1';
             $isHOD   = ($rank == 2 || $rank === '2');
-            $canViewAll = ($isHRDept || $isEODept) && ($isGM || $isEXCOM || $isHOD);
+            // GM/HR always see every department's OT (rank-based, not dependent on
+            // matching a department name string); an EXCOM/HOD sitting in the HR or
+            // Executive Office department also gets unrestricted visibility. This
+            // mirrors the tiers documented at Common.php:3838 for the Performance
+            // module's visibility rule. Everyone else who is EXCOM/HOD sees their
+            // entire own department (not just their direct reporting chain) —
+            // previously this fell through to the subordinate-chain branch below,
+            // which excluded same-department staff outside the reporting chain.
+            $canViewAll   = $isGM || $isHR || (($isHRDept || $isEODept) && ($isEXCOM || $isHOD));
+            $deptWideOnly = !$canViewAll && ($isEXCOM || $isHOD);
 
-            $underEmpId = Common::getSubordinates($employee->id);
+            // Previously excluded the caller's own id, so an HOD/EXCOM viewing their
+            // own OT for a date always showed zero.
+            $underEmpId = array_unique(array_merge(Common::getSubordinates($employee->id), [$employee->id]));
 
             // Pre-Planned OT: what the duty roster allocated for this date.
             $plannedQuery = DB::table('duty_roster_entries as t2')
@@ -4064,9 +4160,13 @@ class TimeAndAttendanceController extends Controller
                 ->where('t2.OverTime', '!=', '');
 
             if (!$canViewAll) {
-                $plannedQuery->whereIn('employees.id', $underEmpId);
-                if ($deptId) {
+                if ($deptWideOnly && $deptId) {
                     $plannedQuery->where('employees.Dept_id', $deptId);
+                } else {
+                    $plannedQuery->whereIn('employees.id', $underEmpId);
+                    if ($deptId) {
+                        $plannedQuery->where('employees.Dept_id', $deptId);
+                    }
                 }
             }
 
@@ -4095,9 +4195,13 @@ class TimeAndAttendanceController extends Controller
                 ->where('t3.total_time', '!=', '');
 
             if (!$canViewAll) {
-                $actualQuery->whereIn('employees.id', $underEmpId);
-                if ($deptId) {
+                if ($deptWideOnly && $deptId) {
                     $actualQuery->where('employees.Dept_id', $deptId);
+                } else {
+                    $actualQuery->whereIn('employees.id', $underEmpId);
+                    if ($deptId) {
+                        $actualQuery->where('employees.Dept_id', $deptId);
+                    }
                 }
             }
 

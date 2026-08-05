@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Storage;
 use App\Models\Employee;
 use App\Models\AssingAccommodation;
 use App\Models\AvailableAccommodationModel;
+use App\Models\AvailableAccommodationInvItem;
 use App\Models\BuildingModel;
 use App\Models\MaintanaceRequest;
 use App\Models\InventoryModule;
@@ -203,7 +204,23 @@ class StaffAccommodationController extends Controller
         }
 
         try {
-            $InventoryItems                             =   InventoryModule::where('resort_id',$this->resort_id)->get();
+            // Affected Amenities must only list items actually stocked in the
+            // employee's own assigned room, not every resort-wide inventory
+            // item — this previously had no accommodation scope at all.
+            $employee                                   =   $this->user->GetEmployee;
+            $assignment                                 =   AssingAccommodation::where('emp_id', $employee->id)->first();
+
+            // No accommodation assigned means no room to scope amenities to —
+            // matches createMaintenanceRequests()'s hard-block for the same
+            // precondition, instead of silently falling back to every
+            // resort-wide item (the exact bug being fixed here).
+            if (!$assignment) {
+                $InventoryItems = collect();
+            } else {
+                $InventoryItems = InventoryModule::where('resort_id', $this->resort_id)
+                    ->whereIn('id', AvailableAccommodationInvItem::where('Available_Acc_id', $assignment->available_a_id)->pluck('Item_id'))
+                    ->get();
+            }
 
             $response['status']                         =   true;
             $response['message']                        =   'InventoryItems Fetched successfully';
@@ -227,9 +244,6 @@ class StaffAccommodationController extends Controller
 
         $validator = Validator::make($request->all(), [
             'item_id'                                   =>  'required',
-            'building_id'                               =>  'required',
-            'FloorNo'                                   =>  'required',
-            'RoomNo'                                    =>  'required',
             'descriptionIssues'                         =>  'required',
             'priority'                                  =>  'required',
         ]);
@@ -243,13 +257,27 @@ class StaffAccommodationController extends Controller
             $date                                       =   DateTime::createFromFormat('d/m/Y', $request->date);
             $date                                       =   isset($request->date) ? $date->format('Y-m-d') :  date('Y-m-d');
             $path_path                                  =   config('settings.MaintanceRequest') . '/' . Auth::guard('api')->user()->resort->resort_id;
-            
+
+            // Building/floor/room must come from the employee's own accommodation
+            // assignment, not a client-supplied value — previously required the
+            // employee to manually pick these even though the assignment already
+            // exists (staffAccommodationDetails resolves the exact same data).
+            $employee                                   =   $this->user->GetEmployee;
+            $assignment                                 =   AssingAccommodation::where('emp_id', $employee->id)
+                                                                ->join('available_accommodation_models as aam', 'aam.id', '=', 'assing_accommodations.available_a_id')
+                                                                ->select('aam.BuildingName as building_id', 'aam.Floor as FloorNo', 'aam.RoomNo')
+                                                                ->first();
+            if (!$assignment) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'No accommodation is assigned to this employee.'], 200);
+            }
+
             $collection                                 =   [
                 'resort_id'                             =>  $this->resort_id,
                 'item_id'                               =>  $request->item_id,
-                'building_id'                           =>  $request->building_id,
-                'FloorNo'                               =>  $request->FloorNo,
-                'RoomNo'                                =>  $request->RoomNo,
+                'building_id'                           =>  $assignment->building_id,
+                'FloorNo'                               =>  $assignment->FloorNo,
+                'RoomNo'                                =>  $assignment->RoomNo,
                 'descriptionIssues'                     =>  $request->descriptionIssues,
                 'priority'                              =>  isset($request->priority)? $request->priority:'Low',
                 'date'                                  =>  $date,
@@ -274,7 +302,11 @@ class StaffAccommodationController extends Controller
                     }
                 }
             }
-            $collection['Image']                        =   json_encode($filePath);
+            // json_encode(null) produces the literal 4-character string "null"
+            // (not a real SQL NULL), which broke resolveMaintenanceAttachmentUrl()'s
+            // empty()-based guard downstream and built a garbage file URL for
+            // requests submitted with no image.
+            $collection['Image']                        =   $filePath ? json_encode($filePath) : null;
 
             $m_id                                       =   MaintanaceRequest::create($collection);
 
@@ -347,10 +379,20 @@ class StaffAccommodationController extends Controller
                 ]);
             }
 
+            // List endpoint returned Image as the raw stored value (plain
+            // filename, JSON blob, or the literal string "null") with no
+            // resolution at all — only the detail endpoint did this.
+            $maintenanceRequests->transform(function ($item) {
+                if (!empty($item->Image)) {
+                    $item->Image = Common::resolveMaintenanceAttachmentUrl($item->Image, $this->resort_id);
+                }
+                return $item;
+            });
+
             $response['status']                         =   true;
             $response['message']                        =   'Maintenance Requests Retrieved Successfully';
             $response['data']                           =   $maintenanceRequests;
-                                                                   
+
             return response()->json($response);
 
         } catch (\Exception $e) {
@@ -578,6 +620,14 @@ class StaffAccommodationController extends Controller
 
         // **Set Profile Image**
         $row->profileImg                                    =   Common::getResortUserPicture($row->Parentid);
+
+        // Was passed through raw (plain filename, JSON blob, or the literal
+        // string "null") — every other maintenance-request read path
+        // (staffMaintenanceReqList, viewMaintenanceRequest) already resolves
+        // this, but the dashboard's own preview list never did.
+        if (!empty($row->Image)) {
+            $row->Image = Common::resolveMaintenanceAttachmentUrl($row->Image, $row->resort_id);
+        }
 
         // **Get Inventory Item Name**
         $row->EffectedAmenity                               =   ucfirst($inventoryItems[$row->item_id] ?? 'N/A');

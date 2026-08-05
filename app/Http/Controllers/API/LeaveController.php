@@ -607,13 +607,21 @@ class LeaveController extends Controller
                                                                 ? Employee::select('id', 'rank', 'reporting_to')->where('resort_id', $user->resort_id)->find($directReportingManagerId)
                                                                 : null;
 
-                // Line Worker/Supervisor: reporting_to can point straight at
-                // the HOD in departments with no Supervisor layer, skipping
-                // the intended approver level — look for an actual
-                // Supervisor/Manager in the applicant's own department first.
+                // Line Worker/Supervisor: only fall back to a department-wide
+                // Supervisor/Manager search when reporting_to is genuinely
+                // unset. Previously this also triggered whenever the direct
+                // manager simply wasn't rank 4/5 — which silently replaced a
+                // CORRECTLY configured direct report to an HOD/EXCOM with
+                // whatever unrelated rank-4/5 employee happened to exist
+                // anywhere else in the department (no supervision check on
+                // that substitute at all), excluding the real HOD from the
+                // approval chain entirely. A reporting_to that already points
+                // at a valid employee (any rank) is a valid immediate
+                // approver — the intended chain is reporting manager first,
+                // whoever that is.
                 if (
                     in_array($rank, ['5', '6'], true)
-                    && (!$directReportingManager || !in_array((string) $directReportingManager->rank, ['4', '5'], true))
+                    && !$directReportingManager
                 ) {
                     $deptSupervisorOrManager             =   Employee::select('id', 'rank', 'reporting_to')
                                                                 ->where('resort_id', $user->resort_id)
