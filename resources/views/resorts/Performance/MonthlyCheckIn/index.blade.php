@@ -18,7 +18,7 @@
                             <h1>{{$page_title}}</h1>
                         </div>
                     </div>
-                    <div class="col-auto ms-auto"><a href="{{route('Performance.CreateMonltyCheckIn')}}" class="btn btn-theme @if(App\Helpers\Common::checkRouteWisePermission('Performance.CreateMonltyCheckIn',config('settings.resort_permissions.create'))== false) d-none @endif">Add New</a></div>
+                    <div class="col-auto ms-auto"><a href="{{route('Performance.CreateMonltyCheckIn')}}" class="btn perf-btn-accent @if(App\Helpers\Common::checkRouteWisePermission('Performance.CreateMonltyCheckIn',config('settings.resort_permissions.create'))== false) d-none @endif">Add New</a></div>
                 </div>
             </div>
 
@@ -64,6 +64,7 @@
         </div>
     </div>
 </div>
+@include('resorts.Performance._performance_buttons_v2_styles')
 @endsection
 
 @section('import-css')

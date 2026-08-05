@@ -160,7 +160,7 @@ Edit
             <label class="form-label">ATTACHMENTS (OPTIONAL)</label>
             <div class="uploadFile-block">
                 <div class="uploadFile-btn">
-                    <a href="#" class="btn btn-themeBlue btn-sm">Upload File</a>
+                    <a href="#" class="btn eb-btn-accent btn-sm">Upload File</a>
                     <input type="file" id="uploadFile" name="Attachments[]" class="uploadFile-input" multiple
                         data-parsley-max-file-size="2"
                         data-parsley-fileextension="png,jpg,jpeg,gif,svg,webp,heic,heif,pdf">
@@ -187,7 +187,7 @@ Edit
     <div class="card-footer">
         <div class="row align-items-center g-3">
             <div class="col-auto ms-auto">
-                <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
             </div>
         </div>
     </div>
@@ -195,6 +195,7 @@ Edit
         </div>
     </div>
 </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')

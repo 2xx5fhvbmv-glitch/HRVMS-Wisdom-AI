@@ -36,7 +36,7 @@
 
                         <div class="col-auto">
                             <div class="d-flex align-items-center">
-                                <a href="javascript:void(0)" class="btn btn-themeBlue btn-sm EditXpatDetails @if(Common::checkRouteWisePermission('resort.visa.xpactEmployee',config('settings.resort_permissions.edit')) == false) d-none @endif">Edit Expiry Dates</a>
+                                <a href="javascript:void(0)" class="btn eb-btn-secondary btn-sm EditXpatDetails @if(Common::checkRouteWisePermission('resort.visa.xpactEmployee',config('settings.resort_permissions.edit')) == false) d-none @endif">Edit Expiry Dates</a>
                                 {{-- <ul class="employee-details-nav">
                                     <li>Slot Reference: #SR12345</li>
                                     <li>Payment Type: {{$QuotaSlotRenewal->PaymentType ?? '-'}}</li>
@@ -168,7 +168,7 @@
                                 <h3>Documents</h3>
                             </div>
                             
-                            <div class="col-auto"><a href="javascript:void(0)" class="VisaFileUpload btn btn-themeBlue btn-sm @if(Common::checkRouteWisePermission('resort.visa.xpactEmployee',config('settings.resort_permissions.create')) == false) d-none @endif">Upload Document</a>
+                            <div class="col-auto"><a href="javascript:void(0)" class="VisaFileUpload btn eb-btn-accent btn-sm @if(Common::checkRouteWisePermission('resort.visa.xpactEmployee',config('settings.resort_permissions.create')) == false) d-none @endif">Upload Document</a>
                             </div>
                         </div>
                     </div>
@@ -185,8 +185,8 @@
                                                 <h6>{{$VisaEmployeeExpiry->DocName}}</h6>
                                                 <span>Uploaded: {{$VisaEmployeeExpiry->lastUploadedFile}}</span>
                                             </div>
-                                            <a target="_blank" href="javascript:void(0)" class="download-link" data-id="{{$VisaEmployeeExpiry->child_id}}">
-                                                <img src="{{URL::asset('resorts_assets/images/download-green.svg')}}" alt="" class="img-fluid">
+                                            <a target="_blank" href="javascript:void(0)" class="btn-tableIcon btnIcon-blue download-link" title="Download" data-id="{{$VisaEmployeeExpiry->child_id}}">
+                                                <i class="fa-solid fa-download"></i>
                                             </a>
                                         </div>
                                     </div>
@@ -408,8 +408,8 @@
                     </div>
 
                     <div class="modal-footer">
-                        <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                        <button type="submit" class="btn btn-themeBlue FileUploadButton" href="javascript:void(0)">Submit</button>
+                        <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Cancel</a>
+                        <button type="submit" class="btn eb-btn-primary FileUploadButton" href="javascript:void(0)">Submit</button>
                     </div>
                 </form>
             </div>
@@ -468,8 +468,8 @@
                     </div>
 
                     <div class="modal-footer">
-                        <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                        <button type="submit" class="btn btn-themeBlue SeprateFileUploadButton FileUploadButton" href="javascript:void(0)">Submit</button>
+                        <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Cancel</a>
+                        <button type="submit" class="btn eb-btn-primary SeprateFileUploadButton FileUploadButton" href="javascript:void(0)">Submit</button>
                     </div>
                 </form>
             </div>
@@ -504,8 +504,8 @@
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                        <button type="submit" class="btn btn-themeBlue">Save</button>
+                        <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Cancel</a>
+                        <button type="submit" class="btn eb-btn-primary">Save</button>
                     </div>
                 </form>
             </div>
@@ -520,7 +520,7 @@
             <div class="modal-header">
                     <h5 class="modal-title" id="staticBackdropLabel">Download File</h5>
                 
-                    <a href="" class="btn btn-smbtn-primary downloadLink" target="_blank"> Download</a>
+                    <a href="" class="btn eb-btn-secondary downloadLink" target="_blank"> Download</a>
                 
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
@@ -533,12 +533,13 @@
                     
                     </div>
                     <div class="modal-footer">
-                        <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
+                        <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Cancel</a>
                     </div>
     
             </div>
         </div>
     </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 @section('import-css')
 @endsection
@@ -637,8 +638,8 @@ $(document).ready(function(){
                                                                 <h6>${value.DocName}</h6>
                                                                 <span>Uploaded: ${value.lastUploadedFile}</span>
                                                             </div>
-                                                            <a target="_blank" href="javascript:void(0)" class="download-link" data-id="${value.child_id}">
-                                                                <img src="{{URL::asset('resorts_assets/images/download-green.svg')}}" alt="" class="img-fluid">
+                                                            <a target="_blank" href="javascript:void(0)" class="btn-tableIcon btnIcon-blue download-link" title="Download" data-id="${value.child_id}">
+                                                                <i class="fa-solid fa-download"></i>
                                                             </a>
                                                         </div>
                                                     </div>`;

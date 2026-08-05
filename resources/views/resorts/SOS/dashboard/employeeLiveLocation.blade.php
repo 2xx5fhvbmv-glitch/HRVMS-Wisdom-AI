@@ -69,8 +69,8 @@
                                             <option value="Unknown">Unknown</option>
                                         </select></div>
                                     <div class="col-sm-6 d-flex">
-                                        <button type="submit" class="btn btn-themeBlue btn-sm mx-1">Submit</button>
-                                        <button type="button" id="resetFilterBtn" class="btn btn-themeSkyblueLight btn-sm">Reset</button>
+                                        <button type="submit" class="btn eb-btn-primary btn-sm mx-1">Submit</button>
+                                        <button type="button" id="resetFilterBtn" class="btn eb-btn-neutral btn-sm">Reset</button>
                                     </div>
                                     <div id="filterError" class="text-danger small mt-1"></div>
                                 </div>
@@ -86,6 +86,7 @@
             </div>
         </div>
     </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')

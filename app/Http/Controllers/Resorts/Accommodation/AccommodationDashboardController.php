@@ -398,7 +398,7 @@ class AccommodationDashboardController extends Controller
                             $string = '<a href="'.route('resort.accommodation.MainRequestDetails',$id ).'" class="btn-tableIcon btnIcon-skyblue mainRequetDetails" data-task_id="'.$id.'"><i class="fa-regular fa-eye"></i></a>
                                         <a href="javascript:void(0)" class="btn-tableIcon btnIcon-blue ForwardToHOD" data-bs-toggle="tooltip"
                                         data-bs-placement="bottom" title="Approve & Forward" data-req_id="'.$id.'" data-Location="'.e($row->Location).'" data-EffectedAmenity="'.e($row->EffectedAmenity).'" data-description="'.e($row->descriptionIssues).'"><i class="fa-solid fa-check"></i></a>
-                                        <a href="javascript:void(0)" class="btn-tableIcon btnIcon-danger RejectedRequest" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Reject Request" data-req_id="'.$id.'" data-Location="'.e($row->Location).'" data-EffectedAmenity="'.e($row->EffectedAmenity).'" data-description="'.e($row->descriptionIssues).'"><i class="fa-solid fa-xmark"></i></a>';
+                                        <a href="javascript:void(0)" class="btn-tableIcon eb-icon-critical RejectedRequest" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Reject Request" data-req_id="'.$id.'" data-Location="'.e($row->Location).'" data-EffectedAmenity="'.e($row->EffectedAmenity).'" data-description="'.e($row->descriptionIssues).'"><i class="fa-solid fa-xmark"></i></a>';
                      }
                      else
                      {
@@ -1278,11 +1278,11 @@ class AccommodationDashboardController extends Controller
                 $id = base64_encode($row->id);
                 return '
                     <div class="d-flex align-items-center">
-                        <a href="javascript:void(0)" class="btn-lg-icon icon-bg-green me-1 edit-row-btn" data-cat-id="' . e($id) . '">
-                            <img src="' . asset("resorts_assets/images/edit.svg") . '" alt="Edit" class="img-fluid">
+                        <a href="javascript:void(0)" class="btn-tableIcon btnIcon-yellow me-1 edit-row-btn" data-cat-id="' . e($id) . '">
+                            <i class="fa-solid fa-pen-to-square"></i>
                         </a>
-                        <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-row-btn" data-cat-id="' . e($id) . '">
-                            <img src="' . asset("resorts_assets/images/trash-red.svg") . '" alt="Delete" class="img-fluid">
+                        <a href="javascript:void(0)" class="btn-tableIcon eb-icon-critical delete-row-btn" data-cat-id="' . e($id) . '">
+                            <i class="fa-regular fa-trash-can"></i>
                         </a>
                     </div>';
             })
@@ -1305,7 +1305,7 @@ class AccommodationDashboardController extends Controller
                 }
                 else
                 {
-                    return '<a href="javascript:void(0)" class="btn btn-themeSkyblueLight AssingToRoom btn-small" data-id="'.$row->available_a_id.'" data-roomtype="'.$row->RoomType_id.'">Assign</a>';
+                    return '<a href="javascript:void(0)" class="btn eb-btn-accent AssingToRoom btn-small" data-id="'.$row->available_a_id.'" data-roomtype="'.$row->RoomType_id.'">Assign</a>';
                 }
             })
             ->rawColumns(['ItemName','Occupied','Location','Employee'])

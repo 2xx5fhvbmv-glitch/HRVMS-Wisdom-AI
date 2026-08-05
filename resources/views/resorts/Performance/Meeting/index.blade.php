@@ -20,7 +20,7 @@
                 </div>
                 <div class="col-auto">
                     <div class="d-flex justify-content-end">
-                        <a href="{{ route('Performance.Meeting.list') }}" class="btn btn-themeSkyblue">
+                        <a href="{{ route('Performance.Meeting.list') }}" class="btn perf-btn-secondary">
                             <i class="fa-solid fa-list me-1"></i> View All Meetings
                         </a>
                     </div>
@@ -106,7 +106,7 @@
                         </div>
                     </div>
 
-                    <div class="card-footer text-end"><button type="submit" class="btn btn-themeBlue btn-sm ScheduleMeeting @if(App\Helpers\Common::checkRouteWisePermission('Performance.Meeting.index',config('settings.resort_permissions.create')) == false) d-none @endif">Schedule Meeting</button>
+                    <div class="card-footer text-end"><button type="submit" class="btn perf-btn-primary btn-sm ScheduleMeeting @if(App\Helpers\Common::checkRouteWisePermission('Performance.Meeting.index',config('settings.resort_permissions.create')) == false) d-none @endif">Schedule Meeting</button>
                     </div>
                 </form>
             </div>
@@ -114,6 +114,7 @@
 
     </div>
 </div>
+@include('resorts.Performance._performance_buttons_v2_styles')
 @endsection
 
 @section('import-css')

@@ -70,9 +70,9 @@
                 </div>
                 <div class="mb-md-4 mb-3">
                     @if(in_array($request_detail->status, ['Pending', 'On Hold']))
-                        <button class="btn btn-themeBlue btn-sm" onclick="updateLearningRequestStatus('{{ $request_detail->id }}', 'Approved')">Approve</button>
-                        <button class="btn btn-sm btn-warning" onclick="updateLearningRequestStatus('{{ $request_detail->id }}', 'On Hold')">On Hold</button>
-                        <button class="btn btn-danger btn-sm" onclick="rejectLearningRequest('{{ $request_detail->id }}')">Deny</button>
+                        <button class="btn lnd-btn-positive btn-sm" onclick="updateLearningRequestStatus('{{ $request_detail->id }}', 'Approved')">Approve</button>
+                        <button class="btn lnd-btn-neutral btn-sm" onclick="updateLearningRequestStatus('{{ $request_detail->id }}', 'On Hold')">On Hold</button>
+                        <button class="btn lnd-btn-critical btn-sm" onclick="rejectLearningRequest('{{ $request_detail->id }}')">Deny</button>
                     @else
                         @php
                             $badgeClass = $request_detail->status === 'Approved' ? 'success' : ($request_detail->status === 'Denied' ? 'danger' : 'secondary');
@@ -100,12 +100,13 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" onclick="submitStatusChange()">Submit</button>
+                    <button type="button" class="btn lnd-btn-neutral" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn lnd-btn-primary" onclick="submitStatusChange()">Submit</button>
                 </div>
             </div>
         </div>
     </div>
+@include('resorts.Learning._learning_buttons_v2_styles')
 @endsection
 
 @section('import-css')

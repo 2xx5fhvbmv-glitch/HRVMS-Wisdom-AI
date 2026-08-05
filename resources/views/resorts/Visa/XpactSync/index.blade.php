@@ -87,7 +87,7 @@
 
                     <!-- Submit -->
                     <div class="card-footer mt-3">
-                        <button type="submit" class="btn btn-themeBlue btn-sm float-end next SubmitFile">Submit</button>
+                        <button type="submit" class="btn eb-btn-primary btn-sm float-end next SubmitFile">Submit</button>
                     </div>
                 </form>
             </div>
@@ -127,13 +127,14 @@
                     </div>
 
                     <div class="modal-footer">
-                        <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                        <button type="submit" class="btn btn-themeBlue FileUploadButton" href="javascript:void(0)">Submit</button>
+                        <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Cancel</a>
+                        <button type="submit" class="btn eb-btn-primary FileUploadButton" href="javascript:void(0)">Submit</button>
                     </div>
                 </form>
             </div>
         </div>
         </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -229,7 +230,7 @@
 
     // Reset the Submit button back to its idle state.
     function restoreXpatSubmit() {
-        $(".SubmitFile").removeClass('btn-danger').addClass('btn-themeBlue')
+        $(".SubmitFile").removeClass('eb-btn-critical').addClass('eb-btn-primary')
                         .html('Submit').attr('data-processing', 'false');
     }
 
@@ -279,7 +280,7 @@
         e.preventDefault();
         if ($(this).parsley().isValid())
         {
-            $(".SubmitFile").addClass('btn-danger').removeClass('btn-themeBlue')
+            $(".SubmitFile").addClass('eb-btn-critical').removeClass('eb-btn-primary')
                    .html("Please Wait AI Insights is Working Don't Refresh Page")
                    .attr('data-processing', 'true');
             
@@ -350,14 +351,14 @@
                     errs = errors;
                     }
                 }
-                $(".SubmitFile").removeClass('btn-danger').addClass('btn-themeBlue')
+                $(".SubmitFile").removeClass('eb-btn-critical').addClass('eb-btn-primary')
                            .html('Submit').attr('data-processing', 'false');
 
                 toastr.error(errs, "Validation Error", {
                     positionClass: 'toast-bottom-right'
                 });
                 } else {
-                $(".SubmitFile").removeClass('btn-danger').addClass('btn-themeBlue')
+                $(".SubmitFile").removeClass('eb-btn-critical').addClass('eb-btn-primary')
                            .html('Submit').attr('data-processing', 'false');
                 toastr.error("An unexpected error occurred.", "Error", {
                     positionClass: 'toast-bottom-right'

@@ -37,7 +37,7 @@
                                 </div>
                             </div>
 
-                            <div class="col-auto ms-auto"><a href="{{route('sos.config.index')}}" class="btn  btn-themeSkyblue btn-sm">Add New</a>
+                            <div class="col-auto ms-auto"><a href="{{route('sos.config.index')}}" class="btn eb-btn-accent btn-sm">Add New</a>
                             </div>
                         </div>
                     </div>
@@ -104,18 +104,19 @@
                         </div>
                         <div id="custom-fields-container"></div>
                         <div class="col-12">
-                            <button id="add-custom-field" type="button" class="btn btn-sm btn-theme">Add custom Field </button>
+                            <button id="add-custom-field" type="button" class="btn eb-btn-accent btn-sm">Add custom Field </button>
                         </div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                    <button type="submit" class="btn btn-themeBlue btn-sm" id="submit">Submit</button>
+                    <a href="#" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Cancel</a>
+                    <button type="submit" class="btn eb-btn-primary btn-sm" id="submit">Submit</button>
                 </div>
             </div>
         </form>
     </div>
 </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -235,7 +236,7 @@
                             <input type="text" name="custom_field_values[]" class="form-control" placeholder="Field Value" value="${fieldValue}">
                         </div>
                         <div class="col-auto">
-                        <button type="button" class="btn btn-danger remove-custom-field">Remove</button>
+                        <button type="button" class="btn eb-btn-critical remove-custom-field">Remove</button>
                     </div></div>`;
 
                 $('.AppendCustomField').append(fieldHtml);
@@ -255,7 +256,7 @@
                     <input type="text" name="custom_field_values[]" class="form-control" placeholder="Field Value">
                 </div>
                 <div class="col-auto">
-                    <button type="button" class="btn btn-danger remove-custom-field">Remove</button>
+                    <button type="button" class="btn eb-btn-critical remove-custom-field">Remove</button>
                 </div>
             `;
             document.getElementById('custom-fields-container').appendChild(container);

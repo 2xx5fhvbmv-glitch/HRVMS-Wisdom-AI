@@ -20,7 +20,7 @@
                     </div>
                     @if($canCreate)
                     <div class="col-auto">
-                        <a href="javascript:void(0)" class="btn btn-theme" data-bs-toggle="modal" data-bs-target="#selectIncidentForMeetingModal">
+                        <a href="javascript:void(0)" class="btn eb-btn-accent" data-bs-toggle="modal" data-bs-target="#selectIncidentForMeetingModal">
                             <i class="fa-solid fa-plus me-1"></i> Create Meeting
                         </a>
                     </div>
@@ -86,8 +86,8 @@
                     @endif
                 </div>
                 <div class="modal-footer">
-                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray">Cancel</a>
-                    <a href="javascript:void(0)" id="proceedToCreateMeeting" class="btn btn-themeBlue {{ $incidents->isEmpty() ? 'disabled' : '' }}">Proceed</a>
+                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn eb-btn-neutral">Cancel</a>
+                    <a href="javascript:void(0)" id="proceedToCreateMeeting" class="btn eb-btn-primary {{ $incidents->isEmpty() ? 'disabled' : '' }}">Proceed</a>
                 </div>
             </div>
         </div>
@@ -101,7 +101,7 @@
             <div class="modal-header">
                     <h5 class="modal-title" id="staticBackdropLabel">Download File</h5>
                 
-                    <a href="" class="btn btn-smbtn-primary downloadLink" target="_blank"> Download</a>
+                    <a href="" class="btn eb-btn-secondary downloadLink" target="_blank"> Download</a>
                 
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
@@ -114,12 +114,13 @@
                     
                     </div>
                     <div class="modal-footer">
-                        <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
+                        <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Cancel</a>
                     </div>
     
             </div>
         </div>
     </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -129,11 +130,11 @@
 
 @php
     $viewIcon = '<i class="fa-regular fa-eye"></i>';
-    $editIcon = asset("resorts_assets/images/edit.svg");
-    $trashIcon = asset("resorts_assets/images/trash-red.svg");
-    $updateIcon = asset("resorts_assets/images/update.svg");
+    $editIcon = '<i class="fa-solid fa-pen-to-square"></i>';
+    $trashIcon = '<i class="fa-regular fa-trash-can"></i>';
+    $updateIcon = '<i class="fa-solid fa-check"></i>';
     $viewRouteTemplate = route('incident.meeting.detail', '__MEETING_ID__'); // placeholder
-    $cancelIcon = asset("resorts_assets/images/cancel.svg");
+    $cancelIcon = '<i class="fa-solid fa-xmark"></i>';
 @endphp
 
 <script>
@@ -188,11 +189,11 @@
             $timeCell.html(`<input type="time" id="edit-meeting-time-${meetingId}" class="form-control" value="${originalTime}" />`);
 
             $row.find("td:last-child").html(`
-                <a href="javascript:void(0)" class="update-row-btn btn-lg-icon icon-bg-green me-1" data-meeting-id="${meetingId}">
-                    <img src="{{ $updateIcon }}" alt="Update" class="img-fluid" />
+                <a href="javascript:void(0)" title="Update" class="update-row-btn btn-tableIcon btnIcon-success me-1" data-meeting-id="${meetingId}">
+                    {!! $updateIcon !!}
                 </a>
-                <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red mx-1 cancel-row-btn" data-meeting-id="${meetingId}">
-                    <img src="{{ $cancelIcon }}" alt="Update" class="img-fluid" />
+                <a href="javascript:void(0)" title="Cancel" class="btn-tableIcon eb-icon-neutral mx-1 cancel-row-btn" data-meeting-id="${meetingId}">
+                    {!! $cancelIcon !!}
                 </a>
                
             `);
@@ -230,14 +231,14 @@
             const viewUrl = "{{ $viewRouteTemplate }}".replace('__MEETING_ID__', meetingId);
 
             $row.find("td:last-child").html(`
-                <a href="${viewUrl}" title="View Meeting Detail" class="btn-tableIcon btnIcon-yellow me-1">
+                <a href="${viewUrl}" title="View Meeting Detail" class="btn-tableIcon btnIcon-blue me-1">
                     {!! $viewIcon !!}
                 </a>
-                <a href="javascript:void(0)" class="btn-lg-icon icon-bg-green me-1 edit-row-btn" data-meeting-id="${meetingId}">
-                    <img src="{{ $editIcon }}" alt="Edit" class="img-fluid" />
+                <a href="javascript:void(0)" class="btn-tableIcon btnIcon-yellow me-1 edit-row-btn" data-meeting-id="${meetingId}">
+                    {!! $editIcon !!}
                 </a>
-                <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-row-btn" data-meeting-id="${meetingId}">
-                    <img src="{{ $trashIcon }}" alt="Delete" class="img-fluid" />
+                <a href="javascript:void(0)" class="btn-tableIcon eb-icon-critical delete-row-btn" data-meeting-id="${meetingId}">
+                    {!! $trashIcon !!}
                 </a>
             `);
         });
@@ -271,14 +272,14 @@
                     const viewUrl = "{{ $viewRouteTemplate }}".replace('__MEETING_ID__', meetingId);
 
                     $row.find("td:last-child").html(`
-                        <a href="${viewUrl}" title="View Meeting Detail" class="btn-tableIcon btnIcon-yellow me-1">
+                        <a href="${viewUrl}" title="View Meeting Detail" class="btn-tableIcon btnIcon-blue me-1">
                             {!! $viewIcon !!}
                         </a>
-                        <a href="javascript:void(0)" class="btn-lg-icon icon-bg-green me-1 edit-row-btn" data-meeting-id="${meetingId}">
-                            <img src="{{ $editIcon }}" alt="Edit" class="img-fluid" />
+                        <a href="javascript:void(0)" class="btn-tableIcon btnIcon-yellow me-1 edit-row-btn" data-meeting-id="${meetingId}">
+                            {!! $editIcon !!}
                         </a>
-                        <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-row-btn" data-meeting-id="${meetingId}">
-                            <img src="{{ $trashIcon }}" alt="Delete" class="img-fluid" />
+                        <a href="javascript:void(0)" class="btn-tableIcon eb-icon-critical delete-row-btn" data-meeting-id="${meetingId}">
+                            {!! $trashIcon !!}
                         </a>
                     `);
                 },

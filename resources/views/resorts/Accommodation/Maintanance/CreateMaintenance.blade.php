@@ -20,7 +20,7 @@
                     </div>
                 </div>
                 <div class="col-auto">
-                    <a href="{{ route('resort.accommodation.MaintanaceRequestlist') }}" class="btn btn-theme">View All</a>
+                    <a href="{{ route('resort.accommodation.MaintanaceRequestlist') }}" class="btn eb-btn-secondary">View All</a>
                 </div>
             </div>
         </div>
@@ -71,7 +71,7 @@
                     <label for="image" class="form-label">IMAGE</label>
                     <div class="uploadFile-block">
                         <div class="uploadFile-btn">
-                            <a href="#" class="btn btn-themeBlue btn-sm">Upload File</a>
+                            <a href="#" class="btn eb-btn-accent btn-sm">Upload File</a>
                             <input type="file" name="Image" id="image_check" accept="image/*"
                                 data-parsley-filemimetypes="image/jpeg, image/png, image/gif, image/svg+xml, image/webp, image/heic, image/heif"
                                 data-parsley-errors-container="#image_error">
@@ -87,7 +87,7 @@
                     <label for="video" class="form-label">VIDEO</label>
                     <div class="uploadFile-block">
                         <div class="uploadFile-btn">
-                            <a href="#" class="btn btn-themeBlue btn-sm">Upload File</a>
+                            <a href="#" class="btn eb-btn-accent btn-sm">Upload File</a>
                             <input type="file" name="Video" id="video" accept="video/*"
                                 data-parsley-filemimetypes="video/mp4, video/quicktime"
                                 data-parsley-errors-container="#video_error">
@@ -162,7 +162,7 @@
 
             <div class="d-none d-md-block" style="height: 252px;"></div>
             <div class="card-footer text-end">
-                <button type="submit" class="btn btn-themeBlue ms-1 btn-sm">Submit</button>
+                <button type="submit" class="btn eb-btn-primary ms-1 btn-sm">Submit</button>
             </div>
         </form>
 
@@ -172,6 +172,7 @@
 </div>
 
 
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')

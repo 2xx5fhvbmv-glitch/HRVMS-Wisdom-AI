@@ -49,6 +49,7 @@
 
         </div>
     </div>
+    @include('resorts.Learning._learning_buttons_v2_styles')
     @endsection
 
     @section('import-css')
@@ -96,7 +97,7 @@
                 showCancelButton: true,
                 confirmButtonText: 'Yes',
                 cancelButtonText: 'No',
-                confirmButtonColor: '#DD6B55',
+                confirmButtonColor: '#FF2400',
             }).then((result) => {
                 if (result.isConfirmed) {
                     $.ajax({

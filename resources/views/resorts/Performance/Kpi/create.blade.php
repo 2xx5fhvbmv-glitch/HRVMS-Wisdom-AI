@@ -15,7 +15,7 @@
                         </div>
                     </div>
                     <div class="col-auto">
-                        <a href="{{ route('Performance.kpi.KpiList') }}" class="btn btn-themeGray btn-sm">
+                        <a href="{{ route('Performance.kpi.KpiList') }}" class="btn perf-btn-secondary btn-sm">
                             <i class="fa-solid fa-arrow-left"></i> Back
                         </a>
                     </div>
@@ -55,7 +55,7 @@
                                         </div>
                                     </div>
                                     <div class="col-sm-6 d-flex align-items-end d-none remove-col">
-                                        <a href="#" class="btn btn-danger btn-sm createKpi-remove">Remove</a>
+                                        <a href="#" class="btn perf-btn-neutral btn-sm createKpi-remove">Remove</a>
                                     </div>
                                 </div>
                             </div>
@@ -67,18 +67,19 @@
                             </div>
 
                             <div class="md-mb-4 mb-3">
-                                <a href="#" class="btn btn-themeSkyblue btn-sm createKpi-add">Add More</a>
+                                <a href="#" class="btn perf-btn-accent btn-sm createKpi-add">Add More</a>
                             </div>
                         @endunless
 
                         <div class="card-footer text-end">
-                            <button type="submit" class="btn btn-themeBlue btn-sm">{{ $isEdit ? 'Update' : 'Send' }}</button>
+                            <button type="submit" class="btn perf-btn-primary btn-sm">{{ $isEdit ? 'Update' : 'Send' }}</button>
                         </div>
                     </div>
                 </form>
             </div>
         </div>
     </div>
+@include('resorts.Performance._performance_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')

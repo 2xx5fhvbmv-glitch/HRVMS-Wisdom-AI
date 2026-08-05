@@ -13,7 +13,7 @@
                     </div>
                 </div>
                 <div class="col-auto">
-                    <a href="{{ route('learning.programs.index') }}" class="btn btn-themeBlue btn-sm">
+                    <a href="{{ route('learning.programs.index') }}" class="btn lnd-btn-secondary btn-sm">
                         <i class="fa-solid fa-arrow-left"></i> Back
                     </a>
                 </div>
@@ -107,7 +107,7 @@
                     <ul class="mb-0 list-unstyled">
                         @foreach($materials as $m)
                             <li class="mb-2">
-                                <a href="{{ route('learning.programs.material', base64_encode($m->id)) }}" class="btn btn-themeLight btn-sm">
+                                <a href="{{ route('learning.programs.material', base64_encode($m->id)) }}" class="btn lnd-btn-secondary btn-sm">
                                     <i class="fa-solid fa-file-arrow-down me-1"></i>
                                     {{ preg_replace('/^\d+_/', '', basename($m->file_path)) }}
                                 </a>
@@ -121,4 +121,5 @@
         </div>
     </div>
 </div>
+@include('resorts.Learning._learning_buttons_v2_styles')
 @endsection

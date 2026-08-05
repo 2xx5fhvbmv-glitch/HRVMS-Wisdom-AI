@@ -13,7 +13,7 @@
                         </div>
                     </div>
                     <div class="col-auto ms-auto">
-                        <a href="{{ route('Performance.employees') }}" class="btn btn-themeBlue btn-sm">
+                        <a href="{{ route('Performance.employees') }}" class="btn perf-btn-secondary btn-sm">
                             <i class="fa-solid fa-arrow-left"></i> Back
                         </a>
                     </div>
@@ -62,17 +62,17 @@
                         <div class="col-auto text-end">
                             @if($latestChildCycleId && ($latestChildReviewRoute ?? null))
                                 <a href="{{ route($latestChildReviewRoute, base64_encode($latestChildCycleId)) }}"
-                                   class="btn btn-theme btn-sm mb-1">View Appraisal Form</a>
+                                   class="btn perf-btn-secondary btn-sm mb-1">View Appraisal Form</a>
                             @elseif($latestChildCycleId)
-                                <button type="button" class="btn btn-theme btn-sm mb-1" disabled title="Appraisal form available once the self review is submitted">View Appraisal Form</button>
+                                <button type="button" class="btn perf-btn-secondary btn-sm mb-1" disabled title="Appraisal form available once the self review is submitted">View Appraisal Form</button>
                             @else
-                                <button type="button" class="btn btn-theme btn-sm mb-1" disabled title="No appraisal cycle assigned">View Appraisal Form</button>
+                                <button type="button" class="btn perf-btn-secondary btn-sm mb-1" disabled title="No appraisal cycle assigned">View Appraisal Form</button>
                             @endif
                             @if($activePip)
-                                <button type="button" class="btn btn-danger btn-sm mb-1 remove-plan-btn" data-plan-id="{{ $activePip->id }}" data-plan-type="pip">Remove from PIP</button>
+                                <button type="button" class="btn perf-btn-critical btn-sm mb-1 remove-plan-btn" data-plan-id="{{ $activePip->id }}" data-plan-type="pip">Remove from PIP</button>
                             @endif
                             @if($activePdp)
-                                <button type="button" class="btn btn-danger btn-sm mb-1 remove-plan-btn" data-plan-id="{{ $activePdp->id }}" data-plan-type="pdp">Remove from PDP</button>
+                                <button type="button" class="btn perf-btn-critical btn-sm mb-1 remove-plan-btn" data-plan-id="{{ $activePdp->id }}" data-plan-type="pdp">Remove from PDP</button>
                             @endif
                         </div>
                     </div>
@@ -135,6 +135,7 @@
             </div>
         </div>
     </div>
+@include('resorts.Performance._performance_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')

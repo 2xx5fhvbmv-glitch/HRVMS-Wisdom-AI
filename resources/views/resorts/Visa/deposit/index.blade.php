@@ -112,9 +112,9 @@
 
                         <div class="card-footer mt-3">
 
-                            <!-- <a href="#" class=" btn btn-themeBlue btn-sm float-end next ">Send To Finance</a> -->
+                            <!-- <a href="#" class=" btn eb-btn-primary btn-sm float-end next ">Send To Finance</a> -->
 
-                            <button class=" btn btn-themeBlue btn-sm float-end  ">Approved </button>
+                            <button class=" btn eb-btn-primary btn-sm float-end  ">Approved </button>
                         </div>
                     </div>
 
@@ -123,6 +123,7 @@
 
         </div>
     </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')

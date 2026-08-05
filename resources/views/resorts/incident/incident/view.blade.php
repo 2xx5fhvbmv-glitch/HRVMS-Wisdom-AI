@@ -160,7 +160,7 @@
                         </div>
                     </div>
                     <div class="card-footer text-end">
-                        <button type="submit" class="btn btn-themeBlue">Submit</button>
+                        <button type="submit" class="btn eb-btn-primary">Submit</button>
                     </div>
                 </form>
             </div>
@@ -174,7 +174,7 @@
             <div class="modal-header">
                     <h5 class="modal-title" id="staticBackdropLabel">Download File</h5>
                 
-                    <a href="" class="btn btn-smbtn-primary downloadLink" target="_blank"> Download</a>
+                    <a href="" class="btn eb-btn-secondary downloadLink" target="_blank"> Download</a>
                 
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
@@ -187,12 +187,13 @@
                     
                     </div>
                     <div class="modal-footer">
-                        <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
+                        <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Cancel</a>
                     </div>
     
             </div>
         </div>
     </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')

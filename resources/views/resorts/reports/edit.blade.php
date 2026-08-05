@@ -28,7 +28,7 @@
                         <h3>Reports</h3>
                     </div>
                     <div class="col-auto">
-                        <a href="{{ route('resort.report.index')}}" class="btn btn-sm btn-theme "> Report List</a>
+                        <a href="{{ route('resort.report.index')}}" class="btn eb-btn-secondary"> Report List</a>
                     </div>
                 </div>
             </div>
@@ -102,8 +102,8 @@
             </div>
 
             <div class="col-md-12 form-group">
-                <button type="submit" class="btn btn-sm btn-theme">Save Report</button>
-                <a href="{{ route('resort.report.index') }}" class="btn btn-sm btn-danger">Cancel</a>
+                <button type="submit" class="btn eb-btn-primary">Save Report</button>
+                <a href="{{ route('resort.report.index') }}" class="btn eb-btn-neutral">Cancel</a>
             </div>
         </div>
     </form>
@@ -111,6 +111,7 @@
         </div>
     </div>
 </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')
@@ -224,7 +225,7 @@ $(document).ready(function() {
                             <input type="text" name="filters[${filterCount}][value]" class="form-control" placeholder="Value" required>
                         </div>
                         <div class="col-md-2">
-                            <button type="button" class="btn btn-danger remove-filter">Remove</button>
+                            <button type="button" class="btn eb-btn-critical remove-filter">Remove</button>
                         </div>
                     </div>
                 </div>

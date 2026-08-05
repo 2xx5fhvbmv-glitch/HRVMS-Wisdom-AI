@@ -620,9 +620,9 @@ class SurveyController extends Controller
                 $view = route('Survey.view',$id);
                             return '
                             <div  class="d-flex align-items-center">
-                                <a target="_blank" href="'.$view.'" class="btn-lg-icon icon-bg-skyblue"><img src="' . asset("resorts_assets/images/eye.svg") . '" alt="icon"></a>
-                                <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-row-btn '.$delete_class.'" data-id="' . e($id) . '">
-                                    <img src="' . asset("resorts_assets/images/trash-red.svg") . '" alt="Delete" class="img-fluid">
+                                <a target="_blank" href="'.$view.'" class="btn-lg-icon icon-bg-skyblue"><i class="fa-regular fa-eye"></i></a>
+                                <a href="javascript:void(0)" class="btn-lg-icon eb-icon-critical delete-row-btn '.$delete_class.'" data-id="' . e($id) . '">
+                                    <i class="fa-regular fa-trash-can"></i>
                                 </a>
                             </div>';
                                                             // <a href="#" class="btn-lg-icon icon-bg-blue"><img src="' . asset("resorts_assets/images/copy.svg") . '" alt="icon"></a>
@@ -810,7 +810,7 @@ class SurveyController extends Controller
                 $view = route('Survey.view',$id);
                             return '
                             <div  class="d-flex align-items-center">
-                                <a target="_blank" href="'.$view.'" class="btn-lg-icon icon-bg-skyblue"><img src="' . asset("resorts_assets/images/eye.svg") . '" alt="icon"></a>
+                                <a target="_blank" href="'.$view.'" class="btn-lg-icon icon-bg-skyblue"><i class="fa-regular fa-eye"></i></a>
                             </div>';
 
 
@@ -899,10 +899,10 @@ class SurveyController extends Controller
                 $edit = route('Survey.edit',$id);
                             return '
                             <div  class="d-flex align-items-center">
-                                <a target="_blank" href="'.$view.'" class="btn-lg-icon icon-bg-skyblue"><img src="' . asset("resorts_assets/images/eye.svg") . '" alt="icon"></a>
-                                <a href="'.$edit.'" class="btn-lg-icon icon-bg-blue" title="Edit Draft"><img src="' . asset("resorts_assets/images/edit.svg") . '" alt="Edit"></a>
-                                <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-row-btn '.$delete_class.'" data-id="' . e($id) . '">
-                                    <img src="' . asset("resorts_assets/images/trash-red.svg") . '" alt="Delete" class="img-fluid">
+                                <a target="_blank" href="'.$view.'" class="btn-lg-icon icon-bg-skyblue"><i class="fa-regular fa-eye"></i></a>
+                                <a href="'.$edit.'" class="btn-lg-icon icon-bg-blue" title="Edit Draft"><i class="fa-solid fa-pen-to-square"></i></a>
+                                <a href="javascript:void(0)" class="btn-lg-icon eb-icon-critical delete-row-btn '.$delete_class.'" data-id="' . e($id) . '">
+                                    <i class="fa-regular fa-trash-can"></i>
                                 </a>
                             </div>';
 

@@ -81,14 +81,15 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                    <button type="button" id="save-form" class="btn btn-themeBlue">Submit</button>
+                    <a href="#" data-bs-dismiss="modal" class="btn perf-btn-neutral ms-auto">Cancel</a>
+                    <button type="button" id="save-form" class="btn perf-btn-primary">Submit</button>
                 </div>
             </form>
 
         </div>
     </div>
 </div>
+@include('resorts.Performance._performance_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -343,13 +344,13 @@
             e.preventDefault();
             var main_id = $(this).data('id');
             Swal.fire({
-                    title: 'Sure want to delete?',
+                    title: 'Are you sure you want to delete?',
                     text: 'This cannot be undone',
                     icon: 'warning',
                     showCancelButton: true,
                     confirmButtonText: 'Yes',
                     cancelButtonText: 'No',
-                    confirmButtonColor: "#DD6B55"
+                    confirmButtonColor: "#FF2400"
                 }).then((result) =>
                 {
                     if (result.isConfirmed)

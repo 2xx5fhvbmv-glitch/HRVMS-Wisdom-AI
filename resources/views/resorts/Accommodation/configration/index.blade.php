@@ -46,7 +46,7 @@
                             </div>
                         </div>
                         <div class="card-footer text-end mt-3">
-                            <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                            <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                         </div>
                     </form>
                 </div>
@@ -74,7 +74,7 @@
                             --}}
                         </div>
                         <div class="card-footer text-end mt-3">
-                            <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                            <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                         </div>
                     </form>
                 </div>
@@ -112,7 +112,7 @@
                         </div>
 
                         <div class="card-footer text-end mt-3">
-                            <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                            <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                         </div>
                     </form>
                 </div>
@@ -131,18 +131,18 @@
                                 @csrf
                                 <div class="row g-2 align-items-center mb-3">
                                     <div class="col-auto">
-                                        <a href="{{ route('resort.accommodation.config.AccommodationTemplete') }}" class="btn btn-themeSkyblue btn-sm">Download Template</a>
+                                        <a href="{{ route('resort.accommodation.config.AccommodationTemplete') }}" class="btn eb-btn-secondary btn-sm">Download Template</a>
                                     </div>
                                     <div class="col-auto">
                                         <div class="uploadFile-block">
                                             <div class="uploadFile-btn me-0">
-                                                <a href="#" class="btn btn-themeBlue btn-sm">Upload File</a>
+                                                <a href="#" class="btn eb-btn-accent btn-sm">Upload File</a>
                                                 <input type="file" name="AvailableAccommodationFile" id="uploadFile" accept=".csv, .xls, .xlsx">
                                             </div>
                                         </div>
                                     </div>
                                     <div class="col-auto">
-                                        <button type="submit" class="btn btn-themeBlue btn-sm availableFormSubmit">Submit</button>
+                                        <button type="submit" class="btn eb-btn-primary btn-sm availableFormSubmit">Submit</button>
                                     </div>
                                 </div>
                             </form>
@@ -291,10 +291,10 @@
 
                                 <input type="hidden" name="AvailableCount" id="AvailableCount"  value="1">
                                 <div class="mb-4">
-                                    <button type="button" class="btn btn-themeSkyblue btn-sm addMore-availabel">Add More</a>
+                                    <button type="button" class="btn eb-btn-accent btn-sm addMore-availabel">Add More</a>
                                 </div>
                                 <div class="card-footer text-end">
-                                    <button type="submit" class="btn btn-themeBlue btn-sm availableFormSubmit">Submit</button>
+                                    <button type="submit" class="btn eb-btn-primary btn-sm availableFormSubmit">Submit</button>
                                 </div>
                             </form>
                         </div>
@@ -368,10 +368,10 @@
                             </div>
                         </div>
                         <div class="mb-4">
-                            <button type="button" class="btn btn-themeSkyblue btn-sm addMore-Occupancy_threshod">Add More</button>
+                            <button type="button" class="btn eb-btn-accent btn-sm addMore-Occupancy_threshod">Add More</button>
                         </div>
                         <div class="card-footer text-end">
-                            <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                            <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                         </div>
                     </div>
                 </form>
@@ -385,18 +385,18 @@
                     <form id="QuickAssignmentForm">
                         @csrf
                         <div class="row g-2 align-items-center mb-3">
-                            <div class="col-auto"><a href="{{route('resort.accommodation.config.QuickAssignmentTemplete')}}" class="btn btn-themeSkyblue btn-sm">Download
+                            <div class="col-auto"><a href="{{route('resort.accommodation.config.QuickAssignmentTemplete')}}" class="btn eb-btn-secondary btn-sm">Download
                                     Template</a></div>
                             <div class="col-auto">
                                 <div class="uploadFile-block">
                                     <div class="uploadFile-btn me-0">
-                                        <a href="#" class="btn btn-themeBlue btn-sm">Upload File</a>
+                                        <a href="#" class="btn eb-btn-accent btn-sm">Upload File</a>
                                         <input type="file"  name="QuickAssignmentFile"id="uploadFile1">
                                     </div>
                                 </div>
                             </div>
                         </div>
-                        <div class="card-footer text-end"><button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                        <div class="card-footer text-end"><button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                         </div>
                     </form>
                 </div>
@@ -412,7 +412,7 @@
                             value="{{ old('EscalationDay', isset($EscalationDay) ? $EscalationDay->EscalationDay : '') }}"
                             class="form-control" placeholder="Define Time Duration">
                         </div>
-                        <div class="card-footer text-end"><button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                        <div class="card-footer text-end"><button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                         </div>
                     </form>
                 </div>
@@ -430,7 +430,7 @@
                         <div class="mb-3">
                             <input type="text" class="form-control" name="CategoryName" placeholder="Category Name">
                         </div>
-                        <div class="card-footer text-end"><button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                        <div class="card-footer text-end"><button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                         </div>
                     </form>
                 </div>
@@ -444,6 +444,7 @@
 
 
 
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')

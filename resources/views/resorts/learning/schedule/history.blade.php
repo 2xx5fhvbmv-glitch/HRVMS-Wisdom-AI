@@ -78,11 +78,12 @@
                     <p class="text-center text-muted my-4">Loading…</p>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn lnd-btn-neutral" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
         </div>
     </div>
+@include('resorts.Learning._learning_buttons_v2_styles')
 @endsection
 
 @section('import-css')

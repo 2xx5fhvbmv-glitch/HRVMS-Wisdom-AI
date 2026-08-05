@@ -21,12 +21,12 @@
                     <div class="col-auto">
                         <div class="d-flex justify-content-end">
                     
-                            <a href="{{ route('Survey.create') }}" class="btn btn-theme me-2 @if(Common::checkRouteWisePermission('Survey.Surveylist',config('settings.resort_permissions.create')) == false) d-none @endif">Create Survey</a>
+                            <a href="{{ route('Survey.create') }}" class="btn eb-btn-accent me-2 @if(Common::checkRouteWisePermission('Survey.Surveylist',config('settings.resort_permissions.create')) == false) d-none @endif">Create Survey</a>
                    
                
-                            <a href="{{ route('Survey.CompleteSurvey') }}" class="btn btn-themeLightNew me-2">Completed Survey</a>
+                            <a href="{{ route('Survey.CompleteSurvey') }}" class="btn eb-btn-secondary me-2">Completed Survey</a>
                       
-                            <a href="{{ route('Survey.DarftSurvey') }}" class="btn btn-themeLightNew">Draft Survey</a>
+                            <a href="{{ route('Survey.DarftSurvey') }}" class="btn eb-btn-secondary">Draft Survey</a>
                         </div>
                     </div>
                 </div>
@@ -84,13 +84,14 @@
 
                     </div>
                     <div class="modal-footer">
-                        <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
+                        <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Cancel</a>
                     </div>
             </div>
         </div>
     </div>
 
-    @endsection
+    @include('resorts._emotional_buttons_v2_styles')
+@endsection
 
     @section('import-css')
     @endsection

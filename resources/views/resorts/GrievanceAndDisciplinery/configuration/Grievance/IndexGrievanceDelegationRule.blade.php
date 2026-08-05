@@ -55,6 +55,7 @@
         </div>
     </div>
 </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -163,7 +164,7 @@
                         </div>
                         </td>
                     <td class="py-1">
-                         <a href="javascript:void(0)" class="btn btn-theme update-row-btn_cat" data-cat-id="${Main_id}">Submit</a>
+                         <a href="javascript:void(0)" class="btn eb-btn-primary update-row-btn_cat" data-cat-id="${Main_id}">Submit</a>
                     </td>`;
             $row.html(editRowHtml);
             $("#Grievance_Cat_id").select2({

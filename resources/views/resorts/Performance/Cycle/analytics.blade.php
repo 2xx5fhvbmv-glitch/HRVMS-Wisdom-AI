@@ -14,7 +14,7 @@
                     </div>
                 </div>
                 <div class="col-auto">
-                    <a href="{{ route('Performance.cycle.view', base64_encode($cycle->id)) }}" class="btn btn-themeGray">
+                    <a href="{{ route('Performance.cycle.view', base64_encode($cycle->id)) }}" class="btn perf-btn-secondary">
                         <i class="fa-solid fa-arrow-left me-1"></i> Back
                     </a>
                 </div>
@@ -49,7 +49,7 @@
                     </select>
                 </div>
                 <div class="col-md-3">
-                    <a href="{{ route('Performance.cycle.analytics', base64_encode($cycle->id)) }}" class="btn btn-themeBlue btn-sm">Clear Filters</a>
+                    <a href="{{ route('Performance.cycle.analytics', base64_encode($cycle->id)) }}" class="btn perf-btn-neutral btn-sm">Clear Filters</a>
                 </div>
             </form>
 
@@ -89,11 +89,12 @@
 
             <div class="mt-4 small text-muted">
                 Rating source: numeric values (1–5 scale) extracted from manager review data.
-                Thresholds — Does not Meet: &lt; 2.5 · Meets: 2.5–4.0 · Exceeds: &gt; 4.0.
+                Thresholds — Does Not Meet: &lt; 2.5 · Meets: 2.5–4.0 · Exceeds: &gt; 4.0.
             </div>
         </div>
     </div>
 </div>
+@include('resorts.Performance._performance_buttons_v2_styles')
 @endsection
 
 @section('import-css')

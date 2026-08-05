@@ -119,7 +119,7 @@
                                             </td>
                                             <td>
                                                 <a href="{{ route('learning.schedule') }}?program_id={{ $row->program_id }}&employee_id={{ $row->employee_id }}"
-                                                   class="btn btn-theme btn-sm">Schedule</a>
+                                                   class="btn lnd-btn-accent btn-sm">Schedule</a>
                                             </td>
                                         </tr>
                                     @endforeach
@@ -360,6 +360,7 @@
             </div>
         </div>
     </div>
+@include('resorts.Learning._learning_buttons_v2_styles')
 @endsection
 
 @section('import-css')

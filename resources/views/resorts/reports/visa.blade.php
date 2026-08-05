@@ -19,7 +19,7 @@
                     <div class="page-title"><span>Report</span><h1>{{ $page_title }}</h1></div>
                 </div>
                 <div class="col-auto">
-                    <a href="{{ route('resort.report.index') }}" class="btn btn-sm btn-themeSkyblue">Back to Reports</a>
+                    <a href="{{ route('resort.report.index') }}" class="btn eb-btn-secondary">Back to Reports</a>
                 </div>
             </div>
         </div>
@@ -114,17 +114,17 @@
                             </div>
 
                             <div class="col-12 d-flex flex-wrap gap-2 align-items-center">
-                                <button type="submit" class="btn btn-sm btn-theme" id="vsRunBtn">Run Report</button>
+                                <button type="submit" class="btn eb-btn-primary btn-sm" id="vsRunBtn">Run Report</button>
                                 <div class="dropdown">
-                                    <button class="btn btn-sm btn-primary dropdown-toggle vsActionBtn" disabled type="button" data-bs-toggle="dropdown"><i class="fa fa-download"></i> Export</button>
+                                    <button class="btn eb-btn-accent dropdown-toggle vsActionBtn" disabled type="button" data-bs-toggle="dropdown"><i class="fa fa-download"></i> Export</button>
                                     <ul class="dropdown-menu">
                                         <li><a class="dropdown-item vsExport" href="javascript:void(0)" data-format="csv"><i class="fa fa-file-csv"></i> CSV</a></li>
                                         <li><a class="dropdown-item vsExport" href="javascript:void(0)" data-format="excel"><i class="fa fa-file-excel"></i> Excel</a></li>
                                         <li><a class="dropdown-item vsExport" href="javascript:void(0)" data-format="pdf"><i class="fa fa-file-pdf"></i> PDF</a></li>
                                     </ul>
                                 </div>
-                                <button type="button" class="btn btn-sm btn-theme vsActionBtn" id="vsInsightsBtn" disabled>WAI Insights</button>
-                                <button type="button" class="btn btn-sm btn-themeSkyblue d-none" id="vsBackToData">Back to Data</button>
+                                <button type="button" class="btn eb-btn-accent vsActionBtn" id="vsInsightsBtn" disabled>WAI Insights</button>
+                                <button type="button" class="btn eb-btn-secondary d-none" id="vsBackToData">Back to Data</button>
                             </div>
                         </form>
 
@@ -138,6 +138,7 @@
         </div>
     </div>
 </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')

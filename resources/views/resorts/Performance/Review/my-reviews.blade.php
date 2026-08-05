@@ -65,12 +65,12 @@
                             </td>
                             <td>
                                 @if($r->self_review_status === 'pending')
-                                    <a href="{{ route('Performance.Review.showSelf', base64_encode($r->id)) }}" class="btn btn-sm btn-themeBlue">Fill Self Review</a>
+                                    <a href="{{ route('Performance.Review.showSelf', base64_encode($r->id)) }}" class="btn btn-sm perf-btn-primary">Fill Self Review</a>
                                 @else
-                                    <a href="{{ route('Performance.Review.showSelf', base64_encode($r->id)) }}" class="btn btn-sm btn-themeSkyblue">View</a>
+                                    <a href="{{ route('Performance.Review.showSelf', base64_encode($r->id)) }}" class="btn btn-sm perf-btn-secondary">View</a>
                                 @endif
                                 @if($r->is_gm_review && $r->self_review_status === 'completed')
-                                    <a href="{{ route('Performance.Review.gmExport', base64_encode($r->id)) }}" target="_blank" class="btn btn-sm btn-theme">
+                                    <a href="{{ route('Performance.Review.gmExport', base64_encode($r->id)) }}" target="_blank" class="btn btn-sm perf-btn-secondary">
                                         <i class="fa-solid fa-download me-1"></i> Export for Corporate
                                     </a>
                                 @endif
@@ -84,4 +84,5 @@
         </div>
     </div>
 </div>
+@include('resorts.Performance._performance_buttons_v2_styles')
 @endsection

@@ -117,13 +117,14 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-success" id="save-attendance">Save</button>
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn lnd-btn-primary" id="save-attendance">Save</button>
+                    <button type="button" class="btn lnd-btn-neutral" data-bs-dismiss="modal">Cancel</button>
                 </div>
             </div>
         </div>
     </div>
 
+@include('resorts.Learning._learning_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -241,13 +242,13 @@
                     orderable: false,
                     searchable: false,
                     render: function(data) {
-                        return `<a href="javascript:void(0)" title="Edit" data-id="${data.id}" 
-                                    data-employee-id="${data.employee_id}" 
-                                    data-schedule-id="${data.training_schedule_id}" 
-                                    data-date="${data.attendance_date}" 
-                                    data-status="${data.status}" 
-                                    data-notes="${data.notes || ''}" class="btn-lg-icon icon-bg-green me-1 edit-attendance">
-                <img src="${window.location.origin}/resorts_assets/images/edit.svg" alt="Edit" class="img-fluid">
+                        return `<a href="javascript:void(0)" title="Edit" data-id="${data.id}"
+                                    data-employee-id="${data.employee_id}"
+                                    data-schedule-id="${data.training_schedule_id}"
+                                    data-date="${data.attendance_date}"
+                                    data-status="${data.status}"
+                                    data-notes="${data.notes || ''}" class="btn-tableIcon btnIcon-yellow me-1 edit-attendance">
+                <i class="fa-solid fa-pen-to-square"></i>
                         </a>`;
                     }
                 }

@@ -28,7 +28,7 @@
                     <div class="row g-md-3 g-2 align-items-center">
 
                         <div class="col-auto ms-auto">
-                            <a href="#" class="btn btn-themeBlue btn-sm">Download</a>
+                            <a href="#" class="btn eb-btn-secondary btn-sm">Download</a>
                         </div>
                     </div>
                 </div>
@@ -51,7 +51,7 @@
                 </div>
                 <div class="modal-body" id="liabilityBreakdownBody"></div>
                 <div class="modal-footer">
-                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Close</a>
+                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Close</a>
                 </div>
             </div>
         </div>
@@ -85,12 +85,13 @@
                     
                     </div>
                     <div class="modal-footer">
-                        <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
+                        <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Cancel</a>
                     </div>
     
             </div>
         </div>
     </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')

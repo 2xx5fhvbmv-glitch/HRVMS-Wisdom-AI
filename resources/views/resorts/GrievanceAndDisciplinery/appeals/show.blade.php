@@ -92,7 +92,7 @@
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h5 class="mb-0">Hearings</h5>
                             @if(!$isClosed)
-                                <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#scheduleHearingModal">
+                                <button class="btn eb-btn-accent btn-sm" data-bs-toggle="modal" data-bs-target="#scheduleHearingModal">
                                     <i class="fa fa-plus me-1"></i> Schedule Hearing
                                 </button>
                             @endif
@@ -162,7 +162,7 @@
                                 <label class="form-label">Decision Notes</label>
                                 <textarea class="form-control" name="decision_notes" rows="4" maxlength="5000" placeholder="Optional rationale, conditions, follow-up actions..."></textarea>
                             </div>
-                            <button type="submit" class="btn btn-primary">Record Decision</button>
+                            <button type="submit" class="btn eb-btn-primary">Record Decision</button>
                         </form>
                     </div>
                 </div>
@@ -212,14 +212,15 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Schedule</button>
+                    <button type="button" class="btn eb-btn-neutral" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn eb-btn-primary">Schedule</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 @endif
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')

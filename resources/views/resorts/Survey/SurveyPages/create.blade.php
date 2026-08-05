@@ -68,7 +68,7 @@
                                 <div class="col-sm-6 ">
                                     <label for="question_type" class="form-label"></label>
 
-                                    <a href="javascript:void(0);" class="AddMore btn btn-themeSkyblue btn-sm ">Add New Question</a>
+                                    <a href="javascript:void(0);" class="AddMore btn eb-btn-accent btn-sm ">Add New Question</a>
                                 </div>
                             </div>
                     
@@ -80,7 +80,7 @@
                         <div class="d-inline-flex align-items-center">
                             {{-- <a href="#" class="a-link">Save As Draft</a> --}}
                         </div>
-                        <a href="javascript:void(0)" class=" btn btn-themeBlue btn-sm float-end next ">Next</a>
+                        <a href="javascript:void(0)" class=" btn eb-btn-primary btn-sm float-end next ">Next</a>
 
                     </fieldset>
                     <fieldset data-parsley-group="block-1">
@@ -106,7 +106,7 @@
                                     <div class="col-auto participant-filters-actions">
                                         <div class="position-relative">
                                             <a href="javascript:void(0)"
-                                                class="btn btn-themeGrayLight filters-btn">Filters<i
+                                                class="btn eb-btn-neutral filters-btn">Filters<i
                                                     class="fa-solid fa-angle-down"></i></a>
                                         </div>
                                     </div>
@@ -151,7 +151,7 @@
                                                     </select>
                                                 </div>
                                                 <div class="col-auto">
-                                                    <a href="javascript:void(0)" class="FilterSubmit btn btn-themeBlue">Submit</a>
+                                                    <a href="javascript:void(0)" class="FilterSubmit btn eb-btn-primary">Submit</a>
                                                 </div>
                                             </div>
                                         </div>
@@ -194,8 +194,8 @@
                         </div>
                         <hr class="hr-footer">
                         {{-- <a href="#" class="a-link me-1">Save As Draft</a> --}}
-                        <a href="javascript:void(0) " class=" btn btn-themeBlue btn-sm float-end next ">Next</a>
-                        <a href="javascript:void(0)" class=" btn btn-themeSkyblue btn-sm float-end previous me-2">Back</a>
+                        <a href="javascript:void(0) " class=" btn eb-btn-primary btn-sm float-end next ">Next</a>
+                        <a href="javascript:void(0)" class=" btn eb-btn-secondary btn-sm float-end previous me-2">Back</a>
                     </fieldset>
 
                     <fieldset data-parsley-group="block-2">
@@ -303,10 +303,10 @@
                             Save As Draft
                         </a>
                         <a href="javascript:void(0)" class="a-linkTheme me-1 SurveyPreview" role="button">Preview</a>
-                        <button type="submit" data-flag="Publish" class="btn btn-themeBlue btn-sm float-end SubmitAsPublish ">
+                        <button type="submit" data-flag="Publish" class="btn eb-btn-primary btn-sm float-end SubmitAsPublish ">
                             Publish Survey
                         </button>
-                        <a href="javascript:void(0)" class="btn btn-themeSkyblue btn-sm float-end previous me-2">
+                        <a href="javascript:void(0)" class="btn eb-btn-secondary btn-sm float-end previous me-2">
                             Back
                         </a>
                     </fieldset>
@@ -316,6 +316,7 @@
         </div>
     </div>
 </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -848,7 +849,7 @@
                     $(".AppendHerer").append(` <div class="talentAc-block mb-3 " id="remove_id_${nos}">
                         <div class="title mb-2">
                         <label for="question_type" class="form-label"> QUESTION ${nos}</label>
-                            <button type="button" class="btn btn-danger btn-sm remove-btn"  data-id="${nos}"><i class="fa-solid fa-xmark"></i></i></button>
+                            <button type="button" class="btn eb-btn-critical btn-sm remove-btn"  data-id="${nos}"><i class="fa-solid fa-xmark"></i></i></button>
                         </div> ${appendstring}
                     </div>`);
                     nos  = 1  + parseInt(nos);
@@ -1270,7 +1271,7 @@
                 var block = '<div class="talentAc-block mb-3" id="remove_id_' + nos + '">' +
                     '<div class="title mb-2">' +
                     '<label class="form-label"> QUESTION ' + nos + '</label>' +
-                    '<button type="button" class="btn btn-danger btn-sm remove-btn" data-id="' + nos + '"><i class="fa-solid fa-xmark"></i></button>' +
+                    '<button type="button" class="btn eb-btn-critical btn-sm remove-btn" data-id="' + nos + '"><i class="fa-solid fa-xmark"></i></button>' +
                     '</div>' + inner + '</div>';
 
                 var $row = $(block);

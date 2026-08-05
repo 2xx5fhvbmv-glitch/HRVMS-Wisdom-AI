@@ -58,9 +58,9 @@
                             <td>
                                 @if($r->self_review_status === 'completed')
                                     @if($r->manager_review_status === 'pending')
-                                        <a href="{{ route('Performance.Review.showManager', base64_encode($r->id)) }}" class="btn btn-sm btn-themeBlue">Fill Manager Review</a>
+                                        <a href="{{ route('Performance.Review.showManager', base64_encode($r->id)) }}" class="btn btn-sm perf-btn-primary">Fill Manager Review</a>
                                     @else
-                                        <a href="{{ route('Performance.Review.showManager', base64_encode($r->id)) }}" class="btn btn-sm btn-themeSkyblue">View</a>
+                                        <a href="{{ route('Performance.Review.showManager', base64_encode($r->id)) }}" class="btn btn-sm perf-btn-secondary">View</a>
                                     @endif
                                 @else
                                     <span class="text-muted small">Waiting for self review</span>
@@ -75,4 +75,5 @@
         </div>
     </div>
 </div>
+@include('resorts.Performance._performance_buttons_v2_styles')
 @endsection

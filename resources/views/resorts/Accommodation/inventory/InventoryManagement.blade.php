@@ -20,7 +20,7 @@
                     </div>
                 </div>
                 <div class="col-auto">
-                    <a href="{{ route('resort.accommodation.inventory') }}"  class="btn btn-theme  @if(App\Helpers\Common::checkRouteWisePermission('resort.accommodation.Inventory',config('settings.resort_permissions.create')) == false) d-none @endif">Add New
+                    <a href="{{ route('resort.accommodation.inventory') }}"  class="btn eb-btn-accent  @if(App\Helpers\Common::checkRouteWisePermission('resort.accommodation.Inventory',config('settings.resort_permissions.create')) == false) d-none @endif">Add New
                         Inventory</a>
                 </div>
             </div>
@@ -117,14 +117,15 @@
                     <input type="hidden" name="resort_id" id="assignResortId">
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-themeGray" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-themeBlue">Assign</button>
+                    <button type="button" class="btn eb-btn-neutral" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn eb-btn-primary">Assign</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')

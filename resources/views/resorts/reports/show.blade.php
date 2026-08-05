@@ -32,7 +32,7 @@
                         </h3>
                     </div>
                     <div class="col-auto">
-                        <a href="{{ route('reports.create') }}" class="btn btn-sm btn-theme  @if(Common::checkRouteWisePermission('resort.report.index',config('settings.resort_permissions.create')) == false) d-none @endif">Create Report</a>
+                        <a href="{{ route('reports.create') }}" class="btn eb-btn-accent @if(Common::checkRouteWisePermission('resort.report.index',config('settings.resort_permissions.create')) == false) d-none @endif">Create Report</a>
                     </div>
                 </div>  
                 <hr>
@@ -79,7 +79,7 @@
                             </div>
 
                             <div class="col-xl-1">
-                                <button type="submit" class="btn btn-sm btn-theme SearchReport">Search</button>
+                                <button type="submit" class="btn eb-btn-primary SearchReport">Search</button>
                             </div>
                             <div class="col-xl-1 page-hedding">
                                 <div class="d-flex">
@@ -87,7 +87,7 @@
                                       
                                         <div class="dropdown">
                                         
-                                            <button class="btn btn-sm btn-primary dropdown-toggle" disabled type="button" id="exportDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                                            <button class="btn eb-btn-accent dropdown-toggle" disabled type="button" id="exportDropdown" data-bs-toggle="dropdown" aria-expanded="false">
                                                 <i class="fa fa-download"></i> Export Report
                                             </button>
                                             <ul class="dropdown-menu" aria-labelledby="exportDropdown">
@@ -110,7 +110,7 @@
                                         </div>                                    
                                     </div>
                                     <div class="d-flex align-items-center ms-2">
-                                        <button class="btn btn-sm btn-theme AIInSide" disabled type="button"aria-expanded="false">WAI Insights</button>
+                                        <button class="btn eb-btn-accent AIInSide" disabled type="button"aria-expanded="false">WAI Insights</button>
                                     </div>
                                 </div>
                             </div>
@@ -135,7 +135,7 @@
                    <div id="insightsWrapper" style="display:none;">
                         <div class="d-flex justify-content-between align-items-center mt-3 mb-2">
                             <h5 class="mb-0"><i class="fa fa-robot me-1"></i> WAI Insights</h5>
-                            <button type="button" class="btn btn-sm btn-secondary" id="backToReportData">
+                            <button type="button" class="btn eb-btn-secondary" id="backToReportData">
                                 <i class="fa fa-arrow-left me-1"></i> Back to Report Data
                             </button>
                         </div>
@@ -145,7 +145,7 @@
             <div class="card-footer">
                 <div class="row">
                     <div class="col">
-                        <a href="{{ route('resort.report.index') }}" class="btn btn-sm btn-danger">Back to Reports</a>
+                        <a href="{{ route('resort.report.index') }}" class="btn eb-btn-secondary">Back to Reports</a>
                     </div>  
                     <div class="col-auto">
                         <div class="dropdown">
@@ -159,6 +159,7 @@
         </div>
     </div>
 </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')

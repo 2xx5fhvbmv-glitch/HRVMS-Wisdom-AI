@@ -65,9 +65,9 @@
                                     </select>
                                 </td>
                                 <td>
-                                    <button class="btn btn-theme btn-sm edit-bonus-btn" data-rank="{{ $row->rank }}">Edit</button>
-                                    <button class="btn btn-themeBlue btn-sm save-bonus-btn d-none" data-rank="{{ $row->rank }}">Save</button>
-                                    <button class="btn btn-themeGray btn-sm cancel-bonus-btn d-none" data-rank="{{ $row->rank }}">Cancel</button>
+                                    <button class="btn perf-btn-secondary btn-sm edit-bonus-btn" data-rank="{{ $row->rank }}">Edit</button>
+                                    <button class="btn perf-btn-primary btn-sm save-bonus-btn d-none" data-rank="{{ $row->rank }}">Save</button>
+                                    <button class="btn perf-btn-neutral btn-sm cancel-bonus-btn d-none" data-rank="{{ $row->rank }}">Cancel</button>
                                 </td>
                             </tr>
                         @endforeach
@@ -77,6 +77,7 @@
         </div>
     </div>
 </div>
+@include('resorts.Performance._performance_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')

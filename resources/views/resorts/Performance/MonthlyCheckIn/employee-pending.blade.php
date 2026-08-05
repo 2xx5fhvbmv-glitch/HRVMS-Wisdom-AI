@@ -28,8 +28,8 @@
                                 <div class="mb-1"><strong>Time:</strong> {{ $p->start_time }} - {{ $p->end_time }}</div>
                                 <div class="mb-2"><strong>Meeting Place:</strong> {{ $p->Meeting_Place }}</div>
                                 <div class="d-flex gap-2">
-                                    <button type="button" class="btn btn-theme btn-sm approve-btn" data-id="{{ $p->id }}">Approve</button>
-                                    <button type="button" class="btn btn-danger btn-sm reject-btn" data-id="{{ $p->id }}">Reject</button>
+                                    <button type="button" class="btn perf-btn-positive btn-sm approve-btn" data-id="{{ $p->id }}">Approve</button>
+                                    <button type="button" class="btn perf-btn-critical btn-sm reject-btn" data-id="{{ $p->id }}">Reject</button>
                                 </div>
                             </div>
                         </div>
@@ -55,13 +55,14 @@
                     <textarea name="reason" class="form-control" rows="4" required placeholder="Please explain why you are rejecting this check-in"></textarea>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-themeGray btn-sm" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-danger btn-sm">Submit Rejection</button>
+                    <button type="button" class="btn perf-btn-neutral btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn perf-btn-critical btn-sm">Submit Rejection</button>
                 </div>
             </div>
         </form>
     </div>
 </div>
+@include('resorts.Performance._performance_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')

@@ -13,7 +13,7 @@
                     </div>
                 </div>
                 <div class="col-auto">
-                    <a href="{{ route('Survey.DownloadQuestionAndAns', base64_encode($parent->id)) }}" class="btn btn-theme DownloadQuestionAndAns" data-id="{{ base64_encode($parent->id) }}">
+                    <a href="{{ route('Survey.DownloadQuestionAndAns', base64_encode($parent->id)) }}" class="btn eb-btn-secondary DownloadQuestionAndAns" data-id="{{ base64_encode($parent->id) }}">
                         <i class="fa-regular fa-download me-1"></i> Download
                     </a>
                 </div>
@@ -145,7 +145,7 @@
                                     <span id="statusError" class="text-danger small"></span>
                                 </div>
                                 <div class="col-auto">
-                                    <button class="btn btn-theme btn-sm" type="submit">Update status</button>
+                                    <button class="btn eb-btn-primary btn-sm" type="submit">Update status</button>
                                 </div>
                             </form>
                         </div>
@@ -156,6 +156,7 @@
 
     </div>
 </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')

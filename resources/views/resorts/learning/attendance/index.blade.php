@@ -45,7 +45,7 @@
                         </div>
 
                         <div class="col-xl-5 col-lg-3 col-md-2 col-sm-6 ms-auto text-end">
-                            <button id="mark-attendance-btn" class="btn btn-themeBlue btn-sm">Mark Attendance</button>
+                            <button id="mark-attendance-btn" class="btn lnd-btn-accent btn-sm">Mark Attendance</button>
                         </div>
                     </div>
                 </div>
@@ -94,12 +94,13 @@
                     </table>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-success" id="save-attendance">Save</button>
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn lnd-btn-primary" id="save-attendance">Save</button>
+                    <button type="button" class="btn lnd-btn-neutral" data-bs-dismiss="modal">Cancel</button>
                 </div>
             </div>
         </div>
     </div>
+@include('resorts.Learning._learning_buttons_v2_styles')
 @endsection
 
 @section('import-css')

@@ -13,10 +13,10 @@
                     </div>
                 </div>
                 <div class="col-auto d-flex gap-2">
-                    <a href="{{ route('feedback-form.edit', $form->id) }}" class="btn btn-themeBlue btn-sm">
+                    <a href="{{ route('feedback-form.edit', $form->id) }}" class="btn lnd-btn-secondary btn-sm">
                         <i class="fa-solid fa-pen-to-square me-1"></i> Edit
                     </a>
-                    <a href="{{ route('feedback-form.index') }}" class="btn btn-themeGray btn-sm">
+                    <a href="{{ route('feedback-form.index') }}" class="btn lnd-btn-neutral btn-sm">
                         <i class="fa-solid fa-arrow-left me-1"></i> Back
                     </a>
                 </div>
@@ -30,6 +30,7 @@
         </div>
     </div>
 </div>
+@include('resorts.Learning._learning_buttons_v2_styles')
 @endsection
 
 @section('import-css')

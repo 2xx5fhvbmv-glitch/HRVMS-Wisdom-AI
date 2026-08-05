@@ -121,7 +121,7 @@ class AssignAccommodationController extends Controller
                             return '<span class="badge badge-danger">Full</span>';
                         }
                         $id = base64_encode($row->id);
-                        return '<a href="#" id="Bedshow" class="btn btn-themeSkyblueLight btn-small '.$edit_class.'" data-id="'.$id.'">Select Bed</a>';
+                        return '<a href="#" id="Bedshow" class="btn eb-btn-accent btn-small '.$edit_class.'" data-id="'.$id.'">Select Bed</a>';
                     })
                     ->editColumn('FloorNo', function ($row)
                     {

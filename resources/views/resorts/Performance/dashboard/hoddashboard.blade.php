@@ -250,7 +250,7 @@
                                     <input type="text" class="form-control datepicker RosterDate" id="RosterDate">
                                 </div>
                             </div>
-                            <div class="col-auto"><a href="{{route('resort.timeandattendance.CreateDutyRoster')}}" class="btn btn-themeSkyblue btn-sm">Create Duty
+                            <div class="col-auto"><a href="{{route('resort.timeandattendance.CreateDutyRoster')}}" class="btn perf-btn-accent btn-sm">Create Duty
                                     Roster</a>
                             </div>
                         </div>
@@ -328,10 +328,10 @@
                     </div>
                     <div class="row g-2 justify-content-center mb-3">
                         <div class="col-auto">
-                            <button type="submit" class="btn btn-themeBlue btn-sm todoListApprove" data-button="approve"><i  class="fa-solid fa-check me-2"></i>Approved</button>
+                            <button type="submit" class="btn perf-btn-positive btn-sm todoListApprove" data-button="approve"><i  class="fa-solid fa-check me-2"></i>Approved</button>
                         </div>
                         <div class="col-auto">
-                            <button type="submit" class="btn btn-danger btn-sm todoListReject"  data-button="reject"><i class="fa-solid fa-xmark me-2"></i>Reject</button>
+                            <button type="submit" class="btn perf-btn-critical btn-sm todoListReject"  data-button="reject"><i class="fa-solid fa-xmark me-2"></i>Reject</button>
                         </div>
                     </div>
 
@@ -354,6 +354,7 @@
         </div>
     </div>
 </div>
+@include('resorts.Performance._performance_buttons_v2_styles')
 @endsection
 
 @section('import-css')

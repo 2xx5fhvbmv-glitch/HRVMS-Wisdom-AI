@@ -20,7 +20,7 @@
                 </div>
                 <div class="col-auto ms-auto">
                     @if($canCreateCycle ?? false)
-                        <a href="{{ route('Performance.create') }}" class="btn btn-theme">Create New Cycle</a>
+                        <a href="{{ route('Performance.create') }}" class="btn perf-btn-hero">Create New Cycle</a>
                     @endif
                 </div>
             </div>
@@ -65,7 +65,7 @@
                                     <p><img src="{{ URL::asset('resorts_assets/images/users.svg') }}" alt="icon"> {{ $p->child_count }} Employees</p>
                                 </div>
                                 <div>
-                                    <a href="{{ route('Performance.cycle.view', base64_encode($p->id)) }}" class="btn btn-themeSkyblue btn-xsmall"><i class="fa-regular fa-eye me-1"></i> View</a>
+                                    <a href="{{ route('Performance.cycle.view', base64_encode($p->id)) }}" class="btn perf-btn-secondary btn-xsmall"><i class="fa-regular fa-eye me-1"></i> View</a>
                                     <a href="#" class="btn-tableIcon btnIcon-danger cycle-delete" data-id="{{ base64_encode($p->id) }}"><i class="fa-regular fa-trash-can"></i></a>
                                 </div>
                             </div>
@@ -91,9 +91,18 @@
 
     </div>
 </div>
+@include('resorts.Performance._performance_buttons_v2_styles')
 @endsection
 
 @section('import-css')
+<style>
+    /* .btnIcon-danger is a shared global class (also used by benifitgrid)
+       with an old dark-red (#A90000), not the agreed brand Critical
+       scarlet — override just this page's delete icon rather than the
+       shared class, which would silently recolor the other module too. */
+    .btn-tableIcon.cycle-delete { color: #FF2400; background: rgba(255,36,0,.09); }
+    .btn-tableIcon.cycle-delete:hover { color: #fff; background: #FF2400; }
+</style>
 @endsection
 
 @section('import-scripts')
@@ -131,13 +140,13 @@ $(document).ready(function(){
             var main_id = $(this).data('id');
 
             Swal.fire({
-                title: 'Sure want to delete?',
+                title: 'Are you sure you want to delete?',
                 text: 'This cannot be undone',
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonText: 'Yes',
                 cancelButtonText: 'No',
-                confirmButtonColor: "#DD6B55"
+                confirmButtonColor: "#FF2400"
              }).then((result) => {
                 if (result.isConfirmed)
                 {

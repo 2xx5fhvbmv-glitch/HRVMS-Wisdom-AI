@@ -19,7 +19,7 @@
                         </div>
                     </div>
                     <div class="col-auto">
-                        <a href="{{ route('learning.request.index') }}" class="btn btn-theme">View All</a>
+                        <a href="{{ route('learning.request.index') }}" class="btn lnd-btn-secondary">View All</a>
                     </div>
                 </div>
             </div>
@@ -103,7 +103,7 @@
                         </div>
 
                         <div class="card-footer text-end">
-                            <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                            <button type="submit" class="btn lnd-btn-primary btn-sm">Submit</button>
                         </div>
                     </div>
                 </form>
@@ -111,6 +111,7 @@
 
         </div>
     </div>
+@include('resorts.Learning._learning_buttons_v2_styles')
 @endsection
 
 @section('import-css')

@@ -34,7 +34,7 @@
                                 || in_array($_curPos, $_ldTitles, true);
                         @endphp
                         @if($_canAddSchedule)
-                            <a href="{{route('learning.schedule')}}" class="btn btn-theme">Add Learning Schedule</a>
+                            <a href="{{route('learning.schedule')}}" class="btn lnd-btn-accent">Add Learning Schedule</a>
                         @endif
                     </div>
                 </div>
@@ -60,6 +60,7 @@
         </div>
     </div>
 </div>
+@include('resorts.Learning._learning_buttons_v2_styles')
 @endsection
 
 @section('import-css')

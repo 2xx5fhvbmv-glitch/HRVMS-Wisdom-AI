@@ -130,9 +130,9 @@
 
             </div>
             <div class="modal-footer">
-                 <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
+                 <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Cancel</a>
                 <button type="submit"
-                    class="btn btn-themeBlue">Submit</button>
+                    class="btn eb-btn-primary">Submit</button>
             </div>
         </form>
         </div>
@@ -151,12 +151,13 @@
 
             </div>
             <div class="modal-footer">
-                <!-- <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a> -->
-                <a href="#" data-bs-toggle="modal" data-bs-dismiss="modal" class="btn btn-themeBlue">Submit</a>
+                <!-- <a href="#" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Cancel</a> -->
+                <a href="#" data-bs-toggle="modal" data-bs-dismiss="modal" class="btn eb-btn-primary">Submit</a>
             </div>
         </div>
     </div>
 </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')

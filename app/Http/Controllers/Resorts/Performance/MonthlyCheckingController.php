@@ -829,7 +829,7 @@ class MonthlyCheckingController extends Controller
                 return '<span class="badge badge-themeWarning">Pending Approval</span>';
             })
             ->addColumn('action', function ($row) {
-                return '<a href="'.route('Performance.GetMonthlyCheckInDetails', $row->id).'" class="btn btn-theme btn-sm">View</a>';
+                return '<a href="'.route('Performance.GetMonthlyCheckInDetails', $row->id).'" class="btn perf-btn-secondary btn-sm">View</a>';
             })
             ->rawColumns(['employee', 'status_badge', 'action'])
             ->make(true);

@@ -71,7 +71,7 @@
                                         </select>
                                     </div>
                                     <div class="col-12">
-                                        <a href="javascript:void(0);" class="btn btn-themeSkyblue btn-sm AddAppendTeamMember blockAdd-btn">Add More</a>
+                                        <a href="javascript:void(0);" class="btn eb-btn-accent btn-sm AddAppendTeamMember blockAdd-btn">Add More</a>
                                     </div>
                                 </div>
                                 <div class="AppendTeamMemberDiv"></div>
@@ -99,7 +99,7 @@
                             <div id="team-description-error"></div>
                         </div>
                         <div class="card-footer text-end">
-                            <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                            <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                         </div>
                     </form>
                     
@@ -142,14 +142,14 @@
                                         </select>
                                     </div>
                                     <div class="col-12">
-                                        <a href="javascript:void(0);" class="btn btn-themeSkyblue btn-sm AddAppendRolesPermission blockAdd-btn">Add More</a>
+                                        <a href="javascript:void(0);" class="btn eb-btn-accent btn-sm AddAppendRolesPermission blockAdd-btn">Add More</a>
                                     </div>
                                 </div>
                                 <div class="AppendSOSRolesAndPermDiv"></div>
                             </div>
                         </div>
                         <div class="card-footer text-end">
-                            <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                            <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                         </div>
                     </form>
                 </div>
@@ -195,7 +195,7 @@
                                 </select>
                             </div>
                             <div class="col-12">
-                                <button id="add-custom-field" type="button" class="btn btn-sm btn-theme">Add custom Field </button>
+                                <button id="add-custom-field" type="button" class="btn eb-btn-accent btn-sm">Add custom Field </button>
                             </div>
                             <div class="col-12">
                                 <div id="custom-fields-container">
@@ -204,7 +204,7 @@
                             </div>
                         </div>
                         <div class="card-footer text-end">
-                            <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                            <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                         </div>
                     </form>
                     
@@ -214,6 +214,7 @@
 
     </div>
 </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -288,7 +289,7 @@
 
                 <!-- Remove Button -->
                 <div class="col-md-6 d-flex align-items-end">
-                    <button type="button" class="btn btn-danger btn-sm TeamMemberRemove" 
+                    <button type="button" class="btn eb-btn-critical btn-sm TeamMemberRemove" 
                             data-id="${TeamMemberCount}">
                         <i class="fa fa-trash"></i> 
                     </button>
@@ -359,7 +360,7 @@
 
                 <!-- Remove Button -->
                 <div class="col-md-6 d-flex align-items-end">
-                    <button type="button" class="btn btn-danger btn-sm RolesAndPermRemove" 
+                    <button type="button" class="btn eb-btn-critical btn-sm RolesAndPermRemove" 
                             data-id="${SoSRolesCount}">
                         <i class="fa fa-trash"></i> 
                     </button>
@@ -543,7 +544,7 @@
                     <input type="text" name="custom_field_values[]" class="form-control" placeholder="Field Value">
                 </div>
                 <div class="col-auto">
-                    <button type="button" class="btn btn-danger remove-custom-field">Remove</button>
+                    <button type="button" class="btn eb-btn-critical remove-custom-field">Remove</button>
                 </div>
             `;
             document.getElementById('custom-fields-container').appendChild(container);

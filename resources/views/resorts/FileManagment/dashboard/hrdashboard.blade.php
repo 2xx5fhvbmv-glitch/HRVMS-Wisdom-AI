@@ -18,7 +18,7 @@
                         <h1>Dashboard</h1>
                     </div>
                 </div>
-                <div class="col-auto  ms-auto"><a class="btn btn-theme UploadDocumentbutton " href="javascript:void(0)"  >Upload Document</a></div>
+                <div class="col-auto  ms-auto"><a class="btn eb-btn-accent UploadDocumentbutton " href="javascript:void(0)"  >Upload Document</a></div>
             </div>
         </div>
 
@@ -244,7 +244,7 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body ">
-                    <div class="text-end mb-2"><a href="javascript:void(0)" class="btn btn-themeSkyblue btn-sm AddFolder">+ Add Folder</a>
+                    <div class="text-end mb-2"><a href="javascript:void(0)" class="btn eb-btn-accent btn-sm AddFolder">+ Add Folder</a>
                     </div>
                     <div class="AppendFolder">
 
@@ -258,8 +258,8 @@
                                         <input type="text" class="form-control d-none"  />
                                         <h5>{{ $f->Folder_Name}}</h5>
                                     </div>
-                                    <a href="javascript:void(0)" class="btn-lg-icon icon-bg-green selFolLoc-edit"   data-name="{{ $f->Folder_Name}}" data-id="{{  base64_encode($f->id)  }}">
-                                        <img src="{{ URL::asset('resorts_assets/images/edit.svg')}}" alt="" class="img-fluid" />
+                                    <a href="javascript:void(0)" class="btn-tableIcon btnIcon-yellow selFolLoc-edit"   data-name="{{ $f->Folder_Name}}" data-id="{{  base64_encode($f->id)  }}">
+                                        <i class="fa-solid fa-pen-to-square"></i>
                                     </a>
                                 </div>
                             @endforeach
@@ -267,8 +267,8 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                    <a class="btn btn-themeBlue FileUploadButton" href="javascript:void(0)">Upload File</a>
+                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Cancel</a>
+                    <a class="btn eb-btn-primary FileUploadButton" href="javascript:void(0)">Upload File</a>
                 </div>
             </div>
         </div>
@@ -320,8 +320,8 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                    <a href="#postUploadPrompt-modal" data-bs-toggle="modal" data-bs-dismiss="modal" class="btn btn-themeBlue UpoladInternalFileForm">Upload</a>
+                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Cancel</a>
+                    <a href="#postUploadPrompt-modal" data-bs-toggle="modal" data-bs-dismiss="modal" class="btn eb-btn-primary UpoladInternalFileForm">Upload</a>
                     </div>
             </form>
         </div>
@@ -339,8 +339,8 @@
                     <img src="{{ URL::asset('resorts_assets/images/scan.svg')}}" alt="image">
                     <h4>Would You Like To Process This File As A Scanned Document For Enhanced Clarity?</h4>
                     <div>
-                        <button  type="button" class="btn btn-themeBlue btn-sm me-md-4 me-2 SaveFiles" data-id="SaveAsStandard" >Save As Standard</button>
-                        <button  type="button" class="btn btn-themeGray btn-sm SaveFiles" data-id="EnhanceAndSave">Enhance And Save</button>
+                        <button  type="button" class="btn eb-btn-primary btn-sm me-md-4 me-2 SaveFiles" data-id="SaveAsStandard" >Save As Standard</button>
+                        <button  type="button" class="btn eb-btn-accent btn-sm SaveFiles" data-id="EnhanceAndSave">Enhance And Save</button>
                     </div>
                 </div>
             </div>
@@ -364,12 +364,13 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <a href="javascript:void(0)" id="close-crop-btn" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Close</a>
-                    <a href="javascript:void(0)" id="crop-btn" class="btn btn-themeBlue">Crop</a>
+                    <a href="javascript:void(0)" id="close-crop-btn" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Close</a>
+                    <a href="javascript:void(0)" id="crop-btn" class="btn eb-btn-primary">Crop</a>
                 </div>
             </div>
         </div>
     </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -406,7 +407,7 @@ document.getElementById("file").addEventListener("change", function (event) {
         // Create buttons column based on file type
         const actionColumn = isImage ? 
             `<td>
-                <a href="#" class="btn btn-sm btn-themeSkyblue crop-btn" data-index="${index}">Crop</a>
+                <a href="#" class="btn eb-btn-accent btn-sm crop-btn" data-index="${index}">Crop</a>
             </td>` : 
             `<td>-</td>`;
         
@@ -757,8 +758,8 @@ document.getElementById('file').addEventListener('change', function (e) {
                                 <input type="text" class="form-control d-none" />
                                 <h5>New Folder</h5>
                             </div>
-                            <a href="#" class="btn-lg-icon icon-bg-green selFolLoc-edit">
-                                <img src="{{ URL::asset('resorts_assets/images/edit.svg')}}" alt="" class="img-fluid" />
+                            <a href="#" class="btn-tableIcon btnIcon-yellow selFolLoc-edit">
+                                <i class="fa-solid fa-pen-to-square"></i>
                             </a>
                     </div>`);
     });
@@ -778,7 +779,7 @@ document.getElementById('file').addEventListener('change', function (e) {
                             <div>
                 <input type="text" class="form-control" name="FolderName" value="${name}"/>
                             </div>
-                                        <a href="javascript:void(0)" class="btn btn-theme update-row-btn SubmitFolder" data-id="${id}">Submit</a>
+                                        <a href="javascript:void(0)" class="btn eb-btn-primary update-row-btn SubmitFolder" data-id="${id}">Submit</a>
 
         `);
        

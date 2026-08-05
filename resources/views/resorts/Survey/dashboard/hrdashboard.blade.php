@@ -19,7 +19,7 @@
                     </div>
                 </div>
                 <div class="col-auto ms-auto">
-                    <a href="{{ route('Survey.create') }}" class="btn btn-theme @if(Common::checkRouteWisePermission('Survey.Surveylist',config('settings.resort_permissions.create')) == false) d-none @endif">Create Survey</a>
+                    <a href="{{ route('Survey.create') }}" class="btn eb-btn-accent @if(Common::checkRouteWisePermission('Survey.Surveylist',config('settings.resort_permissions.create')) == false) d-none @endif">Create Survey</a>
                 </div>
                 <!-- <div class="col-xxl-2 col-auto ms-auto">
                     <select class="form-select select2t-none" id="select-budgeted"
@@ -474,12 +474,13 @@
 
                 </div>
                 <div class="modal-footer">
-                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
+                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Cancel</a>
                 </div>
         </div>
     </div>
 </div>
 @includeWhen(isset($surveyInsights), 'resorts.Survey.dashboard._insight_modals')
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')

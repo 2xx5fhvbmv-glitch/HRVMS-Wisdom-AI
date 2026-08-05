@@ -112,7 +112,7 @@
                         </nav>
                      </div>
                      <div class="col-auto">
-                        <button type="button" class="btn btn-themeBlue btn-sm" id="MoveDoc">Move</button>
+                        <button type="button" class="btn eb-btn-accent btn-sm" id="MoveDoc">Move</button>
                      </div>
                   </div>
                </div>
@@ -137,7 +137,7 @@
                      </table>
                   </div>
                </div>
-               <div class="card-footer text-end"><a href="javascript:void(0)" class="MoveAllFiles btn btn-themeBlue btn-sm" >Submit</a></div>
+               <div class="card-footer text-end"><a href="javascript:void(0)" class="MoveAllFiles btn eb-btn-primary btn-sm" >Submit</a></div>
             </div>
          </div>
       </div>
@@ -218,8 +218,8 @@
             </div>
          </div>
          <div class="modal-footer">
-            <button type="button" class="btn btn-themeGray me-2" data-bs-dismiss="modal">Cancel</button>
-            <button type="button" class="btn btn-themeBlue" id="shareSubmitBtn">Share</button>
+            <button type="button" class="btn eb-btn-neutral me-2" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" class="btn eb-btn-primary" id="shareSubmitBtn">Share</button>
          </div>
       </div>
    </div>
@@ -269,8 +269,8 @@
                <input type="text" class="form-control" name="renameFile" id="renameFile" placeholder="Visa.pdf">
             </div>
             <div class="modal-footer">
-               <a href="javascritpt:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-               <button type="submit" class="btn btn-themeBlue">Submit</button>
+               <a href="javascritpt:void(0)" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Cancel</a>
+               <button type="submit" class="btn eb-btn-primary">Submit</button>
             </div>
          </form>
       </div>
@@ -328,8 +328,8 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <a href="javascript:void(0)"  class="btn btn-themeGray ms-auto RestAdvancedfilter">Reset</a>
-                    <button type="button"  class="btn btn-themeBlue SubmutAdvancefilter">Search</a>
+                    <a href="javascript:void(0)"  class="btn eb-btn-neutral ms-auto RestAdvancedfilter">Reset</a>
+                    <button type="button"  class="btn eb-btn-primary SubmutAdvancefilter">Search</a>
                 </div>
             </form>
       </div>
@@ -356,8 +356,8 @@
                 </div> <!-- Added missing closing tag for modal-body -->
 
                 <div class="modal-footer ">
-                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                    <button type="submit" class="btn btn-themeBlue">Submit</button>
+                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Cancel</a>
+                    <button type="submit" class="btn eb-btn-primary">Submit</button>
                 </div>
             </form> <!-- Closing form correctly -->
         </div>
@@ -372,7 +372,7 @@
         <div class="modal-header">
                 <h5 class="modal-title" id="staticBackdropLabel">Download File</h5>
                
-                <a href="" class="btn btn-smbtn-primary downloadLink" target="_blank"> Download</a>
+                <a href="" class="btn eb-btn-secondary downloadLink" target="_blank"> Download</a>
                
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
@@ -385,8 +385,8 @@
                    
                 </div>
                 <div class="modal-footer">
-                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                    <button type="submit" class="btn btn-themeBlue">Submit</button>
+                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Cancel</a>
+                    <button type="submit" class="btn eb-btn-primary">Submit</button>
                 </div>
    
         </div>
@@ -397,6 +397,7 @@
     <img id="largeImage" src="" alt="Large View">
 </div>
 
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 @section('import-css')
 

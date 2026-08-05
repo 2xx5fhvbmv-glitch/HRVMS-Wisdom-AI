@@ -19,7 +19,7 @@
                         </div>
                     </div>
                     <div class="col-auto ms-auto">
-                        <a class="btn btn-theme @if(Common::checkRouteWisePermission('support.index',config('settings.resort_permissions.create')) == false) d-none @endif" href="#raiseATicket-modal" data-bs-toggle="modal">
+                        <a class="btn eb-btn-accent @if(Common::checkRouteWisePermission('support.index',config('settings.resort_permissions.create')) == false) d-none @endif" href="#raiseATicket-modal" data-bs-toggle="modal">
                             Raise a Ticket
                         </a>
                     </div>
@@ -134,14 +134,15 @@
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-themeGray ms-auto" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-themeBlue">Submit</button>
+                        <button type="button" class="btn eb-btn-neutral ms-auto" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn eb-btn-primary">Submit</button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
 
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -175,7 +176,7 @@
                 contentType: false,
                 processData: false,
                 beforeSend: function() {
-                    $('.btn-themeBlue').prop('disabled', true).text('Submitting...');
+                    $('.eb-btn-primary').prop('disabled', true).text('Submitting...');
                 },
                 success: function(response) {
                     if (response.success) {
@@ -224,7 +225,7 @@
                     }
                 },
                 complete: function() {
-                    $('.btn-themeBlue').prop('disabled', false).text('Submit');
+                    $('.eb-btn-primary').prop('disabled', false).text('Submit');
                 }
             });
         });

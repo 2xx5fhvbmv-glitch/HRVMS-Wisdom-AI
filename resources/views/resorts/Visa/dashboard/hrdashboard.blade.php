@@ -362,7 +362,7 @@
                                         <label for="attachments" class="form-label">ATTACHMENTS</label>
                                         <div class="uploadFile-block">
                                             <div class="uploadFile-btn">
-                                                <a href="javascript:void(0)" class="btn btn-themeBlue btn-sm">Upload Files</a>
+                                                <a href="javascript:void(0)" class="btn eb-btn-accent btn-sm">Upload Files</a>
                                                 <input type="file" name="transectionFile" id="uploadFile" name="attachment">
                                             </div>
                                             <div class="uploadFile-text"></div>
@@ -371,7 +371,7 @@
                                 </div>
 
                                 <div class="card-footer text-end mt-xl-4 mt-3">
-                                    <button type="submit" class="btn btn-themeBlue btn-sm">Transfer Amount</button>
+                                    <button type="submit" class="btn eb-btn-primary btn-sm">Transfer Amount</button>
                                 </div>
                             </form>
 
@@ -417,8 +417,8 @@
                                                         <div class="reconciliation-block">
                                                             <div>
                                                                 <div class="d-flex align-items-center">
-                                                                       <h6>{{$VisaWallet->Xpact_WalletName}}   <a href="javascript:void(0)" class="edit-visa-wallet"  data-amt="{{base64_encode($VisaWallet->Xpact_Amt)}}" data-name="{{base64_encode($VisaWallet->Xpact_WalletName)}}" data-id="{{ base64_encode($VisaWallet->id) }}" class="me-2">
-                                                                        <img src="{{URL::asset('resorts_assets/images/edit.svg')}}" alt="icon">
+                                                                       <h6>{{$VisaWallet->Xpact_WalletName}}   <a href="javascript:void(0)" class="btn-tableIcon btnIcon-yellow edit-visa-wallet me-2" title="Edit" data-amt="{{base64_encode($VisaWallet->Xpact_Amt)}}" data-name="{{base64_encode($VisaWallet->Xpact_WalletName)}}" data-id="{{ base64_encode($VisaWallet->id) }}">
+                                                                        <i class="fa-solid fa-pen-to-square"></i>
                                                                     </a> </h6>
                                                                 </div>
                                                             
@@ -553,8 +553,8 @@
                 </div>
 
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                    <button type="button" class="btn eb-btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                 </div>
             </form>
         </div>
@@ -586,13 +586,14 @@
                 </div>
 
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn eb-btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
           
         </div>
     </div>
 </div>
 @includeWhen(isset($visaInsights), 'resorts.Visa.dashboard._insight_modals')
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')

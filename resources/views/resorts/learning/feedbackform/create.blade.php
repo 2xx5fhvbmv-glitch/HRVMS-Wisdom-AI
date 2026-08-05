@@ -57,7 +57,7 @@
                                 </div>
                             </div>
                             <div class="card-footer text-end"> <!-- Footer for Save Form button -->
-                                <button id="save-form" class="btn btn-themeBlue btn-sm">Save Form</button>
+                                <button id="save-form" class="btn lnd-btn-primary btn-sm">Save Form</button>
                             </div>
                         </div>
                     </div>
@@ -65,6 +65,7 @@
             </div>
         </div>
     </div>
+@include('resorts.Learning._learning_buttons_v2_styles')
 @endsection
 
 @section('import-css')
