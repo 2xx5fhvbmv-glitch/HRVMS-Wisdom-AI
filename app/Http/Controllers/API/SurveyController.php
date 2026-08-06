@@ -280,6 +280,23 @@ class SurveyController extends Controller
         }
         $employee_id = (int) $employee->id;
 
+        // Nothing previously stopped answers being submitted for a survey
+        // whose End_date has already passed — trust boundary gap, not just
+        // a UI nicety (the closing-date status flip is a separate cron
+        // check, this validates the actual write regardless of whether
+        // that cron has run yet).
+        $targetSurvey = ParentSurvey::where('id', $request->parent_survey_id[0])
+            ->where('resort_id', $this->resort_id)
+            ->first(['id', 'Status', 'End_date']);
+        if (!$targetSurvey) {
+            return response()->json(['success' => false, 'message' => 'Survey not found'], 200);
+        }
+        $isExpired = $targetSurvey->Status === 'Complete'
+            || \Carbon\Carbon::parse($targetSurvey->End_date)->endOfDay()->isPast();
+        if ($isExpired) {
+            return response()->json(['success' => false, 'message' => 'This survey has closed and no longer accepts responses.'], 200);
+        }
+
         if (
             count($request->parent_survey_id) !== count($request->survey_emp_ta_id) ||
             count($request->parent_survey_id) !== count($request->question_id) ||
@@ -358,8 +375,12 @@ class SurveyController extends Controller
                                                                 ->update(['emp_status' => "yes"]);
             }
 
-            $hrEmployee = Common::FindResortHR($this->user);
-            if ($hrEmployee) {
+            // FindResortHR() only ever returns the first HR match (->first())
+            // — a resort with more than one HR/HOD/EXCOM in the HR
+            // department silently left everyone but that one person with no
+            // "survey completed" notification.
+            $hrEmployeeIds = Common::getResortHrEmployeeIds($this->resort_id);
+            if (!empty($hrEmployeeIds)) {
                 Common::sendMobileNotification(
                     $this->resort_id,
                     2,
@@ -368,7 +389,7 @@ class SurveyController extends Controller
                     'Survey Completed',
                     '📝 A survey has been completed by ' . $this->user->first_name . ' ' . $this->user->last_name . '.',
                     'Survey',
-                    [$hrEmployee->id],
+                    $hrEmployeeIds,
                     $request->parent_survey_id[0],
                     false,
                     'survey-completed',
