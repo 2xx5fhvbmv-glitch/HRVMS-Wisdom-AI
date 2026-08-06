@@ -1092,7 +1092,6 @@ class VacancyController extends Controller
         ->join('resort_departments as t4','t4.id','=','vacancies.department')
         ->join('resort_positions as t5','t5.id','=','vacancies.position')
         ->join('resort_admins as t6','t6.id','=','t1.Admin_Parent_id')
-        ->join('job_advertisements as t7', 't7.Resort_id', '=', 'vacancies.Resort_id')
         ->leftjoin('application_links as t8', 't8.ta_child_id', '=', 't3.id')
         ->leftjoin('applicant_form_data as t9', 't9.Parent_v_id', '=', 'vacancies.id')
         ->where('vacancies.Resort_id',$resort_id)
@@ -1114,7 +1113,6 @@ class VacancyController extends Controller
                         'vacancies.required_starting_date',
                         'vacancies.budgeted as Budget',
                         'vacancies.employee_type as EmployeeType',
-                        't7.Jobadvimg',
                         't8.link as adv_link',
                         't8.link_Expiry_date as ExpiryDate',
                         // DB::raw('SUM(t9.id) as t9_id_sum')
@@ -1139,7 +1137,7 @@ class VacancyController extends Controller
                 $vacancy->Required = Carbon::createFromFormat('Y-m-d', $vacancy->required_starting_date)->format('Y-m-d');
                 $vacancy->ReportingTo =  ucfirst($vacancy->first_name.'  ' .$vacancy->last_name);
                 $vacancy->applicationUrlshow = substr($applicant_link, 0, 30).'...';
-                $vacancy->JobAdvertisement = Common::GetJobAdvertisementImage($resort_id, $vacancy->Jobadvimg);
+                $vacancy->JobAdvertisement = Common::resolveVacancyPosterImage($resort_id, $vacancy->V_id);
                 return $vacancy;
         });
         $page_title = 'View All To Do';
@@ -1217,13 +1215,6 @@ class VacancyController extends Controller
             $isHrUser = stripos($userDeptName ?? '', 'Human Resources') !== false;
             $isGM = (int)$employeeRank === 8;
             $canSeeAllDepts = $isHrUser || $isGM;
-
-            // Fetch all job ad images for this resort (for carousel).
-            // Use the driver-aware helper so Wasabi/S3 storage URLs work
-            // on live, not just local dev.
-            $allJobAdImages = \App\Models\JobAdvertisement::where('Resort_id', $resort_id)->get()->map(function($ad) use ($resort_id) {
-                return Common::GetJobAdvertisementImage($resort_id, $ad->Jobadvimg);
-            })->values()->toArray();
 
             $NewVacancies = Vacancies::join("resort_departments as t1", "t1.id", "=", "vacancies.department")
             ->join("resort_positions as t2", "t2.id", "=", "vacancies.position")
@@ -1368,7 +1359,7 @@ class VacancyController extends Controller
             $v->ApplicationDate =  Carbon::parse($v->Application_date)->format('d M Y');
             $v->ExpiryDate = Carbon::parse($v->link_Expiry_date)->format('d M Y');
             $v->ApplicationId= $v->application_id;
-            $v->allJobAdImages = json_encode($allJobAdImages);
+            $v->allJobAdImages = json_encode([Common::resolveVacancyPosterImage($resort_id, $v->vacancy_id)]);
 
             // Hired status — drives the new "Hired" column. Three states:
             //   • filled = required → "1 of 1" green
@@ -1557,16 +1548,10 @@ class VacancyController extends Controller
                                 )->paginate(10);
 
 
-                    // Fetch all job ad images for this resort. Driver-aware
-                    // helper handles local/wasabi/s3 — URL::asset() only
-                    // worked for local.
-                    $gridAllJobAdImages = \App\Models\JobAdvertisement::where('Resort_id', $resort_id)->get()->map(function($ad) use ($resort_id) {
-                        return Common::GetJobAdvertisementImage($resort_id, $ad->Jobadvimg);
-                    })->values()->toArray();
-
-                    $NewVacancies->getCollection()->transform(function ($vacancy) use ($gridAllJobAdImages, $resort_id) {
-                        $vacancy->image = !empty($gridAllJobAdImages) ? $gridAllJobAdImages[0] : null;
-                        $vacancy->allJobAdImages = $gridAllJobAdImages;
+                    $NewVacancies->getCollection()->transform(function ($vacancy) use ($resort_id) {
+                        $poster = Common::resolveVacancyPosterImage($resort_id, $vacancy->vacancy_id);
+                        $vacancy->image = $poster;
+                        $vacancy->allJobAdImages = [$poster];
                         $vacancy->ExpiryDate = $vacancy->link_Expiry_date ? Carbon::parse($vacancy->link_Expiry_date)->format('d M Y') : null;
                         return $vacancy;
                     });

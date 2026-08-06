@@ -1383,6 +1383,31 @@ class Common
         return \Storage::disk($driver)->url($relPath);
     }
 
+    /**
+     * Which poster a specific vacancy should show: its own
+     * (job_advertisements.vacancy_id = $vacancyId), falling back to the
+     * resort-wide default (vacancy_id IS NULL — the only kind of row that
+     * existed before per-vacancy posters were added). Every
+     * grid/dashboard/modal that shows a vacancy's poster should call this
+     * instead of independently joining/fetching job_advertisements by
+     * Resort_id alone, which is what made every vacancy show the same
+     * poster in the first place.
+     */
+    public static function resolveVacancyPosterImage($resortId, $vacancyId)
+    {
+        $ad = JobAdvertisement::where('Resort_id', $resortId)
+            ->where('vacancy_id', $vacancyId)
+            ->first();
+
+        if (!$ad) {
+            $ad = JobAdvertisement::where('Resort_id', $resortId)
+                ->whereNull('vacancy_id')
+                ->first();
+        }
+
+        return self::GetJobAdvertisementImage($resortId, $ad->Jobadvimg ?? null);
+    }
+
     public static function nofitication($resortid,$type,$Msgid= 0,$Budget_id=0,$other='',$sendto='',$moduleName="",$pageId=null)
     {
         if($type==1)

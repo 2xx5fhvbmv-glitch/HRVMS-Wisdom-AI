@@ -301,9 +301,12 @@ class SurveyController extends Controller
             // initial create flow.
             $notifyParticipants = $request->Status === 'Publish';
             $notificationTitle = ' Survey Request';
-            $notificationMessage = "Survey  request for **'{$survey->Surevey_title}'** has been submitted for feedback.
-                                    **Dates:** {$startDate} to {$endDate}
-                                    **Please  participants.";
+            // Mobile notification bodies render as plain text, not markdown
+            // — **bold** syntax was showing up as literal asterisks on the
+            // notification list instead of being rendered.
+            $notificationMessage = "Survey request for '{$survey->Surevey_title}' has been submitted for feedback. "
+                . "Dates: {$startDate} to {$endDate}. "
+                . "Please participate in the survey. If you have already participated, kindly ignore this message.";
             foreach ($Emp_id as $e) {
                 $employeeId = (int) base64_decode($e);
                 if ($employeeId <= 0) continue;
@@ -488,9 +491,9 @@ class SurveyController extends Controller
                 
 
                 $notificationTitle = ' Survey Request';
-                $notificationMessage = "Survey  request for **'{$survey->Surevey_title}'** has been submitted for feedback.  
-                                        **Dates:** {$startDate} to {$endDate}  
-                                        **Please  participants.";
+                $notificationMessage = "Survey request for '{$survey->Surevey_title}' has been submitted for feedback. "
+                    . "Dates: {$startDate} to {$endDate}. "
+                    . "Please participate in the survey. If you have already participated, kindly ignore this message.";
         
                 $moduleName = "Survey";
                 foreach($Emp_id as $e)
@@ -583,7 +586,11 @@ class SurveyController extends Controller
                                 ->get(['t2.first_name','t2.last_name','t2.id as ParentId'] )
                                 ->map(function($i){
                                     $i->EmployeeName = ucfirst($i->first_name . ' ' .  $i->last_name);
-                                    $i->profileImg = Common::getResortUserPicture($i->Parentid);
+                                    // Same Parentid/ParentId casing typo as the mobile survey
+                                    // endpoint — always null, so every participant avatar
+                                    // silently fell back to the default placeholder (or
+                                    // rendered blank if that placeholder itself didn't load).
+                                    $i->profileImg = Common::getResortUserPicture($i->ParentId);
                                     return $i;
                                 });
 
@@ -990,9 +997,9 @@ class SurveyController extends Controller
       
             $ParentSurvey = ParentSurvey::where('id', $id)->first();
             $notificationTitle = ' Survey Request';
-            $notificationMessage = "Survey request for **'{$ParentSurvey->Surevey_title}'** has been submitted for feedback.  
-                                    **Dates:** {$ParentSurvey->Start_date} to {$ParentSurvey->End_date}  
-                                    **Please participate in the survey. If you have already participated, kindly ignore this message.**";
+            $notificationMessage = "Survey request for '{$ParentSurvey->Surevey_title}' has been submitted for feedback. "
+                . "Dates: {$ParentSurvey->Start_date} to {$ParentSurvey->End_date}. "
+                . "Please participate in the survey. If you have already participated, kindly ignore this message.";
             
             $moduleName = "Survey";
             $SurveyEmployee = SurveyEmployee::where("Parent_survey_id",$ParentSurvey->id)->get();
@@ -1087,7 +1094,13 @@ class SurveyController extends Controller
             }
         }
 
-        $deadlineStart = Carbon::today()->format('Y-m-d');
+        // Was whereBetween(today, today+3) — a survey already past its
+        // deadline (e.g. the status-flip cron hasn't run yet, or it's still
+        // "OnGoing") fell out of the window entirely and never appeared
+        // here, even with participants who never responded. An overdue
+        // survey with pending participants is more urgent than one merely
+        // approaching its deadline, not less — only the upper bound (the
+        // "nearing" cutoff) makes sense as a limit here.
         $deadlineEnd = Carbon::today()->addDays(3)->format('Y-m-d');
 
         $ParentSurvey = ParentSurvey::join('survey_employees as t1', 't1.Parent_survey_id', '=', 'parent_surveys.id')
@@ -1095,7 +1108,7 @@ class SurveyController extends Controller
             ->join('resort_admins as t3', 't3.id', '=', 't2.Admin_Parent_id')
             ->where('parent_surveys.resort_id', $this->resort->resort_id)
             ->whereIn('parent_surveys.Status', ['Publish', 'OnGoing'])
-            ->whereBetween('parent_surveys.End_date', [$deadlineStart, $deadlineEnd])
+            ->where('parent_surveys.End_date', '<=', $deadlineEnd)
             ->select(
                 'parent_surveys.id',
                 'parent_surveys.Status',

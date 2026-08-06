@@ -13,6 +13,7 @@ class JobAdvertisement extends Model
     protected $table = 'job_advertisements';
     protected $fillable = [
                                 'Resort_id',
+                                'vacancy_id',
                                 'Jobadvimg',
                                 'created_by',
                                 'modified_by',

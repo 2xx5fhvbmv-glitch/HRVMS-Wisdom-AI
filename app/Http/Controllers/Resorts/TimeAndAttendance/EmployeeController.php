@@ -429,7 +429,16 @@ class EmployeeController extends Controller
             || ($isHRDeptForAccess && (in_array($employeeRankPosition['rank'], ['EXCOM', 'HOD']) || in_array($employeeRankPosition['position'], ['EXCOM', 'HOD'])));
 
         if (!$canViewAll) {
-            if (in_array($employeeRankPosition['rank'], ['HOD', 'MGR']) || in_array($employeeRankPosition['position'], ['HOD', 'MGR'])) {
+            // Was missing 'EXCOM' here (present in the identical check in
+            // index() and EmployeeList() right above) — an EXCOM viewing
+            // this grid fell through to subordinate-chain-only scoping
+            // instead of their whole department, which both excludes
+            // themselves (getSubordinates() never includes the caller) and
+            // drops any department member whose reporting_to happens to
+            // point outside the department even though Dept_id doesn't.
+            // Exactly why "Total Employees: 6" on the dashboard (a plain
+            // Dept_id count) didn't match this grid showing only 4.
+            if (in_array($employeeRankPosition['rank'], ['HOD', 'MGR', 'EXCOM']) || in_array($employeeRankPosition['position'], ['HOD', 'MGR', 'EXCOM'])) {
                 $employees->where('employees.Dept_id', $Dept_id);
             } else {
                 $employees->whereIn('employees.id', $this->underEmp_id);
