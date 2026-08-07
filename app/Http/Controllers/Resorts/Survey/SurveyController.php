@@ -767,27 +767,45 @@ class SurveyController extends Controller
     public function TotalApplicant($id)
     {
 
+        $surveyId = base64_decode($id);
+        $privacy = ParentSurvey::where('id', $surveyId)->value('survey_privacy_type');
+        $showRespondentIdentity = $this->canSeeRespondentIdentity($privacy);
+
         $parent = ParentSurvey::join('survey_employees as t1',"t1.Parent_survey_id","=","parent_surveys.id")
                     ->join('employees as t2',"t2.id","=","t1.Emp_id")
                     ->join('resort_admins as t3',"t3.id","=","t2.Admin_Parent_id")
-                    ->where("parent_surveys.id",base64_decode($id))
+                    ->where("parent_surveys.id",$surveyId)
                     ->where('parent_surveys.resort_id',$this->resort->resort_id)
 
-                    ->get(['t3.id as Parentid','t3.first_name','t3.last_name','t1.Emp_id'])
-                    ->map(function($ak){
+                    ->get(['t3.id as Parentid','t3.first_name','t3.last_name','t1.Emp_id','t1.emp_status'])
+                    ->values()
+                    ->map(function($ak, $idx) use ($showRespondentIdentity, $privacy){
 
-                        $ak->EmployeeName = ucfirst($ak->first_name . ' ' . $ak->last_name);
-                        $ak->profileImg = Common::getResortUserPicture($ak->Parentid);
+                        // Same masking as GetSurveyResults()/Result.blade —
+                        // was showing every assigned employee's real name
+                        // unconditionally, defeating Anonymous/Confidential
+                        // privacy for anyone who had already submitted.
+                        // Pending (not-yet-responded) participants still
+                        // show real names — chasing non-responders is a
+                        // legitimate need and doesn't leak who answered.
+                        if ($ak->emp_status === 'yes' && !$showRespondentIdentity) {
+                            $label = $privacy === 'Anonymous' ? 'Anonymous Respondent' : 'Confidential Respondent';
+                            $ak->EmployeeName = $label . ' #' . ($idx + 1);
+                            $ak->profileImg = asset('resorts_assets/images/user.svg');
+                        } else {
+                            $ak->EmployeeName = ucfirst($ak->first_name . ' ' . $ak->last_name);
+                            $ak->profileImg = Common::getResortUserPicture($ak->Parentid);
+                        }
                         return $ak;
                     });
 
-        $row='';    
+        $row='';
         if($parent->isNotEmpty())
         {
             foreach($parent as $p)
             {
 
-                
+
                     $row .='<div class="col-sm-6">
                                 <div class="d-flex align-items-center employee-name-box">
                                     <div class="img-box">

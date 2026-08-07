@@ -12,7 +12,16 @@
                         <h1>{{ $page_title }}</h1>
                     </div>
                 </div>
-                <div class="col-auto">
+                <div class="col-auto d-flex gap-2">
+                    {{-- Was only reachable from the Complete-survey list's
+                         eye-icon and the dashboards' "View Details" link —
+                         every other list (main Surveylist, etc.) lands here
+                         on Survey.view instead, which has no response data
+                         of its own, so there was no way to see who
+                         answered what from this page at all. --}}
+                    <a href="{{ route('Survey.GetSurveyResults', base64_encode($parent->id)) }}" class="btn btn-themeSkyblue" target="_blank">
+                        <i class="fa-regular fa-chart-bar me-1"></i> View Responses
+                    </a>
                     <a href="{{ route('Survey.DownloadQuestionAndAns', base64_encode($parent->id)) }}" class="btn btn-theme DownloadQuestionAndAns" data-id="{{ base64_encode($parent->id) }}">
                         <i class="fa-regular fa-download me-1"></i> Download
                     </a>
