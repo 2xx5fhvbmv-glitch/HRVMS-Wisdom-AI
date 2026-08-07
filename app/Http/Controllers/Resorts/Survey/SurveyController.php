@@ -881,7 +881,14 @@ class SurveyController extends Controller
             ->addColumn('Action', function ($row) {
                 $id = base64_encode($row->id);
 
-                $view = route('Survey.view',$id);
+                // Every row on this list is Status='Complete' (see the
+                // whereIn above), so the results page is always the right
+                // destination — Survey.view only renders the question
+                // template, never the respondents/response-rate/answers,
+                // which is what "view responses" on a completed survey
+                // actually means. Matches what the dashboards' own "View
+                // Details" link already does (Survey.GetSurveyResults).
+                $view = route('Survey.GetSurveyResults',$id);
                             return '
                             <div  class="d-flex align-items-center">
                                 <a target="_blank" href="'.$view.'" class="btn-lg-icon icon-bg-skyblue"><img src="' . asset("resorts_assets/images/eye.svg") . '" alt="icon"></a>
@@ -1101,13 +1108,20 @@ class SurveyController extends Controller
         // survey with pending participants is more urgent than one merely
         // approaching its deadline, not less — only the upper bound (the
         // "nearing" cutoff) makes sense as a limit here.
+        //
+        // Status also has to include 'Complete': SurveychangeStatus (the
+        // daily cron) flips Status to Complete the moment End_date passes,
+        // regardless of participation — so an actually-overdue survey is
+        // already 'Complete', not still 'OnGoing', by the time anyone
+        // looks at this page. Excluding it here is why expired surveys
+        // never showed up.
         $deadlineEnd = Carbon::today()->addDays(3)->format('Y-m-d');
 
         $ParentSurvey = ParentSurvey::join('survey_employees as t1', 't1.Parent_survey_id', '=', 'parent_surveys.id')
             ->join('employees as t2', 't2.id', '=', 't1.Emp_id')
             ->join('resort_admins as t3', 't3.id', '=', 't2.Admin_Parent_id')
             ->where('parent_surveys.resort_id', $this->resort->resort_id)
-            ->whereIn('parent_surveys.Status', ['Publish', 'OnGoing'])
+            ->whereIn('parent_surveys.Status', ['Publish', 'OnGoing', 'Complete'])
             ->where('parent_surveys.End_date', '<=', $deadlineEnd)
             ->select(
                 'parent_surveys.id',
