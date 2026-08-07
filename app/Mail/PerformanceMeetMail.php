@@ -6,6 +6,7 @@ use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
 use Illuminate\Queue\SerializesModels;
+use App\Helpers\Common;
 
 class PerformanceMeetMail extends Mailable
 {
@@ -18,10 +19,12 @@ class PerformanceMeetMail extends Mailable
      */
     public $body;
     public $subject;
-    public function __construct($subject,$body)
+    public $resort_id;
+    public function __construct($subject,$body,$resort_id = null)
     {
         $this->subject = $subject;
         $this->body= $body;
+        $this->resort_id = $resort_id;
     }
 
     /**
@@ -31,6 +34,10 @@ class PerformanceMeetMail extends Mailable
      */
     public function build()
     {
+        // ->queue() runs on a separate queue-worker process, so the
+        // request-time config() override (ApplyResortSmtpConfig
+        // middleware) never reaches this — re-apply here.
+        Common::applyResortSmtpConfig($this->resort_id);
 
         return $this->subject('Performance Meeting Invitation')
                      ->view('emails.commonEmail') // Blade template

@@ -43,6 +43,7 @@ use App\Models\ApplicantInterViewDetails;
 use URL;
 use App\Models\ManningResponse;
 use App\Models\JobAdvertisement;
+use App\Models\ResortSmtpConfig;
 use App\Models\PositionMonthlyData;
 use App\Models\DutyRoster;
 use App\Models\DutyRosterEntry;
@@ -2900,6 +2901,37 @@ class Common
 	}
 
 	/**
+	 * Single choke point every mail-sending path routes through: overrides
+	 * the smtp mailer + from-address with the resort's own SMTP config, if
+	 * one exists. No row for the resort = no-op, system default (.env)
+	 * stays in effect. Laravel resolves the smtp mailer transport lazily,
+	 * so calling this once before any Mail::send()/Mail::to() in the same
+	 * request/job is enough — no per-caller changes needed.
+	 */
+	public static function applyResortSmtpConfig($resortId)
+	{
+		if (empty($resortId)) {
+			return;
+		}
+
+		$config = ResortSmtpConfig::where('resort_id', $resortId)->first();
+
+		if (!$config) {
+			return;
+		}
+
+		config([
+			'mail.mailers.smtp.host' => $config->host,
+			'mail.mailers.smtp.port' => $config->port,
+			'mail.mailers.smtp.username' => $config->username,
+			'mail.mailers.smtp.password' => $config->password,
+			'mail.mailers.smtp.encryption' => $config->encryption,
+			'mail.from.address' => $config->from_address,
+			'mail.from.name' => $config->from_name,
+		]);
+	}
+
+	/**
      * Send email using a template */
 	public static function sendTemplateEmail($Module =null,$templateId, $recipientEmail, $dynamicData)
 	{
@@ -2913,6 +2945,7 @@ class Common
                 $body = self::replacePlaceholders($template->content, $dynamicData);
 
                 $subject = self::replacePlaceholders($template->subject, $dynamicData);
+                $resortId = $template->resort_id;
             }
             if($Module=="TalentAcquisition")
             {
@@ -2921,9 +2954,10 @@ class Common
                 $body = self::replacePlaceholders($template->MailTemplete, $dynamicData);
 
                 $subject = self::replacePlaceholders($template->MailSubject, $dynamicData);
+                $resortId = $template->Resort_id;
             }
 
-			TaEmailSent::dispatch($recipientEmail, $subject, ['mainbody' => $body]);
+			TaEmailSent::dispatch($recipientEmail, $subject, ['mainbody' => $body], $resortId ?? null);
 
 			return true;
 		} catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {

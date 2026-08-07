@@ -458,7 +458,7 @@ class ContractResponseController extends Controller
                 <p>{$resortName}</p>
             ";
 
-            TaEmailSent::dispatch($applicant->email, $subject, ['mainbody' => $body]);
+            TaEmailSent::dispatch($applicant->email, $subject, ['mainbody' => $body], $contract->resort_id);
         } catch (\Exception $e) {
             \Log::warning("Failed to send contract email: " . $e->getMessage());
         }
@@ -482,7 +482,7 @@ class ContractResponseController extends Controller
                 <p>Regards,<br>HR Team<br>" . ($resort->resort_name ?? '') . "</p>
             ";
 
-            \App\Jobs\TaEmailSent::dispatch($applicant->email, $subject, ['mainbody' => $body]);
+            \App\Jobs\TaEmailSent::dispatch($applicant->email, $subject, ['mainbody' => $body], $resort->id);
         } catch (\Exception $e) {
             \Log::warning("Welcome email failed: " . $e->getMessage());
         }
