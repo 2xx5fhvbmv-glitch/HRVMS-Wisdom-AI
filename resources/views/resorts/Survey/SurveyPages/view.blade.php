@@ -72,14 +72,14 @@
                                 <div class="min-w-0 flex-grow-1">
                                     <div class="text-uppercase text-muted" style="font-size: 0.7rem; letter-spacing: 0.02em;">Participants</div>
                                     @if($participantEmp->isNotEmpty())
-                                        <div class="d-flex align-items-center gap-2 flex-wrap">
+                                        <a href="javascript:void(0)" class="d-flex align-items-center gap-2 flex-wrap text-decoration-none showTotalapplicant" data-id="{{ base64_encode($parent->id) }}">
                                             @foreach($participantEmp as $e)
                                                 <div class="rounded-circle overflow-hidden flex-shrink-0 border border-2 border-white shadow-sm" style="width: 26px; height: 26px;" title="{{ $e->EmployeeName }}">
                                                     <img src="{{ $e->profileImg }}" alt="" class="w-100 h-100 object-fit-cover">
                                                 </div>
                                             @endforeach
                                             <span class="fw-500 text-body small">{{ $participantEmp->count() }} participant(s)</span>
-                                        </div>
+                                        </a>
                                     @else
                                         <div class="fw-500 text-body small text-muted">No participants assigned</div>
                                     @endif
@@ -156,6 +156,26 @@
 
     </div>
 </div>
+
+<div class="modal fade show" id="Surveyparticipant" tabindex="-1" aria-labelledby="exampleModalLabel" aria-modal="true" role="dialog">
+    <div class="modal-dialog modal-dialog-centered modal-small">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="staticBackdropLabel">Survey Participant</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="employee-name-content">
+                    <div class="row g-3 AppendinRow">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
+            </div>
+        </div>
+    </div>
+</div>
 @endsection
 
 @section('import-css')
@@ -201,11 +221,29 @@
                     }
         });
 
-      
+
+        $(document).on('click', '.showTotalapplicant', function() {
+            var id = $(this).data('id');
+
+            $("#Surveyparticipant").modal('show');
+            $('.AppendinRow').html('No Record Found.     ');
+            let url = "{{ route('Survey.TotalApplicant', ':id') }}";
+            url = url.replace(':id', id);
+            $.ajax({
+                url: url,
+                method: "GET",
+                success: function(response) {
+                    $('.AppendinRow').html(response);
+                },
+                error: function(xhr, status, error) {
+                    console.error('Error fetching data:', error);
+                }
+            });
+        });
 
     });
 
 
-    
+
 </script>
 @endsection
