@@ -515,7 +515,7 @@ class PerformanceMeetingController extends Controller
 
             $finalBody = str_replace($placeholders, $replacements, $emailTemplate);
             Mail::to($employee->resortAdmin->email)->queue(
-                new PerformanceMeetMail($request->title, $finalBody)
+                new PerformanceMeetMail($request->title, $finalBody, $this->resort->resort_id)
             );
         }
 
