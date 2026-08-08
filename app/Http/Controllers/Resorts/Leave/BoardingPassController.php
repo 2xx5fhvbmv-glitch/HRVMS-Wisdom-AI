@@ -53,9 +53,16 @@ class BoardingPassController extends Controller
         ->where('status', 'Approved')
         ->where('resort_id', $resort_id)
         ->whereHas('employeeTravelPassStatusData', function($q) {
-            // Confirm rank 2 is approved
+            // Confirm the HOD step is approved — was approver_rank=2 only,
+            // which missed any pass whose HOD step was actually filled by
+            // an EXCOM (rank 1) standing in for a department with no HOD.
+            // approver_role would be the more precise filter here, but real
+            // data shows it's NULL on every existing row (not reliably
+            // populated despite the create-flow setting it in code) — so
+            // widening the rank filter is the safe fix, not switching
+            // columns.
             $q->where('status', 'Approved')
-              ->where('approver_rank', 2);
+              ->whereIn('approver_rank', [1, 2]);
         });
         
         if (!empty($datefilter)) {

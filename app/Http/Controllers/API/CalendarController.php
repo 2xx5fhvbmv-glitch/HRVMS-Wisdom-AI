@@ -233,11 +233,19 @@ class CalendarController extends Controller
                                                                         ->where('events.resort_id', $this->resort_id)
                                                                         ->select('events.*')
                                                                         ->distinct()
-                                                                    : Events::join('child_events as ce', 'ce.event_id', '=', 'events.id')
+                                                                    // leftJoin (not join) + created_by OR — a creator who
+                                                                    // didn't add themselves to the invite list had no
+                                                                    // child_events row at all, so the inner join dropped
+                                                                    // their own event entirely from their own calendar.
+                                                                    : Events::leftJoin('child_events as ce', 'ce.event_id', '=', 'events.id')
                                                                         ->where('events.status', '=', 'accept')
                                                                         ->where('events.resort_id', $this->resort_id)
-                                                                        ->where('ce.employee_id', $emp_id)
-                                                                        ->select('events.*'),
+                                                                        ->where(function ($q) use ($emp_id) {
+                                                                            $q->where('ce.employee_id', $emp_id)
+                                                                              ->orWhere('events.created_by', $emp_id);
+                                                                        })
+                                                                        ->select('events.*')
+                                                                        ->distinct(),
 
                 'employee_probation'                            =>  Employee::query()->where('resort_id', $this->resort_id)
                                                                     ->where('employment_type','Probationary')

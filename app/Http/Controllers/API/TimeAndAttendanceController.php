@@ -1407,7 +1407,9 @@ class TimeAndAttendanceController extends Controller
         $isHOD   = ($rank == 2 || $rank === '2');
 
         $canViewAll = ($isHRDept || $isEODept) && ($isGM || $isEXCOM || $isHOD);
-        $isDeptHOD  = ($rank == 2 && $deptId && $department && !$isHRDept);
+        // HOD and EXCOM get identical dept-wide permission for a non-HR
+        // department — was HOD-only.
+        $isDeptHOD  = (($isHOD || $isEXCOM) && $deptId && $department && !$isHRDept);
 
         $isAllowed = $canViewAll
             || ($isDeptHOD && (int) $targetEmployee->Dept_id === (int) $deptId)
@@ -3946,8 +3948,9 @@ class TimeAndAttendanceController extends Controller
             $isHOD    = ($rank == 2 || $rank === '2');
 
             $canViewAll = ($isHRDept || $isEODept) && ($isGM || $isEXCOM || $isHOD);
+            // HOD and EXCOM get identical dept-wide permission — was HOD-only.
             $isDeptHOD  = false;
-            if ($rank == 2 && $deptId && $department && !$isHRDept) {
+            if (($isHOD || $isEXCOM) && $deptId && $department && !$isHRDept) {
                 $isDeptHOD = true;
             }
 

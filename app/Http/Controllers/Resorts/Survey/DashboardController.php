@@ -68,8 +68,9 @@ class DashboardController extends Controller
             return true;
         }
 
-        // Department HOD (rank 2 in non-HR dept) also sees whole resort data on survey dashboard
-        if ($isHOD) {
+        // Department HOD or EXCOM (rank 2 or 1 in non-HR dept) also sees
+        // whole resort data on survey dashboard — was HOD-only.
+        if ($isHOD || $isEXCOM) {
             return true;
         }
 

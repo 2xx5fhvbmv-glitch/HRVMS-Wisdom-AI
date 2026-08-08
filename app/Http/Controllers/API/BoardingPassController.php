@@ -294,14 +294,14 @@ class BoardingPassController extends Controller
                     $passApprovalFlow->push($hrApprover); // Third approver: HR
                 }
 
-                // Add HOD to the approval flow (rank 2)
-                // Onboarding/inactive employees can carry a valid rank/dept
-                // (a placeholder record before onboarding completes), so an
-                // unfiltered, unordered first() could non-deterministically
-                // resolve one of those instead of the real active HOD —
-                // confirmed against real data where a department had 3
-                // rank=2 employees, only one of them Active.
-                $hodApprover                             =   Employee::select('id', 'rank')->where('rank', 2)->where('resort_id',$this->resort_id)->where('Dept_id', $employee->Dept_id)->where('status', 'Active')->orderBy('id')->first();
+                // Add department head to the approval flow — HOD (rank 2),
+                // falls back to EXCOM (rank 1) via FindResortHODDepartment()
+                // for departments with no rank-2 employee. That helper also
+                // already excludes inactive placeholder rows (onboarding
+                // records can carry a valid rank/dept before onboarding
+                // completes — confirmed against real data where a
+                // department had 3 rank=2 employees, only one Active).
+                $hodApprover                             =   Common::FindResortHODDepartment($this->resort_id, $employee->Dept_id);
                 if ($hodApprover ) {
                     $hodApprover->approver_role          =   'HOD';
                     $passApprovalFlow->push($hodApprover); // Second approver: HOD
@@ -1278,8 +1278,10 @@ class BoardingPassController extends Controller
             $startDate                              =   Carbon::today();
             $endDate                                =   $filter === 'week' ? Carbon::today()->endOfWeek() : Carbon::today();
 
-            // Build query based on user rank
-            if($employee->rank == 2) {
+            // Build query based on user rank — HOD (2) and EXCOM (1) get the
+            // same department-scoped view; was HOD-only, so EXCOM fell into
+            // the narrower branch below.
+            if(in_array((int) $employee->rank, [1, 2])) {
                 $query                              =   EmployeeTravelPass::with([
                                                             'employee:id,Admin_Parent_id,Position_id',
                                                             'employee.resortAdmin:id,first_name,last_name,profile_picture',

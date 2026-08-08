@@ -1147,8 +1147,8 @@ class AccommodationController extends Controller
                                                                     ->where('status', 'Pending')
                                                                     ->first();
 
-            if ($housekeepingSchCheck) {// Add HOD to the approval flow (rank 2)
-                        $hodApprover                             =   Employee::select('id', 'rank')->where('rank', 2)->where('resort_id',$user->resort_id)->where('Dept_id', $employee->Dept_id)->first();
+            if ($housekeepingSchCheck) {// Add department head to the approval flow — HOD (rank 2), falls back to EXCOM (rank 1)
+                        $hodApprover                             =   Common::FindResortHODDepartment($user->resort_id, $employee->Dept_id);
                         if ($hodApprover ) {
                             $passApprovalFlow->push($hodApprover); // Second approver: HOD
                         }
@@ -1261,9 +1261,11 @@ class AccommodationController extends Controller
                                                                     ->where('housekeeping_schedules.id', $scheduleId)
                                                                     ->first();
 
+            // HOD (2) and EXCOM (1) — was HOD-only, so an EXCOM-headed
+            // department showed no contact here at all.
             $hodData                                        =   Employee::join('resort_admins', 'resort_admins.id', "=", 'employees.Admin_Parent_id')
                                                                     ->where('employees.resort_id', $this->resort_id)
-                                                                    ->where("employees.rank", 2)
+                                                                    ->whereIn("employees.rank", [1, 2])
                                                                     ->get(['employees.id', 'employees.Admin_Parent_id', 'employees.resort_id', 'employees.Emp_id', 'resort_admins.first_name', 'resort_admins.last_name']);
             // Prepare response data
             $scheduleRes                                    =   [

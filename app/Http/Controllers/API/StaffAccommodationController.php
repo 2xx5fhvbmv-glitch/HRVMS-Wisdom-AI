@@ -265,8 +265,13 @@ class StaffAccommodationController extends Controller
 
         try {
             DB::beginTransaction();
-            $date                                       =   DateTime::createFromFormat('d/m/Y', $request->date);
-            $date                                       =   isset($request->date) ? $date->format('Y-m-d') :  date('Y-m-d');
+            // createFromFormat() returns false (not an exception) on any
+            // mismatch — a date sent in the wrong format (or any format
+            // other than exactly d/m/Y) made $parsedDate false, and
+            // ->format() on false was a fatal "call to member function on
+            // bool", not a clean validation error.
+            $parsedDate                                 =   $request->filled('date') ? DateTime::createFromFormat('d/m/Y', $request->date) : false;
+            $date                                       =   $parsedDate ? $parsedDate->format('Y-m-d') : date('Y-m-d');
             $path_path                                  =   config('settings.MaintanceRequest') . '/' . Auth::guard('api')->user()->resort->resort_id;
 
             // Building/floor/room must come from the employee's own accommodation
@@ -302,8 +307,13 @@ class StaffAccommodationController extends Controller
                 $status     =   Common::AWSEmployeeFileUpload($this->resort_id, $file, $this->user->GetEmployee->Emp_id, $SubFolder, true);
 
                 if ($status['status'] == false) {
+                    // Was returning without ever committing or rolling back
+                    // the transaction opened above — every other exit path
+                    // out of this method does one or the other, this one
+                    // left the connection with an open transaction.
+                    DB::rollBack();
                     return response()->json([
-                        'success'           =>  false, 
+                        'success'           =>  false,
                         'message'           =>  'File upload failed: ' . ($status['msg'] ?? 'Unknown error')
                     ], 400);
                 } else {
@@ -574,8 +584,13 @@ class StaffAccommodationController extends Controller
 
         try {
             DB::beginTransaction();
-            $date                                       =   DateTime::createFromFormat('d/m/Y', $request->date);
-            $date                                       =   isset($request->date) ? $date->format('Y-m-d') :  date('Y-m-d');
+            // createFromFormat() returns false (not an exception) on any
+            // mismatch — a date sent in the wrong format (or any format
+            // other than exactly d/m/Y) made $parsedDate false, and
+            // ->format() on false was a fatal "call to member function on
+            // bool", not a clean validation error.
+            $parsedDate                                 =   $request->filled('date') ? DateTime::createFromFormat('d/m/Y', $request->date) : false;
+            $date                                       =   $parsedDate ? $parsedDate->format('Y-m-d') : date('Y-m-d');
             $path_path                                  =   config('settings.MaintanceRequest') . '/' . Auth::guard('api')->user()->resort->resort_id;
             
             $maintanaceRequestEdit                      =   MaintanaceRequest::find($request->request_id);

@@ -400,9 +400,9 @@ class ExitClearanceController extends Controller
                 ->first();
             $deptLabel = $department ? $department->name : ('Department #' . $department_id);
 
-            $employee = Employee::where('resort_id', $resort_id)->where('Dept_id',$department_id)
-            ->where('rank',2)
-            ->first();
+            // HOD (rank 2), falls back to EXCOM (rank 1) — still counts as
+            // department head — before falling further back to HR/Manager.
+            $employee = Common::FindResortHODDepartment($resort_id, $department_id);
 
             if (!$employee) {
                 $employee = Employee::where('resort_id', $resort_id)->where('Dept_id',$department_id)

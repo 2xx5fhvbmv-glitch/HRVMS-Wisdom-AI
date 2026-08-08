@@ -177,6 +177,15 @@ class RequestController extends Controller
             // Mobile app posts the files as "attachments"; older builds used
             // the misspelled "attechments" key, so accept either.
             $attachmentFiles = $request->file('attachments') ?? $request->file('attechments');
+            // A failed upload (S3/storage error, bad file, etc.) was silently
+            // swallowed — the request still saved and returned "Request Send
+            // Successfully" with an empty attachments array, giving the app
+            // (and the employee) no indication their file never made it in.
+            // Surface it instead so the app can tell the user and let them
+            // retry, rather than only finding out later that the attachment
+            // is missing.
+            $attachmentUploadFailed = false;
+            $attachmentUploadError = null;
             if($attachmentFiles) {
                      $imagePaths = [];
                     foreach ($attachmentFiles as $file) {
@@ -184,6 +193,8 @@ class RequestController extends Controller
                         $status =   Common::AWSEmployeeFileUpload($this->resort_id,$file, $this->user->GetEmployee->Emp_id,$SubFolder,true);
 
                         if ($status['status'] == false) {
+                            $attachmentUploadFailed = true;
+                            $attachmentUploadError  = $status['msg'] ?? 'Attachment upload failed.';
                             break;
                         } else {
                             if($status['status'] == true && isset($status['Chil_file_id']) && !empty($status['Chil_file_id'])) {
@@ -287,7 +298,11 @@ class RequestController extends Controller
             $PayrollAdvance->attachments = $this->resolveAttachments($PayrollAdvance->PayrollAdvanceAttachment);
             return response()->json([
                 'success'                               =>  true,
-                'message'                               =>  "Request Send Successfully.",
+                'message'                               =>  $attachmentUploadFailed
+                                                                ? "Request Send Successfully, but your attachment could not be uploaded. Please try attaching it again."
+                                                                : "Request Send Successfully.",
+                'attachment_upload_failed'              =>  $attachmentUploadFailed,
+                'attachment_upload_error'               =>  $attachmentUploadFailed ? $attachmentUploadError : null,
                 'data'                                  =>  $PayrollAdvance
             ], 200);
 
