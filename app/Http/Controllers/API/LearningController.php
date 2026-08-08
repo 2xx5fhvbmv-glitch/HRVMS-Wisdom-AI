@@ -484,18 +484,16 @@ class LearningController extends Controller
         }
 
         try {
-            $startDate                              =   Carbon::now()->startOfMonth()->format('Y-m-d');
-            $endDate                                =   Carbon::now()->endOfMonth()->format('Y-m-d');
             $employeeId                             =   $this->user->GetEmployee->id;
+            // Was hard-restricted to the current calendar month on every
+            // query below — web's equivalent (Learning\DashboardController::
+            // admin_dashboard()) counts by status only, resort-wide, no date
+            // window at all. A training scheduled/completed outside the
+            // current month (e.g. this employee's only session, April 2026,
+            // viewed in August) fell out of every one of these queries,
+            // making the whole mobile dashboard show zeros while web (same
+            // underlying data, no month filter) showed the real counts.
             $pendingCount                           =     TrainingSchedule::where('resort_id', $this->resort_id)
-                                                            ->where(function ($query) use ($startDate, $endDate) {
-                                                            $query->whereBetween('start_date', [$startDate, $endDate])
-                                                                    ->orWhereBetween('end_date', [$startDate, $endDate])
-                                                                    ->orWhere(function ($subQuery) use ($startDate, $endDate) {
-                                                                        $subQuery->where('start_date', '<=', $startDate)
-                                                                                ->where('end_date', '>=', $endDate);
-                                                                    });
-                                                                })
                                                                 ->whereHas('participants', function ($query) use ($employeeId) {
                                                                     $query->where('employee_id', $employeeId);
                                                                 })
@@ -504,14 +502,6 @@ class LearningController extends Controller
 
 
             $completedHours                         =     TrainingSchedule::where('resort_id', $this->resort_id)
-                                                                ->where(function ($query) use ($startDate, $endDate) {
-                                                                $query->whereBetween('start_date', [$startDate, $endDate])
-                                                                        ->orWhereBetween('end_date', [$startDate, $endDate])
-                                                                        ->orWhere(function ($subQuery) use ($startDate, $endDate) {
-                                                                            $subQuery->where('start_date', '<=', $startDate)
-                                                                                    ->where('end_date', '>=', $endDate);
-                                                                        });
-                                                                    })
                                                                     ->whereHas('participants', function ($query) use ($employeeId) {
                                                                         $query->where('employee_id', $employeeId);
                                                                     })
@@ -535,14 +525,6 @@ class LearningController extends Controller
             $dashboardArr['pending_training_count']     =   $pendingCount; 
 
             $sessions                               =   TrainingSchedule::where('resort_id', $this->resort_id)
-                                                            ->where(function ($query) use ($startDate, $endDate) {
-                                                            $query->whereBetween('start_date', [$startDate, $endDate])
-                                                                ->orWhereBetween('end_date', [$startDate, $endDate])
-                                                                ->orWhere(function ($subQuery) use ($startDate, $endDate) {
-                                                                    $subQuery->where('start_date', '<=', $startDate)
-                                                                            ->where('end_date', '>=', $endDate);
-                                                                });
-                                                            })
                                                             ->whereHas('participants', function ($query) use ($employeeId) {
                                                                 $query->where('employee_id', $employeeId);
                                                             })
@@ -555,28 +537,12 @@ class LearningController extends Controller
                                                             ])->get();
 
             $assignedCount                          =   TrainingSchedule::where('resort_id', $this->resort_id)
-                                                            ->where(function ($query) use ($startDate, $endDate) {
-                                                            $query->whereBetween('start_date', [$startDate, $endDate])
-                                                                    ->orWhereBetween('end_date', [$startDate, $endDate])
-                                                                    ->orWhere(function ($subQuery) use ($startDate, $endDate) {
-                                                                        $subQuery->where('start_date', '<=', $startDate)
-                                                                                ->where('end_date', '>=', $endDate);
-                                                                    });
-                                                            })
                                                             ->whereHas('participants', function ($query) use ($employeeId) {
                                                                 $query->where('employee_id', $employeeId);
                                                             })
                                                             ->count();
-                                                        
+
              $completedCount                         =   TrainingSchedule::where('resort_id', $this->resort_id)
-                                                            ->where(function ($query) use ($startDate, $endDate) {
-                                                            $query->whereBetween('start_date', [$startDate, $endDate])
-                                                                    ->orWhereBetween('end_date', [$startDate, $endDate])
-                                                                    ->orWhere(function ($subQuery) use ($startDate, $endDate) {
-                                                                        $subQuery->where('start_date', '<=', $startDate)
-                                                                                ->where('end_date', '>=', $endDate);
-                                                                    });
-                                                            })
                                                             ->whereHas('participants', function ($query) use ($employeeId) {
                                                                 $query->where('employee_id', $employeeId);
                                                             })
@@ -602,7 +568,6 @@ class LearningController extends Controller
             }
             
             $learningRequests                       =   LearningRequest::join("learning_requests_employees as lre", "learning_requests.id", "=", 'lre.learning_request_id')
-                                                            ->whereBetween('learning_requests.start_date', [$startDate, $endDate])
                                                             ->where('lre.employee_id', $employeeId)
                                                             ->where('learning_requests.resort_id', $this->resort_id)
                                                             ->get();
