@@ -431,8 +431,18 @@ class BoardingPassController extends Controller
             $year                                   =   now()->year; // or Carbon::now()->year
             $currentRank                            =   $this->user->GetEmployee->rank;
 
+            // underEmp_id is the logged-in user's OWN org-chart subordinates
+            // (Common::getSubordinates($this->user->GetEmployee->id)) — right
+            // for a plain department HOD approving their own team, but wrong
+            // for a cross-department functional approver (HR resort-wide, or
+            // Security Manager as the final approval stage): the requesting
+            // employee belongs to some OTHER department, not the approver's
+            // own reporting tree, so this silently zeroed out every pending
+            // request for those roles. etps.approver_id already precisely
+            // scopes to exactly this approver's rows — that's the real
+            // authorization signal (matches boardingSecurityManagerDashboard(),
+            // which never had this extra restriction).
             $EmployeeTravelPass                     =  EmployeeTravelPass::join('employee_travel_pass_status as etps', 'etps.travel_pass_id', '=', 'employee_travel_passes.id')
-                                                            ->whereIn('employee_travel_passes.employee_id', $this->underEmp_id)
                                                             ->where('employee_travel_passes.resort_id', $this->resort_id)
                                                             ->where('etps.approver_id', $this->user->GetEmployee->id)
                                                             ->where('etps.approver_rank', $currentRank)
@@ -488,6 +498,11 @@ class BoardingPassController extends Controller
                                                                 return $row;
                                                             });
 
+            // Same underEmp_id problem as the count query above — replaced
+            // with the actual authorization signal (approver_id, not org
+            // hierarchy) so a cross-department approver (HR/SM) sees every
+            // request actually routed to them, not just ones from their own
+            // reporting tree.
             $EmployeeTravelPassReq                  =   EmployeeTravelPass::with([
                                                             'employeeTravelPassStatusData' => function($query) {
                                                                     $query->orderBy('id', 'desc');
@@ -501,10 +516,10 @@ class BoardingPassController extends Controller
                                                             'DepartureResortTransportation:id,resort_id,transportation_option',
                                                             'ArrivalResortTransportation:id,resort_id,transportation_option',
                                                             ])
-                                                            ->whereIn('employee_id', $this->underEmp_id)
                                                             ->where('resort_id', $this->resort_id)
                                                             ->whereHas('employeeTravelPassStatusData', function($q) use ($currentRank) {
-                                                                    $q->where('approver_rank', $currentRank)
+                                                                    $q->where('approver_id', $this->user->GetEmployee->id)
+                                                                    ->where('approver_rank', $currentRank)
                                                                     ->where('status', 'Pending');
                                                                 })
                                                             ->where('status', 'Pending')

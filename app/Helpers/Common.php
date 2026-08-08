@@ -5419,39 +5419,41 @@ class Common
     }
 
     /**
-     * Shift-color CSS class for the createDuty-* indicator system used on
-     * the duty roster / attendance calendar views. The original inline
-     * version of this (duplicated across GetRosterdata/GetOverTime) only
-     * matched the literal names "First Shift"/"Second Shift"/"General
-     * Shift"/"Night Shift" — names that don't exist on resorts whose
-     * shifts are actually named "Morning Shift"/"Afternoon Shift"/"Evening
-     * Shift" (the common real-world case), so ShiftNameColor came back
-     * blank for them on every screen that used it, and GetAttandanceRegister
-     * (which feeds the mobile month-view calendar) never set it at all.
-     * Matches by keyword instead of exact string so real shift names
-     * resolve correctly.
+     * Shift color for the duty roster / attendance calendar views on
+     * mobile — the only consumer (GetRosterdata/GetOverTime/
+     * GetAttandanceRegister, all called exclusively from the API
+     * controller; no web controller references this). Originally returned
+     * a "createDuty-*" CSS class name, meaningless to the mobile app, and
+     * only recognised 4 keyword patterns — any custom/resort-specific
+     * shift name (e.g. "Dev test shift", "Asters Shift") fell through to
+     * '', so every custom-named shift looked identical (blank/default) on
+     * the app regardless of how many distinct shifts existed. Now always
+     * returns a real hex color: the 4 keyword patterns keep their
+     * original semantic colors, anything else gets a stable color hashed
+     * from the shift name — same name always maps to the same color, and
+     * different custom names spread across a wider palette instead of all
+     * collapsing to the same blank fallback.
      */
     public static function shiftNameColor(?string $shiftName): string
     {
-        // Only createDuty-blue/yellow/skyBlue/purple actually exist in
-        // default.css — the old code's "createDuty-green" for First Shift
-        // was a dead class reference (never styled).
         $name = strtolower((string) $shiftName);
+        if ($name === '') {
+            return '';
+        }
         if (str_contains($name, 'morning') || str_contains($name, 'first')) {
-            return 'createDuty-blue';
+            return '#3B82F6'; // blue
         }
         if (str_contains($name, 'afternoon') || str_contains($name, 'second')) {
-            return 'createDuty-yellow';
+            return '#EAB308'; // yellow
         }
         if (str_contains($name, 'evening') || str_contains($name, 'general')) {
-            return 'createDuty-skyBlue';
+            return '#38BDF8'; // sky blue
         }
         if (str_contains($name, 'night')) {
-            return 'createDuty-purple';
+            return '#A855F7'; // purple
         }
-        // Custom/unrecognised shift name (e.g. a one-off resort-specific
-        // shift) — no color guess better than a wrong one.
-        return '';
+        $palette = ['#EF4444', '#F97316', '#22C55E', '#14B8A6', '#6366F1', '#EC4899', '#84CC16', '#0EA5E9', '#F59E0B', '#8B5CF6'];
+        return $palette[crc32($name) % count($palette)];
     }
 
      public static function calculateEWT($taxableIncomeMVR)
