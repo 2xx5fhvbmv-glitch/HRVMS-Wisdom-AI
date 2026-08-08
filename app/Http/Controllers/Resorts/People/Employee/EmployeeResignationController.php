@@ -55,7 +55,10 @@ class EmployeeResignationController extends Controller
 
 
             if($this->resort->is_master_admin == 0){
-                if ($employee->rank == 2) {
+                // HOD (2) and EXCOM (1) — was HOD-only, so an EXCOM fell
+                // into neither branch and saw every resignation resort-wide
+                // unfiltered instead of just their own department's queue.
+                if (in_array((int) $employee->rank, [1, 2], true)) {
                     $empResignations = $empResignations->where('hod_id', $employee->id);
                 } elseif ($employee->rank == 3) {
                     $empResignations = $empResignations->where('hr_id', $employee->id);
@@ -170,7 +173,9 @@ class EmployeeResignationController extends Controller
                         if ($user->rank == 3) {
                             $is_hr = true;
                         }
-                        if ($user->rank == 2) {
+                        // HOD (2) and EXCOM (1) — was HOD-only, so EXCOM
+                        // never got the "Schedule Meeting" action.
+                        if (in_array((int) $user->rank, [1, 2], true)) {
                             $is_hod = true;
                         }
                         $schedule_status = false;
@@ -535,7 +540,10 @@ class EmployeeResignationController extends Controller
         $meeting_date = Carbon::createFromFormat('d/m/Y', $request->meetingDate)->format('Y-m-d');
         $meeting_time = Carbon::createFromFormat('H:i', $request->meetingTime)->format('H:i:s');
 
-        if ($user->rank == 2) {
+        // HOD (2) and EXCOM (1) — was HOD-only, so EXCOM could never
+        // schedule the HOD-stage meeting even when they're the effective
+        // department head.
+        if (in_array((int) $user->rank, [1, 2], true)) {
             $is_hod = true;
             $meeting_type = 'HOD';
         }

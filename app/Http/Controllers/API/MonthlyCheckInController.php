@@ -390,12 +390,58 @@ class MonthlyCheckInController extends Controller
                                                                         return $item;
                                                                     });
 
+            // employeeConfirmMeeting() sets status='Confirm' when the
+            // employee acknowledges — that value matched neither this
+            // bucket's 'Conducted' filter nor pending_acknowledgements'
+            // 'Pending'/'Rescheduled' filter above, so an acknowledged
+            // meeting fell into neither list and vanished from the
+            // dashboard entirely until it was later marked Conducted.
+            $confirmedMeetings                              =   (clone $baseQuery)
+                                                                    ->where('monthly_checking_models.status', 'Confirm')
+                                                                    ->get()->map(function($item){
+                                                                        $managerRecord          =   Employee::join('resort_admins as ra', 'ra.id', '=', 'employees.Admin_Parent_id')
+                                                                                                    ->join("resort_positions as rp", "rp.id", "=", "employees.Position_id")
+                                                                                                    ->where('ra.id',$item->created_by)
+                                                                                                    ->select('ra.first_name', 'ra.last_name', 'rp.position_title')
+                                                                                                    ->first();
+                                                                        $item->manager_id       =   $item->created_by;
+                                                                        $item->manager_name     =   $managerRecord ? $managerRecord->first_name . ' ' . $managerRecord->last_name : '';
+                                                                        $item->position         =   $managerRecord ? $managerRecord->position_title : '';
+                                                                        $item->manager_profile  =   Common::getResortUserPicture($item->created_by);
+                                                                        return $item;
+                                                                    });
+
             $checkInHistory                                 =   (clone $baseQuery)
                                                                     ->where('monthly_checking_models.status', 'Conducted')
                                                                     ->get();
 
+            // Separate, newer request flow (Performance\MonthlyCheckingController
+            // @scheduleRequest, web) — uses approval_status ('pending'/
+            // 'approved'/'rejected'), not the status column above at all
+            // (status stays NULL for the whole lifetime of this flow). The
+            // "Monthly Check-In Approval Required" push comes from this
+            // path — there was no mobile bucket for it and no mobile way to
+            // act on it (employeeApprove/employeeReject were web-portal-only
+            // endpoints), so the notification led nowhere on the app.
+            $pendingApprovalRequests                        =   (clone $baseQuery)
+                                                                    ->where('monthly_checking_models.approval_status', 'pending')
+                                                                    ->get()->map(function($item){
+                                                                        $managerRecord          =   Employee::join('resort_admins as ra', 'ra.id', '=', 'employees.Admin_Parent_id')
+                                                                                                    ->join("resort_positions as rp", "rp.id", "=", "employees.Position_id")
+                                                                                                    ->where('ra.id',$item->created_by)
+                                                                                                    ->select('ra.first_name', 'ra.last_name', 'rp.position_title')
+                                                                                                    ->first();
+                                                                        $item->manager_id       =   $item->created_by;
+                                                                        $item->manager_name     =   $managerRecord ? $managerRecord->first_name . ' ' . $managerRecord->last_name : '';
+                                                                        $item->position         =   $managerRecord ? $managerRecord->position_title : '';
+                                                                        $item->manager_profile  =   Common::getResortUserPicture($item->created_by);
+                                                                        return $item;
+                                                                    });
+
             $monthlyCheckInArr = [
+                'pending_approval_requests'                 =>  $pendingApprovalRequests,
                 'pending_acknowledgements'                  =>  $pendingAcknowledgements,
+                'confirmed_meetings'                        =>  $confirmedMeetings,
                 'check_in_history'                          =>  $checkInHistory,
             ];
 
@@ -613,6 +659,122 @@ class MonthlyCheckInController extends Controller
             return response()->json(['success' => false, 'message' => 'Server error'], 500);
         }
 
+    }
+
+    /**
+     * POST monthlycheckin/employee-approve-request — mobile equivalent of
+     * Performance\MonthlyCheckingController::employeeApprove() (web-only
+     * before this, which is why "Approval Required" pushes had nowhere to
+     * lead on the app). Same authorization/status-transition logic.
+     */
+    public function employeeApproveRequest(Request $request)
+    {
+        if (!$this->user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'meeting_id' => 'required',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
+        }
+
+        $employee_id = $this->user->GetEmployee->id;
+
+        try {
+            $checkin = MonthlyCheckingModel::where('resort_id', $this->resort_id)->find($request->meeting_id);
+            if (!$checkin) {
+                return response()->json(['success' => false, 'message' => 'Check-in not found'], 200);
+            }
+            if ($checkin->emp_id != $employee_id) {
+                return response()->json(['success' => false, 'message' => 'You are not authorized to approve this request'], 200);
+            }
+            if ($checkin->approval_status !== 'pending') {
+                return response()->json(['success' => false, 'message' => 'This request has already been ' . $checkin->approval_status], 200);
+            }
+
+            $checkin->approval_status = 'approved';
+            $checkin->approved_at = now();
+            $checkin->save();
+
+            $title      = 'Monthly Check-In Approved';
+            $msg        = $this->user->first_name . ' ' . $this->user->last_name . ' has approved the monthly check-in scheduled on ' . date('d M Y', strtotime($checkin->date_discussion)) . '.';
+            $ModuleName = 'Performance';
+
+            event(new ResortNotificationEvent(
+                Common::nofitication($this->resort_id, 10, $title, $msg, $checkin->id, $checkin->created_by, $ModuleName)
+            ));
+            Common::sendMobileNotification(
+                $this->resort_id, 2, null, null, $title, $msg, $ModuleName, [$checkin->created_by], $checkin->id, true, 'monthly-checkin-approved'
+            );
+
+            return response()->json(['status' => true, 'message' => 'Check-in approved']);
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    /**
+     * POST monthlycheckin/employee-reject-request — mobile equivalent of
+     * Performance\MonthlyCheckingController::employeeReject().
+     */
+    public function employeeRejectRequest(Request $request)
+    {
+        if (!$this->user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'meeting_id' => 'required',
+            'reason'     => 'required|string|max:1000',
+        ], [
+            'reason.required' => 'Please provide a reason for rejection.',
+        ]);
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
+        }
+
+        $employee_id = $this->user->GetEmployee->id;
+
+        try {
+            $checkin = MonthlyCheckingModel::where('resort_id', $this->resort_id)->find($request->meeting_id);
+            if (!$checkin) {
+                return response()->json(['success' => false, 'message' => 'Check-in not found'], 200);
+            }
+            if ($checkin->emp_id != $employee_id) {
+                return response()->json(['success' => false, 'message' => 'You are not authorized to reject this request'], 200);
+            }
+            if ($checkin->approval_status !== 'pending') {
+                return response()->json(['success' => false, 'message' => 'This request has already been ' . $checkin->approval_status], 200);
+            }
+
+            $checkin->approval_status = 'rejected';
+            $checkin->rejected_at = now();
+            $checkin->employee_rejection_reason = $request->reason;
+            $checkin->save();
+
+            $title      = 'Monthly Check-In Rejected';
+            $msg        = $this->user->first_name . ' ' . $this->user->last_name . ' has rejected the monthly check-in. Reason: ' . $request->reason;
+            $ModuleName = 'Performance';
+
+            event(new ResortNotificationEvent(
+                Common::nofitication($this->resort_id, 10, $title, $msg, $checkin->id, $checkin->created_by, $ModuleName)
+            ));
+            Common::sendMobileNotification(
+                $this->resort_id, 2, null, null, $title, $msg, $ModuleName, [$checkin->created_by], $checkin->id, true, 'monthly-checkin-rejected'
+            );
+
+            return response()->json(['status' => true, 'message' => 'Check-in rejected']);
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
     }
 
 }

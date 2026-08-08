@@ -350,6 +350,7 @@ use Illuminate\Support\Facades\Route;
 		Route::post('incident/incident-calender', [App\Http\Controllers\API\IncidentController::class, 'incidentCalender']);
 		Route::get('incident/statement-request/{incident_id}', [App\Http\Controllers\API\IncidentController::class, 'getStatementRequest']);
 		Route::post('incident/incident-statement', [App\Http\Controllers\API\IncidentController::class, 'provideStatement']);
+			Route::get('incident/my-statements', [App\Http\Controllers\API\IncidentController::class, 'myStatements']);
 		Route::get('incident/insights/{incident_id}', [App\Http\Controllers\API\IncidentController::class, 'getPreventiveInsights']);
 
 		//calendar
@@ -379,6 +380,8 @@ use Illuminate\Support\Facades\Route;
 		Route::get('monthlycheckin/employee-monthly-dashboard', [App\Http\Controllers\API\MonthlyCheckInController::class, 'employeeMonthlyCheckinDashboard']);
 		Route::get('monthlycheckin/monthly-checkin-meeting-details/{meeting_id}', [App\Http\Controllers\API\MonthlyCheckInController::class, 'MonthlyCheckinMeetingDetails']);
 		Route::post('monthlycheckin/employee-confirm-meeting', [App\Http\Controllers\API\MonthlyCheckInController::class, 'employeeConfirmMeeting']);
+		Route::post('monthlycheckin/employee-approve-request', [App\Http\Controllers\API\MonthlyCheckInController::class, 'employeeApproveRequest']);
+		Route::post('monthlycheckin/employee-reject-request', [App\Http\Controllers\API\MonthlyCheckInController::class, 'employeeRejectRequest']);
 		Route::post('monthlycheckin/post-meeting-employee-comment', [App\Http\Controllers\API\MonthlyCheckInController::class, 'postMeetingEmployeeComment']);
 		Route::get('monthlycheckin/monthly-checkin-history', [App\Http\Controllers\API\MonthlyCheckInController::class, 'monthlyCheckInHistory']);
 
@@ -390,6 +393,8 @@ use Illuminate\Support\Facades\Route;
 		Route::post('grievance/informal-resolution', [App\Http\Controllers\API\GrievanceController::class, 'InformalResolution']);
 		Route::get('grievance/my-grievances', [App\Http\Controllers\API\GrievanceController::class, 'myGrievances']);
 		Route::post('grievance/identity-disclosure-respond', [App\Http\Controllers\API\GrievanceController::class, 'respondIdentityDisclosure']);
+		Route::get('grievance/witness-statement-request/{grievance_id}', [App\Http\Controllers\API\GrievanceController::class, 'witnessStatementRequest']);
+		Route::post('grievance/witness-statement', [App\Http\Controllers\API\GrievanceController::class, 'submitWitnessStatement']);
 		Route::get('grievance/{id}', [App\Http\Controllers\API\GrievanceController::class, 'grievanceDetail']);
 
 

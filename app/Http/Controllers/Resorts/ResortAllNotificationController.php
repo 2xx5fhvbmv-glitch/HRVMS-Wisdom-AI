@@ -235,9 +235,13 @@ class ResortAllNotificationController extends Controller
                 // persistent bell-list row per pending department's HOD too.
                 $pendingDeptIds = $notificationPayload['PendingDepartment_id'] ?? [];
                 if (!empty($pendingDeptIds)) {
+                    // rank 2 (HOD) and rank 1 (EXCOM) — a department headed
+                    // by EXCOM with no HOD was never getting this persistent
+                    // reminder row (the live broadcast above already covers
+                    // both, see $hodsByDept).
                     $hods = Employee::where('resort_id', $resort_id)
                         ->where('status', 'Active')
-                        ->where('rank', 2)
+                        ->whereIn('rank', [1, 2])
                         ->whereIn('Dept_id', $pendingDeptIds)
                         ->pluck('id');
 

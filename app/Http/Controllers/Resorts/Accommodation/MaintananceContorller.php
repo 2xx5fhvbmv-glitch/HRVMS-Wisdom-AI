@@ -1030,9 +1030,11 @@ class MaintananceContorller extends Controller
             }
         $page_title="On Hold Requests";
         $holdAjaxRoute = route('resort.accommodation.HoldMaintanaceRequest');
+        // HOD (2) and EXCOM (1) — this feeds an assignee dropdown, an
+        // EXCOM-headed department previously had no one to assign to here.
         $Employee =Employee::join('resort_admins','resort_admins.id',"=",'employees.Admin_Parent_id')
                             ->where('employees.resort_id', $this->resort->resort_id)
-                            ->where("employees.rank",2)
+                            ->whereIn("employees.rank",[1,2])
                             ->get(['employees.*','resort_admins.first_name','resort_admins.last_name']);
         return view('resorts.Accommodation.Maintanance.HoldMaintanaceRequest',compact('page_title','Employee','holdAjaxRoute'));
     }
@@ -1315,9 +1317,11 @@ class MaintananceContorller extends Controller
             }
         $page_title="On Hold Requests";
         $holdAjaxRoute = route('resort.accommodation.HODHoldMaintanaceRequest');
-                    $Employee =Employee::join('resort_admins','resort_admins.id',"=",'employees.Admin_Parent_id')
+                    // HOD (2) and EXCOM (1) — this feeds an assignee dropdown, an
+        // EXCOM-headed department previously had no one to assign to here.
+        $Employee =Employee::join('resort_admins','resort_admins.id',"=",'employees.Admin_Parent_id')
                             ->where('employees.resort_id', $this->resort->resort_id)
-                            ->where("employees.rank",2)
+                            ->whereIn("employees.rank",[1,2])
                             ->get(['employees.*','resort_admins.first_name','resort_admins.last_name']);
         return view('resorts.Accommodation.Maintanance.HoldMaintanaceRequest',compact('page_title','Employee','holdAjaxRoute'));
     }

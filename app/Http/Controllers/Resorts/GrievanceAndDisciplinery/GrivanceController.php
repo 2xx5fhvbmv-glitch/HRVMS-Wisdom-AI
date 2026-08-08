@@ -800,6 +800,25 @@ class GrivanceController extends Controller
             $title = ' Rrequest To give your Statement For Grievance';
             $ModuleName = "Grievance And Disciplinery ";
             event(new ResortNotificationEvent(Common::nofitication($this->resort->resort_id, 10,$title,$msg,0,$g->Witness_id,$ModuleName)));
+
+            // Was only ever the in-app DB notification above — nothing
+            // actually reached the witness's device, so the mobile app had
+            // no way to surface this at all (matches the report: witnesses
+            // never got notified, only email). Same push mechanism every
+            // other statement-request flow in this app uses.
+            Common::sendMobileNotification(
+                $this->resort->resort_id,
+                2,
+                null,
+                null,
+                'Grievance Witness Statement Required',
+                $msg,
+                $ModuleName,
+                [$g->Witness_id],
+                $parent_id->id,
+                true,
+                'grievance-witness-statement',
+            );
         }
         return response()->json([
             'success' => true,

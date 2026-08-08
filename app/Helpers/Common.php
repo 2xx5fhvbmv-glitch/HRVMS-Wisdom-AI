@@ -7575,7 +7575,7 @@ class Common
             ]);
 
             $newUrl = StorageHelper::temporaryUrl($tempFilePath, 30);
-            if(empty($newUrl) && $$newUrl == null){
+            if (empty($newUrl)) {
                 return ['success' => false, 'NewURLshow' => null, 'mimeType' => null];
             }
             return [
@@ -8561,11 +8561,41 @@ class Common
     }
 
 
+    /**
+     * Department head resolution — rank 2 (HOD) first, falls back to rank 1
+     * (EXCOM) when the department has no HOD. Previously rank-2-only, which
+     * meant an EXCOM-only department had no resolvable department head at
+     * all: this is the actual write-path source of EmployeeResignation's
+     * hod_id, so that gap hard-blocked resignation submission (422 "No HOD
+     * configured") for anyone in such a department, and left every
+     * approval-flow step / notification fan-out built from this helper
+     * silently EXCOM-blind. Same return shape (single Employee|null) — no
+     * caller needs to change.
+     */
     public static function FindResortHODDepartment($resort_id,$department_id)
     {
-        //  currently getting a static rank based on resort HOD
-        $emp = Employee::where('resort_id',$resort_id)->where('Dept_id',$department_id)->where("rank",2)->first();
-        return  $emp;
+        $emp = Employee::where('resort_id',$resort_id)->where('Dept_id',$department_id)->where("rank",2)->where('status','Active')->first();
+        if ($emp) {
+            return $emp;
+        }
+        return Employee::where('resort_id',$resort_id)->where('Dept_id',$department_id)->where("rank",1)->where('status','Active')->first();
+    }
+
+    /**
+     * Every active HOD (rank 2) and EXCOM (rank 1) employee id in a
+     * department — for notification fan-outs / assignee-contact lists that
+     * need "everyone who counts as this department's head", not just one.
+     * Same shape as getResortHrEmployeeIds()/getResortFinanceEmployeeIds().
+     */
+    public static function getDepartmentApproverIds($resort_id, $department_id)
+    {
+        return Employee::where('resort_id', $resort_id)
+            ->where('Dept_id', $department_id)
+            ->whereIn('rank', [1, 2])
+            ->where('status', 'Active')
+            ->pluck('id')
+            ->map(fn($v) => (int) $v)
+            ->all();
     }
 
 

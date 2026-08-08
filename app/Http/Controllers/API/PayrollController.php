@@ -375,10 +375,19 @@ class PayrollController extends Controller
        
         try {
              
-            // Fetch Last Month's Payroll Data. Same INNER-JOIN-drops-rows
-            // bug as payrollDashboard()/paySlipList() — left-joined so a
-            // missing deductions/reviews/service_charge row for a given
-            // month doesn't hide that month's payslip entirely.
+            // Fetch Last Month's Payroll Data. Deductions/service-charge stay
+            // left-joined (a missing row there just means $0 deductions/no
+            // service charge, still a real payslip) — but payroll_reviews
+            // must be an inner join: no payroll_reviews row means this
+            // payroll_employees row is roster-only, earnings never
+            // calculated (same reasoning already applied in
+            // payrollDashboard()/paySlipList()'s header-snapshot query).
+            // Left-joining it here meant a real processed payslip could lose
+            // to a roster-only placeholder for the same month via
+            // ->first(), returning an all-null/all-zero "payslip" for a
+            // period that actually has real data (this is exactly what the
+            // Payslip List screen — queried without this bug — showed
+            // correctly while this detail endpoint showed zeros).
             $payroll                                    =   Payroll::join('payroll_employees as pe','pe.payroll_id','=','payroll.id')
                                                                 ->join('employees as e','e.id','=','pe.employee_id')
                                                                 ->join('resort_admins as ra','ra.id','=','e.Admin_Parent_id')
@@ -387,7 +396,7 @@ class PayrollController extends Controller
                                                                 ->leftJoin('payroll_deductions as pd', function($j) use ($employee_id) {
                                                                     $j->on('pd.payroll_id','=','payroll.id')->where('pd.employee_id',$employee_id);
                                                                 })
-                                                                ->leftJoin('payroll_reviews as pr', function($j) use ($employee_id) {
+                                                                ->join('payroll_reviews as pr', function($j) use ($employee_id) {
                                                                     $j->on('pr.payroll_id','=','payroll.id')->where('pr.employee_id',$employee_id);
                                                                 })
                                                                 ->leftJoin('payroll_service_charges as psc', function($j) use ($employee_id) {
@@ -395,10 +404,23 @@ class PayrollController extends Controller
                                                                 })
                                                                 ->where('pe.employee_id',$employee_id);
                                                                 if($month) {
-                                                                    $payroll->whereMonth('payroll.start_date', $month);
+                                                                    // A pay period is labelled by the month it ENDS in
+                                                                    // (e.g. 26 Feb - 25 Mar is "March's" payslip — matches
+                                                                    // how the Payslip List screen already displays it), not
+                                                                    // the month it starts in. Filtering on start_date meant
+                                                                    // asking for "March" never matched this period at all
+                                                                    // (its start_date is in February), even though it's
+                                                                    // exactly the real, fully-processed period the list
+                                                                    // screen shows for that card.
+                                                                    $payroll->whereMonth('payroll.end_date', $month);
                                                                 }
 
             $payroll                                    =   $payroll->whereYear('payroll.start_date', $year)
+                                                                // Two genuinely-processed periods can both end in the
+                                                                // same month (e.g. a correction/re-run) — most recently
+                                                                // created wins, matching real data where a later run
+                                                                // (higher id) is the one with the actually-current figures.
+                                                                ->orderBy('payroll.id', 'desc')
                                                                 ->select(
                                                                     'payroll.*', 'ra.first_name', 'ra.last_name', 'ra.profile_picture',
                                                                     'ra.id as admin_id', 'rp.position_title as position', 'rd.name as department', 'e.joining_date',
@@ -486,10 +508,19 @@ class PayrollController extends Controller
        
         try {
              
-            // Fetch Last Month's Payroll Data. Same INNER-JOIN-drops-rows
-            // bug as payrollDashboard()/paySlipList() — left-joined so a
-            // missing deductions/reviews/service_charge row for a given
-            // month doesn't hide that month's payslip entirely.
+            // Fetch Last Month's Payroll Data. Deductions/service-charge stay
+            // left-joined (a missing row there just means $0 deductions/no
+            // service charge, still a real payslip) — but payroll_reviews
+            // must be an inner join: no payroll_reviews row means this
+            // payroll_employees row is roster-only, earnings never
+            // calculated (same reasoning already applied in
+            // payrollDashboard()/paySlipList()'s header-snapshot query).
+            // Left-joining it here meant a real processed payslip could lose
+            // to a roster-only placeholder for the same month via
+            // ->first(), returning an all-null/all-zero "payslip" for a
+            // period that actually has real data (this is exactly what the
+            // Payslip List screen — queried without this bug — showed
+            // correctly while this detail endpoint showed zeros).
             $payroll                                    =   Payroll::join('payroll_employees as pe','pe.payroll_id','=','payroll.id')
                                                                 ->join('employees as e','e.id','=','pe.employee_id')
                                                                 ->join('resort_admins as ra','ra.id','=','e.Admin_Parent_id')
@@ -498,7 +529,7 @@ class PayrollController extends Controller
                                                                 ->leftJoin('payroll_deductions as pd', function($j) use ($employee_id) {
                                                                     $j->on('pd.payroll_id','=','payroll.id')->where('pd.employee_id',$employee_id);
                                                                 })
-                                                                ->leftJoin('payroll_reviews as pr', function($j) use ($employee_id) {
+                                                                ->join('payroll_reviews as pr', function($j) use ($employee_id) {
                                                                     $j->on('pr.payroll_id','=','payroll.id')->where('pr.employee_id',$employee_id);
                                                                 })
                                                                 ->leftJoin('payroll_service_charges as psc', function($j) use ($employee_id) {
@@ -506,10 +537,23 @@ class PayrollController extends Controller
                                                                 })
                                                                 ->where('pe.employee_id',$employee_id);
                                                                 if($month) {
-                                                                    $payroll->whereMonth('payroll.start_date', $month);
+                                                                    // A pay period is labelled by the month it ENDS in
+                                                                    // (e.g. 26 Feb - 25 Mar is "March's" payslip — matches
+                                                                    // how the Payslip List screen already displays it), not
+                                                                    // the month it starts in. Filtering on start_date meant
+                                                                    // asking for "March" never matched this period at all
+                                                                    // (its start_date is in February), even though it's
+                                                                    // exactly the real, fully-processed period the list
+                                                                    // screen shows for that card.
+                                                                    $payroll->whereMonth('payroll.end_date', $month);
                                                                 }
 
             $payroll                                    =   $payroll->whereYear('payroll.start_date', $year)
+                                                                // Two genuinely-processed periods can both end in the
+                                                                // same month (e.g. a correction/re-run) — most recently
+                                                                // created wins, matching real data where a later run
+                                                                // (higher id) is the one with the actually-current figures.
+                                                                ->orderBy('payroll.id', 'desc')
                                                                 ->select(
                                                                     'payroll.*', 'ra.first_name', 'ra.last_name', 'ra.profile_picture',
                                                                     'ra.id as admin_id', 'rp.position_title as position', 'rd.name as department', 'e.joining_date',
