@@ -130,15 +130,12 @@ class ChatController extends Controller
           $resort = $this->resort;
          
 
-          if($resort->GetEmployee->rank == 3) {
-               $hr_access = true;
-          }elseif($resort->GetEmployee->rank == 2){
-               $hod_access = true;
-          }
+          $rank = (int) ($resort->GetEmployee->rank ?? 0);
+          $fullAccess = in_array($rank, [3, 8]); // HR, GM see the full resort list
 
           $employees = Employee::where('resort_id', $resort->resort_id);
 
-               if(isset($hod_access) && $hod_access) {
+               if(!$fullAccess) {
                     $employees->where('Dept_id', $resort->GetEmployee->Dept_id);
                }
 
@@ -360,7 +357,6 @@ class ChatController extends Controller
                if (!$member) {
                     return response()->json(['success' => false, 'message' => 'Member not found in this group'], 404);
                }
-               dd($member);
                $member->delete();
                DB::commit();
                $group->members_count = $group->groupMembers()->count();
