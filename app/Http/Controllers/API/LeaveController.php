@@ -754,7 +754,20 @@ class LeaveController extends Controller
                         'status'                        =>  'Pending',
                     ]);
 
-                    // Send In App Notification to each approver
+                    // Send In App Notification to each approver. When this
+                    // step is the department HOD (rank 2), also cc the
+                    // department's EXCOM — informational only, not a new
+                    // formal approval step (no extra EmployeeLeaveStatus
+                    // row, chain step count unchanged), per "XCOM should
+                    // mirror HOD" notification visibility requirement.
+                    $sendto = [$approver->id];
+                    if ((int) $approver->rank === 2) {
+                        $sendto = array_unique(array_merge(
+                            $sendto,
+                            Common::getDepartmentApproverIds($user->resort_id, $employee->Dept_id)
+                        ));
+                    }
+
                     Common::sendMobileNotification(
                        $user->resort_id,
                        2,
@@ -763,7 +776,7 @@ class LeaveController extends Controller
                         'Leave Request',
                         'A request has been sent by ' . $user->first_name . ' ' . $user->last_name . '.',
                         'Leave',
-                        [$approver->id],
+                        $sendto,
                         $leave->id,
                         false,
                         'leave-pending-approval'
