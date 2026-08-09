@@ -308,7 +308,7 @@ class BoardingPassController extends Controller
                 }
 
                 // Add the same approval flow for Exit Pass as well
-                $passApprovalFlow->each(function($approver) use ($boardingPass) {
+                $passApprovalFlow->each(function($approver) use ($boardingPass, $employee) {
                     EmployeeTravelPassStatus::create([
                         'travel_pass_id'                =>  $boardingPass->id,
                         'approver_id'                   =>  $approver->id,
@@ -325,6 +325,21 @@ class BoardingPassController extends Controller
                     // already Approved, a silent HOD (never notified, never
                     // opened the app) meant the request could never progress
                     // far enough to appear on the web page either.
+                    //
+                    // When this step is the department HOD, also cc the
+                    // department's EXCOM — informational only, not a new
+                    // formal approval step (no extra EmployeeTravelPassStatus
+                    // row, Island Pass's fixed HOD→HR→SM step count
+                    // unchanged), per "XCOM should mirror HOD" notification
+                    // visibility requirement.
+                    $sendto = [$approver->id];
+                    if ($approver->approver_role === 'HOD') {
+                        $sendto = array_unique(array_merge(
+                            $sendto,
+                            Common::getDepartmentApproverIds($this->resort_id, $employee->Dept_id)
+                        ));
+                    }
+
                     Common::sendMobileNotification(
                         $this->resort_id,
                         2,
@@ -333,7 +348,7 @@ class BoardingPassController extends Controller
                         'Boarding Pass Request',
                         'A boarding pass request has been submitted by ' . $this->user->first_name . ' ' . $this->user->last_name . '.',
                         'Boarding Pass',
-                        [$approver->id],
+                        $sendto,
                         $boardingPass->id,
                         false,
                         'boarding-pass-request'
