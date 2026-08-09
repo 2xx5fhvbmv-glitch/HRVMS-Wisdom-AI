@@ -301,21 +301,27 @@ class StaffAccommodationController extends Controller
             ];
 
             $filePath                                   =   null;
+            $attachmentUploadFailed                     =   false;
+            $attachmentUploadError                      =   null;
             if ($request->hasFile('Image')) {
                 $file       =   $request->file('Image');
                 $SubFolder  =   "MaintanceRequest";
                 $status     =   Common::AWSEmployeeFileUpload($this->resort_id, $file, $this->user->GetEmployee->Emp_id, $SubFolder, true);
 
                 if ($status['status'] == false) {
-                    // Was returning without ever committing or rolling back
-                    // the transaction opened above — every other exit path
-                    // out of this method does one or the other, this one
-                    // left the connection with an open transaction.
-                    DB::rollBack();
-                    return response()->json([
-                        'success'           =>  false,
-                        'message'           =>  'File upload failed: ' . ($status['msg'] ?? 'Unknown error')
-                    ], 400);
+                    // Was blocking the ENTIRE request over a photo upload
+                    // failure — a storage-provider outage (e.g. Wasabi
+                    // account suspended) meant no employee could submit any
+                    // maintenance request at all, even a text-only one,
+                    // until the storage provider was fixed. The description/
+                    // priority/room details are still valid and worth
+                    // saving; degrade instead of blocking — create the
+                    // request without the photo and tell the caller it
+                    // didn't attach, so the app can say "submitted, but add
+                    // your photo later" instead of "failed, try again"
+                    // (retrying would hit the same outage every time).
+                    $attachmentUploadFailed             =   true;
+                    $attachmentUploadError              =   $status['msg'] ?? 'Attachment upload failed.';
                 } else {
                     if($status['status'] == true && isset($status['Chil_file_id']) && !empty($status['Chil_file_id'])) {
                         $filename                       =   $file->getClientOriginalName();
@@ -365,8 +371,14 @@ class StaffAccommodationController extends Controller
             
             DB::commit();
             $response['status']                         =   true;
-            $response['message']                        =   'Maintanance Request Created Successfully';
-           
+            $response['message']                        =   $attachmentUploadFailed
+                ? 'Maintenance request created successfully, but your photo could not be uploaded. You can add it later by editing this request.'
+                : 'Maintanance Request Created Successfully';
+            $response['attachment_upload_failed']       =   $attachmentUploadFailed;
+            if ($attachmentUploadFailed) {
+                $response['attachment_upload_error']    =   $attachmentUploadError;
+            }
+
             return response()->json($response);
 
         } catch (\Exception $e) {
