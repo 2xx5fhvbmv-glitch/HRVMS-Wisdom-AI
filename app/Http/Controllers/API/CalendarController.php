@@ -1513,8 +1513,21 @@ class CalendarController extends Controller
             return response()->json(['success' => false, 'message' => 'Event not found.'], 404);
         }
 
+        // Same access rule as eventsCalender()'s list query (this is the
+        // sibling detail endpoint for the same feature, and had drifted
+        // from it): the creator can always see their own event, and HR has
+        // resort-wide visibility, regardless of whether either is an
+        // invited attendee. Was attendee-only here, so an HR user (or the
+        // creator, if they didn't self-invite) who could already see the
+        // event in their list got a 403 the moment they tapped it.
+        $deptName  = $this->reporting_to
+            ? strtolower(trim(\App\Models\ResortDepartment::where('id', Employee::where('id', $this->reporting_to)->value('Dept_id'))->value('name') ?? ''))
+            : '';
+        $isHR      = in_array($deptName, ['human resources', 'hr']);
+        $isCreator = (int) $event->created_by === (int) $this->reporting_to;
         $isInvited = ChildEvents::where('event_id', $event->id)->where('employee_id', $this->reporting_to)->exists();
-        if (!$isInvited) {
+
+        if (!$isInvited && !$isCreator && !$isHR) {
             return response()->json(['success' => false, 'message' => 'You do not have access to this event.'], 403);
         }
 
