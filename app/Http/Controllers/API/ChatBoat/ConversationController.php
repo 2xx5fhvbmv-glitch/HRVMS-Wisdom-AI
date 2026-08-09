@@ -5,7 +5,6 @@ namespace App\Http\Controllers\API\ChatBoat;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Support\Facades\Http;
 use Auth;
 use App\Helpers\Common;
 use App\Models\Conversation;
@@ -127,38 +126,26 @@ class ConversationController extends Controller
 
       
 
-        $base_url = env('BASE_URL', 'https://app.thewisdom.ai:2053');
+        broadcast(new \App\Events\MessageSent($conversation))->toOthers();
 
         if ($conversation->type == 'group') {
             $group = GroupChat::where('id', $conversation->type_id)
                 ->where('resort_id', $resort->resort_id)
                 ->first();
 
-            if ($group) {
-                $groupMembers = $group->groupMembers()->pluck('user_id')->toArray();
-
-                foreach ($groupMembers as $memberId) {
-                    if ($memberId == $conversation->sender_id) {
-                        continue;
-                    }
-
-                    Http::post($base_url . '/sendChatMessage', [
-                        'sender_id' => $conversation->sender_id,
-                        'receiver_id' => $memberId,
-                        'message' => $conversation->message ?? null,
-                        'attachment' => $conversation->attachment ?? null,
-                        'timestamp' => now(),
-                    ]);
-                }
-            }
+            $recipientIds = $group
+                ? array_diff($group->groupMembers()->pluck('user_id')->toArray(), [$conversation->sender_id])
+                : [];
         } else {
-            Http::post($base_url . '/sendChatMessage', [
-                'sender_id' => $conversation->sender_id,
-                'receiver_id' => $conversation->type_id,
-                'message' => $conversation->message ?? null,
-                'attachment' => $conversation->attachment ?? null,
-                'timestamp' => now(),
-            ]);
+            $recipientIds = [$conversation->type_id];
+        }
+
+        if (!empty($recipientIds)) {
+            Common::sendMobileNotification(
+                $resort->resort_id, 2, null, null,
+                $resort->full_name, $conversation->message ?: 'Sent an attachment',
+                'Chat', $recipientIds
+            );
         }
 
         // Prepare chat history to return
@@ -177,8 +164,9 @@ class ConversationController extends Controller
         $chat_history = $send_message->merge($get_message)->sortBy('created_at')->values()->all();
 
         return response()->json([
+            'success' => true,
             'message' => 'Message sent successfully',
-            'message' => [
+            'data' => [
                 'message_id' => $conversation->id,
                 'message' => $conversation->message
             ],
