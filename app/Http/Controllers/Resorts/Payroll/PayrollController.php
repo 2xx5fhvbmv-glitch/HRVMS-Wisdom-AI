@@ -2026,7 +2026,7 @@ class PayrollController extends Controller
 
         if ($invalidOTs->isNotEmpty()) {
             $employeeIds = $invalidOTs->pluck('Emp_id')->unique();
-            $employeeNames = Employee::with('resortAdmin')->whereIn('Emp_id', $employeeIds)->where('resort_id', $this->resort->resort_id)->get()
+            $employeeNames = Employee::with('resortAdmin')->whereIn('id', $employeeIds)->where('resort_id', $this->resort->resort_id)->get()
                 ->map(fn($e) => $e->resortAdmin->first_name . ' ' . $e->resortAdmin->last_name)->implode(', ');
 
             return response()->json([
@@ -2044,7 +2044,7 @@ class PayrollController extends Controller
 
         if ($missingStatus->isNotEmpty()) {
             $employeeIds = $missingStatus->pluck('Emp_id')->unique();
-            $employeeNames = Employee::with('resortAdmin')->whereIn('Emp_id', $employeeIds)->where('resort_id', $this->resort->resort_id)->get()
+            $employeeNames = Employee::with('resortAdmin')->whereIn('id', $employeeIds)->where('resort_id', $this->resort->resort_id)->get()
                 ->map(fn($e) => $e->resortAdmin->first_name . ' ' . $e->resortAdmin->last_name)->implode(', ');
 
             return response()->json([
@@ -2068,7 +2068,7 @@ class PayrollController extends Controller
 
         if ($invalidAttendance->isNotEmpty()) {
             $employeeIds = $invalidAttendance->pluck('Emp_id')->unique();
-            $employeeNames = Employee::with('resortAdmin')->whereIn('Emp_id', $employeeIds)->where('resort_id', $this->resort->resort_id)->get()
+            $employeeNames = Employee::with('resortAdmin')->whereIn('id', $employeeIds)->where('resort_id', $this->resort->resort_id)->get()
                 ->map(fn($e) => $e->resortAdmin->first_name . ' ' . $e->resortAdmin->last_name)->implode(', ');
 
             return response()->json([
