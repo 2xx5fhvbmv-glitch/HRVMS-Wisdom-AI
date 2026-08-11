@@ -286,14 +286,25 @@ class ProbationReportController extends Controller
         // alone excluded virtually every row — apply the same fallback via
         // SQL so the date-range filter matches what the live page shows.
         $effectiveEndExpr = 'COALESCE(e.probation_end_date, DATE_ADD(e.joining_date, INTERVAL 3 MONTH))';
+        // from_date/to_date are calendar dates the user typed, meaning "end
+        // date shown on screen" — but effectiveEndExpr is the raw
+        // end-EXCLUSIVE boundary (one day later than the displayed date, see
+        // probationEndDateLabel()). Comparing the user's range directly
+        // against the raw value silently excluded anyone whose displayed
+        // end date fell exactly on the range boundary (e.g. to_date=31 Aug
+        // excluded someone displayed as ending 31 Aug, because their raw
+        // value is 1 Sep). Only the user-facing range comparisons need the
+        // -1 day adjustment; the "today" floor and Days Remaining
+        // intentionally stay on the raw value per the existing design.
+        $displayEndExpr = "DATE_SUB($effectiveEndExpr, INTERVAL 1 DAY)";
 
         $rows = $this->baseQuery($rid, $scoped)
             ->whereIn('e.probation_status', ['Active', 'Extended'])
             ->whereRaw("$effectiveEndExpr >= ?", [$today->toDateString()])
-            ->whereRaw("$effectiveEndExpr <= ?", [$f['to_date'] ?? $defaultWindowEnd->toDateString()])
+            ->whereRaw("$displayEndExpr <= ?", [$f['to_date'] ?? $defaultWindowEnd->toDateString()])
             ->when($f['department'] ?? null, fn($q) => $q->where('e.Dept_id', $f['department']))
             ->when($f['reporting_manager'] ?? null, fn($q) => $q->where('e.reporting_to', $f['reporting_manager']))
-            ->when($f['from_date'] ?? null, fn($q) => $q->whereRaw("$effectiveEndExpr >= ?", [$f['from_date']]))
+            ->when($f['from_date'] ?? null, fn($q) => $q->whereRaw("$displayEndExpr >= ?", [$f['from_date']]))
             ->orderByRaw($effectiveEndExpr)
             ->get([
                 'e.Emp_id', 'e.joining_date', 'e.probation_end_date', 'e.probation_status',
