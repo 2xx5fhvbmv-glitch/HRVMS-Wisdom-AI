@@ -16,6 +16,7 @@ use App\Helpers\Common;
 use App\Models\Shopkeeper;
 use App\Models\Payment;
 use App\Models\PayrollConfig;
+use App\Models\Payroll;
 
 class DashboardController extends Controller
 {
@@ -48,12 +49,24 @@ class DashboardController extends Controller
                           ->orWhere('payments.status', '!=','Pending');
                 });
         
-            if ($request->has('month') && !empty($request->month)) {
-                $tableData->whereMonth('purchased_date', $request->month);
-            }
-        
-            if ($request->has('year') && !empty($request->year)) {
-                $tableData->whereYear('purchased_date', $request->year);
+            if ($request->filled('month') || $request->filled('year')) {
+                if ($request->filled('month')) {
+                    $tableData->whereMonth('purchased_date', $request->month);
+                }
+                if ($request->filled('year')) {
+                    $tableData->whereYear('purchased_date', $request->year);
+                }
+            } else {
+                // No explicit filter yet — default to the resort's current
+                // payroll period instead of showing every purchase ever
+                // made, so the table lands on something meaningful before
+                // the user picks a month/year themselves.
+                $currentPayroll = Payroll::where('resort_id', $this->shopkeeper->resort_id)
+                    ->orderBy('start_date', 'desc')
+                    ->first();
+                if ($currentPayroll) {
+                    $tableData->whereBetween('purchased_date', [$currentPayroll->start_date, $currentPayroll->end_date]);
+                }
             }
             
             // updated_at bumps on every status change (Consented, Rejected,
@@ -156,7 +169,10 @@ class DashboardController extends Controller
         {
             $shopkeeper = Shopkeeper::find($request->id);
             $shopkeeper->name = $request->name;
-            $shopkeeper->email = $request->email;
+            // Email is intentionally not updatable from this form (also
+            // the shopkeeper login identifier) — the field is disabled
+            // client-side, but a disabled input isn't submitted at all, so
+            // this line used to null the email out on every save regardless.
             $shopkeeper->contact_no = $request->contact_no;
            
             if(isset($request->password))
