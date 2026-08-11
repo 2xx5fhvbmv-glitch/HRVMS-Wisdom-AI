@@ -1446,7 +1446,12 @@ class LeaveController extends Controller
                                                                 ->whereIn('employees_leaves.status', ['Approved', 'Rejected']) // Filter by the Status
                                                                 ->orderBy('employees_leaves.from_date', 'desc') // Optional: Order by most recent past leave first
                                                                 ->take(2)
-                                                                ->get()->map(function ($item) {
+                                                                // $emp_id wasn't captured into this closure — every call
+                                                                // below silently passed null as the viewer id instead of
+                                                                // the real employee, a warning locally but possibly fatal
+                                                                // on a server that escalates warnings to exceptions
+                                                                // (confirmed happens on this app's prod once already).
+                                                                ->get()->map(function ($item) use ($emp_id) {
                                                                     $item->approve_data         =   EmployeeLeaveStatus::where('leave_request_id', $item->id)->get()->map(function ($empAppr) {
                                                                         $role                   =   ucfirst(strtolower($empAppr->approver_rank ?? ''));
                                                                         $rank                   =   config('settings.Position_Rank');
