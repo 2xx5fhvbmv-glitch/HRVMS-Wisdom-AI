@@ -45,82 +45,61 @@ class PayrollController extends Controller
             
             $year                                       =   $request->input('year', date('Y'));
 
-        // Get payroll data for the selected year
-            $payrollData                                =   DB::table('payroll')
-                                                            ->select(
-                                                                DB::raw("MONTHNAME(start_date) as month"),
-                                                                DB::raw("SUM(total_payroll) as payroll_cost")
-                                                            )
-                                                            ->whereYear('start_date', $year)
-                                                            ->groupBy('month')
+            // 12-month chart data (Basic Pay / Overtime / Service Charge per
+            // month, this employee only). Was three separate queries: one
+            // pulling SUM(total_payroll) with no employee_id filter at all
+            // (the whole resort's payroll cost for the month, not this
+            // employee's), and an OT recompute using the employee's full
+            // monthly basic_salary as if it were an hourly rate (missing
+            // /days-in-period/8 — the same formula PayrollController's
+            // run-payroll estimate uses), inflating OT cost by roughly two
+            // orders of magnitude. payroll_reviews already stores the real,
+            // correctly-computed per-period earnings_basic/earnings_overtime/
+            // service_charge for each employee (same source the rest of
+            // this dashboard already trusts for the current-period fields
+            // below) — pull the whole year from there instead of
+            // recomputing anything.
+            $monthlyReviews                             =   DB::table('payroll_reviews as pr')
+                                                            ->join('payroll as p', 'p.id', '=', 'pr.payroll_id')
+                                                            ->where('pr.employee_id', $employee_id)
+                                                            ->whereYear('p.start_date', $year)
+                                                            ->selectRaw('MONTH(p.start_date) as month_num, SUM(pr.earnings_basic) as basic, SUM(pr.earnings_overtime) as overtime, SUM(pr.service_charge) as service_charge')
+                                                            ->groupBy('month_num')
                                                             ->get();
 
-            $otData                                     =   DB::table('payroll as p')
-                                                            ->join('payroll_time_and_attandance as pta', 'p.id', '=', 'pta.payroll_id')
-                                                            ->join('employees as e', 'e.id', '=', 'pta.employee_id')
-                                                            ->whereYear('start_date', $year)
-                                                            ->where('pta.employee_id',$employee_id)
-                                                            ->where(function ($query) {
-                                                                $query->where('pta.regular_ot_hours', '>', 0)
-                                                                    ->orWhere('pta.holiday_ot_hours', '>', 0);
-                                                            }) // Only fetch employees with OT
-                                                            ->selectRaw("
-                                                                MONTHNAME(p.start_date) as month,
-                                                                pta.employee_id,
-                                                                e.basic_salary,
-                                                                pta.regular_ot_hours,
-                                                                pta.holiday_ot_hours,
-                                                                (pta.regular_ot_hours * e.basic_salary * 1.25) as regular_ot_cost,
-                                                                (pta.holiday_ot_hours * e.basic_salary * 1.50) as holiday_ot_cost,
-                                                                ((pta.regular_ot_hours * e.basic_salary * 1.25) + 
-                                                                (pta.holiday_ot_hours * e.basic_salary * 1.50)) as ot_cost
-                                                            ")->get();
-        
-            // Get service charge data
-            $serviceChargeData                          =   DB::table('payroll_service_charges')
-                                                            ->join('payroll','payroll.id','=','payroll_service_charges.payroll_id')
-                                                            ->where('payroll_service_charges.employee_id',$employee_id)
-                                                            ->select(
-                                                                DB::raw("MONTHNAME(payroll.start_date) as month"),
-                                                                DB::raw("SUM(payroll_service_charges.service_charge_amount) as service_charge")
-                                                            )
-                                                            ->whereYear('payroll.start_date', $year)
-                                                            ->groupBy('month')
-                                                            ->get();
-                                                            
-            // Generate labels (Months)
-            $months                                     =   ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+            $monthLabels                                =   ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
             // Initialize arrays
             $payrollCost                                =   array_fill(0, 12, 0);
             $otCost                                     =   array_fill(0, 12, 0);
             $serviceCharge                              =   array_fill(0, 12, 0);
 
-            // Map database results to correct month index
-            foreach ($payrollData as $row) {
-                $index                                  = array_search($row->month, $months);
-                if ($index !== false) {
-                    $payrollCost[$index]                = $row->payroll_cost;
+            foreach ($monthlyReviews as $row) {
+                $index                                  = ((int) $row->month_num) - 1;
+                if ($index >= 0 && $index < 12) {
+                    $payrollCost[$index]                = round((float) $row->basic, 2);
+                    $otCost[$index]                     = round((float) $row->overtime, 2);
+                    $serviceCharge[$index]               = round((float) $row->service_charge, 2);
                 }
             }
 
-            foreach ($otData as $row) {
-                $index                                  = array_search(strtolower($row->month), array_map('strtolower', $months));
-            
-                if ($index !== false) {
-                    if (!isset($otCost[$index])) {
-                        $otCost[$index]                 = 0;
-                    }
-                    $otCost[$index]                     += $row->ot_cost; // Accumulate OT costs
-                }
-            }
+            $chartLabels                                =   array_map(fn($m) => $m . ' ' . $year, $monthLabels);
 
-            foreach ($serviceChargeData as $row) {
-                $index                                  = array_search($row->month, $months);
-                if ($index !== false) {
-                    $serviceCharge[$index]              = $row->service_charge;
-                }
-            }
+            // Trend badge ("Last 12 Months +12%") — this year's total net
+            // salary vs the prior year's, same employee.
+            $currentYearNet                             =   (float) DB::table('payroll_reviews as pr')
+                                                            ->join('payroll as p', 'p.id', '=', 'pr.payroll_id')
+                                                            ->where('pr.employee_id', $employee_id)
+                                                            ->whereYear('p.start_date', $year)
+                                                            ->sum('pr.net_salary');
+            $priorYearNet                                =   (float) DB::table('payroll_reviews as pr')
+                                                            ->join('payroll as p', 'p.id', '=', 'pr.payroll_id')
+                                                            ->where('pr.employee_id', $employee_id)
+                                                            ->whereYear('p.start_date', $year - 1)
+                                                            ->sum('pr.net_salary');
+            $yearOverYearChangePercent                  =   $priorYearNet > 0
+                                                            ? round((($currentYearNet - $priorYearNet) / $priorYearNet) * 100, 1)
+                                                            : null;
        
             // payroll_deductions/payroll_reviews/payroll_service_charges don't
             // necessarily have a row for every employee in every payroll run
@@ -202,6 +181,23 @@ class PayrollController extends Controller
                     'payrollCost'                       => $payrollCost,
                     'otCost'                            => $otCost,
                     'serviceCharge'                     => $serviceCharge,
+                    // Everything the 12-month stacked bar chart needs in one
+                    // object — labels already carry the year (e.g. "Jan
+                    // 2026") so the app doesn't have to reconstruct them.
+                    'chart'                             => [
+                        'labels'                        => $chartLabels,
+                        'basic_pay'                      => $payrollCost,
+                        'overtime'                       => $otCost,
+                        'service_charge'                 => $serviceCharge,
+                    ],
+                    'net_salary_trend'                  => [
+                        'current_year_total'            => round($currentYearNet, 2),
+                        'prior_year_total'               => round($priorYearNet, 2),
+                        // null when there's no prior-year data to compare
+                        // against at all — a literal 0% would falsely read
+                        // as "no change" instead of "not enough history".
+                        'change_percent'                 => $yearOverYearChangePercent,
+                    ],
                     'salary'                            => round($payroll->earnings_basic ?? 0,2),
                     'earnings'                          => round($earningsTotal, 2),  // Ensuring two decimal places
                     'deductions'                        => round($payroll->total_deductions ?? 0, 2),
