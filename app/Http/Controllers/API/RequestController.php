@@ -116,14 +116,16 @@ class RequestController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
         
-        // Guarantors and an amount only apply to monetary requests (Payroll
-        // Advance); letter-type requests such as Employment Verification
-        // Letter carry neither.
+        // Guarantors and an amount only apply to monetary requests (Salary
+        // Advance / Loan Request — the actual request_type values the app
+        // sends; 'Payroll Advance' here never matched anything real).
+        // Letter-type requests such as Employment Verification Letter
+        // carry neither.
         $validator = Validator::make($request->all(), [
             'request_type'                              =>  'required',
-            'guarantor_id'                              =>  'required_if:request_type,Payroll Advance|array',
+            'guarantor_id'                              =>  'required_if:request_type,Salary Advance,Loan Request|array',
             'guarantor_id.*'                            =>  'integer|exists:employees,id',
-            'request_amount'                            =>  'required_if:request_type,Payroll Advance',
+            'request_amount'                            =>  'required_if:request_type,Salary Advance,Loan Request',
             'currency'                                  =>  'nullable|in:MVR,USD',
             'priority'                                  =>  'required',
             'request_date'                              =>  'required',
@@ -224,7 +226,7 @@ class RequestController extends Controller
                         null,
                         null,
                         'Request',
-                        'A request has been sent by ' . $this->user->first_name . ' ' . $this->user->last_name . '.',
+                        'A ' . $request->request_type . ' request has been sent by ' . $this->user->first_name . ' ' . $this->user->last_name . '.',
                         'Request',
                         $hrEmployeeIds,
                         $PayrollAdvance->id,
@@ -237,7 +239,7 @@ class RequestController extends Controller
                 // in the loop up front — approval later routes through them
                 // anyway, so they should see the request the moment it lands,
                 // not only at their own approval step.
-                if ($request->request_type === 'Payroll Advance') {
+                if (in_array($request->request_type, ['Salary Advance', 'Loan Request'], true)) {
                     $financeEmployeeIds = Common::getResortFinanceEmployeeIds($this->resort_id);
                     if (!empty($financeEmployeeIds)) {
                         Common::sendMobileNotification(
@@ -246,7 +248,7 @@ class RequestController extends Controller
                             null,
                             null,
                             'Request',
-                            'An advance salary request has been sent by ' . $this->user->first_name . ' ' . $this->user->last_name . '.',
+                            'A ' . $request->request_type . ' request has been sent by ' . $this->user->first_name . ' ' . $this->user->last_name . '.',
                             'Request',
                             $financeEmployeeIds,
                             $PayrollAdvance->id,
