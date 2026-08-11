@@ -7063,6 +7063,17 @@ class Common
                                                                     ? trim($employee->first_name . ' ' . $employee->last_name)
                                                                     : 'Someone';
 
+                                        // $payload->created_at is Announcement::getCreatedAtAttribute()'s
+                                        // already-formatted display string (e.g. "26/07/2026 03:20"),
+                                        // not the raw DB value — Carbon::parse() can't read d/m/Y and
+                                        // threw here, an uncaught error since the display string only
+                                        // gets built AFTER the constructor's format lookup succeeds.
+                                        // Same bug/fix already applied to the notification-bell
+                                        // renderer — use getRawOriginal() for a parseable timestamp.
+                                        $rawCreatedAt = method_exists($payload, 'getRawOriginal')
+                                            ? $payload->getRawOriginal('created_at')
+                                            : $payload->getOriginal('created_at');
+
                                         return [
                                             'id'            => $payload->id,
                                             'resortid'      => $payload->resort_id,
@@ -7071,7 +7082,7 @@ class Common
                                             'status'        => $payload->status,
                                             'module'        => 'Announcement Wish',
                                             'sendto'        => $payload->employee_id,
-                                            'created_at'    => Carbon::parse($payload->created_at)->format('d M Y h:i A')
+                                            'created_at'    => $rawCreatedAt ? Carbon::parse($rawCreatedAt)->format('d M Y h:i A') : ''
                                         ];
             });
 
