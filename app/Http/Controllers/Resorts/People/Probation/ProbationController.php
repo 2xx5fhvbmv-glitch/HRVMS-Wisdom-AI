@@ -93,13 +93,22 @@ class ProbationController extends Controller
                 });
             }
 
-            // Date-range filter on probation end date (From / To).
-            if($request->filled('date_from') && $request->filled('date_to')){
-                $query->whereBetween('probation_end_date', [$request->date_from, $request->date_to]);
-            } elseif($request->filled('date_from')){
-                $query->whereDate('probation_end_date', '>=', $request->date_from);
-            } elseif($request->filled('date_to')){
-                $query->whereDate('probation_end_date', '<=', $request->date_to);
+            // Date-range filter on probation end date (From / To). Same gap
+            // as the base "still on probation" clause above: probation_end_date
+            // is frequently null (falls back to joining_date + 3 months) and,
+            // when it IS set, is stored one day past what's actually displayed
+            // (see the -1 day adjustment on the probation_end_date column
+            // below) — filtering on the raw column directly dropped every row
+            // with no explicit end_date and off-by-one excluded rows whose
+            // displayed end date landed exactly on the range boundary.
+            if ($request->filled('date_from') || $request->filled('date_to')) {
+                $effectiveEndExpr = 'DATE_SUB(COALESCE(probation_end_date, DATE_ADD(joining_date, INTERVAL 3 MONTH)), INTERVAL 1 DAY)';
+                if ($request->filled('date_from')) {
+                    $query->whereRaw("$effectiveEndExpr >= ?", [$request->date_from]);
+                }
+                if ($request->filled('date_to')) {
+                    $query->whereRaw("$effectiveEndExpr <= ?", [$request->date_to]);
+                }
             }
 
             // Onboarding-training status filter — same buckets as the

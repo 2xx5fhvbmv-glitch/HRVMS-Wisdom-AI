@@ -235,14 +235,23 @@ class ProbationReportController extends Controller
         $scoped = Common::getScopedDepartmentIds();
 
         $today = Carbon::today();
+        // Same gap as upcomingProbationExpiry(): probation_end_date is
+        // frequently null (falls back to joining_date + 3 months, computed
+        // in PHP below) and, when set, is one day past what's displayed.
+        // Filtering From/To directly on the raw column dropped every row
+        // with no explicit end_date at all — real employees like DR-486/
+        // DR-28 have null probation_end_date and only ever matched via the
+        // PHP fallback, which the SQL-level date filter never saw — and
+        // off-by-one excluded rows landing exactly on the range boundary.
+        $displayEndExprForFilter = 'DATE_SUB(COALESCE(e.probation_end_date, DATE_ADD(e.joining_date, INTERVAL 3 MONTH)), INTERVAL 1 DAY)';
 
         $rows = $this->baseQuery($rid, $scoped)
             ->whereIn('e.probation_status', ['Active', 'Extended', 'Confirmed', 'Failed'])
             ->when($f['department'] ?? null, fn($q) => $q->where('e.Dept_id', $f['department']))
             ->when($f['position'] ?? null, fn($q) => $q->where('e.Position_id', $f['position']))
             ->when($f['reporting_manager'] ?? null, fn($q) => $q->where('e.reporting_to', $f['reporting_manager']))
-            ->when($f['from_date'] ?? null, fn($q) => $q->whereDate('e.probation_end_date', '>=', $f['from_date']))
-            ->when($f['to_date'] ?? null, fn($q) => $q->whereDate('e.probation_end_date', '<=', $f['to_date']))
+            ->when($f['from_date'] ?? null, fn($q) => $q->whereRaw("$displayEndExprForFilter >= ?", [$f['from_date']]))
+            ->when($f['to_date'] ?? null, fn($q) => $q->whereRaw("$displayEndExprForFilter <= ?", [$f['to_date']]))
             ->orderBy('e.probation_end_date')
             ->get([
                 'e.id', 'e.Emp_id', 'e.joining_date', 'e.probation_end_date', 'e.probation_status',
