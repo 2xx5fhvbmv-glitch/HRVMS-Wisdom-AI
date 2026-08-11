@@ -34,11 +34,11 @@
                                     if (($privacy ?? null) === 'Confidential') {
                                         $badgeClass = 'badge-info';
                                         $privacyNote = $showRespondentIdentity
-                                            ? 'Confidential — identities are visible to you because you are an authorised admin (HR / GM).'
-                                            : 'Confidential — respondent identities are hidden. Only authorised admins (HR / GM) can see who responded.';
+                                            ? 'Identities are visible to you because you are an authorised admin (HR / GM).'
+                                            : 'Respondent identities are hidden. Only authorised admins (HR / GM) can see who responded.';
                                     } elseif (($privacy ?? null) === 'Anonymous') {
                                         $badgeClass = 'badge-secondary';
-                                        $privacyNote = 'Anonymous — respondent identities are hidden for everyone, including admins.';
+                                        $privacyNote = 'Respondent identities are hidden for everyone, including admins.';
                                     }
                                 @endphp
                                 <div class="mt-1">
@@ -88,14 +88,14 @@
                             <div class="col-lg-4 col-md-6">
                                 <select class="form-select select2t-none" name="respondent"  id="respondent">
                                     <option value="{{ base64_encode('All') }}">All Respondents</option>
-                                    @if($showRespondentIdentity && $ResponedEmp->isNotEmpty())
+                                    @if($ResponedEmp->isNotEmpty())
                                         @foreach ($ResponedEmp as $item)
                                             <option value="{{ $item->emp_id }}">{{ $item->EmployeeName }}</option>
                                         @endforeach
                                     @endif
                                 </select>
                                 @if(!$showRespondentIdentity)
-                                    <small class="text-muted">Per-respondent selection is disabled for {{ $privacy }} surveys.</small>
+                                    <small class="text-muted">Respondent names are masked for {{ $privacy }} surveys — any selection exports all responses combined, to avoid identifying an individual by elimination.</small>
                                 @endif
                             </div>
                             <div class="col-auto">
@@ -103,52 +103,38 @@
                             </div>
                         </form>
                     </div>
-                    {{-- <div class="bg-white">
+                    @if(!empty($ratingChartLabels) || !empty($optionChartLabels))
+                    <div class="bg-white">
                         <div class="row g-md-4 g-3 align-items-center">
+                            @if(!empty($ratingChartLabels))
                             <div class="col-xxl-6 col-xl-7 col-lg-8">
-                                <canvas id="barchart"></canvas>
-                                <!-- <canvas id="barchart" width="906" height="293"></canvas> -->
-                            </div>
-                            <div class="col-xxl-5  col-lg-4 offset-xl-1 ">
-                                <div class="row g-2 doughnut-labelTop justify-content-center justify-content-lg-start">
-                                    <div class="col-lg-6 col-auto">
-                                        <div class="doughnut-label">
-                                            <span class="bg-theme"></span>
-                                            <div><span class="fw-600">Strongly Disagree</span><br>10%</div>
-                                        </div>
-                                    </div>
-                                    <div class="col-lg-6 col-auto">
-                                        <div class="doughnut-label">
-                                            <span class="bg-theme"></span>
-                                            <div><span class="fw-600">Disagree</span> <br>26%
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-lg-6 col-auto">
-                                        <div class="doughnut-label">
-                                            <span class="bg-theme"></span>
-                                            <div><span class="fw-600">Neutral</span> <br>37%
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-lg-6 col-auto">
-                                        <div class="doughnut-label">
-                                            <span class="bg-theme"></span>
-                                            <div><span class="fw-600">Agree</span> <br>52%
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-lg-6 col-auto">
-                                        <div class="doughnut-label">
-                                            <span class="bg-theme"></span>
-                                            <div><span class="fw-600">Strongly Agree</span> <br>80%
-                                            </div>
-                                        </div>
-                                    </div>
+                                <p class="fw-600 mb-2">Average rating per question</p>
+                                <div style="max-height:220px;">
+                                    <canvas id="barchart"></canvas>
                                 </div>
                             </div>
+                            @endif
+                            @if(!empty($optionChartLabels))
+                            <div class="col-xxl-5 col-lg-4 offset-xl-1">
+                                <p class="fw-600 mb-2">{{ $optionChartQuestion }}</p>
+                                <div style="max-height:220px;">
+                                    <canvas id="doughnutchart"></canvas>
+                                </div>
+                                <div class="row g-2 doughnut-labelTop justify-content-center justify-content-lg-start mt-2">
+                                    @foreach($optionChartLabels as $idx => $label)
+                                    <div class="col-lg-6 col-auto">
+                                        <div class="doughnut-label">
+                                            <span class="bg-theme"></span>
+                                            <div><span class="fw-600">{{ $label }}</span><br>{{ $optionChartData[$idx] }}%</div>
+                                        </div>
+                                    </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                            @endif
                         </div>
-                    </div> --}}
+                    </div>
+                    @endif
                 </div>
             </div>
 
@@ -183,72 +169,71 @@
 
     </script>
     <script type="module">
-        const ctp = document.getElementById('barchart').getContext('2d');
-        const barchart = new Chart(ctp, {
-            type: 'bar',
-            data: {
-                labels: ['Strongly Disagree', 'Disagree', 'Neutral', 'Agree', 'Strongly Agree'],
-                datasets: [
-                    {
-                        label: 'Preplannned OT',
-                        data: [10, 30, 50, 80, 90],
-                        backgroundColor: '#014653',
-                        borderColor: '#014653',
-                        borderWidth: 1,
-                        borderRadius: 5,
-                        barThickness: 36
+        const barCanvas = document.getElementById('barchart');
+        if (barCanvas) {
+            new Chart(barCanvas.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: @json($ratingChartLabels ?? []),
+                    datasets: [
+                        {
+                            label: 'Average rating',
+                            data: @json($ratingChartData ?? []),
+                            backgroundColor: '#014653',
+                            borderColor: '#014653',
+                            borderWidth: 1,
+                            borderRadius: 5,
+                            barThickness: 36
+                        },
+                    ]
+                },
+                options: {
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
                     },
-                ]
-            },
-            options: {
-                plugins: {
-                    legend: {
-                        display: false
-                    },
-                    layout: {
-                        padding: {
-                            top: 0,
-                            bottom: 0,
-                            left: 0,
-                            right: 0
+                    scales: {
+                        x: {
+                            grid: { display: false },
+                            border: { display: true }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: { display: false },
+                            border: { display: true }
                         }
-                    },
-                    tooltip: {
-                        enabled: true, // Enable tooltips
-                        callbacks: {
-                            label: function (tooltipItem) {
-                                // const datasetLabel = tooltipItem.dataset.label || '';
-                                const value = tooltipItem.raw.toLocaleString(); // Format the value with commas
-                                return formatAmount(value, 'USD'); // Custom tooltip format
+                    }
+                }
+            });
+        }
+
+        const doughnutCanvas = document.getElementById('doughnutchart');
+        if (doughnutCanvas) {
+            new Chart(doughnutCanvas.getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: @json($optionChartLabels ?? []),
+                    datasets: [
+                        {
+                            data: @json($optionChartData ?? []),
+                            backgroundColor: ['#014653', '#2E86AB', '#5CB85C', '#F0AD4E', '#D9534F', '#9E5CF7'],
+                        },
+                    ]
+                },
+                options: {
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function (tooltipItem) {
+                                    return tooltipItem.label + ': ' + tooltipItem.raw + '%';
+                                }
                             }
                         }
                     }
-                },
-                scales: {
-                    x: {
-                        beginAtZero: true, // Start x-axis at zero
-                        grid: {
-                            display: false // Hide grid lines on the x-axis
-                        },
-                        border: {
-                            display: true // Show the x-axis border
-                        }
-                    },
-                    y: {
-                        beginAtZero: true, // Do not start y-axis at zero
-                        grid: {
-                            display: false // Hide grid lines on the y-axis
-                        }, ticks: {
-                            stepSize: 20,
-                        },
-                        border: {
-                            display: true // Show the y-axis border
-                        },
-                    }
                 }
-            }
-        });
-
-
+            });
+        }
     </script>
     @endsection
