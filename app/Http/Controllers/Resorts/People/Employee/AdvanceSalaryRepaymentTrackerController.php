@@ -147,12 +147,32 @@ class AdvanceSalaryRepaymentTrackerController extends Controller
     }
     
 
-    // Update recovery payment Data
+    // Update recovery payment Data — shared by this page's own Edit row
+    // and the advance-salary show page's Repayment Schedule table (same
+    // PayrollRecoverySchedule rows, same edit rules).
     public function update(Request $request){
 
-        $recovery_schedule = PayrollRecoverySchedule::find($request->schedule_id);
+        // Tenant-scope the lookup — schedule_id is a raw row id with no
+        // other check, so without this any resort-admin could edit another
+        // resort's live repayment schedule by guessing/enumerating ids.
+        $recovery_schedule = PayrollRecoverySchedule::where('id', $request->schedule_id)
+            ->whereHas('employee', function ($q) {
+                $q->where('resort_id', $this->resort->resort_id);
+            })
+            ->first();
 
         if ($recovery_schedule) {
+            // Already-deducted installments are done — the payroll run that
+            // paid them is in the past, so moving their month now would
+            // rewrite history without touching the actual payroll record.
+            if ($recovery_schedule->status !== 'Pending') {
+                return response()->json([
+                    'success' => false,
+                    'status' => 'error',
+                    'message' => 'This installment has already been paid and can no longer be changed.',
+                ]);
+            }
+
             $check_recovery_schedule = PayrollRecoverySchedule::where('payroll_advance_id', $recovery_schedule->payroll_advance_id)
                 ->whereYear('repayment_date', Carbon::createFromFormat('F Y', $request->repayment_date)->year)
                 ->whereMonth('repayment_date', Carbon::createFromFormat('F Y', $request->repayment_date)->month)
@@ -160,7 +180,7 @@ class AdvanceSalaryRepaymentTrackerController extends Controller
                 ->first();
 
             $month_date = Carbon::createFromFormat('F Y', $request->repayment_date)->startOfMonth()->format('Y-m-d');
-            
+
             if (!$check_recovery_schedule) {
                 $recovery_schedule->repayment_date = $month_date;
                 $recovery_schedule->amount = $request->amount;
@@ -173,6 +193,12 @@ class AdvanceSalaryRepaymentTrackerController extends Controller
                     'message' => 'A recovery schedule for this month already exists. Please select a different month.',
                 ]);
             }
+        }else{
+            return response()->json([
+                'success' => false,
+                'status' => 'error',
+                'message' => 'Recovery schedule not found.',
+            ]);
         }
 
         return response()->json([
