@@ -265,6 +265,11 @@ class ChatController extends Controller
                $group = GroupChat::where('id', $type_id)
                     ->where('resort_id', $resort->resort_id)
                     ->first();
+
+               if (!$group) {
+                    return response()->json(['success' => false, 'message' => 'Group not found'], 404);
+               }
+
                $members = $group->groupMembers()->pluck('user_id')->toArray();
 
                $newMemberList = Employee::where('resort_id', $resort->resort_id)
