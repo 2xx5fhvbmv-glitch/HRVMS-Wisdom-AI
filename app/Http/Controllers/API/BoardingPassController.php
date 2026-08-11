@@ -994,6 +994,14 @@ class BoardingPassController extends Controller
                 'employee.position:id,position_title',
                 'DepartureResortTransportation:id,resort_id,transportation_option',
                 'ArrivalResortTransportation:id,resort_id,transportation_option',
+                // Assigned via manifestStore() — arrival_time/departure_time
+                // get copied onto this row directly, but transportation_mode/
+                // transportation_name only ever lived on the manifest row
+                // itself, linked via manifest_id. This view never loaded that
+                // relation, so a confirmed manifest's boat/vessel details
+                // never reached the employee's own pass detail screen even
+                // though the notification (and the time) went out correctly.
+                'manifest:id,transportation_mode,transportation_name,manifest_type,date,time',
             ])
                 ->where('resort_id', $this->resort_id)
                 ->where('id', $passId)
@@ -1044,6 +1052,20 @@ class BoardingPassController extends Controller
                 : '';
             $designation = ($emp && $emp->position) ? ($emp->position->position_title ?? '') : '';
 
+            // Manifest confirmation (boat/vessel name + mode) — only ever
+            // stored on the manifest row, surfaced here as its own object
+            // plus merged into the matching travel segment below so both a
+            // top-level lookup and the existing segment shape work.
+            $manifest = $EmployeeTravelPassView->manifest;
+            $manifestConfirmation = $manifest ? [
+                'manifest_id' => $manifest->id,
+                'manifest_type' => $manifest->manifest_type,
+                'transportation_mode' => $manifest->transportation_mode,
+                'transportation_name' => $manifest->transportation_name,
+                'date' => $manifest->date,
+                'time' => $manifest->time,
+            ] : null;
+
             $travelSegments = [];
             if ($EmployeeTravelPassView->departure_date && $EmployeeTravelPassView->DepartureResortTransportation) {
                 $travelSegments[] = [
@@ -1053,6 +1075,7 @@ class BoardingPassController extends Controller
                     'departure_time' => $EmployeeTravelPassView->departure_time,
                     'departure_date_display' => Carbon::parse($EmployeeTravelPassView->departure_date)->format('d M Y, D'),
                     'departure_time_display' => $EmployeeTravelPassView->departure_time ?? '—',
+                    'manifest_confirmation' => ($manifest && $manifest->manifest_type === 'departure') ? $manifestConfirmation : null,
                 ];
             }
             if ($EmployeeTravelPassView->arrival_date && $EmployeeTravelPassView->ArrivalResortTransportation) {
@@ -1063,6 +1086,7 @@ class BoardingPassController extends Controller
                     'arrival_time' => $EmployeeTravelPassView->arrival_time,
                     'departure_date_display' => Carbon::parse($EmployeeTravelPassView->arrival_date)->format('d M Y, D'),
                     'departure_time_display' => $EmployeeTravelPassView->arrival_time ?? '—',
+                    'manifest_confirmation' => ($manifest && $manifest->manifest_type === 'arrival') ? $manifestConfirmation : null,
                 ];
             }
 
@@ -1080,6 +1104,7 @@ class BoardingPassController extends Controller
                 ],
                 'travel_segments' => $travelSegments,
                 'reason' => $reason,
+                'manifest_confirmation' => $manifestConfirmation,
             ], $approvalFlowData, [
                 // Same Pending-only rule as boardingEmpDashboard's can_modify/
                 // can_cancel — Modify/Cancel must disappear once approved or

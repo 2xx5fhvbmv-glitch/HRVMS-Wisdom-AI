@@ -1259,7 +1259,7 @@ class SurveyController extends Controller
         $minutes = round(($totalHours - $hours) * 60);
         $formattedTime = sprintf('%02d hours %02d mins', $hours, $minutes);
 
-        $responseRate = ($TotalResponed  > 0) ? ($TotalResponed  / $Min_responsed) * 100 : 0;
+        $responseRate = ($TotalResponed  > 0) ? round(($TotalResponed  / $Min_responsed) * 100, 2) : 0;
    
         $privacy = $ParentSurvey->survey_privacy_type;
         $showRespondentIdentity = $this->canSeeRespondentIdentity($privacy);
@@ -1277,9 +1277,9 @@ class SurveyController extends Controller
                                                 $i->profileImg = Common::getResortUserPicture($i->ParentId);
                                             } else {
                                                 // Mask: stable per-row label, no real ID surfaced to the client.
-                                                $label = $privacy === 'Anonymous' ? 'Anonymous Respondent' : 'Confidential Respondent';
+                                                $label = $privacy === 'Anonymous' ? 'Anonymous' : 'Confidential';
                                                 $i->emp_id  = base64_encode('All'); // disable per-respondent export
-                                                $i->EmployeeName = $label . ' #' . ($idx + 1);
+                                                $i->EmployeeName = ($idx + 1) . ' ' . $label;
                                                 $i->profileImg = asset('resorts_assets/images/user.svg');
                                                 $i->first_name = $label;
                                                 $i->last_name = '';
@@ -1287,9 +1287,43 @@ class SurveyController extends Controller
                                             return $i;
                                         });
 
+        // Average score per Rating-type question, for the bar chart —
+        // real questions use a numeric scale (e.g. 0-10), not the 5-point
+        // Likert buckets the old disabled mockup assumed.
+        $ratingQuestions = SurveyQuestion::where('Parent_survey_id', $id)->where('type', 'Rating')->get();
+        $ratingChartLabels = [];
+        $ratingChartData = [];
+        foreach ($ratingQuestions as $q) {
+            $avg = SurveyResult::where('Parent_survey_id', $id)->where('Question_id', $q->id)->avg('Emp_Ans');
+            $ratingChartLabels[] = $q->Question_Text;
+            $ratingChartData[] = $avg !== null ? round((float) $avg, 2) : 0;
+        }
+
+        // Option-distribution for the doughnut — first question with a real
+        // option list (Multi-Choice/Checkbox/Dropdown), % of respondents
+        // picking each option.
+        $optionQuestion = SurveyQuestion::where('Parent_survey_id', $id)
+            ->whereNotNull('Total_Option_Json')
+            ->where('Total_Option_Json', '!=', '')
+            ->first();
+        $optionChartQuestion = null;
+        $optionChartLabels = [];
+        $optionChartData = [];
+        if ($optionQuestion) {
+            $options = json_decode($optionQuestion->Total_Option_Json, true) ?: [];
+            $answers = SurveyResult::where('Parent_survey_id', $id)->where('Question_id', $optionQuestion->id)->pluck('Emp_Ans');
+            $totalAnswers = $answers->count();
+            $optionChartQuestion = $optionQuestion->Question_Text;
+            foreach ($options as $opt) {
+                $count = $answers->filter(fn($a) => trim((string) $a) === trim((string) $opt))->count();
+                $optionChartLabels[] = $opt;
+                $optionChartData[] = $totalAnswers > 0 ? round(($count / $totalAnswers) * 100, 1) : 0;
+            }
+        }
+
         $page_title = "Survey Results";
         $id = base64_encode($id);
-        return  view('resorts.Survey.SurveyPages.Result',compact('id','page_title','ResponedEmp','responseRate','formattedTime','TotalResponed','ParentSurvey','showRespondentIdentity','privacy'));
+        return  view('resorts.Survey.SurveyPages.Result',compact('id','page_title','ResponedEmp','responseRate','formattedTime','TotalResponed','ParentSurvey','showRespondentIdentity','privacy','ratingChartLabels','ratingChartData','optionChartQuestion','optionChartLabels','optionChartData'));
 
     }
 
@@ -1334,7 +1368,7 @@ class SurveyController extends Controller
             $hours = floor($totalHours);
             $minutes = round(($totalHours - $hours) * 60);
   
-            $responseRate = ($TotalResponed  > 0) ? ($TotalResponed  / $Min_responsed) * 100 : 0;
+            $responseRate = ($TotalResponed  > 0) ? round(($TotalResponed  / $Min_responsed) * 100, 2) : 0;
             $surveyName =   ucfirst($ParentSurvey->Surevey_title)             ;
             $totalRespondents =  $TotalResponed ;
             $responseRate = $responseRate;
