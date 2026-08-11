@@ -59,7 +59,17 @@ class ConversationController extends Controller
             
             ->get(['id','type', 'type_id', 'sender_id', 'message','attachment', 'created_at']);
 
-        $chats = $send_message->merge($get_message)->sortBy('created_at')->values()->all();
+        // 'attachment' stores the raw disk path AWSEmployeeFileUpload() returned
+        // (e.g. "26/public/EmployeesChatAttachments/.../file.jpg") — not a URL
+        // the app can load directly, same as every other tenant-uploaded file;
+        // must go through StorageHelper (per house convention), never raw.
+        $chats = $send_message->merge($get_message)->sortBy('created_at')->values()
+            ->map(function ($message) {
+                if (!empty($message->attachment)) {
+                    $message->attachment = \App\Helpers\StorageHelper::temporaryUrl($message->attachment);
+                }
+                return $message;
+            })->all();
 
         return response()->json([
             'success' => true,
@@ -161,7 +171,15 @@ class ConversationController extends Controller
             ->orderBy('created_at', 'asc')
             ->get(['id','type', 'type_id', 'sender_id', 'message', 'attachment','created_at']);
 
-        $chat_history = $send_message->merge($get_message)->sortBy('created_at')->values()->all();
+        // Same raw-path-to-URL resolution as chatView() — this response is the
+        // other read path for the same attachment column (per-view duplicate).
+        $chat_history = $send_message->merge($get_message)->sortBy('created_at')->values()
+            ->map(function ($message) {
+                if (!empty($message->attachment)) {
+                    $message->attachment = \App\Helpers\StorageHelper::temporaryUrl($message->attachment);
+                }
+                return $message;
+            })->all();
 
         return response()->json([
             'success' => true,
