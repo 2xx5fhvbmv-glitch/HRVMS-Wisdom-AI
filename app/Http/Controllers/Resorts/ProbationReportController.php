@@ -247,6 +247,14 @@ class ProbationReportController extends Controller
 
         $rows = $this->baseQuery($rid, $scoped)
             ->whereIn('e.probation_status', ['Active', 'Extended', 'Confirmed', 'Failed'])
+            // Same rule the live Probation page already applies: with
+            // neither probation_end_date nor joining_date set, there's no
+            // way to confirm the employee was ever actually on a probation
+            // window at all — these were showing up as "Active" with every
+            // date column 'N/A', despite having no real probation data.
+            ->where(function ($q) {
+                $q->whereNotNull('e.probation_end_date')->orWhereNotNull('e.joining_date');
+            })
             ->when($f['department'] ?? null, fn($q) => $q->where('e.Dept_id', $f['department']))
             ->when($f['position'] ?? null, fn($q) => $q->where('e.Position_id', $f['position']))
             ->when($f['reporting_manager'] ?? null, fn($q) => $q->where('e.reporting_to', $f['reporting_manager']))
