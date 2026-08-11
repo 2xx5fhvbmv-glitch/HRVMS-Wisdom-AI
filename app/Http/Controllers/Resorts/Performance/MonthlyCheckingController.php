@@ -829,7 +829,11 @@ class MonthlyCheckingController extends Controller
                 return '<span class="badge badge-themeWarning">Pending Approval</span>';
             })
             ->addColumn('action', function ($row) {
-                return '<a href="'.route('Performance.GetMonthlyCheckInDetails', $row->id).'" class="btn btn-theme btn-sm">View</a>';
+                // GetMonthlyCheckInDetails() base64-decodes the id (every
+                // other caller of this route already base64_encode()s it) —
+                // this one passed the raw id, so the decoded garbage never
+                // matched a row and every "View" from History 403'd.
+                return '<a href="'.route('Performance.GetMonthlyCheckInDetails', base64_encode($row->id)).'" class="btn btn-theme btn-sm">View</a>';
             })
             ->rawColumns(['employee', 'status_badge', 'action'])
             ->make(true);
