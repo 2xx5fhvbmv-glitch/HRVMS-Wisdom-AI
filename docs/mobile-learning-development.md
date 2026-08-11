@@ -6,13 +6,15 @@ employee-facing integration reference.
 
 ## GET learning/employee-learning-dashboard (alias: learning/emp-lt-dashboard)
 
-Employee's own L&D summary for the current calendar month:
+Employee's own L&D summary, all-time (not scoped to the current month):
 ```json
 {
   "success": true,
   "emp_dashboard_data": {
     "training_completed_hours": 6.5,
     "pending_training_count": 2,
+    "ongoing_training_count": 1,
+    "completed_training_count": 4,
     "assign_trainig_prog_comp_percen": 40,
     "assign_trainig_programs": [
       {
@@ -25,11 +27,22 @@ Employee's own L&D summary for the current calendar month:
   }
 }
 ```
+`ongoing_training_count`/`completed_training_count`/`pending_training_count`
+are derived from each session's `start_date`/`end_date` vs today (ongoing:
+started, not yet ended; completed: ended; pending: not yet started) — **not**
+the raw `status` column on `training_schedules`, which is unreliable across
+the whole table (every row is stuck at `'Scheduled'` regardless of its real
+dates, confirmed against live data). Same date-derived approach the web
+HOD dashboard already uses for the identical reason — this is what makes
+the three counts match web instead of drifting from it again.
+
 `assign_trainig_programs` mixes two source types with different id spaces —
 scheduled trainings (`TrainingSchedule`, id = the linked `learningProgram.id`)
 and standalone approved `LearningRequest`s (id = `learning_request.learning_id`,
 title prefixed `"Learning Request: "`) — both rendered as one combined list
-for display, not meant to be treated as a single foreign key.
+for display, not meant to be treated as a single foreign key. Note each
+item's own `status` field here is still the raw (unreliable) column — use
+the three top-level counts above for anything status-driven, not this field.
 
 ## POST learning/employee-training-calendar
 
