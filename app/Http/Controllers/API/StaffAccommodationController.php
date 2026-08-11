@@ -63,7 +63,15 @@ class StaffAccommodationController extends Controller
                                                                     ->join('building_models as bm', 'bm.id', '=', 'available_accommodation_models.BuildingName')
                                                                     ->where('available_accommodation_models.resort_id', $this->resort_id)
                                                                     ->where("t1.emp_id", $employee->id)
-                                                                    ->select('available_accommodation_models.*','t1.id as assing_acc_id','t1.BedNo','t1.emp_id','bm.BuildingName')
+                                                                    // bm.BuildingName (the actual building name string) must alias to
+                                                                    // BName, not the bare 'BuildingName' the wildcard already selects —
+                                                                    // available_accommodation_models.BuildingName is itself a distinct
+                                                                    // (string-typed) column, and two columns sharing one output key
+                                                                    // collapse to whichever comes last in the result set, silently
+                                                                    // dropping the wildcard's value. Same convention already used by
+                                                                    // AccommodationController::mainRequestDetails and
+                                                                    // AssignAccommodationController for this identical join.
+                                                                    ->select('available_accommodation_models.*','t1.id as assing_acc_id','t1.BedNo','t1.emp_id','bm.BuildingName as BName')
                                                                     ->first();
 
             // Check if accommodation details exist to avoid errors
@@ -170,7 +178,10 @@ class StaffAccommodationController extends Controller
                                                                     ->where("available_accommodation_models.id", $accommodationId)
                                                                     ->where("t1.emp_id", $employee->id)
                                                                     ->with('availableAccommodationInvItem.inventoryModule')
-                                                                    ->select('available_accommodation_models.*','at.AccommodationName','t1.id as assing_acc_id','t1.BedNo','t1.emp_id as employee_id','bm.BuildingName','e.Emp_id','ra.first_name','ra.last_name','rd.name as department_name','ra.id as Parentid');
+                                                                    // Same wildcard/alias collision as staffAccommodationDashboard() above —
+                                                                    // bm.BuildingName must not reuse the 'BuildingName' key already
+                                                                    // produced by available_accommodation_models.*.
+                                                                    ->select('available_accommodation_models.*','at.AccommodationName','t1.id as assing_acc_id','t1.BedNo','t1.emp_id as employee_id','bm.BuildingName as BName','e.Emp_id','ra.first_name','ra.last_name','rd.name as department_name','ra.id as Parentid');
                                                                     
             $accommodationDetails                           =   $accommodationDetailsQuery->first();
 
