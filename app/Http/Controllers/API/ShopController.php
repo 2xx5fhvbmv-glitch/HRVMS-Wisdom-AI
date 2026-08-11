@@ -268,11 +268,24 @@ class ShopController extends Controller
             $startOfMonth                                   =   Carbon::now()->startOfMonth();
             $endOfMonth                                     =   Carbon::now()->endOfMonth();
             $employeeId                                     =   $this->user->GetEmployee->id;
-            $consentHistoryList                             =   Payment::with(['shopKeeper:id,name','product:id,name'])
+            // Same fix as employeeDashboard(): consentRequestHandle() flips
+            // status on approve/reject, it doesn't touch purchased_date, so
+            // "this month" has to be measured by updated_at (when the
+            // consent decision happened), not purchased_date (when the item
+            // was bought) — a purchase from a prior month that gets
+            // consented this month was otherwise invisible here. Also
+            // selecting product.currency_type so history rows carry a
+            // currency like the dashboard's pending list does.
+            $consentHistoryList                             =   Payment::with(['shopKeeper:id,name','product:id,name,currency_type'])
                                                                     ->where('emp_id', $employeeId)
                                                                     ->whereIn('status', ['Consented', 'Rejected'])
-                                                                    ->whereBetween('purchased_date', [$startOfMonth, $endOfMonth])
-                                                                    ->get();
+                                                                    ->whereBetween('updated_at', [$startOfMonth, $endOfMonth])
+                                                                    ->orderBy('updated_at', 'DESC')
+                                                                    ->get()
+                                                                    ->map(function ($payment) {
+                                                                        $payment->currency = $payment->product->currency_type ?? 'USD';
+                                                                        return $payment;
+                                                                    });
 
             $response['status']                             =   true;
             $response['message']                            =   "Pending consents retrieved successfully.";
