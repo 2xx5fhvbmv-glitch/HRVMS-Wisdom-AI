@@ -384,7 +384,9 @@ class AdvanceSalaryController extends Controller
 
     // HR is the resort's single point of contact for a loan request, so it
     // stays looped in on every stage's outcome (its own, Finance's, GM's) —
-    // not only notified when it's the one acting.
+    // not only notified when it's the one acting. Finance and GM get the
+    // same treatment below — all 3 approval-chain departments see every
+    // action taken on an application, not only their own step.
     private function notifyHR($payrollAdvance, $title, $message)
     {
         $hrEmployeeIds = Common::getResortHrEmployeeIds($this->resort->resort_id);
@@ -396,6 +398,38 @@ class AdvanceSalaryController extends Controller
                 $message,
                 0,
                 $hrId,
+                'People'
+            )));
+        }
+    }
+
+    private function notifyFinance($payrollAdvance, $title, $message)
+    {
+        $financeEmployeeIds = Common::getResortFinanceEmployeeIds($this->resort->resort_id);
+        foreach ($financeEmployeeIds as $financeId) {
+            event(new ResortNotificationEvent(Common::nofitication(
+                $this->resort->resort_id,
+                10,
+                $title,
+                $message,
+                0,
+                $financeId,
+                'People'
+            )));
+        }
+    }
+
+    private function notifyGM($payrollAdvance, $title, $message)
+    {
+        $gmEmployeeIds = Common::getResortGmEmployeeIds($this->resort->resort_id);
+        foreach ($gmEmployeeIds as $gmId) {
+            event(new ResortNotificationEvent(Common::nofitication(
+                $this->resort->resort_id,
+                10,
+                $title,
+                $message,
+                0,
+                $gmId,
                 'People'
             )));
         }
@@ -499,6 +533,8 @@ class AdvanceSalaryController extends Controller
                     $this->notifyEmployeePush($payrollAdvance, $payrollAdvance->request_type . ' Approved', "Your {$payrollAdvance->request_type} request for amount {$payrollAdvance->request_amount} has been approved by HR.", 'advance-salary-hr-approved');
 
                     $this->notifyHR($payrollAdvance, $payrollAdvance->request_type . ' Approved (HR)', "HR approved {$employeeName}'s {$payrollAdvance->request_type} request for amount {$payrollAdvance->request_amount}.");
+                    $this->notifyFinance($payrollAdvance, $payrollAdvance->request_type . ' Approved (HR)', "HR approved {$employeeName}'s {$payrollAdvance->request_type} request for amount {$payrollAdvance->request_amount}.");
+                    $this->notifyGM($payrollAdvance, $payrollAdvance->request_type . ' Approved (HR)', "HR approved {$employeeName}'s {$payrollAdvance->request_type} request for amount {$payrollAdvance->request_amount}.");
 
                 } elseif($request->status == 'Rejected'){
                     $payrollAdvance->update([
@@ -520,6 +556,8 @@ class AdvanceSalaryController extends Controller
                     )));
 
                     $this->notifyHR($payrollAdvance, $payrollAdvance->request_type . ' Rejected (HR)', "HR rejected {$employeeName}'s {$payrollAdvance->request_type} request for amount {$payrollAdvance->request_amount}. Reason: {$request->reject_reason}");
+                    $this->notifyFinance($payrollAdvance, $payrollAdvance->request_type . ' Rejected (HR)', "HR rejected {$employeeName}'s {$payrollAdvance->request_type} request for amount {$payrollAdvance->request_amount}. Reason: {$request->reject_reason}");
+                    $this->notifyGM($payrollAdvance, $payrollAdvance->request_type . ' Rejected (HR)', "HR rejected {$employeeName}'s {$payrollAdvance->request_type} request for amount {$payrollAdvance->request_amount}. Reason: {$request->reject_reason}");
 
                 }
             }elseif($request->action_by == 'finance' && $payrollAdvance->finance_status == 'Pending'){
@@ -567,6 +605,8 @@ class AdvanceSalaryController extends Controller
                     $this->notifyEmployeePush($payrollAdvance, $payrollAdvance->request_type . ' Approved', "Your {$payrollAdvance->request_type} request for amount {$payrollAdvance->request_amount} has been approved by Finance.", 'advance-salary-finance-approved');
 
                     $this->notifyHR($payrollAdvance, $payrollAdvance->request_type . ' Approved (Finance)', "Finance approved {$employeeName}'s {$payrollAdvance->request_type} request for amount {$payrollAdvance->request_amount}.");
+                    $this->notifyFinance($payrollAdvance, $payrollAdvance->request_type . ' Approved (Finance)', "Finance approved {$employeeName}'s {$payrollAdvance->request_type} request for amount {$payrollAdvance->request_amount}.");
+                    $this->notifyGM($payrollAdvance, $payrollAdvance->request_type . ' Approved (Finance)', "Finance approved {$employeeName}'s {$payrollAdvance->request_type} request for amount {$payrollAdvance->request_amount}.");
 
                 } elseif($request->status == 'Rejected'){
                     $payrollAdvance->update([
@@ -587,6 +627,8 @@ class AdvanceSalaryController extends Controller
                     )));
 
                     $this->notifyHR($payrollAdvance, $payrollAdvance->request_type . ' Rejected (Finance)', "Finance rejected {$employeeName}'s {$payrollAdvance->request_type} request for amount {$payrollAdvance->request_amount}. Reason: {$request->reject_reason}");
+                    $this->notifyFinance($payrollAdvance, $payrollAdvance->request_type . ' Rejected (Finance)', "Finance rejected {$employeeName}'s {$payrollAdvance->request_type} request for amount {$payrollAdvance->request_amount}. Reason: {$request->reject_reason}");
+                    $this->notifyGM($payrollAdvance, $payrollAdvance->request_type . ' Rejected (Finance)', "Finance rejected {$employeeName}'s {$payrollAdvance->request_type} request for amount {$payrollAdvance->request_amount}. Reason: {$request->reject_reason}");
 
                 }
             }elseif($request->action_by == 'gm' && $payrollAdvance->gm_status == 'Pending'){
@@ -632,6 +674,8 @@ class AdvanceSalaryController extends Controller
                     $this->notifyEmployeePush($payrollAdvance, $payrollAdvance->request_type . ' Fully Approved', "Your {$payrollAdvance->request_type} request for amount {$payrollAdvance->request_amount} has been fully approved.", 'advance-salary-fully-approved');
 
                     $this->notifyHR($payrollAdvance, $payrollAdvance->request_type . ' Approved (GM)', "GM approved {$employeeName}'s {$payrollAdvance->request_type} request for amount {$payrollAdvance->request_amount}.");
+                    $this->notifyFinance($payrollAdvance, $payrollAdvance->request_type . ' Approved (GM)', "GM approved {$employeeName}'s {$payrollAdvance->request_type} request for amount {$payrollAdvance->request_amount}.");
+                    $this->notifyGM($payrollAdvance, $payrollAdvance->request_type . ' Approved (GM)', "GM approved {$employeeName}'s {$payrollAdvance->request_type} request for amount {$payrollAdvance->request_amount}.");
 
                 } elseif($request->status == 'Rejected'){
                     $payrollAdvance->update([
@@ -655,6 +699,8 @@ class AdvanceSalaryController extends Controller
                     )));
 
                     $this->notifyHR($payrollAdvance, $payrollAdvance->request_type . ' Rejected (GM)', "GM rejected {$employeeName}'s {$payrollAdvance->request_type} request for amount {$payrollAdvance->request_amount}. Reason: {$request->reject_reason}");
+                    $this->notifyFinance($payrollAdvance, $payrollAdvance->request_type . ' Rejected (GM)', "GM rejected {$employeeName}'s {$payrollAdvance->request_type} request for amount {$payrollAdvance->request_amount}. Reason: {$request->reject_reason}");
+                    $this->notifyGM($payrollAdvance, $payrollAdvance->request_type . ' Rejected (GM)', "GM rejected {$employeeName}'s {$payrollAdvance->request_type} request for amount {$payrollAdvance->request_amount}. Reason: {$request->reject_reason}");
                 }
             }
 
