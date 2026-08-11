@@ -261,14 +261,7 @@ class RequestController extends Controller
                     // (see AdvanceSalaryController::updateStatus / the
                     // rank_status column on the resort admin list) — GM is
                     // rank=8, not "XCOM".
-                    $gmEmployeeIds = \App\Models\Employee::where('resort_id', $this->resort_id)
-                        ->where('rank', 8)
-                        ->where(function ($q) {
-                            $q->whereNull('status')->orWhere('status', 'Active')->orWhere('status', 'Probationary');
-                        })
-                        ->pluck('id')
-                        ->map(fn($v) => (int) $v)
-                        ->all();
+                    $gmEmployeeIds = Common::getResortGmEmployeeIds($this->resort_id);
                     if (!empty($gmEmployeeIds)) {
                         Common::sendMobileNotification(
                             $this->resort_id,
@@ -276,7 +269,7 @@ class RequestController extends Controller
                             null,
                             null,
                             'Request',
-                            'An advance salary request has been sent by ' . $this->user->first_name . ' ' . $this->user->last_name . '.',
+                            'A ' . $request->request_type . ' request has been sent by ' . $this->user->first_name . ' ' . $this->user->last_name . '.',
                             'Request',
                             $gmEmployeeIds,
                             $PayrollAdvance->id,

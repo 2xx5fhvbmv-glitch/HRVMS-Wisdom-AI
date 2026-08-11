@@ -4394,6 +4394,23 @@ class Common
     }
 
     /**
+     * Active GM (rank 8) employees in the resort. Mirrors getResortHrEmployeeIds/
+     * getResortFinanceEmployeeIds for fanning out approval-chain notifications
+     * (e.g. Salary Advance/Loan) to the GM as well as HR/Finance.
+     */
+    public static function getResortGmEmployeeIds($resortId)
+    {
+        return \App\Models\Employee::where('resort_id', $resortId)
+            ->where('rank', 8)
+            ->where(function ($q) {
+                $q->whereNull('status')->orWhere('status', 'Active')->orWhere('status', 'Probationary');
+            })
+            ->pluck('id')
+            ->map(fn($v) => (int) $v)
+            ->all();
+    }
+
+    /**
      * Position titles that grant full resort-wide visibility for Learning / Performance
      * modules. Treated equivalently to GM (rank 8) and super/master admin.
      * Update this list when product confirms additional leadership roles need
