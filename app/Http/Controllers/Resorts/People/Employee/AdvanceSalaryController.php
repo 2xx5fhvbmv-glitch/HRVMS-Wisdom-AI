@@ -204,7 +204,7 @@ class AdvanceSalaryController extends Controller
         $attechment_path     =   $request_attachment . '/' . $advance_salary->employee->resort_id.'/'.$advance_salary->employee->Emp_id;
 
         $total_interest = 0;
-        $actual_amount = 0; 
+        $actual_amount = 0;
         $total_recovery = 0;
         if($recovery_schedule){
             $total_interest = $recovery_schedule->sum('interest_amount');
@@ -212,7 +212,18 @@ class AdvanceSalaryController extends Controller
             $total_recovery = $actual_amount + $total_interest;
 
         }
-        return view('resorts.people.employee.advance-salary.show',compact('page_title','advance_salary','guarantors','recovery_schedule','total_interest','actual_amount','total_recovery','attechment_path','isHR','isFinance','isGM'));
+
+        // Same month picker as the Repayment Tracker's edit row — lets HR/
+        // Finance move a still-Pending installment to a different upcoming
+        // month (e.g. April instead of March) via the same shared
+        // AdvanceSalaryRepaymentTrackerController::update() endpoint.
+        $availableMonths = [];
+        $currentMonth = Carbon::now();
+        for ($i = 0; $i < 36; $i++) {
+            $availableMonths[] = $currentMonth->copy()->addMonths($i)->format('F Y');
+        }
+
+        return view('resorts.people.employee.advance-salary.show',compact('page_title','advance_salary','guarantors','recovery_schedule','total_interest','actual_amount','total_recovery','attechment_path','isHR','isFinance','isGM','availableMonths'));
     }
     
     public function paymentReschedule(Request $request){
