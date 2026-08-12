@@ -30,7 +30,7 @@
                 <p class="text-start">{{ $request->reason ?? 'No reason provided' }}</p>
                 <div class="btn-block">
                     <button class="btn btn-themeBlue btn-sm approve-btn" data-leave-id="{{ $request->id }}">Approve</button>
-                    <button class="btn btn-danger btn-sm reject-btn" data-leave-id="{{ $request->id }}">Reject</button>
+                    <button class="btn eb-btn-critical btn-sm reject-btn" data-leave-id="{{ $request->id }}">Reject</button>
                 </div>
             </div>
         </div>
@@ -40,3 +40,4 @@
         <h5>No Request Found.</h5>
     </div>
 @endif
+@include('resorts._emotional_buttons_v2_styles')

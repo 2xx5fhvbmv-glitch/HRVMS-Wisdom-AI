@@ -3,7 +3,7 @@
         <div class="col-xxl-cust5 col-xl-3 col-lg-4 col-sm-6">
             <div class="applicantsGrid-block">
                 <div class="dropdown table-dropdown ">
-                    <button class="btn btn-secondary dropdown-toggle dotsV-link" type="button"
+                    <button class="btn eb-btn-ghost dropdown-toggle dotsV-link" type="button"
                         id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false">
                         <i class="fa-solid fa-ellipsis-vertical"></i>
                     </button>
@@ -131,4 +131,4 @@
     </div>
 </div>
 @endif
-
+@include('resorts._emotional_buttons_v2_styles')

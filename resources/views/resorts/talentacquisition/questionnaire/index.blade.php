@@ -124,14 +124,12 @@ $(document).on('click', '.delete-row-btn', function (e) {
     // Get the division ID from the data attribute
     var position_id = $(this).data('dept-id');
     var ParentId =$(this).data('parent-id');
-    Swal.fire({
+    wisdomConfirm({
+        role: 'destructive',
         title: 'Sure want to delete?',
         text: 'This cannot be undone',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonText: 'Yes',
-        cancelButtonText: 'No',
-        confirmButtonColor: "#DD6B55"
+        confirmText: 'Yes',
+        cancelText: 'No'
     }).then((result) => {
         if (result.isConfirmed) {
             $.ajax({

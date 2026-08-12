@@ -139,14 +139,12 @@ $(document).ready(function(){
             // Get the division ID from the data attribute
             var main_id = $(this).data('id');
 
-            Swal.fire({
+            wisdomConfirm({
+                role: 'destructive',
                 title: 'Are you sure you want to delete?',
                 text: 'This cannot be undone',
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonText: 'Yes',
-                cancelButtonText: 'No',
-                confirmButtonColor: "#FF2400"
+                confirmText: 'Yes',
+                cancelText: 'No'
              }).then((result) => {
                 if (result.isConfirmed)
                 {

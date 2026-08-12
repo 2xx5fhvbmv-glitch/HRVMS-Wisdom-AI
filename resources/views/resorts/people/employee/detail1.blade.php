@@ -26,7 +26,7 @@
                     <div class="col-md-auto">
                         <div class="empDetailPeopleEmp-sidebar">
                             <div class="dropdown table-dropdown ">
-                                <button class="btn btn-secondary dropdown-toggle dotsV-link" type="button"
+                                <button class="btn eb-btn-ghost dropdown-toggle dotsV-link" type="button"
                                     id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false">
                                     <i class="fa-solid fa-ellipsis-vertical"></i>
                                 </button>
@@ -464,7 +464,7 @@
                                                                             <input type="text" name="languages[{{ $index }}][proficiency_level]" class="form-control edit-mode d-none" value="{{ $lang->proficiency_level }}">
                                                                         </td>
                                                                         <td class="edit-mode d-none">
-                                                                            <button type="button" class="btn btn-danger btn-sm remove-language">Remove</button>
+                                                                            <button type="button" class="btn eb-btn-critical btn-sm remove-language">Remove</button>
                                                                         </td>
                                                                     </tr>
                                                                 @endforeach
@@ -908,7 +908,7 @@
                                                                     </select>
                                                                 </div>
                                                                 <div class="col-2">
-                                                                    <button type="button" class="btn btn-danger btn-sm remove-allowance">
+                                                                    <button type="button" class="btn eb-btn-critical btn-sm remove-allowance">
                                                                         <i class="fa fa-times"></i>
                                                                     </button>
                                                                 </div>
@@ -919,7 +919,7 @@
                                                     </div>
                                                     <div class="row mt-3">
                                                         <div class="col-12">
-                                                            <button type="button" id="add-allowance" class="btn btn-sm btn-outline-primary">
+                                                            <button type="button" id="add-allowance" class="btn btn-sm eb-btn-secondary">
                                                                 <i class="fa fa-plus"></i> Add Allowance
                                                             </button>
                                                         </div>
@@ -1472,7 +1472,7 @@
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="submit" class="btn btn-primary">Assign</button>
+                        <button type="submit" class="btn eb-btn-primary">Assign</button>
                     </div>
                 </div>
             </form>
@@ -1501,12 +1501,13 @@
                 </select>
                 </div>
                 <div class="modal-footer">
-                <button type="submit" class="btn btn-primary">Update</button>
+                <button type="submit" class="btn eb-btn-primary">Update</button>
                 </div>
             </div>
             </form>
         </div>
     </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -1855,7 +1856,7 @@
                         </select>
                     </div>
                     <div class="col-2">
-                        <button type="button" class="btn btn-danger btn-sm remove-allowance">
+                        <button type="button" class="btn eb-btn-critical btn-sm remove-allowance">
                             <i class="fa fa-times"></i>
                         </button>
                     </div>
@@ -2672,7 +2673,7 @@
             row.innerHTML = `
                 <td><input type="text" name="languages[${languageIndex}][language]" class="form-control" /></td>
                 <td><input type="text" name="languages[${languageIndex}][proficiency_level]" class="form-control" /></td>
-                <td><button type="button" class="btn btn-danger btn-sm remove-language">Remove</button></td>
+                <td><button type="button" class="btn eb-btn-critical btn-sm remove-language">Remove</button></td>
             `;
             document.getElementById('language-rows').appendChild(row);
             languageIndex++;

@@ -164,15 +164,13 @@
         $(document).on('click','.delete-row-btn', function() {
             let id = $(this).data('id');
             let url = "{{ route('Survey.Destory', ':id') }}".replace(':id', id);
-                Swal.fire({
-                        title: 'Sure want to delete?',
-                        text: 'This cannot be undone',
-                        icon: 'warning',
-                        showCancelButton: true,
-                        confirmButtonText: 'Yes',
-                        cancelButtonText: 'No',
-                        confirmButtonColor: "#DD6B55"
-                    }).then((result) => {
+                wisdomConfirm({
+                    role: 'destructive',
+                    title: 'Sure want to delete?',
+                    text: 'This cannot be undone',
+                    confirmText: 'Yes',
+                    cancelText: 'No'
+                }).then((result) => {
                         if (result.isConfirmed) {
                             $.ajax({
                                 type: "DELETE",

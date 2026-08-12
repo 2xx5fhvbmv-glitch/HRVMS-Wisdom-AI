@@ -527,6 +527,7 @@
             </div>
         </div>
     </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -581,7 +582,7 @@ document.getElementById("file").addEventListener("change", function (event) {
             row.innerHTML = `
                 <td>${file.name}</td>
                 <td>
-                    <a type="button" href="#" class="btn btn-sm btn-primary crop-btn" data-index="${i}">Crop</a>
+                    <a type="button" href="#" class="btn btn-sm eb-btn-primary crop-btn" data-index="${i}">Crop</a>
                 </td>
             `;
             fileListContainer.appendChild(row);

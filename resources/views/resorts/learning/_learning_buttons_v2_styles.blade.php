@@ -28,8 +28,8 @@
     .lnd-btn-secondary:hover { background: #F9F8F1; border-color: #014653; color: #014653; transform: translateY(-2px); box-shadow: 0 8px 18px -8px rgba(20,35,42,.18); }
 
     /* Affirming — Approve, Update (inline row confirm). */
-    .lnd-btn-positive { background: #E4F3E9; color: #2E9E5B; }
-    .lnd-btn-positive:hover { background: #2E9E5B; color: #fff; transform: translateY(-2px); box-shadow: 0 8px 18px -8px rgba(20,35,42,.25); }
+    .lnd-btn-positive { background: var(--positive-bg); color: var(--positive); }
+    .lnd-btn-positive:hover { background: var(--positive); color: #fff; transform: translateY(-2px); box-shadow: 0 8px 18px -8px rgba(20,35,42,.25); }
 
     /* Additive/construction, general — Add Learning Schedule, Create
        Evaluation/Feedback Form, Upload, Add More, Mark Attendance. */
@@ -69,7 +69,7 @@
     }
     .lnd-btn-primary[disabled] { background: #014653; color: #fff; }
     .lnd-btn-secondary[disabled] { background: transparent; color: #014653; }
-    .lnd-btn-positive[disabled] { background: #E4F3E9; color: #2E9E5B; }
+    .lnd-btn-positive[disabled] { background: var(--positive-bg); color: var(--positive); }
     .lnd-btn-accent[disabled] { background: #E6F0F1; color: #035b6c; }
     .lnd-btn-hero[disabled] { background: #E0FF02; color: #17260a; }
     .lnd-btn-neutral[disabled] { background: #DEDEDE; color: #222; }

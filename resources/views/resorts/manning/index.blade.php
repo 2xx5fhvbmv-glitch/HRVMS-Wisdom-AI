@@ -1149,14 +1149,12 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
         e.preventDefault();
         // Get the division ID from the data attribute
         var divisionId = $(this).data('division-id');
-        Swal.fire({
+        wisdomConfirm({
+            role: 'destructive',
             title: 'Sure want to delete?',
             text: 'This cannot be undone',
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonText: 'Yes',
-            cancelButtonText: 'No',
-            confirmButtonColor: "#DD6B55"
+            confirmText: 'Yes',
+            cancelText: 'No'
         }).then((result) => {
         if (result.isConfirmed) {
                 $.ajax({
@@ -1410,14 +1408,12 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
         e.preventDefault();
         // Get the division ID from the data attribute
         var dept_id = $(this).data('dept-id');
-        Swal.fire({
+        wisdomConfirm({
+            role: 'destructive',
             title: 'Sure want to delete?',
             text: 'This cannot be undone',
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonText: 'Yes',
-            cancelButtonText: 'No',
-            confirmButtonColor: "#DD6B55"
+            confirmText: 'Yes',
+            cancelText: 'No'
         }).then((result) => {
             if (result.isConfirmed) {
                 $.ajax({
@@ -1695,14 +1691,12 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
         e.preventDefault();
         // Get the division ID from the data attribute
         var section_id = $(this).data('section-id');
-        Swal.fire({
+        wisdomConfirm({
+            role: 'destructive',
             title: 'Sure want to delete?',
             text: 'This cannot be undone',
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonText: 'Yes',
-            cancelButtonText: 'No',
-            confirmButtonColor: "#DD6B55"
+            confirmText: 'Yes',
+            cancelText: 'No'
         }).then((result) => {
             if (result.isConfirmed) {
                 $.ajax({
@@ -2009,14 +2003,12 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
         e.preventDefault();
         // Get the division ID from the data attribute
         var position_id = $(this).data('position-id');
-        Swal.fire({
+        wisdomConfirm({
+            role: 'destructive',
             title: 'Sure want to delete?',
             text: 'This cannot be undone',
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonText: 'Yes',
-            cancelButtonText: 'No',
-            confirmButtonColor: "#DD6B55"
+            confirmText: 'Yes',
+            cancelText: 'No'
         }).then((result) => {
             if (result.isConfirmed) {
                 $.ajax({

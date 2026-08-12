@@ -31,7 +31,7 @@
                             </div>
                         </div>
                         <div class="ms-auto">
-                            <button class="btn btn-sm btn-outline-secondary">
+                            <button class="btn btn-sm eb-btn-ghost">
                                 <i class="fa-solid fa-ellipsis-vertical"></i>
                             </button>
                         </div>
@@ -46,11 +46,11 @@
                     <!-- Chat Input Area -->
                     <div class="chat-input-area p-3 border-top bg-light">
                         <div class="input-group">
-                            <button class="btn btn-outline-secondary" type="button">
+                            <button class="btn eb-btn-secondary" type="button">
                                 <i class="fa-solid fa-paperclip"></i>
                             </button>
                             <input type="text" class="form-control" placeholder="Type here..." id="messageInput">
-                            <button class="btn btn-primary" type="button" id="sendMessage">
+                            <button class="btn eb-btn-primary" type="button" id="sendMessage">
                                 <i class="fa-solid fa-paper-plane"></i>
                             </button>
                         </div>
@@ -61,6 +61,7 @@
     </div>
 </div>
 
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')

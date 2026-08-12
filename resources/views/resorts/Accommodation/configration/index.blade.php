@@ -1198,7 +1198,7 @@ $(document).ready(function()
         var row =`<div class="col-12 added-accommodation-row" id="accommodation_row_${AvailableCount}">
                         <hr class="my-3">
                         <div class="d-flex justify-content-end mb-2">
-                            <button type="button" class="btn btn-sm btn-outline-danger remove-accommodation-row" data-row="${AvailableCount}"><i class="fa-solid fa-times me-1"></i>Remove</button>
+                            <button type="button" class="btn btn-sm eb-btn-critical remove-accommodation-row" data-row="${AvailableCount}"><i class="fa-solid fa-times me-1"></i>Remove</button>
                         </div>
                         <div class="row g-xl-4 g-3">
                               <div class="col-lg-3 col-md-4 col-sm-6">

@@ -122,13 +122,14 @@
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                        <button type="submit" class="btn btn-primary">Schedule Meeting</button>
+                        <button type="button" class="btn eb-btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <button type="submit" class="btn eb-btn-primary">Schedule Meeting</button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')

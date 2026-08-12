@@ -231,7 +231,7 @@
             const viewUrl = "{{ $viewRouteTemplate }}".replace('__MEETING_ID__', meetingId);
 
             $row.find("td:last-child").html(`
-                <a href="${viewUrl}" title="View Meeting Detail" class="btn-tableIcon btnIcon-blue me-1">
+                <a href="${viewUrl}" title="View Meeting Detail" class="btn-tableIcon btnIcon-teal me-1">
                     {!! $viewIcon !!}
                 </a>
                 <a href="javascript:void(0)" class="btn-tableIcon btnIcon-yellow me-1 edit-row-btn" data-meeting-id="${meetingId}">
@@ -272,7 +272,7 @@
                     const viewUrl = "{{ $viewRouteTemplate }}".replace('__MEETING_ID__', meetingId);
 
                     $row.find("td:last-child").html(`
-                        <a href="${viewUrl}" title="View Meeting Detail" class="btn-tableIcon btnIcon-blue me-1">
+                        <a href="${viewUrl}" title="View Meeting Detail" class="btn-tableIcon btnIcon-teal me-1">
                             {!! $viewIcon !!}
                         </a>
                         <a href="javascript:void(0)" class="btn-tableIcon btnIcon-yellow me-1 edit-row-btn" data-meeting-id="${meetingId}">
@@ -297,14 +297,12 @@
 
             const meetingId = $(this).data('meeting-id');
 
-            Swal.fire({
+            wisdomConfirm({
+                role: 'destructive',
                 title: 'Sure want to delete?',
                 text: 'This cannot be undone',
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonText: 'Yes',
-                cancelButtonText: 'No',
-                confirmButtonColor: "#DD6B55"
+                confirmText: 'Yes',
+                cancelText: 'No'
             }).then((result) => {
                 if (result.isConfirmed) {
                     $.ajax({

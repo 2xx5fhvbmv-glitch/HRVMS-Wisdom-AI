@@ -118,7 +118,6 @@
                                             class="fa-regular fa-eye"></i></a>
                                     <a href="javascript:void(0)" data-id="{{$id}}" class="SendNotifcation btn-tableIcon btnIcon-yellow"><i
                                             class="fa-regular fa-bell"></i></a>
-                                    {{-- <a href="#" class="btn-tableIcon btnIcon-blue"><i class="fa-regular fa-pen"></i></a> --}}
                                 </div>
                             </div>
                         </div>

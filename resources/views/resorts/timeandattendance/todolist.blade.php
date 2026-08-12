@@ -269,20 +269,20 @@
                     // Show modal
                     $('#updateOvertimeStatusModal').modal('show');
                 } else {
-                    Swal.fire(
-                        'Error!',
-                        response.message || 'Failed to load overtime entries.',
-                        'error'
-                    );
+                    wisdomAlert({
+                        type: 'error',
+                        title: 'Error!',
+                        text: response.message || 'Failed to load overtime entries.'
+                    });
                 }
             },
             error: function(xhr) {
                 button.prop('disabled', false).html('<i class="fa-solid fa-clock me-1"></i>Update');
-                Swal.fire(
-                    'Error!',
-                    'An error occurred while loading overtime entries.',
-                    'error'
-                );
+                wisdomAlert({
+                    type: 'error',
+                    title: 'Error!',
+                    text: 'An error occurred while loading overtime entries.'
+                });
                 console.error('Error:', xhr);
             }
         });
@@ -452,25 +452,23 @@
         const button = $(this);
         const row = button.closest('tr');
 
-        Swal.fire({
+        wisdomConfirm({
+            role: action === 'check_in' ? 'positive' : 'warning',
             title: `Confirm ${actionText}`,
-            html: `
-                <p>Are you sure you want to record ${actionText.toLowerCase()} for ${employeeName}?</p>
-                <label class="mt-2 d-block">Time</label>
-                <input type="text" id="manualTime" class="swal2-input" placeholder="e.g. 09:00 AM" required>
-            `,
-            icon: 'question',
-            showCancelButton: true,
-            confirmButtonColor: action === 'check_in' ? '#2E9E5B' : '#D98A00',
-            cancelButtonColor: '#6c757d',
-            confirmButtonText: `Yes, ${actionText}`,
-            cancelButtonText: 'Cancel',
-            didOpen: () => {
-                const timeInput = document.getElementById('manualTime');
-                if (timeInput && time) {
-                    timeInput.value = time;
+            confirmText: `Yes, ${actionText}`,
+            extra: {
+                html: `
+                    <p>Are you sure you want to record ${actionText.toLowerCase()} for ${employeeName}?</p>
+                    <label class="mt-2 d-block">Time</label>
+                    <input type="text" id="manualTime" class="swal2-input" placeholder="e.g. 09:00 AM" required>
+                `,
+                didOpen: () => {
+                    const timeInput = document.getElementById('manualTime');
+                    if (timeInput && time) {
+                        timeInput.value = time;
+                    }
                 }
-            },
+            }
         }).then((result) => {
             if (result.isConfirmed) {
                 const selectedTime = (document.getElementById('manualTime') && document.getElementById('manualTime').value) ? document.getElementById('manualTime').value : time;
@@ -489,30 +487,29 @@
                     },
                     success: function(response) {
                         if (response.success) {
-                            Swal.fire({
+                            wisdomAlert({
+                                type: 'success',
                                 title: 'Success!',
-                                text: response.message,
-                                icon: 'success',
-                                confirmButtonColor: '#2E9E5B'
+                                text: response.message
                             }).then(() => {
                                 // Reload the datatable
                                 datatablelist();
                             });
                         } else {
-                            Swal.fire(
-                                'Error!',
-                                response.message || 'An error occurred.',
-                                'error'
-                            );
+                            wisdomAlert({
+                                type: 'error',
+                                title: 'Error!',
+                                text: response.message || 'An error occurred.'
+                            });
                             button.prop('disabled', false);
                         }
                     },
                     error: function(xhr) {
-                        Swal.fire(
-                            'Error!',
-                            'An error occurred while processing the request.',
-                            'error'
-                        );
+                        wisdomAlert({
+                            type: 'error',
+                            title: 'Error!',
+                            text: 'An error occurred while processing the request.'
+                        });
                         button.prop('disabled', false);
                         console.error('Error:', xhr);
                     }
@@ -559,14 +556,11 @@
     {
         const action = flag === 'approve' ? 'approved' : 'rejected'; // Determine action based on flag
 
-        Swal.fire({
+        wisdomConfirm({
+            role: flag === 'approve' ? 'positive' : 'destructive',
             title: `Are you sure you want to ${flag} this OT?`,
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: flag === 'approve' ? '#28a745' : '#dc3545', // Green for approve, red for reject
-            cancelButtonColor: '#6c757d', // Gray for cancel
-            confirmButtonText: `Yes, ${flag} it!`,
-            cancelButtonText: 'No, cancel',
+            confirmText: `Yes, ${flag} it!`,
+            cancelText: 'No, cancel'
             }).then((result) => {
                 if (result.isConfirmed) {
                     // Perform the AJAX request
@@ -580,21 +574,21 @@
                     },
                     success: function(response) {
                         // Show success message
-                        Swal.fire(
-                            `${action.charAt(0).toUpperCase() + action.slice(1)}!`,
-                            `The OT has been successfully ${action}.`,
-                            'success'
-                        );
+                        wisdomAlert({
+                            type: 'success',
+                            title: `${action.charAt(0).toUpperCase() + action.slice(1)}!`,
+                            text: `The OT has been successfully ${action}.`
+                        });
                         datatablelist();
                         // Optional: Update the UI (e.g., remove the item or update status)
                     },
                     error: function(xhr, status, error) {
                         // Show error message
-                        Swal.fire(
-                            'Error!',
-                            'An error occurred while processing the request.',
-                            'error'
-                        );
+                        wisdomAlert({
+                            type: 'error',
+                            title: 'Error!',
+                            text: 'An error occurred while processing the request.'
+                        });
 
                         console.error(error);
                     }

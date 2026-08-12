@@ -785,29 +785,30 @@
                 : `<p>The email <strong>${body.conflicting_email}</strong> on this candidate's Talent Acquisition record is already used by <strong>${body.owner_name}</strong>.</p>
                    <p>Enter a unique email to use for <strong>${body.applicant_name}</strong>'s new account.</p>`;
 
-            Swal.fire({
+            wisdomConfirm({
+                role: 'confirm',
                 title: 'Email Already In Use',
-                html: intro + '<input id="replacementEmail" type="email" class="swal2-input" placeholder="name@example.com" />',
-                showCancelButton: true,
-                confirmButtonText: 'Use this email',
-                cancelButtonText: 'Cancel',
-                focusConfirm: false,
-                preConfirm: function () {
-                    const value = (document.getElementById('replacementEmail').value || '').trim();
-                    if (!value) {
-                        Swal.showValidationMessage('Please enter an email address.');
-                        return false;
+                confirmText: 'Use this email',
+                extra: {
+                    html: intro + '<input id="replacementEmail" type="email" class="swal2-input" placeholder="name@example.com" />',
+                    focusConfirm: false,
+                    preConfirm: function () {
+                        const value = (document.getElementById('replacementEmail').value || '').trim();
+                        if (!value) {
+                            Swal.showValidationMessage('Please enter an email address.');
+                            return false;
+                        }
+                        // Lightweight client-side sanity check; the server still validates.
+                        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+                            Swal.showValidationMessage('Please enter a valid email address.');
+                            return false;
+                        }
+                        if (value.toLowerCase() === String(body.conflicting_email).toLowerCase()) {
+                            Swal.showValidationMessage('That is the same email — pick a different one.');
+                            return false;
+                        }
+                        return value;
                     }
-                    // Lightweight client-side sanity check; the server still validates.
-                    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-                        Swal.showValidationMessage('Please enter a valid email address.');
-                        return false;
-                    }
-                    if (value.toLowerCase() === String(body.conflicting_email).toLowerCase()) {
-                        Swal.showValidationMessage('That is the same email — pick a different one.');
-                        return false;
-                    }
-                    return value;
                 }
             }).then(function (result) {
                 if (result.isConfirmed && result.value) {

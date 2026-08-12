@@ -202,7 +202,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title">Download File</h5>
-                    <a href="" class="btn btn-sm btn-primary downloadLink" target="_blank">Download</a>
+                    <a href="" class="btn btn-sm eb-btn-secondary downloadLink" target="_blank">Download</a>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
@@ -405,14 +405,11 @@
             var location = $(this).attr('data-location');
 
             // SweetAlert confirmation dialog
-            Swal.fire({
+            wisdomConfirm({
+                role: 'destructive',
                 title: "Are you sure?",
                 text: "This action will permanently delete the applicant.",
-                icon: "warning",
-                showCancelButton: true,
-                confirmButtonColor: "#3085d6",
-                cancelButtonColor: "#d33",
-                confirmButtonText: "Yes, delete it!"
+                confirmText: "Yes, delete it!"
             }).then((result) => {
                 if (result.isConfirmed) {
                     // Proceed with AJAX request after confirmation
@@ -423,19 +420,19 @@
                         success: function(response) {
                             $('#respond-rejectModal').modal('hide');
                             if (response.success) {
-                                Swal.fire(
-                                    "Deleted!",
-                                    response.message,
-                                    "success"
-                                );
+                                wisdomAlert({
+                                    type: 'success',
+                                    title: "Deleted!",
+                                    text: response.message
+                                });
                                 $("#talentPool_" + location).remove();
                                 DatatableList(); DatatableGrid();
                             } else {
-                                Swal.fire(
-                                    "Error!",
-                                    response.message,
-                                    "error"
-                                );
+                                wisdomAlert({
+                                    type: 'error',
+                                    title: "Error!",
+                                    text: response.message
+                                });
                             }
                         },
                         error: function(response) {
@@ -445,7 +442,11 @@
                                 console.log(error);
                                 errs += error + '<br>';
                             });
-                            Swal.fire("Error!", errs, "error");
+                            wisdomAlert({
+                                type: 'error',
+                                title: "Error!",
+                                text: errs
+                            });
                         }
                     });
                 }
@@ -472,14 +473,11 @@
             var location = $(this).attr('data-location');
 
             // SweetAlert confirmation dialog
-            Swal.fire({
+            wisdomConfirm({
+                role: 'destructive',
                 title: "Are you sure?",
                 text: "This action will permanently delete the applicant.",
-                icon: "warning",
-                showCancelButton: true,
-                confirmButtonColor: "#3085d6",
-                cancelButtonColor: "#d33",
-                confirmButtonText: "Yes, delete it!"
+                confirmText: "Yes, delete it!"
             }).then((result) => {
                 if (result.isConfirmed) {
                     // Proceed with AJAX request after confirmation
@@ -490,19 +488,19 @@
                         success: function(response) {
                             $('#respond-rejectModal').modal('hide');
                             if (response.success) {
-                                Swal.fire(
-                                    "Deleted!",
-                                    response.message,
-                                    "success"
-                                );
+                                wisdomAlert({
+                                    type: 'success',
+                                    title: "Deleted!",
+                                    text: response.message
+                                });
                                 $("#talentPool_" + location).remove();
                                 DatatableList(); DatatableGrid();
                             } else {
-                                Swal.fire(
-                                    "Error!",
-                                    response.message,
-                                    "error"
-                                );
+                                wisdomAlert({
+                                    type: 'error',
+                                    title: "Error!",
+                                    text: response.message
+                                });
                             }
                         },
                         error: function(response) {
@@ -512,7 +510,11 @@
                                 console.log(error);
                                 errs += error + '<br>';
                             });
-                            Swal.fire("Error!", errs, "error");
+                            wisdomAlert({
+                                type: 'error',
+                                title: "Error!",
+                                text: errs
+                            });
                         }
                     });
                 }

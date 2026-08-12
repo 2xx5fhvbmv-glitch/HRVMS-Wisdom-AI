@@ -494,7 +494,7 @@
                                                                 </div>
 
                                                                 <div class="col-auto">
-                                                                    <button id="clearRecord-{{$key}}" onclick="clearRecording({{$key}})" class="btn btn-outline-danger btn-sm" style="display:none;">Clear Video</button>
+                                                                    <button id="clearRecord-{{$key}}" onclick="clearRecording({{$key}})" class="btn eb-btn-critical btn-sm" style="display:none;">Clear Video</button>
                                                                 </div>
 
                                                             </div>
@@ -646,6 +646,7 @@
         </div>
     </div>
 </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -1227,7 +1228,7 @@
                     <input type="text" id="total-experience-${uniqueId}" class="form-control total-experience" name="total_experience[]" >
                 </div>
                 <div class="col-12 text-end">
-                    <button type="button" class="btn btn-danger btn-sm mt-2 removeRow" data-row-id="${uniqueId}">Remove</button>
+                    <button type="button" class="btn eb-btn-critical btn-sm mt-2 removeRow" data-row-id="${uniqueId}">Remove</button>
                 </div>
             </div>
         `;
@@ -1322,7 +1323,7 @@
                     <input type="number" name="pass_out_year[]" class="form-control" id="txt-pass-out-year-${uniqueId}" placeholder="e.g. 2020" min="1950" max="2099" required>
                 </div>
                 <div class="col-12 text-end">
-                    <button type="button" class="btn btn-danger btn-sm mt-2 removeRowEducation" data-row-id="${uniqueId}">Remove</button>
+                    <button type="button" class="btn eb-btn-critical btn-sm mt-2 removeRowEducation" data-row-id="${uniqueId}">Remove</button>
                 </div>
             </div>
         `;
@@ -1723,7 +1724,7 @@
                 </select>
             </div>
             <div class="col-md-2 d-flex align-items-center">
-                <button type="button" class="btn btn-danger btn-sm remove-language-btn" data-id="${languageIncrement}">Remove</button>
+                <button type="button" class="btn eb-btn-critical btn-sm remove-language-btn" data-id="${languageIncrement}">Remove</button>
             </div>
         </div>`;
 

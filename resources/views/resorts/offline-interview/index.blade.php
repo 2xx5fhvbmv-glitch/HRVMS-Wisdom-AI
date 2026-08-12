@@ -80,12 +80,11 @@ $(document).ready(function () {
     // Delete (only for non-finalised rows).
     $(document).on('click', '.offline-iv-delete', function () {
         var id = $(this).data('id');
-        Swal.fire({
+        wisdomConfirm({
+            role: 'destructive',
             title: 'Delete this offline interview?',
             text: 'The draft and any uploaded files will be removed. This cannot be undone.',
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonText: 'Yes, delete',
+            confirmText: 'Yes, delete'
         }).then(function (r) {
             if (!r.isConfirmed) return;
             $.ajax({

@@ -455,7 +455,7 @@
                             @endif
                             <div class="text-muted small mt-1">{{ \Illuminate\Support\Str::limit($ap->reason, 140) }}</div>
                         </div>
-                        <a href="{{ route('GrievanceAndDisciplinery.Appeals.Show', base64_encode($ap->id)) }}" class="btn btn-info btn-sm">Open</a>
+                        <a href="{{ route('GrievanceAndDisciplinery.Appeals.Show', base64_encode($ap->id)) }}" class="btn eb-btn-secondary btn-sm">Open</a>
                     </div>
                 @empty
                     <p class="text-muted mb-0">No appeals filed against this grievance.</p>

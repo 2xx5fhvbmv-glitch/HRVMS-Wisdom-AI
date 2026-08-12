@@ -128,7 +128,7 @@
 
                     <div class="action-buttons">
                         <button type="submit" class="btn-accept">Accept Selected Time</button>
-                        <button type="button" class="btn-outline-decline" id="showDeclineForm">Decline Interview</button>
+                        <button type="button" class="eb-btn-decline" id="showDeclineForm">Decline Interview</button>
                     </div>
                 </form>
             @else
@@ -148,7 +148,7 @@
                             @csrf
                             <button type="submit" class="btn-accept">Accept Interview</button>
                         </form>
-                        <button type="button" class="btn-outline-decline" id="showDeclineForm">Decline Interview</button>
+                        <button type="button" class="eb-btn-decline" id="showDeclineForm">Decline Interview</button>
                     </div>
                 @endif
             @endif
@@ -187,3 +187,4 @@
 </script>
 </body>
 </html>
+@include('resorts._emotional_buttons_v2_styles')

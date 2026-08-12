@@ -227,11 +227,11 @@
 
                 if(!isNaN(que_type))
                 {
-                    Swal.fire({
-                            title: 'Error!',
-                            text: "Please Select Option Type",
-                            icon: 'error'
-                        })
+                    wisdomAlert({
+                        type: 'error',
+                        title: 'Error!',
+                        text: 'Please Select Option Type'
+                    })
                 }
                 else
                 {

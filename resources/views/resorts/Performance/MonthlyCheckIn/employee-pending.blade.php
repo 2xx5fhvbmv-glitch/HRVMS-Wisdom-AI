@@ -69,11 +69,10 @@
 <script>
 $(document).on('click', '.approve-btn', function() {
     const id = $(this).data('id');
-    Swal.fire({
+    wisdomConfirm({
+        role: 'confirm',
         title: 'Approve this check-in?',
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonText: 'Yes, approve'
+        confirmText: 'Yes, approve'
     }).then((result) => {
         if (!result.isConfirmed) return;
         $.ajax({

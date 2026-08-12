@@ -1081,8 +1081,8 @@
                     </form>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" id="confirmRejectBtn" class="btn btn-danger">Reject</button>
+                    <button type="button" class="btn eb-btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" id="confirmRejectBtn" class="btn eb-btn-critical">Reject</button>
                 </div>
                 
             </div>
@@ -1090,6 +1090,7 @@
     </div>
     {{--END info Update And Reject Modal Code --}}
 
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')

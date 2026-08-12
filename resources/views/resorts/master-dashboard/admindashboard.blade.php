@@ -1065,7 +1065,6 @@
                                                             class="fa-regular fa-eye"></i></a>
                                                     <a href="javascript:void(0)" data-id="{{$id}}" class="SendNotifcation btn-tableIcon btnIcon-yellow"><i
                                                             class="fa-regular fa-bell"></i></a>
-                                                    {{-- <a href="#" class="btn-tableIcon btnIcon-blue"><i class="fa-regular fa-pen"></i></a> --}}
                                                 </div>
                                             </div>
                                         </div>
@@ -2476,12 +2475,13 @@
                 <textarea id="rejectionReason" class="form-control" rows="3" placeholder="Enter a reason (optional)"></textarea>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" id="confirmRejectBtn" class="btn btn-danger">Reject</button>
+                <button type="button" class="btn eb-btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" id="confirmRejectBtn" class="btn eb-btn-critical">Reject</button>
             </div>
         </div>
     </div>
 </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')

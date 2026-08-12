@@ -43,11 +43,11 @@
                                              </a>
                                       </div>
                                       <div class="mt-2 d-flex gap-2">
-                                              <a href="javascript:void();" class="btn-link btn-icon btn-themeSuccess btn-sm" onclick="openEditModal('{{ $facilityTourCategory->id }}', 'thumbnail', 'null')">
+                                              <a href="javascript:void();" class="eb-btn-ghost btn-icon btn-themeSuccess btn-sm" onclick="openEditModal('{{ $facilityTourCategory->id }}', 'thumbnail', 'null')">
                                                      <i class="fas fa-edit "></i>
                                               </a>
                                              <!-- Delete Icon -->
-                                             <a href="javascript:void();" class=" btn-link btn-icon btn-themeDanger btn-sm" onclick="confirmDelete('{{ $facilityTourCategory->id }}', 'thumbnail')">
+                                             <a href="javascript:void();" class="eb-btn-ghost btn-icon btn-themeDanger btn-sm" onclick="confirmDelete('{{ $facilityTourCategory->id }}', 'thumbnail')">
                                                    <i class="fas fa-trash"></i>
                                              </a>
                                       </div>
@@ -70,10 +70,10 @@
                                                                  <img src="{{ $thumbnailImagePath['NewURLshow'] }}" alt="Facility Tour Image" class="img-fluid rounded border">
                                                           </a>
                                                           <div class="mt-2 d-flex gap-2">
-                                                                  <a href="javascript:void(0);" class="btn-link btn-icon btn-themeSuccess btn-sm" onclick="openEditModal('{{ $facilityTourCategory->id }}', 'tour_image', '{{ $facilityTourImage->id }}')">
+                                                                  <a href="javascript:void(0);" class="eb-btn-ghost btn-icon btn-themeSuccess btn-sm" onclick="openEditModal('{{ $facilityTourCategory->id }}', 'tour_image', '{{ $facilityTourImage->id }}')">
                                                                          <i class="fas fa-edit"></i>
                                                                   </a>
-                                                                 <a href="javascript:void(0);" class="btn-link btn-icon btn-themeDanger btn-sm" onclick="confirmDelete('{{ $facilityTourImage->id }}','tour_image')">
+                                                                 <a href="javascript:void(0);" class="eb-btn-ghost btn-icon btn-themeDanger btn-sm" onclick="confirmDelete('{{ $facilityTourImage->id }}','tour_image')">
                                                                        <i class="fas fa-trash"></i>
                                                                  </a>
                                                           </div>
@@ -123,6 +123,7 @@
      </div>
 </div>
 
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -193,14 +194,12 @@ $('#editThumbnailForm').on('submit', function(e) {
 function confirmDelete(id, type) {
      let url = "{{ route('people.onboarding.facility-tour-categories.image-delete') }}";
 
-     Swal.fire({
-          title: 'Are you sure you want to delete?',
-          text: 'This action cannot be undone.',
-          icon: 'warning',
-          showCancelButton: true,
-          confirmButtonText: 'Yes',
-          cancelButtonText: 'No',
-          confirmButtonColor: '#DD6B55',
+     wisdomConfirm({
+         role: 'destructive',
+         title: 'Are you sure you want to delete?',
+         text: 'This action cannot be undone.',
+         confirmText: 'Yes',
+         cancelText: 'No'
      }).then((result) => {
           if (result.isConfirmed) {
                $.ajax({

@@ -98,7 +98,7 @@
                 <div id="filters-container">
                     <div class="alert alert-info">You can add filters after selecting fields</div>
                 </div>
-                <button type="button" class="btn btn-info mt-2" id="add-filter" style="display: none;">Add Filter</button>
+                <button type="button" class="btn eb-btn-secondary mt-2" id="add-filter" style="display: none;">Add Filter</button>
             </div>
 
             <div class="col-md-12 form-group">

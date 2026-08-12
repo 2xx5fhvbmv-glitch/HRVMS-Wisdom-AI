@@ -4,7 +4,7 @@
             <div class="applicantsGrid-block">
                 @if($isHrDepartment)
                 <div class="dropdown table-dropdown ">
-                    <button class="btn btn-secondary dropdown-toggle dotsV-link" type="button"
+                    <button class="btn eb-btn-ghost dropdown-toggle dotsV-link" type="button"
                         id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false">
                         <i class="fa-solid fa-ellipsis-vertical"></i>
                     </button>
@@ -124,4 +124,4 @@
     </div>
 </div>
 @endif
-
+@include('resorts._emotional_buttons_v2_styles')

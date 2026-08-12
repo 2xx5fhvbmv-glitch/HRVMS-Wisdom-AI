@@ -70,7 +70,7 @@
 
                         
                         <div class="col-auto ms-auto">
-                            <button id="delete-selected" class="btn btn-danger btn-sm">Delete</button>
+                            <button id="delete-selected" class="btn eb-btn-critical btn-sm">Delete</button>
 
                             <button id="exportSelectedEmployees" class="btn btn-themeBlue btn-sm">Export</button>
                         </div>
@@ -153,7 +153,7 @@
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="submit" class="btn btn-primary">Assign</button>
+                        <button type="submit" class="btn eb-btn-primary">Assign</button>
                     </div>
                 </div>
             </form>
@@ -182,12 +182,13 @@
                 </select>
                 </div>
                 <div class="modal-footer">
-                <button type="submit" class="btn btn-primary">Update</button>
+                <button type="submit" class="btn eb-btn-primary">Update</button>
                 </div>
             </div>
             </form>
         </div>
     </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -350,14 +351,11 @@
             e.preventDefault();
             const empId = $(this).data('emp-id');
 
-            Swal.fire({
+            wisdomConfirm({
+                role: 'destructive',
                 title: 'Are you sure?',
                 text: "You won't be able to revert this!",
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#d33',
-                cancelButtonColor: '#3085d6',
-                confirmButtonText: 'Yes, delete it!'
+                confirmText: 'Yes, delete it!'
             }).then((result) => {
                 if (result.isConfirmed) {
                     $.ajax({
@@ -368,7 +366,11 @@
                             id: empId
                         },
                         success: function(response) {
-                            Swal.fire('Deleted!', response.message, 'success').then(() => {
+                            wisdomAlert({
+                                type: 'success',
+                                title: 'Deleted!',
+                                text: response.message
+                            }).then(() => {
                                 if ($('.btn-grid').hasClass('active')) {
                                     loadGridView(); // Reload Grid View
                                 } else {
@@ -377,7 +379,11 @@
                             });
                         },
                         error: function(xhr) {
-                            Swal.fire('Error!', xhr.responseJSON?.message || 'Something went wrong.', 'error');
+                            wisdomAlert({
+                                type: 'error',
+                                title: 'Error!',
+                                text: xhr.responseJSON?.message || 'Something went wrong.'
+                            });
                         }
                     });
                 }
@@ -437,19 +443,20 @@
                 }).get();
 
             if (selected.length === 0) {
-                Swal.fire('No Selection', 'Please select at least one employee.', 'info');
+                wisdomAlert({
+                    type: 'info',
+                    title: 'No Selection',
+                    text: 'Please select at least one employee.'
+                });
                 return;
             }
 
             // Confirm deletion
-            Swal.fire({
+            wisdomConfirm({
+                role: 'destructive',
                 title: 'Are you sure?',
                 text: `You are about to delete ${selected.length} employee(s).`,
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#d33',
-                cancelButtonColor: '#3085d6',
-                confirmButtonText: 'Yes, delete them!'
+                confirmText: 'Yes, delete them!'
             }).then((result) => {
                 if (result.isConfirmed) {
                     $.ajax({
@@ -460,7 +467,11 @@
                             ids: selected
                         },
                         success: function (response) {
-                            Swal.fire('Deleted!', response.message, 'success').then(() => {
+                            wisdomAlert({
+                                type: 'success',
+                                title: 'Deleted!',
+                                text: response.message
+                            }).then(() => {
                                 if ($('.btn-grid').hasClass('active')) {
                                     loadGridView(); // Reload Grid View
                                 } else {
@@ -469,7 +480,11 @@
                             });
                         },
                         error: function (xhr) {
-                            Swal.fire('Error!', xhr.responseJSON?.message || 'Something went wrong.', 'error');
+                            wisdomAlert({
+                                type: 'error',
+                                title: 'Error!',
+                                text: xhr.responseJSON?.message || 'Something went wrong.'
+                            });
                         }
                     });
                 }

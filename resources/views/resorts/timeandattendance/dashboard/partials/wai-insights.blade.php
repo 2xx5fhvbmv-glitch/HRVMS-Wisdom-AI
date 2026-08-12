@@ -57,13 +57,16 @@
 @endphp
 
 <style>
-    /* These tokens don't exist anywhere else in the app yet — scoped here
-       rather than added to :root so they can't collide with a future
-       global token system before one exists. */
+    /* Neutral/geometry tokens (--teal/--teal-2/--lime/--ink/--muted/
+       --faint/--line/--line-2) now come from the shared :root palette
+       (resorts/layouts/_design_tokens.blade.php). --teal-mid stays local
+       (used as a gradient stop, not a flat teal — see mapping guide).
+       --ok/--ok-bg folded into --positive/--positive-bg (same #1f9d6b/
+       #e9f7f0 value, now canonical). --warn/--err stay local for now
+       (out of scope for this pass). */
     .card-wiINsight {
-        --teal: #014653; --teal-2: #035b6c; --teal-mid: #0e8a9e; --lime: #e0ff02;
-        --ink: #14232a; --muted: #5d6f75; --faint: #9fadb2; --line: #eaf0f0; --line-2: #f2f6f6;
-        --ok: #1f9d6b; --ok-bg: #e9f7f0; --warn: #d98a00; --warn-bg: #fff6e5; --err: #e5573f; --err-bg: #fdeeeb;
+        --teal-mid: #0e8a9e;
+        --warn: #d98a00; --warn-bg: #fff6e5; --err: #e5573f; --err-bg: #fdeeeb;
     }
     .card-wiINsight { display: flex; flex-direction: column; padding: 0; overflow: hidden; border-radius: 16px; }
 
@@ -97,7 +100,7 @@
         border: 1px solid #d7ecdf;
     }
     .wai-hero-count { font-size: 28px; font-weight: 800; color: var(--err); line-height: 1; flex-shrink: 0; }
-    .wai-hero-icon { font-size: 22px; color: var(--ok); flex-shrink: 0; }
+    .wai-hero-icon { font-size: 22px; color: var(--positive); flex-shrink: 0; }
     .wai-hero-text { flex: 1 1 auto; min-width: 0; }
     .wai-hero-text p { margin: 0; font-size: 13.5px; color: var(--ink); line-height: 1.4; }
     .wai-hero-text small { color: var(--muted); font-size: 12px; }
@@ -112,7 +115,7 @@
         font-size: 14px; flex-shrink: 0;
         align-self: flex-start;
     }
-    .wai-row-icon.is-ok { background: var(--ok-bg); color: var(--ok); }
+    .wai-row-icon.is-ok { background: var(--positive-bg); color: var(--positive); }
     .wai-row-icon.is-flagged { background: var(--err-bg); color: var(--err); }
     .wai-row-body { flex: 1 1 auto; min-width: 0; }
     .wai-row-body h6 { margin: 0; font-size: 13.5px; font-weight: 600; color: var(--ink); }

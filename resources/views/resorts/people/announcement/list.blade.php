@@ -113,14 +113,12 @@
         $(document).on('click', '.archive-announcement', function () {
             let announcementId = $(this).data('id');
 
-            Swal.fire({
+            wisdomConfirm({
+                role: 'destructive',
                 title: 'Are you sure you want to archive this announcement?',
                 text: 'This cannot be undone.',
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonText: 'Yes, archive it!',
-                cancelButtonText: 'Cancel',
-                confirmButtonColor: '#DD6B55'
+                confirmText: 'Yes, archive it!',
+                cancelText: 'Cancel'
             }).then((result) => {
                 if (result.isConfirmed) {
                     $.ajax({
@@ -155,14 +153,11 @@
         $(document).on('click', '.restore-announcement', function () {
             let announcementId = $(this).data('id');
 
-            Swal.fire({
+            wisdomConfirm({
+                role: 'positive',
                 title: 'Restore this announcement?',
                 text: 'It will be moved back to active list.',
-                icon: 'info',
-                showCancelButton: true,
-                confirmButtonText: 'Yes, Restore',
-                cancelButtonText: 'Cancel',
-                confirmButtonColor: '#28a745'
+                confirmText: 'Yes, Restore'
             }).then((result) => {
                 if (result.isConfirmed) {
                     $.ajax({

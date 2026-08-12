@@ -185,7 +185,7 @@
                                                 <h6>{{$VisaEmployeeExpiry->DocName}}</h6>
                                                 <span>Uploaded: {{$VisaEmployeeExpiry->lastUploadedFile}}</span>
                                             </div>
-                                            <a target="_blank" href="javascript:void(0)" class="btn-tableIcon btnIcon-blue download-link" title="Download" data-id="{{$VisaEmployeeExpiry->child_id}}">
+                                            <a target="_blank" href="javascript:void(0)" class="btn-tableIcon btnIcon-teal download-link" title="Download" data-id="{{$VisaEmployeeExpiry->child_id}}">
                                                 <i class="fa-solid fa-download"></i>
                                             </a>
                                         </div>
@@ -638,7 +638,7 @@ $(document).ready(function(){
                                                                 <h6>${value.DocName}</h6>
                                                                 <span>Uploaded: ${value.lastUploadedFile}</span>
                                                             </div>
-                                                            <a target="_blank" href="javascript:void(0)" class="btn-tableIcon btnIcon-blue download-link" title="Download" data-id="${value.child_id}">
+                                                            <a target="_blank" href="javascript:void(0)" class="btn-tableIcon btnIcon-teal download-link" title="Download" data-id="${value.child_id}">
                                                                 <i class="fa-solid fa-download"></i>
                                                             </a>
                                                         </div>

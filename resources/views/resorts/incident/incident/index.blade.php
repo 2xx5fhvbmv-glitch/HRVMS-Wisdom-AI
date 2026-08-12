@@ -148,23 +148,25 @@
             let id = $(this).data('id');
             let isApprove = $(this).hasClass('correct-btn');
 
-            Swal.fire({
+            wisdomConfirm({
+                role: 'confirm',
                 title: isApprove ? 'Approve Report' : 'Reject Report',
-                input: 'textarea',
-                inputLabel: 'Remarks',
-                showCancelButton: true,
-                confirmButtonText: isApprove ? 'Approve' : 'Reject',
-                preConfirm: (remarks) => {
-                    return $.ajax({
-                        url: "{{route('incident.investigation.approvedorreject')}}",
-                        method: 'POST',
-                        data: {
-                            id: id,
-                            remarks: remarks,
-                            status: isApprove ? 'approved' : 'rejected',
-                            _token: $('meta[name="csrf-token"]').attr('content')
-                        }
-                    });
+                confirmText: isApprove ? 'Approve' : 'Reject',
+                extra: {
+                    input: 'textarea',
+                    inputLabel: 'Remarks',
+                    preConfirm: (remarks) => {
+                        return $.ajax({
+                            url: "{{route('incident.investigation.approvedorreject')}}",
+                            method: 'POST',
+                            data: {
+                                id: id,
+                                remarks: remarks,
+                                status: isApprove ? 'approved' : 'rejected',
+                                _token: $('meta[name="csrf-token"]').attr('content')
+                            }
+                        });
+                    }
                 }
             }).then((result) => {
                 if (result.isConfirmed) {
@@ -180,14 +182,11 @@
             e.preventDefault();
             let id = $(this).data('id');
 
-            Swal.fire({
+            wisdomConfirm({
+                role: 'destructive',
                 title: 'Are you sure?',
                 text: 'This action cannot be undone.',
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#d33',
-                cancelButtonColor: '#3085d6',
-                confirmButtonText: 'Yes, delete it!'
+                confirmText: 'Yes, delete it!'
             }).then((result) => {
                 if (result.isConfirmed) {
                     $.ajax({

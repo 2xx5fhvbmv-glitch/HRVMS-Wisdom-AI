@@ -139,12 +139,20 @@
 
     @section('import-css')
     <style>
-        /* Brand tokens — scoped to this page only, since no global
-           CSS-variable system exists yet in this app. */
+        /* Neutral/geometry tokens now come from the shared :root palette
+           (resorts/layouts/_design_tokens.blade.php) — .compliance-page
+           inherits --teal/--teal-2/--teal-3/--teal-soft/--lime/--ink/
+           --muted/--faint/--line/--line-2 from there.
+           --warn folded into --warning (exact hex match, #d98a00).
+           --crit/--crit-bg folded into --critical/--critical-bg —
+           INTENDED VISUAL CHANGE: this page's "critical" badge/chip was
+           a dark brick red (#c0392b), now the same bright red-orange
+           (#FF2400) as the button system's critical state everywhere else.
+           --warn-bg stays local — #fff6e5 doesn't match --warning-bg's
+           #FBF0DC, left rather than silently nudged. --err was defined
+           but unused (no var(--err) reference anywhere in this file). */
         .compliance-page {
-            --teal:#014653; --teal-2:#035b6c; --teal-3:#e6f0f1; --teal-soft:#f4f8f8; --lime:#e0ff02;
-            --ink:#14232a; --muted:#5d6f75; --faint:#93a4a9; --line:#e2ebec; --line-2:#eef3f3;
-            --warn:#d98a00; --warn-bg:#fff6e5; --err:#e5573f; --crit:#c0392b; --crit-bg:#fbe9e6;
+            --warn-bg:#fff6e5;
         }
 
         .compliance-page .cc-subtitle {
@@ -173,7 +181,7 @@
             line-height: 1.2;
         }
         .compliance-page .cc-summary-card--crit .cc-summary-value {
-            color: var(--crit);
+            color: var(--critical);
         }
         .compliance-page .cc-summary-label {
             font-size: 12.5px;
@@ -205,7 +213,7 @@
             border-color: var(--teal);
             color: #fff;
         }
-        .compliance-page .cc-chip--crit.is-active { background: var(--crit); border-color: var(--crit); }
+        .compliance-page .cc-chip--crit.is-active { background: var(--critical); border-color: var(--critical); }
         .compliance-page .cc-chip-count {
             opacity: .75;
             margin-left: 2px;
@@ -322,8 +330,8 @@
             padding: 3px 10px;
             border-radius: 20px;
         }
-        .cc-badge--crit { background: var(--crit-bg); color: var(--crit); }
-        .cc-badge--warn { background: var(--warn-bg); color: var(--warn); }
+        .cc-badge--crit { background: var(--critical-bg); color: var(--critical); }
+        .cc-badge--warn { background: var(--warn-bg); color: var(--warning); }
         .cc-badge--ok   { background: #e9f7f0; color: #1f9d6b; }
 
         /* ---- Action cell ---- */
@@ -405,33 +413,30 @@
           $(document).on('click', '.dismmisal', function(e) {
                e.preventDefault();
                var complianceId = $(this).data('id');
-               Swal.fire({
+               wisdomConfirm({
+                    role: 'confirm',
                     title: 'Are you sure?',
                     text: "You want to dismiss this compliance?",
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonColor: '#014653',
-                    cancelButtonColor: '#d33',
-                    confirmButtonText: 'Yes, dismiss it!'
+                    confirmText: 'Yes, dismiss it!'
                }).then((result) => {
                     if (result.isConfirmed) {
                          $.ajax({
                               url: "{{ route('people.compliances.dismiss', '') }}/" + complianceId,
                               type: 'GET',
                               success: function(response) {
-                                   Swal.fire(
-                                        'Dismissed!',
-                                        'Compliance has been dismissed.',
-                                        'success'
-                                   );
+                                   wisdomAlert({
+                                       type: 'success',
+                                       title: 'Dismissed!',
+                                       text: 'Compliance has been dismissed.'
+                                   });
                                   ComplianceIndex();
                               },
                               error: function(xhr, status, error) {
-                                   Swal.fire(
-                                        'Error!',
-                                        'Something went wrong. Please try again.',
-                                        'error'
-                                   );
+                                   wisdomAlert({
+                                       type: 'error',
+                                       title: 'Error!',
+                                       text: 'Something went wrong. Please try again.'
+                                   });
                               }
                          });
                     }

@@ -5,7 +5,7 @@
     <div class="col-xxl-cust5 col-xl-3 col-lg-4 col-sm-6">
         <div class="talentPoolGrid-block">
             <div class="dropdown table-dropdown ">
-                <button class="btn btn-secondary dropdown-toggle dotsV-link" type="button" id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false">
+                <button class="btn eb-btn-ghost dropdown-toggle dotsV-link" type="button" id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false">
                     <i class="fa-solid fa-ellipsis-vertical"></i>
                 </button>
                 <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dropdownMenuButton1">
@@ -71,3 +71,4 @@
 <nav aria-label="Page navigation example">
     {!! $pagination !!}
 </nav>
+@include('resorts._emotional_buttons_v2_styles')

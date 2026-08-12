@@ -560,14 +560,12 @@
             let newValue = $(this).val();
 
             if (originalPriority && newValue !== originalPriority) {
-                Swal.fire({
+                wisdomConfirm({
+                    role: 'confirm',
                     title: 'Are you sure?',
                     text: 'Priority level was already set by HR. Do you want to change it?',
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonText: 'Yes, change it',
-                    cancelButtonText: 'No, keep original',
-                    confirmButtonColor: "#DD6B55"
+                    confirmText: 'Yes, change it',
+                    cancelText: 'No, keep original'
                 }).then((result) => {
                     if (!result.isConfirmed) {
                         $('#priority_level').val(originalPriority); // Revert if not confirmed

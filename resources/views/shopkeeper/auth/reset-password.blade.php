@@ -6,6 +6,7 @@
     <meta name=viewport content="width=device-width,initial-scale=1">
     <meta name="description" content="">
     <meta name=keywords content="">
+    @include('resorts.layouts._design_tokens')
     <link href="{{ URL::asset('resorts_assets/css/bootstrap.min.css')}}" rel=stylesheet>
     <link href="{{ URL::asset('resorts_assets/css/select2.min.css')}}" rel=stylesheet>
     <link href="{{ URL::asset('resorts_assets/css/slick-theme.css')}}" rel=stylesheet>
@@ -21,6 +22,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="{{ URL::asset('resorts_assets/images//apple-touch-icon.png')}}">
     <link rel="icon" type="image/png" sizes="32x32" href="{{ URL::asset('resorts_assets/images//favicon-32x32.png')}}">
     <link rel="icon" type="image/png" sizes="16x16" href="{{ URL::asset('resorts_assets/images//favicon-16x16.png')}}">
+    @include('resorts._emotional_buttons_v2_styles')
 
     <title>HRVMS | Shopkeeper Panel</title>
 </head>
@@ -124,21 +126,21 @@
                         <input type="hidden" name="token" value="{{ $token }}">
 
                         <label for="email" class="form-label">Email Id</label>
-                        <input type="email" name="email" id="email" class="form-control" placeholder="Email" value="{{$email}}">
+                        <input type="email" name="email" id="email" class="form-control" placeholder="Email" value="{{ $email ?? '' }}">
 
-                        <div id="div-email" style="color:red;"></div>
+                        <div id="div-email" style="color:var(--error);"></div>
                     </div>
                     <div class="mb-4">
                         <label for="email" class="form-label">Password</label>
                         <input type="password" name="password" id="password" class="form-control" placeholder="Password">
 
-                        <div id="div-password" style="color:red;"></div>
+                        <div id="div-password" style="color:var(--error);"></div>
                     </div>
                     <div class="mb-4">
                         <label for="email" class="form-label">Confirm Password</label>
                         <input type="password" name="password_confirmation" id="password_confirmation" class="form-control" placeholder="Confirm Password">
 
-                        <div id="div-password_confirmation" style="color:red;"></div>
+                        <div id="div-password_confirmation" style="color:var(--error);"></div>
                     </div>
 
 
@@ -146,7 +148,7 @@
 
 
                     <div class="text-center">
-                        <button type="submit" class="btn btn-primary  btn-theme">Request new password</button>
+                        <button type="submit" class="btn eb-btn-primary">Request new password</button>
 
                     </div>
 
@@ -214,13 +216,13 @@
                 },
                 errorPlacement: function(error, element) {
                     if( element.attr("name") == "email" ) {
-                    error.insertAfter( "#div-email" ).css('color', 'red');
+                    error.insertAfter( "#div-email" ).css('color', 'var(--error)');
                     } else if( element.attr("name") == "password" ) {
                     error.insertAfter( "#div-password" );
                     } else if( element.attr("name") == "password_confirmation" ) {
-                    error.insertAfter( "#div-password_confirmation" ).css('color', 'red');
+                    error.insertAfter( "#div-password_confirmation" ).css('color', 'var(--error)');
                     } else {
-                    error.insertAfter(element).css('color', 'red');
+                    error.insertAfter(element).css('color', 'var(--error)');
                     }
                 },
                 errorElement: 'span'

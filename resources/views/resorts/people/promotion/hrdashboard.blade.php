@@ -199,6 +199,7 @@
             </div>
         </div>
     </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -406,8 +407,8 @@
         // Replace action buttons
         var $actionCell = $row.find("td:last-child");
         $actionCell.html(`
-            <button class="btn btn-sm btn-success update-row-btn" data-promotion-id="${promotionId}">Update</button>
-            <button class="btn btn-sm btn-secondary cancel-row-btn" data-promotion-id="${promotionId}">Cancel</button>
+            <button class="btn btn-sm eb-btn-primary update-row-btn" data-promotion-id="${promotionId}">Update</button>
+            <button class="btn btn-sm eb-btn-secondary cancel-row-btn" data-promotion-id="${promotionId}">Cancel</button>
         `);
 
         // Store original values for cancel functionality

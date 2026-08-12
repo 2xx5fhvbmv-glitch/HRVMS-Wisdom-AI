@@ -26,8 +26,8 @@
     .taa-btn-secondary:hover { background: #F9F8F1; border-color: #014653; color: #014653; transform: translateY(-2px); box-shadow: 0 8px 18px -8px rgba(20,35,42,.18); }
 
     /* Affirming, additive — Approve, Add Shift/Entry/Zone/Holiday. */
-    .taa-btn-positive { background: #E4F3E9; color: #2E9E5B; }
-    .taa-btn-positive:hover { background: #2E9E5B; color: #fff; transform: translateY(-2px); box-shadow: 0 8px 18px -8px rgba(20,35,42,.25); }
+    .taa-btn-positive { background: var(--positive-bg); color: var(--positive); }
+    .taa-btn-positive:hover { background: var(--positive); color: #fff; transform: translateY(-2px); box-shadow: 0 8px 18px -8px rgba(20,35,42,.25); }
 
     /* Consequential/needs-a-decision, not destructive — Reject, manual
        Check-In/Check-Out, Update Overtime Status, Pause zone. */
@@ -67,7 +67,7 @@
     }
     .taa-btn-primary[disabled] { background: #014653; color: #fff; }
     .taa-btn-secondary[disabled] { background: transparent; color: #014653; }
-    .taa-btn-positive[disabled] { background: #E4F3E9; color: #2E9E5B; }
+    .taa-btn-positive[disabled] { background: var(--positive-bg); color: var(--positive); }
     .taa-btn-attention[disabled] { background: #FBF0DC; color: #D98A00; }
     .taa-btn-neutral[disabled] { background: #DEDEDE; color: #222; }
     .taa-btn-critical[disabled] { background: #FFDED9; color: #FF2400; }

@@ -454,7 +454,7 @@
             </div>
             <div class="modal-footer justify-content-center">
                 <a href="#respond-HoldModel" id="holdResponseModel" data-bs-toggle="modal"  data-bs-dismiss="modal" class="btn btn-themeSkyblue">On Hold</a>
-                <a href="#respond-rejectModal" id="RejectResponseModel" data-bs-toggle="modal" data-bs-dismiss="modal" class="btn btn-danger">Reject</a>
+                <a href="#respond-rejectModal" id="RejectResponseModel" data-bs-toggle="modal" data-bs-dismiss="modal" class="btn eb-btn-critical">Reject</a>
                 <a href="javascript:void(0)" id="ApprovedResponseModel" data-bs-toggle="modal" data-bs-dismiss="modal" class="btn btn-themeBlue">Approved</a>
             </div>
         </div>
@@ -673,6 +673,7 @@
     </div>
 </div>
 <input type="hidden" name="Dasboard_resort_id" value="{{$resort_id}}" id="Dasboard_resort_id" >
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')

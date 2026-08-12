@@ -138,12 +138,10 @@ function datatablelist() {
 // GM Approve
 $(document).on('click', '.gm-approve-btn', function() {
     const id = $(this).data('id');
-    Swal.fire({
+    wisdomConfirm({
+        role: 'positive',
         title: 'Approve this KPI response?',
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonColor: '#2E9E5B',
-        confirmButtonText: 'Yes, approve'
+        confirmText: 'Yes, approve'
     }).then((result) => {
         if (!result.isConfirmed) return;
         $.ajax({
@@ -166,13 +164,11 @@ $(document).on('click', '.gm-approve-btn', function() {
 // GM Delete
 $(document).on('click', '.kpi-delete-btn', function() {
     const id = $(this).data('id');
-    Swal.fire({
+    wisdomConfirm({
+        role: 'destructive',
         title: 'Delete this KPI?',
         text: 'This will permanently remove the KPI and all its actual entries.',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#FF2400',
-        confirmButtonText: 'Yes, delete'
+        confirmText: 'Yes, delete'
     }).then((result) => {
         if (!result.isConfirmed) return;
         $.ajax({

@@ -320,7 +320,7 @@
                 '<div class="form-check form-switch form-switchTheme">' +
                 '<input class="form-check-input currency-switch" type="checkbox" name="currency[]">' +
                 '<label class="form-check-label">USD</label></div></div></div>' +
-                '<div class="col-auto"><button type="button" class="btn btn-danger remove-earnings">Remove</button></div>' +
+                '<div class="col-auto"><button type="button" class="btn eb-btn-critical remove-earnings">Remove</button></div>' +
                 '</div></div>';
             $('.earnings-main').append(newRow);
         });
@@ -384,7 +384,7 @@
                 '<div class="form-check form-switch form-switchTheme">' +
                 '<input class="form-check-input currency-switch" type="checkbox" name="currency[]">' +
                 '<label class="form-check-label">USD</label></div></div></div>' +
-                '<div class="col-auto"><button type="button" class="btn btn-danger remove-deduction">Remove</button></div>' +
+                '<div class="col-auto"><button type="button" class="btn eb-btn-critical remove-deduction">Remove</button></div>' +
                 '</div></div>';
             $('.deduction-main').append(newRow);
         });

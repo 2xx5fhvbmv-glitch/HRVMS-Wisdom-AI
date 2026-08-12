@@ -118,12 +118,11 @@
             const action = $(this).data('action');
             const finalUrl = transferApprovalUrl.replace('__ID__', transferId).replace('__ACTION__', action);
 
-            Swal.fire({
+            wisdomConfirm({
+                role: 'confirm',
                 title: `Are you sure?`,
                 text: `You want to ${action} this transfer?`,
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonText: `Yes, ${action} it!`,
+                confirmText: `Yes, ${action} it!`
             }).then((result) => {
                 if (result.isConfirmed) {
                     $.ajax({

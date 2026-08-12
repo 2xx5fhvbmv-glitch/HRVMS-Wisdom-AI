@@ -118,7 +118,7 @@
                                                         Department, Position and Division on Step 2 will be pre-filled and locked.
                                                     </div>
                                                 </div>
-                                                <button type="button" class="btn btn-sm btn-outline-secondary" id="vacancyPickerClear">
+                                                <button type="button" class="btn btn-sm eb-btn-secondary" id="vacancyPickerClear">
                                                     Clear selection
                                                 </button>
                                             </div>
@@ -606,7 +606,7 @@
                                                 <a href="javascript:void(0);"
                                                     class="btn btn-themeSkyblue btn-sm blockAdd-btn w-100">Add</a>
                                                 <a href="javascript:void(0);"
-                                                    class="btn btn-danger btn-sm remove-btn w-100"
+                                                    class="btn eb-btn-critical btn-sm remove-btn w-100"
                                                     style="display:none;">Remove</a>
                                             </div>
                                         </div>
@@ -907,7 +907,7 @@
                                                 <a href="javascript:void(0);"
                                                     class="btn btn-themeSkyblue btn-sm allowanceAdd-btn">Add</a>
                                                 <a href="javascript:void(0);"
-                                                    class="btn btn-danger btn-sm allowanceRemove-btn ms-1"
+                                                    class="btn eb-btn-critical btn-sm allowanceRemove-btn ms-1"
                                                     style="display:none;">Remove</a>
                                             </div>
                                         </div>
@@ -1003,7 +1003,7 @@
 
                                     <div class="col-lg-4 col-sm-6 d-flex align-items-end">
 
-                                        <a href="javascript:void(0);" class="btn btn-danger btn-sm bankRemove-btn ms-2"
+                                        <a href="javascript:void(0);" class="btn eb-btn-critical btn-sm bankRemove-btn ms-2"
                                             style="display:none;">Remove</a>
                                     </div>
                                 </div>
@@ -1027,7 +1027,7 @@
                                                 <a href="javascript:void(0);"
                                                     class="btn btn-themeSkyblue btn-sm education-add-btn">Add</a>
                                                 <a href="javascript:void(0);"
-                                                    class="btn btn-danger btn-sm education-remove-btn"
+                                                    class="btn eb-btn-critical btn-sm education-remove-btn"
                                                     style="display:none;">Remove</a>
                                             </div>
                                         </div>
@@ -1213,7 +1213,7 @@
                                         <div class="col-12">
                                             <a href="javascript:void(0);"
                                                 class="btn btn-themeSkyblue btn-sm blockAdd-btn">Add More</a>
-                                            <a href="javascript:void(0);" class="btn btn-danger btn-sm remove-btn"
+                                            <a href="javascript:void(0);" class="btn eb-btn-critical btn-sm remove-btn"
                                                 style="display:none;">Remove</a>
                                         </div>
                                     </div>
@@ -1250,7 +1250,7 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-primary crop-picture custom-btn"
+                    <button type="button" class="btn eb-btn-primary crop-picture custom-btn"
                         data-dismiss="modal">Crop</button>
                     <!-- <button type="button" class="btn btn-default" id="closemodalpass" data-dismiss="modal">Close</button> -->
                     <button type="button" data-bs-dismiss="modal" class="btn btn-default">Close</button>
@@ -1273,13 +1273,14 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-primary crop_picture_full_img custom-btn"
+                    <button type="button" class="btn eb-btn-primary crop_picture_full_img custom-btn"
                         data-dismiss="modal">Crop</button>
                     <button type="button" data-bs-dismiss="modal" class="btn btn-default">Close</button>
                 </div>
             </div>
         </div>
     </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -2082,9 +2083,9 @@
                 // Show loading spinner
                 let $progressBar = $(`
                     <div id="cv-upload-progress" style="display:inline-block; width:150px; margin-left:10px; vertical-align:middle;">
-                        <div class="progress" style="height: 1.5rem; background-color: #e0f2fe;">
-                            <div class="progress-bar progress-bar-striped progress-bar-animated bg-themeBlue" 
-                                role="progressbar" style="width: 60%; background: linear-gradient(90deg, #1e90ff 60%, #38b6ff 100%);" 
+                        <div class="progress" style="height: 1.5rem; background-color: var(--teal-3);">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated bg-themeBlue"
+                                role="progressbar" style="width: 60%; background: linear-gradient(90deg, var(--teal) 60%, var(--teal-bright) 100%);"
                                 aria-valuenow="60" aria-valuemin="0" aria-valuemax="100">
                                 Uploading...
                             </div>

@@ -1,3 +1,4 @@
+@include('resorts.layouts._design_tokens')
 <link href="{{ URL::asset('resorts_assets/css/bootstrap.min.css')}}" rel=stylesheet>
 <link href="{{ URL::asset('resorts_assets/css/select2.min.css')}}" rel=stylesheet>
 <link href="{{ URL::asset('resorts_assets/css/slick-theme.css')}}" rel=stylesheet>
@@ -19,3 +20,4 @@
 <link rel="icon" type="image/png" sizes="16x16" href="{{ URL::asset('resorts_assets/images//favicon-16x16.png')}}">
 
 @yield('import-css')
+@include('resorts._emotional_buttons_v2_styles')

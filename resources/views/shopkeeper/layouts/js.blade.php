@@ -20,6 +20,7 @@
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script src="{{ URL::asset('resorts_assets/additionalJs/swatalart.min.js') }}"></script>
 <script src="{{ URL::asset('resorts_assets/additionalJs/sweetalert2.js') }}"></script>
+@include('resorts.layouts._confirm')
 <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-validate/1.19.3/jquery.validate.min.js"></script>
 

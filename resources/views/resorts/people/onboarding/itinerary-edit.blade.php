@@ -378,7 +378,7 @@
                                                 </div>
                                                 <div class="col-lg-4 col-sm-6 d-flex align-items-end">
                                                     @if($index > 0 || count($itinerary->meetings) > 1)
-                                                        <button type="button" class="btn btn-danger btn-sm remove-meeting-btn">
+                                                        <button type="button" class="btn eb-btn-critical btn-sm remove-meeting-btn">
                                                             Remove Meeting
                                                         </button>
                                                     @endif
@@ -444,12 +444,13 @@
                     </div>
                     <div class="card-footer">
                         <button type="submit" class="btn btn-themeSkyblue">Update Itinerary</button>
-                        <a href="{{ route('people.onboarding.itinerary.list') }}" class="btn btn-secondary">Cancel</a>
+                        <a href="{{ route('people.onboarding.itinerary.list') }}" class="btn eb-btn-secondary">Cancel</a>
                     </div>
                 </div>
             </form>
         </div>
     </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -515,7 +516,7 @@
                             </select>
                         </div>
                         <div class="col-lg-4 col-sm-6 d-flex align-items-end">
-                            <button type="button" class="btn btn-danger btn-sm remove-meeting-btn">
+                            <button type="button" class="btn eb-btn-critical btn-sm remove-meeting-btn">
                                 Remove Meeting
                             </button>
                         </div>

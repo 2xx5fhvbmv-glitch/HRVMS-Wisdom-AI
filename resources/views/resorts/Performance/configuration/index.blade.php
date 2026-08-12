@@ -792,7 +792,7 @@
                                         </div>
 
                                     <div class="col-sm-2">
-                                        <button type="button" data-id="${id}"  class=" btn btn-sm btn-danger removeReviewCategories"><i class="fa fa-trash"></i></button>
+                                        <button type="button" data-id="${id}"  class="btn btn-sm eb-btn-critical removeReviewCategories"><i class="fa fa-trash"></i></button>
                                     </div>
                             </div>
                             `);
@@ -918,15 +918,13 @@
             // Get the division ID from the data attribute
             var main_id = $(this).data('id');
 
-            Swal.fire({
+            wisdomConfirm({
+                role: 'destructive',
                 title: 'Sure want to delete?',
                 text: 'This cannot be undone',
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonText: 'Yes',
-                cancelButtonText: 'No',
-                confirmButtonColor: "#DD6B55"
-             }).then((result) => {
+                confirmText: 'Yes',
+                cancelText: 'No'
+            }).then((result) => {
                 if (result.isConfirmed)
                 {
 
