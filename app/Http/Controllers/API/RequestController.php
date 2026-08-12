@@ -116,14 +116,16 @@ class RequestController extends Controller
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
         
-        // Guarantors and an amount only apply to monetary requests (Payroll
-        // Advance); letter-type requests such as Employment Verification
-        // Letter carry neither.
+        // Guarantors and an amount only apply to monetary requests (Salary
+        // Advance / Loan Request — the actual request_type values the app
+        // sends; 'Payroll Advance' here never matched anything real).
+        // Letter-type requests such as Employment Verification Letter
+        // carry neither.
         $validator = Validator::make($request->all(), [
             'request_type'                              =>  'required',
-            'guarantor_id'                              =>  'required_if:request_type,Payroll Advance|array',
+            'guarantor_id'                              =>  'required_if:request_type,Salary Advance,Loan Request|array',
             'guarantor_id.*'                            =>  'integer|exists:employees,id',
-            'request_amount'                            =>  'required_if:request_type,Payroll Advance',
+            'request_amount'                            =>  'required_if:request_type,Salary Advance,Loan Request',
             'currency'                                  =>  'nullable|in:MVR,USD',
             'priority'                                  =>  'required',
             'request_date'                              =>  'required',
@@ -177,6 +179,15 @@ class RequestController extends Controller
             // Mobile app posts the files as "attachments"; older builds used
             // the misspelled "attechments" key, so accept either.
             $attachmentFiles = $request->file('attachments') ?? $request->file('attechments');
+            // A failed upload (S3/storage error, bad file, etc.) was silently
+            // swallowed — the request still saved and returned "Request Send
+            // Successfully" with an empty attachments array, giving the app
+            // (and the employee) no indication their file never made it in.
+            // Surface it instead so the app can tell the user and let them
+            // retry, rather than only finding out later that the attachment
+            // is missing.
+            $attachmentUploadFailed = false;
+            $attachmentUploadError = null;
             if($attachmentFiles) {
                      $imagePaths = [];
                     foreach ($attachmentFiles as $file) {
@@ -184,6 +195,8 @@ class RequestController extends Controller
                         $status =   Common::AWSEmployeeFileUpload($this->resort_id,$file, $this->user->GetEmployee->Emp_id,$SubFolder,true);
 
                         if ($status['status'] == false) {
+                            $attachmentUploadFailed = true;
+                            $attachmentUploadError  = $status['msg'] ?? 'Attachment upload failed.';
                             break;
                         } else {
                             if($status['status'] == true && isset($status['Chil_file_id']) && !empty($status['Chil_file_id'])) {
@@ -213,7 +226,7 @@ class RequestController extends Controller
                         null,
                         null,
                         'Request',
-                        'A request has been sent by ' . $this->user->first_name . ' ' . $this->user->last_name . '.',
+                        'A ' . $request->request_type . ' request has been sent by ' . $this->user->first_name . ' ' . $this->user->last_name . '.',
                         'Request',
                         $hrEmployeeIds,
                         $PayrollAdvance->id,
@@ -226,7 +239,7 @@ class RequestController extends Controller
                 // in the loop up front — approval later routes through them
                 // anyway, so they should see the request the moment it lands,
                 // not only at their own approval step.
-                if ($request->request_type === 'Payroll Advance') {
+                if (in_array($request->request_type, ['Salary Advance', 'Loan Request'], true)) {
                     $financeEmployeeIds = Common::getResortFinanceEmployeeIds($this->resort_id);
                     if (!empty($financeEmployeeIds)) {
                         Common::sendMobileNotification(
@@ -235,7 +248,7 @@ class RequestController extends Controller
                             null,
                             null,
                             'Request',
-                            'An advance salary request has been sent by ' . $this->user->first_name . ' ' . $this->user->last_name . '.',
+                            'A ' . $request->request_type . ' request has been sent by ' . $this->user->first_name . ' ' . $this->user->last_name . '.',
                             'Request',
                             $financeEmployeeIds,
                             $PayrollAdvance->id,
@@ -248,14 +261,7 @@ class RequestController extends Controller
                     // (see AdvanceSalaryController::updateStatus / the
                     // rank_status column on the resort admin list) — GM is
                     // rank=8, not "XCOM".
-                    $gmEmployeeIds = \App\Models\Employee::where('resort_id', $this->resort_id)
-                        ->where('rank', 8)
-                        ->where(function ($q) {
-                            $q->whereNull('status')->orWhere('status', 'Active')->orWhere('status', 'Probationary');
-                        })
-                        ->pluck('id')
-                        ->map(fn($v) => (int) $v)
-                        ->all();
+                    $gmEmployeeIds = Common::getResortGmEmployeeIds($this->resort_id);
                     if (!empty($gmEmployeeIds)) {
                         Common::sendMobileNotification(
                             $this->resort_id,
@@ -263,7 +269,7 @@ class RequestController extends Controller
                             null,
                             null,
                             'Request',
-                            'An advance salary request has been sent by ' . $this->user->first_name . ' ' . $this->user->last_name . '.',
+                            'A ' . $request->request_type . ' request has been sent by ' . $this->user->first_name . ' ' . $this->user->last_name . '.',
                             'Request',
                             $gmEmployeeIds,
                             $PayrollAdvance->id,
@@ -287,7 +293,11 @@ class RequestController extends Controller
             $PayrollAdvance->attachments = $this->resolveAttachments($PayrollAdvance->PayrollAdvanceAttachment);
             return response()->json([
                 'success'                               =>  true,
-                'message'                               =>  "Request Send Successfully.",
+                'message'                               =>  $attachmentUploadFailed
+                                                                ? "Request Send Successfully, but your attachment could not be uploaded. Please try attaching it again."
+                                                                : "Request Send Successfully.",
+                'attachment_upload_failed'              =>  $attachmentUploadFailed,
+                'attachment_upload_error'               =>  $attachmentUploadFailed ? $attachmentUploadError : null,
                 'data'                                  =>  $PayrollAdvance
             ], 200);
 

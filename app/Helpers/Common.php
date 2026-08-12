@@ -43,6 +43,7 @@ use App\Models\ApplicantInterViewDetails;
 use URL;
 use App\Models\ManningResponse;
 use App\Models\JobAdvertisement;
+use App\Models\ResortSmtpConfig;
 use App\Models\PositionMonthlyData;
 use App\Models\DutyRoster;
 use App\Models\DutyRosterEntry;
@@ -1381,6 +1382,31 @@ class Common
             return rtrim($explicitUrl, '/') . '/' . ltrim($relPath, '/');
         }
         return \Storage::disk($driver)->url($relPath);
+    }
+
+    /**
+     * Which poster a specific vacancy should show: its own
+     * (job_advertisements.vacancy_id = $vacancyId), falling back to the
+     * resort-wide default (vacancy_id IS NULL — the only kind of row that
+     * existed before per-vacancy posters were added). Every
+     * grid/dashboard/modal that shows a vacancy's poster should call this
+     * instead of independently joining/fetching job_advertisements by
+     * Resort_id alone, which is what made every vacancy show the same
+     * poster in the first place.
+     */
+    public static function resolveVacancyPosterImage($resortId, $vacancyId)
+    {
+        $ad = JobAdvertisement::where('Resort_id', $resortId)
+            ->where('vacancy_id', $vacancyId)
+            ->first();
+
+        if (!$ad) {
+            $ad = JobAdvertisement::where('Resort_id', $resortId)
+                ->whereNull('vacancy_id')
+                ->first();
+        }
+
+        return self::GetJobAdvertisementImage($resortId, $ad->Jobadvimg ?? null);
     }
 
     public static function nofitication($resortid,$type,$Msgid= 0,$Budget_id=0,$other='',$sendto='',$moduleName="",$pageId=null)
@@ -2875,6 +2901,37 @@ class Common
 	}
 
 	/**
+	 * Single choke point every mail-sending path routes through: overrides
+	 * the smtp mailer + from-address with the resort's own SMTP config, if
+	 * one exists. No row for the resort = no-op, system default (.env)
+	 * stays in effect. Laravel resolves the smtp mailer transport lazily,
+	 * so calling this once before any Mail::send()/Mail::to() in the same
+	 * request/job is enough — no per-caller changes needed.
+	 */
+	public static function applyResortSmtpConfig($resortId)
+	{
+		if (empty($resortId)) {
+			return;
+		}
+
+		$config = ResortSmtpConfig::where('resort_id', $resortId)->first();
+
+		if (!$config) {
+			return;
+		}
+
+		config([
+			'mail.mailers.smtp.host' => $config->host,
+			'mail.mailers.smtp.port' => $config->port,
+			'mail.mailers.smtp.username' => $config->username,
+			'mail.mailers.smtp.password' => $config->password,
+			'mail.mailers.smtp.encryption' => $config->encryption,
+			'mail.from.address' => $config->from_address,
+			'mail.from.name' => $config->from_name,
+		]);
+	}
+
+	/**
      * Send email using a template */
 	public static function sendTemplateEmail($Module =null,$templateId, $recipientEmail, $dynamicData)
 	{
@@ -2888,6 +2945,7 @@ class Common
                 $body = self::replacePlaceholders($template->content, $dynamicData);
 
                 $subject = self::replacePlaceholders($template->subject, $dynamicData);
+                $resortId = $template->resort_id;
             }
             if($Module=="TalentAcquisition")
             {
@@ -2896,9 +2954,10 @@ class Common
                 $body = self::replacePlaceholders($template->MailTemplete, $dynamicData);
 
                 $subject = self::replacePlaceholders($template->MailSubject, $dynamicData);
+                $resortId = $template->Resort_id;
             }
 
-			TaEmailSent::dispatch($recipientEmail, $subject, ['mainbody' => $body]);
+			TaEmailSent::dispatch($recipientEmail, $subject, ['mainbody' => $body], $resortId ?? null);
 
 			return true;
 		} catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
@@ -4335,6 +4394,23 @@ class Common
     }
 
     /**
+     * Active GM (rank 8) employees in the resort. Mirrors getResortHrEmployeeIds/
+     * getResortFinanceEmployeeIds for fanning out approval-chain notifications
+     * (e.g. Salary Advance/Loan) to the GM as well as HR/Finance.
+     */
+    public static function getResortGmEmployeeIds($resortId)
+    {
+        return \App\Models\Employee::where('resort_id', $resortId)
+            ->where('rank', 8)
+            ->where(function ($q) {
+                $q->whereNull('status')->orWhere('status', 'Active')->orWhere('status', 'Probationary');
+            })
+            ->pluck('id')
+            ->map(fn($v) => (int) $v)
+            ->all();
+    }
+
+    /**
      * Position titles that grant full resort-wide visibility for Learning / Performance
      * modules. Treated equivalently to GM (rank 8) and super/master admin.
      * Update this list when product confirms additional leadership roles need
@@ -5360,39 +5436,41 @@ class Common
     }
 
     /**
-     * Shift-color CSS class for the createDuty-* indicator system used on
-     * the duty roster / attendance calendar views. The original inline
-     * version of this (duplicated across GetRosterdata/GetOverTime) only
-     * matched the literal names "First Shift"/"Second Shift"/"General
-     * Shift"/"Night Shift" — names that don't exist on resorts whose
-     * shifts are actually named "Morning Shift"/"Afternoon Shift"/"Evening
-     * Shift" (the common real-world case), so ShiftNameColor came back
-     * blank for them on every screen that used it, and GetAttandanceRegister
-     * (which feeds the mobile month-view calendar) never set it at all.
-     * Matches by keyword instead of exact string so real shift names
-     * resolve correctly.
+     * Shift color for the duty roster / attendance calendar views on
+     * mobile — the only consumer (GetRosterdata/GetOverTime/
+     * GetAttandanceRegister, all called exclusively from the API
+     * controller; no web controller references this). Originally returned
+     * a "createDuty-*" CSS class name, meaningless to the mobile app, and
+     * only recognised 4 keyword patterns — any custom/resort-specific
+     * shift name (e.g. "Dev test shift", "Asters Shift") fell through to
+     * '', so every custom-named shift looked identical (blank/default) on
+     * the app regardless of how many distinct shifts existed. Now always
+     * returns a real hex color: the 4 keyword patterns keep their
+     * original semantic colors, anything else gets a stable color hashed
+     * from the shift name — same name always maps to the same color, and
+     * different custom names spread across a wider palette instead of all
+     * collapsing to the same blank fallback.
      */
     public static function shiftNameColor(?string $shiftName): string
     {
-        // Only createDuty-blue/yellow/skyBlue/purple actually exist in
-        // default.css — the old code's "createDuty-green" for First Shift
-        // was a dead class reference (never styled).
         $name = strtolower((string) $shiftName);
+        if ($name === '') {
+            return '';
+        }
         if (str_contains($name, 'morning') || str_contains($name, 'first')) {
-            return 'createDuty-blue';
+            return '#3B82F6'; // blue
         }
         if (str_contains($name, 'afternoon') || str_contains($name, 'second')) {
-            return 'createDuty-yellow';
+            return '#EAB308'; // yellow
         }
         if (str_contains($name, 'evening') || str_contains($name, 'general')) {
-            return 'createDuty-skyBlue';
+            return '#38BDF8'; // sky blue
         }
         if (str_contains($name, 'night')) {
-            return 'createDuty-purple';
+            return '#A855F7'; // purple
         }
-        // Custom/unrecognised shift name (e.g. a one-off resort-specific
-        // shift) — no color guess better than a wrong one.
-        return '';
+        $palette = ['#EF4444', '#F97316', '#22C55E', '#14B8A6', '#6366F1', '#EC4899', '#84CC16', '#0EA5E9', '#F59E0B', '#8B5CF6'];
+        return $palette[crc32($name) % count($palette)];
     }
 
      public static function calculateEWT($taxableIncomeMVR)
@@ -7002,6 +7080,17 @@ class Common
                                                                     ? trim($employee->first_name . ' ' . $employee->last_name)
                                                                     : 'Someone';
 
+                                        // $payload->created_at is Announcement::getCreatedAtAttribute()'s
+                                        // already-formatted display string (e.g. "26/07/2026 03:20"),
+                                        // not the raw DB value — Carbon::parse() can't read d/m/Y and
+                                        // threw here, an uncaught error since the display string only
+                                        // gets built AFTER the constructor's format lookup succeeds.
+                                        // Same bug/fix already applied to the notification-bell
+                                        // renderer — use getRawOriginal() for a parseable timestamp.
+                                        $rawCreatedAt = method_exists($payload, 'getRawOriginal')
+                                            ? $payload->getRawOriginal('created_at')
+                                            : $payload->getOriginal('created_at');
+
                                         return [
                                             'id'            => $payload->id,
                                             'resortid'      => $payload->resort_id,
@@ -7010,7 +7099,7 @@ class Common
                                             'status'        => $payload->status,
                                             'module'        => 'Announcement Wish',
                                             'sendto'        => $payload->employee_id,
-                                            'created_at'    => Carbon::parse($payload->created_at)->format('d M Y h:i A')
+                                            'created_at'    => $rawCreatedAt ? Carbon::parse($rawCreatedAt)->format('d M Y h:i A') : ''
                                         ];
             });
 
@@ -7514,7 +7603,7 @@ class Common
             ]);
 
             $newUrl = StorageHelper::temporaryUrl($tempFilePath, 30);
-            if(empty($newUrl) && $$newUrl == null){
+            if (empty($newUrl)) {
                 return ['success' => false, 'NewURLshow' => null, 'mimeType' => null];
             }
             return [
@@ -8500,11 +8589,41 @@ class Common
     }
 
 
+    /**
+     * Department head resolution — rank 2 (HOD) first, falls back to rank 1
+     * (EXCOM) when the department has no HOD. Previously rank-2-only, which
+     * meant an EXCOM-only department had no resolvable department head at
+     * all: this is the actual write-path source of EmployeeResignation's
+     * hod_id, so that gap hard-blocked resignation submission (422 "No HOD
+     * configured") for anyone in such a department, and left every
+     * approval-flow step / notification fan-out built from this helper
+     * silently EXCOM-blind. Same return shape (single Employee|null) — no
+     * caller needs to change.
+     */
     public static function FindResortHODDepartment($resort_id,$department_id)
     {
-        //  currently getting a static rank based on resort HOD
-        $emp = Employee::where('resort_id',$resort_id)->where('Dept_id',$department_id)->where("rank",2)->first();
-        return  $emp;
+        $emp = Employee::where('resort_id',$resort_id)->where('Dept_id',$department_id)->where("rank",2)->where('status','Active')->first();
+        if ($emp) {
+            return $emp;
+        }
+        return Employee::where('resort_id',$resort_id)->where('Dept_id',$department_id)->where("rank",1)->where('status','Active')->first();
+    }
+
+    /**
+     * Every active HOD (rank 2) and EXCOM (rank 1) employee id in a
+     * department — for notification fan-outs / assignee-contact lists that
+     * need "everyone who counts as this department's head", not just one.
+     * Same shape as getResortHrEmployeeIds()/getResortFinanceEmployeeIds().
+     */
+    public static function getDepartmentApproverIds($resort_id, $department_id)
+    {
+        return Employee::where('resort_id', $resort_id)
+            ->where('Dept_id', $department_id)
+            ->whereIn('rank', [1, 2])
+            ->where('status', 'Active')
+            ->pluck('id')
+            ->map(fn($v) => (int) $v)
+            ->all();
     }
 
 

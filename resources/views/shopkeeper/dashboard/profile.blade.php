@@ -40,7 +40,7 @@
 
                             <div class="col-md-4">
                                 <label for="emp-grade-select" class="form-label">Email Id  </label>
-                                <input type="email" id="email" name="email" class="form-control" value="{{ old('email',isset($profile->email) ? $profile->email : '') }}"/>
+                                <input type="email" id="email" name="email" class="form-control" value="{{ old('email',isset($profile->email) ? $profile->email : '') }}" disabled readonly/>
                             </div>
                            
                             <div class="col-md-4">

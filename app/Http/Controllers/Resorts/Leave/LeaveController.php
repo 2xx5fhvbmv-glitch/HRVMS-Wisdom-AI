@@ -2066,18 +2066,15 @@ class LeaveController extends Controller
                         $approvalFlow->push($directReportingManager);
                         $approvalIds[] = $directReportingManager->id;
                     } else {
-                        // Fallback: find HOD of same department
+                        // Fallback: find HOD of same department, falling
+                        // back to EXCOM (rank 1) if the department has no
+                        // rank-2 employee.
                         $applicantDeptId = $applicantEmployee->Dept_id ?? null;
                         if (!$applicantDeptId) {
                             $applicantDeptId = Employee::where('id', $emp_id)->value('Dept_id');
                         }
-                        $hodApprover = Employee::select('id', 'rank', 'reporting_to')
-                            ->where('resort_id', $this->resort->resort_id)
-                            ->where('Dept_id', $applicantDeptId)
-                            ->where('rank', 2) // HOD
-                            ->where('id', '!=', $emp_id)
-                            ->first();
-                        if ($hodApprover && !in_array($hodApprover->id, $approvalIds)) {
+                        $hodApprover = Common::FindResortHODDepartment($this->resort->resort_id, $applicantDeptId);
+                        if ($hodApprover && $hodApprover->id != $emp_id && !in_array($hodApprover->id, $approvalIds)) {
                             $approvalFlow->push($hodApprover);
                             $approvalIds[] = $hodApprover->id;
                         }

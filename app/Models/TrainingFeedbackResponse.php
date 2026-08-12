@@ -13,6 +13,7 @@ class TrainingFeedbackResponse extends Model
     use HasFactory;
     protected $table="training_feedback_responses";
     public  $fillable = ['form_id','training_id','participant_id','responses'];
+    protected $casts = ['responses' => 'array'];
     public static function boot()
     {
         parent::boot();

@@ -44,6 +44,21 @@ class MaintananceContorller extends Controller
             'created_at' => now(),
             'updated_at' => now(),
         ]);
+
+        // Was DB-only — every one of this helper's callers got an in-app
+        // row but never a real push unless they separately (and only
+        // sometimes) fired one themselves. Centralized here so HR, the
+        // requester, and whoever it's forwarded/assigned to all get a real
+        // push consistently, not just an in-app row some of the time.
+        try {
+            $employee = Employee::find($userId);
+            $tokens = $employee ? Common::decodeDeviceTokens($employee->device_token) : [];
+            if (!empty($tokens)) {
+                Common::sendPushNotificationForMobile($tokens, $type, $message, 'Accommodation', null, null, null, null);
+            }
+        } catch (\Exception $e) {
+            \Log::warning('Accommodation push notification failed: ' . $e->getMessage());
+        }
     }
 
     public function __construct()
@@ -296,17 +311,12 @@ class MaintananceContorller extends Controller
             ]);
 
 
-            // Notify HOD and send push notification
+            // Notify HOD (createNotification() now sends the push too)
             try {
                 $mainRequest = MaintanaceRequest::find($task_id);
                 $this->createNotification($HOD_id, 'Maintenance Forwarded', 'A maintenance request has been forwarded to you: ' . ($mainRequest->descriptionIssues ?? ''), $task_id);
-
-                $hodEmployee = Employee::find($HOD_id);
-                if ($hodEmployee && $hodEmployee->device_token) {
-                    Common::sendPushNotificationForMobile([$hodEmployee->device_token], 'Maintenance Request Assigned', 'A maintenance request has been forwarded to you: ' . ($mainRequest->descriptionIssues ?? ''), 'Accommodation', 'Open', null, null, null);
-                }
             } catch (\Exception $e) {
-                \Log::warning('Push notification failed: ' . $e->getMessage());
+                \Log::warning('Notification failed: ' . $e->getMessage());
             }
 
             DB::commit();
@@ -1030,9 +1040,11 @@ class MaintananceContorller extends Controller
             }
         $page_title="On Hold Requests";
         $holdAjaxRoute = route('resort.accommodation.HoldMaintanaceRequest');
+        // HOD (2) and EXCOM (1) — this feeds an assignee dropdown, an
+        // EXCOM-headed department previously had no one to assign to here.
         $Employee =Employee::join('resort_admins','resort_admins.id',"=",'employees.Admin_Parent_id')
                             ->where('employees.resort_id', $this->resort->resort_id)
-                            ->where("employees.rank",2)
+                            ->whereIn("employees.rank",[1,2])
                             ->get(['employees.*','resort_admins.first_name','resort_admins.last_name']);
         return view('resorts.Accommodation.Maintanance.HoldMaintanaceRequest',compact('page_title','Employee','holdAjaxRoute'));
     }
@@ -1060,19 +1072,14 @@ class MaintananceContorller extends Controller
                     'date'=>date('Y-m-d'),
                 ]);
 
-                // Send push notification to assigned employee
+                // Notify assigned employee + requester (createNotification() now sends the push too)
                 try {
                     $mainRequest = MaintanaceRequest::find($task_id);
                     $this->createNotification($emp_id, 'Maintenance Assigned', 'You have been assigned a maintenance task: ' . ($mainRequest->descriptionIssues ?? ''), $task_id);
                     // Also notify the person who raised the request
                     $this->createNotification($mainRequest->Raised_By, 'Maintenance Update', 'Your maintenance request has been assigned to a technician.', $task_id);
-
-                    $assignedEmp = Employee::find($emp_id);
-                    if ($assignedEmp && $assignedEmp->device_token) {
-                        Common::sendPushNotificationForMobile([$assignedEmp->device_token], 'Maintenance Task Assigned', 'You have been assigned a maintenance task: ' . ($mainRequest->descriptionIssues ?? ''), 'Accommodation', 'Assigned', null, null, null);
-                    }
                 } catch (\Exception $e) {
-                    \Log::warning('Push notification failed: ' . $e->getMessage());
+                    \Log::warning('Notification failed: ' . $e->getMessage());
                 }
             }
             DB::commit();
@@ -1315,9 +1322,11 @@ class MaintananceContorller extends Controller
             }
         $page_title="On Hold Requests";
         $holdAjaxRoute = route('resort.accommodation.HODHoldMaintanaceRequest');
-                    $Employee =Employee::join('resort_admins','resort_admins.id',"=",'employees.Admin_Parent_id')
+                    // HOD (2) and EXCOM (1) — this feeds an assignee dropdown, an
+        // EXCOM-headed department previously had no one to assign to here.
+        $Employee =Employee::join('resort_admins','resort_admins.id',"=",'employees.Admin_Parent_id')
                             ->where('employees.resort_id', $this->resort->resort_id)
-                            ->where("employees.rank",2)
+                            ->whereIn("employees.rank",[1,2])
                             ->get(['employees.*','resort_admins.first_name','resort_admins.last_name']);
         return view('resorts.Accommodation.Maintanance.HoldMaintanaceRequest',compact('page_title','Employee','holdAjaxRoute'));
     }

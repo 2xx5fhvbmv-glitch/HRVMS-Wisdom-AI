@@ -39,9 +39,18 @@ class ShopController extends Controller
             $employeeId                                     =   $this->user->GetEmployee->id;
             $startOfMonth                                   =   Carbon::now()->startOfMonth();
             $endOfMonth                                     =   Carbon::now()->endOfMonth();
+            // consentRequestHandle() sets status to 'Consented' on approval,
+            // never 'Paid' ('Paid' is a separate, later payroll-settlement
+            // step HR does) — filtering on 'Paid' only meant an approved
+            // consent could never count as spent. Also scoped by
+            // purchased_date, so a purchase made one month but only
+            // consented to in a later month (a normal flow — consent isn't
+            // always same-day) never showed up in "this month's spend"
+            // either; updated_at (when the status actually flipped) is the
+            // correct anchor for "when did this become spend".
             $totalSpentThisMonth                            =   Payment::where('emp_id', $employeeId)
-                                                                    ->where('status','Paid')
-                                                                    ->whereBetween('purchased_date', [$startOfMonth, $endOfMonth])
+                                                                    ->whereIn('status', ['Consented', 'Paid', 'Partial Paid'])
+                                                                    ->whereBetween('updated_at', [$startOfMonth, $endOfMonth])
                                                                     ->sum('price'); // or ->sum('cash_paid') based on logic
             $pendingConsentThisMonth                        =   Payment::where('emp_id', $employeeId)
                                                                     ->where('status','Pending Consent')
@@ -55,7 +64,7 @@ class ShopController extends Controller
                                                                         'products.name as product_name',
                                                                         DB::raw('SUM(payments.price * payments.quantity) as total_spent')
                                                                     )
-                                                                    ->where('payments.status', 'Paid')
+                                                                    ->whereIn('payments.status', ['Consented', 'Paid', 'Partial Paid'])
                                                                     ->where('payments.emp_id', $employeeId)
                                                                     ->groupBy('payments.product_id', 'products.name', 'payments.emp_id')
                                                                     ->orderByDesc('total_spent')
@@ -259,11 +268,24 @@ class ShopController extends Controller
             $startOfMonth                                   =   Carbon::now()->startOfMonth();
             $endOfMonth                                     =   Carbon::now()->endOfMonth();
             $employeeId                                     =   $this->user->GetEmployee->id;
-            $consentHistoryList                             =   Payment::with(['shopKeeper:id,name','product:id,name'])
+            // Same fix as employeeDashboard(): consentRequestHandle() flips
+            // status on approve/reject, it doesn't touch purchased_date, so
+            // "this month" has to be measured by updated_at (when the
+            // consent decision happened), not purchased_date (when the item
+            // was bought) — a purchase from a prior month that gets
+            // consented this month was otherwise invisible here. Also
+            // selecting product.currency_type so history rows carry a
+            // currency like the dashboard's pending list does.
+            $consentHistoryList                             =   Payment::with(['shopKeeper:id,name','product:id,name,currency_type'])
                                                                     ->where('emp_id', $employeeId)
                                                                     ->whereIn('status', ['Consented', 'Rejected'])
-                                                                    ->whereBetween('purchased_date', [$startOfMonth, $endOfMonth])
-                                                                    ->get();
+                                                                    ->whereBetween('updated_at', [$startOfMonth, $endOfMonth])
+                                                                    ->orderBy('updated_at', 'DESC')
+                                                                    ->get()
+                                                                    ->map(function ($payment) {
+                                                                        $payment->currency = $payment->product->currency_type ?? 'USD';
+                                                                        return $payment;
+                                                                    });
 
             $response['status']                             =   true;
             $response['message']                            =   "Pending consents retrieved successfully.";

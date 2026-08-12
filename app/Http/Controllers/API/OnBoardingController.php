@@ -145,7 +145,9 @@ class OnBoardingController extends Controller
                                                                     ->join('resort_departments as rd', 'rd.id', '=', 'employees.Dept_id')
                                                                     ->where('employees.resort_id', $this->resort_id)
                                                                     ->where('employees.division_id', $employee->division_id)
-                                                                    ->where('employees.rank', 2)
+                                                                    // HOD (2) and EXCOM (1) — a division headed by EXCOM
+                                                                    // with no HOD showed no division head contact at all.
+                                                                    ->whereIn('employees.rank', [1, 2])
                                                                     ->select('employees.id', 'ra.first_name', 'ra.last_name', 'ra.personal_phone', 'ra.profile_picture', 'employees.Admin_Parent_id','rp.position_title','rd.name as department_name')                                                                                                               
                                                                     ->where('employees.status', 'Active')
                                                                     ->get()->map(function ($item) {

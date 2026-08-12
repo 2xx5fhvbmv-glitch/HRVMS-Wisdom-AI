@@ -21,6 +21,7 @@ use App\Models\Payment;
 use App\Models\Employee;
 use App\Models\Product;
 use App\Models\ResortNotification;
+use App\Models\Payroll;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\PaymentsExport;
 use SimpleSoftwareIO\QrCode\Facades\QrCode;
@@ -75,6 +76,16 @@ class PaymentController extends Controller
             // **Date Range Filter**
             if (!empty($startDate) && !empty($endDate)) {
                 $tableData->whereBetween('payments.purchased_date', [$startDate , $endDate ]);
+            } else {
+                // No explicit range picked yet — default to the resort's
+                // current payroll period instead of every purchase ever
+                // made (same fix as the Dashboard transactions table).
+                $currentPayroll = Payroll::where('resort_id', $this->shopkeeper->resort_id)
+                    ->orderBy('start_date', 'desc')
+                    ->first();
+                if ($currentPayroll) {
+                    $tableData->whereBetween('payments.purchased_date', [$currentPayroll->start_date, $currentPayroll->end_date]);
+                }
             }
             $tableData = $tableData->orderBy('payments.updated_at', 'DESC')
                 ->select([

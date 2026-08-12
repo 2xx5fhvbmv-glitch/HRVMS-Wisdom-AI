@@ -21,11 +21,12 @@ use Illuminate\Support\Facades\Route;
 	Route::post('login', [App\Http\Controllers\API\LoginController::class, 'apiLogin'])->name('api.resort.login');
 	Route::post('forgotpassword', [App\Http\Controllers\API\LoginController::class, 'apiForgotPassword'])->name('api.resort.forgotpassword');
 
-	Route::middleware('auth:api')->group(function () {
+	Route::middleware(['auth:api', 'applyResortSmtp'])->group(function () {
 
 		Route::get('on-boarding/get-onboarding-virtual-facility', [App\Http\Controllers\API\OnBoardingController::class, 'getOnboardingVirtualFacility']);
 
 		Route::post('add-device-token', [App\Http\Controllers\API\LoginController::class, 'addDeviceToken']);
+		Route::post('remove-device-token', [App\Http\Controllers\API\LoginController::class, 'removeDeviceToken']);
 		Route::post('logout', [App\Http\Controllers\API\LoginController::class, 'apiLogout'])->name('api.resort.logout');
 
 		//Employees
@@ -349,6 +350,7 @@ use Illuminate\Support\Facades\Route;
 		Route::post('incident/incident-calender', [App\Http\Controllers\API\IncidentController::class, 'incidentCalender']);
 		Route::get('incident/statement-request/{incident_id}', [App\Http\Controllers\API\IncidentController::class, 'getStatementRequest']);
 		Route::post('incident/incident-statement', [App\Http\Controllers\API\IncidentController::class, 'provideStatement']);
+			Route::get('incident/my-statements', [App\Http\Controllers\API\IncidentController::class, 'myStatements']);
 		Route::get('incident/insights/{incident_id}', [App\Http\Controllers\API\IncidentController::class, 'getPreventiveInsights']);
 
 		//calendar
@@ -378,6 +380,8 @@ use Illuminate\Support\Facades\Route;
 		Route::get('monthlycheckin/employee-monthly-dashboard', [App\Http\Controllers\API\MonthlyCheckInController::class, 'employeeMonthlyCheckinDashboard']);
 		Route::get('monthlycheckin/monthly-checkin-meeting-details/{meeting_id}', [App\Http\Controllers\API\MonthlyCheckInController::class, 'MonthlyCheckinMeetingDetails']);
 		Route::post('monthlycheckin/employee-confirm-meeting', [App\Http\Controllers\API\MonthlyCheckInController::class, 'employeeConfirmMeeting']);
+		Route::post('monthlycheckin/employee-approve-request', [App\Http\Controllers\API\MonthlyCheckInController::class, 'employeeApproveRequest']);
+		Route::post('monthlycheckin/employee-reject-request', [App\Http\Controllers\API\MonthlyCheckInController::class, 'employeeRejectRequest']);
 		Route::post('monthlycheckin/post-meeting-employee-comment', [App\Http\Controllers\API\MonthlyCheckInController::class, 'postMeetingEmployeeComment']);
 		Route::get('monthlycheckin/monthly-checkin-history', [App\Http\Controllers\API\MonthlyCheckInController::class, 'monthlyCheckInHistory']);
 
@@ -389,6 +393,8 @@ use Illuminate\Support\Facades\Route;
 		Route::post('grievance/informal-resolution', [App\Http\Controllers\API\GrievanceController::class, 'InformalResolution']);
 		Route::get('grievance/my-grievances', [App\Http\Controllers\API\GrievanceController::class, 'myGrievances']);
 		Route::post('grievance/identity-disclosure-respond', [App\Http\Controllers\API\GrievanceController::class, 'respondIdentityDisclosure']);
+		Route::get('grievance/witness-statement-request/{grievance_id}', [App\Http\Controllers\API\GrievanceController::class, 'witnessStatementRequest']);
+		Route::post('grievance/witness-statement', [App\Http\Controllers\API\GrievanceController::class, 'submitWitnessStatement']);
 		Route::get('grievance/{id}', [App\Http\Controllers\API\GrievanceController::class, 'grievanceDetail']);
 
 
@@ -525,8 +531,15 @@ use Illuminate\Support\Facades\Route;
 
 		Route::get('chat/view/{type}/{type_id}', [App\Http\Controllers\API\ChatBoat\ConversationController::class, 'chatView']);
 		Route::post('chat/send-message', [App\Http\Controllers\API\ChatBoat\ConversationController::class, 'sendMessage']);
-		Route::get('chat/get-messages/{type}/{type_id}', [App\Http\Controllers\API\ChatBoat\ConversationController::class, 'getMessages']);
+		Route::get('chat/get-messages/{type}/{type_id}', [App\Http\Controllers\API\ChatBoat\ConversationController::class, 'chatView']);
 		Route::get('chat/messages/mark-read', [App\Http\Controllers\API\ChatBoat\ConversationController::class, 'markAsRead']);
+
+		// Pusher private/presence channel auth for mobile (Passport/api guard) —
+		// the default Broadcast::routes() auth endpoint only works under the
+		// web/session guard, which mobile requests never carry.
+		Route::post('broadcasting/auth', function (\Illuminate\Http\Request $request) {
+			return \Illuminate\Support\Facades\Broadcast::auth($request);
+		});
 
 	});
 

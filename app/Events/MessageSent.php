@@ -5,12 +5,12 @@ use App\Models\Conversation;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PresenceChannel; 
-use Illuminate\Broadcasting\PrivateChannel;  
-use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
+use Illuminate\Broadcasting\PrivateChannel;
+use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 
 use Illuminate\Queue\SerializesModels;
 
-class MessageSent implements ShouldBroadcast
+class MessageSent implements ShouldBroadcastNow
 {
     use InteractsWithSockets, SerializesModels;
 
@@ -45,6 +45,7 @@ class MessageSent implements ShouldBroadcast
             'message' => $this->message->message,
             'type' => $this->message->type,
             'type_id' => $this->message->type_id,
+            'attachment' => $this->message->attachment,
             'created_at' => $this->message->created_at->toDateTimeString(),
         ];
     }

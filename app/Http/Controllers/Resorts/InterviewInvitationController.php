@@ -181,7 +181,7 @@ class InterviewInvitationController extends Controller
                 ";
             }
 
-            TaEmailSent::dispatch($interviewer->email, $subject, ['mainbody' => $body]);
+            TaEmailSent::dispatch($interviewer->email, $subject, ['mainbody' => $body], $interview->resort_id);
         } catch (\Exception $e) {
             \Log::warning("Failed to notify interviewer: " . $e->getMessage());
         }
@@ -230,7 +230,7 @@ class InterviewInvitationController extends Controller
                 <p>{$resortName}</p>
             ";
 
-            TaEmailSent::dispatch($applicant->email, $subject, ['mainbody' => $body]);
+            TaEmailSent::dispatch($applicant->email, $subject, ['mainbody' => $body], $interview->resort_id);
         } catch (\Exception $e) {
             \Log::warning("Failed to send meeting link to candidate: " . $e->getMessage());
         }

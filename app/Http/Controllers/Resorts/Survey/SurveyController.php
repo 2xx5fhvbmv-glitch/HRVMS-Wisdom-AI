@@ -301,9 +301,12 @@ class SurveyController extends Controller
             // initial create flow.
             $notifyParticipants = $request->Status === 'Publish';
             $notificationTitle = ' Survey Request';
-            $notificationMessage = "Survey  request for **'{$survey->Surevey_title}'** has been submitted for feedback.
-                                    **Dates:** {$startDate} to {$endDate}
-                                    **Please  participants.";
+            // Mobile notification bodies render as plain text, not markdown
+            // — **bold** syntax was showing up as literal asterisks on the
+            // notification list instead of being rendered.
+            $notificationMessage = "Survey request for '{$survey->Surevey_title}' has been submitted for feedback. "
+                . "Dates: {$startDate} to {$endDate}. "
+                . "Please participate in the survey. If you have already participated, kindly ignore this message.";
             foreach ($Emp_id as $e) {
                 $employeeId = (int) base64_decode($e);
                 if ($employeeId <= 0) continue;
@@ -488,9 +491,9 @@ class SurveyController extends Controller
                 
 
                 $notificationTitle = ' Survey Request';
-                $notificationMessage = "Survey  request for **'{$survey->Surevey_title}'** has been submitted for feedback.  
-                                        **Dates:** {$startDate} to {$endDate}  
-                                        **Please  participants.";
+                $notificationMessage = "Survey request for '{$survey->Surevey_title}' has been submitted for feedback. "
+                    . "Dates: {$startDate} to {$endDate}. "
+                    . "Please participate in the survey. If you have already participated, kindly ignore this message.";
         
                 $moduleName = "Survey";
                 foreach($Emp_id as $e)
@@ -583,7 +586,11 @@ class SurveyController extends Controller
                                 ->get(['t2.first_name','t2.last_name','t2.id as ParentId'] )
                                 ->map(function($i){
                                     $i->EmployeeName = ucfirst($i->first_name . ' ' .  $i->last_name);
-                                    $i->profileImg = Common::getResortUserPicture($i->Parentid);
+                                    // Same Parentid/ParentId casing typo as the mobile survey
+                                    // endpoint — always null, so every participant avatar
+                                    // silently fell back to the default placeholder (or
+                                    // rendered blank if that placeholder itself didn't load).
+                                    $i->profileImg = Common::getResortUserPicture($i->ParentId);
                                     return $i;
                                 });
 
@@ -760,27 +767,45 @@ class SurveyController extends Controller
     public function TotalApplicant($id)
     {
 
+        $surveyId = base64_decode($id);
+        $privacy = ParentSurvey::where('id', $surveyId)->value('survey_privacy_type');
+        $showRespondentIdentity = $this->canSeeRespondentIdentity($privacy);
+
         $parent = ParentSurvey::join('survey_employees as t1',"t1.Parent_survey_id","=","parent_surveys.id")
                     ->join('employees as t2',"t2.id","=","t1.Emp_id")
                     ->join('resort_admins as t3',"t3.id","=","t2.Admin_Parent_id")
-                    ->where("parent_surveys.id",base64_decode($id))
+                    ->where("parent_surveys.id",$surveyId)
                     ->where('parent_surveys.resort_id',$this->resort->resort_id)
 
-                    ->get(['t3.id as Parentid','t3.first_name','t3.last_name','t1.Emp_id'])
-                    ->map(function($ak){
+                    ->get(['t3.id as Parentid','t3.first_name','t3.last_name','t1.Emp_id','t1.emp_status'])
+                    ->values()
+                    ->map(function($ak, $idx) use ($showRespondentIdentity, $privacy){
 
-                        $ak->EmployeeName = ucfirst($ak->first_name . ' ' . $ak->last_name);
-                        $ak->profileImg = Common::getResortUserPicture($ak->Parentid);
+                        // Same masking as GetSurveyResults()/Result.blade —
+                        // was showing every assigned employee's real name
+                        // unconditionally, defeating Anonymous/Confidential
+                        // privacy for anyone who had already submitted.
+                        // Pending (not-yet-responded) participants still
+                        // show real names — chasing non-responders is a
+                        // legitimate need and doesn't leak who answered.
+                        if ($ak->emp_status === 'yes' && !$showRespondentIdentity) {
+                            $label = $privacy === 'Anonymous' ? 'Anonymous Respondent' : 'Confidential Respondent';
+                            $ak->EmployeeName = $label . ' #' . ($idx + 1);
+                            $ak->profileImg = asset('resorts_assets/images/user.svg');
+                        } else {
+                            $ak->EmployeeName = ucfirst($ak->first_name . ' ' . $ak->last_name);
+                            $ak->profileImg = Common::getResortUserPicture($ak->Parentid);
+                        }
                         return $ak;
                     });
 
-        $row='';    
+        $row='';
         if($parent->isNotEmpty())
         {
             foreach($parent as $p)
             {
 
-                
+
                     $row .='<div class="col-sm-6">
                                 <div class="d-flex align-items-center employee-name-box">
                                     <div class="img-box">
@@ -874,7 +899,14 @@ class SurveyController extends Controller
             ->addColumn('Action', function ($row) {
                 $id = base64_encode($row->id);
 
-                $view = route('Survey.view',$id);
+                // Every row on this list is Status='Complete' (see the
+                // whereIn above), so the results page is always the right
+                // destination — Survey.view only renders the question
+                // template, never the respondents/response-rate/answers,
+                // which is what "view responses" on a completed survey
+                // actually means. Matches what the dashboards' own "View
+                // Details" link already does (Survey.GetSurveyResults).
+                $view = route('Survey.GetSurveyResults',$id);
                             return '
                             <div  class="d-flex align-items-center">
                                 <a target="_blank" href="'.$view.'" class="btn-lg-icon icon-bg-skyblue"><i class="fa-regular fa-eye"></i></a>
@@ -990,9 +1022,9 @@ class SurveyController extends Controller
       
             $ParentSurvey = ParentSurvey::where('id', $id)->first();
             $notificationTitle = ' Survey Request';
-            $notificationMessage = "Survey request for **'{$ParentSurvey->Surevey_title}'** has been submitted for feedback.  
-                                    **Dates:** {$ParentSurvey->Start_date} to {$ParentSurvey->End_date}  
-                                    **Please participate in the survey. If you have already participated, kindly ignore this message.**";
+            $notificationMessage = "Survey request for '{$ParentSurvey->Surevey_title}' has been submitted for feedback. "
+                . "Dates: {$ParentSurvey->Start_date} to {$ParentSurvey->End_date}. "
+                . "Please participate in the survey. If you have already participated, kindly ignore this message.";
             
             $moduleName = "Survey";
             $SurveyEmployee = SurveyEmployee::where("Parent_survey_id",$ParentSurvey->id)->get();
@@ -1087,15 +1119,28 @@ class SurveyController extends Controller
             }
         }
 
-        $deadlineStart = Carbon::today()->format('Y-m-d');
+        // Was whereBetween(today, today+3) — a survey already past its
+        // deadline (e.g. the status-flip cron hasn't run yet, or it's still
+        // "OnGoing") fell out of the window entirely and never appeared
+        // here, even with participants who never responded. An overdue
+        // survey with pending participants is more urgent than one merely
+        // approaching its deadline, not less — only the upper bound (the
+        // "nearing" cutoff) makes sense as a limit here.
+        //
+        // Status also has to include 'Complete': SurveychangeStatus (the
+        // daily cron) flips Status to Complete the moment End_date passes,
+        // regardless of participation — so an actually-overdue survey is
+        // already 'Complete', not still 'OnGoing', by the time anyone
+        // looks at this page. Excluding it here is why expired surveys
+        // never showed up.
         $deadlineEnd = Carbon::today()->addDays(3)->format('Y-m-d');
 
         $ParentSurvey = ParentSurvey::join('survey_employees as t1', 't1.Parent_survey_id', '=', 'parent_surveys.id')
             ->join('employees as t2', 't2.id', '=', 't1.Emp_id')
             ->join('resort_admins as t3', 't3.id', '=', 't2.Admin_Parent_id')
             ->where('parent_surveys.resort_id', $this->resort->resort_id)
-            ->whereIn('parent_surveys.Status', ['Publish', 'OnGoing'])
-            ->whereBetween('parent_surveys.End_date', [$deadlineStart, $deadlineEnd])
+            ->whereIn('parent_surveys.Status', ['Publish', 'OnGoing', 'Complete'])
+            ->where('parent_surveys.End_date', '<=', $deadlineEnd)
             ->select(
                 'parent_surveys.id',
                 'parent_surveys.Status',
@@ -1214,7 +1259,7 @@ class SurveyController extends Controller
         $minutes = round(($totalHours - $hours) * 60);
         $formattedTime = sprintf('%02d hours %02d mins', $hours, $minutes);
 
-        $responseRate = ($TotalResponed  > 0) ? ($TotalResponed  / $Min_responsed) * 100 : 0;
+        $responseRate = ($TotalResponed  > 0) ? round(($TotalResponed  / $Min_responsed) * 100, 2) : 0;
    
         $privacy = $ParentSurvey->survey_privacy_type;
         $showRespondentIdentity = $this->canSeeRespondentIdentity($privacy);
@@ -1232,9 +1277,9 @@ class SurveyController extends Controller
                                                 $i->profileImg = Common::getResortUserPicture($i->ParentId);
                                             } else {
                                                 // Mask: stable per-row label, no real ID surfaced to the client.
-                                                $label = $privacy === 'Anonymous' ? 'Anonymous Respondent' : 'Confidential Respondent';
+                                                $label = $privacy === 'Anonymous' ? 'Anonymous' : 'Confidential';
                                                 $i->emp_id  = base64_encode('All'); // disable per-respondent export
-                                                $i->EmployeeName = $label . ' #' . ($idx + 1);
+                                                $i->EmployeeName = ($idx + 1) . ' ' . $label;
                                                 $i->profileImg = asset('resorts_assets/images/user.svg');
                                                 $i->first_name = $label;
                                                 $i->last_name = '';
@@ -1242,9 +1287,43 @@ class SurveyController extends Controller
                                             return $i;
                                         });
 
+        // Average score per Rating-type question, for the bar chart —
+        // real questions use a numeric scale (e.g. 0-10), not the 5-point
+        // Likert buckets the old disabled mockup assumed.
+        $ratingQuestions = SurveyQuestion::where('Parent_survey_id', $id)->where('type', 'Rating')->get();
+        $ratingChartLabels = [];
+        $ratingChartData = [];
+        foreach ($ratingQuestions as $q) {
+            $avg = SurveyResult::where('Parent_survey_id', $id)->where('Question_id', $q->id)->avg('Emp_Ans');
+            $ratingChartLabels[] = $q->Question_Text;
+            $ratingChartData[] = $avg !== null ? round((float) $avg, 2) : 0;
+        }
+
+        // Option-distribution for the doughnut — first question with a real
+        // option list (Multi-Choice/Checkbox/Dropdown), % of respondents
+        // picking each option.
+        $optionQuestion = SurveyQuestion::where('Parent_survey_id', $id)
+            ->whereNotNull('Total_Option_Json')
+            ->where('Total_Option_Json', '!=', '')
+            ->first();
+        $optionChartQuestion = null;
+        $optionChartLabels = [];
+        $optionChartData = [];
+        if ($optionQuestion) {
+            $options = json_decode($optionQuestion->Total_Option_Json, true) ?: [];
+            $answers = SurveyResult::where('Parent_survey_id', $id)->where('Question_id', $optionQuestion->id)->pluck('Emp_Ans');
+            $totalAnswers = $answers->count();
+            $optionChartQuestion = $optionQuestion->Question_Text;
+            foreach ($options as $opt) {
+                $count = $answers->filter(fn($a) => trim((string) $a) === trim((string) $opt))->count();
+                $optionChartLabels[] = $opt;
+                $optionChartData[] = $totalAnswers > 0 ? round(($count / $totalAnswers) * 100, 1) : 0;
+            }
+        }
+
         $page_title = "Survey Results";
         $id = base64_encode($id);
-        return  view('resorts.Survey.SurveyPages.Result',compact('id','page_title','ResponedEmp','responseRate','formattedTime','TotalResponed','ParentSurvey','showRespondentIdentity','privacy'));
+        return  view('resorts.Survey.SurveyPages.Result',compact('id','page_title','ResponedEmp','responseRate','formattedTime','TotalResponed','ParentSurvey','showRespondentIdentity','privacy','ratingChartLabels','ratingChartData','optionChartQuestion','optionChartLabels','optionChartData'));
 
     }
 
@@ -1289,7 +1368,7 @@ class SurveyController extends Controller
             $hours = floor($totalHours);
             $minutes = round(($totalHours - $hours) * 60);
   
-            $responseRate = ($TotalResponed  > 0) ? ($TotalResponed  / $Min_responsed) * 100 : 0;
+            $responseRate = ($TotalResponed  > 0) ? round(($TotalResponed  / $Min_responsed) * 100, 2) : 0;
             $surveyName =   ucfirst($ParentSurvey->Surevey_title)             ;
             $totalRespondents =  $TotalResponed ;
             $responseRate = $responseRate;

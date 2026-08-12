@@ -294,21 +294,21 @@ class BoardingPassController extends Controller
                     $passApprovalFlow->push($hrApprover); // Third approver: HR
                 }
 
-                // Add HOD to the approval flow (rank 2)
-                // Onboarding/inactive employees can carry a valid rank/dept
-                // (a placeholder record before onboarding completes), so an
-                // unfiltered, unordered first() could non-deterministically
-                // resolve one of those instead of the real active HOD —
-                // confirmed against real data where a department had 3
-                // rank=2 employees, only one of them Active.
-                $hodApprover                             =   Employee::select('id', 'rank')->where('rank', 2)->where('resort_id',$this->resort_id)->where('Dept_id', $employee->Dept_id)->where('status', 'Active')->orderBy('id')->first();
+                // Add department head to the approval flow — HOD (rank 2),
+                // falls back to EXCOM (rank 1) via FindResortHODDepartment()
+                // for departments with no rank-2 employee. That helper also
+                // already excludes inactive placeholder rows (onboarding
+                // records can carry a valid rank/dept before onboarding
+                // completes — confirmed against real data where a
+                // department had 3 rank=2 employees, only one Active).
+                $hodApprover                             =   Common::FindResortHODDepartment($this->resort_id, $employee->Dept_id);
                 if ($hodApprover ) {
                     $hodApprover->approver_role          =   'HOD';
                     $passApprovalFlow->push($hodApprover); // Second approver: HOD
                 }
 
                 // Add the same approval flow for Exit Pass as well
-                $passApprovalFlow->each(function($approver) use ($boardingPass) {
+                $passApprovalFlow->each(function($approver) use ($boardingPass, $employee) {
                     EmployeeTravelPassStatus::create([
                         'travel_pass_id'                =>  $boardingPass->id,
                         'approver_id'                   =>  $approver->id,
@@ -325,6 +325,21 @@ class BoardingPassController extends Controller
                     // already Approved, a silent HOD (never notified, never
                     // opened the app) meant the request could never progress
                     // far enough to appear on the web page either.
+                    //
+                    // When this step is the department HOD, also cc the
+                    // department's EXCOM — informational only, not a new
+                    // formal approval step (no extra EmployeeTravelPassStatus
+                    // row, Island Pass's fixed HOD→HR→SM step count
+                    // unchanged), per "XCOM should mirror HOD" notification
+                    // visibility requirement.
+                    $sendto = [$approver->id];
+                    if ($approver->approver_role === 'HOD') {
+                        $sendto = array_unique(array_merge(
+                            $sendto,
+                            Common::getDepartmentApproverIds($this->resort_id, $employee->Dept_id)
+                        ));
+                    }
+
                     Common::sendMobileNotification(
                         $this->resort_id,
                         2,
@@ -333,7 +348,7 @@ class BoardingPassController extends Controller
                         'Boarding Pass Request',
                         'A boarding pass request has been submitted by ' . $this->user->first_name . ' ' . $this->user->last_name . '.',
                         'Boarding Pass',
-                        [$approver->id],
+                        $sendto,
                         $boardingPass->id,
                         false,
                         'boarding-pass-request'
@@ -431,8 +446,18 @@ class BoardingPassController extends Controller
             $year                                   =   now()->year; // or Carbon::now()->year
             $currentRank                            =   $this->user->GetEmployee->rank;
 
+            // underEmp_id is the logged-in user's OWN org-chart subordinates
+            // (Common::getSubordinates($this->user->GetEmployee->id)) — right
+            // for a plain department HOD approving their own team, but wrong
+            // for a cross-department functional approver (HR resort-wide, or
+            // Security Manager as the final approval stage): the requesting
+            // employee belongs to some OTHER department, not the approver's
+            // own reporting tree, so this silently zeroed out every pending
+            // request for those roles. etps.approver_id already precisely
+            // scopes to exactly this approver's rows — that's the real
+            // authorization signal (matches boardingSecurityManagerDashboard(),
+            // which never had this extra restriction).
             $EmployeeTravelPass                     =  EmployeeTravelPass::join('employee_travel_pass_status as etps', 'etps.travel_pass_id', '=', 'employee_travel_passes.id')
-                                                            ->whereIn('employee_travel_passes.employee_id', $this->underEmp_id)
                                                             ->where('employee_travel_passes.resort_id', $this->resort_id)
                                                             ->where('etps.approver_id', $this->user->GetEmployee->id)
                                                             ->where('etps.approver_rank', $currentRank)
@@ -488,6 +513,11 @@ class BoardingPassController extends Controller
                                                                 return $row;
                                                             });
 
+            // Same underEmp_id problem as the count query above — replaced
+            // with the actual authorization signal (approver_id, not org
+            // hierarchy) so a cross-department approver (HR/SM) sees every
+            // request actually routed to them, not just ones from their own
+            // reporting tree.
             $EmployeeTravelPassReq                  =   EmployeeTravelPass::with([
                                                             'employeeTravelPassStatusData' => function($query) {
                                                                     $query->orderBy('id', 'desc');
@@ -501,10 +531,10 @@ class BoardingPassController extends Controller
                                                             'DepartureResortTransportation:id,resort_id,transportation_option',
                                                             'ArrivalResortTransportation:id,resort_id,transportation_option',
                                                             ])
-                                                            ->whereIn('employee_id', $this->underEmp_id)
                                                             ->where('resort_id', $this->resort_id)
                                                             ->whereHas('employeeTravelPassStatusData', function($q) use ($currentRank) {
-                                                                    $q->where('approver_rank', $currentRank)
+                                                                    $q->where('approver_id', $this->user->GetEmployee->id)
+                                                                    ->where('approver_rank', $currentRank)
                                                                     ->where('status', 'Pending');
                                                                 })
                                                             ->where('status', 'Pending')
@@ -964,6 +994,14 @@ class BoardingPassController extends Controller
                 'employee.position:id,position_title',
                 'DepartureResortTransportation:id,resort_id,transportation_option',
                 'ArrivalResortTransportation:id,resort_id,transportation_option',
+                // Assigned via manifestStore() — arrival_time/departure_time
+                // get copied onto this row directly, but transportation_mode/
+                // transportation_name only ever lived on the manifest row
+                // itself, linked via manifest_id. This view never loaded that
+                // relation, so a confirmed manifest's boat/vessel details
+                // never reached the employee's own pass detail screen even
+                // though the notification (and the time) went out correctly.
+                'manifest:id,transportation_mode,transportation_name,manifest_type,date,time',
             ])
                 ->where('resort_id', $this->resort_id)
                 ->where('id', $passId)
@@ -1014,6 +1052,20 @@ class BoardingPassController extends Controller
                 : '';
             $designation = ($emp && $emp->position) ? ($emp->position->position_title ?? '') : '';
 
+            // Manifest confirmation (boat/vessel name + mode) — only ever
+            // stored on the manifest row, surfaced here as its own object
+            // plus merged into the matching travel segment below so both a
+            // top-level lookup and the existing segment shape work.
+            $manifest = $EmployeeTravelPassView->manifest;
+            $manifestConfirmation = $manifest ? [
+                'manifest_id' => $manifest->id,
+                'manifest_type' => $manifest->manifest_type,
+                'transportation_mode' => $manifest->transportation_mode,
+                'transportation_name' => $manifest->transportation_name,
+                'date' => $manifest->date,
+                'time' => $manifest->time,
+            ] : null;
+
             $travelSegments = [];
             if ($EmployeeTravelPassView->departure_date && $EmployeeTravelPassView->DepartureResortTransportation) {
                 $travelSegments[] = [
@@ -1023,6 +1075,7 @@ class BoardingPassController extends Controller
                     'departure_time' => $EmployeeTravelPassView->departure_time,
                     'departure_date_display' => Carbon::parse($EmployeeTravelPassView->departure_date)->format('d M Y, D'),
                     'departure_time_display' => $EmployeeTravelPassView->departure_time ?? '—',
+                    'manifest_confirmation' => ($manifest && $manifest->manifest_type === 'departure') ? $manifestConfirmation : null,
                 ];
             }
             if ($EmployeeTravelPassView->arrival_date && $EmployeeTravelPassView->ArrivalResortTransportation) {
@@ -1033,6 +1086,7 @@ class BoardingPassController extends Controller
                     'arrival_time' => $EmployeeTravelPassView->arrival_time,
                     'departure_date_display' => Carbon::parse($EmployeeTravelPassView->arrival_date)->format('d M Y, D'),
                     'departure_time_display' => $EmployeeTravelPassView->arrival_time ?? '—',
+                    'manifest_confirmation' => ($manifest && $manifest->manifest_type === 'arrival') ? $manifestConfirmation : null,
                 ];
             }
 
@@ -1050,6 +1104,7 @@ class BoardingPassController extends Controller
                 ],
                 'travel_segments' => $travelSegments,
                 'reason' => $reason,
+                'manifest_confirmation' => $manifestConfirmation,
             ], $approvalFlowData, [
                 // Same Pending-only rule as boardingEmpDashboard's can_modify/
                 // can_cancel — Modify/Cancel must disappear once approved or
@@ -1263,8 +1318,10 @@ class BoardingPassController extends Controller
             $startDate                              =   Carbon::today();
             $endDate                                =   $filter === 'week' ? Carbon::today()->endOfWeek() : Carbon::today();
 
-            // Build query based on user rank
-            if($employee->rank == 2) {
+            // Build query based on user rank — HOD (2) and EXCOM (1) get the
+            // same department-scoped view; was HOD-only, so EXCOM fell into
+            // the narrower branch below.
+            if(in_array((int) $employee->rank, [1, 2])) {
                 $query                              =   EmployeeTravelPass::with([
                                                             'employee:id,Admin_Parent_id,Position_id',
                                                             'employee.resortAdmin:id,first_name,last_name,profile_picture',

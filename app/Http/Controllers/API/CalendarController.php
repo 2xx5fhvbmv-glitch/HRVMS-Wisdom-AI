@@ -8,6 +8,7 @@ use App\Models\ResortHoliday;
 use App\Models\Events;
 use App\Models\ChildEvents;
 use App\Models\Employee;
+use App\Models\ResortDepartment;
 use App\Models\ResortAdmin;
 use App\Models\EmployeeLeave;
 use App\Models\MonthlyCheckingModel;
@@ -185,7 +186,17 @@ class CalendarController extends Controller
         $user                                                   =   Auth::guard('api')->user();
         $employee                                               =   $user->GetEmployee;
         $emp_id                                                 =   $employee->id;
-      
+
+        // HR should see every event created, not just ones they're invited
+        // to — the events query below joins child_events (the invitee
+        // list) and filters to the current user, which is right for a
+        // regular employee but wrong for HR, who needs resort-wide
+        // visibility regardless of attendance.
+        $deptName                                              =   $employee->Dept_id
+                                                                        ? strtolower(trim(ResortDepartment::where('id', $employee->Dept_id)->value('name') ?? ''))
+                                                                        : '';
+        $isHR                                                  =   in_array($deptName, ['human resources', 'hr']);
+
         try{
             $data                                               =   $validator->validated();
 
@@ -217,11 +228,24 @@ class CalendarController extends Controller
                                                                         ->where('tp.employee_id', $emp_id)
                                                                         ->where('ts.status', 'Ongoing'),
 
-                'events'                                        =>  Events::join('child_events as ce', 'ce.event_id', '=', 'events.id')
-                                                                    ->where('events.status', '=', 'accept')
-                                                                    ->where('events.resort_id', $this->resort_id)
-                                                                    ->where('ce.employee_id', $emp_id)
-                                                                    ->select('events.*'),
+                'events'                                        =>  $isHR
+                                                                    ? Events::where('events.status', '=', 'accept')
+                                                                        ->where('events.resort_id', $this->resort_id)
+                                                                        ->select('events.*')
+                                                                        ->distinct()
+                                                                    // leftJoin (not join) + created_by OR — a creator who
+                                                                    // didn't add themselves to the invite list had no
+                                                                    // child_events row at all, so the inner join dropped
+                                                                    // their own event entirely from their own calendar.
+                                                                    : Events::leftJoin('child_events as ce', 'ce.event_id', '=', 'events.id')
+                                                                        ->where('events.status', '=', 'accept')
+                                                                        ->where('events.resort_id', $this->resort_id)
+                                                                        ->where(function ($q) use ($emp_id) {
+                                                                            $q->where('ce.employee_id', $emp_id)
+                                                                              ->orWhere('events.created_by', $emp_id);
+                                                                        })
+                                                                        ->select('events.*')
+                                                                        ->distinct(),
 
                 'employee_probation'                            =>  Employee::query()->where('resort_id', $this->resort_id)
                                                                     ->where('employment_type','Probationary')
@@ -1489,8 +1513,21 @@ class CalendarController extends Controller
             return response()->json(['success' => false, 'message' => 'Event not found.'], 404);
         }
 
+        // Same access rule as eventsCalender()'s list query (this is the
+        // sibling detail endpoint for the same feature, and had drifted
+        // from it): the creator can always see their own event, and HR has
+        // resort-wide visibility, regardless of whether either is an
+        // invited attendee. Was attendee-only here, so an HR user (or the
+        // creator, if they didn't self-invite) who could already see the
+        // event in their list got a 403 the moment they tapped it.
+        $deptName  = $this->reporting_to
+            ? strtolower(trim(\App\Models\ResortDepartment::where('id', Employee::where('id', $this->reporting_to)->value('Dept_id'))->value('name') ?? ''))
+            : '';
+        $isHR      = in_array($deptName, ['human resources', 'hr']);
+        $isCreator = (int) $event->created_by === (int) $this->reporting_to;
         $isInvited = ChildEvents::where('event_id', $event->id)->where('employee_id', $this->reporting_to)->exists();
-        if (!$isInvited) {
+
+        if (!$isInvited && !$isCreator && !$isHR) {
             return response()->json(['success' => false, 'message' => 'You do not have access to this event.'], 403);
         }
 

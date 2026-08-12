@@ -147,7 +147,7 @@ class OfferLetterResponseController extends Controller
                 <p>{$resortName}</p>
             ";
 
-            TaEmailSent::dispatch($applicant->email, $subject, ['mainbody' => $body]);
+            TaEmailSent::dispatch($applicant->email, $subject, ['mainbody' => $body], $offer->resort_id);
         } catch (\Exception $e) {
             \Log::warning("Failed to send offer letter email: " . $e->getMessage());
         }

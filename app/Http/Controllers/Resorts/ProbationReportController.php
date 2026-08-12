@@ -98,7 +98,14 @@ class ProbationReportController extends Controller
             ['filter' => 'position', 'name' => 'position', 'label' => 'Position', 'type' => 'select', 'placeholder' => 'All positions', 'options' => $positions->map(fn($p) => ['value' => $p->id, 'label' => $p->position_title])->all()],
             ['filter' => 'employee', 'name' => 'employee', 'label' => 'Employee Name', 'type' => 'select', 'placeholder' => 'All employees', 'options' => $employees->map(fn($e) => ['value' => $e->id, 'label' => $e->name])->all()],
             ['filter' => 'reporting_manager', 'name' => 'reporting_manager', 'label' => 'Reporting Manager', 'type' => 'select', 'placeholder' => 'All managers', 'options' => $managers->map(fn($m) => ['value' => $m->id, 'label' => $m->name])->all()],
-            ['filter' => 'probation_status', 'name' => 'probation_status', 'label' => 'Probation Status', 'type' => 'select', 'placeholder' => 'All statuses', 'options' => collect(['Active', 'Extended', 'Confirmed', 'Failed'])->map(fn($s) => ['value' => $s, 'label' => $s])->all()],
+            // Review Overdue is a derived status, not a real probation_status
+            // value — an employee stays 'Active'/'Extended' in the raw column
+            // indefinitely until HR actually completes the review, even long
+            // after their end date has passed (confirmed: real rows sit at
+            // -5000+ Days Remaining, still 'Active'). Filtering "Active"
+            // without this distinction returned every unreviewed employee
+            // regardless of how overdue they were.
+            ['filter' => 'probation_status', 'name' => 'probation_status', 'label' => 'Probation Status', 'type' => 'select', 'placeholder' => 'All statuses', 'options' => collect(['Active', 'Review Overdue', 'Extended', 'Confirmed', 'Failed'])->map(fn($s) => ['value' => $s, 'label' => $s])->all()],
             ['filter' => 'duration', 'name' => 'from_date', 'label' => 'From Date', 'type' => 'date'],
             ['filter' => 'duration', 'name' => 'to_date', 'label' => 'To Date', 'type' => 'date'],
         ];
@@ -227,14 +234,32 @@ class ProbationReportController extends Controller
         $rid = $this->resort->resort_id;
         $scoped = Common::getScopedDepartmentIds();
 
+        $today = Carbon::today();
+        // Same gap as upcomingProbationExpiry(): probation_end_date is
+        // frequently null (falls back to joining_date + 3 months, computed
+        // in PHP below) and, when set, is one day past what's displayed.
+        // Filtering From/To directly on the raw column dropped every row
+        // with no explicit end_date at all — real employees like DR-486/
+        // DR-28 have null probation_end_date and only ever matched via the
+        // PHP fallback, which the SQL-level date filter never saw — and
+        // off-by-one excluded rows landing exactly on the range boundary.
+        $displayEndExprForFilter = 'DATE_SUB(COALESCE(e.probation_end_date, DATE_ADD(e.joining_date, INTERVAL 3 MONTH)), INTERVAL 1 DAY)';
+
         $rows = $this->baseQuery($rid, $scoped)
-            ->whereIn('e.probation_status', ['Active', 'Extended'])
+            ->whereIn('e.probation_status', ['Active', 'Extended', 'Confirmed', 'Failed'])
+            // Same rule the live Probation page already applies: with
+            // neither probation_end_date nor joining_date set, there's no
+            // way to confirm the employee was ever actually on a probation
+            // window at all — these were showing up as "Active" with every
+            // date column 'N/A', despite having no real probation data.
+            ->where(function ($q) {
+                $q->whereNotNull('e.probation_end_date')->orWhereNotNull('e.joining_date');
+            })
             ->when($f['department'] ?? null, fn($q) => $q->where('e.Dept_id', $f['department']))
             ->when($f['position'] ?? null, fn($q) => $q->where('e.Position_id', $f['position']))
             ->when($f['reporting_manager'] ?? null, fn($q) => $q->where('e.reporting_to', $f['reporting_manager']))
-            ->when($f['probation_status'] ?? null, fn($q) => $q->where('e.probation_status', $f['probation_status']))
-            ->when($f['from_date'] ?? null, fn($q) => $q->whereDate('e.probation_end_date', '>=', $f['from_date']))
-            ->when($f['to_date'] ?? null, fn($q) => $q->whereDate('e.probation_end_date', '<=', $f['to_date']))
+            ->when($f['from_date'] ?? null, fn($q) => $q->whereRaw("$displayEndExprForFilter >= ?", [$f['from_date']]))
+            ->when($f['to_date'] ?? null, fn($q) => $q->whereRaw("$displayEndExprForFilter <= ?", [$f['to_date']]))
             ->orderBy('e.probation_end_date')
             ->get([
                 'e.id', 'e.Emp_id', 'e.joining_date', 'e.probation_end_date', 'e.probation_status',
@@ -242,7 +267,7 @@ class ProbationReportController extends Controller
                 'd.name as dept', 'p.position_title',
                 DB::raw("TRIM(CONCAT(COALESCE(rmra.first_name,''),' ',COALESCE(rmra.last_name,''))) as manager_name"),
             ])
-            ->map(function ($r) use ($rid) {
+            ->map(function ($r) use ($rid, $today) {
                 // employees.probation_end_date is frequently unset — same as
                 // People\Probation\ProbationController's list column, derive
                 // it as joining_date + 3 months when the explicit column is
@@ -250,6 +275,17 @@ class ProbationReportController extends Controller
                 $effectiveEnd = $r->probation_end_date
                     ?: ($r->joining_date ? Carbon::parse($r->joining_date)->addMonths(3)->format('Y-m-d') : null);
                 $days = $this->daysRemaining($effectiveEnd);
+
+                // 'Active'/'Extended' never auto-advances once the end date
+                // passes — HR has to explicitly review and confirm/fail the
+                // employee, and real data shows that often just doesn't
+                // happen for a long time (rows sitting at -5000+ Days
+                // Remaining, still 'Active'). Derive "Review Overdue"
+                // instead of reporting them as still Active.
+                $isOverdue = in_array($r->probation_status, ['Active', 'Extended'], true)
+                    && $effectiveEnd && Carbon::parse($effectiveEnd)->subDay()->lt($today);
+                $currentStatus = $isOverdue ? 'Review Overdue' : ($r->probation_status ?: 'N/A');
+
                 return [
                     'Employee ID'                => $r->Emp_id ?: 'N/A',
                     'Employee Name'              => trim($r->employee_name) ?: 'N/A',
@@ -263,9 +299,14 @@ class ProbationReportController extends Controller
                     'Onboarding Training Status' => $this->onboardingTrainingStatus($rid, $r->id),
                     'Monthly Check-in Status'    => $this->monthlyCheckinStatus($r->id),
                     'Probation Review Status'    => $r->probation_status ?: 'N/A',
-                    'Current Status'             => $r->probation_status ?: 'N/A',
+                    'Current Status'             => $currentStatus,
                 ];
-            })->values()->all();
+            })
+            // Filtering on the derived Current Status, not the raw column —
+            // picking "Active" must exclude Review Overdue rows, which the
+            // old SQL-level filter on e.probation_status couldn't do.
+            ->when($f['probation_status'] ?? null, fn($rows) => $rows->where('Current Status', $f['probation_status']))
+            ->values()->all();
 
         return [
             'columns' => ['Employee ID', 'Employee Name', 'Department', 'Position', 'Joining Date', 'Probation Start Date', 'Probation End Date', 'Days Remaining', 'Reporting Manager', 'Onboarding Training Status', 'Monthly Check-in Status', 'Probation Review Status', 'Current Status'],
@@ -286,14 +327,25 @@ class ProbationReportController extends Controller
         // alone excluded virtually every row — apply the same fallback via
         // SQL so the date-range filter matches what the live page shows.
         $effectiveEndExpr = 'COALESCE(e.probation_end_date, DATE_ADD(e.joining_date, INTERVAL 3 MONTH))';
+        // from_date/to_date are calendar dates the user typed, meaning "end
+        // date shown on screen" — but effectiveEndExpr is the raw
+        // end-EXCLUSIVE boundary (one day later than the displayed date, see
+        // probationEndDateLabel()). Comparing the user's range directly
+        // against the raw value silently excluded anyone whose displayed
+        // end date fell exactly on the range boundary (e.g. to_date=31 Aug
+        // excluded someone displayed as ending 31 Aug, because their raw
+        // value is 1 Sep). Only the user-facing range comparisons need the
+        // -1 day adjustment; the "today" floor and Days Remaining
+        // intentionally stay on the raw value per the existing design.
+        $displayEndExpr = "DATE_SUB($effectiveEndExpr, INTERVAL 1 DAY)";
 
         $rows = $this->baseQuery($rid, $scoped)
             ->whereIn('e.probation_status', ['Active', 'Extended'])
             ->whereRaw("$effectiveEndExpr >= ?", [$today->toDateString()])
-            ->whereRaw("$effectiveEndExpr <= ?", [$f['to_date'] ?? $defaultWindowEnd->toDateString()])
+            ->whereRaw("$displayEndExpr <= ?", [$f['to_date'] ?? $defaultWindowEnd->toDateString()])
             ->when($f['department'] ?? null, fn($q) => $q->where('e.Dept_id', $f['department']))
             ->when($f['reporting_manager'] ?? null, fn($q) => $q->where('e.reporting_to', $f['reporting_manager']))
-            ->when($f['from_date'] ?? null, fn($q) => $q->whereRaw("$effectiveEndExpr >= ?", [$f['from_date']]))
+            ->when($f['from_date'] ?? null, fn($q) => $q->whereRaw("$displayEndExpr >= ?", [$f['from_date']]))
             ->orderByRaw($effectiveEndExpr)
             ->get([
                 'e.Emp_id', 'e.joining_date', 'e.probation_end_date', 'e.probation_status',

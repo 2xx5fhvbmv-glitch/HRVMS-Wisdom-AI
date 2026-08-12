@@ -223,9 +223,20 @@
                                                             @endphp
                                                             <tr>
                                                                  <td>
-                                                                      <select class="form-select" aria-label="Default select example">
-                                                                           <option selected value="{{$month}}">{{ $month }}</option>
-                                                                      </select>
+                                                                      @if($value->status === 'Pending')
+                                                                           {{-- Still-unpaid installment — HR/Finance can move it to a
+                                                                                different upcoming month (e.g. April instead of March).
+                                                                                Server blocks picking a month another row already uses. --}}
+                                                                           <select class="form-select month-select" data-schedule-id="{{ $value->id }}" data-amount="{{ $value->amount }}" data-original="{{ $month }}" aria-label="Payroll month">
+                                                                                @foreach($availableMonths as $m)
+                                                                                     <option value="{{ $m }}" @if($m == $month) selected @endif>{{ $m }}</option>
+                                                                                @endforeach
+                                                                           </select>
+                                                                      @else
+                                                                           <select class="form-select" aria-label="Payroll month" disabled>
+                                                                                <option selected value="{{$month}}">{{ $month }}</option>
+                                                                           </select>
+                                                                      @endif
                                                                  </td>
                                                                  <td>{{ Common::formatRequestCurrency($value->amount, $advance_salary->currency ?: 'USD') }}</td>
                                                                  <td>
@@ -396,7 +407,49 @@
 @endsection
 
 @section('import-scripts')
-<script>  
+<script>
+$(document).on('change', '.month-select', function () {
+     let $select = $(this);
+     let newMonth = $select.val();
+     let previousMonth = $select.data('original');
+     if (newMonth === previousMonth) {
+          return;
+     }
+
+     $select.prop('disabled', true);
+     $.ajax({
+          url: "{{ route('people.advance-salary-repayment-tracker.update') }}",
+          type: 'POST',
+          data: {
+               _token: '{{ csrf_token() }}',
+               schedule_id: $select.data('schedule-id'),
+               repayment_date: newMonth,
+               amount: $select.data('amount'),
+          },
+          success: function (response) {
+               $select.prop('disabled', false);
+               if (response.success) {
+                    $select.data('original', newMonth);
+                    toastr.success(response.message, "Success", {
+                         positionClass: 'toast-bottom-right'
+                    });
+               } else {
+                    $select.val(previousMonth);
+                    toastr.error(response.message, "Error", {
+                         positionClass: 'toast-bottom-right'
+                    });
+               }
+          },
+          error: function () {
+               $select.prop('disabled', false);
+               $select.val(previousMonth);
+               toastr.error("Something went wrong while updating the repayment month.", "Error", {
+                    positionClass: 'toast-bottom-right'
+               });
+          }
+     });
+});
+
 $(document).ready(function () {
      $('#monthlyRepaymentForm').on('submit', function (e) {
           e.preventDefault();
