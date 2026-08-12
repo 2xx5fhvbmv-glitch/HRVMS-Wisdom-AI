@@ -4411,6 +4411,36 @@ class Common
     }
 
     /**
+     * Chat Module Group Admin check — the group's creator, OR (HR
+     * administrative override) any HR user (rank 3, or EXCOM/HOD inside the
+     * HR department) when the group was itself created by an HR user. Both
+     * HR HOD and HR XCOM can manage each other's HR-created groups, but get
+     * no special access to a group some other department created. Shared
+     * between ChatController (add/remove member, rename, delete) and
+     * ConversationController (chatView's "can I manage this group" flag).
+     */
+    public static function isChatGroupAdmin($group, $resort): bool
+    {
+        if ((int) $group->created_by === (int) $resort->id) {
+            return true;
+        }
+
+        $rank = (int) ($resort->GetEmployee->rank ?? 0);
+        $isActingHr = $rank === 3
+            || (in_array($rank, [1, 2], true) && self::isHRDepartment($resort->GetEmployee->Dept_id ?? null));
+        if (!$isActingHr) {
+            return false;
+        }
+
+        $creator = \App\Models\ResortAdmin::find($group->created_by);
+        $creatorEmployee = $creator->GetEmployee ?? null;
+        $creatorRank = (int) ($creatorEmployee->rank ?? 0);
+
+        return $creatorRank === 3
+            || (in_array($creatorRank, [1, 2], true) && self::isHRDepartment($creatorEmployee->Dept_id ?? null));
+    }
+
+    /**
      * Position titles that grant full resort-wide visibility for Learning / Performance
      * modules. Treated equivalently to GM (rank 8) and super/master admin.
      * Update this list when product confirms additional leadership roles need
