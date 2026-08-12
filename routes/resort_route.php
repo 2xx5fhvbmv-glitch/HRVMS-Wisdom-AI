@@ -2161,4 +2161,21 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
 
       Route::get('people/approvel','People\ApprovalController@getApprovedRequests')->name('people.approvel.index');
 
+      // Chat Module (web) — same controllers as the mobile 'api'-guard
+      // routes in routes/api.php; both constructors resolve $this->resort
+      // from either guard, so this is one conversation, reachable from
+      // either platform, not a parallel web-only chat system.
+      Route::get('chat/list', [\App\Http\Controllers\API\ChatBoat\ChatController::class, 'index'])->name('resort.chat.list');
+      Route::get('chat/start-new', [\App\Http\Controllers\API\ChatBoat\ChatController::class, 'newChat'])->name('resort.chat.newChat');
+      Route::get('chat/group-candidates', [\App\Http\Controllers\API\ChatBoat\ChatController::class, 'groupMemberCandidates'])->name('resort.chat.groupCandidates');
+      Route::post('chat/create-group', [\App\Http\Controllers\API\ChatBoat\ChatController::class, 'createGroupChat'])->name('resort.chat.createGroup');
+      Route::get('chat/group/{type_id}/new-member-list', [\App\Http\Controllers\API\ChatBoat\ChatController::class, 'newEmployeeList'])->name('resort.chat.newEmployeeList');
+      Route::post('chat/group/{type_id}/add-member', [\App\Http\Controllers\API\ChatBoat\ChatController::class, 'addMember'])->name('resort.chat.addMember');
+      Route::post('chat/group/{type_id}/remove-member', [\App\Http\Controllers\API\ChatBoat\ChatController::class, 'removeMember'])->name('resort.chat.removeMember');
+      Route::post('chat/group/{type_id}/update', [\App\Http\Controllers\API\ChatBoat\ChatController::class, 'updateGroup'])->name('resort.chat.updateGroup');
+      Route::post('chat/group/{type_id}/delete', [\App\Http\Controllers\API\ChatBoat\ChatController::class, 'deleteGroup'])->name('resort.chat.deleteGroup');
+      Route::get('chat/view/{type}/{type_id}', [\App\Http\Controllers\API\ChatBoat\ConversationController::class, 'chatView'])->name('resort.chat.view');
+      Route::post('chat/send', [\App\Http\Controllers\API\ChatBoat\ConversationController::class, 'sendMessage'])->name('resort.chat.send');
+      Route::post('chat/mark-read', [\App\Http\Controllers\API\ChatBoat\ConversationController::class, 'markAsRead'])->name('resort.chat.markRead');
+
   });

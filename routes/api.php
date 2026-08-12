@@ -524,10 +524,12 @@ use Illuminate\Support\Facades\Route;
 		Route::get('chat/faq-list', [App\Http\Controllers\API\ChatBoat\ChatController::class, 'faqList']);
 		Route::get('chat/start-new/chat', [App\Http\Controllers\API\ChatBoat\ChatController::class, 'newChat']);
 		Route::get('group/new-employee/list/{type_id}', [App\Http\Controllers\API\ChatBoat\ChatController::class, 'newEmployeeList']);
+		Route::get('group/new-group-member/list', [App\Http\Controllers\API\ChatBoat\ChatController::class, 'groupMemberCandidates']);
 		Route::post('create/group-chat', [App\Http\Controllers\API\ChatBoat\ChatController::class, 'createGroupChat']);
 		Route::post('group/add-member/{type_id}', [App\Http\Controllers\API\ChatBoat\ChatController::class, 'addMember']);
 		Route::post('group/remove-member/{type_id}', [App\Http\Controllers\API\ChatBoat\ChatController::class, 'removeMember']);
 		Route::post('group/remove/{type_id}', [App\Http\Controllers\API\ChatBoat\ChatController::class, 'deleteGroup']);
+		Route::post('group/update/{type_id}', [App\Http\Controllers\API\ChatBoat\ChatController::class, 'updateGroup']);
 
 		Route::get('chat/view/{type}/{type_id}', [App\Http\Controllers\API\ChatBoat\ConversationController::class, 'chatView']);
 		Route::post('chat/send-message', [App\Http\Controllers\API\ChatBoat\ConversationController::class, 'sendMessage']);
