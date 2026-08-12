@@ -96,10 +96,10 @@
 
         <div class="wai-suggestions" id="wai-suggestions"></div>
 
-        <form class="wai-input" id="wai-form" autocomplete="off">
+        <div class="wai-input" id="wai-form">
             <textarea id="wai-text" rows="1" placeholder="Ask Wisdom AI…" maxlength="2000"></textarea>
-            <button type="submit" id="wai-send" aria-label="Send"><i class="fa-solid fa-paper-plane"></i></button>
-        </form>
+            <button type="button" id="wai-send" aria-label="Send"><i class="fa-solid fa-paper-plane"></i></button>
+        </div>
         <div class="wai-foot">Wisdom AI can make mistakes. Verify important HR decisions.</div>
     </div>
 
@@ -162,14 +162,14 @@
                 </div>
             </div>
             <div class="wai-messages" id="uc-messages"></div>
-            <form class="wai-input uc-thread-input" id="uc-send-form" autocomplete="off" enctype="multipart/form-data">
+            <div class="wai-input uc-thread-input" id="uc-send-form">
                 <label class="uc-attach-btn" title="Attach a photo or file">
                     <input type="file" id="uc-attachment" accept=".jpg,.jpeg,.png,.pdf,.doc,.docx,.xls,.xlsx" hidden>
                     <i class="fa-solid fa-paperclip"></i>
                 </label>
                 <textarea id="uc-text" rows="1" placeholder="Message…" maxlength="2000"></textarea>
-                <button type="submit" id="uc-send" aria-label="Send"><i class="fa-solid fa-paper-plane"></i></button>
-            </form>
+                <button type="button" id="uc-send" aria-label="Send"><i class="fa-solid fa-paper-plane"></i></button>
+            </div>
             <div class="uc-attach-preview" id="uc-attach-preview" style="display:none;"></div>
         </div>
 
@@ -314,19 +314,29 @@
 }
 .wai-chip:hover { background: var(--wai-grad-soft); color: #fff; border-color: transparent; }
 
-/* Input */
-.wai-input { display: flex; align-items: flex-end; gap: 8px; padding: 10px 12px 6px; background: #f7f7fb; }
-#wai-text {
-    flex: 1; resize: none; border: 1px solid #d8e2de; border-radius: 14px; padding: 10px 13px;
-    font-size: 14px; max-height: 110px; outline: none; background: #fff; color: #25243a; line-height: 1.4;
+/* Input — shared pill bar for both the AI panel and the Users chat panel */
+.wai-input {
+    display: flex; align-items: flex-end; gap: 9px; padding: 10px 12px 12px; background: #f7f7fb;
 }
-#wai-text:focus { border-color: #1c7c81; box-shadow: 0 0 0 3px rgba(28,124,129,.18); }
-#wai-send {
-    width: 42px; height: 42px; flex: 0 0 42px; border: none; border-radius: 13px; cursor: pointer;
-    background: var(--wai-send); color: #0b2e37; font-size: 16px; transition: transform .15s, opacity .15s;
+#wai-text, #uc-text {
+    flex: 1; resize: none; border: 1.5px solid #e1e6f0; border-radius: 22px; padding: 11px 17px;
+    font-size: 14px; max-height: 110px; outline: none; background: #fff; color: #25243a; line-height: 1.45;
+    box-shadow: 0 1px 3px rgba(30,12,80,.04);
+    transition: border-color .15s ease, box-shadow .15s ease;
 }
-#wai-send:hover { transform: scale(1.06); }
-#wai-send:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+#wai-text::placeholder, #uc-text::placeholder { color: #a6a2b8; }
+#wai-text:focus, #uc-text:focus { border-color: #1c7c81; box-shadow: 0 0 0 3px rgba(28,124,129,.16); }
+#wai-send, #uc-send {
+    width: 44px; height: 44px; flex: 0 0 44px; border: none; border-radius: 50%; cursor: pointer;
+    background: var(--wai-send); color: #0b2e37; font-size: 16px;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 14px rgba(170,207,0,.45);
+    transition: transform .15s ease, box-shadow .15s ease, opacity .15s ease;
+}
+#wai-send i, #uc-send i { transform: translateX(-1px); }
+#wai-send:hover, #uc-send:hover { transform: translateY(-1px) scale(1.05); box-shadow: 0 6px 18px rgba(170,207,0,.55); }
+#wai-send:active, #uc-send:active { transform: scale(.96); }
+#wai-send:disabled, #uc-send:disabled { opacity: .45; cursor: not-allowed; transform: none; box-shadow: none; }
 .wai-foot { text-align: center; font-size: 10.5px; color: #a09ab5; padding: 0 12px 10px; }
 
 @media (max-width: 480px) {
@@ -613,7 +623,12 @@
     document.addEventListener('wai:open-ai', openPanel);
     closeBtn.addEventListener('click', closePanel);
     clearBtn.addEventListener('click', clearChat);
-    form.addEventListener('submit', function (e) { e.preventDefault(); sendMessage(); });
+    // Send button and Enter-key both call sendMessage() directly — no
+    // <form> submit involved, so this can't be swallowed or redirected by
+    // an ancestor form elsewhere on the page (the wai-input/uc-send-form
+    // wrappers were plain <form> elements nested inside the page's other
+    // forms, which is invalid HTML the browser is free to reparse/ignore).
+    sendBtn.addEventListener('click', sendMessage);
     input.addEventListener('input', autoGrow);
     input.addEventListener('keydown', function (e) {
         if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
@@ -677,9 +692,62 @@
     var state = { pickerMode: 'chat', selected: {}, current: null };
     var pendingAttachment = null;
     var convCache = [];
+    var subscribedChannels = {};
 
     function showView(v) {
         [viewList, viewPicker, viewThread, viewInfo].forEach(function (el) { el.style.display = (el === v) ? 'flex' : 'none'; });
+    }
+
+    // ---- Realtime (Pusher via the window.Echo shim in partials.pusher-init) ----
+    // My own private channel covers every 1-1 message sent TO me; each group
+    // I'm in needs its own presence-channel subscription (joined lazily as
+    // groups show up in the conversation list, same "join on load" pattern
+    // the resort-online presence roster already uses elsewhere).
+    function handleIncomingMessage(data) {
+        if (parseInt(data.sender_id, 10) === MY_ID) return; // echo of my own send
+        var open = state.current;
+        var forOpenThread = open && data.type === open.type && String(data.type_id) === String(
+            open.type === 'individual' ? MY_ID : open.id
+        ) && (open.type === 'group' ? true : parseInt(data.sender_id, 10) === parseInt(open.id, 10));
+        if (forOpenThread && ucPanel.classList.contains('wai-open')) {
+            // Re-fetch rather than append the raw broadcast payload — the
+            // attachment path in the socket event isn't resolved to a real
+            // URL (only the REST endpoints do that), so a re-fetch is the
+            // simplest correct way to render it.
+            loadThread();
+        } else if (ucPanel.classList.contains('wai-open') && viewList.style.display !== 'none') {
+            loadConversations();
+        }
+        if (window.playChatPing) window.playChatPing();
+    }
+
+    function subscribeRealtime() {
+        if (!window.Echo || !MY_ID) return;
+        var myChannel = 'chat.' + MY_ID;
+        if (!subscribedChannels[myChannel]) {
+            subscribedChannels[myChannel] = true;
+            window.Echo.private(myChannel).listen('MessageSent', handleIncomingMessage);
+        }
+    }
+    function subscribeToGroups(list) {
+        if (!window.Echo) return;
+        list.forEach(function (c) {
+            if (c.type !== 'group') return;
+            var name = 'group.' + c.id;
+            if (subscribedChannels[name]) return;
+            subscribedChannels[name] = true;
+            window.Echo.join(name).listen('MessageSent', handleIncomingMessage);
+        });
+    }
+    // partials.pusher-init (which defines window.Echo) is included in
+    // resorts.layouts.js — loaded AFTER resorts.layouts.footer (this
+    // widget) in the page layout, so window.Echo doesn't exist yet at this
+    // point in document order. DOMContentLoaded fires once every
+    // synchronous script — including the later one — has run.
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', subscribeRealtime);
+    } else {
+        subscribeRealtime();
     }
 
     // ---- Launcher chooser --------------------------------------------------
@@ -720,6 +788,7 @@
             .then(function (data) {
                 convCache = (data && data.chats) ? data.chats : [];
                 renderConversations(convCache);
+                subscribeToGroups(convCache);
             })
             .catch(function () { document.getElementById('uc-conversations').innerHTML = '<div class="uc-empty">Couldn\'t load conversations.</div>'; });
     }
@@ -936,8 +1005,16 @@
         });
     });
 
-    document.getElementById('uc-send-form').addEventListener('submit', function (e) {
-        e.preventDefault();
+    var ucTextEl = document.getElementById('uc-text');
+    ucTextEl.addEventListener('input', function () {
+        this.style.height = 'auto'; this.style.height = Math.min(this.scrollHeight, 110) + 'px';
+    });
+    ucTextEl.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendUsersChatMessage(); }
+    });
+    document.getElementById('uc-send').addEventListener('click', sendUsersChatMessage);
+
+    function sendUsersChatMessage() {
         var textEl = document.getElementById('uc-text');
         var text = textEl.value.trim();
         if (!text && !pendingAttachment) return;
@@ -961,7 +1038,7 @@
                 }
             })
             .catch(function () { toastrOrAlert('Network error. Please try again.'); });
-    });
+    }
 
     // ---- Group info -------------------------------------------------------------
     document.getElementById('uc-thread-info').addEventListener('click', function () { showView(viewInfo); renderGroupInfo(); });

@@ -5,13 +5,18 @@ use Illuminate\Support\Facades\Artisan;
 
 use Illuminate\Support\Facades\Broadcast;
 
-Route::post('/broadcasting/auth', function () {
-    \Log::info('AUTH DEBUG', [
-        'resort_admin' => Auth::guard('resort-admin')->user(),
-        'default' => Auth::user(),
-        'session' => session()->all(),
-    ]);
-    return Broadcast::auth(request());
+// Broadcast::auth() resolves the channel-authorization user via the
+// request's DEFAULT guard ($request->user()) — resort-admin logins never
+// touch the 'web' guard at all, so every private/presence channel
+// subscription from the web portal (Chat Module, etc.) was silently
+// failing auth here. shouldUse() makes 'resort-admin' the default guard
+// for the rest of this request, matching how the resort-admin session
+// middleware group already behaves elsewhere.
+Route::post('/broadcasting/auth', function (\Illuminate\Http\Request $request) {
+    if (Auth::guard('resort-admin')->check()) {
+        Auth::shouldUse('resort-admin');
+    }
+    return Broadcast::auth($request);
 });
 /*
 |--------------------------------------------------------------------------

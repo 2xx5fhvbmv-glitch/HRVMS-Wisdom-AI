@@ -29,9 +29,21 @@
     Pusher.logToConsole = true;
     @endif
 
+    var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
+
     var pusher = new Pusher(@json(env('PUSHER_APP_KEY')), {
         cluster: @json(env('PUSHER_APP_CLUSTER')),
-        forceTLS: true
+        forceTLS: true,
+        // Private/presence channels (Chat Module 1-1 + group threads) need
+        // this to reach routes/web.php's /broadcasting/auth — without it
+        // pusher-js falls back to the classic /pusher/auth default, which
+        // doesn't exist in this app, and the subscription just silently
+        // never completes.
+        channelAuthorization: {
+            endpoint: '/broadcasting/auth',
+            transport: 'ajax',
+            headers: { 'X-CSRF-TOKEN': csrfToken }
+        }
     });
 
     pusher.connection.bind('connected', function () {
@@ -41,13 +53,16 @@
         console.warn('[pusher-shim] connection error', err);
     });
 
-    function makeChannel(name) {
-        var ch = pusher.subscribe(name);
+    // subscribeName is the RAW pusher-js channel name actually subscribed to
+    // (i.e. already carrying the private-/presence- prefix, if any);
+    // logName is what callers passed in, kept for readable console logs.
+    function wrapChannel(subscribeName, logName) {
+        var ch = pusher.subscribe(subscribeName);
         ch.bind('pusher:subscription_succeeded', function () {
-            console.log('[pusher-shim] subscribed to ' + name);
+            console.log('[pusher-shim] subscribed to ' + logName);
         });
         ch.bind('pusher:subscription_error', function (status) {
-            console.warn('[pusher-shim] subscription_error on ' + name, status);
+            console.warn('[pusher-shim] subscription_error on ' + logName, status);
         });
         return {
             listen: function (eventName, cb) {
@@ -60,14 +75,14 @@
                     if (boundEvent.indexOf('pusher') === 0) return;
                     var leaf = boundEvent.replace(/^\./, '').split('\\').pop();
                     if (leaf === eventName) {
-                        console.log('[pusher-shim] event ' + boundEvent + ' on ' + name);
+                        console.log('[pusher-shim] event ' + boundEvent + ' on ' + logName);
                         cb(data);
                     }
                 });
                 return this;
             },
             stopListening: function () {
-                pusher.unsubscribe(name);
+                pusher.unsubscribe(subscribeName);
                 return this;
             }
         };
@@ -75,11 +90,13 @@
 
     window.Echo = {
         __shim: true,
-        channel: makeChannel,
-        // Private/presence channels need /broadcasting/auth wiring; the
-        // chat module currently uses public channels, so route private()
-        // through the same path as a fallback.
-        private: makeChannel,
+        // Public channel — no auth prefix, no handshake. Used as-is by
+        // admin/resort support chat and the resort event feed.
+        channel: function (name) { return wrapChannel(name, name); },
+        // PrivateChannel (Chat Module 1-1 threads: 'chat.{id}').
+        private: function (name) { return wrapChannel('private-' + name, name); },
+        // PresenceChannel (Chat Module group threads: 'group.{id}').
+        join: function (name) { return wrapChannel('presence-' + name, name); },
         connector: { pusher: pusher }
     };
 
