@@ -172,7 +172,15 @@ return [
          */
         App\Providers\AppServiceProvider::class,
         App\Providers\AuthServiceProvider::class,
-        // App\Providers\BroadcastServiceProvider::class,
+        // Disabled since before this repo's history begins (baked into the
+        // original scaffold) — without it, Broadcast::routes() never runs
+        // and routes/channels.php's Broadcast::channel() authorizers
+        // (chat.{id}, group.{id}, etc.) never register at all, so every
+        // private/presence channel subscription 403s with no matching
+        // channel definition, regardless of any guard fix on the auth
+        // route itself. This is the root cause of realtime chat delivery
+        // never working.
+        App\Providers\BroadcastServiceProvider::class,
         App\Providers\EventServiceProvider::class,
         App\Providers\RouteServiceProvider::class,
         Yajra\DataTables\DataTablesServiceProvider::class,
