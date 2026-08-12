@@ -21,7 +21,13 @@ class ChatController extends Controller
      protected $resort;
     public function __construct()
     {
-        $this->resort = Auth::guard('api')->user();
+        // Mobile hits these routes on the Passport-token 'api' guard, the
+        // web portal on the session 'resort-admin' guard — both providers
+        // resolve to the same resort_admins table (config/auth.php), so
+        // this is genuinely one identity, one set of conversations, just
+        // reached two ways (Chat Module spec §1/§8: same login, same chat
+        // identity on both platforms).
+        $this->resort = Auth::guard('api')->user() ?: Auth::guard('resort-admin')->user();
     }
 
 // In this controller, we are using the ResortAdmin table's ID, not the Employee table's ID,
@@ -244,7 +250,7 @@ class ChatController extends Controller
           if (!$group) {
                return response()->json(['success' => false, 'message' => 'Group not found'], 404);
           }
-          if (!$this->isGroupAdmin($group, $resort)) {
+          if (!Common::isChatGroupAdmin($group, $resort)) {
                return response()->json(['success' => false, 'message' => 'You are not authorized to delete this group'], 403);
           }
           try {
@@ -278,7 +284,7 @@ class ChatController extends Controller
                if (!$group) {
                     return response()->json(['success' => false, 'message' => 'Group not found'], 404);
                }
-               if (!$this->isGroupAdmin($group, $resort)) {
+               if (!Common::isChatGroupAdmin($group, $resort)) {
                     return response()->json(['success' => false, 'message' => 'You are not authorized to manage this group.'], 403);
                }
 
@@ -326,7 +332,7 @@ class ChatController extends Controller
                if (!$group) {
                     return response()->json(['success' => false, 'message' => 'Group not found'], 404);
                }
-               if (!$this->isGroupAdmin($group, $resort)) {
+               if (!Common::isChatGroupAdmin($group, $resort)) {
                     return response()->json(['success' => false, 'message' => 'You are not authorized to manage this group.'], 403);
                }
 
@@ -377,7 +383,7 @@ class ChatController extends Controller
                     return response()->json(['success' => false, 'message' => 'Group not found'], 404);
 
                }
-               if (!$this->isGroupAdmin($group, $resort)) {
+               if (!Common::isChatGroupAdmin($group, $resort)) {
                     return response()->json(['success' => false, 'message' => 'You are not authorized to manage this group.'], 403);
                }
                $member = GroupChatMember::where('chat_group_id', $group->id)
@@ -467,34 +473,6 @@ class ChatController extends Controller
      }
 
      /**
-      * Group Admin = the creator, OR — HR administrative override — any HR
-      * user (rank 3, or EXCOM/HOD inside the HR department) when the group
-      * was itself created by an HR user. Both HR HOD and HR XCOM can manage
-      * each other's HR-created groups regardless of who created it.
-      */
-     private function isGroupAdmin(GroupChat $group, $resort)
-     {
-          if ((int) $group->created_by === (int) $resort->id) {
-               return true;
-          }
-
-          $actingPermission = $this->resolveChatGroupPermission($resort);
-          $isActingHr = (int) ($resort->GetEmployee->rank ?? 0) === 3
-               || (in_array((int) ($resort->GetEmployee->rank ?? 0), [1, 2], true) && Common::isHRDepartment($resort->GetEmployee->Dept_id ?? null));
-          if (!$isActingHr) {
-               return false;
-          }
-
-          $creator = ResortAdmin::find($group->created_by);
-          $creatorEmployee = $creator->GetEmployee ?? null;
-          $creatorRank = (int) ($creatorEmployee->rank ?? 0);
-          $isCreatorHr = $creatorRank === 3
-               || (in_array($creatorRank, [1, 2], true) && Common::isHRDepartment($creatorEmployee->Dept_id ?? null));
-
-          return $isCreatorHr;
-     }
-
-     /**
       * Candidate list for a brand-new group (no group exists yet) — same
       * department scoping as newEmployeeList(), without an exclusion list.
       */
@@ -546,7 +524,7 @@ class ChatController extends Controller
           if (!$group) {
                return response()->json(['success' => false, 'message' => 'Group not found'], 404);
           }
-          if (!$this->isGroupAdmin($group, $resort)) {
+          if (!Common::isChatGroupAdmin($group, $resort)) {
                return response()->json(['success' => false, 'message' => 'You are not authorized to manage this group.'], 403);
           }
 

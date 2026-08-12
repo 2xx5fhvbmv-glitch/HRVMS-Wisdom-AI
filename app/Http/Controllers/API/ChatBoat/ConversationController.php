@@ -19,7 +19,11 @@ class ConversationController extends Controller
 
     public function __construct()
     {
-        $this->resort = Auth::guard('api')->user();
+        // Same dual-guard resolution as ChatController — mobile (api/
+        // Passport) and web (resort-admin session) both authenticate
+        // against the resort_admins table, so this is one chat identity
+        // reached from two platforms (Chat Module spec §1/§8).
+        $this->resort = Auth::guard('api')->user() ?: Auth::guard('resort-admin')->user();
     }
 
     // In this controller, we are using the ResortAdmin table's ID, not the Employee table's ID,
@@ -50,13 +54,31 @@ class ConversationController extends Controller
             if (!$group) {
                 return response()->json(['success' => false, 'message' => 'Group not found.'], 404);
             }
-            if (!$group->groupMembers()->where('user_id', $resort->id)->exists()) {
+            // Actual members can always view; the HR administrative override
+            // ("manage groups created by the HR department") is meaningless
+            // if HR can add/remove/rename a group without ever seeing what's
+            // in it, so it grants viewing too.
+            $isMember = $group->groupMembers()->where('user_id', $resort->id)->exists();
+            if (!$isMember && !Common::isChatGroupAdmin($group, $resort)) {
                 return response()->json(['success' => false, 'message' => 'You are not a member of this group.'], 403);
             }
+
+            $members = $group->groupMembers()->get(['user_id', 'role'])->map(function ($member) {
+                $admin = ResortAdmin::find($member->user_id);
+                return [
+                    'id' => $member->user_id,
+                    'name' => $admin ? $admin->first_name . ' ' . $admin->last_name : 'Unknown',
+                    'profile' => Common::getResortUserPicture($member->user_id),
+                    'role' => $member->role,
+                ];
+            })->values();
+
             $data = [
                 'id' => $group->id,
                 'name' => $group->name,
-                'profile' => asset('resorts_assets/images/group-chat.png'),
+                'profile' => $group->profile_picture ? \App\Helpers\StorageHelper::temporaryUrl($group->profile_picture) : asset('resorts_assets/images/group-chat.png'),
+                'members' => $members,
+                'is_admin' => Common::isChatGroupAdmin($group, $resort),
             ];
         } else {
             return response()->json(['success' => false, 'message' => 'Invalid chat type.'], 400);
@@ -139,7 +161,7 @@ class ConversationController extends Controller
             return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
         }
 
-        if (!Auth::guard('api')->check()) {
+        if (!$this->resort) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
@@ -165,7 +187,7 @@ class ConversationController extends Controller
                 return response()->json(['success' => false, 'message' => 'Group not found.'], 404);
             }
             $isMember = $group->groupMembers()->where('user_id', $resort->id)->exists();
-            if (!$isMember) {
+            if (!$isMember && !Common::isChatGroupAdmin($group, $resort)) {
                 return response()->json(['success' => false, 'message' => 'You are not a member of this group.'], 403);
             }
         }
