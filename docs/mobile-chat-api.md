@@ -20,16 +20,53 @@ resort-admin id.
 |---|---|---|
 | GET | `chat/list` | Your chat list (1:1 + groups), with last message + unread count |
 | GET | `chat/faq-list` | Static FAQ content for the chat help screen |
-| GET | `chat/start-new/chat?search=` | Employee picker to start a new 1:1 chat — **department-scoped**: HR/GM see the whole resort, everyone else sees only their own department |
-| GET | `group/new-employee/list/{group_id}` | Employee picker for adding to an existing group — resort-wide, not department-scoped (deliberate — group membership can cross departments) |
-| POST | `create/group-chat` | Create a group. Body: `name` (required), `description`, `members[]` (required, array of resort-admin ids) |
-| POST | `group/add-member/{group_id}` | Body: `members[]` (array of resort-admin ids) |
-| POST | `group/remove-member/{group_id}` | Body: `member_id` (single id). The group's `admin`-role member cannot be removed. |
-| POST | `group/remove/{group_id}` | Deletes the group (and its conversation history). Only the group creator can call this. |
-| GET | `chat/view/{type}/{type_id}` | Conversation header (other person/group info) + full message history. `type` is `individual` or `group`; `type_id` is the other resort-admin's id or the group id. |
+| GET | `chat/start-new/chat?search=` | Employee picker to start a new 1:1 chat — **unrestricted for everyone**, no department scoping. (Changed — see §Permission model below; this used to be department-scoped for non-HR/GM, that was wrong per the product spec and has been removed.) |
+| GET | `group/new-group-member/list` | **New.** Candidate picker for the *create group* screen (no group exists yet) — scoped to what the caller is allowed to add: any department for HR/GM, own department only for other HOD/XCOM/Finance, 403 for anyone who can't create groups at all. Use this instead of a generic employee list so the UI never offers a choice the server will reject. |
+| GET | `group/new-employee/list/{group_id}` | Employee picker for adding to an *existing* group — same permission scoping as above, now enforced (was resort-wide/unscoped before). |
+| POST | `create/group-chat` | Create a group. Body: `name` (required), `description`, `members[]` (required, array of resort-admin ids). **Now permission-checked server-side** — see §Permission model. 403 if the caller can't create groups, or if any member id is outside their allowed scope (department mismatch, or a different resort entirely). |
+| POST | `group/add-member/{group_id}` | Body: `members[]` (array of resort-admin ids). **Now requires the caller to be that group's Group Admin** (403 otherwise) and enforces the same member-scope rule as group creation. |
+| POST | `group/remove-member/{group_id}` | Body: `member_id` (single id). **Now requires Group Admin** (403 otherwise). The group's `admin`-role member still cannot be removed. |
+| POST | `group/remove/{group_id}` | Deletes the group (and its conversation history). **Now Group Admin** (creator, or HR override — see §Permission model), not strictly creator-only. |
+| POST | `group/update/{group_id}` | **New.** Group Admin only. `multipart/form-data`: `name` (optional, renames), `photo` (optional image file, max 5MB, replaces the group photo). Returns `{"success":true,"group":{"id":12,"name":"...","profile_picture":"https://... or null"}}`. There was no way to rename a group or set a photo before this. |
+| GET | `chat/view/{type}/{type_id}` | Conversation header (other person/group info) + full message history. `type` is `individual` or `group`; `type_id` is the other resort-admin's id or the group id. **Group response shape changed** — see below. Also: group message history was silently broken before (only ever returned messages *you* sent, never anyone else's in the group) — that's fixed now. |
 | GET | `chat/get-messages/{type}/{type_id}` | Alias of `chat/view` — same response, same params. Use whichever reads better client-side. |
-| POST | `chat/send-message` | Multipart. Fields: `type` (`individual`\|`group`, required), `type_id` (required), `message` (required string), `attachment` (optional file) |
+| POST | `chat/send-message` | Multipart. Fields: `type` (`individual`\|`group`, required), `type_id` (required), `message` (**now optional** if `attachment` is present — was hard-required before, so a photo with no caption used to fail validation), `attachment` (optional file, now validated server-side: `jpg,jpeg,png,pdf,doc,docx,xls,xlsx`, max 10MB) |
 | GET | `chat/messages/mark-read?conversation_id=` | Marks that conversation thread read for you — **not** a single-message read receipt, it flips your `chat_message_read` row for the whole thread |
+
+`chat/view`'s response for `type=group` now includes the member list and whether *you* can manage this group:
+```json
+{
+  "success": true,
+  "data": {
+    "id": 12, "name": "F&B Operations", "profile": "https://... or a default group icon",
+    "members": [
+      {"id": 259, "name": "Olivia Davis", "profile": "https://...", "role": "admin"},
+      {"id": 250, "name": "Fatima Naseer", "profile": "https://...", "role": "member"}
+    ],
+    "is_admin": true
+  },
+  "receiver_id": 12, "type": "group", "messages": [ ... ]
+}
+```
+`members` and `is_admin` are new. Gate your manage UI (rename, add/remove member, delete, change photo) on `is_admin` — don't re-derive "am I allowed to manage this" client-side, since HR override (below) means the creator isn't always the only admin.
+
+**Tenant isolation, newly enforced**: `chat/view` and `chat/send-message` both now 404/403 if the individual recipient or group belongs to a different resort, or if you're not that group's member (and not covered by HR override). Previously unchecked — a crafted `type_id` for another resort's user/group would have gone through.
+
+## Permission model (server-enforced, not just a UI convention)
+
+| Caller | Can create a group? | Member selection |
+|---|---|---|
+| GM (rank 8) | yes | any department |
+| HR (rank 3) | yes | any department |
+| EXCOM/HOD **inside the HR department** (rank 1/2) | yes | any department |
+| Other EXCOM/HOD (rank 1/2), Finance approver (rank 7) | yes | **own department only** |
+| Everyone else (line workers, etc.) | **no** | — |
+
+One-to-one chat ignores all of this — always unrestricted, every rank, no exceptions.
+
+**Group Admin.** The creator is a group's admin (`role: "admin"` in the members list). Separately: if a group was created by an HR user (rank 3, or rank 1/2 inside the HR department), *any* HR user — not only the creator — is also treated as admin for that group. This does not apply to non-HR-created groups; a Finance HOD's group stays admin-only to its actual creator even when an HR user looks at it. This is exactly what `is_admin` in `chat/view` reflects.
+
+Member-scope is enforced server-side on both group creation and add-member — hand-crafting a request with an out-of-scope employee id doesn't bypass it, it 403s.
 
 `chat/send-message` response:
 ```json
@@ -55,6 +92,17 @@ Point your Pusher SDK's `authEndpoint` (or `authorizer`, depending on SDK)
 at this URL. The default Laravel `/broadcasting/auth` (no `/api` prefix)
 is a *different* route on a session guard — do not use it, it will reject
 mobile tokens.
+
+**This was broken for everyone, mobile included, until this week** — the
+provider that loads `routes/channels.php` (where every `Broadcast::channel()`
+rule below is defined — `chat.{id}`, `group.{id}`, `resort-online.{id}`) was
+disabled in `config/app.php`, so none of those authorization rules existed
+at runtime regardless of which auth endpoint you pointed at. Every private/
+presence subscription 403'd unconditionally. That's fixed now (the provider
+is enabled), independently of the `/api` vs session-guard endpoint distinction
+above. If the mobile app has any fallback/compensating logic for realtime
+never actually connecting (e.g. polling `chat/list` instead of trusting the
+socket), it's worth re-testing whether that's still needed.
 
 | Channel | Type | Subscribe when | Event |
 |---|---|---|---|
@@ -95,7 +143,7 @@ webhook + one new column), not currently built.
 | `GET /rooms` | `GET chat/list` | |
 | `GET /rooms/:roomId` | `GET chat/view/{type}/{type_id}` | |
 | `POST /rooms` (create group) | `POST create/group-chat` | |
-| `PUT /rooms/:roomId` (rename/update group) | **No equivalent yet.** | Not built — Laravel side has no group-update endpoint at all today. Flag if you need this. |
+| `PUT /rooms/:roomId` (rename/update group) | `POST group/update/{group_id}` | Now built (was missing when this doc was first written) |
 | `DELETE /rooms/:roomId` | `POST group/remove/{group_id}` | |
 | `PUT /rooms/:roomId/add-member` | `POST group/add-member/{group_id}` | |
 | `PUT /rooms/:roomId/remove-member` | `POST group/remove-member/{group_id}` | |
@@ -103,7 +151,7 @@ webhook + one new column), not currently built.
 | `GET /rooms/:roomId/messages` | `GET chat/view/{type}/{type_id}` or `GET chat/get-messages/{type}/{type_id}` | |
 | `POST /messages` (send) | `POST chat/send-message` | |
 | `PUT /messages/:messageId/read` | `GET chat/messages/mark-read` | Old was per-message; new is per-thread — no single-message read receipt |
-| `GET /users/line-workers` | `GET chat/start-new/chat` | New version is department-scoped (see table above); old was resort-wide |
+| `GET /users/line-workers` | `GET chat/start-new/chat` | Resort-wide, same as old — no department scoping |
 | `GET /users/online/list` | `resort-online.{resortId}` presence channel | Now realtime/push-based, not a poll |
 | Socket.io connection | Pusher private/presence channels (see above) | |
 
