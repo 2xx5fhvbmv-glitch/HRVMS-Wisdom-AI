@@ -68,8 +68,9 @@ class DashboardController extends Controller
             return true;
         }
 
-        // Department HOD (rank 2 in non-HR dept) also sees whole resort data on survey dashboard
-        if ($isHOD) {
+        // Department HOD or EXCOM (rank 2 or 1 in non-HR dept) also sees
+        // whole resort data on survey dashboard — was HOD-only.
+        if ($isHOD || $isEXCOM) {
             return true;
         }
 
@@ -128,8 +129,17 @@ class DashboardController extends Controller
                                     
               
 
+        // Same fix as HR_Dashobard's NearingDeadline below: SurveychangeStatus
+        // (the daily cron) flips Status to Complete the moment End_date
+        // passes, regardless of participation, so 'OnGoing'-only excluded
+        // every already-overdue survey. whereIn(End_date, exact date list)
+        // had the same effect for anything more than 2 days overdue — an
+        // upper-bound "on or before" check is what "nearing/overdue"
+        // actually means. where('t1.emp_status','no') already keeps this
+        // to surveys with pending participants.
+        $deadlineEnd = Carbon::today()->addDays(2)->format('Y-m-d');
         $NearingDeadline = ParentSurvey::join('survey_employees as t1', 't1.Parent_survey_id', '=', 'parent_surveys.id')
-                                    ->where('parent_surveys.Status', 'OnGoing')
+                                    ->whereIn('parent_surveys.Status', ['Publish', 'OnGoing', 'Complete'])
                                     ->where('parent_surveys.resort_id', $this->resort->resort_id)
                                     ->select(
                                         'parent_surveys.id',
@@ -144,7 +154,7 @@ class DashboardController extends Controller
                                     ->where('t1.emp_status','no')
 
                                     ->groupBy('parent_surveys.id')
-                                    ->whereIn('End_date',   $this->newdates) // 2 days before deadline
+                                    ->where('parent_surveys.End_date', '<=', $deadlineEnd)
                                     ->get()
                                     
                                     ->map(function($a){ 
@@ -310,8 +320,14 @@ class DashboardController extends Controller
         //                 )
         //                 ->groupBy('parent_surveys.id')
         //                 ->get();
+        // Feeds the "Survey Status" list on the dashboard (not just ongoing
+        // ones despite the variable name) — was excluding 'Complete'
+        // entirely, so an expired survey never appeared here even though
+        // the summary count card right above it (CompleteSurvey_count)
+        // correctly counted it. The blade's badge logic already handles a
+        // 'Complete' status value, it just never received one.
         $OngoingSurvey = ParentSurvey::leftJoin('survey_employees as t1', 't1.Parent_survey_id', '=', 'parent_surveys.id')
-                                    ->whereIn('parent_surveys.Status', ['Publish', 'OnGoing'])
+                                    ->whereIn('parent_surveys.Status', ['Publish', 'OnGoing', 'Complete'])
                                     ->where('parent_surveys.resort_id', $this->resort->resort_id)
                                     ->select(
                                         'parent_surveys.id',
@@ -330,12 +346,22 @@ class DashboardController extends Controller
                                     
               
 
-        $deadlineStart = Carbon::today()->format('Y-m-d');
+        // Same fix as SurveyController@Getneartodeadlinesurvey — was
+        // whereBetween(today, today+3), which excluded an already-overdue
+        // survey (still Publish/OnGoing) entirely, even with pending
+        // participants. Only the upper "nearing" bound is meaningful here.
+        // Status also has to include 'Complete': SurveychangeStatus (the
+        // daily cron) flips Status to Complete the moment End_date passes,
+        // regardless of participation — so a truly-expired survey is
+        // already 'Complete' by the time anyone looks at this widget, not
+        // still 'OnGoing'. Excluding it here is why overdue surveys never
+        // showed up. The havingRaw pending>0 clause below still correctly
+        // drops it once every participant has actually responded.
         $deadlineEnd = Carbon::today()->addDays(3)->format('Y-m-d');
         $NearingDeadline = ParentSurvey::join('survey_employees as t1', 't1.Parent_survey_id', '=', 'parent_surveys.id')
-                                    ->whereIn('parent_surveys.Status', ['Publish', 'OnGoing'])
+                                    ->whereIn('parent_surveys.Status', ['Publish', 'OnGoing', 'Complete'])
                                     ->where('parent_surveys.resort_id', $this->resort->resort_id)
-                                    ->whereBetween('parent_surveys.End_date', [$deadlineStart, $deadlineEnd])
+                                    ->where('parent_surveys.End_date', '<=', $deadlineEnd)
                                     ->select(
                                         'parent_surveys.id',
                                         'parent_surveys.Status',

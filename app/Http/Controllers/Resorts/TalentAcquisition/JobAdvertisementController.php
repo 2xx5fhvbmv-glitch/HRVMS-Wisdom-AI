@@ -112,6 +112,9 @@ class JobAdvertisementController extends Controller
     {
         $validator =  Validator::make($request->all(), [
             'Jobadvimg' => 'required|file|mimes:jpg,jpeg,png,gif,svg,webp,heic,heif|max:2048',
+            // Omitted/null = the resort-wide default poster (unchanged
+            // behavior); a real id scopes the upload to that one vacancy.
+            'vacancy_id' => 'nullable|integer|exists:vacancies,id',
         ], [
             'Jobadvimg.max' => 'The file size must not exceed 2MB.',
             'Jobadvimg.mimes' => 'The file must be an image (jpg, jpeg, png, gif, svg, webp, heic, heif)',
@@ -125,6 +128,7 @@ class JobAdvertisementController extends Controller
             ], 422);
         }
         $resort_id= Auth::guard('resort-admin')->user()->resort_id;
+        $vacancy_id = $request->filled('vacancy_id') ? (int) $request->vacancy_id : null;
         try
         {
             DB::beginTransaction();
@@ -135,7 +139,13 @@ class JobAdvertisementController extends Controller
 
 
 
-                    $fileName  = $request->file('Jobadvimg')->getClientOriginalName();
+                    // A vacancy-specific poster and the resort-wide default
+                    // share this same flat folder with no per-vacancy
+                    // namespacing — two different vacancies uploading a
+                    // same-named file would otherwise silently overwrite
+                    // each other's file on disk even though they're
+                    // different job_advertisements rows.
+                    $fileName  = ($vacancy_id ?? 'default') . '_' . $request->file('Jobadvimg')->getClientOriginalName();
 
                         // Common::uploadFile() only moves the file to local
                         // disk — on live (STORAGE_DRIVER=wasabi) that left
@@ -152,6 +162,7 @@ class JobAdvertisementController extends Controller
 
                         JobAdvertisement::updateOrCreate([
                                 "Resort_id" => $resort_id,
+                                "vacancy_id" => $vacancy_id,
                         ],[
                             "Jobadvimg" => $fileName,
                         ]);

@@ -139,7 +139,15 @@ class PayrollController extends Controller
         $settings = ResortSiteSettings::where('resort_id', $resort_id)->first();
         $currency = $settings['currency'];
         // dd($settings);
-        $scopedDeptIds = \App\Helpers\Common::getScopedDepartmentIds();
+        // Payroll is run by Finance, for every department — the shared
+        // getScopedDepartmentIds() gate (HR/GM/L&D-manager only) isn't
+        // aware of that, so a Finance user only ever saw their own
+        // department's employees here. Scoped to this module only —
+        // Common::hasFullDataAccess()/getScopedDepartmentIds() is shared
+        // across Grievance/Incident/Leave/etc., and Finance has no claim
+        // to full visibility there, only in Payroll.
+        $isFinanceDept = \App\Helpers\Common::isFinanceDepartment($employee->Dept_id ?? null);
+        $scopedDeptIds = $isFinanceDept ? null : \App\Helpers\Common::getScopedDepartmentIds();
         $employees = Employee::with('resortAdmin')->where('resort_id',$resort_id)
             ->whereIn('status', ['Active', 'Probationary','Resigned'])
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
@@ -217,7 +225,12 @@ class PayrollController extends Controller
         $startDate = $request->startDate;
         $endDate = $request->endDate;
 
-        $scopedDeptIds = \App\Helpers\Common::getScopedDepartmentIds();
+        // Same Finance-sees-everything exception as index() above — this is
+        // the actual DataTables source that renders the Run Payroll
+        // employee table, a separate query path for the same page.
+        $currentEmployee = \Auth::guard('resort-admin')->user()->GetEmployee ?? null;
+        $isFinanceDept = \App\Helpers\Common::isFinanceDepartment($currentEmployee->Dept_id ?? null);
+        $scopedDeptIds = $isFinanceDept ? null : \App\Helpers\Common::getScopedDepartmentIds();
         $query = Employee::with(['resortAdmin', 'position', 'department', 'section'])
             ->where('resort_id', $resort_id)
             ->whereIn('status', ['Active', 'Probationary','Resigned'])
@@ -2013,7 +2026,7 @@ class PayrollController extends Controller
 
         if ($invalidOTs->isNotEmpty()) {
             $employeeIds = $invalidOTs->pluck('Emp_id')->unique();
-            $employeeNames = Employee::with('resortAdmin')->whereIn('Emp_id', $employeeIds)->where('resort_id', $this->resort->resort_id)->get()
+            $employeeNames = Employee::with('resortAdmin')->whereIn('id', $employeeIds)->where('resort_id', $this->resort->resort_id)->get()
                 ->map(fn($e) => $e->resortAdmin->first_name . ' ' . $e->resortAdmin->last_name)->implode(', ');
 
             return response()->json([
@@ -2031,7 +2044,7 @@ class PayrollController extends Controller
 
         if ($missingStatus->isNotEmpty()) {
             $employeeIds = $missingStatus->pluck('Emp_id')->unique();
-            $employeeNames = Employee::with('resortAdmin')->whereIn('Emp_id', $employeeIds)->where('resort_id', $this->resort->resort_id)->get()
+            $employeeNames = Employee::with('resortAdmin')->whereIn('id', $employeeIds)->where('resort_id', $this->resort->resort_id)->get()
                 ->map(fn($e) => $e->resortAdmin->first_name . ' ' . $e->resortAdmin->last_name)->implode(', ');
 
             return response()->json([
@@ -2055,7 +2068,7 @@ class PayrollController extends Controller
 
         if ($invalidAttendance->isNotEmpty()) {
             $employeeIds = $invalidAttendance->pluck('Emp_id')->unique();
-            $employeeNames = Employee::with('resortAdmin')->whereIn('Emp_id', $employeeIds)->where('resort_id', $this->resort->resort_id)->get()
+            $employeeNames = Employee::with('resortAdmin')->whereIn('id', $employeeIds)->where('resort_id', $this->resort->resort_id)->get()
                 ->map(fn($e) => $e->resortAdmin->first_name . ' ' . $e->resortAdmin->last_name)->implode(', ');
 
             return response()->json([
@@ -2102,6 +2115,31 @@ class PayrollController extends Controller
             $attendance_id = null;
             $presentCount = collect($recordsArray)->whereIn('Status', ['Present', 'On-Time', 'Late', 'ShortLeave', 'HalfDay'])->count();
 
+            // $presentCount above is a pure day-count — a 1-hour emergency
+            // punch-out and a full 8-hour shift both counted as exactly one
+            // present day, paying the same full day's salary either way.
+            // This is the actual salary basis (kept separate from
+            // $presentCount, which stays a whole-day count everywhere else
+            // it's used — attendance-register display, HR review, etc. —
+            // so those numbers don't start showing confusing fractions).
+            // Prorated by DayWiseTotalHours against a standard 8-hour day,
+            // same 8-hour-day assumption the OT rate below already uses.
+            $presentDayEquivalent = 0.0;
+            foreach (collect($recordsArray)->whereIn('Status', ['Present', 'On-Time', 'Late', 'ShortLeave', 'HalfDay']) as $presentRec) {
+                $hasRecordedHours = !empty($presentRec->DayWiseTotalHours) && !in_array($presentRec->DayWiseTotalHours, ['0', '0:0', '0:00', '00:00'], true);
+                if (!$hasRecordedHours) {
+                    // No DayWiseTotalHours recorded (~12% of real Present rows,
+                    // confirmed against live data) — not the same thing as
+                    // "worked zero hours". Treat as a full day rather than
+                    // silently zeroing out pay for a data gap.
+                    $presentDayEquivalent += 1.0;
+                    continue;
+                }
+                $dParts = explode(':', $presentRec->DayWiseTotalHours);
+                $dayHours = (int) ($dParts[0] ?? 0) + ((int) ($dParts[1] ?? 0) / 60);
+                $presentDayEquivalent += min(1.0, $dayHours / 8);
+            }
+
             $absentRecords = collect($recordsArray)->where('Status', 'Absent');
             // Split absent into regular absent and unpaid leave (based on note field)
             $unpaidLeaveRecords = $absentRecords->filter(function($r) {
@@ -2142,6 +2180,7 @@ class PayrollController extends Controller
                     if ($isPaidLeave) {
                         $paidLeaveDays->push($leaveRec->date);
                         $presentCount++; // Only paid leave counts as present for salary
+                        $presentDayEquivalent += 1.0; // Leave is always a full paid day, no hours to prorate
                     } else {
                         $unpaidAbsentCount++; // Unpaid leave = salary deduction
                     }
@@ -2250,7 +2289,10 @@ class PayrollController extends Controller
             // Apply overrides from logs
             if (isset($latestAttendanceUpdates[$empId])) {
                 foreach ($latestAttendanceUpdates[$empId] as $log) {
-                    if ($log->field === 'present_days') $presentCount = $log->new_value;
+                    // A manual HR override of present_days is a deliberate
+                    // whole-day correction — treat it as that many full-day
+                    // equivalents too, not re-fractionalized.
+                    if ($log->field === 'present_days') { $presentCount = $log->new_value; $presentDayEquivalent = (float) $log->new_value; }
                     if ($log->field === 'absent_days') $absentCount = $log->new_value;
                     if ($log->field === 'total_ot') $totalHours = $log->new_value;
                     if ($log->field === 'regular_ot_hours') $regularOT = $log->new_value;
@@ -2268,7 +2310,14 @@ class PayrollController extends Controller
             }
             // Per day salary = basic / total days in cutoff period (e.g. 28 for Feb-Mar, 31 for Jan, etc.)
             $perDay = $basic / $totalDaysInPeriod;
-            $earnedSalary = round($perDay * ($presentCount + $dayOffCount), 2); // present + paid leave + day-off
+            // Was ($presentCount + $dayOffCount) — presentCount is a flat
+            // day-count, so a 1-hour emergency punch-out was paid identically
+            // to a full 8-hour shift. presentDayEquivalent prorates each
+            // present-type day by actual hours worked (min'd at 1.0 per day,
+            // falling back to a full day only when hours genuinely weren't
+            // recorded — see above). Day-offs are unaffected, no work is
+            // expected on them.
+            $earnedSalary = round($perDay * ($presentDayEquivalent + $dayOffCount), 2); // present (hour-prorated) + paid leave + day-off
             $absentDeduct = round($perDay * ($absentCount + $unpaidAbsentCount), 2); // both absent and unpaid leave get deducted
 
             // OT formula: (monthly salary / total days in period / 8 hours) = per hour salary
@@ -2490,18 +2539,26 @@ class PayrollController extends Controller
         $conversionRate = floatval($request->input('conversionRate', 1)); // Default 1 (no conversion)
         $salary_currency = "Dollar"; // Assume salary is stored in Dollar
     
-        // Get individual transactions for tooltip details
+        // Staff Shop deduction is an OUTSTANDING BALANCE, not "purchased
+        // during this payroll period" — the same purchased_date filter here
+        // silently dropped any unpaid balance from a prior period (e.g. a
+        // March purchase never surfaced on a July-August run), and the total
+        // never subtracted payroll_deducted, so a balance already partly
+        // recovered in an earlier payroll run would be double-counted here.
+        // Both fixed to match the (already-correct) live estimate on the
+        // Payroll dashboard, which uses the same outstanding-balance logic —
+        // the two must agree.
         $transactions = Payment::whereIn('payments.emp_id', $employeeIds)
             ->join('employees as e', 'e.id', '=', 'payments.emp_id')
             ->join('products as p', 'p.id', '=', 'payments.product_id')
             ->whereIn('payments.status', ['Consented', 'Partial Paid'])
-            ->whereBetween('payments.purchased_date', [$startDate, $endDate])
             ->select(
                 'e.Emp_id',
                 'p.name as product_name',
                 'payments.quantity',
                 'payments.price',
                 'payments.cash_paid',
+                'payments.payroll_deducted',
                 'payments.status',
                 'payments.purchased_date'
             )
@@ -2513,14 +2570,9 @@ class PayrollController extends Controller
         $staffShopData = Payment::whereIn('payments.emp_id', $employeeIds)
             ->join('employees as e', 'e.id', '=', 'payments.emp_id')
             ->whereIn('payments.status', ['Consented', 'Partial Paid'])
-            ->whereBetween('payments.purchased_date', [$startDate, $endDate])
             ->select(
                 'e.Emp_id',
-                DB::raw("COALESCE(SUM(CASE
-                            WHEN payments.status = 'Partial Paid'
-                            THEN GREATEST(0, payments.price - payments.cash_paid)
-                            ELSE payments.price
-                        END), 0) as total_usd")
+                DB::raw("COALESCE(SUM(GREATEST(0, payments.price - payments.cash_paid - payments.payroll_deducted)), 0) as total_usd")
             )
             ->groupBy('e.Emp_id')
             ->get()
@@ -2532,9 +2584,7 @@ class PayrollController extends Controller
                 $details = [];
                 if (isset($transactions[$item->Emp_id])) {
                     foreach ($transactions[$item->Emp_id] as $txn) {
-                        $deductAmount = $txn->status === 'Partial Paid'
-                            ? max(0, $txn->price - $txn->cash_paid)
-                            : $txn->price;
+                        $deductAmount = max(0, $txn->price - $txn->cash_paid - $txn->payroll_deducted);
                         $deductDisplay = ($currency === 'MVR') ? $deductAmount * $convRate : $deductAmount;
 
                         $details[] = [

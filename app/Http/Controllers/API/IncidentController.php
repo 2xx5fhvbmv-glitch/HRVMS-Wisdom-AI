@@ -775,6 +775,84 @@ class IncidentController extends Controller
         }
     }
 
+    /**
+     * GET incident/my-statements — the "employee statement dashboard/history"
+     * the mobile app has nowhere to fetch from yet. Every incident the
+     * employee is involved in or a witness for, one row each, with status
+     * derived the same way getStatementRequest() derives already_submitted
+     * (there's no separate "pending request" row — a statement only exists
+     * once submitted, per docs/mobile-incident-statement.md).
+     */
+    public function myStatements()
+    {
+        if (!Auth::guard('api')->check()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $emp_id = $this->user->GetEmployee->id;
+
+        try {
+            $involvedIncidents = Incidents::with(['categoryName', 'subcategoryName'])
+                ->where('resort_id', $this->resort_id)
+                ->where(function ($q) use ($emp_id) {
+                    $q->whereRaw("FIND_IN_SET(?, involved_employees)", [$emp_id]);
+                })
+                ->get()
+                ->map(function ($incident) use ($emp_id) {
+                    $statement = IncidentsEmployeeStatements::where('incident_id', $incident->id)
+                        ->where('employee_id', $emp_id)
+                        ->orderByDesc('id')
+                        ->first();
+                    return $this->formatMyStatementRow($incident, 'involved_employee', $statement->statement ?? null, $statement ? $statement->status === 'submitted' : false);
+                });
+
+            $witnessIncidentIds = IncidentsWitness::where('witness_id', $emp_id)->pluck('incident_id');
+            $witnessIncidents = Incidents::with(['categoryName', 'subcategoryName'])
+                ->where('resort_id', $this->resort_id)
+                ->whereIn('id', $witnessIncidentIds)
+                ->get()
+                ->map(function ($incident) use ($emp_id) {
+                    $witness = IncidentsWitness::where('incident_id', $incident->id)->where('witness_id', $emp_id)->first();
+                    $stmt = $witness->witness_statements ?? null;
+                    return $this->formatMyStatementRow($incident, 'witness', $stmt, !empty($stmt));
+                });
+
+            $all = $involvedIncidents->merge($witnessIncidents)
+                ->unique('id')
+                ->sortByDesc('id')
+                ->values();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Employee statement history fetched successfully',
+                'data' => [
+                    'pending_count'   => $all->where('status', 'pending')->count(),
+                    'submitted_count' => $all->where('status', 'submitted')->count(),
+                    'statements'      => $all,
+                ],
+            ], 200);
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    private function formatMyStatementRow($incident, $role, $statementText, $submitted)
+    {
+        return [
+            'id'            => $incident->id,
+            'incident_id'   => $incident->incident_id,
+            'incident_name' => $incident->incident_name,
+            'incident_date' => $incident->incident_date ? date('d M Y', strtotime($incident->incident_date)) : null,
+            'category_name' => optional($incident->categoryName)->category_name,
+            'your_role'     => $role,
+            'status'        => $submitted ? 'submitted' : 'pending',
+            'statement'     => $statementText,
+        ];
+    }
+
     public function provideStatement(Request $request)
     {
         if (!Auth::guard('api')->check()) {
@@ -782,9 +860,12 @@ class IncidentController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'incident_id'                  => 'required|exists:incidents,id', 
-            'statement'                    => 'required', 
-            'attatchements.*'              => 'file|mimes:jpeg,png,jpg,heic,heif,mp4,mov,doc,docx,pdf'
+            'incident_id'                  => 'required|exists:incidents,id',
+            'statement'                    => 'required',
+            // Voice-recording submission (per the mobile statement form) —
+            // was image/video/document mimes only, no audio at all, so any
+            // recorded statement attachment failed validation outright.
+            'attatchements.*'              => 'file|mimes:jpeg,png,jpg,heic,heif,mp4,mov,doc,docx,pdf,mp3,m4a,wav,aac,ogg'
         ]);
 
         if ($validator->fails()) {

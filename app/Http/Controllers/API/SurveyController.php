@@ -75,7 +75,17 @@ class SurveyController extends Controller
                 ")->first();
 
             // Get all the surveys with their question count (one row per survey for this employee); match parent_surveys.resort_id to user's resort
+            // Creator name/position weren't included at all on this listing
+            // endpoint — only the per-survey detail endpoint
+            // (employeeSurveyQuestions) had them. Same join pattern as that
+            // endpoint (t2=resort_admins, t1=employees, rp=resort_positions
+            // via parent_surveys.created_by), left-joined so a survey never
+            // disappears from the list if its creator's admin/employee/
+            // position record is ever missing.
             $surveyQuestionData = ParentSurvey::join('survey_employees as se', 'se.Parent_survey_id', '=', 'parent_surveys.id')
+                ->leftJoin('resort_admins as t2', 't2.id', '=', 'parent_surveys.created_by')
+                ->leftJoin('employees as t1', 't1.Admin_Parent_id', '=', 't2.id')
+                ->leftJoin('resort_positions as rp', 'rp.id', '=', 't1.Position_id')
                 ->where('se.Emp_id', $employee_id)
                 ->where('parent_surveys.resort_id', $this->resort_id)
                 ->whereIn('parent_surveys.Status', ['Publish', 'OnGoing', 'Complete'])
@@ -90,6 +100,10 @@ class SurveyController extends Controller
                     'se.id as sur_emp_id',
                     'se.Complete_time',
                     'se.emp_status',
+                    't2.id as creator_admin_id',
+                    't2.first_name as creator_first_name',
+                    't2.last_name as creator_last_name',
+                    'rp.position_title as creator_position',
                     \DB::raw('(SELECT COUNT(*) FROM survey_questions WHERE Parent_survey_id = parent_surveys.id) as surveyQuetioncount')
                 )
                 ->get()
@@ -99,6 +113,9 @@ class SurveyController extends Controller
                     $row->survey_id = (int) $row->id;
                     $row->survey_id_encoded = base64_encode($row->id);
                     $row->sur_emp_id = (int) ($row->sur_emp_id ?? 0);
+                    $row->created_by_name = trim(($row->creator_first_name ?? '') . ' ' . ($row->creator_last_name ?? '')) ?: null;
+                    $row->created_by_role = $row->creator_position;
+                    $row->created_by_photo = $row->creator_admin_id ? Common::getResortUserPicture($row->creator_admin_id) : null;
                     return $row;
                 });
 
@@ -263,6 +280,23 @@ class SurveyController extends Controller
         }
         $employee_id = (int) $employee->id;
 
+        // Nothing previously stopped answers being submitted for a survey
+        // whose End_date has already passed — trust boundary gap, not just
+        // a UI nicety (the closing-date status flip is a separate cron
+        // check, this validates the actual write regardless of whether
+        // that cron has run yet).
+        $targetSurvey = ParentSurvey::where('id', $request->parent_survey_id[0])
+            ->where('resort_id', $this->resort_id)
+            ->first(['id', 'Status', 'End_date']);
+        if (!$targetSurvey) {
+            return response()->json(['success' => false, 'message' => 'Survey not found'], 200);
+        }
+        $isExpired = $targetSurvey->Status === 'Complete'
+            || \Carbon\Carbon::parse($targetSurvey->End_date)->endOfDay()->isPast();
+        if ($isExpired) {
+            return response()->json(['success' => false, 'message' => 'This survey has closed and no longer accepts responses.'], 200);
+        }
+
         if (
             count($request->parent_survey_id) !== count($request->survey_emp_ta_id) ||
             count($request->parent_survey_id) !== count($request->question_id) ||
@@ -341,8 +375,12 @@ class SurveyController extends Controller
                                                                 ->update(['emp_status' => "yes"]);
             }
 
-            $hrEmployee = Common::FindResortHR($this->user);
-            if ($hrEmployee) {
+            // FindResortHR() only ever returns the first HR match (->first())
+            // — a resort with more than one HR/HOD/EXCOM in the HR
+            // department silently left everyone but that one person with no
+            // "survey completed" notification.
+            $hrEmployeeIds = Common::getResortHrEmployeeIds($this->resort_id);
+            if (!empty($hrEmployeeIds)) {
                 Common::sendMobileNotification(
                     $this->resort_id,
                     2,
@@ -351,7 +389,7 @@ class SurveyController extends Controller
                     'Survey Completed',
                     '📝 A survey has been completed by ' . $this->user->first_name . ' ' . $this->user->last_name . '.',
                     'Survey',
-                    [$hrEmployee->id],
+                    $hrEmployeeIds,
                     $request->parent_survey_id[0],
                     false,
                     'survey-completed',

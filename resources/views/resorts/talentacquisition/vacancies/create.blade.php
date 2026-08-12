@@ -659,6 +659,15 @@
             });
 
             var vacancyValidationTimer = null;
+            // Once the user manually picks Budgeted/Out of Budget, stop
+            // auto-overwriting it — updateVacancyStatus() used to force
+            // this field back to the server-computed status every time the
+            // vacancy count changed, silently discarding an explicit
+            // "Out of Budget" choice the moment the count was typed.
+            // isProgrammaticBudgetUpdate distinguishes our own .val().trigger()
+            // call below from a real user selection on the same 'change' event.
+            var userChangedBudgetStatus = false;
+            var isProgrammaticBudgetUpdate = false;
 
             function updateVacancyStatus(positionId, requestedVacancy) {
                 $.ajax({
@@ -670,7 +679,11 @@
                     },
                     success: function(response) {
                         const selectBox = $('#vacancy_status');
-                        selectBox.val(response.status).trigger('change.select2');
+                        if (!userChangedBudgetStatus) {
+                            isProgrammaticBudgetUpdate = true;
+                            selectBox.val(response.status).trigger('change.select2');
+                            isProgrammaticBudgetUpdate = false;
+                        }
 
                         $('#txt-budget-salary').val(response.budgeted_salary);
                         $('#txt-proposed-salary').val(response.proposed_salary);
@@ -799,6 +812,9 @@
 
             // Trigger filter on budget status change
             $('#vacancy_status').on('change', function() {
+                if (!isProgrammaticBudgetUpdate) {
+                    userChangedBudgetStatus = true;
+                }
                 filterPositionsByBudget($(this).val());
             });
 

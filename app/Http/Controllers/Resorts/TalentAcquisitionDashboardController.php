@@ -60,7 +60,6 @@ class TalentAcquisitionDashboardController extends Controller
                             ->join("t_anotification_children as t4", "t4.Parent_ta_id", "=", "t3.id")
                             ->join("application_links as t5", "t5.ta_child_id", "=", "t4.id")
                             ->leftJoin("applicant_form_data as t6", "t6.Parent_v_id", "=", "vacancies.id")
-                            ->join('job_advertisements as t7', 't7.Resort_id', '=', 'vacancies.Resort_id')
                             ->where("vacancies.resort_id", $resort_id)
                             ->where("t4.status", "ForwardedToNext")
                             ->where("t4.Approved_By", Common::TaFinalApproval($resort_id))
@@ -75,8 +74,7 @@ class TalentAcquisitionDashboardController extends Controller
                                 COUNT(t6.id) AS NoOfApplication, -- Total applications per vacancy
                                 MAX(t5.link_Expiry_date) AS LinkExpiryDate, -- Latest link expiry date
                                 MAX(t6.Application_date) AS LatestApplicationDate, -- Latest application date
-                                vacancies.Total_position_required as NoOfVacnacy,
-                                t7.Jobadvimg
+                                vacancies.Total_position_required as NoOfVacnacy
                             ")
                             ->groupBy(
                                 "vacancies.id",
@@ -86,8 +84,7 @@ class TalentAcquisitionDashboardController extends Controller
                                 "t2.code",
                                 "t1.name",
                                 "t1.code",
-                                "vacancies.Total_position_required",
-                                "t7.Jobadvimg"
+                                "vacancies.Total_position_required"
                             )
                             ->get();
 
@@ -214,7 +211,6 @@ class TalentAcquisitionDashboardController extends Controller
                                 $join->on("t8.Applicant_id", "=", "t6.id")
                                     ->whereRaw("t8.id = (SELECT MAX(id) FROM applicant_wise_statuses WHERE Applicant_id = t6.id)");
                             })
-                            ->join('job_advertisements as t7', 't7.Resort_id', '=', 'vacancies.Resort_id')
                             ->where("vacancies.resort_id", $resort_id)
                             ->where("t4.status", "ForwardedToNext")
                             ->where("t4.Approved_By", Common::TaFinalApproval($resort_id));
@@ -235,8 +231,7 @@ class TalentAcquisitionDashboardController extends Controller
                                 COUNT(DISTINCT CASE WHEN t8.status IN ('Sortlisted By Wisdom AI', 'Sortlisted', 'Round', 'Selected', 'Complete', 'Offer Letter Sent', 'Offer Letter Accepted', 'Offer Letter Rejected', 'Contract Sent', 'Contract Accepted', 'Contract Rejected') THEN t6.id END) AS NoOfApplication,
                                 MAX(t5.link_Expiry_date) AS LinkExpiryDate,
                                 MAX(t6.Application_date) AS LatestApplicationDate,
-                                vacancies.Total_position_required as NoOfVacnacy,
-                                t7.Jobadvimg
+                                vacancies.Total_position_required as NoOfVacnacy
                             ")
                             ->groupBy(
                                 "vacancies.id",
@@ -246,8 +241,7 @@ class TalentAcquisitionDashboardController extends Controller
                                 "t2.code",
                                 "t1.name",
                                 "t1.code",
-                                "vacancies.Total_position_required",
-                                "t7.Jobadvimg"
+                                "vacancies.Total_position_required"
                             )
                             ->get();
                             foreach($NewVacancies  as $v)

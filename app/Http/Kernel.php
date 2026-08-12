@@ -70,8 +70,9 @@ class Kernel extends HttpKernel
         'hasModuleAccess' => \App\Http\Middleware\CheckAdminModuleAccess::class,
         'redirectIfNotCorrect.dashboard' => \App\Http\Middleware\RedirectIfNotCorrectDashboard::class,
         'checkResortPermission' => \App\Http\Middleware\CheckResortPermission::class,
+        'applyResortSmtp' => \App\Http\Middleware\ApplyResortSmtpConfig::class,
 
-        
+
         // Add rank-check middleware here
         'check.rank' => \App\Http\Middleware\CheckUserRankForAPI::class,
 

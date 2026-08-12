@@ -484,34 +484,35 @@ class LearningController extends Controller
         }
 
         try {
-            $startDate                              =   Carbon::now()->startOfMonth()->format('Y-m-d');
-            $endDate                                =   Carbon::now()->endOfMonth()->format('Y-m-d');
             $employeeId                             =   $this->user->GetEmployee->id;
-            $pendingCount                           =     TrainingSchedule::where('resort_id', $this->resort_id)
-                                                            ->where(function ($query) use ($startDate, $endDate) {
-                                                            $query->whereBetween('start_date', [$startDate, $endDate])
-                                                                    ->orWhereBetween('end_date', [$startDate, $endDate])
-                                                                    ->orWhere(function ($subQuery) use ($startDate, $endDate) {
-                                                                        $subQuery->where('start_date', '<=', $startDate)
-                                                                                ->where('end_date', '>=', $endDate);
-                                                                    });
-                                                                })
-                                                                ->whereHas('participants', function ($query) use ($employeeId) {
-                                                                    $query->where('employee_id', $employeeId);
-                                                                })
-                                                                ->where('status', '!=', 'Completed') // or use 'Pending' if you have that
-                                                                ->count();
+            $today                                  =   \Carbon\Carbon::now()->toDateString();
 
+            // Was hard-restricted to the current calendar month on every
+            // query below (fixed separately) AND, before that, filtered by
+            // the raw `status` column — which is unreliable across this
+            // whole table (confirmed: every single training_schedules row
+            // in the system is still 'Scheduled', regardless of its actual
+            // dates — nothing ever advances it). Web's HOD dashboard
+            // (Learning\DashboardController::hod_dashboard()) already hit
+            // this and switched to deriving Ongoing/Completed/Pending
+            // purely from start_date/end_date vs today — mirroring that
+            // same date-derived logic here instead of trusting `status`,
+            // scoped to this employee's own participant records.
+            $baseQuery                              =   function () use ($employeeId) {
+                return TrainingSchedule::where('resort_id', $this->resort_id)
+                    ->whereHas('participants', function ($query) use ($employeeId) {
+                        $query->where('employee_id', $employeeId);
+                    });
+            };
+
+            $ongoingCount                           =   $baseQuery()->where('start_date', '<=', $today)->where('end_date', '>=', $today)->count();
+            $completedCount                         =   $baseQuery()->where('end_date', '<', $today)->count();
+            $scheduledCount                         =   $baseQuery()->where('start_date', '>', $today)->count();
+            // Matches hod_dashboard()'s own semantic: "pending" = not yet started.
+            $pendingCount                           =   $scheduledCount;
+            $assignedCount                          =   $ongoingCount + $completedCount + $scheduledCount;
 
             $completedHours                         =     TrainingSchedule::where('resort_id', $this->resort_id)
-                                                                ->where(function ($query) use ($startDate, $endDate) {
-                                                                $query->whereBetween('start_date', [$startDate, $endDate])
-                                                                        ->orWhereBetween('end_date', [$startDate, $endDate])
-                                                                        ->orWhere(function ($subQuery) use ($startDate, $endDate) {
-                                                                            $subQuery->where('start_date', '<=', $startDate)
-                                                                                    ->where('end_date', '>=', $endDate);
-                                                                        });
-                                                                    })
                                                                     ->whereHas('participants', function ($query) use ($employeeId) {
                                                                         $query->where('employee_id', $employeeId);
                                                                     })
@@ -522,27 +523,21 @@ class LearningController extends Controller
                                                                     ->with([
                                                                         'learningProgram',
                                                                         ])
-                                                                    ->where('status', '=', 'Completed') // or use 'Pending' if you have that
+                                                                    ->where('end_date', '<', $today)
                                                                    ->get()->reduce(function ($carry, $session) {
                                                                     $start = \Carbon\Carbon::parse($session->start_time);
                                                                     $end = \Carbon\Carbon::parse($session->end_time);
                                                                     $hours = $end->diffInMinutes($start) / 60;
                                                                     return $carry + $hours;
                                                                 }, 0);
-                                                                    
-                                    
-            $dashboardArr['training_completed_hours']   =   $completedHours; 
-            $dashboardArr['pending_training_count']     =   $pendingCount; 
+
+
+            $dashboardArr['training_completed_hours']   =   $completedHours;
+            $dashboardArr['pending_training_count']     =   $pendingCount;
+            $dashboardArr['ongoing_training_count']     =   $ongoingCount;
+            $dashboardArr['completed_training_count']   =   $completedCount;
 
             $sessions                               =   TrainingSchedule::where('resort_id', $this->resort_id)
-                                                            ->where(function ($query) use ($startDate, $endDate) {
-                                                            $query->whereBetween('start_date', [$startDate, $endDate])
-                                                                ->orWhereBetween('end_date', [$startDate, $endDate])
-                                                                ->orWhere(function ($subQuery) use ($startDate, $endDate) {
-                                                                    $subQuery->where('start_date', '<=', $startDate)
-                                                                            ->where('end_date', '>=', $endDate);
-                                                                });
-                                                            })
                                                             ->whereHas('participants', function ($query) use ($employeeId) {
                                                                 $query->where('employee_id', $employeeId);
                                                             })
@@ -553,35 +548,6 @@ class LearningController extends Controller
                                                                     ->with(['employee.resortAdmin', 'employee.position']);
                                                                 }
                                                             ])->get();
-
-            $assignedCount                          =   TrainingSchedule::where('resort_id', $this->resort_id)
-                                                            ->where(function ($query) use ($startDate, $endDate) {
-                                                            $query->whereBetween('start_date', [$startDate, $endDate])
-                                                                    ->orWhereBetween('end_date', [$startDate, $endDate])
-                                                                    ->orWhere(function ($subQuery) use ($startDate, $endDate) {
-                                                                        $subQuery->where('start_date', '<=', $startDate)
-                                                                                ->where('end_date', '>=', $endDate);
-                                                                    });
-                                                            })
-                                                            ->whereHas('participants', function ($query) use ($employeeId) {
-                                                                $query->where('employee_id', $employeeId);
-                                                            })
-                                                            ->count();
-                                                        
-             $completedCount                         =   TrainingSchedule::where('resort_id', $this->resort_id)
-                                                            ->where(function ($query) use ($startDate, $endDate) {
-                                                            $query->whereBetween('start_date', [$startDate, $endDate])
-                                                                    ->orWhereBetween('end_date', [$startDate, $endDate])
-                                                                    ->orWhere(function ($subQuery) use ($startDate, $endDate) {
-                                                                        $subQuery->where('start_date', '<=', $startDate)
-                                                                                ->where('end_date', '>=', $endDate);
-                                                                    });
-                                                            })
-                                                            ->whereHas('participants', function ($query) use ($employeeId) {
-                                                                $query->where('employee_id', $employeeId);
-                                                            })
-                                                            ->where('status', 'Completed')
-                                                            ->count();
 
             $completedPercentage = $assignedCount > 0 ? round(($completedCount / $assignedCount) * 100, 2) : 0;
             $events                                 =   [];
@@ -602,7 +568,6 @@ class LearningController extends Controller
             }
             
             $learningRequests                       =   LearningRequest::join("learning_requests_employees as lre", "learning_requests.id", "=", 'lre.learning_request_id')
-                                                            ->whereBetween('learning_requests.start_date', [$startDate, $endDate])
                                                             ->where('lre.employee_id', $employeeId)
                                                             ->where('learning_requests.resort_id', $this->resort_id)
                                                             ->get();

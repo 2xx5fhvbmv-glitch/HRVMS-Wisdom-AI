@@ -60,7 +60,7 @@ Route::prefix('resort')->namespace('Resort')->group(function () {
 });
 
 /*** Admin Authenticated Routes ***/
-Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkResortPermission'])->namespace('Resorts')->group(function () {
+Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkResortPermission','applyResortSmtp'])->namespace('Resorts')->group(function () {
 
     /*** Logout ***/
     Route::get( '/logout', ['App\Http\Controllers\Resorts\ResortLoginController','logout'] )->name('resort.logout');
@@ -352,6 +352,11 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get(  '/site/setting', 'SitesettignsController@index')->name('resort.sitesettings');
     Route::post(   '/site/setting', 'SitesettignsController@UpdateSiteSettings')->name('resort.updatesitesettings');
     Route::post('/site/setting/currency-update','SitesettignsController@UpdateCurrency')->name('sitesetting.UpdateCurrency');
+
+    // Email Config (per-resort SMTP)
+    Route::get('/settings/email-config', 'EmailConfigController@index')->name('resort.emailconfig.index');
+    Route::post('/settings/email-config', 'EmailConfigController@store')->name('resort.emailconfig.store');
+    Route::post('/settings/email-config/test', 'EmailConfigController@test')->name('resort.emailconfig.test');
 
     Route::post('update/resort-menutype', 'SitesettignsController@UpdateResortMenuType')->name('resort.update.menu-type');
     // End

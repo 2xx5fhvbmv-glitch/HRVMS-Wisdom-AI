@@ -110,7 +110,12 @@ class Employee extends Model
         parent::boot();
 
         self::saving(function ($model) {
-            if (!$model->exists) {
+            // Was missing the same ->check() guard the modified_by branch
+            // below already has — creating an Employee outside a
+            // resort-admin session (migration, CLI, queue job) made
+            // ->user() null, and ->id on null threw (fatal on any server
+            // that escalates PHP warnings to exceptions).
+            if (!$model->exists && Auth::guard('resort-admin')->check()) {
                 $model->created_by = Auth::guard('resort-admin')->user()->id;
             }
 

@@ -116,13 +116,17 @@
 
                             {{-- 2. Sent to HR --}}
                             <li class="{{ $sentToHrActive ? 'active' : '' }} {{ $MaintanaceRequest->Status == 'Rejected' ? 'text-danger' : '' }}">
-                                <span>Sent to HR</span>
+                                <span>{{ in_array('Open', $displayedStatuses) ? 'Approved by HR' : 'Sent to HR' }}</span>
                                 @if($MaintanaceRequest->Status == 'Rejected')
                                     <small class="d-block text-danger">Rejected: {{ $MaintanaceRequest->RejactionReason ?? '' }}</small>
                                 @elseif($MaintanaceRequest->Status == 'On-Hold')
                                     <small class="d-block text-warning">On Hold: {{ $MaintanaceRequest->ReasonOnHold ?? '' }}</small>
                                 @elseif(in_array('Open', $displayedStatuses))
-                                    <small class="d-block text-success">Approved</small>
+                                    @if(isset($displayedStatusesDetails['Open'][0]))
+                                        <small class="d-block text-success">by {{ $displayedStatusesDetails['Open'][0][2] ?? '' }} on {{ $displayedStatusesDetails['Open'][0][0] ?? '' }}</small>
+                                    @else
+                                        <small class="d-block text-success">Approved</small>
+                                    @endif
                                 @else
                                     <small class="d-block text-muted">Pending</small>
                                 @endif

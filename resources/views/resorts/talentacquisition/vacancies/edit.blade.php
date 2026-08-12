@@ -287,6 +287,31 @@
                         </div>
                     </div>
                 </form>
+
+                <div class="card mt-4">
+                    <div class="card-title">
+                        <h3>Job Advertisement Poster</h3>
+                        <p class="text-muted mb-0">Optional. Overrides the resort's default poster for this vacancy only.</p>
+                    </div>
+                    <form id="VacancyAdTemplete" enctype="multipart/form-data">
+                        @csrf
+                        <input type="hidden" name="vacancy_id" value="{{ $vacancy->id }}">
+                        <div class="uploadFileNew-block mb-md-3 mb-2" id="vacancyPosterDropzone">
+                            <img src="{{ URL::asset('resorts_assets/images/upload.svg') }}" alt="icon">
+                            <h5>Upload This Vacancy's Poster</h5>
+                            <p>Browse or Drag the file here</p>
+                            <input type="file" id="vacancyPosterFile" name="Jobadvimg" hidden>
+                            <div id="vacancyPosterFileName" class="mt-2 text-primary"></div>
+                        </div>
+                        <div class="mb-2 text-center">
+                            <p class="mb-1 text-muted"><small>Current Poster:</small></p>
+                            <img src="{{ \App\Helpers\Common::resolveVacancyPosterImage($vacancy->Resort_id, $vacancy->id) }}" alt="Job Ad Poster" class="img-fluid rounded" style="max-height: 200px;">
+                        </div>
+                        <div class="card-footer text-end">
+                            <button type="submit" class="btn ta-btn-primary btn-sm">Submit</button>
+                        </div>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
@@ -594,6 +619,65 @@
 
             filterPositionsByBudget($('#vacancy_status').val());
 
+        });
+
+        $('#vacancyPosterFile').on('change', function() {
+            if (this.files.length > 0) {
+                $('#vacancyPosterFileName').text('📎 ' + this.files[0].name);
+            }
+        });
+
+        $('#VacancyAdTemplete').on('submit', function(e) {
+            e.preventDefault();
+            var $submitBtn = $(this).find('button[type="submit"]');
+            if ($submitBtn.prop('disabled')) return false;
+
+            var fileInput = document.getElementById('vacancyPosterFile');
+            if (!fileInput.files || fileInput.files.length === 0) {
+                toastr.error("Please select an image to upload.", "Error", {
+                    positionClass: 'toast-bottom-right'
+                });
+                return false;
+            }
+
+            $submitBtn.prop('disabled', true).text('Uploading...');
+
+            var formData = new FormData(this);
+            $.ajax({
+                url: "{{ route('resort.ta.jobadvertisment.upload') }}",
+                type: "POST",
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    if (response.success) {
+                        toastr.success(response.message, "Success", {
+                            positionClass: 'toast-bottom-right'
+                        });
+                        location.reload();
+                    } else {
+                        toastr.error(response.message || "Upload failed.", "Error", {
+                            positionClass: 'toast-bottom-right'
+                        });
+                    }
+                },
+                error: function(xhr) {
+                    var errs = '';
+                    if (xhr.status === 422 && xhr.responseJSON && xhr.responseJSON.errors) {
+                        $.each(xhr.responseJSON.errors, function(key, value) {
+                            errs += value[0] + '<br>';
+                        });
+                    } else {
+                        errs = 'An unexpected error occurred. Please try again.';
+                    }
+                    toastr.error(errs, "Error", {
+                        positionClass: 'toast-bottom-right'
+                    });
+                },
+                complete: function() {
+                    $submitBtn.prop('disabled', false).text('Submit');
+                }
+            });
         });
     </script>
 @endsection

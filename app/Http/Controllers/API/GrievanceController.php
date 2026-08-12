@@ -347,6 +347,37 @@ class GrievanceController extends Controller
     }
 
     /**
+     * Investigation files / older-style attachments are stored as a plain
+     * comma-separated filename list under GrievanceSubmission/{resort_id}
+     * (see GrivanceController::InvestigationReportStore on the web side) —
+     * not the [{Filename,Child_id}] JSON shape used by grievance-store's
+     * own Attachments. Different storage convention, needs its own resolver.
+     */
+    private function resolvePlainFileUrls(?string $commaSeparated): array
+    {
+        if (empty($commaSeparated)) {
+            return [];
+        }
+        $basePath = config('settings.GrievanceSubmission') . '/' . $this->resort_id;
+        $urls = [];
+        foreach (explode(',', $commaSeparated) as $filename) {
+            $filename = trim($filename);
+            if ($filename === '') {
+                continue;
+            }
+            try {
+                $path = $basePath . '/' . $filename;
+                if (\App\Helpers\StorageHelper::disk()->exists($path)) {
+                    $urls[] = ['filename' => $filename, 'url' => \App\Helpers\StorageHelper::temporaryUrl($path, 30)];
+                }
+            } catch (\Throwable $e) {
+                // skip files that fail to resolve
+            }
+        }
+        return $urls;
+    }
+
+    /**
      * GET resort/grievance/my-grievances
      * Every grievance the current user has submitted (created_by, auto-set
      * by the model from the authenticated session, is the only field
@@ -450,8 +481,45 @@ class GrievanceController extends Controller
                             ? trim($emp->resortAdmin->first_name . ' ' . $emp->resortAdmin->last_name)
                             : null,
                         'statement'   => $w->Statement,
+                        'status'      => $w->status,
+                        'attachments' => $this->resolvePlainFileUrls($w->Attachement),
                     ];
                 });
+
+            // Committee investigation updates — entered on the web portal
+            // (GrivanceController::InvestigationReportStore), never exposed
+            // to mobile before. One GrivanceInvestigationModel row per
+            // grievance (start/resolution date), many
+            // GrivanceInvestigationChildModel rows underneath — one per
+            // committee stage update/follow-up entry.
+            $investigation = \App\Models\GrivanceInvestigationModel::where('Grievance_s_id', $g->id)->first();
+            $investigationData = null;
+            if ($investigation) {
+                $timeline = \App\Models\GrivanceInvestigationChildModel::where('investigation_p_id', $investigation->id)
+                    ->orderBy('id')
+                    ->get()
+                    ->map(function ($row) {
+                        $member = $row->Committee_member_id ? Employee::with('resortAdmin')->find($row->Committee_member_id) : null;
+                        return [
+                            'investigation_stage'   => $row->investigation_stage,
+                            'explanation'            => $row->Grivance_Eexplination_description,
+                            'recommendations'        => $row->inves_find_recommendations,
+                            'committee_member'       => $member && $member->resortAdmin
+                                ? trim($member->resortAdmin->first_name . ' ' . $member->resortAdmin->last_name)
+                                : null,
+                            'follow_up_action'       => $row->follow_up_action,
+                            'follow_up_description'  => $row->follow_up_description,
+                            'resolution_note'        => $row->resolution_note,
+                            'date'                   => $row->created_at,
+                        ];
+                    });
+                $investigationData = [
+                    'investigation_start_date'  => $investigation->inves_start_date,
+                    'expected_resolution_date'  => $investigation->resolution_date,
+                    'investigation_files'       => $this->resolvePlainFileUrls($investigation->investigation_files),
+                    'timeline'                  => $timeline,
+                ];
+            }
 
             $attachments = [];
             $decoded = json_decode((string) $g->Attachements, true);
@@ -494,6 +562,7 @@ class GrievanceController extends Controller
                 'witnesses'              => $witnesses,
                 'attachments'            => $attachments,
                 'has_attachments'        => count($attachments) > 0,
+                'investigation'          => $investigationData,
                 // Populated once the review process has completed.
                 'outcome_type'           => $g->outcome_type,
                 'action_taken'           => $actionTakenName,
@@ -574,6 +643,132 @@ class GrievanceController extends Controller
             }
 
             return response()->json(['status' => true, 'message' => 'Response recorded successfully.'], 200);
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::emergency("Message: " . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    /**
+     * GET resort/grievance/witness-statement-request/{grievance_id}
+     * Mirrors the Incident module's getStatementRequest() — the fetch step
+     * the push notification (RequestForStatement(), web side) had nothing
+     * to lead to before this. Caller must be a registered witness on the
+     * grievance.
+     */
+    public function witnessStatementRequest($grievanceId)
+    {
+        if (!$this->user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $emp_id = $this->user->GetEmployee->id;
+
+        try {
+            $grievanceId = base64_decode($grievanceId, true) ?: $grievanceId;
+
+            $g = GrivanceSubmissionModel::with(['category:id,Category_Name'])
+                ->where('resort_id', $this->resort_id)
+                ->where('id', $grievanceId)
+                ->first();
+
+            if (!$g) {
+                return response()->json(['success' => false, 'message' => 'Grievance not found.'], 200);
+            }
+
+            $witness = GrivanceSubmissionWitness::where('G_S_Parent_id', $g->id)
+                ->where('Witness_id', $emp_id)
+                ->first();
+
+            if (!$witness) {
+                return response()->json(['success' => false, 'message' => 'You are not registered as a witness for this grievance.'], 200);
+            }
+
+            $subCategoryName = GrievanceSubcategory::where('id', $g->Grivance_Sub_cat)->value('Sub_Category_Name');
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Witness statement request fetched successfully',
+                'data' => [
+                    'grievance' => [
+                        'id'            => $g->id,
+                        'grievance_id'  => $g->Grivance_id,
+                        'category'      => optional($g->category)->Category_Name,
+                        'subcategory'   => $subCategoryName,
+                        'incident_datetime' => $g->Grivance_date_time,
+                        'location'      => $g->location,
+                        'description'   => $g->Grivance_description,
+                    ],
+                    'existing_statement' => $witness->Statement,
+                    'already_submitted'  => $witness->status === 'Submitted',
+                    'can_submit'         => $witness->status !== 'Submitted',
+                ],
+            ], 200);
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::emergency("Message: " . $e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    /**
+     * POST resort/grievance/witness-statement — submit. Text is required;
+     * voice recording and file/image attachments both go through the same
+     * `attachments[]` field (mimes cover all three), stored the same
+     * comma-separated-filename way InvestigationReportStore() already uses
+     * for this module, resolved back via resolvePlainFileUrls().
+     */
+    public function submitWitnessStatement(Request $request)
+    {
+        if (!$this->user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'grievance_id'     => 'required|exists:grivance_submission_models,id',
+            'statement'        => 'required',
+            'attachments.*'    => 'file|mimes:jpeg,png,jpg,heic,heif,mp4,mov,doc,docx,pdf,mp3,m4a,wav,aac,ogg',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
+        }
+
+        $emp_id = $this->user->GetEmployee->id;
+
+        try {
+            $witness = GrivanceSubmissionWitness::where('G_S_Parent_id', $request->grievance_id)
+                ->where('Witness_id', $emp_id)
+                ->first();
+
+            if (!$witness) {
+                return response()->json(['success' => false, 'message' => 'You are not registered as a witness for this grievance.'], 200);
+            }
+
+            $filenames = [];
+            if ($request->hasFile('attachments')) {
+                $basePath = config('settings.GrievanceSubmission') . '/' . $this->resort_id;
+                foreach ($request->file('attachments') as $file) {
+                    $filename = time() . '_' . $file->getClientOriginalName();
+                    \App\Helpers\StorageHelper::put($basePath . '/' . $filename, file_get_contents($file->getRealPath()));
+                    $filenames[] = $filename;
+                }
+            }
+
+            $witness->Statement   = $request->statement;
+            $witness->Attachement = !empty($filenames) ? implode(',', $filenames) : null;
+            $witness->status      = 'Submitted';
+            $witness->save();
+
+            $g = GrivanceSubmissionModel::find($request->grievance_id);
+
+            return response()->json([
+                'status'  => true,
+                'message' => 'Your statement for grievance #' . optional($g)->Grivance_id . ' has been successfully submitted',
+            ], 200);
         } catch (\Exception $e) {
             \Log::emergency("File: " . $e->getFile());
             \Log::emergency("Line: " . $e->getLine());

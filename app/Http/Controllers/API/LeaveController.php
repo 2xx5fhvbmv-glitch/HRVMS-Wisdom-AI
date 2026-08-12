@@ -516,8 +516,12 @@ class LeaveController extends Controller
                     $passApprovalFlow->push($hrApprover); // Third approver: HR
                 }
 
-                // Add HOD to the approval flow (rank 2)
-                $hodApprover                             =   Employee::select('id', 'rank')->where('rank', 2)->where('resort_id',$user->resort_id)->where('Dept_id', $employee->Dept_id)->where('status', 'Active')->orderBy('id')->first();
+                // Add department head to the approval flow — HOD (rank 2),
+                // falls back to EXCOM (rank 1) via FindResortHODDepartment()
+                // for departments with no rank-2 employee (previously
+                // excluded entirely, silently dropping the department-head
+                // step from the whole approval chain).
+                $hodApprover                             =   Common::FindResortHODDepartment($user->resort_id, $employee->Dept_id);
                 if ($hodApprover ) {
                     $hodApprover->approver_role           =   'HOD';
                     $passApprovalFlow->push($hodApprover); // Second approver: HOD
@@ -718,13 +722,10 @@ class LeaveController extends Controller
                         $approvalFlow->push($directReportingManager);
                         $approvalIds[]                    = $directReportingManager->id;
                     } else {
-                        $hodApprover                      =   Employee::select('id', 'rank')
-                                                                ->where('resort_id', $user->resort_id)
-                                                                ->where('Dept_id', $employee->Dept_id)
-                                                                ->where('rank', 2)
-                                                                ->where('id', '!=', $emp_id)
-                                                                ->first();
-                        if ($hodApprover && !in_array($hodApprover->id, $approvalIds)) {
+                        // HOD (rank 2), falls back to EXCOM (rank 1) for a
+                        // department with no rank-2 employee.
+                        $hodApprover                      =   Common::FindResortHODDepartment($user->resort_id, $employee->Dept_id);
+                        if ($hodApprover && $hodApprover->id != $emp_id && !in_array($hodApprover->id, $approvalIds)) {
                             $approvalFlow->push($hodApprover);
                             $approvalIds[]                = $hodApprover->id;
                         }
@@ -753,7 +754,20 @@ class LeaveController extends Controller
                         'status'                        =>  'Pending',
                     ]);
 
-                    // Send In App Notification to each approver
+                    // Send In App Notification to each approver. When this
+                    // step is the department HOD (rank 2), also cc the
+                    // department's EXCOM — informational only, not a new
+                    // formal approval step (no extra EmployeeLeaveStatus
+                    // row, chain step count unchanged), per "XCOM should
+                    // mirror HOD" notification visibility requirement.
+                    $sendto = [$approver->id];
+                    if ((int) $approver->rank === 2) {
+                        $sendto = array_unique(array_merge(
+                            $sendto,
+                            Common::getDepartmentApproverIds($user->resort_id, $employee->Dept_id)
+                        ));
+                    }
+
                     Common::sendMobileNotification(
                        $user->resort_id,
                        2,
@@ -762,7 +776,7 @@ class LeaveController extends Controller
                         'Leave Request',
                         'A request has been sent by ' . $user->first_name . ' ' . $user->last_name . '.',
                         'Leave',
-                        [$approver->id],
+                        $sendto,
                         $leave->id,
                         false,
                         'leave-pending-approval'
@@ -1432,7 +1446,12 @@ class LeaveController extends Controller
                                                                 ->whereIn('employees_leaves.status', ['Approved', 'Rejected']) // Filter by the Status
                                                                 ->orderBy('employees_leaves.from_date', 'desc') // Optional: Order by most recent past leave first
                                                                 ->take(2)
-                                                                ->get()->map(function ($item) {
+                                                                // $emp_id wasn't captured into this closure — every call
+                                                                // below silently passed null as the viewer id instead of
+                                                                // the real employee, a warning locally but possibly fatal
+                                                                // on a server that escalates warnings to exceptions
+                                                                // (confirmed happens on this app's prod once already).
+                                                                ->get()->map(function ($item) use ($emp_id) {
                                                                     $item->approve_data         =   EmployeeLeaveStatus::where('leave_request_id', $item->id)->get()->map(function ($empAppr) {
                                                                         $role                   =   ucfirst(strtolower($empAppr->approver_rank ?? ''));
                                                                         $rank                   =   config('settings.Position_Rank');
@@ -2445,8 +2464,11 @@ class LeaveController extends Controller
                             $passApprovalFlow->push($hrApprover); // Third approver: HR
                         }
 
-                        // Add HOD to the approval flow (rank 2)
-                        $hodApprover                             =   Employee::select('id', 'rank')->where('rank', 2)->where('resort_id',$user->resort_id)->where('Dept_id', $employee->Dept_id)->where('status', 'Active')->orderBy('id')->first();
+                        // Add department head to the approval flow — HOD
+                        // (rank 2), falls back to EXCOM (rank 1) via
+                        // FindResortHODDepartment() for departments with no
+                        // rank-2 employee.
+                        $hodApprover                             =   Common::FindResortHODDepartment($user->resort_id, $employee->Dept_id);
                         if ($hodApprover ) {
                             $hodApprover->approver_role           =   'HOD';
                             $passApprovalFlow->push($hodApprover); // Second approver: HOD

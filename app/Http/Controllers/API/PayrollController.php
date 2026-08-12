@@ -45,86 +45,62 @@ class PayrollController extends Controller
             
             $year                                       =   $request->input('year', date('Y'));
 
-        // Get payroll data for the selected year
-            $payrollData                                =   DB::table('payroll')
-                                                            ->select(
-                                                                DB::raw("MONTHNAME(start_date) as month"),
-                                                                DB::raw("SUM(total_payroll) as payroll_cost")
-                                                            )
-                                                            ->whereYear('start_date', $year)
-                                                            ->groupBy('month')
+            // 12-month chart data (Basic Pay / Overtime / Service Charge per
+            // month, this employee only). Was three separate queries: one
+            // pulling SUM(total_payroll) with no employee_id filter at all
+            // (the whole resort's payroll cost for the month, not this
+            // employee's), and an OT recompute using the employee's full
+            // monthly basic_salary as if it were an hourly rate (missing
+            // /days-in-period/8 — the same formula PayrollController's
+            // run-payroll estimate uses), inflating OT cost by roughly two
+            // orders of magnitude. payroll_reviews already stores the real,
+            // correctly-computed per-period earnings_basic/earnings_overtime/
+            // service_charge for each employee (same source the rest of
+            // this dashboard already trusts for the current-period fields
+            // below) — pull the whole year from there instead of
+            // recomputing anything.
+            $monthlyReviews                             =   DB::table('payroll_reviews as pr')
+                                                            ->join('payroll as p', 'p.id', '=', 'pr.payroll_id')
+                                                            ->where('pr.employee_id', $employee_id)
+                                                            ->whereYear('p.start_date', $year)
+                                                            ->selectRaw('MONTH(p.start_date) as month_num, SUM(pr.earnings_basic) as basic, SUM(pr.earnings_overtime) as overtime, SUM(pr.service_charge) as service_charge')
+                                                            ->groupBy('month_num')
                                                             ->get();
 
-            $otData                                     =   DB::table('payroll as p')
-                                                            ->join('payroll_time_and_attandance as pta', 'p.id', '=', 'pta.payroll_id')
-                                                            ->join('employees as e', 'e.id', '=', 'pta.employee_id')
-                                                            ->whereYear('start_date', $year)
-                                                            ->where('pta.employee_id',$employee_id)
-                                                            ->where(function ($query) {
-                                                                $query->where('pta.regular_ot_hours', '>', 0)
-                                                                    ->orWhere('pta.holiday_ot_hours', '>', 0);
-                                                            }) // Only fetch employees with OT
-                                                            ->selectRaw("
-                                                                MONTHNAME(p.start_date) as month,
-                                                                pta.employee_id,
-                                                                e.basic_salary,
-                                                                pta.regular_ot_hours,
-                                                                pta.holiday_ot_hours,
-                                                                (pta.regular_ot_hours * e.basic_salary * 1.25) as regular_ot_cost,
-                                                                (pta.holiday_ot_hours * e.basic_salary * 1.50) as holiday_ot_cost,
-                                                                ((pta.regular_ot_hours * e.basic_salary * 1.25) + 
-                                                                (pta.holiday_ot_hours * e.basic_salary * 1.50)) as ot_cost
-                                                            ")->get();
-        
-            // Get service charge data
-            $serviceChargeData                          =   DB::table('payroll_service_charges')
-                                                            ->join('payroll','payroll.id','=','payroll_service_charges.payroll_id')
-                                                            ->where('payroll_service_charges.employee_id',$employee_id)
-                                                            ->select(
-                                                                DB::raw("MONTHNAME(payroll.start_date) as month"),
-                                                                DB::raw("SUM(payroll_service_charges.service_charge_amount) as service_charge")
-                                                            )
-                                                            ->whereYear('payroll.start_date', $year)
-                                                            ->groupBy('month')
-                                                            ->get();
-                                                            
-            // Generate labels (Months)
-            $months                                     =   ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+            $monthLabels                                =   ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
             // Initialize arrays
             $payrollCost                                =   array_fill(0, 12, 0);
             $otCost                                     =   array_fill(0, 12, 0);
             $serviceCharge                              =   array_fill(0, 12, 0);
 
-            // Map database results to correct month index
-            foreach ($payrollData as $row) {
-                $index                                  = array_search($row->month, $months);
-                if ($index !== false) {
-                    $payrollCost[$index]                = $row->payroll_cost;
+            foreach ($monthlyReviews as $row) {
+                $index                                  = ((int) $row->month_num) - 1;
+                if ($index >= 0 && $index < 12) {
+                    $payrollCost[$index]                = round((float) $row->basic, 2);
+                    $otCost[$index]                     = round((float) $row->overtime, 2);
+                    $serviceCharge[$index]               = round((float) $row->service_charge, 2);
                 }
             }
 
-            foreach ($otData as $row) {
-                $index                                  = array_search(strtolower($row->month), array_map('strtolower', $months));
-            
-                if ($index !== false) {
-                    if (!isset($otCost[$index])) {
-                        $otCost[$index]                 = 0;
-                    }
-                    $otCost[$index]                     += $row->ot_cost; // Accumulate OT costs
-                }
-            }
+            $chartLabels                                =   array_map(fn($m) => $m . ' ' . $year, $monthLabels);
 
-            foreach ($serviceChargeData as $row) {
-                $index                                  = array_search($row->month, $months);
-                if ($index !== false) {
-                    $serviceCharge[$index]              = $row->service_charge;
-                }
-            }
+            // Trend badge ("Last 12 Months +12%") — this year's total net
+            // salary vs the prior year's, same employee.
+            $currentYearNet                             =   (float) DB::table('payroll_reviews as pr')
+                                                            ->join('payroll as p', 'p.id', '=', 'pr.payroll_id')
+                                                            ->where('pr.employee_id', $employee_id)
+                                                            ->whereYear('p.start_date', $year)
+                                                            ->sum('pr.net_salary');
+            $priorYearNet                                =   (float) DB::table('payroll_reviews as pr')
+                                                            ->join('payroll as p', 'p.id', '=', 'pr.payroll_id')
+                                                            ->where('pr.employee_id', $employee_id)
+                                                            ->whereYear('p.start_date', $year - 1)
+                                                            ->sum('pr.net_salary');
+            $yearOverYearChangePercent                  =   $priorYearNet > 0
+                                                            ? round((($currentYearNet - $priorYearNet) / $priorYearNet) * 100, 1)
+                                                            : null;
        
-            $lastMonth                                  = Carbon::now()->subMonth()->format('m'); // Example: "03" for March
-            $currentYear                                = Carbon::now()->format('Y'); // Example: "2025"
-
             // payroll_deductions/payroll_reviews/payroll_service_charges don't
             // necessarily have a row for every employee in every payroll run
             // (e.g. no service charge for non-tipped departments) — these
@@ -141,15 +117,33 @@ class PayrollController extends Controller
                                                             ->leftJoin('payroll_deductions as pd', function($j) use ($employee_id) {
                                                                 $j->on('pd.payroll_id','=','payroll.id')->where('pd.employee_id',$employee_id);
                                                             })
-                                                            ->leftJoin('payroll_reviews as pr', function($j) use ($employee_id) {
+                                                            // Was a left join — several of an employee's payroll_employees
+                                                            // rows are just roster entries with earnings never actually
+                                                            // calculated (no payroll_reviews row at all yet), so picking
+                                                            // "the latest period" alone could still land on an
+                                                            // unprocessed one and show 0. Requiring the review row to
+                                                            // exist means this always lands on the latest period that
+                                                            // was genuinely processed. Deductions/service-charge stay
+                                                            // left-joined — those can legitimately be absent even for a
+                                                            // fully processed period (e.g. no service charge for a
+                                                            // non-tipped role).
+                                                            ->join('payroll_reviews as pr', function($j) use ($employee_id) {
                                                                 $j->on('pr.payroll_id','=','payroll.id')->where('pr.employee_id',$employee_id);
                                                             })
                                                             ->leftJoin('payroll_service_charges as psc', function($j) use ($employee_id) {
                                                                 $j->on('psc.payroll_id','=','payroll.id')->where('psc.employee_id',$employee_id);
                                                             })
                                                             ->where('pe.employee_id',$employee_id)
-                                                            ->whereMonth('payroll.start_date', $lastMonth)
-                                                            ->whereYear('payroll.start_date', $currentYear)
+                                                            // Was hardcoded to exactly last calendar month — if payroll
+                                                            // for that specific month hasn't been run yet (a common lag;
+                                                            // e.g. today is in August but the latest processed payroll
+                                                            // run only covers 26 Mar-25 Apr), this matched nothing and
+                                                            // every field on the dashboard silently showed 0 even though
+                                                            // the employee's payslip history (a separate endpoint) has
+                                                            // real data. Show whatever the most recently processed
+                                                            // payroll period actually is instead of demanding an exact
+                                                            // month match.
+                                                            ->orderBy('payroll.start_date', 'desc')
                                                             ->select(
                                                                 'payroll.*',
                                                                 'ra.first_name',
@@ -187,6 +181,23 @@ class PayrollController extends Controller
                     'payrollCost'                       => $payrollCost,
                     'otCost'                            => $otCost,
                     'serviceCharge'                     => $serviceCharge,
+                    // Everything the 12-month stacked bar chart needs in one
+                    // object — labels already carry the year (e.g. "Jan
+                    // 2026") so the app doesn't have to reconstruct them.
+                    'chart'                             => [
+                        'labels'                        => $chartLabels,
+                        'basic_pay'                      => $payrollCost,
+                        'overtime'                       => $otCost,
+                        'service_charge'                 => $serviceCharge,
+                    ],
+                    'net_salary_trend'                  => [
+                        'current_year_total'            => round($currentYearNet, 2),
+                        'prior_year_total'               => round($priorYearNet, 2),
+                        // null when there's no prior-year data to compare
+                        // against at all — a literal 0% would falsely read
+                        // as "no change" instead of "not enough history".
+                        'change_percent'                 => $yearOverYearChangePercent,
+                    ],
                     'salary'                            => round($payroll->earnings_basic ?? 0,2),
                     'earnings'                          => round($earningsTotal, 2),  // Ensuring two decimal places
                     'deductions'                        => round($payroll->total_deductions ?? 0, 2),
@@ -230,8 +241,6 @@ class PayrollController extends Controller
         
         $employee_id                                    =   $this->user->GetEmployee->id;
         $year                                           =   $request->year ?? Carbon::now()->format('Y');
-        $lastMonth                                      =   Carbon::now()->subMonth()->format('m');
-        $currentYear                                    =   Carbon::now()->format('Y');
 
         try {
              // Fetch Employee Details
@@ -259,15 +268,24 @@ class PayrollController extends Controller
                                                             ->leftJoin('payroll_time_and_attandance as ptaa', function($j) use ($employee_id) {
                                                                 $j->on('ptaa.payroll_id','=','payroll.id')->where('ptaa.employee_id',$employee_id);
                                                             })
-                                                            ->leftJoin('payroll_reviews as pr', function($j) use ($employee_id) {
+                                                            // Inner join, not left — several payroll_employees rows are
+                                                            // roster-only with earnings never calculated (no
+                                                            // payroll_reviews row yet); requiring it here means "latest
+                                                            // period" (below) always lands on one that was genuinely
+                                                            // processed, same reasoning as payrollDashboard().
+                                                            ->join('payroll_reviews as pr', function($j) use ($employee_id) {
                                                                 $j->on('pr.payroll_id','=','payroll.id')->where('pr.employee_id',$employee_id);
                                                             })
                                                             ->leftJoin('payroll_deductions as pd', function($j) use ($employee_id) {
                                                                 $j->on('pd.payroll_id','=','payroll.id')->where('pd.employee_id',$employee_id);
                                                             })
                                                             ->where('pe.employee_id',$employee_id)
-                                                            ->whereMonth('payroll.start_date', $lastMonth)
-                                                            ->whereYear('payroll.start_date', $currentYear)
+                                                            // Same "exactly last calendar month" bug as payrollDashboard()
+                                                            // — shows the most recently processed period instead of
+                                                            // demanding an exact match, so this header snapshot doesn't
+                                                            // go blank while the list right below it (queried by year
+                                                            // only) has real rows for the same employee.
+                                                            ->orderBy('payroll.start_date', 'desc')
                                                             ->select(
                                                                 'payroll.id', 'ptaa.total_ot', 'pr.earnings_allowance',
                                                                 'pr.earnings_basic', 'pd.total_deductions'
@@ -353,10 +371,19 @@ class PayrollController extends Controller
        
         try {
              
-            // Fetch Last Month's Payroll Data. Same INNER-JOIN-drops-rows
-            // bug as payrollDashboard()/paySlipList() — left-joined so a
-            // missing deductions/reviews/service_charge row for a given
-            // month doesn't hide that month's payslip entirely.
+            // Fetch Last Month's Payroll Data. Deductions/service-charge stay
+            // left-joined (a missing row there just means $0 deductions/no
+            // service charge, still a real payslip) — but payroll_reviews
+            // must be an inner join: no payroll_reviews row means this
+            // payroll_employees row is roster-only, earnings never
+            // calculated (same reasoning already applied in
+            // payrollDashboard()/paySlipList()'s header-snapshot query).
+            // Left-joining it here meant a real processed payslip could lose
+            // to a roster-only placeholder for the same month via
+            // ->first(), returning an all-null/all-zero "payslip" for a
+            // period that actually has real data (this is exactly what the
+            // Payslip List screen — queried without this bug — showed
+            // correctly while this detail endpoint showed zeros).
             $payroll                                    =   Payroll::join('payroll_employees as pe','pe.payroll_id','=','payroll.id')
                                                                 ->join('employees as e','e.id','=','pe.employee_id')
                                                                 ->join('resort_admins as ra','ra.id','=','e.Admin_Parent_id')
@@ -365,7 +392,7 @@ class PayrollController extends Controller
                                                                 ->leftJoin('payroll_deductions as pd', function($j) use ($employee_id) {
                                                                     $j->on('pd.payroll_id','=','payroll.id')->where('pd.employee_id',$employee_id);
                                                                 })
-                                                                ->leftJoin('payroll_reviews as pr', function($j) use ($employee_id) {
+                                                                ->join('payroll_reviews as pr', function($j) use ($employee_id) {
                                                                     $j->on('pr.payroll_id','=','payroll.id')->where('pr.employee_id',$employee_id);
                                                                 })
                                                                 ->leftJoin('payroll_service_charges as psc', function($j) use ($employee_id) {
@@ -373,10 +400,23 @@ class PayrollController extends Controller
                                                                 })
                                                                 ->where('pe.employee_id',$employee_id);
                                                                 if($month) {
-                                                                    $payroll->whereMonth('payroll.start_date', $month);
+                                                                    // A pay period is labelled by the month it ENDS in
+                                                                    // (e.g. 26 Feb - 25 Mar is "March's" payslip — matches
+                                                                    // how the Payslip List screen already displays it), not
+                                                                    // the month it starts in. Filtering on start_date meant
+                                                                    // asking for "March" never matched this period at all
+                                                                    // (its start_date is in February), even though it's
+                                                                    // exactly the real, fully-processed period the list
+                                                                    // screen shows for that card.
+                                                                    $payroll->whereMonth('payroll.end_date', $month);
                                                                 }
 
             $payroll                                    =   $payroll->whereYear('payroll.start_date', $year)
+                                                                // Two genuinely-processed periods can both end in the
+                                                                // same month (e.g. a correction/re-run) — most recently
+                                                                // created wins, matching real data where a later run
+                                                                // (higher id) is the one with the actually-current figures.
+                                                                ->orderBy('payroll.id', 'desc')
                                                                 ->select(
                                                                     'payroll.*', 'ra.first_name', 'ra.last_name', 'ra.profile_picture',
                                                                     'ra.id as admin_id', 'rp.position_title as position', 'rd.name as department', 'e.joining_date',
@@ -464,10 +504,19 @@ class PayrollController extends Controller
        
         try {
              
-            // Fetch Last Month's Payroll Data. Same INNER-JOIN-drops-rows
-            // bug as payrollDashboard()/paySlipList() — left-joined so a
-            // missing deductions/reviews/service_charge row for a given
-            // month doesn't hide that month's payslip entirely.
+            // Fetch Last Month's Payroll Data. Deductions/service-charge stay
+            // left-joined (a missing row there just means $0 deductions/no
+            // service charge, still a real payslip) — but payroll_reviews
+            // must be an inner join: no payroll_reviews row means this
+            // payroll_employees row is roster-only, earnings never
+            // calculated (same reasoning already applied in
+            // payrollDashboard()/paySlipList()'s header-snapshot query).
+            // Left-joining it here meant a real processed payslip could lose
+            // to a roster-only placeholder for the same month via
+            // ->first(), returning an all-null/all-zero "payslip" for a
+            // period that actually has real data (this is exactly what the
+            // Payslip List screen — queried without this bug — showed
+            // correctly while this detail endpoint showed zeros).
             $payroll                                    =   Payroll::join('payroll_employees as pe','pe.payroll_id','=','payroll.id')
                                                                 ->join('employees as e','e.id','=','pe.employee_id')
                                                                 ->join('resort_admins as ra','ra.id','=','e.Admin_Parent_id')
@@ -476,7 +525,7 @@ class PayrollController extends Controller
                                                                 ->leftJoin('payroll_deductions as pd', function($j) use ($employee_id) {
                                                                     $j->on('pd.payroll_id','=','payroll.id')->where('pd.employee_id',$employee_id);
                                                                 })
-                                                                ->leftJoin('payroll_reviews as pr', function($j) use ($employee_id) {
+                                                                ->join('payroll_reviews as pr', function($j) use ($employee_id) {
                                                                     $j->on('pr.payroll_id','=','payroll.id')->where('pr.employee_id',$employee_id);
                                                                 })
                                                                 ->leftJoin('payroll_service_charges as psc', function($j) use ($employee_id) {
@@ -484,10 +533,23 @@ class PayrollController extends Controller
                                                                 })
                                                                 ->where('pe.employee_id',$employee_id);
                                                                 if($month) {
-                                                                    $payroll->whereMonth('payroll.start_date', $month);
+                                                                    // A pay period is labelled by the month it ENDS in
+                                                                    // (e.g. 26 Feb - 25 Mar is "March's" payslip — matches
+                                                                    // how the Payslip List screen already displays it), not
+                                                                    // the month it starts in. Filtering on start_date meant
+                                                                    // asking for "March" never matched this period at all
+                                                                    // (its start_date is in February), even though it's
+                                                                    // exactly the real, fully-processed period the list
+                                                                    // screen shows for that card.
+                                                                    $payroll->whereMonth('payroll.end_date', $month);
                                                                 }
 
             $payroll                                    =   $payroll->whereYear('payroll.start_date', $year)
+                                                                // Two genuinely-processed periods can both end in the
+                                                                // same month (e.g. a correction/re-run) — most recently
+                                                                // created wins, matching real data where a later run
+                                                                // (higher id) is the one with the actually-current figures.
+                                                                ->orderBy('payroll.id', 'desc')
                                                                 ->select(
                                                                     'payroll.*', 'ra.first_name', 'ra.last_name', 'ra.profile_picture',
                                                                     'ra.id as admin_id', 'rp.position_title as position', 'rd.name as department', 'e.joining_date',

@@ -3149,7 +3149,7 @@ class ApplicantsController extends Controller
         ";
 
         try {
-            \App\Jobs\TaEmailSent::dispatch($applicant->email, $subject, ['mainbody' => $body]);
+            \App\Jobs\TaEmailSent::dispatch($applicant->email, $subject, ['mainbody' => $body], $this->resort->resort_id);
         } catch (\Exception $e) {
             \Log::warning("Consent email failed: " . $e->getMessage());
         }
@@ -3231,7 +3231,7 @@ class ApplicantsController extends Controller
         ";
 
         try {
-            \App\Jobs\TaEmailSent::dispatch($applicant->email, $subject, ['mainbody' => $body]);
+            \App\Jobs\TaEmailSent::dispatch($applicant->email, $subject, ['mainbody' => $body], $this->resort->resort_id);
         } catch (\Exception $e) {
             \Log::warning("Availability email exception: " . $e->getMessage());
         }

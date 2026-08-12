@@ -84,4 +84,9 @@ class EmployeeTravelPass extends Model
     {
         return $this->belongsTo(ResortTransportation::class,'arrival_mode');
     }
+
+    public function manifest()
+    {
+        return $this->belongsTo(Manifest::class, 'manifest_id');
+    }
 }

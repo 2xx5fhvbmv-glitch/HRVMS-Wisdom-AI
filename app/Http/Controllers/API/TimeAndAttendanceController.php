@@ -537,27 +537,51 @@ class TimeAndAttendanceController extends Controller
 
             // Roster-level, not per-day — a geofence zone is assigned to
             // the whole duty_rosters row (see myGeofenceZone()), not per
-            // schedule entry, so this is resolved once per response instead
-            // of duplicated onto every row in $timeAttendanceData. Was
-            // entirely absent from this endpoint's response, so the app had
-            // no way to know a roster was geofence-bound at all.
-            // A roster can have more than one zone assigned (Assign
-            // Geo-Fence Zone is a multi-select) — returns a list, empty
-            // when none configured.
+            // schedule entry. Was resolved from a single $rosterEntry (the
+            // first matching row for the viewed week/month), so an employee
+            // with more than one roster block in the viewed range (e.g.
+            // "Dev test shift" 4th-5th on one geofence, "Asters Shift"
+            // 6th-8th on a different one) only ever got the FIRST block's
+            // geofence back — the app kept showing that same one for every
+            // date, never switching. Now resolves every distinct roster_id
+            // actually present in $timeAttendanceData, each tagged with the
+            // dates/shift it applies to, so the app can look up the right
+            // geofence for whichever date is selected instead of assuming
+            // there's only one.
             $geofence = [];
-            if ($rosterEntry) {
-                $rosterRow = DutyRoster::find($rosterEntry->roster_id);
-                if ($rosterRow) {
-                    foreach (Common::resolveDutyRosterGeofences($rosterRow->geofence_zone_id) as $zone) {
-                        $geofence[] = [
-                            'id'           => $zone->id,
-                            'name'         => $zone->name,
-                            'color'        => $zone->color,
-                            'shape_type'   => $zone->shape_type,
-                            'coordinates'  => json_decode($zone->coordinates, true),
-                            'grace_period' => $zone->grace_period,
-                        ];
-                    }
+            $rosterIdToDates = [];
+            $rosterIdToShiftName = [];
+            foreach ($timeAttendanceData as $row) {
+                $rid = $row['roster_id'] ?? null;
+                if (empty($rid)) {
+                    continue;
+                }
+                $rDate = $row['date'] ?? null;
+                $rDate = is_object($rDate) && method_exists($rDate, 'format') ? $rDate->format('Y-m-d') : (string) $rDate;
+                if ($rDate !== '') {
+                    $rosterIdToDates[$rid][] = $rDate;
+                }
+                if (!isset($rosterIdToShiftName[$rid]) && !empty($row['ShiftName'])) {
+                    $rosterIdToShiftName[$rid] = $row['ShiftName'];
+                }
+            }
+            foreach ($rosterIdToDates as $rid => $dates) {
+                $rosterRow = DutyRoster::find($rid);
+                if (!$rosterRow) {
+                    continue;
+                }
+                foreach (Common::resolveDutyRosterGeofences($rosterRow->geofence_zone_id) as $zone) {
+                    $geofence[] = [
+                        'id'           => $zone->id,
+                        'name'         => $zone->name,
+                        'color'        => $zone->color,
+                        'shape_type'   => $zone->shape_type,
+                        'coordinates'  => json_decode($zone->coordinates, true),
+                        'grace_period' => $zone->grace_period,
+                        'roster_id'    => $rid,
+                        'shift_name'   => $rosterIdToShiftName[$rid] ?? null,
+                        'dates'        => array_values(array_unique($dates)),
+                    ];
                 }
             }
 
@@ -1383,7 +1407,9 @@ class TimeAndAttendanceController extends Controller
         $isHOD   = ($rank == 2 || $rank === '2');
 
         $canViewAll = ($isHRDept || $isEODept) && ($isGM || $isEXCOM || $isHOD);
-        $isDeptHOD  = ($rank == 2 && $deptId && $department && !$isHRDept);
+        // HOD and EXCOM get identical dept-wide permission for a non-HR
+        // department — was HOD-only.
+        $isDeptHOD  = (($isHOD || $isEXCOM) && $deptId && $department && !$isHRDept);
 
         $isAllowed = $canViewAll
             || ($isDeptHOD && (int) $targetEmployee->Dept_id === (int) $deptId)
@@ -3922,8 +3948,9 @@ class TimeAndAttendanceController extends Controller
             $isHOD    = ($rank == 2 || $rank === '2');
 
             $canViewAll = ($isHRDept || $isEODept) && ($isGM || $isEXCOM || $isHOD);
+            // HOD and EXCOM get identical dept-wide permission — was HOD-only.
             $isDeptHOD  = false;
-            if ($rank == 2 && $deptId && $department && !$isHRDept) {
+            if (($isHOD || $isEXCOM) && $deptId && $department && !$isHRDept) {
                 $isDeptHOD = true;
             }
 

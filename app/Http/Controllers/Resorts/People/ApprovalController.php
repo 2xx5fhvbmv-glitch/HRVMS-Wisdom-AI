@@ -235,7 +235,10 @@ class ApprovalController extends Controller
             // Pending resignation to GM (rank 8) — who then got
             // "You are not authorized to update this resignation
             // status." when they clicked Approve.
-            if ($rank == 2) {
+            // HOD (2) and EXCOM (1) — hod_id can now be an EXCOM's id too
+            // (FindResortHODDepartment falls back to EXCOM for a department
+            // with no HOD), so the acting-user check needs to accept both.
+            if (in_array((int) $rank, [1, 2], true)) {
                 $empResignations->where(function($q) use ($employee, $delegatedForIds) {
                     $q->where('hod_id', $employee->id)
                       ->orWhereIn('hod_id', $delegatedForIds);

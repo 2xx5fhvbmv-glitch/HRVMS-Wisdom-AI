@@ -63,7 +63,15 @@ class StaffAccommodationController extends Controller
                                                                     ->join('building_models as bm', 'bm.id', '=', 'available_accommodation_models.BuildingName')
                                                                     ->where('available_accommodation_models.resort_id', $this->resort_id)
                                                                     ->where("t1.emp_id", $employee->id)
-                                                                    ->select('available_accommodation_models.*','t1.id as assing_acc_id','t1.BedNo','t1.emp_id','bm.BuildingName')
+                                                                    // bm.BuildingName (the actual building name string) must alias to
+                                                                    // BName, not the bare 'BuildingName' the wildcard already selects —
+                                                                    // available_accommodation_models.BuildingName is itself a distinct
+                                                                    // (string-typed) column, and two columns sharing one output key
+                                                                    // collapse to whichever comes last in the result set, silently
+                                                                    // dropping the wildcard's value. Same convention already used by
+                                                                    // AccommodationController::mainRequestDetails and
+                                                                    // AssignAccommodationController for this identical join.
+                                                                    ->select('available_accommodation_models.*','t1.id as assing_acc_id','t1.BedNo','t1.emp_id','bm.BuildingName as BName')
                                                                     ->first();
 
             // Check if accommodation details exist to avoid errors
@@ -84,7 +92,18 @@ class StaffAccommodationController extends Controller
                                                                     ->orderBy('maintanace_requests.created_at', 'desc')
                                                                     ->whereNotIn("maintanace_requests.Status", ['ResolvedAwaiting'])
                                                                     ->take(2)
-                                                                    ->get(['maintanace_requests.*']);
+                                                                    ->get(['maintanace_requests.*'])
+                                                                    // Third duplicate path returning raw Image values
+                                                                    // unresolved (viewMaintenanceRequest and
+                                                                    // staffMaintenanceReqList already went through
+                                                                    // resolveMaintenanceAttachmentUrl — this dashboard
+                                                                    // card list didn't).
+                                                                    ->map(function ($row) {
+                                                                        if (!empty($row->Image)) {
+                                                                            $row->Image = Common::resolveMaintenanceAttachmentUrl($row->Image, $this->resort_id);
+                                                                        }
+                                                                        return $row;
+                                                                    });
             
             $completeMaintananceReqQuery                    =   MaintanaceRequest::join("employees as t3", "t3.id", "=", "maintanace_requests.Raised_By")
                                                                     ->join("resort_admins as t1", "t1.id", "=", "t3.Admin_Parent_id")
@@ -159,7 +178,10 @@ class StaffAccommodationController extends Controller
                                                                     ->where("available_accommodation_models.id", $accommodationId)
                                                                     ->where("t1.emp_id", $employee->id)
                                                                     ->with('availableAccommodationInvItem.inventoryModule')
-                                                                    ->select('available_accommodation_models.*','at.AccommodationName','t1.id as assing_acc_id','t1.BedNo','t1.emp_id as employee_id','bm.BuildingName','e.Emp_id','ra.first_name','ra.last_name','rd.name as department_name','ra.id as Parentid');
+                                                                    // Same wildcard/alias collision as staffAccommodationDashboard() above —
+                                                                    // bm.BuildingName must not reuse the 'BuildingName' key already
+                                                                    // produced by available_accommodation_models.*.
+                                                                    ->select('available_accommodation_models.*','at.AccommodationName','t1.id as assing_acc_id','t1.BedNo','t1.emp_id as employee_id','bm.BuildingName as BName','e.Emp_id','ra.first_name','ra.last_name','rd.name as department_name','ra.id as Parentid');
                                                                     
             $accommodationDetails                           =   $accommodationDetailsQuery->first();
 
@@ -254,8 +276,13 @@ class StaffAccommodationController extends Controller
 
         try {
             DB::beginTransaction();
-            $date                                       =   DateTime::createFromFormat('d/m/Y', $request->date);
-            $date                                       =   isset($request->date) ? $date->format('Y-m-d') :  date('Y-m-d');
+            // createFromFormat() returns false (not an exception) on any
+            // mismatch — a date sent in the wrong format (or any format
+            // other than exactly d/m/Y) made $parsedDate false, and
+            // ->format() on false was a fatal "call to member function on
+            // bool", not a clean validation error.
+            $parsedDate                                 =   $request->filled('date') ? DateTime::createFromFormat('d/m/Y', $request->date) : false;
+            $date                                       =   $parsedDate ? $parsedDate->format('Y-m-d') : date('Y-m-d');
             $path_path                                  =   config('settings.MaintanceRequest') . '/' . Auth::guard('api')->user()->resort->resort_id;
 
             // Building/floor/room must come from the employee's own accommodation
@@ -285,16 +312,27 @@ class StaffAccommodationController extends Controller
             ];
 
             $filePath                                   =   null;
+            $attachmentUploadFailed                     =   false;
+            $attachmentUploadError                      =   null;
             if ($request->hasFile('Image')) {
                 $file       =   $request->file('Image');
                 $SubFolder  =   "MaintanceRequest";
                 $status     =   Common::AWSEmployeeFileUpload($this->resort_id, $file, $this->user->GetEmployee->Emp_id, $SubFolder, true);
 
                 if ($status['status'] == false) {
-                    return response()->json([
-                        'success'           =>  false, 
-                        'message'           =>  'File upload failed: ' . ($status['msg'] ?? 'Unknown error')
-                    ], 400);
+                    // Was blocking the ENTIRE request over a photo upload
+                    // failure — a storage-provider outage (e.g. Wasabi
+                    // account suspended) meant no employee could submit any
+                    // maintenance request at all, even a text-only one,
+                    // until the storage provider was fixed. The description/
+                    // priority/room details are still valid and worth
+                    // saving; degrade instead of blocking — create the
+                    // request without the photo and tell the caller it
+                    // didn't attach, so the app can say "submitted, but add
+                    // your photo later" instead of "failed, try again"
+                    // (retrying would hit the same outage every time).
+                    $attachmentUploadFailed             =   true;
+                    $attachmentUploadError              =   $status['msg'] ?? 'Attachment upload failed.';
                 } else {
                     if($status['status'] == true && isset($status['Chil_file_id']) && !empty($status['Chil_file_id'])) {
                         $filename                       =   $file->getClientOriginalName();
@@ -344,8 +382,14 @@ class StaffAccommodationController extends Controller
             
             DB::commit();
             $response['status']                         =   true;
-            $response['message']                        =   'Maintanance Request Created Successfully';
-           
+            $response['message']                        =   $attachmentUploadFailed
+                ? 'Maintenance request created successfully, but your photo could not be uploaded. You can add it later by editing this request.'
+                : 'Maintanance Request Created Successfully';
+            $response['attachment_upload_failed']       =   $attachmentUploadFailed;
+            if ($attachmentUploadFailed) {
+                $response['attachment_upload_error']    =   $attachmentUploadError;
+            }
+
             return response()->json($response);
 
         } catch (\Exception $e) {
@@ -563,8 +607,13 @@ class StaffAccommodationController extends Controller
 
         try {
             DB::beginTransaction();
-            $date                                       =   DateTime::createFromFormat('d/m/Y', $request->date);
-            $date                                       =   isset($request->date) ? $date->format('Y-m-d') :  date('Y-m-d');
+            // createFromFormat() returns false (not an exception) on any
+            // mismatch — a date sent in the wrong format (or any format
+            // other than exactly d/m/Y) made $parsedDate false, and
+            // ->format() on false was a fatal "call to member function on
+            // bool", not a clean validation error.
+            $parsedDate                                 =   $request->filled('date') ? DateTime::createFromFormat('d/m/Y', $request->date) : false;
+            $date                                       =   $parsedDate ? $parsedDate->format('Y-m-d') : date('Y-m-d');
             $path_path                                  =   config('settings.MaintanceRequest') . '/' . Auth::guard('api')->user()->resort->resort_id;
             
             $maintanaceRequestEdit                      =   MaintanaceRequest::find($request->request_id);

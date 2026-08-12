@@ -943,6 +943,22 @@ class ResortModulePagesSeeder extends Seeder
               "place_order"     => "0"
             ],
            [
+              "page_name"       => "Master Import",
+              "Module_Id"       => "14",
+              "internal_route"  => "resort.masterimport.index",
+              "TypeOfPage"      => "InsideOfMenu",
+              "type"            => "normal",
+              "place_order"     => "1"
+            ],
+           [
+              "page_name"       => "Email Config",
+              "Module_Id"       => "14",
+              "internal_route"  => "resort.emailconfig.index",
+              "TypeOfPage"      => "InsideOfMenu",
+              "type"            => "normal",
+              "place_order"     => "2"
+            ],
+           [
               "page_name"       => "Final Settlement List",
               "Module_Id"       => "2",
               "internal_route"  => "final.settlement.list",
