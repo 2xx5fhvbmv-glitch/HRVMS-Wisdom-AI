@@ -62,6 +62,7 @@
     <button type="button" id="wai-launcher" aria-label="Open chat">
         <span class="wai-launcher-icon"><img src="{{ URL::asset('resorts_assets/images/wisdom-ai-icon.jpeg') }}" class="wai-bot-img" alt="Chat"></span>
         <span class="wai-launcher-spark"><i class="fa-solid fa-wand-magic-sparkles"></i></span>
+        <span id="uc-launcher-badge" class="uc-launcher-badge" style="display:none;">0</span>
     </button>
 
     <!-- Launcher chooser: Ask Wisdom AI vs message a colleague -->
@@ -216,6 +217,12 @@
     background: #0b2e37; width: 22px; height: 22px; border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
     box-shadow: 0 2px 8px rgba(0,0,0,.3);
+}
+.uc-launcher-badge {
+    position: absolute; top: -5px; left: -5px; min-width: 21px; height: 21px; padding: 0 5px;
+    background: #e5484d; color: #fff; font-size: 11.5px; font-weight: 700; line-height: 21px;
+    text-align: center; border-radius: 11px; box-shadow: 0 0 0 2px #f7f7fb, 0 2px 6px rgba(0,0,0,.3);
+    font-variant-numeric: tabular-nums;
 }
 @keyframes wai-pulse {
     0%   { box-shadow: 0 10px 28px rgba(11,46,55,.45), 0 0 0 0 rgba(28,124,129,.45); }
@@ -715,9 +722,11 @@
             // URL (only the REST endpoints do that), so a re-fetch is the
             // simplest correct way to render it.
             loadThread();
-        } else if (ucPanel.classList.contains('wai-open') && viewList.style.display !== 'none') {
-            loadConversations();
         }
+        // Always refresh in the background (updates the launcher badge and
+        // list preview/unread counts) — not just while the list view is on
+        // screen, since the badge has to update even with the panel closed.
+        loadConversations();
         if (window.playChatPing) window.playChatPing();
     }
 
@@ -744,10 +753,11 @@
     // widget) in the page layout, so window.Echo doesn't exist yet at this
     // point in document order. DOMContentLoaded fires once every
     // synchronous script — including the later one — has run.
+    function initRealtimeAndBadge() { subscribeRealtime(); loadConversations(); }
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', subscribeRealtime);
+        document.addEventListener('DOMContentLoaded', initRealtimeAndBadge);
     } else {
-        subscribeRealtime();
+        initRealtimeAndBadge();
     }
 
     // ---- Launcher chooser --------------------------------------------------
@@ -781,16 +791,34 @@
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && ucPanel.classList.contains('wai-open')) closeUsersChat(); });
 
     // ---- Conversation list --------------------------------------------------
+    function updateLauncherBadge(list) {
+        var badge = document.getElementById('uc-launcher-badge');
+        var total = (list || []).reduce(function (sum, c) { return sum + (parseInt(c.unread_count, 10) || 0); }, 0);
+        if (total > 0) {
+            badge.textContent = total > 99 ? '99+' : String(total);
+            badge.style.display = 'flex';
+        } else {
+            badge.style.display = 'none';
+        }
+    }
+
+    // Called both to render the visible list and, silently, in the
+    // background (panel closed, or another view open) purely to keep the
+    // launcher's unread badge accurate as messages arrive in realtime.
     function loadConversations() {
-        document.getElementById('uc-conversations').innerHTML = '<div class="uc-empty">Loading…</div>';
+        var listVisible = ucPanel.classList.contains('wai-open') && viewList.style.display !== 'none';
+        if (listVisible) document.getElementById('uc-conversations').innerHTML = '<div class="uc-empty">Loading…</div>';
         fetch(LIST_URL, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
             .then(function (r) { return r.json(); })
             .then(function (data) {
                 convCache = (data && data.chats) ? data.chats : [];
-                renderConversations(convCache);
+                updateLauncherBadge(convCache);
+                if (listVisible) renderConversations(convCache);
                 subscribeToGroups(convCache);
             })
-            .catch(function () { document.getElementById('uc-conversations').innerHTML = '<div class="uc-empty">Couldn\'t load conversations.</div>'; });
+            .catch(function () {
+                if (listVisible) document.getElementById('uc-conversations').innerHTML = '<div class="uc-empty">Couldn\'t load conversations.</div>';
+            });
     }
     function renderConversations(list) {
         var wrap = document.getElementById('uc-conversations');
@@ -955,6 +983,7 @@
                 }
                 renderMessages(res.body.messages || []);
                 markRead(res.body.messages || []);
+                loadConversations(); // refresh the launcher badge now that these are read
             })
             .catch(function () { msgsEl.innerHTML = '<div class="uc-empty">Something went wrong.</div>'; });
     }
