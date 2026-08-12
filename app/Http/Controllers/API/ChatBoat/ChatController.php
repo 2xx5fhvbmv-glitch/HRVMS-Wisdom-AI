@@ -441,7 +441,7 @@ class ChatController extends Controller
       */
      private function membersOutsideChatScope(array $memberIds, $resort, array $permission)
      {
-          if ($permission['unrestricted'] || empty($memberIds)) {
+          if (empty($memberIds)) {
                return [];
           }
 
@@ -450,7 +450,19 @@ class ChatController extends Controller
                ->pluck('Dept_id', 'Admin_Parent_id');
 
           return collect($memberIds)
-               ->filter(fn($id) => ($deptByAdminId[$id] ?? null) != $permission['dept_id'])
+               ->filter(function ($id) use ($deptByAdminId, $permission) {
+                    // Not an employee of this resort at all — blocked for
+                    // everyone, including HR/GM. This is tenant isolation,
+                    // not the department rule below, so it isn't skipped by
+                    // 'unrestricted'.
+                    if (!$deptByAdminId->has($id)) {
+                         return true;
+                    }
+                    if ($permission['unrestricted']) {
+                         return false;
+                    }
+                    return $deptByAdminId[$id] != $permission['dept_id'];
+               })
                ->values()->all();
      }
 
