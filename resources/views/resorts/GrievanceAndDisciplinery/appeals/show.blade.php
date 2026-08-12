@@ -29,7 +29,7 @@
                 <div class="col-auto">
                     <span class="badge {{ $statusBadge }}" style="font-size:13px;padding:6px 12px;">{{ str_replace('_',' ', $appeal->status) }}</span>
                     @if(!$isClosed)
-                        <button class="btn btn-outline-secondary btn-sm ms-2" id="withdrawBtn">Withdraw Appeal</button>
+                        <button class="btn eb-btn-secondary btn-sm ms-2" id="withdrawBtn">Withdraw Appeal</button>
                     @endif
                 </div>
             </div>
@@ -121,8 +121,8 @@
                                 @endif
                                 @if(!$isClosed && $h->status === 'Scheduled')
                                     <div class="mt-2">
-                                        <button class="btn btn-sm btn-outline-success update-hearing-status" data-id="{{ $h->id }}" data-status="Completed">Mark Completed</button>
-                                        <button class="btn btn-sm btn-outline-secondary update-hearing-status" data-id="{{ $h->id }}" data-status="Cancelled">Cancel</button>
+                                        <button class="btn btn-sm eb-btn-positive update-hearing-status" data-id="{{ $h->id }}" data-status="Completed">Mark Completed</button>
+                                        <button class="btn btn-sm eb-btn-secondary update-hearing-status" data-id="{{ $h->id }}" data-status="Cancelled">Cancel</button>
                                     </div>
                                 @endif
                             </div>

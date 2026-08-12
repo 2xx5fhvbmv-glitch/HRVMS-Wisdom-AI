@@ -312,7 +312,7 @@ label#SlotBook-error {
     margin: 0; /* Remove default margin to ensure proper alignment */
 }
 .editIcon-btn {
-    color: #004552;
+    color: var(--teal);
     font-size: 14px;
     background: transparent;
     border: 0;
@@ -361,13 +361,13 @@ display: inline-block;
     }
 .pagination-custom .relative.shadow-sm>*:hover{
     color: #fff;
-    background-color: #004552  !important;
-    border-color: #004552 !important;
+    background-color: var(--teal)  !important;
+    border-color: var(--teal) !important;
     }
 .pagination-custom .relative.shadow-sm>span{
     color: #fff;
-    background-color: #004552  !important;
-    border-color: #004552 !important;
+    background-color: var(--teal)  !important;
+    border-color: var(--teal) !important;
     }
     .pagination-custom .relative.shadow-sm>span:first-child,
     .pagination-custom .relative.shadow-sm>span:last-child{

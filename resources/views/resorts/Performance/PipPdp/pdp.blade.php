@@ -101,7 +101,7 @@
                                     @endif
                                 </td>
                                 <td>
-                                    <a href="{{ route('Performance.pdp.view', $plan->id) }}" class="btn-tableIcon btnIcon-blue" title="View / Fill Form"><i class="fa-solid fa-eye"></i></a>
+                                    <a href="{{ route('Performance.pdp.view', $plan->id) }}" class="btn-tableIcon btnIcon-teal" title="View / Fill Form"><i class="fa-solid fa-eye"></i></a>
                                     @if($archivedView ?? false)
                                         <a href="javascript:void(0)" class="btn-tableIcon btnIcon-success pdp-restore" data-id="{{ $plan->id }}" title="Restore"><i class="fa-solid fa-rotate-left"></i></a>
                                     @else

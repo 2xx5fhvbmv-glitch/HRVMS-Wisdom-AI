@@ -132,7 +132,7 @@
                         You can add filters after selecting columns
                     </div>
                 </div>
-                <button type="button" class="btn btn-info mt-2" id="add-filter" style="display: none;">
+                <button type="button" class="btn eb-btn-secondary mt-2" id="add-filter" style="display: none;">
                     Add Filter
                 </button>
             </div>

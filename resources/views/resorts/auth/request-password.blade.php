@@ -17,7 +17,10 @@
     <link href="{{ URL::asset('resorts_assets/css/media.css')}}" rel=stylesheet>
     <link rel="stylesheet" href="{{ URL::asset('admin_assets/plugins/toastr/toastr.min.css') }}">
 
-
+    {{-- This page doesn't extend resorts.layouts.app (no session yet), so it
+         doesn't inherit css.blade.php/js.blade.php's includes. Included
+         directly here since this page's own JS calls wisdomAlert(). --}}
+    @include('resorts._emotional_buttons_v2_styles')
 
     <link rel="apple-touch-icon" sizes="180x180" href="{{ URL::asset('resorts_assets/images//apple-touch-icon.png')}}">
     <link rel="icon" type="image/png" sizes="32x32" href="{{ URL::asset('resorts_assets/images//favicon-32x32.png')}}">
@@ -92,7 +95,7 @@
                             <div id="div-email" style="color:red;"></div>
                         </div>
                         <div class="text-center">
-                            <button type="submit" class="btn btn-primary  btn-theme">Request new password</button>
+                            <button type="submit" class="btn eb-btn-primary btn-theme">Request new password</button>
                         </div>
                     </form>
                     </div>
@@ -116,6 +119,7 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script src="{{ URL::asset('resorts_assets/additionalJs/swatalart.min.js') }}"></script>
     <script src="{{ URL::asset('resorts_assets/additionalJs/sweetalert2.js') }}"></script>
+    @include('resorts.layouts._confirm')
     <script type="text/javascript">
         $(document).ready( function() {
 
@@ -176,24 +180,23 @@
 
                 console.log(result.success);
                 if (result.success === true) {
-                    // Using SweetAlert2
-                    Swal.fire({
+                    wisdomAlert({
+                        type: 'success',
                         title: 'Success!',
-                        text: result.msg,
-                        icon: 'success' // Corrected from `type` to `icon`
-                    }).then(function (success) {
-                        if (success) {
+                        text: result.msg
+                    }).then(function (res) {
+                        if (res.isConfirmed) {
                             window.location.href = result.redirect_url;
                         }
                     });
                 } else {
 
-                    Swal.fire({
+                    wisdomAlert({
+                        type: 'error',
                         title: 'Error!',
-                        text: result.msg,
-                        icon: 'error' // Corrected from `type` to `icon`
-                    }).then(function (success) {
-                        if (success && result.redirect_url) {
+                        text: result.msg
+                    }).then(function (res) {
+                        if (res.isConfirmed && result.redirect_url) {
                             window.location.href = result.redirect_url;
                         }
                     });
@@ -224,16 +227,16 @@
                     });
                     errorHtml += '</ul>';
 
-                    Swal.fire({
+                    wisdomAlert({
+                        type: 'error',
                         title: 'Validation Error!',
-                        html: errorHtml,
-                        icon: 'error'
+                        extra: { html: errorHtml }
                     });
                 } else {
-                    Swal.fire({
+                    wisdomAlert({
+                        type: 'error',
                         title: 'Error!',
-                        text: response?.message || 'Something went wrong.',
-                        icon: 'error'
+                        text: response?.message || 'Something went wrong.'
                     });
                 }
             }

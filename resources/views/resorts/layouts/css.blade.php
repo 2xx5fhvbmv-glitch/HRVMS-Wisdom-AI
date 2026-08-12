@@ -1,3 +1,4 @@
+@include('resorts.layouts._design_tokens')
 <link href="{{ URL::asset('resorts_assets/css/skeleton.css')}}" rel=stylesheet>
 <link href="{{ URL::asset('resorts_assets/css/bootstrap.min.css')}}" rel=stylesheet>
 <link href="{{ URL::asset('resorts_assets/css/select2.min.css')}}" rel=stylesheet>

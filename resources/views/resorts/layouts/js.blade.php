@@ -31,6 +31,7 @@
 <script src="{{ URL::asset('applicant_form_assets/js/croppie.js')}}"></script>
 <script src="{{ URL::asset('resorts_assets/additionalJs/swatalart.min.js') }}"></script>
 <script src="{{ URL::asset('resorts_assets/additionalJs/sweetalert2.js') }}"></script>
+@include('resorts.layouts._confirm')
 <script src="{{ URL::asset('resorts_assets/js/flatpickr.min.js')}}"></script>
 <script src="{{ URL::asset('resorts_assets/js/jQuery.print.js')}}"></script>
 <script src="{{ URL::asset('resorts_assets/js/chartjs-chart-treemap.js')}}"></script>
@@ -65,19 +66,87 @@
 </script>
 
 
+<style>
+    .logout-swal-popup {
+        width: 290px !important;
+        padding: 24px 22px 20px !important;
+        border-radius: 20px !important;
+        box-shadow: 0 24px 60px rgba(1, 30, 36, .32) !important;
+    }
+    .swal2-container.swal2-backdrop-show { background: rgba(6, 24, 29, .4) !important; }
+    .logout-swal-popup .logout-swal-icon {
+        width: 60px !important;
+        height: 60px !important;
+        margin: 0 auto 16px !important;
+        border: 0 !important;
+        border-radius: 50% !important;
+        background: #e6f0f1 !important;
+        color: #014653 !important;
+    }
+    .logout-swal-popup .logout-swal-icon .swal2-icon-content { padding: 0; }
+    .logout-swal-popup .logout-swal-title {
+        font-size: 18px !important;
+        font-weight: 800 !important;
+        color: #14232a !important;
+        padding: 0 0 4px !important;
+        margin: 0 !important;
+    }
+    .logout-swal-popup .logout-swal-text {
+        font-size: 13px !important;
+        color: #5d6f75 !important;
+        margin: 0 0 16px !important;
+    }
+    .logout-swal-popup .logout-swal-actions {
+        flex-direction: column !important;
+        gap: 9px !important;
+        width: 100% !important;
+        margin: 0 !important;
+    }
+    .logout-swal-popup .logout-swal-confirm,
+    .logout-swal-popup .logout-swal-cancel {
+        width: 100%;
+        margin: 0 !important;
+        padding: 11px !important;
+        border-radius: 12px !important;
+        font-size: 14px;
+        font-weight: 700;
+        box-shadow: none !important;
+    }
+    .logout-swal-popup .logout-swal-confirm {
+        background: #014653 !important;
+        color: #fff !important;
+        border: none !important;
+    }
+    .logout-swal-popup .logout-swal-cancel {
+        background: #fff !important;
+        color: #5d6f75 !important;
+        border: 1px solid #e2ebec !important;
+        font-weight: 600;
+    }
+</style>
 <script>
-    
+
 
     $(document).on("click", "#logout", function(e) {
         e.preventDefault();
         Swal.fire({
-            title: 'Are you sure?',
-            text: "You want to logout!",
-            icon: 'warning',
+            title: 'Log out?',
+            text: "You'll need to sign in again next time.",
+            iconHtml: '<svg width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>',
             showCancelButton: true,
-            confirmButtonColor: '#3085d6',
-            cancelButtonColor: '#d33',
-            confirmButtonText: 'Yes, Logout!'
+            buttonsStyling: false,
+            focusConfirm: true,
+            confirmButtonText: 'Log out',
+            cancelButtonText: 'Stay signed in',
+            customClass: {
+                popup: 'logout-swal-popup',
+                icon: 'logout-swal-icon',
+                title: 'logout-swal-title',
+                htmlContainer: 'logout-swal-text',
+                actions: 'logout-swal-actions',
+                confirmButton: 'logout-swal-confirm',
+                cancelButton: 'logout-swal-cancel',
+            }
         }).then((result) => {
             if (result.isConfirmed) {
                 window.location.href = "{{ route('resort.logout') }}";
@@ -965,14 +1034,11 @@
 
             submitHandler: function(form) {
 
-                Swal.fire({
+                wisdomConfirm({
+                    role: 'confirm',
                     title: 'Are you sure?',
                     text: "You are about to send the budget to finance!",
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonColor: '#3085d6',
-                    cancelButtonColor: '#d33',
-                    confirmButtonText: 'Yes, send it!'
+                    confirmText: 'Yes, send it!'
                 }).then((result) => {
 
                     if (result.isConfirmed) {

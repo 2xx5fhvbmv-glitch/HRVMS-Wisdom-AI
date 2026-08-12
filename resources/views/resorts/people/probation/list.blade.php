@@ -127,13 +127,14 @@
                 </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="submit" class="btn btn-warning">Extend</button>
+                    <button type="submit" class="btn eb-btn-secondary">Extend</button>
                 </div>
             </div>
             </form>
         </div>
     </div>
 
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -162,30 +163,30 @@
         $(document).on('click', '.confirm-probation', function () {
             let id = $(this).data('id');
 
-            Swal.fire({
+            wisdomConfirm({
+                role: 'confirm',
                 title: 'Confirm Probation',
-                html: `
-                    <p>Select new Employment Type:</p>
-                    <select id="employmentTypeSelect" class="swal2-input select2t-none" style="width: 100%; padding: 5px;">
-                        <option value="">-- Select Type --</option>
-                        <option value="Full-Time">Full-Time</option>
-                        <option value="Part-Time">Part-Time</option>
-                        <option value="Contract">Contract</option>
-                        <option value="Casual">Casual</option>
-                        <option value="Probationary">Probationary</option>
-                        <option value="Internship">Internship</option>
-                        <option value="Temporary">Temporary</option>
-                    </select>
-                `,
-                icon: 'question',
-                showCancelButton: true,
-                confirmButtonText: 'Confirm',
-                preConfirm: () => {
-                    const selected = $('#employmentTypeSelect').val();
-                    if (!selected) {
-                        Swal.showValidationMessage('Please select an employment type');
+                extra: {
+                    html: `
+                        <p>Select new Employment Type:</p>
+                        <select id="employmentTypeSelect" class="swal2-input select2t-none" style="width: 100%; padding: 5px;">
+                            <option value="">-- Select Type --</option>
+                            <option value="Full-Time">Full-Time</option>
+                            <option value="Part-Time">Part-Time</option>
+                            <option value="Contract">Contract</option>
+                            <option value="Casual">Casual</option>
+                            <option value="Probationary">Probationary</option>
+                            <option value="Internship">Internship</option>
+                            <option value="Temporary">Temporary</option>
+                        </select>
+                    `,
+                    preConfirm: () => {
+                        const selected = $('#employmentTypeSelect').val();
+                        if (!selected) {
+                            Swal.showValidationMessage('Please select an employment type');
+                        }
+                        return selected;
                     }
-                    return selected;
                 }
             }).then((result) => {
                 if (result.isConfirmed) {
@@ -218,22 +219,22 @@
         $(document).on('click', '.fail-probation', function () {
             let id = $(this).data('id');
 
-            Swal.fire({
+            wisdomConfirm({
+                role: 'destructive',
                 title: 'Fail Probation',
-                html: `
-                    <p>You are about to mark this probation as <strong>Failed</strong>.</p>
-                    <textarea id="fail_remarks" class="swal2-textarea" placeholder="Enter reason for failure..."></textarea>
-                `,
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonText: 'Submit',
-                cancelButtonText: 'Cancel',
-                preConfirm: () => {
-                    const remarks = document.getElementById('fail_remarks').value;
-                    if (!remarks.trim()) {
-                        Swal.showValidationMessage('Remarks are required!');
+                confirmText: 'Submit',
+                extra: {
+                    html: `
+                        <p>You are about to mark this probation as <strong>Failed</strong>.</p>
+                        <textarea id="fail_remarks" class="swal2-textarea" placeholder="Enter reason for failure..."></textarea>
+                    `,
+                    preConfirm: () => {
+                        const remarks = document.getElementById('fail_remarks').value;
+                        if (!remarks.trim()) {
+                            Swal.showValidationMessage('Remarks are required!');
+                        }
+                        return remarks;
                     }
-                    return remarks;
                 }
             }).then((result) => {
                 if (result.isConfirmed) {

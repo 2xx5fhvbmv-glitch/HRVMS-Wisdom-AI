@@ -998,11 +998,10 @@
                         let errs = errors?.errors ? Object.values(errors.errors).join('<br>') : "An unexpected error occurred.";
 
                         // Show error SweetAlert
-                        Swal.fire({
+                        wisdomAlert({
+                            type: 'error',
                             title: 'Error!',
-                            html: errs,
-                            icon: 'error',
-                            confirmButtonColor: '#d33'
+                            extra: { html: errs }
                         });
                     }
                 });
@@ -1049,19 +1048,18 @@
 
         var description = $(this).attr('data-description') || '';
 
-        Swal.fire({
+        wisdomConfirm({
+            role: 'confirm',
             title: 'Approve & Forward?',
-            html: `<div class="text-start">
-                        <p><strong>Description:</strong> ${description}</p>
-                        <p><strong>Item:</strong> ${EffectedAmenity}</p>
-                        <p><strong>Location:</strong> ${Location}</p>
-                        <p class="text-muted mt-2">This request will be approved and forwarded to the Engineering department.</p>
-                    </div>`,
-            icon: 'question',
-            showCancelButton: true,
-            confirmButtonText: 'Approve & Forward',
-            confirmButtonColor: '#014653',
-            cancelButtonText: 'Cancel'
+            confirmText: 'Approve & Forward',
+            extra: {
+                html: `<div class="text-start">
+                            <p><strong>Description:</strong> ${description}</p>
+                            <p><strong>Item:</strong> ${EffectedAmenity}</p>
+                            <p><strong>Location:</strong> ${Location}</p>
+                            <p class="text-muted mt-2">This request will be approved and forwarded to the Engineering department.</p>
+                        </div>`
+            }
         }).then(function(result) {
             if (result.isConfirmed) {
                 $.ajax({
@@ -1095,19 +1093,18 @@
         let msg = (flag === "On-Hold") ? 'Yes, put it on hold!' : 'Yes, close it!';
 
         // SweetAlert confirmation dialog with input field
-        Swal.fire({
+        wisdomConfirm({
+            role: 'confirm',
             title: 'Are you sure?',
             text: msg,
-            icon: 'warning',
-            input: 'textarea', // Input type for providing a reason
-            inputPlaceholder: 'Enter your reason here...',
-            showCancelButton: true,
-            confirmButtonColor: '#3085d6',
-            cancelButtonColor: '#d33',
-            confirmButtonText: msg,
-            inputValidator: (value) => {
-                if (!value) {
-                    return 'Reason is required!';
+            confirmText: msg,
+            extra: {
+                input: 'textarea', // Input type for providing a reason
+                inputPlaceholder: 'Enter your reason here...',
+                inputValidator: (value) => {
+                    if (!value) {
+                        return 'Reason is required!';
+                    }
                 }
             }
         }).then((result) => {
@@ -1127,19 +1124,17 @@
                     success: function(response) {
                         if (response.success) {
                             // Show success SweetAlert
-                            Swal.fire({
+                            wisdomAlert({
+                                type: 'success',
                                 title: 'Success!',
-                                text: response.message,
-                                icon: 'success',
-                                confirmButtonColor: '#3085d6'
+                                text: response.message
                             });
                             OnHoldTaskList(); // Refresh task list
                         } else {
-                            Swal.fire({
+                            wisdomAlert({
+                                type: 'error',
                                 title: 'Error!',
-                                text: response.message || "Something went wrong.",
-                                icon: 'error',
-                                confirmButtonColor: '#d33'
+                                text: response.message || "Something went wrong."
                             });
                         }
                     },
@@ -1148,11 +1143,10 @@
                         let errs = errors?.errors ? Object.values(errors.errors).join('<br>') : "An unexpected error occurred.";
 
                         // Show error SweetAlert
-                        Swal.fire({
+                        wisdomAlert({
+                            type: 'error',
                             title: 'Error!',
-                            html: errs,
-                            icon: 'error',
-                            confirmButtonColor: '#d33'
+                            extra: { html: errs }
                         });
                     }
                 });

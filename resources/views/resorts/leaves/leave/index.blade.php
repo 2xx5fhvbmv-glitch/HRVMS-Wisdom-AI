@@ -403,7 +403,7 @@
         white-space: nowrap;
     }
     .pill-purple     { background: #ede7ff; color: #5b21b6; }
-    .pill-blue       { background: #e0f2fe; color: #075985; }
+    .pill-blue       { background: var(--teal-3); color: var(--teal); }
     .pill-amber      { background: #fef3c7; color: #92400e; }
     .pill-green      { background: #dcfce7; color: #166534; }
     .pill-green-soft { background: #ecfdf5; color: #065f46; }

@@ -241,12 +241,13 @@
                     <p class="mb-0">This employee's probation period is <strong>not complete yet</strong>. Are you sure you want to send the <strong>Probation Successful</strong> letter?</p>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn eb-btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
                     <button type="button" class="btn btn-themeBlue btn-sm" id="confirmSendSuccessLetter">Send Anyway</button>
                 </div>
             </div>
         </div>
     </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -319,29 +320,29 @@
         // confirm-probation action. Sends the Successful Letter, marks
         // probation Confirmed and updates employment type in one call.
         function promptConfirmSuccess(empId) {
-            Swal.fire({
+            wisdomConfirm({
+                role: 'confirm',
                 title: 'Confirm Probation',
-                html: '<p>Select new Employment Type:</p>' +
-                      '<select id="employmentTypeSelect" class="swal2-input" style="width: 100%; padding: 5px;">' +
-                          '<option value="">-- Select Type --</option>' +
-                          '<option value="Full-Time">Full-Time</option>' +
-                          '<option value="Part-Time">Part-Time</option>' +
-                          '<option value="Contract">Contract</option>' +
-                          '<option value="Casual">Casual</option>' +
-                          '<option value="Probationary">Probationary</option>' +
-                          '<option value="Internship">Internship</option>' +
-                          '<option value="Temporary">Temporary</option>' +
-                      '</select>',
-                icon: 'question',
-                showCancelButton: true,
-                confirmButtonText: 'Confirm',
-                preConfirm: function () {
-                    var selected = document.getElementById('employmentTypeSelect').value;
-                    if (!selected) {
-                        Swal.showValidationMessage('Please select an employment type');
-                        return false;
+                extra: {
+                    html: '<p>Select new Employment Type:</p>' +
+                          '<select id="employmentTypeSelect" class="swal2-input" style="width: 100%; padding: 5px;">' +
+                              '<option value="">-- Select Type --</option>' +
+                              '<option value="Full-Time">Full-Time</option>' +
+                              '<option value="Part-Time">Part-Time</option>' +
+                              '<option value="Contract">Contract</option>' +
+                              '<option value="Casual">Casual</option>' +
+                              '<option value="Probationary">Probationary</option>' +
+                              '<option value="Internship">Internship</option>' +
+                              '<option value="Temporary">Temporary</option>' +
+                          '</select>',
+                    preConfirm: function () {
+                        var selected = document.getElementById('employmentTypeSelect').value;
+                        if (!selected) {
+                            Swal.showValidationMessage('Please select an employment type');
+                            return false;
+                        }
+                        return selected;
                     }
-                    return selected;
                 }
             }).then(function (result) {
                 if (result.isConfirmed && result.value) {
@@ -376,21 +377,21 @@
             // Clearance record. Confirm with the same SweetAlert prompt as
             // the list page's Fail Probation action so HR captures a reason.
             if (type === 'failed') {
-                Swal.fire({
+                wisdomConfirm({
+                    role: 'destructive',
                     title: 'Fail Probation',
-                    html: '<p>You are about to mark this probation as <strong>Failed</strong>.</p>' +
-                          '<textarea id="fail_remarks" class="swal2-textarea" placeholder="Enter reason for failure..."></textarea>',
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonText: 'Submit',
-                    cancelButtonText: 'Cancel',
-                    preConfirm: function () {
-                        var remarks = (document.getElementById('fail_remarks').value || '').trim();
-                        if (!remarks) {
-                            Swal.showValidationMessage('Remarks are required!');
-                            return false;
+                    confirmText: 'Submit',
+                    extra: {
+                        html: '<p>You are about to mark this probation as <strong>Failed</strong>.</p>' +
+                              '<textarea id="fail_remarks" class="swal2-textarea" placeholder="Enter reason for failure..."></textarea>',
+                        preConfirm: function () {
+                            var remarks = (document.getElementById('fail_remarks').value || '').trim();
+                            if (!remarks) {
+                                Swal.showValidationMessage('Remarks are required!');
+                                return false;
+                            }
+                            return remarks;
                         }
-                        return remarks;
                     }
                 }).then(function (result) {
                     if (result.isConfirmed && result.value) {

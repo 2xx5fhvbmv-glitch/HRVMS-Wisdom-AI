@@ -17,6 +17,9 @@
     <link href="{{ URL::asset('resorts_assets/css/media.css')}}" rel=stylesheet>
     <link rel="stylesheet" href="{{ URL::asset('admin_assets/plugins/toastr/toastr.min.css') }}">
 
+    {{-- This page doesn't extend resorts.layouts.app (no session yet), so it
+         doesn't inherit css.blade.php's includes. --}}
+    @include('resorts._emotional_buttons_v2_styles')
 
     <link rel="apple-touch-icon" sizes="180x180" href="{{ URL::asset('resorts_assets/images//apple-touch-icon.png')}}">
     <link rel="icon" type="image/png" sizes="32x32" href="{{ URL::asset('resorts_assets/images//favicon-32x32.png')}}">
@@ -152,7 +155,7 @@
 
 
                     <div class="text-center">
-                        <button type="submit" class="btn btn-primary  btn-theme">Request new password</button>
+                        <button type="submit" class="btn eb-btn-primary btn-theme">Request new password</button>
 
                     </div>
 

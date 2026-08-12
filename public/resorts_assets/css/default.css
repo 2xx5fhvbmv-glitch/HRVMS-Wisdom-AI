@@ -49,12 +49,12 @@
 }
 
 :root {
-    --green: #014653;
-    --neon-yellow: #2EACB3;
+    --teal: #014653;
+    --teal-bright: #2EACB3;
+    --teal-dark: #013842;
     --white: #ffffff;
     --darkblack: #222222;
     --black: #000000;
-    --coolblue: #2EACB3;
     --success: #0CAF00;
     --danger: #C80000
 }
@@ -74,7 +74,7 @@ body::before {
     position: absolute;
     width: 100%;
     height: 315px;
-    background-color: var(--green);
+    background-color: var(--teal);
     border-radius: 0 0 50px 50px;
     z-index: -2;
 }
@@ -84,7 +84,7 @@ body::before {
 }
 
 *:not(img)::selection {
-    background-color: var(--green);
+    background-color: var(--teal);
     color: #fff;
 }
 
@@ -110,7 +110,7 @@ input[type=range]:focus {
 
 a,
 .btn-link {
-    color: var(--neon-yellow);
+    color: var(--teal-bright);
 }
 
 a:hover {
@@ -157,7 +157,6 @@ hr {
 /* Handle */
 
 ::-webkit-scrollbar-thumb {
-    background: #013842;
     background: #01384238;
 }
 
@@ -307,15 +306,15 @@ header .nav-item:hover .nav-link {
 }
 
 .bg-theme {
-    background-color: var(--green) !important;
+    background-color: var(--teal) !important;
 }
 
 .text-theme {
-    color: var(--green) !important;
+    color: var(--teal) !important;
 }
 
 .text-yellow {
-    color: var(--neon-yellow);
+    color: var(--teal-bright);
 }
 
 .text-dark {
@@ -348,7 +347,7 @@ header .nav-item:hover .nav-link {
 
 
 .btn-link-yellow {
-    color: var(--neon-yellow);
+    color: var(--teal-bright);
 }
 
 .row.g-30>* {
@@ -399,31 +398,31 @@ header .nav-item:hover .nav-link {
 }
 
 .btn-theme {
-    background-color: var(--neon-yellow);
+    background-color: var(--teal-bright);
     color: var(--white);
 }
 
 .btn-theme:hover {
-    color: var(--neon-yellow);
+    color: var(--teal-bright);
     background-color: #217e83;
     background: var(--white);
-    border-color: var(--neon-yellow);
+    border-color: var(--teal-bright);
 }
 
 .btn-coolblue {
-    background-color: var(--coolblue);
+    background-color: var(--teal-bright);
     color: var(--white);
 }
 
 .btn-coolblue:hover {
-    color: var(--coolblue);
+    color: var(--teal-bright);
     background-color: var(--white);
-    border-color: var(--coolblue);
+    border-color: var(--teal-bright);
 }
 
 /* .btn-theme:hover {
         background-color: var(--darkblack);
-        color: var(--neon-yellow);
+        color: var(--teal-bright);
     } */
 
 .btn-white {
@@ -474,7 +473,7 @@ header .nav-item:hover .nav-link {
 }
 
 .form-select.btn-theme:hover {
-    background-color: var(--neon-yellow);
+    background-color: var(--teal-bright);
     color: var(--white);
 }
 
@@ -524,7 +523,7 @@ header {
     width: 100%;
     top: 0;
     z-index: 11;
-    background-color: var(--green);
+    background-color: var(--teal);
     transition: top 0.3s;
     position: relative;
     border-bottom: 1px solid hsla(0, 0%, 100%, 0.16);
@@ -579,7 +578,7 @@ header nav {
 }
 
 .notification-nav .dropdown-menu {
-    background-color: #013842;
+    background-color: var(--teal-dark);
     color: var(--white);
     width: 198px;
     border-radius: 13px;
@@ -587,7 +586,7 @@ header nav {
 }
 
 .profile-dropdown .dropdown-menu {
-    background-color: #013842;
+    background-color: var(--teal-dark);
     color: var(--white);
     width: 218px;
     border-radius: 13px;
@@ -727,7 +726,7 @@ header nav {
     /* Smooth transition for opacity */
     opacity: 0;
     /* Start hidden */
-    background: #013842;
+    background: var(--teal-dark);
 }
 
 .dropdown-menu.carosel-nav-menu.show {
@@ -783,7 +782,7 @@ header nav {
     height: 98px;
     left: 0;
     top: 100px;
-    background: var(--green);
+    background: var(--teal);
     /* top: -135%; */
     /* display: none; */
     transition: all 0.3s linear;
@@ -833,7 +832,7 @@ header nav {
 }
 
 .serch-box .serch-icon {
-    background: var(--green);
+    background: var(--teal);
     position: absolute;
     right: 2px;
     top: 50%;
@@ -933,7 +932,7 @@ strong {
 }
 
 .grey-box .progress .progress-bar {
-    background-color: var(--green);
+    background-color: var(--teal);
 }
 
 .fs-18 {
@@ -1019,11 +1018,11 @@ strong {
 
 .bg-green {
     color: #fff;
-    background-color: var(--green) !important;
+    background-color: var(--teal) !important;
 }
 
 .btn-icon.bg-green:hover {
-    color: var(--green);
+    color: var(--teal);
     background: #077e94 !important;
     background: #fff !important;
     border-color: #077e94 !important;
@@ -1031,7 +1030,7 @@ strong {
 
 .bg-yellow {
     color: #fff;
-    background-color: var(--neon-yellow) !important;
+    background-color: var(--teal-bright) !important;
 }
 
 .dashboard-boxcard {
@@ -1056,7 +1055,7 @@ strong {
 }
 
 .budget-accordion .accordion-button {
-    background-color: var(--green);
+    background-color: var(--teal);
     color: var(--white);
     border-radius: 15px !important;
     border: none;
@@ -1351,14 +1350,14 @@ strong {
 
 .pie:before {
     inset: 0;
-    background: radial-gradient(farthest-side, var(--green) 98%, #0000) top/var(--border) var(--border) no-repeat, conic-gradient(var(--green) calc(var(--p)*1%), #0000 0);
+    background: radial-gradient(farthest-side, var(--teal) 98%, #0000) top/var(--border) var(--border) no-repeat, conic-gradient(var(--teal) calc(var(--p)*1%), #0000 0);
     -webkit-mask: radial-gradient(farthest-side, #0000 calc(99% - var(--border)), #000 calc(100% - var(--border)));
     mask: radial-gradient(farthest-side, #0000 calc(99% - var(--border)), #000 calc(100% - var(--border)));
 }
 
 .pie:after {
     inset: calc(50% - var(--border)/2);
-    background: var(--green);
+    background: var(--teal);
     transform: rotate(calc(var(--p)*3.6deg)) translateY(calc(50% - var(--w-130)/2));
 }
 
@@ -1430,7 +1429,7 @@ strong {
     overflow: hidden;
     box-shadow: 0px 4px 4px rgba(0, 0, 0, 0.25);
     border-radius: 0 7px 7px 0;
-    background-color: var(--green);
+    background-color: var(--teal);
     width: 300px;
 }
 
@@ -1488,7 +1487,7 @@ strong {
 
 .navigation-box .nav .nav-item .nav-link:hover::before,
 .navigation-box .nav .nav-item .nav-link.active::before {
-    background-color: var(--neon-yellow);
+    background-color: var(--teal-bright);
 }
 
 .navigation-box .nav .nav-item .nav-link::before {
@@ -1508,7 +1507,7 @@ strong {
     position: relative !important;
     top: 0 !important;
     transform: translate(0px, 0px) !important;
-    background: #013842;
+    background: var(--teal-dark);
     color: var(--white);
 }
 
@@ -1536,7 +1535,7 @@ strong {
 }
 
 .navigation-box .nav-link.show {
-    background-color: var(--neon-yellow);
+    background-color: var(--teal-bright);
     color: var(--darkblack) !important;
 }
 
@@ -1545,7 +1544,7 @@ strong {
 }
 
 .navigation-box .dropdown-menu .dropdown-item:hover {
-    background-color: var(--neon-yellow);
+    background-color: var(--teal-bright);
     color: var(--darkblack) !important;
 }
 
@@ -1877,8 +1876,8 @@ div.dt-container .dt-paging .dt-paging-button {
 .page-item.active .page-link {
     z-index: 2;
     color: var(--white);
-    background-color: #004552;
-    border-color: #004552;
+    background-color: var(--teal);
+    border-color: var(--teal);
 
 }
 
@@ -2243,14 +2242,14 @@ input.timePicker {
 .datepicker table tr td.active:hover[disabled],
 .datepicker table tr td.active.disabled[disabled],
 .datepicker table tr td.active.disabled:hover[disabled] {
-    background: var(--green) !important;
+    background: var(--teal) !important;
 }
 
 .datepicker table tr td.active,
 .datepicker table tr td.active:hover,
 .datepicker table tr td.active.disabled,
 .datepicker table tr td.active.disabled:hover {
-    background: var(--green) !important;
+    background: var(--teal) !important;
 }
 
 .datepicker th {
@@ -2406,7 +2405,7 @@ table tbody tr td .update-row-btn {
     width: 47px;
     height: 47px;
     min-width: 47px;
-    background: #004552;
+    background: var(--teal);
     border-radius: 50%;
 }
 
@@ -3546,7 +3545,7 @@ border-color: #ddd; */
     font-weight: 900;
     font-family: "Font Awesome 6 Free";
     font-size: 21px;
-    color: #004552;
+    color: var(--teal);
     position: absolute;
     top: 50%;
     right: 10px;
@@ -4598,14 +4597,14 @@ border-color: #ddd; */
     border-radius: 7px;
 }
 
-.btnIcon-orange {
-    color: #FFC658;
-    background: rgb(255 198 88 / 15%);
+.btnIcon-neutral {
+    color: var(--muted);
+    background: rgb(93 111 117 / 15%);
 }
 
-.btnIcon-orange:hover {
+.btnIcon-neutral:hover {
     color: #fff;
-    background: #FFC658;
+    background: var(--muted);
 }
 
 .btnIcon-orangeDark {
@@ -4638,14 +4637,14 @@ border-color: #ddd; */
     background: #2EACB3;
 }
 
-.btnIcon-blue {
-    color: #004552;
+.btnIcon-teal {
+    color: var(--teal);
     background: rgb(0 69 82 / 9%);
 }
 
-.btnIcon-blue:hover {
+.btnIcon-teal:hover {
     color: #fff;
-    background: #004552;
+    background: var(--teal);
 }
 
 .btnIcon-success {
@@ -6663,7 +6662,7 @@ html,
     left: 0;
     right: 0;
     bottom: 0;
-    background: #004552;
+    background: var(--teal);
     border-radius: 50%;
     z-index: -1;
 }
@@ -6798,7 +6797,7 @@ html,
 
 .leaveUser-bgBlock.blue {
     color: #014653;
-    background: #01384221;
+    background: #01465321;
 }
 
 .leaveUser-bgBlock:last-child {
@@ -7497,7 +7496,7 @@ html,
 
 .calendar-event .fc-toolbar .fc-state-default.fc-state-active,
 .calendar-event .fc-toolbar .fc-state-default.fc-state-down {
-    background: #013842
+    background: var(--teal)
 }
 
 .calendar-event .fc-state-default.fc-corner-left {
@@ -9530,7 +9529,7 @@ ol.listingNo-wrapper li:last-child {
 
 .perforCycleMatrix-table .content.highlight {
     color: #fff;
-    background: #004552;
+    background: var(--teal);
 }
 
 .modal-viewProgress .modal-body h5 {
@@ -13012,7 +13011,7 @@ ul.listing-wrapper.document-proces-listing li::before {
     width: 30px;
     height: 30px;
     padding: 7px;
-    background: #004552
+    background: var(--teal)
 }
 
 .empDetailPeopleEmp-tab .btn-lg-icon img {

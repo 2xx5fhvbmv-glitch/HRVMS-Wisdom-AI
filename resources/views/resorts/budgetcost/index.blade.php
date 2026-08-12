@@ -645,14 +645,12 @@ $(document).ready(function()
         e.preventDefault();
         // Get the division ID from the data attribute
         var costId = $(this).data('cost-id');
-        Swal.fire({
+        wisdomConfirm({
+            role: 'destructive',
             title: 'Are you sure?',
             text: ' Do you really want to delete these records? this process cannot be undone.',
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonText: 'Yes',
-            cancelButtonText: 'No',
-            confirmButtonColor: "#DD6B55"
+            confirmText: 'Yes',
+            cancelText: 'No'
         }).then((result) => {
             if (result.isConfirmed) {
                 $.ajax({

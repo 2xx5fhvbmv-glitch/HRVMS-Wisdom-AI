@@ -563,7 +563,7 @@
             '</td>' +
             '<td class="text-end">' +
                 (custom
-                    ? '<button type="button" class="btn btn-sm btn-link text-danger p-0 payable-leave-remove"' +
+                    ? '<button type="button" class="btn btn-sm eb-btn-critical text-danger p-0 payable-leave-remove"' +
                       ' title="Remove row"><i class="fa-solid fa-trash"></i></button>'
                     : '') +
             '</td>' +
@@ -943,7 +943,7 @@
             '<td class="text-end">' + formatMoney(mvrToDisplay(dailyRate)) + '</td>' +
             '<td class="text-end payable-leave-amount">' + formatMoney(0) + '</td>' +
             '<td class="text-end">' +
-                '<button type="button" class="btn btn-sm btn-link text-danger p-0 payable-leave-remove"' +
+                '<button type="button" class="btn btn-sm eb-btn-critical text-danger p-0 payable-leave-remove"' +
                 ' title="Remove row"><i class="fa-solid fa-trash"></i></button>' +
             '</td>' +
         '</tr>');

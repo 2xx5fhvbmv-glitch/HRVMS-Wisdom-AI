@@ -101,6 +101,7 @@
             </form>
         </div>
     </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -167,7 +168,7 @@
             $(".AppendHerer").append(` <div class="talentAc-block" id="remove_id_${nos}">
                                 <div class="title mb-2">
                                     <h5>QUESTION ${nos}</h5>
-                                    <button type="button" class="btn btn-danger btn-sm remove-btn"  data-id="${nos}">Remove</button>
+                                    <button type="button" class="btn eb-btn-critical btn-sm remove-btn"  data-id="${nos}">Remove</button>
                                 </div>
                                 <div class="row g-md-4 g-3">
                                     <div class="col-lg-3 col-sm-6">

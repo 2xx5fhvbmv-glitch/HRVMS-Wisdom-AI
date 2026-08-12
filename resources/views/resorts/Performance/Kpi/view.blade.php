@@ -456,12 +456,10 @@ $(document).ready(function () {
 
     $(document).on('click', '.delete-actual-btn', function() {
         var id = $(this).data('id');
-        Swal.fire({
+        wisdomConfirm({
+            role: 'destructive',
             title: 'Remove this actual entry?',
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#FF2400',
-            confirmButtonText: 'Yes, remove'
+            confirmText: 'Yes, remove'
         }).then((result) => {
             if (!result.isConfirmed) return;
             $.ajax({

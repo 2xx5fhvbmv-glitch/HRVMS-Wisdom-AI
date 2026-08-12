@@ -103,7 +103,7 @@
                                             </select>
                                         </div>
                                         <div class="col-auto">
-                                            <button type="button" class="btn btn-sm btn-danger remove-task">Remove</button>
+                                            <button type="button" class="btn btn-sm eb-btn-critical remove-task">Remove</button>
                                         </div>
                                     </div>
                                 </div>
@@ -170,6 +170,7 @@
             </div>
         </div>
     </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -288,7 +289,7 @@
                     </select>
                 </div>
                 <div class="col-auto">
-                    <button type="button" class="btn btn-sm btn-danger remove-task">Remove</button>
+                    <button type="button" class="btn btn-sm eb-btn-critical remove-task">Remove</button>
                 </div>
             `;
             container.appendChild(row);

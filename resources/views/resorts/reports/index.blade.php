@@ -131,13 +131,11 @@
 
     $(document).on('click', '.report-delete-btn', function() {
         const id = $(this).data('id');
-        Swal.fire({
+        wisdomConfirm({
+            role: 'destructive',
             title: 'Delete this report?',
             text: 'This cannot be undone.',
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#d33',
-            confirmButtonText: 'Yes, delete it'
+            confirmText: 'Yes, delete it'
         }).then((result) => {
             if (!result.isConfirmed) return;
             $.ajax({

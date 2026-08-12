@@ -148,14 +148,11 @@
             ? "{{ url('resort/Performance/pip') }}"
             : "{{ url('resort/Performance/pdp') }}";
 
-        Swal.fire({
+        wisdomConfirm({
+            role: 'destructive',
             title: 'Remove from ' + label + '?',
             text: 'This will delete the active ' + label + ' plan for this employee.',
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#d33',
-            cancelButtonColor: '#3085d6',
-            confirmButtonText: 'Yes, remove'
+            confirmText: 'Yes, remove'
         }).then((result) => {
             if (!result.isConfirmed) return;
             $.ajax({

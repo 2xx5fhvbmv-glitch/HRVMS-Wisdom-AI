@@ -1043,14 +1043,11 @@
     function confirmations(flag, itemId) {
         const action = flag === "approve" ? "approved" : "rejected"; // Determine action based on flag
         alert(action);
-        Swal.fire({
+        wisdomConfirm({
+            role: flag === "approve" ? 'positive' : 'destructive',
             title: `Are you sure you want to ${flag} this OT?`,
-            icon: "warning",
-            showCancelButton: true,
-            confirmButtonColor: flag === "approve" ? "#28a745" : "#dc3545", // Green for approve, red for reject
-            cancelButtonColor: "#6c757d", // Gray for cancel
-            confirmButtonText: `Yes, ${flag} it!`,
-            cancelButtonText: "No, cancel",
+            confirmText: `Yes, ${flag} it!`,
+            cancelText: 'No, cancel'
         }).then((result) => {
             if (result.isConfirmed) {
                 // Perform the AJAX request
@@ -1065,20 +1062,20 @@
                     },
                     success: function (response) {
                         // Show success message
-                        Swal.fire(
-                            `${action.charAt(0).toUpperCase() + action.slice(1)}!`,
-                            `The OT has been successfully ${action}.`,
-                            "success"
-                        );
+                        wisdomAlert({
+                            type: 'success',
+                            title: `${action.charAt(0).toUpperCase() + action.slice(1)}!`,
+                            text: `The OT has been successfully ${action}.`
+                        });
                         window.location.reload(); // Reload the page
                     },
                     error: function (xhr, status, error) {
                         // Show error message
-                        Swal.fire(
-                            "Error!",
-                            "An error occurred while processing the request.",
-                            "error"
-                        );
+                        wisdomAlert({
+                            type: 'error',
+                            title: "Error!",
+                            text: "An error occurred while processing the request."
+                        });
                         console.error(error);
                     },
                 });

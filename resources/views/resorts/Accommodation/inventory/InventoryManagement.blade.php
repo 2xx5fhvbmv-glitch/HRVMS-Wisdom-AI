@@ -276,18 +276,18 @@ $(document).ready(function()
                         empOptions[emp.assign_id] = emp.name + ' (' + emp.emp_id + ') - ' + emp.bed_no;
                     });
 
-                    Swal.fire({
+                    wisdomConfirm({
+                        role: 'confirm',
                         title: "Select Employee to Unassign",
                         text: response.message,
-                        icon: "question",
-                        input: "select",
-                        inputOptions: empOptions,
-                        inputPlaceholder: "Select an employee",
-                        showCancelButton: true,
-                        confirmButtonText: "Unassign",
-                        confirmButtonColor: "#d33",
-                        inputValidator: function(value) {
-                            if (!value) return "Please select an employee";
+                        confirmText: "Unassign",
+                        extra: {
+                            input: "select",
+                            inputOptions: empOptions,
+                            inputPlaceholder: "Select an employee",
+                            inputValidator: function(value) {
+                                if (!value) return "Please select an employee";
+                            }
                         }
                     }).then(function(result) {
                         if (result.isConfirmed) {
@@ -302,10 +302,18 @@ $(document).ready(function()
                                 },
                                 success: function(res) {
                                     if (res.success) {
-                                        Swal.fire("Unassigned!", res.message, "success");
+                                        wisdomAlert({
+                                            type: 'success',
+                                            title: "Unassigned!",
+                                            text: res.message
+                                        });
                                         InventoryList();
                                     } else {
-                                        Swal.fire("Error!", res.message, "error");
+                                        wisdomAlert({
+                                            type: 'error',
+                                            title: "Error!",
+                                            text: res.message
+                                        });
                                     }
                                 }
                             });
@@ -313,10 +321,18 @@ $(document).ready(function()
                     });
                 } else if (response.success) {
                     // Single employee — already unassigned
-                    Swal.fire("Unassigned!", response.message, "success");
+                    wisdomAlert({
+                        type: 'success',
+                        title: "Unassigned!",
+                        text: response.message
+                    });
                     InventoryList();
                 } else {
-                    Swal.fire("Error!", response.message, "error");
+                    wisdomAlert({
+                        type: 'error',
+                        title: "Error!",
+                        text: response.message
+                    });
                 }
             },
             error: function (response) {
@@ -329,7 +345,11 @@ $(document).ready(function()
                 } else {
                     errs = errors ? errors.message : 'An error occurred';
                 }
-                        Swal.fire("Error", errs, "error");
+                        wisdomAlert({
+                            type: 'error',
+                            title: "Error",
+                            text: errs
+                        });
                 }
         });
     });

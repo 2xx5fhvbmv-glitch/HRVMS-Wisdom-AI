@@ -6,6 +6,7 @@
     <meta name=viewport content="width=device-width,initial-scale=1">
     <meta name="description" content="">
     <meta name=keywords content="">
+    @include('resorts.layouts._design_tokens')
     <link href="{{ URL::asset('resorts_assets/css/bootstrap.min.css')}}" rel=stylesheet>
     <link href="{{ URL::asset('resorts_assets/css/select2.min.css')}}" rel=stylesheet>
     <link href="{{ URL::asset('resorts_assets/css/slick-theme.css')}}" rel=stylesheet>
@@ -22,6 +23,7 @@
     <link rel="apple-touch-icon" sizes="180x180" href="{{ URL::asset('resorts_assets/images//apple-touch-icon.png')}}">
     <link rel="icon" type="image/png" sizes="32x32" href="{{ URL::asset('resorts_assets/images//favicon-32x32.png')}}">
     <link rel="icon" type="image/png" sizes="16x16" href="{{ URL::asset('resorts_assets/images//favicon-16x16.png')}}">
+    @include('resorts._emotional_buttons_v2_styles')
 
     <title>HRVMS | SHopkeeper Panel</title>
 </head>
@@ -89,10 +91,10 @@
                             <label for="email" class="form-label">Email Id</label>
                             <input type="email" name="email" id="email" class="form-control" placeholder="Email">
 
-                            <div id="div-email" style="color:red;"></div>
+                            <div id="div-email" style="color:var(--error);"></div>
                         </div>
                         <div class="text-center">
-                            <button type="submit" class="btn btn-primary  btn-theme">Request new password</button>
+                            <button type="submit" class="btn eb-btn-primary">Request new password</button>
                         </div>
                     </form>
                     </div>
@@ -103,8 +105,6 @@
     </div>
 
     <script src="{{ URL::asset('resorts_assets/js/jquery.min.js') }}"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/limonte-sweetalert2/6.6.9/sweetalert2.min.js"></script>
-    <script
     <script src="{{ URL::asset('resorts_assets/js/jquery.lazy.min.js') }}"></script>
 
     <script src="{{ URL::asset('resorts_assets/js/select2.min.js') }}"></script>
@@ -113,9 +113,8 @@
     <script src="{{ URL::asset('admin_assets/plugins/toastr/toastr.min.js') }}"></script>
     <script src="{{ URL::asset('admin_assets/plugins/holdon/holdon.min.js') }}"></script>
     <script src="{{ URL::asset('assets/js/jquery.validate.min.js') }}"></script>
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script src="{{ URL::asset('resorts_assets/additionalJs/swatalart.min.js') }}"></script>
     <script src="{{ URL::asset('resorts_assets/additionalJs/sweetalert2.js') }}"></script>
+    @include('resorts.layouts._confirm')
     <script type="text/javascript">
         $(document).ready( function() {
 
@@ -143,7 +142,7 @@
                 },
                 errorPlacement: function(error, element) {
                 if( element.attr("name") == "email" ) {
-                    error.insertAfter( "#div-email" ).css('color', 'red');
+                    error.insertAfter( "#div-email" ).css('color', 'var(--error)');
                 } else {
                     error.insertAfter(element);
                 }
@@ -172,23 +171,22 @@
                         success: function(result) {
                             HoldOn.close();
                             if (result.success === true) {
-                                // Using SweetAlert2
-                                Swal.fire({
+                                wisdomAlert({
+                                    type: 'success',
                                     title: 'Success!',
-                                    text: result.msg,
-                                    icon: 'success' // Corrected from `type` to `icon`
-                                }).then(function (success) {
-                                    if (success) {
+                                    text: result.msg
+                                }).then(function (res) {
+                                    if (res.isConfirmed) {
                                         window.location.href = result.redirect_url;
                                     }
                                 });
                             } else {
-                                Swal.fire({
+                                wisdomAlert({
+                                    type: 'error',
                                     title: 'Error!',
-                                    text: result.msg,
-                                    icon: 'error' // Corrected from `type` to `icon`
-                                }).then(function (success) {
-                                    if (success && result.redirect_url) {
+                                    text: result.msg
+                                }).then(function (res) {
+                                    if (res.isConfirmed && result.redirect_url) {
                                         window.location.href = result.redirect_url;
                                     }
                                 });

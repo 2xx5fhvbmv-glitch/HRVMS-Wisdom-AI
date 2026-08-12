@@ -101,13 +101,14 @@
                 <input type="text" id="scheduled_date" class="form-control datepicker" min="{{ date('Y-m-d') }}">
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary btn-sm" onclick="confirmScheduled()">Confirm</button>
+                <button type="button" class="btn eb-btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn eb-btn-primary btn-sm" onclick="confirmScheduled()">Confirm</button>
             </div>
             </div>
         </div>
     </div>
 
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')

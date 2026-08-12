@@ -30,8 +30,8 @@
     .perf-btn-secondary:hover { background: #F9F8F1; border-color: #014653; color: #014653; transform: translateY(-2px); box-shadow: 0 8px 18px -8px rgba(20,35,42,.18); }
 
     /* Affirming — Approve, Restore (bringing an archived plan back). */
-    .perf-btn-positive { background: #E4F3E9; color: #2E9E5B; }
-    .perf-btn-positive:hover { background: #2E9E5B; color: #fff; transform: translateY(-2px); box-shadow: 0 8px 18px -8px rgba(20,35,42,.25); }
+    .perf-btn-positive { background: var(--positive-bg); color: var(--positive); }
+    .perf-btn-positive:hover { background: var(--positive); color: #fff; transform: translateY(-2px); box-shadow: 0 8px 18px -8px rgba(20,35,42,.25); }
 
     /* Additive/construction, general — Create KPI/Meeting/Template, Add to
        PIP/PDP, Add More (repeatable rows), Add Training, Add New. Neutral
@@ -77,7 +77,7 @@
     }
     .perf-btn-primary[disabled] { background: #014653; color: #fff; }
     .perf-btn-secondary[disabled] { background: transparent; color: #014653; }
-    .perf-btn-positive[disabled] { background: #E4F3E9; color: #2E9E5B; }
+    .perf-btn-positive[disabled] { background: var(--positive-bg); color: var(--positive); }
     .perf-btn-accent[disabled] { background: #E6F0F1; color: #035b6c; }
     .perf-btn-hero[disabled] { background: #E0FF02; color: #17260a; }
     .perf-btn-neutral[disabled] { background: #DEDEDE; color: #222; }

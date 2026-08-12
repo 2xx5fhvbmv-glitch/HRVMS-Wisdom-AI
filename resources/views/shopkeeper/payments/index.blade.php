@@ -40,7 +40,7 @@
                             </div>                        
                         </div>
                         <div class="col-auto ms-md-auto">
-                            <button type="button" id="payment-download-btn" class="btn btn-themeSkyblue btn-sm">
+                            <button type="button" id="payment-download-btn" class="btn eb-btn-secondary btn-sm">
                                 <i class="fa-solid fa-download me-1"></i> Download
                             </button>
                         </div>
@@ -92,7 +92,7 @@
     .dateRangeAb{position: relative;}
     .dateRangeAb .daterangepicker {
         position: absolute !important;
-        background-color: #fff;
+        background-color: var(--card);
         width: 100%;
         /* min-width: 350px; */
     }

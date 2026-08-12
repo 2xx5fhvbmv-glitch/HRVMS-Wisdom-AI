@@ -549,7 +549,6 @@
                                 @endforeach
                             @endif
                         </div>
-                        {{-- <button type="button" id="add-custom-benefit" class="btn btn-primary">Add Another Benefit</button> --}}
                     </div>
                 </div>
                 {{-- <div class="col-auto">
@@ -840,7 +839,6 @@
                             </div>
                         @endforeach
                     </div>
-                    {{-- <button type="button" id="add-custom-field" class="btn btn-primary">Add Another Custom Field</button> --}}
                 </div>
                 {{-- <hr> --}}
                 <div class="modal-footer justify-content-end">

@@ -330,13 +330,11 @@ $(document).ready(function() {
 
     $(document).on('click', '.delete-accommodation-btn', function() {
         var id = $(this).data('id');
-        Swal.fire({
+        wisdomConfirm({
+            role: 'destructive',
             title: 'Are you sure?',
             text: 'This will delete the room and all its bed assignments.',
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: '#d33',
-            confirmButtonText: 'Yes, delete it!'
+            confirmText: 'Yes, delete it!'
         }).then(function(result) {
             if (result.isConfirmed) {
                 $.ajax({

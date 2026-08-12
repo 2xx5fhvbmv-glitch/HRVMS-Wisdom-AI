@@ -381,14 +381,10 @@
                if (rows.length === 0) return;
 
                if (status === 'Approved') {
-                    Swal.fire({
+                    wisdomConfirm({
+                         role: 'confirm',
                          title: 'Are you sure?',
-                         text: 'You are about to approve ' + rows.length + ' salary increment(s).',
-                         icon: 'warning',
-                         showCancelButton: true,
-                         confirmButtonText: 'Confirm',
-                         cancelButtonText: 'Cancel',
-                         confirmButtonColor: "#014653"
+                         text: 'You are about to approve ' + rows.length + ' salary increment(s).'
                     }).then((result) => {
                          if (result.isConfirmed) {
                               submitStatus(status, rows);

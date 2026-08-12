@@ -16,11 +16,12 @@
 --}}
 <style>
     .eb-btn-primary, .eb-btn-secondary, .eb-btn-positive,
-    .eb-btn-accent, .eb-btn-hero, .eb-btn-neutral, .eb-btn-critical {
+    .eb-btn-accent, .eb-btn-hero, .eb-btn-neutral, .eb-btn-critical, .eb-btn-decline, .eb-btn-ghost {
         transition: transform .16s cubic-bezier(.2,.8,.2,1), box-shadow .16s ease, background .16s ease, border-color .16s ease;
     }
     .eb-btn-primary:focus-visible, .eb-btn-secondary:focus-visible, .eb-btn-positive:focus-visible,
-    .eb-btn-accent:focus-visible, .eb-btn-hero:focus-visible, .eb-btn-neutral:focus-visible, .eb-btn-critical:focus-visible {
+    .eb-btn-accent:focus-visible, .eb-btn-hero:focus-visible, .eb-btn-neutral:focus-visible, .eb-btn-critical:focus-visible,
+    .eb-btn-decline:focus-visible, .eb-btn-ghost:focus-visible {
         outline: 2px solid #014653;
         outline-offset: 2px;
     }
@@ -34,8 +35,8 @@
     .eb-btn-secondary:hover { background: #F9F8F1; border-color: #014653; color: #014653; transform: translateY(-2px); box-shadow: 0 8px 18px -8px rgba(20,35,42,.18); }
 
     /* Affirming — Approve, Resolve, Restore, Mark Safe/Complete. */
-    .eb-btn-positive { background: #E4F3E9; color: #2E9E5B; }
-    .eb-btn-positive:hover { background: #2E9E5B; color: #fff; transform: translateY(-2px); box-shadow: 0 8px 18px -8px rgba(20,35,42,.25); }
+    .eb-btn-positive { background: var(--positive-bg); color: var(--positive); }
+    .eb-btn-positive:hover { background: var(--positive); color: #fff; transform: translateY(-2px); box-shadow: 0 8px 18px -8px rgba(20,35,42,.25); }
 
     /* Additive/construction, general — Create/Add New/Upload/Raise Request. */
     .eb-btn-accent { background: #E6F0F1; color: #035b6c; }
@@ -55,8 +56,22 @@
     .eb-btn-critical { background: #FFDED9; color: #FF2400; }
     .eb-btn-critical:hover { background: #FF2400; color: #fff; transform: translateY(-2px); box-shadow: 0 8px 18px -8px rgba(20,35,42,.25); }
 
+    /* A considered negative response inside a formal flow (Decline an
+       offer/contract/interview invite) — distinct from Critical's "delete
+       a record" urgency: outlined, not filled, so it doesn't read as an
+       alarm the way a solid-red destructive action does. */
+    .eb-btn-decline { background: transparent; color: #FF2400; border: 1.5px solid #FFC2B3; }
+    .eb-btn-decline:hover { background: #FF2400; border-color: #FF2400; color: #fff; transform: translateY(-2px); box-shadow: 0 8px 18px -8px rgba(20,35,42,.25); }
+
+    /* Quiet icon-only trigger — kebab/"..." menus and other low-emphasis
+       toggles that shouldn't compete visually with real actions on the
+       page. No idle color at all; only a faint hover/press affordance. */
+    .eb-btn-ghost { background: transparent; border: none; color: #5D6F75; }
+    .eb-btn-ghost:hover { background: rgba(93,111,117,.1); color: #14232A; transform: none; box-shadow: none; }
+    .eb-btn-ghost:active { background: rgba(93,111,117,.16); transform: none; }
+
     .eb-btn-primary:active, .eb-btn-secondary:active, .eb-btn-positive:active,
-    .eb-btn-accent:active, .eb-btn-hero:active, .eb-btn-neutral:active, .eb-btn-critical:active {
+    .eb-btn-accent:active, .eb-btn-hero:active, .eb-btn-neutral:active, .eb-btn-critical:active, .eb-btn-decline:active {
         transition-duration: .07s;
         transform: translateY(0) scale(.94);
         box-shadow: 0 1px 1px rgba(0,0,0,.04);
@@ -67,18 +82,20 @@
        wins on specificity and silently repaints any disabled button in
        this system that color. */
     .eb-btn-primary[disabled], .eb-btn-secondary[disabled], .eb-btn-positive[disabled],
-    .eb-btn-accent[disabled], .eb-btn-hero[disabled], .eb-btn-neutral[disabled], .eb-btn-critical[disabled] {
+    .eb-btn-accent[disabled], .eb-btn-hero[disabled], .eb-btn-neutral[disabled], .eb-btn-critical[disabled],
+    .eb-btn-decline[disabled], .eb-btn-ghost[disabled] {
         opacity: .55;
         cursor: not-allowed;
         transform: none;
     }
     .eb-btn-primary[disabled] { background: #014653; color: #fff; }
     .eb-btn-secondary[disabled] { background: transparent; color: #014653; }
-    .eb-btn-positive[disabled] { background: #E4F3E9; color: #2E9E5B; }
+    .eb-btn-positive[disabled] { background: var(--positive-bg); color: var(--positive); }
     .eb-btn-accent[disabled] { background: #E6F0F1; color: #035b6c; }
     .eb-btn-hero[disabled] { background: #E0FF02; color: #17260a; }
     .eb-btn-neutral[disabled] { background: #DEDEDE; color: #222; }
     .eb-btn-critical[disabled] { background: #FFDED9; color: #FF2400; }
+    .eb-btn-decline[disabled] { background: transparent; color: #FF2400; }
 
     /* .page-hedding sits directly on the dark teal body::before band
        (--green, #014653, 315px tall behind every page header). Secondary's

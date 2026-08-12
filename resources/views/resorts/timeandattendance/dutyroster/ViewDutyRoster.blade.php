@@ -213,7 +213,7 @@
                                                                                                                 {{-- Per-employee collapse — same idea as the dept/section
                                                                                                                      accordion above. CSS hides every <td> except the
                                                                                                                      header when this <tr> has class .emp-collapsed. --}}
-                                                                                                                <button type="button" class="btn btn-sm btn-link emp-collapse-toggle p-1 text-decoration-none" aria-label="Toggle employee">
+                                                                                                                <button type="button" class="btn btn-sm eb-btn-ghost emp-collapse-toggle p-1 text-decoration-none" aria-label="Toggle employee">
                                                                                                                     <i class="fa-solid fa-chevron-up"></i>
                                                                                                                     <i class="fa-solid fa-chevron-down"></i>
                                                                                                                 </button>
@@ -608,7 +608,7 @@
                                                                                                 @endif
                                                                                             </div>
                                                                                         </div>
-                                                                                        <button type="button" class="btn btn-sm btn-link emp-collapse-toggle p-1 text-decoration-none" aria-label="Toggle employee">
+                                                                                        <button type="button" class="btn btn-sm eb-btn-ghost emp-collapse-toggle p-1 text-decoration-none" aria-label="Toggle employee">
                                                                                             <i class="fa-solid fa-chevron-up"></i>
                                                                                             <i class="fa-solid fa-chevron-down"></i>
                                                                                         </button>

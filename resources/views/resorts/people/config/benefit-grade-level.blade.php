@@ -70,7 +70,7 @@
                     </select>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn eb-btn-secondary" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-theme">Save</button>
                 </div>
             </form>
@@ -78,6 +78,7 @@
     </div>
 </div>
 
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')
@@ -140,14 +141,12 @@
 
     $(document).on('click', '.delete-row-btn', function () {
         var gradeId = $(this).data('grade-id');
-        Swal.fire({
+        wisdomConfirm({
+            role: 'destructive',
             title: 'Sure want to delete?',
             text: 'This cannot be undone',
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonText: 'Yes',
-            cancelButtonText: 'No',
-            confirmButtonColor: '#DD6B55'
+            confirmText: 'Yes',
+            cancelText: 'No'
         }).then((result) => {
             if (result.isConfirmed) {
                 $.ajax({

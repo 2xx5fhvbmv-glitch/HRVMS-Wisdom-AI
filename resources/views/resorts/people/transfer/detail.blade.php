@@ -349,12 +349,11 @@
                 doSend();
                 return;
             }
-            Swal.fire({
+            wisdomConfirm({
+                role: 'confirm',
                 title: 'Send Transfer Letter?',
                 text: 'The letter will be emailed to the transferred employee.',
-                icon: 'question',
-                showCancelButton: true,
-                confirmButtonText: 'Yes, send',
+                confirmText: 'Yes, send'
             }).then(function (r) {
                 if (r.isConfirmed) doSend();
             });
