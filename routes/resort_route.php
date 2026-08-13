@@ -2178,4 +2178,14 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
       Route::post('chat/send', [\App\Http\Controllers\API\ChatBoat\ConversationController::class, 'sendMessage'])->name('resort.chat.send');
       Route::post('chat/mark-read', [\App\Http\Controllers\API\ChatBoat\ConversationController::class, 'markAsRead'])->name('resort.chat.markRead');
 
+      // Clinic — temporary (third-party/agency) doctor accounts. HR-only
+      // (Common::hasFullDataAccess(), checked in the controller); mobile
+      // login for these accounts is a separate guard, see routes/api.php.
+      Route::get('clinic/temporary-doctors', [\App\Http\Controllers\Resorts\Clinic\TemporaryDoctorController::class, 'index'])->name('resort.clinic.temporary-doctors.index');
+      Route::post('clinic/temporary-doctors', [\App\Http\Controllers\Resorts\Clinic\TemporaryDoctorController::class, 'store'])->name('resort.clinic.temporary-doctors.store');
+      Route::post('clinic/temporary-doctors/{id}/update', [\App\Http\Controllers\Resorts\Clinic\TemporaryDoctorController::class, 'update'])->name('resort.clinic.temporary-doctors.update');
+      Route::post('clinic/temporary-doctors/{id}/reset-password', [\App\Http\Controllers\Resorts\Clinic\TemporaryDoctorController::class, 'resetPassword'])->name('resort.clinic.temporary-doctors.resetPassword');
+      Route::post('clinic/temporary-doctors/{id}/revoke-sessions', [\App\Http\Controllers\Resorts\Clinic\TemporaryDoctorController::class, 'revokeSessions'])->name('resort.clinic.temporary-doctors.revokeSessions');
+      Route::post('clinic/temporary-doctors/{id}/toggle-status', [\App\Http\Controllers\Resorts\Clinic\TemporaryDoctorController::class, 'toggleStatus'])->name('resort.clinic.temporary-doctors.toggleStatus');
+
   });
