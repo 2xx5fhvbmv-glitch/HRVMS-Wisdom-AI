@@ -545,4 +545,52 @@ use Illuminate\Support\Facades\Route;
 
 	});
 
+	// Temporary Clinic Doctor (third-party/agency) — mobile-app only,
+	// separate Passport guard from the ResortAdmin-backed 'api' guard above
+	// (config/auth.php: 'temp-clinic-doctor' / 'temporary-clinic-doctors').
+	// Login can't require auth, so it stays outside the auth:api group.
+	Route::post('clinic-doctor/login', [App\Http\Controllers\API\TemporaryClinicDoctorAuthController::class, 'login']);
+	Route::post('clinic-doctor/logout', [App\Http\Controllers\API\TemporaryClinicDoctorAuthController::class, 'logout'])->middleware('auth:temp-clinic-doctor');
+
+	// Clinic Manager tier, reachable by either identity — 'clinic.manager'
+	// accepts a real rank-12 employee (unrestricted, same as before) OR an
+	// active TemporaryClinicDoctor, further limited per-endpoint by
+	// 'clinic.capability' to whatever HR granted that account. These
+	// re-register the SAME URIs as the auth:api-only group above; Laravel
+	// keeps only the last-registered route per URI+method, so real
+	// employee callers are unaffected (their ResortAdmin token still
+	// matches 'auth:api' first) — this purely ADDS the temp-doctor path.
+	// appointment-categories-store (category/taxonomy config) and
+	// clinic-staff-leave-action (leave-approval chain) are deliberately
+	// NOT re-registered here — a third-party doctor has no employee/
+	// approver identity to act as, and shouldn't be editing the resort's
+	// permanent category list. Those two stay auth:api-only (real
+	// employees, unchanged).
+	Route::middleware(['auth:api,temp-clinic-doctor', 'applyResortSmtp', 'clinic.manager'])->group(function () {
+		Route::get('clinic/appointment-categories', [App\Http\Controllers\API\ClinicController::class, 'appointmentCategories']);
+
+		Route::middleware(['clinic.capability:can_view_appointments'])->group(function () {
+			Route::get('clinic/clinic-staff-dashboard', [App\Http\Controllers\API\ClinicController::class, 'clinicStaffDashboard']);
+			Route::post('clinic/appointment-list-based-filter', [App\Http\Controllers\API\ClinicController::class, 'appointmentListBasedonFilter']);
+			Route::get('clinic/appointment-and-leave-list', [App\Http\Controllers\API\ClinicController::class, 'appointmentAndLeaveList']);
+			Route::get('clinic/appointment-details/{appointment_id}', [App\Http\Controllers\API\ClinicController::class, 'appointmentDetails']);
+		});
+
+		Route::middleware(['clinic.capability:can_manage_treatment'])->group(function () {
+			Route::post('clinic/treatment-add', [App\Http\Controllers\API\ClinicController::class, 'treatmentAdd']);
+			Route::post('clinic/treatment-additional-note-update', [App\Http\Controllers\API\ClinicController::class, 'treatmentAdditionalNoteUpdate']);
+			Route::get('clinic/treatment-details/{treatment_id}', [App\Http\Controllers\API\ClinicController::class, 'treatmentDetails']);
+		});
+
+		Route::middleware(['clinic.capability:can_view_medical_history'])->group(function () {
+			Route::get('clinic/medical-history-list', [App\Http\Controllers\API\ClinicController::class, 'medicalHistoryList']);
+			Route::get('clinic/medical-history-details/{emp_id}', [App\Http\Controllers\API\ClinicController::class, 'medicalHistoryDetails']);
+		});
+
+		Route::middleware(['clinic.capability:can_issue_medical_certificate'])->group(function () {
+			Route::post('clinic/medical-certificate-store', [App\Http\Controllers\API\ClinicController::class, 'medicalCertificateStore']);
+			Route::get('clinic/medical-certificate-details/{medical_cert_id}', [App\Http\Controllers\API\ClinicController::class, 'medicalCertificateDetail']);
+		});
+	});
+
 // });

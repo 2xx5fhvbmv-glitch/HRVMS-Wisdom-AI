@@ -16,7 +16,7 @@ class ApplyResortSmtpConfig
 {
     public function handle(Request $request, Closure $next)
     {
-        $user = Auth::guard('resort-admin')->user() ?? Auth::guard('api')->user();
+        $user = Auth::guard('resort-admin')->user() ?? Auth::guard('api')->user() ?? Auth::guard('temp-clinic-doctor')->user();
 
         if ($user) {
             Common::applyResortSmtpConfig($user->resort_id);

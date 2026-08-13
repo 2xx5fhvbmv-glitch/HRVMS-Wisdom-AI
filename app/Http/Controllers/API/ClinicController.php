@@ -31,9 +31,17 @@ class ClinicController extends Controller
 
     public function __construct()
     {
-
+        // Clinic Manager-tier routes are reachable by either a real
+        // rank-12 employee (guard 'api') or an HR-managed third-party
+        // TemporaryClinicDoctor (guard 'temp-clinic-doctor', mobile-only,
+        // never an Employee row — see EnsureClinicManagerAccess). Every
+        // Employee-tier method below only ever sees an 'api' actor, since
+        // those routes never accept the second guard.
         if (Auth::guard('api')->check()) {
             $this->user                             =   Auth::guard('api')->user();
+            $this->resort_id                        =   $this->user->resort_id;
+        } elseif (Auth::guard('temp-clinic-doctor')->check()) {
+            $this->user                             =   Auth::guard('temp-clinic-doctor')->user();
             $this->resort_id                        =   $this->user->resort_id;
         }
     }
