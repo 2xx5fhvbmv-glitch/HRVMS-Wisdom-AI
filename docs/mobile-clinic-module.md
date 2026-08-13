@@ -44,9 +44,83 @@ also seeded 5 default appointment categories per resort: **General Checkup**
 should expect `GET clinic/appointment-categories` to return these out of the
 box on any resort, even before a Clinic Manager adds their own.
 
-No employee currently has `rank = 12` in the local DB. The Clinic Manager
-endpoints won't be callable until someone is promoted to that rank via the
-web admin panel — no sample login credentials exist yet for that role.
+A real rank-12 test employee now exists locally (from
+`2026_08_09_233000_seed_clinic_module_test_accounts.php`), so the Clinic
+Manager endpoints are reachable today via the normal `POST login` flow with
+that employee's `emp_id`/password — no separate setup needed for that path.
+
+## Temporary (third-party/agency) doctor accounts — a second way into the Clinic Manager tier
+
+Some resorts contract a clinic doctor from an outside agency rather than
+employing one directly. That account is **not** an `Employee` row — it's a
+standalone identity (`temporary_clinic_doctors` table /
+`App\Models\TemporaryClinicDoctor`), created and managed entirely from the
+web portal by HR (Clinic > Temporary Doctors). Mobile only needs to know how
+it authenticates and what it can/can't do — HR password management, session
+revocation, and account creation are all web-side, not mobile endpoints.
+
+### Login — separate endpoint, separate guard
+
+```
+POST clinic-doctor/login
+Body: { "email": "...", "password": "..." }
+```
+Same token mechanics as the regular `POST login` (`$model->createToken()->accessToken`
+— no OAuth client/password-grant flow, use the returned `token` directly as
+a Bearer token). Response also includes the account's granted capabilities
+so the app can build its own UI without a separate permissions call:
+```json
+{
+  "success": true,
+  "message": "Login successful",
+  "token": "...",
+  "doctor": {
+    "id": 3, "name": "Dr. Jane Doe", "email": "jane@agency.example", "agency_name": "Island Medical Partners",
+    "permissions": {
+      "can_view_appointments": true,
+      "can_manage_treatment": true,
+      "can_view_medical_history": false,
+      "can_issue_medical_certificate": false
+    }
+  }
+}
+```
+`POST clinic-doctor/logout` (Bearer token required) revokes the token, same
+as the regular logout.
+
+**Do not reuse the regular `POST login` endpoint for this account type** —
+it looks up an `Employee` by `emp_id`, which this account will never have.
+
+### What this account can reach
+
+All of the existing Clinic Manager + a few Employee-tier "detail" endpoints
+documented below are reachable by this identity too — same URLs, same
+request/response shapes, no separate versions. Two exceptions, gated by two
+new middlewares (`clinic.manager`, `clinic.capability:{flag}`):
+
+| Endpoint | Reachable by a temporary doctor? |
+|---|---|
+| `clinic/appointment-categories` (read) | Always, regardless of capabilities |
+| `clinic/clinic-staff-dashboard`, `clinic/appointment-list-based-filter`, `clinic/appointment-and-leave-list`, `clinic/appointment-details/{id}` | Only if `can_view_appointments` |
+| `clinic/treatment-add`, `clinic/treatment-additional-note-update`, `clinic/treatment-details/{id}` | Only if `can_manage_treatment` |
+| `clinic/medical-history-list`, `clinic/medical-history-details/{emp_id}` | Only if `can_view_medical_history` |
+| `clinic/medical-certificate-store`, `clinic/medical-certificate-details/{id}` | Only if `can_issue_medical_certificate` |
+| `clinic/appointment-categories-store` | **Never** — taxonomy/config is HR-only regardless of capabilities |
+| `clinic/clinic-staff-leave-action` | **Never** — this account has no employee/approver identity, so it can never validly appear as `approver_id` in the leave chain |
+| Every Employee-tier endpoint not listed above (`appointment-store`, `appointment-status-update`, `employee-clinic-dashboard`, `past-medical-history`) | Never — those are patient-facing; a doctor account isn't a patient |
+
+A capability the account doesn't have returns:
+```json
+{ "success": false, "message": "Your account does not have access to this feature." }
+```
+HTTP 403. Calling one of the two fully-excluded endpoints returns a plain
+`401 Unauthenticated` — those routes only accept the regular employee guard.
+
+On `clinicStaffDashboard`/`appointmentAndLeaveList`, the leave-related
+sub-fields (`medical_leave_requests_pending`, `medical_leave_requests_approved`,
+`leave_request`) will always be `0`/empty for this account type, since it
+has no employee id to match against `approver_id` — this is expected, not a
+bug to report.
 
 ### General response-shape notes (apply across all 18 endpoints)
 
