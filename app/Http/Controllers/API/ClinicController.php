@@ -46,6 +46,17 @@ class ClinicController extends Controller
         }
     }
 
+    // A TemporaryClinicDoctor actor has no Employee row, so GetEmployee is
+    // null — bare `$this->user->GetEmployee->id` reads a property off null,
+    // which is only a non-fatal warning locally but a fatal error under
+    // prod's stricter handling (confirmed: 500 on live, 200 locally for the
+    // identical call). optional() gives the same "no employee, no id" outcome
+    // without ever dereferencing the null.
+    private function actorEmployeeId()
+    {
+        return optional($this->user->GetEmployee)->id;
+    }
+
     public function appointmentCategoriesStore(Request $request)
     {
         if (!$this->user) {
@@ -424,14 +435,14 @@ class ClinicController extends Controller
             $leaveRequestPendingCount                  =   DB::table('employees_leaves as el')
                                                                 ->join('employees_leaves_status as els', 'els.leave_request_id', '=', 'el.id')
                                                                 ->where('els.status', 'Pending')
-                                                                ->where('els.approver_id', $this->user->GetEmployee->id)
+                                                                ->where('els.approver_id', $this->actorEmployeeId())
                                                                 ->where('el.resort_id', $this->resort_id)
                                                                 ->count();
 
             $leaveRequestApproveCount                   =   DB::table('employees_leaves as el')
                                                                 ->join('employees_leaves_status as els', 'els.leave_request_id', '=', 'el.id')
                                                                 ->where('els.status', 'Approved')
-                                                                ->where('els.approver_id', $this->user->GetEmployee->id)
+                                                                ->where('els.approver_id', $this->actorEmployeeId())
                                                                 ->where('el.resort_id', $this->resort_id)
                                                                 ->count();
 
@@ -510,8 +521,7 @@ class ClinicController extends Controller
         if (!$this->user) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
-        $employee                                       =   $this->user->GetEmployee;
-        $emp_id                                         =   $employee->id;
+        $emp_id                                         =   $this->actorEmployeeId();
         try {
             
             $treatmentSubquery                          =   ClinicTreatment::select('id')
@@ -1116,7 +1126,7 @@ class ClinicController extends Controller
 
             if($request->leave_request_id) {
                 $leaveApprvEmpIds                   =   EmployeeLeaveStatus::where('leave_request_id', $request->leave_request_id)
-                                                                ->where('approver_id','!=', $this->user->GetEmployee->id)
+                                                                ->where('approver_id','!=', $this->actorEmployeeId())
                                                                 ->where('status','Pending')
                                                                 ->pluck('approver_id')
                                                                 ->toArray();
