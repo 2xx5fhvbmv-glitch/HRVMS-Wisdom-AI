@@ -112,7 +112,20 @@ class AttandanceRegisterController extends Controller
                 return response()->json(['success'=>false,'message' => 'Invalid checkout time format.']);
             }
 
-            $ParentAttendace = ParentAttendace::where('id', $AttdanceId)->first();
+            // Was an unscoped find-by-id — any resort-admin could read and
+            // overwrite another resort's checkout time/overtime by guessing
+            // an id, and would also fatal on the property access below
+            // instead of hitting the (never-reached) null check that used
+            // to come after it.
+            $ParentAttendace = ParentAttendace::where('id', $AttdanceId)
+                ->where('resort_id', $this->resort->resort_id)
+                ->first();
+
+            if (!$ParentAttendace) {
+                DB::rollback();
+                return response()->json(['success'=>false,'message' => 'Record not found.'], 404);
+            }
+
             $DayWiseTotalHours = $ParentAttendace->DayWiseTotalHours;
             $OldOverTime = $ParentAttendace->OverTime ?? "00:00";
             if ($ParentAttendace)
