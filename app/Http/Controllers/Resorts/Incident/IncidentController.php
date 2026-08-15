@@ -123,7 +123,7 @@ class IncidentController extends Controller
                     $count = count($involved_employees);
                     $displayLimit = 5;
                     foreach ($involved_employees as $index => $employee) {
-                        $empDetails = Employee::find($employee);
+                        $empDetails = Employee::where('resort_id', $this->resort->resort_id)->find($employee);
                         if ($empDetails) {
                             $image = Common::getResortUserPicture($empDetails->Admin_Parent_id ?? null);
                             if ($index < $displayLimit) {
@@ -242,7 +242,7 @@ class IncidentController extends Controller
                     $displayLimit = 5;
     
                     foreach ($involved_employees as $index => $employee) {
-                        $empDetails = Employee::find($employee); // ✅ Use find() instead of findOrFail()
+                        $empDetails = Employee::where('resort_id', $this->resort->resort_id)->find($employee); // ✅ Use find() instead of findOrFail()
                         if ($empDetails) { // Ensure employee exists
                             $image = Common::getResortUserPicture($empDetails->Admin_Parent_id ?? null);
                             if ($index < $displayLimit) {
@@ -320,16 +320,22 @@ class IncidentController extends Controller
     {
         // dd($request->all());
         $request->validate([
-            'incident_id' => 'required|exists:incidents,id',
+            'incident_id' => [
+                'required',
+                Rule::exists('incidents', 'id')->where('resort_id', $this->resort->resort_id),
+            ],
             'priority' => 'nullable|in:Low,Medium,High',
             'assigned_commiteee' => 'nullable|array',
-            'assigned_commiteee.*' => 'exists:incident_committee,id',
+            'assigned_commiteee.*' => [
+                Rule::exists('incident_committee', 'id')->where('resort_id', $this->resort->resort_id),
+            ],
             'comments' => 'nullable|string|max:1000',
             'status' => 'required',
         ]);
 
-        // Find the Incident Report
-        $incident = Incidents::findOrFail($request->incident_id);
+        // Find the Incident Report (resort_id already proven by the
+        // validator above, but scope the fetch too — defense in depth)
+        $incident = Incidents::where('resort_id', $this->resort->resort_id)->findOrFail($request->incident_id);
 
         // Update the Incident Report
         $incident->update([
@@ -485,7 +491,7 @@ class IncidentController extends Controller
             'status' => 'nullable|string',
         ]);
 
-        $incident_details = Incidents::findOrFail($request->incident_id);
+        $incident_details = Incidents::where('resort_id', $this->resort->resort_id)->findOrFail($request->incident_id);
         $incident_details->priority = $request->priority;
         $incident_details->severity = $request->severity;
         $incident_details->status = $request->status;
@@ -560,10 +566,15 @@ class IncidentController extends Controller
     public function requestEmployeeStatements(Request $request)
     {
         $request->validate([
-            'incident_id' => 'required|exists:incidents,id',
+            'incident_id' => [
+                'required',
+                Rule::exists('incidents', 'id')->where('resort_id', $this->resort->resort_id),
+            ],
         ]);
-    
-        $incident = Incidents::with(['witness.employee', 'witness.employee.resortAdmin'])->findOrFail($request->incident_id);
+
+        $incident = Incidents::with(['witness.employee', 'witness.employee.resortAdmin'])
+            ->where('resort_id', $this->resort->resort_id)
+            ->findOrFail($request->incident_id);
     
         $userIds = collect();
         // dd($incident->involved_employees)
@@ -648,7 +659,7 @@ class IncidentController extends Controller
 
     public function approve(Request $request)
     {
-        $incident = Incidents::findOrFail($request->incident_id);
+        $incident = Incidents::where('resort_id', $this->resort->resort_id)->find($request->incident_id);
 
         if (!$incident) {
             return response()->json(['message' => 'Incident not found.'], 404);
@@ -658,8 +669,11 @@ class IncidentController extends Controller
         $incident->status = "Approval Pending";
         $incident->save();
 
-        // Notify GM (and their delegate if GM is on leave)
-        $gm = Employee::with(['position','resortAdmin'])->where('Rank', 8)->first();
+        // Notify GM (and their delegate if GM is on leave). Was picking
+        // whichever rank-8 employee happened to be first in the ENTIRE
+        // employees table — any resort's GM, not this one's — and
+        // emailing them this resort's incident details.
+        $gm = Employee::with(['position','resortAdmin'])->where('Rank', 8)->where('resort_id', $this->resort->resort_id)->first();
         if ($gm) {
             $msg = 'An investigation report is awaiting your approval.';
             $title = 'Approval Required';
@@ -724,7 +738,7 @@ class IncidentController extends Controller
 
     public function approveOrReject(Request $request)
     {
-        $incident = Incidents::findOrFail($request->id);
+        $incident = Incidents::where('resort_id', $this->resort->resort_id)->findOrFail($request->id);
         $currentEmpId = $this->resort->getEmployee->id ?? null;
 
         // Only GM (rank 8) or delegate of GM can approve/reject incidents
