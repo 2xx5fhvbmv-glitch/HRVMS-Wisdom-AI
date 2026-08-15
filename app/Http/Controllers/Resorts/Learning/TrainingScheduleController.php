@@ -44,7 +44,7 @@ class TrainingScheduleController extends Controller
         // softened so HOD / XCOM / MGR / SUP can drill in from their dashboard tiles
         // without hitting a 403. Create / edit actions still require full permission.
         $page_title = "Learning Schedule";
-        $trainings = TrainingSchedule::with('participants')->get();
+        $trainings = TrainingSchedule::with('participants')->where('resort_id', $this->resort->resort_id)->get();
         return view('resorts.learning.schedule.list', compact('trainings', 'page_title'));
     }
 
@@ -287,7 +287,7 @@ class TrainingScheduleController extends Controller
         }
 
         $request->validate([
-            'learning_title' => 'required|exists:learning_programs,id',
+            'learning_title' => ['required', Rule::exists('learning_programs', 'id')->where('resort_id', $this->resort->resort_id)],
             'start_date' => 'required|date',
             'end_date' => 'required|date',
             'start_time' => 'required',
@@ -300,7 +300,7 @@ class TrainingScheduleController extends Controller
         $employeeIds = json_decode($request->employee_ids, true);
 
         // Check if the training ID exists in learning_programs
-        $learningProgram = LearningProgram::where('id', $request->learning_title)->first();
+        $learningProgram = LearningProgram::where('id', $request->learning_title)->where('resort_id', $this->resort->resort_id)->first();
         if (!$learningProgram) {
             return response()->json([
                 'success' => false,
@@ -486,15 +486,19 @@ class TrainingScheduleController extends Controller
         try {
             // Validate the request data — accept HH:mm or HH:mm:ss for the times.
             $validated = $request->validate([
-                'id' => 'required|integer|exists:training_schedules,id',
+                'id' => ['required', 'integer', Rule::exists('training_schedules', 'id')->where('resort_id', $this->resort->resort_id)],
                 'start_date' => 'sometimes|nullable|date_format:d/m/Y',
                 'end_date' => 'sometimes|nullable|date_format:d/m/Y',
                 'start_time' => 'sometimes|nullable|regex:/^\d{2}:\d{2}(:\d{2})?$/',
                 'end_time'   => 'sometimes|nullable|regex:/^\d{2}:\d{2}(:\d{2})?$/',
             ]);
 
-            // Find the schedule record
-            $schedule = TrainingSchedule::findOrFail($request->id);
+            // Find the schedule record — scoped to this resort so a client-supplied
+            // id belonging to another resort can't be read/written from here.
+            $schedule = TrainingSchedule::where('resort_id', $this->resort->resort_id)->find($request->id);
+            if (!$schedule) {
+                return response()->json(['success' => false, 'message' => 'Schedule not found.'], 404);
+            }
 
             // Track changes for notifications
             $oldStartDate = $schedule->start_date;
