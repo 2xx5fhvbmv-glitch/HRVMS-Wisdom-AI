@@ -196,7 +196,12 @@ class AdvanceSalaryController extends Controller
         $isFinance = ($available_rank === "Finance");
         $isGM = ($available_rank === "GM");
 
-        $advance_salary = PayrollAdvance::with(['employee.resortAdmin','employee.position','employee.department'])->wherehas('employee.resortAdmin')->where('id',$id)->first();
+        // Was unscoped — cross-tenant read of another resort's loan/advance
+        // request (amount, guarantors, recovery schedule).
+        $advance_salary = PayrollAdvance::with(['employee.resortAdmin','employee.position','employee.department'])->wherehas('employee.resortAdmin')->where('id',$id)->where('resort_id', $resort_id)->first();
+        if (!$advance_salary) {
+            abort(404, 'Advance salary request not found.');
+        }
         $guarantors = PayrollAdvanceGuarantor::where('payroll_advance_id',$id)->get();
         $recovery_schedule = PayrollRecoverySchedule::where('payroll_advance_id',$id)->get();
 
@@ -232,7 +237,13 @@ class AdvanceSalaryController extends Controller
         $current_year = date('Y');
         $total_months = $request->months;
 
-        $payroll_advance_data = PayrollAdvance::where('id', $request->advance_salary_id)->first();
+        // Was unscoped — same PayrollAdvance IDOR pattern as show().
+        $payroll_advance_data = PayrollAdvance::where('id', $request->advance_salary_id)
+            ->where('resort_id', $this->resort->resort_id)
+            ->first();
+        if (!$payroll_advance_data) {
+            return response()->json(['success' => false, 'message' => 'Advance salary request not found.'], 404);
+        }
         $employee = Employee::where('id', $payroll_advance_data->employee_id)->first();
         $amount = $payroll_advance_data->request_amount;
 
@@ -285,8 +296,14 @@ class AdvanceSalaryController extends Controller
 
     public function paymentRescheduleCalculate(Request $request){
 
-        $payroll_advance_data = PayrollAdvance::where('id', $request->data[0]['payrollAdvanceId'])->first();
-        
+        // Was unscoped — same PayrollAdvance IDOR pattern as show().
+        $payroll_advance_data = PayrollAdvance::where('id', $request->data[0]['payrollAdvanceId'])
+            ->where('resort_id', $this->resort->resort_id)
+            ->first();
+        if (!$payroll_advance_data) {
+            return response()->json(['status' => 'error', 'message' => 'Advance salary request not found.'], 404);
+        }
+
         $amount = $payroll_advance_data->request_amount;
         $total_months = count($request->data);
         $remaining_balance = $amount;
@@ -343,7 +360,13 @@ class AdvanceSalaryController extends Controller
             ]);
         }
         $payrollAdvanceId = $request->data[0]['payrollAdvanceId'];
-        $payrollAdvance = PayrollAdvance::where('id', $payrollAdvanceId)->first();
+        // Was unscoped — same PayrollAdvance IDOR pattern as show().
+        $payrollAdvance = PayrollAdvance::where('id', $payrollAdvanceId)
+            ->where('resort_id', $this->resort->resort_id)
+            ->first();
+        if (!$payrollAdvance) {
+            return response()->json(['success' => false, 'status' => 'error', 'message' => 'Advance salary request not found.'], 404);
+        }
 
         // Check for duplicate months in repayment schedule
         foreach($request->data as $key => $value){
@@ -470,7 +493,14 @@ class AdvanceSalaryController extends Controller
     // Update Status Handler
     public function updateStatus(Request $request){
 
-        $payrollAdvance = PayrollAdvance::where('id', $request->advance_salary_id)->first();
+        // Was unscoped — the approver-identity checks below only verify
+        // the caller's OWN resort's HR/Finance/GM role, never that this
+        // PayrollAdvance actually belongs to the caller's resort. A
+        // genuine approver at Resort A could approve/reject a Resort B
+        // advance by guessing its id.
+        $payrollAdvance = PayrollAdvance::where('id', $request->advance_salary_id)
+            ->where('resort_id', $this->resort->resort_id)
+            ->first();
 
         $rank = config('settings.Position_Rank');
         $current_rank = $this->resort->GetEmployee->rank ?? null;
