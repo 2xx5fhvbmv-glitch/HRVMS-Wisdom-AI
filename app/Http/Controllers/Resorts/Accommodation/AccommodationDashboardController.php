@@ -52,6 +52,7 @@ class AccommodationDashboardController extends Controller
             $MaintanaceRequest = MaintanaceRequest::join("employees as t3","t3.id","maintanace_requests.Raised_By")
                                                 ->join("resort_admins as t1","t1.id","t3.Admin_Parent_id")
                                                 ->join("resort_departments as t4","t4.id","t3.Dept_id")
+                                                ->where('maintanace_requests.resort_id', $this->globalUser->resort_id)
                                                 ->whereNotIn('maintanace_requests.Status', ['Closed', 'On-Hold']);
                                                 if( $request->filled('ResortDepartment'))
                                                 {
@@ -73,9 +74,11 @@ class AccommodationDashboardController extends Controller
                                                                                     ->first('ItemName');
                                                     if(isset($row->Assigned_To))
                                                     {
-                                                        $emp = Common::GetEmployeeDetails($row->Assigned_To);
-                                                        $row->Assign_profileImg = Common::getResortUserPicture($emp->Parent_id);
-                                                        $row->Assign_toName     = $emp->first_name.' '.$emp->last_name;
+                                                        $emp = Common::GetEmployeeDetails($row->Assigned_To, $this->globalUser->resort_id);
+                                                        if ($emp) {
+                                                            $row->Assign_profileImg = Common::getResortUserPicture($emp->Parent_id);
+                                                            $row->Assign_toName     = $emp->first_name.' '.$emp->last_name;
+                                                        }
                                                     }
                                                     $row->EffectedAmenity = $InventoryModule ? ucfirst($InventoryModule->ItemName) : 'N/A';
                                                     return  $row;
@@ -380,11 +383,11 @@ class AccommodationDashboardController extends Controller
 
                                                     if(isset($row->Assigned_To) && $row->Assigned_To != 0)
                                                     {
-                                                        $emp = Common::GetEmployeeDetails($row->Assigned_To);
-                                                       
-                                                        $row->Assign_profileImg = Common::getResortUserPicture($emp->Parent_id);
-                                                        $row->Assign_toName     = $emp->first_name.' '.$emp->last_name;
-                                                    
+                                                        $emp = Common::GetEmployeeDetails($row->Assigned_To, $this->globalUser->resort_id);
+                                                        if ($emp) {
+                                                            $row->Assign_profileImg = Common::getResortUserPicture($emp->Parent_id);
+                                                            $row->Assign_toName     = $emp->first_name.' '.$emp->last_name;
+                                                        }
                                                     }
                                                     $row->EffectedAmenity = isset($InventoryModule) ? ucfirst($InventoryModule->ItemName) :'';
                                                     return  $row;
@@ -935,10 +938,11 @@ class AccommodationDashboardController extends Controller
                                                                                     ->first('ItemName');
                                                     if(isset($row->Assigned_To))
                                                     {
-                                                        $emp = Common::GetEmployeeDetails($row->Assigned_To);
-
-                                                        $row->Assign_profileImg = Common::getResortUserPicture($emp->Parent_id);
-                                                        $row->Assign_toName     = $emp->first_name.' '.$emp->last_name;
+                                                        $emp = Common::GetEmployeeDetails($row->Assigned_To, $this->globalUser->resort_id);
+                                                        if ($emp) {
+                                                            $row->Assign_profileImg = Common::getResortUserPicture($emp->Parent_id);
+                                                            $row->Assign_toName     = $emp->first_name.' '.$emp->last_name;
+                                                        }
                                                     }
                                                     $row->EffectedAmenity = $InventoryModule ? ucfirst($InventoryModule->ItemName) : 'N/A';
                                                     return  $row;
@@ -1205,9 +1209,11 @@ class AccommodationDashboardController extends Controller
         // **Assigned Staff Details**
         if (!empty($row->Raised_By)) 
         { 
-            $emp                                            =   Common::GetEmployeeDetails($row->Raised_By);
-            $row->Assign_profileImg                         =   Common::getResortUserPicture($emp->Parent_id);
-            $row->RequestedForMaintance                     =   $emp->first_name . ' ' . $emp->last_name;
+            $emp                                            =   Common::GetEmployeeDetails($row->Raised_By, $this->globalUser->resort_id);
+            if ($emp) {
+                $row->Assign_profileImg                     =   Common::getResortUserPicture($emp->Parent_id);
+                $row->RequestedForMaintance                 =   $emp->first_name . ' ' . $emp->last_name;
+            }
         }
 
         $row->Priority                                      = $row->priority;
@@ -1219,10 +1225,11 @@ class AccommodationDashboardController extends Controller
         if(isset($Request_id->ApprovedBy))
         {
 
-            $hod_request                                            =   Common::GetEmployeeDetails($Request_id->ApprovedBy);
-            $row->Requested_Hod_profileImg                  =   Common::getResortUserPicture($hod_request->Parent_id);
-            $row->Requested_Hod_Name                        =   $hod_request->first_name . ' ' . $hod_request->last_name;
-
+            $hod_request                                            =   Common::GetEmployeeDetails($Request_id->ApprovedBy, $this->globalUser->resort_id);
+            if ($hod_request) {
+                $row->Requested_Hod_profileImg              =   Common::getResortUserPicture($hod_request->Parent_id);
+                $row->Requested_Hod_Name                    =   $hod_request->first_name . ' ' . $hod_request->last_name;
+            }
         }
 
 
@@ -1323,6 +1330,7 @@ class AccommodationDashboardController extends Controller
                 $MaintanaceRequest = MaintanaceRequest::join("employees as t3","t3.id","maintanace_requests.Raised_By")
                                                     ->join("resort_admins as t1","t1.id","t3.Admin_Parent_id")
                                                     ->join("resort_departments as t4","t4.id","t3.Dept_id")
+                                                    ->where('maintanace_requests.resort_id', $this->globalUser->resort_id)
                                                     ->whereNotIn('maintanace_requests.Status', ['Closed', 'On-Hold']);
                                                     if( isset($request->ResortDepartment))
                                                     {
@@ -1345,7 +1353,7 @@ class AccommodationDashboardController extends Controller
                                                                                         ->first('ItemName');
                                                         if(isset($row->Assigned_To))
                                                         {
-                                                            $emp = Common::GetEmployeeDetails($row->Assigned_To);
+                                                            $emp = Common::GetEmployeeDetails($row->Assigned_To, $this->globalUser->resort_id);
                                                             if($emp)
                                                             {
                                                                 $row->Assign_profileImg = Common::getResortUserPicture($emp->Parent_id);
@@ -1404,7 +1412,9 @@ class AccommodationDashboardController extends Controller
             $employee_id                                    =   $this->globalUser->GetEmployee->id;
             $requestId                                      =   base64_decode($request->input('request_id'));
             $childApprMaintReqId                            =   $request->input('child_appr_maint_req_id');
-            $maintanance                                    =   MaintanaceRequest::find($requestId);
+            $maintanance                                    =   MaintanaceRequest::where('id', $requestId)
+                                                                    ->where('resort_id', $this->globalUser->resort_id)
+                                                                    ->first();
            
             if (!$maintanance) {
                 return response()->json(['success' => false, 'message' => 'Maintenance request not found'], 404);

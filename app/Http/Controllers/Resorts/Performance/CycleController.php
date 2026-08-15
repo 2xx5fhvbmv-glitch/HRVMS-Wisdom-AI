@@ -413,16 +413,18 @@ class CycleController extends Controller
                     foreach ((is_array($Emp_main_id) ? $Emp_main_id : []) as $key => $emp_id)
                     {
                         // Resolve employee — Emp_main_id could be numeric id, base64, or Emp_id string (e.g. DR-17)
+                        // Numeric/base64 branches were unscoped, letting one resort
+                        // enroll another resort's employee into its own cycle.
                         $actualEmpId = null;
                         $employee = null;
                         if (is_numeric($emp_id)) {
-                            $employee = Employee::find($emp_id);
+                            $employee = Employee::where('id', $emp_id)->where('resort_id', $this->resort->resort_id)->first();
                             $actualEmpId = $emp_id;
                         } else {
                             // Try base64 decode first
                             $decoded = base64_decode($emp_id, true);
                             if ($decoded && is_numeric($decoded)) {
-                                $employee = Employee::find($decoded);
+                                $employee = Employee::where('id', $decoded)->where('resort_id', $this->resort->resort_id)->first();
                                 $actualEmpId = $decoded;
                             }
                             // Fallback: lookup by Emp_id string like "DR-17"
@@ -573,13 +575,17 @@ class CycleController extends Controller
     {
         if ($identifier === null || $identifier === '') return null;
 
+        // $resortId was accepted but ignored on these two branches — same
+        // gap as Common::resolveEmpMainIdToNumeric.
         if (is_numeric($identifier)) {
-            return Employee::with(['resortAdmin', 'department', 'position'])->find($identifier);
+            return Employee::with(['resortAdmin', 'department', 'position'])
+                ->where('id', $identifier)->where('resort_id', $resortId)->first();
         }
 
         $decoded = base64_decode($identifier, true);
         if ($decoded !== false && is_numeric($decoded)) {
-            $emp = Employee::with(['resortAdmin', 'department', 'position'])->find($decoded);
+            $emp = Employee::with(['resortAdmin', 'department', 'position'])
+                ->where('id', $decoded)->where('resort_id', $resortId)->first();
             if ($emp) return $emp;
         }
 

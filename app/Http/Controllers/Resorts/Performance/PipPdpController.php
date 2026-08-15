@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Resorts\Performance;
 
 use Auth;
 use Validator;
+use Illuminate\Validation\Rule;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use App\Models\Employee;
@@ -53,9 +54,9 @@ class PipPdpController extends Controller
     public function pipStore(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'employee_id' => 'required|exists:employees,id',
-            'position_id' => 'nullable|exists:resort_positions,id',
-            'template_id' => 'nullable|exists:professionalforms,id',
+            'employee_id' => ['required', Rule::exists('employees', 'id')->where('resort_id', $this->resort->resort_id)],
+            'position_id' => ['nullable', Rule::exists('resort_positions', 'id')->where('resort_id', $this->resort->resort_id)],
+            'template_id' => ['nullable', Rule::exists('professionalforms', 'id')->where('resort_id', $this->resort->resort_id)],
             'duration' => 'required|string|max:100',
             'factors' => 'nullable|string|max:2000',
         ]);
@@ -152,9 +153,9 @@ class PipPdpController extends Controller
     public function pdpStore(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'employee_id' => 'required|exists:employees,id',
-            'position_id' => 'nullable|exists:resort_positions,id',
-            'template_id' => 'nullable|exists:professionalforms,id',
+            'employee_id' => ['required', Rule::exists('employees', 'id')->where('resort_id', $this->resort->resort_id)],
+            'position_id' => ['nullable', Rule::exists('resort_positions', 'id')->where('resort_id', $this->resort->resort_id)],
+            'template_id' => ['nullable', Rule::exists('professionalforms', 'id')->where('resort_id', $this->resort->resort_id)],
             'duration' => 'required|string|max:100',
             'factors' => 'nullable|string|max:2000',
         ]);

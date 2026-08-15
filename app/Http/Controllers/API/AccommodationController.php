@@ -195,10 +195,11 @@ class AccommodationController extends Controller
                                                                             ->first('ItemName');
 
                                                                         if (isset($row->Assigned_To)) {
-                                                                            $emp = Common::GetEmployeeDetails($row->Assigned_To);
-
-                                                                            $row->Assign_profileImg = Common::getResortUserPicture($emp->Parent_id);
-                                                                            $row->Assign_toName     = $emp->first_name . ' ' . $row->last_name;
+                                                                            $emp = Common::GetEmployeeDetails($row->Assigned_To, $this->resort_id);
+                                                                            if ($emp) {
+                                                                                $row->Assign_profileImg = Common::getResortUserPicture($emp->Parent_id);
+                                                                                $row->Assign_toName     = $emp->first_name . ' ' . $row->last_name;
+                                                                            }
                                                                         }
                                                                         $row->EffectedAmenity = isset($InventoryModule) ? ucfirst($InventoryModule->ItemName) : '';
                                                                         return  $row;
@@ -633,10 +634,12 @@ class AccommodationController extends Controller
         $row->EffectedAmenity                               =   ucfirst($inventoryItems[$row->item_id] ?? 'N/A');
 
         // **Assigned Staff Details**
-        if (!empty($row->Assigned_To)) { 
-            $emp                                            =   Common::GetEmployeeDetails($row->Assigned_To);
-            $row->Assign_profileImg                         =   Common::getResortUserPicture($emp->Parent_id);
-            $row->Assign_toName                             =   $emp->first_name . ' ' . $emp->last_name;
+        if (!empty($row->Assigned_To)) {
+            $emp                                            =   Common::GetEmployeeDetails($row->Assigned_To, $this->resort_id);
+            if ($emp) {
+                $row->Assign_profileImg                     =   Common::getResortUserPicture($emp->Parent_id);
+                $row->Assign_toName                         =   $emp->first_name . ' ' . $emp->last_name;
+            }
         }
 
         return $row;

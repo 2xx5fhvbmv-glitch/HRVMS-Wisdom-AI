@@ -489,7 +489,11 @@ class InventoryController extends Controller
     public function UnassignItem(Request $request)
     {
         $availableAccId = base64_decode($request->availableAccId);
-        $resort_id = base64_decode($request->resort_id);
+        // Was trusting the client-supplied resort_id directly (Class A) —
+        // every query below keyed off it, letting a modified request
+        // unassign/view another resort's beds. The UI always sends the
+        // caller's own resort_id anyway; use the authenticated one instead.
+        $resort_id = $this->resort->resort_id;
 
         // Helper to decrement inventory when unassigning
         $decrementInventory = function ($availableAId) {

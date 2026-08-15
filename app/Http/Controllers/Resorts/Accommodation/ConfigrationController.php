@@ -181,7 +181,7 @@ class ConfigrationController extends Controller
         DB::beginTransaction();
         try
         {
-            InventoryCategoryModel::where("id",$Catid)->update(["CategoryName"=>ucfirst($CategoryName)]);
+            InventoryCategoryModel::where("id",$Catid)->where('resort_id', $resort_id)->update(["CategoryName"=>ucfirst($CategoryName)]);
 
             DB::commit();
             return response()->json([
@@ -206,7 +206,7 @@ class ConfigrationController extends Controller
         DB::beginTransaction();
         try
         {
-        InventoryCategoryModel::where("id",$id)->delete();
+        InventoryCategoryModel::where("id",$id)->where('resort_id', $this->resort->resort_id)->delete();
 
             DB::commit();
             return response()->json([
@@ -346,7 +346,7 @@ class ConfigrationController extends Controller
         DB::beginTransaction();
         try
         {
-            AccommodationType::where("id",$Catid)->update(["AccommodationName"=>ucfirst($AccommodationName),'Color'=>$request->Color]);
+            AccommodationType::where("id",$Catid)->where('resort_id', $resort_id)->update(["AccommodationName"=>ucfirst($AccommodationName),'Color'=>$request->Color]);
 
             DB::commit();
             return response()->json([
@@ -371,7 +371,7 @@ class ConfigrationController extends Controller
         DB::beginTransaction();
         try
         {
-            AccommodationType::where("id",$id)->delete();
+            AccommodationType::where("id",$id)->where('resort_id', $this->resort->resort_id)->delete();
 
             DB::commit();
             return response()->json([
@@ -665,7 +665,7 @@ class ConfigrationController extends Controller
 
             if ($exists) {
                 DB::rollBack();
-                $buildingName = \App\Models\BuildingModel::find($buildingId)->BuildingName ?? $buildingId;
+                $buildingName = \App\Models\BuildingModel::where('id', $buildingId)->where('resort_id', $resort_id)->value('BuildingName') ?? $buildingId;
                 return response()->json([
                     'success' => false,
                     'message' => "Room {$RoomNo} on Floor {$Floor} in {$buildingName} already exists."
@@ -696,7 +696,7 @@ class ConfigrationController extends Controller
                     $outOfStock = [];
                     foreach ($request->Inv_Cat_id[$i] as $item) {
                         $qty = isset($invQtyMap[$item]) ? intval($invQtyMap[$item]) : 1;
-                        $inv = InventoryModule::find($item);
+                        $inv = InventoryModule::where('id', $item)->where('resort_id', $resort_id)->first();
                         if ($inv) {
                             $available = ($inv->Quantity ?? 0) - ($inv->Occupied ?? 0);
                             if ($qty > $available) {
@@ -719,7 +719,7 @@ class ConfigrationController extends Controller
                         AvailableAccommodationInvItem::create([ 'Available_Acc_id'=>$parent_id->id,'Item_id'=>$item,'quantity'=>$qty]);
 
                         // Increment Occupied count in inventory
-                        $inv = InventoryModule::find($item);
+                        $inv = InventoryModule::where('id', $item)->where('resort_id', $resort_id)->first();
                         if ($inv) {
                             $inv->Occupied = ($inv->Occupied ?? 0) + $qty;
                             $inv->save();
@@ -866,7 +866,10 @@ class ConfigrationController extends Controller
         DB::beginTransaction();
         try
         {
-            BuildingModel::where("id",$b_id)->update(["resort_id"=>$resort_id,"BuildingName"=>$request->BuildingName]);
+            // Was unscoped — the update payload reassigns resort_id to the
+            // caller's own, so without a where() filter this let one resort
+            // "adopt" another resort's building record by id.
+            BuildingModel::where("id",$b_id)->where('resort_id', $resort_id)->update(["resort_id"=>$resort_id,"BuildingName"=>$request->BuildingName]);
 
             DB::commit();
             return response()->json([
@@ -890,8 +893,8 @@ class ConfigrationController extends Controller
         DB::beginTransaction();
         try
         {
-            BuildingModel::where("id",$id)->delete();
-            BulidngAndFloorAndRoom::where("building_id",$id)->delete();
+            BuildingModel::where("id",$id)->where('resort_id', $this->resort->resort_id)->delete();
+            BulidngAndFloorAndRoom::where("building_id",$id)->where('resort_id', $this->resort->resort_id)->delete();
             DB::commit();
             return response()->json([
                 'success' => true,
@@ -1014,7 +1017,8 @@ class ConfigrationController extends Controller
             $Room = $request->Room;
             $Main_id = base64_decode($request->Main_id);
             $resort_id = $this->resort->resort_id;
-            BulidngAndFloorAndRoom::where("id",$Main_id)->update(["resort_id"=>$resort_id,"Floor"=>$Floor,"Room"=>$Room,"building_id"=>$building_id]);
+            // Same hijack pattern as BuildingUpdate — scope the where().
+            BulidngAndFloorAndRoom::where("id",$Main_id)->where('resort_id', $resort_id)->update(["resort_id"=>$resort_id,"Floor"=>$Floor,"Room"=>$Room,"building_id"=>$building_id]);
             DB::commit();
                 return response()->json(['success' =>true,'message'=>'Floor and Room Updated successfully' ], 200);
 
@@ -1036,7 +1040,7 @@ class ConfigrationController extends Controller
 
         DB::beginTransaction();
         try {
-            BulidngAndFloorAndRoom::where("id", $id)->delete();
+            BulidngAndFloorAndRoom::where("id", $id)->where('resort_id', $this->resort->resort_id)->delete();
             DB::commit();
             return response()->json([
                 'success' => true,
