@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Resorts\Leave;
 use App\Http\Controllers\Controller;
 use App\Events\ResortNotificationEvent;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use App\Models\ResortHoliday;
 use App\Models\ResortAdmin;
 use App\Models\Employee;
@@ -1201,10 +1202,14 @@ class DashboardController extends Controller
     public function sendBirthdayNotification(Request $request)
     {
         $request->validate([
-            'employee_id' => 'required|exists:employees,id'
+            'employee_id' => [
+                'required',
+                Rule::exists('employees', 'id')->where('resort_id', $this->resort->resort_id),
+            ],
         ]);
 
         $employee = Employee::with(['resortAdmin', 'position'])
+            ->where('resort_id', $this->resort->resort_id)
             ->findOrFail($request->employee_id);
 
         if (!$employee->resortAdmin) {
