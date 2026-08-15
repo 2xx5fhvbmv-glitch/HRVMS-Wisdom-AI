@@ -210,7 +210,13 @@ class AdvanceSalaryRepaymentTrackerController extends Controller
     }
 
     public function addNote(Request $request){
-        $recovery_schedule = PayrollRecoverySchedule::find($request->schedule_id);
+        // Was unscoped — contrasts with update() right above, which
+        // explicitly tenant-scopes via whereHas('employee', resort_id).
+        $recovery_schedule = PayrollRecoverySchedule::where('id', $request->schedule_id)
+            ->whereHas('employee', function ($q) {
+                $q->where('resort_id', $this->resort->resort_id);
+            })
+            ->first();
         if ($recovery_schedule) {
             $recovery_schedule->remark = $request->remark;
             $recovery_schedule->save();
@@ -230,7 +236,8 @@ class AdvanceSalaryRepaymentTrackerController extends Controller
 
     public function markAsComplete(Request $request,$id){
         $id = base64_decode($id);
-        $payrollAdvance = PayrollAdvance::find($id);
+        // Was unscoped.
+        $payrollAdvance = PayrollAdvance::where('id', $id)->where('resort_id', $this->resort->resort_id)->first();
         if ($payrollAdvance) {
 
             $payrollAdvance->recovery_status = 'Completed';
@@ -249,12 +256,14 @@ class AdvanceSalaryRepaymentTrackerController extends Controller
      public function downloadPdf($id)
     {
         $id = base64_decode($id);
+        // Was unscoped — downloaded another resort's employee loan details
+        // as a PDF.
         $payrollAdvance = PayrollAdvance::with([
             'employee.resortAdmin',
             'employee.position',
             'employee.department',
             'payrollRecoverySchedule'
-        ])->findOrFail($id);
+        ])->where('resort_id', $this->resort->resort_id)->findOrFail($id);
 
 
         $pdf = Pdf::loadView('resorts.people.employee.advance-salary-repayment-tracker.pdf-report', [

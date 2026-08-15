@@ -228,6 +228,8 @@ class EmployeeResignationController extends Controller
         // the relations get lazy-fetched and the chain still works, but
         // it's wasteful — and it doesn't help the rows where hod_id /
         // hr_id were never recorded at create time (see fallback below).
+        // Was unscoped — cross-tenant read of another resort's resignation
+        // details.
         $employeeResignation = EmployeeResignation::with([
                 'employee.resortAdmin',
                 'employee.department',
@@ -237,6 +239,7 @@ class EmployeeResignationController extends Controller
                 'hr.resortAdmin',
                 'hr.position',
             ])
+            ->where('resort_id', $this->resort->resort_id)
             ->findOrFail($resignationId);
 
         // Some resignations were created before hod_id / hr_id started
@@ -329,8 +332,14 @@ class EmployeeResignationController extends Controller
         $status = $request->status;
 
         $user = $this->resort->GetEmployee;
-        
-        $employeeResignation = EmployeeResignation::findOrFail($resignationId);
+
+        // Was unscoped — the GM/EXCOM override branch below doesn't check
+        // the resignation belongs to the caller's resort either, so a
+        // GM/EXCOM at Resort A could approve/reject/hold Resort B's
+        // resignation. Scoping the fetch itself closes the gap for every
+        // branch below.
+        $employeeResignation = EmployeeResignation::where('resort_id', $this->resort->resort_id)
+            ->findOrFail($resignationId);
         $is_hod = false;
         $is_hr = false;
 
@@ -531,8 +540,11 @@ class EmployeeResignationController extends Controller
     public function scheduleMeeting(Request $request)
     {
         $resignationId = base64_decode($request->resignationId);
-       
-        $employeeResignation = EmployeeResignation::findOrFail($resignationId);
+
+        // Was unscoped — same missing filter as updateStatus, cross-tenant
+        // write of a resignation meeting schedule.
+        $employeeResignation = EmployeeResignation::where('resort_id', $this->resort->resort_id)
+            ->findOrFail($resignationId);
 
         $user = $this->resort->GetEmployee;
         $is_hod = false;
