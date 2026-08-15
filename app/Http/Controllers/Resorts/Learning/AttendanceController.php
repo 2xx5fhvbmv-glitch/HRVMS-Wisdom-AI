@@ -163,13 +163,13 @@ class AttendanceController extends Controller
     public function markAttendanceBulk(Request $request)
     {
         $request->validate([
-            'training_schedule_id' => 'required',
+            'training_schedule_id' => ['required', Rule::exists('training_schedules', 'id')->where('resort_id', $this->resort->resort_id)],
             'employees' => 'required|array',
-            'employees.*.employee_id' => 'required|exists:employees,id',
+            'employees.*.employee_id' => ['required', Rule::exists('employees', 'id')->where('resort_id', $this->resort->resort_id)],
             'employees.*.status' => 'required|in:Present,Absent',
         ]);
 
-        $trainingSchedule = TrainingSchedule::find($request->training_schedule_id);
+        $trainingSchedule = TrainingSchedule::where('resort_id', $this->resort->resort_id)->find($request->training_schedule_id);
         if (!$trainingSchedule) {
             return response()->json(['success' => false, 'message' => 'Training schedule not found.'], 404);
         }
@@ -197,8 +197,12 @@ class AttendanceController extends Controller
     public function attendanceHistoryPage($employee_id)
     {
         $page_title = 'Attendance History';
-        $employee = Employee::with('resortAdmin')->findOrFail(base64_decode($employee_id));
-        // $employee = Employee::with('resortAdmin')->findOrFail($employee_id);
+        $employee = Employee::with('resortAdmin')
+            ->where('resort_id', $this->resort->resort_id)
+            ->find(base64_decode($employee_id));
+        if (!$employee) {
+            abort(404, 'Employee not found.');
+        }
         return view('resorts.learning.attendance.history', compact('employee','page_title'));
     }
 
@@ -206,8 +210,11 @@ class AttendanceController extends Controller
     {
         // dd(base64_decode($employee_id));
         $query = TrainingAttendance::with(['schedule.learningProgram'])
-            ->where('employee_id', base64_decode($employee_id));
-     
+            ->where('employee_id', base64_decode($employee_id))
+            // Scope through the owning schedule so another resort's attendance
+            // records can't be read even if employee_id collides across tenants.
+            ->whereHas('schedule', fn($sq) => $sq->where('resort_id', $this->resort->resort_id));
+
         // Apply search filter (training name)
         if ($request->has('searchTerm') && !empty($request->searchTerm)) {
             $search = $request->searchTerm;
@@ -241,8 +248,8 @@ class AttendanceController extends Controller
     public function saveAttendance(Request $request)
     {
         $request->validate([
-            'training_schedule_id' => 'required|exists:training_schedules,id',
-            'employee_id' => 'required|exists:employees,id',
+            'training_schedule_id' => ['required', Rule::exists('training_schedules', 'id')->where('resort_id', $this->resort->resort_id)],
+            'employee_id' => ['required', Rule::exists('employees', 'id')->where('resort_id', $this->resort->resort_id)],
             'attendance_date' => 'required|date',
             'status' => 'required|in:Present,Absent,Late',
             'notes' => 'nullable|string|max:500',

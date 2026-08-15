@@ -66,7 +66,12 @@ class EvaluationFormController extends Controller
     {
         $resort_id = $this->resort->resort_id;
         $page_title = 'Create Evaluation Form';
-        $trainings = TrainingSchedule::with(['learningProgram', 'participants.employee.resortAdmin'])->where('status','Completed')->orwhere('status','Ongoing')->where('resort_id',$this->resort->resort_id)->get();
+        $trainings = TrainingSchedule::with(['learningProgram', 'participants.employee.resortAdmin'])
+            ->where('resort_id', $this->resort->resort_id)
+            ->where(function ($q) {
+                $q->where('status', 'Completed')->orWhere('status', 'Ongoing');
+            })
+            ->get();
         // dd($trainings);
         return view('resorts.learning.evaluation.create',compact('resort_id','trainings','page_title'));
     }
@@ -90,7 +95,10 @@ class EvaluationFormController extends Controller
     {
         $page_title = 'Edit Evaluation Form';
         $resortId = $this->resort->resort_id;
-        $form = EvaluationForm::findOrFail($id);
+        $form = EvaluationForm::where('resort_id', $resortId)->find($id);
+        if (!$form) {
+            abort(404, 'Evaluation form not found.');
+        }
         $form->form_structure = json_decode($form->form_structure, true);
         return view('resorts.learning.evaluation.edit',compact('resortId','form','page_title'));
     }
@@ -107,7 +115,10 @@ class EvaluationFormController extends Controller
 
     public function update(Request $request, $id)
     {
-        $form = EvaluationForm::findOrFail($id);
+        $form = EvaluationForm::where('resort_id', $this->resort->resort_id)->find($id);
+        if (!$form) {
+            abort(404, 'Evaluation form not found.');
+        }
 
         $validatedData = $request->validate([
             'form_name' => 'required|string|max:255',
@@ -124,7 +135,10 @@ class EvaluationFormController extends Controller
 
     public function delete($id)
     {
-        $form = EvaluationForm::findOrFail($id);
+        $form = EvaluationForm::where('resort_id', $this->resort->resort_id)->find($id);
+        if (!$form) {
+            return response()->json(['success' => false, 'message' => 'Form not found.'], 404);
+        }
         $form->delete();
 
         return response()->json(['success' => 'Form deleted successfully.']);

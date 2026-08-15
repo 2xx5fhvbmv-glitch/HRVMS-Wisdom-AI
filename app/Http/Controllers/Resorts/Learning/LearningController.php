@@ -112,9 +112,9 @@ class LearningController extends Controller
     {
         $request->validate([
             'employee_ids' => 'required|json',
-            'suggested_Learning' => 'required|exists:learning_programs,id',
+            'suggested_Learning' => ['required', Rule::exists('learning_programs', 'id')->where('resort_id', $this->resort->resort_id)],
             'reason' => 'required|string|max:255',
-            'learning_manager' => 'required|exists:employees,id',
+            'learning_manager' => ['required', Rule::exists('employees', 'id')->where('resort_id', $this->resort->resort_id)],
             'start_date' => 'required|date',
             // End date temporarily optional — UI field is hidden; column is nullable.
             'end_date' => 'nullable|date|after_or_equal:start_date',
@@ -363,12 +363,12 @@ class LearningController extends Controller
             }
 
             $request->validate([
-                'request_id' => 'required|exists:learning_requests,id',
+                'request_id' => ['required', Rule::exists('learning_requests', 'id')->where('resort_id', $this->resort->resort_id)],
                 'status' => 'required|in:Approved,Denied,On Hold',
                 'reason' => 'nullable|string'
             ]);
 
-            $learningRequest = LearningRequest::find($request->request_id);
+            $learningRequest = LearningRequest::where('resort_id', $this->resort->resort_id)->find($request->request_id);
 
             // ✅ Ensure the request exists
             if (!$learningRequest) {
