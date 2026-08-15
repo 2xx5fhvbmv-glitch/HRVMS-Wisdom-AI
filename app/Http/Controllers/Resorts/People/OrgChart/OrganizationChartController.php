@@ -10,6 +10,7 @@ use App\Models\Resort;
 use App\Models\Employee;
 use App\Models\resortAdmin;
 use App\Models\ResortDepartment;
+use Illuminate\Validation\Rule;
 use Auth;
 use Config;
 use Common;
@@ -298,12 +299,18 @@ class OrganizationChartController extends Controller
     public function getImageAsBase64(Request $request)
     {
         $request->validate([
-            'employee_id' => 'required|exists:employees,id'
+            'employee_id' => ['required', Rule::exists('employees', 'id')->where('resort_id', $this->resort->resort_id)]
         ]);
 
-        $employee = Employee::find($request->employee_id);
+        $employee = Employee::where('resort_id', $this->resort->resort_id)->find($request->employee_id);
+        if (!$employee) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Employee not found'
+            ], 404);
+        }
         $imagePath = \Common::getResortUserPicture($employee->Admin_Parent_id);
-        
+
         if (empty($imagePath)) {
             $imagePath = 'admin_assets/files/user-image.png';
         }
@@ -349,15 +356,19 @@ class OrganizationChartController extends Controller
     {
         $request->validate([
             'employee_ids' => 'required|array',
-            'employee_ids.*' => 'exists:employees,id'
+            'employee_ids.*' => Rule::exists('employees', 'id')->where('resort_id', $this->resort->resort_id)
         ]);
 
         $results = [];
-        
+
         foreach ($request->employee_ids as $employeeId) {
-            $employee = Employee::find($employeeId);
+            $employee = Employee::where('resort_id', $this->resort->resort_id)->find($employeeId);
+            if (!$employee) {
+                $results[$employeeId] = $this->getFallbackImageBase64();
+                continue;
+            }
             $imagePath = \Common::getResortUserPicture($employee->Admin_Parent_id);
-            
+
             if (empty($imagePath)) {
                 $imagePath = 'admin_assets/files/user-image.png';
             }

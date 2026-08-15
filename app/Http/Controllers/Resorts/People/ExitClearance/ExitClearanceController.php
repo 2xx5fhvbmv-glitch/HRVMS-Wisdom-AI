@@ -394,6 +394,22 @@ class ExitClearanceController extends Controller
 
         $deadLineDate = Carbon::createFromFormat('d/m/Y', $request->input('deadline_date'))->format('Y-m-d');
 
+        // Cross-tenant guard: employee_resignation_id is client-supplied
+        // (POST body). Without this, a caller in another resort could
+        // point it at a resignation belonging to this resort's employee,
+        // getting that employee's name/department leaked back to them via
+        // the assignment notification below.
+        $employeeResignationForAssignment = EmployeeResignation::where('id', $request->employee_resignation_id)
+            ->where('resort_id', $resort_id)
+            ->first();
+        if (!$employeeResignationForAssignment) {
+            return response()->json([
+                'success' => false,
+                'status'  => 'invalid_resignation',
+                'message' => 'Resignation record not found for this resort.',
+            ], 404);
+        }
+
         foreach ($request->department_id as $department_id) {
             $department = ResortDepartment::where('resort_id', $resort_id)
                 ->where('id', $department_id)
@@ -446,11 +462,8 @@ class ExitClearanceController extends Controller
                 // landed in their queue. Was silently created
                 // before; HR had to chase by hand.
                 if ($employee) {
-                    $resignation = EmployeeResignation::with('employee.resortAdmin')
-                        ->find($request->employee_resignation_id);
-                    $empName = $resignation
-                        ? (optional(optional($resignation->employee)->resortAdmin)->full_name ?: 'employee')
-                        : 'employee';
+                    $employeeResignationForAssignment->loadMissing('employee.resortAdmin');
+                    $empName = optional(optional($employeeResignationForAssignment->employee)->resortAdmin)->full_name ?: 'employee';
                     $this->notifyExit(
                         $employee->id,
                         'New Exit Clearance Form Assigned',
@@ -601,8 +614,19 @@ class ExitClearanceController extends Controller
         $resort_id = $this->resort->resort_id;
    
         $employee = $this->resort->GetEmployee;
-           
+
         $deadLineDate = Carbon::createFromFormat('d/m/Y', $request->input('deadline_date'))->format('Y-m-d');
+
+        // Cross-tenant guard — see assignmentSubmitDepartment() above for
+        // why employee_resignation_id must be verified against this resort
+        // before it's persisted into a new assignment row / used to look
+        // up the employee for a notification.
+        $employeeResignationForAssignment = EmployeeResignation::where('id', $request->employee_resignation_id)
+            ->where('resort_id', $resort_id)
+            ->first();
+        if (!$employeeResignationForAssignment) {
+            return redirect()->back()->with('error', 'Resignation record not found for this resort.');
+        }
 
         $template = ExitClearanceForm::where('resort_id', $resort_id)
             ->where('id', $request->template_id)
@@ -632,11 +656,10 @@ class ExitClearanceController extends Controller
 
                 // Notify the resigning employee that an exit interview
                 // form is now waiting for them to fill in.
-                $resignation = EmployeeResignation::with('employee.resortAdmin')
-                    ->find($request->employee_resignation_id);
-                if ($resignation && $resignation->employee_id) {
+                $employeeResignationForAssignment->loadMissing('employee.resortAdmin');
+                if ($employeeResignationForAssignment->employee_id) {
                     $this->notifyExit(
-                        $resignation->employee_id,
+                        $employeeResignationForAssignment->employee_id,
                         'Exit Interview Form Assigned',
                         "📋 An exit interview form has been assigned to you ({$template->form_name})."
                         . " Please complete it by " . Carbon::parse($deadLineDate)->format('d M Y') . "."
@@ -905,7 +928,7 @@ class ExitClearanceController extends Controller
         $resignation = EmployeeResignation::with([
             'employee.resortAdmin',
             'employee.department',
-        ])->find($exitClearanceFormAssignment->emp_resignation_id);
+        ])->where('resort_id', $resort_id)->find($exitClearanceFormAssignment->emp_resignation_id);
         $submitter = Auth::guard('resort-admin')->user();
         $submitterName = optional($submitter)->full_name
             ?: trim((optional($submitter)->first_name ?? '') . ' ' . (optional($submitter)->last_name ?? ''));
@@ -1035,6 +1058,7 @@ class ExitClearanceController extends Controller
         // Notify HR — same shape as the API formSubmit + the department
         // completion notification, so the bell log reads consistently.
         $resignation = EmployeeResignation::with('employee.resortAdmin')
+            ->where('resort_id', $resort_id)
             ->find($exitClearanceFormAssignment->emp_resignation_id);
         if ($resignation) {
             $hrId = $resignation->hr_id;
