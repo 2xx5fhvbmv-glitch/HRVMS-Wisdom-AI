@@ -51,6 +51,9 @@ class FilePermissionController extends Controller
         $position =  $request->position;
         $department =  $request->department;
         $FolderList = FilemangementSystem::where('resort_id', $this->resort->resort_id)->where("Folder_unique_id",$folder_id)->first();
+        if (!$FolderList) {
+            return response()->json(['success' => false, 'message' => 'Folder not found.'], 404);
+        }
         $files      = ChildFileManagement::where("Parent_File_ID",$FolderList->id)->get(['unique_id','File_Name','File_Size','updated_at'])->map(function($ak)
         {
             $ak->LastModified =  $ak->updated_at->format('d/m/Y');
@@ -68,7 +71,10 @@ class FilePermissionController extends Controller
                 $FilePermissions = FilePermissions::where('resort_id',$this->resort->resort_id);
                 if(isset($position))
                 {
-                    $FilePermissions->orwhereIn('Position_id',$position);
+                    // Was orWhereIn, which compiled to
+                    // `WHERE resort_id = ? OR (Position_id IN (...))` —
+                    // breaking the intended resort_id AND-scoping.
+                    $FilePermissions->whereIn('Position_id',$position);
                 }
                 
                 $FilePermissions  = $FilePermissions->where('Department_id',$department)
