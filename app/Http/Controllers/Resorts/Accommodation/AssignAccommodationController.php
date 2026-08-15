@@ -77,7 +77,13 @@ class AssignAccommodationController extends Controller
     {
         $Employeeid = $request->Employeeid;
 
-        $emp = Employee::with('resortAdmin')->find($Employeeid);
+        $emp = Employee::with('resortAdmin')
+                ->where('id', $Employeeid)
+                ->where('resort_id', $this->resort->resort_id)
+                ->first();
+        if (!$emp) {
+            abort(404);
+        }
 
         $gender = ucfirst($emp->resortAdmin->gender);
 
@@ -177,12 +183,17 @@ class AssignAccommodationController extends Controller
         $assignId = $request->assignId;
         $empId = $request->emp_id;
 
-        $bed = AssingAccommodation::find($assignId);
+        $bed = AssingAccommodation::where('id', $assignId)
+                ->where('resort_id', $this->resort->resort_id)
+                ->first();
         if (!$bed) {
             return response()->json(['success' => false, 'message' => 'Bed not found'], 404);
         }
 
-        $employee = Employee::with(['resortAdmin', 'position'])->find($empId);
+        $employee = Employee::with(['resortAdmin', 'position'])
+                        ->where('id', $empId)
+                        ->where('resort_id', $this->resort->resort_id)
+                        ->first();
         $accommodation = AvailableAccommodationModel::where('id', $bed->available_a_id)
             ->where('resort_id', $this->resort->resort_id)
             ->with('availableAccommodationInvItem.inventoryModule', 'accommodationType')
@@ -266,12 +277,23 @@ class AssignAccommodationController extends Controller
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-
+        // assignId/emp_id were never checked against the caller's resort
+        // before the update below — cross-tenant bed hijack write, plus an
+        // unscoped read-back leaking the assigned employee's PII.
+        $bed = AssingAccommodation::where('id', $assignId)
+                ->where('resort_id', $this->resort->resort_id)
+                ->first();
+        if (!$bed) {
+            return response()->json(['success' => false, 'message' => 'Bed not found'], 404);
+        }
+        if (!Employee::where('id', $emp_id)->where('resort_id', $this->resort->resort_id)->exists()) {
+            return response()->json(['success' => false, 'message' => 'Employee not found'], 404);
+        }
 
         DB::beginTransaction();
         try
         {
-                    AssingAccommodation::where("id",$assignId)->update(['emp_id'=>$emp_id,"effected_date"=>date('Y-m-d')]);
+                    $bed->update(['emp_id'=>$emp_id,"effected_date"=>date('Y-m-d')]);
 
                     $Employeelist = Employee::join('resort_admins as t1', "t1.id", "=", "employees.Admin_Parent_id")
                                     ->join('resort_positions as t2', "t2.id", "=", "employees.Position_id")
@@ -287,6 +309,7 @@ class AssignAccommodationController extends Controller
                                         'employees.id as new_emp_id'
                                     )
                                     ->where("t3.id", $assignId)
+                                    ->where('employees.resort_id', $this->resort->resort_id)
                                     ->first();
                             if ($Employeelist)
                             {
@@ -316,7 +339,7 @@ class AssignAccommodationController extends Controller
                                             'building_name' => optional(\App\Models\BuildingModel::find($availableAccommodation->BuildingName))->BuildingName ?? 'Not Available',
                                             'floor' => $availableAccommodation->Floor ?? 'Not Available',
                                             'room_no' => $availableAccommodation->RoomNo ?? 'Not Available',
-                                            'bed_no' => optional(\App\Models\AssingAccommodation::find($assignId))->BedNo ?? '-',
+                                            'bed_no' => $bed->BedNo ?? '-',
                                             'facilities' => $itemData,
                                             'RoomStatus'=>$availableAccommodation->RoomStatus ?? 'Not Available',
                                             'color' => $availableAccommodation->accommodationType->Color ?? 'DefaultColor',
@@ -400,7 +423,12 @@ class AssignAccommodationController extends Controller
         $ChildBedId    = $request->ChildBedId;
 
         // Resolve numeric employee ID (form may send Emp_id string like "DR-20")
-        $empRecord = Employee::where('Emp_id', $emp_id_input)->orWhere('id', $emp_id_input)->first();
+        // Was unscoped across all resorts — any resort's Emp_id/id could be
+        // resolved and then assigned into the caller's beds.
+        $empRecord = Employee::where('resort_id', $this->resort->resort_id)
+                        ->where(function ($q) use ($emp_id_input) {
+                            $q->where('Emp_id', $emp_id_input)->orWhere('id', $emp_id_input);
+                        })->first();
         $emp_id = $empRecord ? $empRecord->id : $emp_id_input;
             $validator = Validator::make($request->all(), [
                 'assignId' =>'required',
@@ -413,9 +441,19 @@ class AssignAccommodationController extends Controller
                 'emp_id.required' => 'Please select Employee'
             ]);
 
-            if ($validator->fails()) 
+            if ($validator->fails())
             {
                 return response()->json(['errors' => $validator->errors()], 422);
+            }
+            if (!Employee::where('id', $emp_id)->where('resort_id', $this->resort->resort_id)->exists()) {
+                return response()->json(['success' => false, 'message' => 'Employee not found'], 404);
+            }
+            // assignId/ChildBedId were unscoped below, letting any resort's
+            // bed be vacated/assigned by id — validate ownership up front.
+            $newBed = AssingAccommodation::where('id', $assignId)->where('resort_id', $this->resort->resort_id)->first();
+            $oldBed = AssingAccommodation::where('id', $ChildBedId)->where('resort_id', $this->resort->resort_id)->first();
+            if (!$newBed || !$oldBed) {
+                return response()->json(['success' => false, 'message' => 'Bed not found'], 404);
             }
             DB::beginTransaction();
             try{
@@ -434,22 +472,21 @@ class AssignAccommodationController extends Controller
                             'employees.id as new_emp_id'
                         )
                         ->where("t3.id", $ChildBedId)
+                        ->where('employees.resort_id', $this->resort->resort_id)
                         ->first();
                 $data=[];
                 $item_id=[];
                 if ($Employeelist)
                 {
                     // Get NEW accommodation details (the room being moved to)
-                    $newBed = AssingAccommodation::where("id", $assignId)->first();
-                    $newAccommodation = $newBed ? AvailableAccommodationModel::where("id", $newBed->available_a_id)
+                    $newAccommodation = AvailableAccommodationModel::where("id", $newBed->available_a_id)
                                                                         ->where('resort_id', $this->resort->resort_id)
                                                                         ->with('availableAccommodationInvItem.inventoryModule', 'accommodationType')
-                                                                        ->first() : null;
+                                                                        ->first();
 
                     // Get OLD (current) accommodation details
                     $oldAccommodation = null;
-                    $oldBed = AssingAccommodation::where("id", $ChildBedId)->first();
-                    if ($oldBed) {
+                    {
                         $oldRoom = AvailableAccommodationModel::find($oldBed->available_a_id);
                         if ($oldRoom) {
                             $oldBuilding = BuildingModel::find($oldRoom->BuildingName);
@@ -516,13 +553,13 @@ class AssignAccommodationController extends Controller
                     // AssingAccommodation::where("id",$OldAssingedId)->where(['emp_id'=>$emp_id])
                     // ->update(["effected_date"=>null]);
                 }
-                $AssingData = AssingAccommodation::where("id",$ChildBedId)->first();
-
-                TransferAccommodation::create(['Emp_id'=>$emp_id,'resort_id'=>$this->resort->resort_id,'OldDate'=> $AssingData->effected_date, 'NewdDate'=>Date('Y-m-d'),'NewAccommodation_id'=>$assignId,"OldAccommodation_id"=>$ChildBedId,"Reason"=>$Reason]);
-                $AssingData->emp_id=0;
-                $AssingData->effected_date=null;
-                $AssingData->save();
-                AssingAccommodation::where("id",$assignId)->update(['emp_id'=>$emp_id,"effected_date"=>date('Y-m-d')]);
+                // $oldBed/$newBed were already resolved and resort-verified
+                // above — reuse them instead of re-querying unscoped.
+                TransferAccommodation::create(['Emp_id'=>$emp_id,'resort_id'=>$this->resort->resort_id,'OldDate'=> $oldBed->effected_date, 'NewdDate'=>Date('Y-m-d'),'NewAccommodation_id'=>$assignId,"OldAccommodation_id"=>$ChildBedId,"Reason"=>$Reason]);
+                $oldBed->emp_id=0;
+                $oldBed->effected_date=null;
+                $oldBed->save();
+                $newBed->update(['emp_id'=>$emp_id,"effected_date"=>date('Y-m-d')]);
 
                 DB::commit();
                 return response()->json(['success' =>true,'message'=>'Bed assigned successfully','data' =>$data], 200);

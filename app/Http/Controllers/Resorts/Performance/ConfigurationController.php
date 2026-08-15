@@ -203,7 +203,7 @@ class ConfigurationController extends Controller
         DB::beginTransaction();
         try
         {
-            $PerformanceReviewType = PerformanceReviewType::where('id',$id)->delete();
+            $PerformanceReviewType = PerformanceReviewType::where('id',$id)->where('resort_id', $this->resort->resort_id)->delete();
            DB::commit();
             return response()->json([
                 'success' => true,
@@ -406,7 +406,7 @@ class ConfigurationController extends Controller
         DB::beginTransaction();
         try
         {
-            PerformanceTemplateForm::where('id', $id)->delete();
+            PerformanceTemplateForm::where('id', $id)->where('resort_id', $this->resort->resort_id)->delete();
             DB::commit();
             return response()->json([
                 'success' => true,
@@ -561,7 +561,7 @@ class ConfigurationController extends Controller
         DB::beginTransaction();
         try
         {
-            NintyDayPeformanceForm::where('id', $id)->delete();
+            NintyDayPeformanceForm::where('id', $id)->where('resort_id', $this->resort->resort_id)->delete();
             DB::commit();
             return response()->json([
                 'success' => true,
@@ -751,7 +751,7 @@ class ConfigurationController extends Controller
         DB::beginTransaction();
         try
         {
-            Professionalform::where('id', $id)->delete();
+            Professionalform::where('id', $id)->where('resort_id', $this->resort->resort_id)->delete();
             DB::commit();
             return response()->json([
                 'success' => true,

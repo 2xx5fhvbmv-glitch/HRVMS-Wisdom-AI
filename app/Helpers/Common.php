@@ -4328,11 +4328,26 @@ class Common
     public static function resolveEmpMainIdToNumeric($value, $resortId = null)
     {
         if ($value === null || $value === '') return null;
-        if (is_numeric($value)) return (int) $value;
+
+        // $resortId was accepted but silently ignored on these two
+        // branches — every caller resolving a numeric/base64 Emp_main_id
+        // inherited a gap where a cross-resort id would resolve without
+        // any ownership check.
+        if (is_numeric($value)) {
+            $id = (int) $value;
+            if ($resortId && !\App\Models\Employee::where('id', $id)->where('resort_id', $resortId)->exists()) {
+                return null;
+            }
+            return $id;
+        }
 
         $decoded = base64_decode($value, true);
         if ($decoded !== false && is_numeric($decoded)) {
-            return (int) $decoded;
+            $id = (int) $decoded;
+            if ($resortId && !\App\Models\Employee::where('id', $id)->where('resort_id', $resortId)->exists()) {
+                return null;
+            }
+            return $id;
         }
 
         $query = \App\Models\Employee::where('Emp_id', $value);
@@ -5093,12 +5108,20 @@ class Common
 
 
 
-    public static function GetEmployeeDetails($emp_id)
+    public static function GetEmployeeDetails($emp_id, $resortId = null)
     {
-
-      return  ResortAdmin::join('employees as t1', 't1.Admin_Parent_id', '=', 'resort_admins.id')
-        ->where('t1.id', $emp_id)
-        ->first(['resort_admins.id as Parent_id','resort_admins.first_name','resort_admins.last_name']);
+        // $emp_id values passed in today all originate from an
+        // already-resort-scoped row (Assigned_To/Raised_By/ApprovedBy on a
+        // resort-filtered maintenance query), so this is safe by
+        // construction under normal data — but the helper itself had no
+        // defensive tenant boundary. $resortId is optional so existing
+        // callers keep working; pass it to close the gap defense-in-depth.
+        $query = ResortAdmin::join('employees as t1', 't1.Admin_Parent_id', '=', 'resort_admins.id')
+            ->where('t1.id', $emp_id);
+        if ($resortId !== null) {
+            $query->where('t1.resort_id', $resortId);
+        }
+        return $query->first(['resort_admins.id as Parent_id','resort_admins.first_name','resort_admins.last_name']);
     }
     private function getNextApprover($leave)
     {
