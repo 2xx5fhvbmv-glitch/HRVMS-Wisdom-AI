@@ -230,7 +230,15 @@ class BoardingPassController extends Controller
         $comments                               =   $request->input('reason', null); // Optional comments
         $employee                               =   $this->resort->GetEmployee;
         $currentApproverId                      =   $employee->id; // Assuming the logged-in user is the approver
-        $employeeTravelPasses                   =   EmployeeTravelPass::find($passId);
+        $employeeTravelPasses                   =   EmployeeTravelPass::where('id', $passId)
+                                                        ->where('resort_id', $this->resort->resort_id)
+                                                        ->first();
+        if (!$employeeTravelPasses) {
+            return response()->json([
+                'success'                       =>  false,
+                'message'                       =>  'Boarding pass not found.',
+            ], 404);
+        }
         $employeeTravelPassStatus               =   EmployeeTravelPassStatus::where('travel_pass_id', $passId)
                                                         ->where('status', 'Pending')
                                                         ->orderBy('created_at', 'desc')
