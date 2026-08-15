@@ -239,6 +239,16 @@ class SurveyController extends Controller
                     ->values()
                     ->toArray();
             }
+            // Guard against an explicitly-supplied Emp_id belonging to another
+            // resort's employee (the "Everyone" branch above is already
+            // resort-scoped, so this is a no-op for that path).
+            $resortEmpIds = Employee::join('resort_admins as ra', 'ra.id', '=', 'employees.Admin_Parent_id')
+                ->where('ra.resort_id', $this->resort->resort_id)
+                ->pluck('employees.id')
+                ->all();
+            $Emp_id = array_values(array_filter($Emp_id, function ($e) use ($resortEmpIds) {
+                return in_array((int) base64_decode($e), $resortEmpIds, true);
+            }));
             if (empty($Emp_id)) {
                 DB::rollBack();
                 return response()->json(['success' => false, 'message' => 'Please select at least one participant.'], 422);
@@ -423,6 +433,16 @@ class SurveyController extends Controller
                         ->values()
                         ->toArray();
                 }
+                // Guard against an explicitly-supplied Emp_id belonging to
+                // another resort's employee (the "Everyone" branch above is
+                // already resort-scoped, so this is a no-op for that path).
+                $resortEmpIds = Employee::join('resort_admins as ra', 'ra.id', '=', 'employees.Admin_Parent_id')
+                    ->where('ra.resort_id', $this->resort->resort_id)
+                    ->pluck('employees.id')
+                    ->all();
+                $Emp_id = array_values(array_filter($Emp_id, function ($e) use ($resortEmpIds) {
+                    return in_array((int) base64_decode($e), $resortEmpIds, true);
+                }));
                 if (empty($Emp_id)) {
                     DB::rollBack();
                     return response()->json(['success' => false, 'message' => 'Please select at least one participant.'], 422);
@@ -574,6 +594,9 @@ class SurveyController extends Controller
                                 ->where("parent_surveys.id",$id)
                                 ->where("parent_surveys.resort_id",$this->resort->resort_id)
                                 ->first(['parent_surveys.*','t2.first_name','t2.last_name','t2.id as ParentId'] );
+                                 if (!$parent) {
+                                     return abort(404, 'Survey not found.');
+                                 }
                                  $parent->EmployeeName = ucfirst($parent->first_name . ' ' .  $parent->last_name);
                                  $parent->profileImg = Common::getResortUserPicture($parent->Parentid);
 
@@ -718,10 +741,15 @@ class SurveyController extends Controller
          DB::beginTransaction();
         try
         {
-            ParentSurvey::find($id)->delete();
-            SurveyQuestion::where("Parent_survey_id",$id)->delete();          
-            SurveyEmployee::where("Parent_survey_id",$id)->delete();    
-            
+            $survey = ParentSurvey::where('id', $id)->where('resort_id', $this->resort->resort_id)->first();
+            if (!$survey) {
+                DB::rollBack();
+                return response()->json(['error' => 'Survey not found.'], 404);
+            }
+            $survey->delete();
+            SurveyQuestion::where("Parent_survey_id",$id)->delete();
+            SurveyEmployee::where("Parent_survey_id",$id)->delete();
+
             DB::commit();
             return response()->json([
                 'success' => true,
@@ -746,7 +774,13 @@ class SurveyController extends Controller
         DB::beginTransaction();
         try
         {
-               ParentSurvey::where('id', $id)->update(['status' => $status]);
+               $updated = ParentSurvey::where('id', $id)
+                   ->where('resort_id', $this->resort->resort_id)
+                   ->update(['status' => $status]);
+               if (!$updated) {
+                   DB::rollBack();
+                   return response()->json(['success' => false, 'message' => 'Survey not found.'], 404);
+               }
                DB::commit();
                return response()->json([
                    'success' => true,
@@ -768,7 +802,7 @@ class SurveyController extends Controller
     {
 
         $surveyId = base64_decode($id);
-        $privacy = ParentSurvey::where('id', $surveyId)->value('survey_privacy_type');
+        $privacy = ParentSurvey::where('id', $surveyId)->where('resort_id', $this->resort->resort_id)->value('survey_privacy_type');
         $showRespondentIdentity = $this->canSeeRespondentIdentity($privacy);
 
         $parent = ParentSurvey::join('survey_employees as t1',"t1.Parent_survey_id","=","parent_surveys.id")
@@ -1019,8 +1053,11 @@ class SurveyController extends Controller
     public function NotifyToParticipants(Request $request)
     {
         $id = base64_decode($request->id);
-      
-            $ParentSurvey = ParentSurvey::where('id', $id)->first();
+
+            $ParentSurvey = ParentSurvey::where('id', $id)->where('resort_id', $this->resort->resort_id)->first();
+            if (!$ParentSurvey) {
+                return response()->json(['success' => false, 'message' => 'Survey not found.'], 404);
+            }
             $notificationTitle = ' Survey Request';
             $notificationMessage = "Survey request for '{$ParentSurvey->Surevey_title}' has been submitted for feedback. "
                 . "Dates: {$ParentSurvey->Start_date} to {$ParentSurvey->End_date}. "
@@ -1225,6 +1262,9 @@ class SurveyController extends Controller
                                 ->where("parent_surveys.id",$id)
                                 ->where("parent_surveys.resort_id",$this->resort->resort_id)
                                 ->first(['parent_surveys.*','t2.first_name','t2.last_name','t2.id as ParentId'] );
+                                 if (!$ParentSurvey) {
+                                     return abort(404, 'Survey not found.');
+                                 }
                                  $ParentSurvey->profileImg = Common::getResortUserPicture($ParentSurvey->Parentid);
                                  $ParentSurvey->EmployeeName = ucfirst($ParentSurvey->first_name . ' ' .  $ParentSurvey->last_name);
                                  $ParentSurvey->startDate = \Carbon\Carbon::parse($ParentSurvey->Start_date)->format('d M Y');
@@ -1338,6 +1378,10 @@ class SurveyController extends Controller
                                     ->where("parent_surveys.id",$survey_id)
                                     ->where("parent_surveys.resort_id",$this->resort->resort_id)
                                     ->first(['parent_surveys.*','t2.first_name','t2.last_name','t2.id as ParentId'] );
+
+            if (!$ParentSurvey) {
+                return abort(404, 'Survey not found.');
+            }
 
             $Responed = SurveyEmployee::where("Parent_survey_id",$survey_id)->get();
             
