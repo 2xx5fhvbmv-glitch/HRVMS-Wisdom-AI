@@ -175,7 +175,7 @@ class ConfigController extends Controller
 
     public function inlineUpdateAgent(Request $request, $id){
         // Find the division by ID
-        $agent = TicketAgent::find($id);
+        $agent = TicketAgent::where('resort_id', $this->resort->resort_id)->find($id);
         // dd($request);
 
         if (!$agent) {
@@ -228,7 +228,12 @@ class ConfigController extends Controller
         DB::beginTransaction();
         try{
 
-            TicketAgent::find($id)->delete();
+            $agent = TicketAgent::where('resort_id', $this->resort->resort_id)->find($id);
+            if (!$agent) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'Agent not found.'], 404);
+            }
+            $agent->delete();
             DB::commit();
             return response()->json(['success' => true, 'msg' => 'Ticket Agent Deleted successfully.'], 200);
 
@@ -302,7 +307,12 @@ class ConfigController extends Controller
     {
         DB::beginTransaction();
         try{
-            ServiceProvider::find($id)->delete();
+            $provider = ServiceProvider::where('resort_id', $this->resort->resort_id)->find($id);
+            if (!$provider) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'Service Provider not found.'], 404);
+            }
+            $provider->delete();
             DB::commit();
             return response()->json(['success' => true, 'msg' => 'Service Provider Deleted successfully.'], 200);
         }
@@ -375,7 +385,12 @@ class ConfigController extends Controller
     {
         DB::beginTransaction();
         try{
-            HiringSource::find($id)->delete();
+            $hiringSource = HiringSource::where('resort_id', $this->resort->resort_id)->find($id);
+            if (!$hiringSource) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'Hiring Source not found.'], 404);
+            }
+            $hiringSource->delete();
             DB::commit();
             return response()->json(['success' => true, 'msg' => 'Hiring Source Deleted successfully.'], 200);
         }
@@ -398,7 +413,11 @@ class ConfigController extends Controller
         DB::beginTransaction();
         try
         {
+            // t_anotification_children has no Resort_id column of its own —
+            // scope via the owning t_anotification_parents row so a client
+            // can't hold another resort's hiring-request notification.
             $taupdaet = TAnotificationChild::where("id",$request->ta_id)
+                                            ->whereIn('Parent_ta_id', TAnotificationParent::where('Resort_id', $this->resort->resort_id)->select('id'))
                                             ->update([
                                                                     "status"=>"Hold",
                                                                     "holding_date" => $request->HoldDate,
@@ -455,7 +474,17 @@ class ConfigController extends Controller
         DB::beginTransaction();
         try
         {
-            $taupdaet = TAnotificationChild::find($request->Rejectio_ta_id)->update(['status'=>"Rejected","reason"=>$request->New_Vacancy_Rejected]);
+            // t_anotification_children has no Resort_id column of its own —
+            // scope via the owning t_anotification_parents row so a client
+            // can't reject another resort's hiring-request notification.
+            $taupdaet = TAnotificationChild::where('id', $request->Rejectio_ta_id)
+                ->whereIn('Parent_ta_id', TAnotificationParent::where('Resort_id', $this->resort->resort_id)->select('id'))
+                ->first();
+            if (!$taupdaet) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'Notification record not found.'], 404);
+            }
+            $taupdaet->update(['status'=>"Rejected","reason"=>$request->New_Vacancy_Rejected]);
             $rank = $this->resort->GetEmployee->rank;
 
             // Detect effective rank: Finance-related → rank 7, HR-related → rank 3
@@ -517,9 +546,18 @@ class ConfigController extends Controller
                 }
             }
 
-            $parentNotification = TAnotificationParent::find($request->ta_id);
+            // Scope the parent notification by resort so request->ta_id can't
+            // point at another resort's row; Child_ta_id likewise has no
+            // Resort_id of its own so it's scoped via its own parent.
+            $parentNotification = TAnotificationParent::where('Resort_id', $this->resort->resort_id)->find($request->ta_id);
+            if (!$parentNotification) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'msg' => 'Notification record not found.'], 404);
+            }
             $taupdaet = TAnotificationChild::where("Parent_ta_id", $request->ta_id)->where("Approved_By", $effectiveRank)->first();
-            $childstatus =  TAnotificationChild::find($request->Child_ta_id);
+            $childstatus =  TAnotificationChild::where('id', $request->Child_ta_id)
+                ->whereIn('Parent_ta_id', TAnotificationParent::where('Resort_id', $this->resort->resort_id)->select('id'))
+                ->first();
 
             if(!$childstatus) {
                 DB::rollBack();

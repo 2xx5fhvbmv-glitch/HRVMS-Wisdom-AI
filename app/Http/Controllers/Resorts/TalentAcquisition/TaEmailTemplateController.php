@@ -47,6 +47,20 @@ class TaEmailTemplateController extends Controller
             // Ensure placeholder extraction works
             $placeholders = TaEmailTemplate::extractPlaceholders($request->MailTemplete) ?? [];
 
+            // Guard against hijack: updateOrCreate below matches on "id"
+            // alone and its payload also writes Resort_id, so a client
+            // passing another resort's template id would both edit that
+            // record and reassign it to the attacker's own resort.
+            if ($request->id) {
+                $owned = TaEmailTemplate::where('id', $request->id)
+                    ->where('Resort_id', $resort_id)
+                    ->exists();
+                if (!$owned) {
+                    DB::rollBack();
+                    return response()->json(['success' => false, 'message' => 'Email template not found.'], 404);
+                }
+            }
+
             $emailTemplate = TaEmailTemplate::updateOrCreate(
                 ["id" => $request->id],
                 [

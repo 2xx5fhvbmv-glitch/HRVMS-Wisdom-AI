@@ -2304,7 +2304,18 @@ class VacancyController extends Controller
             $round = $request->Round;
             $Interview_type = $request->InterviewType;
 
-            $ApplicantInterViewDetails =ApplicantInterViewDetails::updateOrCreate(['id' => $Interview_id],['MeetingLink' => $request->MeetingLink]);
+            // Scope by resort_id — this previously matched on id alone, so a
+            // client could write a meeting link onto any other resort's
+            // interview record (and it would emit the email below using the
+            // victim's applicant data).
+            $ApplicantInterViewDetails = ApplicantInterViewDetails::where('id', $Interview_id)
+                ->where('resort_id', $resort_id)
+                ->first();
+            if (!$ApplicantInterViewDetails) {
+                DB::rollBack();
+                return response()->json(['error' => 'Interview record not found'], 404);
+            }
+            $ApplicantInterViewDetails->update(['MeetingLink' => $request->MeetingLink]);
             DB::commit();
 
             $resort_details = Resort::find($resort_id); // Use find() instead of where()->get() for a single result.
