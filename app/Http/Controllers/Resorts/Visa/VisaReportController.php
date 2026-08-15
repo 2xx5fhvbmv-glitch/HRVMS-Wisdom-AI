@@ -519,6 +519,7 @@ class VisaReportController extends Controller
             ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
             ->leftJoin('resort_departments as d', 'd.id', '=', 'e.Dept_id')
             ->leftJoin('resort_positions as p', 'p.id', '=', 'e.Position_id')
+            ->where('e.resort_id', $this->resort->resort_id)
             ->when($f['payment_request'], fn($q) => $q->where('c.Requested_Id', $f['payment_request']))
             ->when(true, fn($q) => $this->applyDuration($q, $f, 'pr.Request_date'))
             ->get([$this->nameExpr(), 'd.name as dept', 'p.position_title',
@@ -547,6 +548,7 @@ class VisaReportController extends Controller
             ->join('employees as e', 'e.id', '=', 't.employee_id')
             ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
             ->where('t.resort_id', $this->resort->resort_id)
+            ->where('e.resort_id', $this->resort->resort_id)
             ->when($f['employee'], fn($q) => $q->where('t.employee_id', $f['employee']))
             ->when(true, fn($q) => $this->applyDuration($q, $f, 't.Due_Date'))
             ->orderBy('ra.first_name')->orderBy('t.Due_Date')
@@ -579,7 +581,7 @@ class VisaReportController extends Controller
             $q = DB::table("$table as t")
                 ->join('employees as e', 'e.id', '=', 't.employee_id')
                 ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
-                ->where('t.resort_id', $rid)->whereRaw("LOWER(COALESCE(t.Status,''))='paid'")
+                ->where('t.resort_id', $rid)->where('e.resort_id', $rid)->whereRaw("LOWER(COALESCE(t.Status,''))='paid'")
                 ->when($f['employee'], fn($x) => $x->where('t.employee_id', $f['employee']))
                 ->when(true, fn($x) => $this->applyDuration($x, $f, "t.$dateCol"))
                 ->get([$this->nameExpr(), "t.$dateCol as pd", "t.$amtCol as amt", 't.Currency']);
@@ -793,7 +795,7 @@ class VisaReportController extends Controller
             $rows = DB::table("$table as t")
                 ->join('employees as e', 'e.id', '=', 't.employee_id')
                 ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
-                ->where('t.resort_id', $rid)->whereRaw("LOWER(COALESCE(t.Status,''))<>'paid'")
+                ->where('t.resort_id', $rid)->where('e.resort_id', $rid)->whereRaw("LOWER(COALESCE(t.Status,''))<>'paid'")
                 ->where("t.$col", '>', 0)
                 ->when(true, fn($q) => $this->applyDuration($q, $f, "t.$dueCol"))
                 ->get([$this->nameExpr(), "t.$col as amt", "t.$dueCol as due"]);
@@ -983,7 +985,7 @@ class VisaReportController extends Controller
             $rows = DB::table("$table as t")
                 ->join('employees as e', 'e.id', '=', 't.employee_id')
                 ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
-                ->where('t.resort_id', $rid)
+                ->where('t.resort_id', $rid)->where('e.resort_id', $rid)
                 ->whereIn('t.id', fn($q) => $q->selectRaw('MAX(id)')->from($table)->groupBy('employee_id'))
                 ->whereDate("t.$dateCol", '<=', $cut)
                 ->when(true, fn($q) => $this->applyDuration($q, $f, "t.$dateCol"))

@@ -674,7 +674,12 @@ class XpactEmployeeController extends Controller
     public function QuotaSlotMakrasPaid(Request $request)
     {
         $child_id = base64_decode($request->child_id);
-        $child    = $child_id ? PaymentRequestChild::find($child_id) : null;
+        // PaymentRequestChild has no resort_id column of its own — scope through
+        // its linked employee so a child_id from another resort can't be used to
+        // advance/complete that resort's payment request from here.
+        $child    = $child_id ? PaymentRequestChild::whereHas('RequestedEmployees', function ($q) {
+            $q->where('resort_id', $this->resort->resort_id);
+        })->find($child_id) : null;
 
         // Who is settling this — the logged-in (Finance) user — so the details
         // page can show "Renewed by …".

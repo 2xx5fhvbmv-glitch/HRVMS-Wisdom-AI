@@ -103,7 +103,7 @@ class PaymentDepositRequestController extends Controller
 
                     if(!$TotalExpensessSinceJoing)
                     {
-                        $emp = Employee::with('resortAdmin')->find($EmployeeId);
+                        $emp = Employee::with('resortAdmin')->where('resort_id', $this->resort->resort_id)->find($EmployeeId);
                         $nm  = ($emp && $emp->resortAdmin)
                             ? trim($emp->resortAdmin->first_name . ' ' . $emp->resortAdmin->last_name)
                             : "Employee #{$EmployeeId}";
