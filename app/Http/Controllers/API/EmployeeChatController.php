@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use App\Helpers\Common;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Validation\Rule;
 use Validator;
 use DB;
 
@@ -35,8 +36,12 @@ class EmployeeChatController extends Controller
             }
 
          $validator = Validator::make($request->all(), [
-            'receiver_id' => 'required|exists:employees,id',   
-            'message' => 'nullable|string' 
+            // exists:employees,id proves the row exists somewhere, never
+            // that it belongs to this resort — a user on Resort A could
+            // read/inject into a conversation between two Resort B
+            // employees just by guessing their numeric ids.
+            'receiver_id' => ['required', Rule::exists('employees', 'id')->where('resort_id', $this->resort_id)],
+            'message' => 'nullable|string'
         ]);
             
          if ($validator->fails()) {
@@ -53,8 +58,8 @@ class EmployeeChatController extends Controller
             $restrictedRanks        = [1, 2, 4, 8];
 
 
-            $sender                 = Employee::where('id', $sender_id)->first();
-            $receiver               = Employee::where('id', $receiver_id)->first();
+            $sender                 = Employee::where('id', $sender_id)->where('resort_id', $this->resort_id)->first();
+            $receiver               = Employee::where('id', $receiver_id)->where('resort_id', $this->resort_id)->first();
             $senderProfile          = ResortAdmin::where('id', $sender->Admin_Parent_id)->first();
             $receiverProfile        = ResortAdmin::where('id', $receiver->Admin_Parent_id)->first();
         
@@ -68,6 +73,7 @@ class EmployeeChatController extends Controller
             $conversationId         = min($sender_id, $receiver_id) . '_' . max($sender_id, $receiver_id);
 
             $chatHistory            =EmployeeChat::where('conversation_id', $conversationId)
+                                                    ->where('resort_id', $this->resort_id)
                                                     ->select(['id','sender_id','message','created_at'])
                                                     ->orderBy('created_at', 'desc')
                                                     ->get()

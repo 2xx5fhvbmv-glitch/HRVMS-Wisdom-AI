@@ -46,14 +46,26 @@ class GrievanceController extends Controller
 
         try
         {
-            $Employee                                       =   Employee::with(['resortAdmin','department','position'])->where('id',$request->emp_id)->first();
+            // Tenant-scoped — this is the mobile "who is this person"
+            // lookup used right before adding someone as a witness; it had
+            // no resort check at all and would return any resort's
+            // employee (name/department/position/supervisor) by id.
+            $Employee                                       =   Employee::with(['resortAdmin','department','position'])
+                                                                    ->where('id',$request->emp_id)
+                                                                    ->where('resort_id', $this->resort_id)
+                                                                    ->first();
+            if (!$Employee) {
+                return response()->json(['success' => false, 'message' => 'Employee not found.'], 404);
+            }
             $Employee->DepartmentName                       =   $Employee->department->name;
             $Employee->PositionName                         =   $Employee->position->position_title;
-            $Superviser                                     =   Employee::with(['resortAdmin'])->where('id',$Employee->reporting_to)->first();
-            $Superviser->Main_Name                          =   $Superviser->resortAdmin->first_name.' '. $Superviser->resortAdmin->last_name;
+            $Superviser                                     =   Employee::with(['resortAdmin'])
+                                                                    ->where('id',$Employee->reporting_to)
+                                                                    ->where('resort_id', $this->resort_id)
+                                                                    ->first();
             $data                                           =   [
                 'Employee'                                  =>  $Employee,
-                'Superviser'                                =>  $Superviser->Main_Name
+                'Superviser'                                =>  $Superviser ? $Superviser->resortAdmin->first_name.' '. $Superviser->resortAdmin->last_name : null
             ];
 
             $response['status']                             =   true;
@@ -146,6 +158,16 @@ class GrievanceController extends Controller
         if($validator->fails())
         {
             return response()->json(['success' => false,'errors' => $validator->errors()], 400);
+        }
+
+        // Any employee id — from any resort — could be stored as a witness
+        // with zero validation. Combined with the (now fixed)
+        // GetEmployeeDetails lookup above, this was the full leak chain:
+        // preview a cross-resort employee, then submit them as a witness.
+        $witnessIds = (array) $request->witness_id;
+        $validWitnessCount = Employee::whereIn('id', $witnessIds)->where('resort_id', $this->resort_id)->count();
+        if ($validWitnessCount !== count(array_unique($witnessIds))) {
+            return response()->json(['success' => false, 'message' => 'One or more witnesses are invalid.'], 422);
         }
 
         DB::beginTransaction();
@@ -474,7 +496,7 @@ class GrievanceController extends Controller
             $witnesses = GrivanceSubmissionWitness::where('G_S_Parent_id', $g->id)
                 ->get()
                 ->map(function ($w) {
-                    $emp = Employee::with('resortAdmin')->find($w->Witness_id);
+                    $emp = Employee::with('resortAdmin')->where('resort_id', $this->resort_id)->find($w->Witness_id);
                     return [
                         'employee_id' => $w->Witness_id,
                         'name'        => $emp && $emp->resortAdmin
@@ -499,7 +521,7 @@ class GrievanceController extends Controller
                     ->orderBy('id')
                     ->get()
                     ->map(function ($row) {
-                        $member = $row->Committee_member_id ? Employee::with('resortAdmin')->find($row->Committee_member_id) : null;
+                        $member = $row->Committee_member_id ? Employee::with('resortAdmin')->where('resort_id', $this->resort_id)->find($row->Committee_member_id) : null;
                         return [
                             'investigation_stage'   => $row->investigation_stage,
                             'explanation'            => $row->Grivance_Eexplination_description,

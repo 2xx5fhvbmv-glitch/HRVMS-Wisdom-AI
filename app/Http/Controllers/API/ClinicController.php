@@ -20,6 +20,7 @@ use App\Models\LeaveCategory;
 use App\Models\EmployeeLeaveStatus;
 use App\Helpers\Common;
 use Carbon\Carbon;
+use Illuminate\Validation\Rule;
 use Validator;
 use DB;
 
@@ -173,7 +174,10 @@ class ClinicController extends Controller
                 $message                            =   'Appointment updated successfully';
 
             } else {
-                $fetchDoctorId                      =   Employee::where('rank', 12)->first();
+                // Was picking whichever rank-12 employee happened to be
+                // first in the ENTIRE employees table (any resort), not
+                // this resort's own clinic doctor.
+                $fetchDoctorId                      =   Employee::where('rank', 12)->where('resort_id', $this->resort_id)->first();
 
                 $AppointmentExist                   =   ClinicAppointment::where('employee_id', $employee_id)
                                                             ->where('doctor_id', $fetchDoctorId->id)
@@ -687,7 +691,10 @@ class ClinicController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'employee_id'                               => 'required',
+            // employee_id (the patient) had no resort ownership check at
+            // all — a treatment record could be created against an
+            // employee id from another resort.
+            'employee_id'                               => ['required', Rule::exists('employees', 'id')->where('resort_id', $this->resort_id)],
             'appointment_category_id'                   => 'required',
             'date'                                      => 'required',
             'time'                                      => 'required',
@@ -943,6 +950,7 @@ class ClinicController extends Controller
             $treatmentData->age                         =   $age;
             $fetchDoctorName                            =   Employee::join('resort_admins as ra', 'ra.id', '=', 'employees.Admin_Parent_id')
                                                                 ->where('employees.rank', 12)
+                                                                ->where('employees.resort_id', $this->resort_id)
                                                                 ->first(['ra.first_name', 'ra.last_name']);
 
             $MedicalCertificate                         =   ClinicMedicalCertificate::where('resort_id', $this->resort_id)
@@ -954,7 +962,7 @@ class ClinicController extends Controller
                 $treatmentData->medical_certificate_issue   =   'No';
             }
 
-            $treatmentData->doctor_name                 =   $fetchDoctorName->first_name . ' ' . $fetchDoctorName->last_name;
+            $treatmentData->doctor_name                 =   $fetchDoctorName ? ($fetchDoctorName->first_name . ' ' . $fetchDoctorName->last_name) : null;
 
             $emp_id                                     =   Employee::where('id',$treatmentData->employee_id)->first();
 
@@ -1030,7 +1038,10 @@ class ClinicController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'employee_id'                               =>  'required',
+            // employee_id was written with no resort check — leaked that
+            // foreign employee's name/photo/dob/gender/position when the
+            // certificate was later viewed.
+            'employee_id'                               =>  ['required', Rule::exists('employees', 'id')->where('resort_id', $this->resort_id)],
             'start_date'                                =>  'required',
             'end_date'                                  =>  'required',
             'appointment_category_id'                   =>  'required',

@@ -3960,7 +3960,7 @@ class Common
     }
 
 
-    public static function getSubordinates($employeeId, $subordinates = [], $visited = [])
+    public static function getSubordinates($employeeId, $subordinates = [], $visited = [], $resortId = null)
     {
         // Prevent infinite loops from circular reporting structures
         if (in_array($employeeId, $visited)) {
@@ -3970,7 +3970,18 @@ class Common
         // Mark this employee as visited
         $visited[] = $employeeId;
 
-        $directSubordinates = Employee::where('reporting_to', $employeeId)->pluck('id')->toArray();
+        // No resort_id filter on `reporting_to` — safe today only because
+        // reporting_to values happen to be set within a resort's own org
+        // chart. Resolve the root employee's own resort_id once and pin
+        // every level of the recursion to it, so a stray cross-resort
+        // reporting_to value can't leak that employee's subordinate chain.
+        if ($resortId === null) {
+            $resortId = Employee::where('id', $employeeId)->value('resort_id');
+        }
+
+        $directSubordinates = Employee::where('reporting_to', $employeeId)
+                                    ->where('resort_id', $resortId)
+                                    ->pluck('id')->toArray();
 
         foreach ($directSubordinates as $subordinateId) {
             // Only add if not already in subordinates list
@@ -3978,7 +3989,7 @@ class Common
                 $subordinates[] = $subordinateId;
             }
             // Pass visited array to prevent cycles
-            $subordinates = self::getSubordinates($subordinateId, $subordinates, $visited);
+            $subordinates = self::getSubordinates($subordinateId, $subordinates, $visited, $resortId);
         }
 
         return $subordinates;

@@ -129,7 +129,13 @@ class InAppNotificationController extends Controller
 
         if($request->module == 'Announcement Wish' && $request->has('notification_id') && $request->has('status')) {
 
-            $announcement                               = AnnouncementNotification::find($request->notification_id);
+            // notification_id was client-supplied with no ownership/resort
+            // check — any authenticated user could flip the status on any
+            // other resort's/employee's announcement notification.
+            $announcement                               = AnnouncementNotification::where('id', $request->notification_id)
+                                                                ->where('resort_id', $this->resort_id)
+                                                                ->where('employee_id', $this->user->GetEmployee->id)
+                                                                ->first();
             if ($announcement) {
                 $announcement->status                   = $request->status;
                 $announcement->save();
@@ -141,7 +147,11 @@ class InAppNotificationController extends Controller
         }
 
         if ($request->has('notification_id') && $request->has('status') && $request->module == 'other') {
-            $notification                               =   ResortNotification::find($request->notification_id);
+            // Same IDOR pattern — scope to the caller's own resort + user.
+            $notification                               =   ResortNotification::where('id', $request->notification_id)
+                                                                ->where('resort_id', $this->resort_id)
+                                                                ->where('user_id', $this->user->GetEmployee->id)
+                                                                ->first();
             if ($notification) {
                 $notification->status                   =   $request->status;
                 $notification->save();
