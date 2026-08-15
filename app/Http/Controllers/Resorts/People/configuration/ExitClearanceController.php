@@ -95,7 +95,13 @@ class ExitClearanceController extends Controller
         $page_title ='Exit Clearance Form';
         $resort_id = $this->resort->resort_id;
         $departments =  ResortDepartment::where('resort_id', $this->resort->resort_id)->get();
-        $exit_clearance = ExitClearanceForm::find(base64_decode($id));
+        // Was ->find(base64_decode($id)) with no resort filter — leaked
+        // another resort's exit-clearance form structure into this view.
+        $exit_clearance = ExitClearanceForm::where('resort_id', $this->resort->resort_id)
+            ->find(base64_decode($id));
+        if (!$exit_clearance) {
+            abort(404, 'Exit Clearance Form not found.');
+        }
         $form_types = ExitClearanceForm::FORM_TYPES;
 
         return view('resorts.people.config.exit-clearance.edit',compact('page_title','departments','exit_clearance','form_types'));
@@ -105,7 +111,9 @@ class ExitClearanceController extends Controller
         if(!is_numeric($id)){
             $id = base64_decode($id);
         }
-        $exit_clearance = ExitClearanceForm::find($id);
+        // Was ->find($id) with no resort filter — unscoped write let
+        // another resort's exit-clearance form be overwritten.
+        $exit_clearance = ExitClearanceForm::where('resort_id', $this->resort->resort_id)->find($id);
 
         if($exit_clearance){
             $exit_clearance->department_id = $request->department;
@@ -129,7 +137,9 @@ class ExitClearanceController extends Controller
           if(!is_numeric($id)){
             $id = base64_decode($id);
         }
-            $exit_clearance = ExitClearanceForm::find($id);
+            // Was ->find($id) with no resort filter — same cross-tenant
+            // gap as edit()/update() above.
+            $exit_clearance = ExitClearanceForm::where('resort_id', $this->resort->resort_id)->find($id);
 
         if ($exit_clearance) {
             $exit_clearance->delete();

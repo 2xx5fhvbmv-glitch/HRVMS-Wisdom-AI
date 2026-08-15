@@ -73,8 +73,10 @@ class EmployeeReminderController extends Controller
 
     public function update(Request $request){
         $id = base64_decode($request->id);
-        $emp_resignation_reason = EmployeeReminder::find($id);
-        
+        // Was ->find($id) with no resort filter — any resort-admin could
+        // update another resort's employee reminder rule by id.
+        $emp_resignation_reason = EmployeeReminder::where('resort_id', $this->resort->resort_id)->find($id);
+
         if($emp_resignation_reason){
             $emp_resignation_reason->task = $request->task;
             $emp_resignation_reason->days = $request->days;
@@ -89,7 +91,9 @@ class EmployeeReminderController extends Controller
 
     public function destroy(Request $request){
         $id = base64_decode($request->id);
-        $emp_resignation_reason = EmployeeReminder::find($id);
+        // Was ->find($id) with no resort filter — same cross-tenant gap
+        // as update() above.
+        $emp_resignation_reason = EmployeeReminder::where('resort_id', $this->resort->resort_id)->find($id);
         if($emp_resignation_reason){
             $emp_resignation_reason->delete();
         }
