@@ -14,6 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 /**
  * Internal sharing for files (child_file_management) and folders
@@ -52,7 +53,13 @@ class FileShareController extends Controller
             'employee_ids'         => 'required_if:scope_type,employees|array',
             'employee_ids.*'       => 'integer',
             'department_ids'       => 'required_if:scope_type,departments|array',
-            'department_ids.*'     => 'integer',
+            // Validation-only gap: 'integer' only proves the id is
+            // numeric, not that the department belongs to the sharer's
+            // own resort. Scope the exists check by resort_id.
+            'department_ids.*'     => [
+                'integer',
+                Rule::exists('resort_departments', 'id')->where('resort_id', $this->resort->resort_id),
+            ],
         ]);
         if ($v->fails()) {
             return response()->json(['success' => false, 'message' => $v->errors()->first()], 422);
@@ -303,8 +310,11 @@ class FileShareController extends Controller
         $folders = [];
 
         if (!empty($fileIds)) {
+            // resort_id belt-and-suspenders on top of the already-scoped
+            // $shareIds resolution above.
             $files = DB::table('child_file_management')
                 ->whereIn('id', $fileIds)
+                ->where('resort_id', $emp->resort_id)
                 ->get(['id', 'unique_id', 'File_Name', 'File_Size', 'File_Type', 'File_Extension', 'updated_at'])
                 ->map(function ($f) {
                     return [
@@ -318,8 +328,11 @@ class FileShareController extends Controller
                 })->all();
         }
         if (!empty($folderIds)) {
+            // resort_id belt-and-suspenders on top of the already-scoped
+            // $shareIds resolution above.
             $folders = DB::table('filemangement_systems')
                 ->whereIn('id', $folderIds)
+                ->where('resort_id', $emp->resort_id)
                 ->get(['id', 'Folder_unique_id', 'Folder_Name'])
                 ->map(function ($f) {
                     return [
@@ -419,9 +432,16 @@ class FileShareController extends Controller
 
         $deptShareIds = [];
         if ($deptId) {
-            $deptShareIds = DB::table('file_share_departments')
-                ->where('department_id', $deptId)
-                ->pluck('share_id')->all();
+            // Dept_id is shared across resorts in some seeds, so joining
+            // back to file_shares and filtering by the share's own
+            // resort_id is required — otherwise a resort-B employee whose
+            // Dept_id numerically collides with a department a resort-A
+            // admin shared with would also see resort-A's share.
+            $deptShareIds = DB::table('file_share_departments as fsd')
+                ->join('file_shares as fs', 'fs.id', '=', 'fsd.share_id')
+                ->where('fsd.department_id', $deptId)
+                ->where('fs.resort_id', $resortId)
+                ->pluck('fsd.share_id')->all();
         }
 
         $orgShareIds = FileShare::where('share_mode', 'internal')
@@ -451,10 +471,13 @@ class FileShareController extends Controller
 
         $dept = [];
         if ($deptId) {
+            // Same Dept_id-collision gap as resolveReceivedShareIds() above
+            // — must also filter by the share's own resort_id.
             $dept = DB::table('file_shares as fs')
                 ->join('file_share_departments as fsd', 'fsd.share_id', '=', 'fs.id')
                 ->where('fs.shareable_type', 'folder')
                 ->where('fsd.department_id', $deptId)
+                ->where('fs.resort_id', $resortId)
                 ->pluck('fs.shareable_id')->all();
         }
 

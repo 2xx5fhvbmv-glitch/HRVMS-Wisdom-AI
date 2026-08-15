@@ -96,24 +96,46 @@ class FileManageController extends Controller
                     'errors' => $validator->errors()
                 ], 422);
             }
+
+            $flag = $request->flag;
+            if ($flag == 'Main') {
+                $UnderON = 0;
+                $FilemangementSystem = null;
+            } else {
+                $UnderON = base64_decode($flag);
+                // Scope by resort_id — $UnderON is client-supplied
+                // (base64-decoded), so an unscoped find() would let a
+                // caller point a new folder's parent at another resort's
+                // folder id.
+                $FilemangementSystem = FilemangementSystem::where('id', $UnderON)
+                    ->where('resort_id', $resortId)
+                    ->first();
+                if (!$FilemangementSystem) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Parent folder not found.'
+                    ], 404);
+                }
+            }
+
+            // $id is client-supplied (base64-decoded). If it's an edit
+            // (id != 0), confirm the target folder actually belongs to
+            // this resort before updateOrCreate() below — otherwise
+            // submitting another resort's row id would update (and
+            // re-tenant) that foreign row.
+            if ($id != 0 && !FilemangementSystem::where('id', $id)->where('resort_id', $resortId)->exists()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Folder not found.'
+                ], 404);
+            }
+
             DB::beginTransaction();
-            try{ 
+            try{
                     $uniqueString = substr(md5(uniqid($request->Folder_Name, true)), 0, 10);
 
-                    $flag  = $request->flag;
-                    if($flag == 'Main')
-                    {
-                        $UnderON = 0;
-                    }              
-                    else
-                    {
-                        $UnderON = base64_decode($flag);
-                        $FilemangementSystem = FilemangementSystem::find($UnderON);
-
-                    }  
-                    
                     DB::beginTransaction();
-                    try 
+                    try
                     {
                         $filesystem =    FilemangementSystem::updateOrCreate(["id"=>$id],[
                                 'resort_id' =>$resortId ,
@@ -1121,7 +1143,9 @@ class FileManageController extends Controller
                             while ($current_folder) 
                             {
                                 $breadcrumbs[] = "<li class='breadcrumb-item '><a class='OpenFileorFolder' data-url='FolderFile' data-unique_id='{$current_folder->Folder_unique_id}' href='javascript:void(0)'>{$current_folder->Folder_Name}</a></li>";
-                                $current_folder = FilemangementSystem::where('id', $current_folder->UnderON)->first();
+                                $current_folder = FilemangementSystem::where('id', $current_folder->UnderON)
+                                    ->where('resort_id', $this->resort->resort_id)
+                                    ->first();
                             }
                         }
                         $breadcrumbs = array_reverse($breadcrumbs);
@@ -1510,20 +1534,46 @@ class FileManageController extends Controller
                     'errors' => $validator->errors()
                 ], 422);
             }
-           
+
                 $uniqueString = substr(md5(uniqid($request->Folder_Name, true)), 0, 10);
                 $flag  = $request->flag;
                 if($flag == 'Main')
                 {
                     $UnderON = 0;
-                }              
+                    $FilemangementSystem = null;
+                }
                 else
                 {
                     $UnderON = base64_decode($flag);
-                    $FilemangementSystem = FilemangementSystem::find($UnderON);
-                }  
+                    // Scope by resort_id — $UnderON is client-supplied
+                    // (base64-decoded), so an unscoped find() would let a
+                    // caller point a new folder's parent at another
+                    // resort's folder id.
+                    $FilemangementSystem = FilemangementSystem::where('id', $UnderON)
+                        ->where('resort_id', $resortId)
+                        ->first();
+                    if (!$FilemangementSystem) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'Parent folder not found.'
+                        ], 404);
+                    }
+                }
+
+                // $id is client-supplied (base64-decoded). If it's an edit
+                // (id != 0), confirm the target folder actually belongs to
+                // this resort before updateOrCreate() below — otherwise
+                // submitting another resort's row id would update (and
+                // re-tenant) that foreign row.
+                if ($id != 0 && !FilemangementSystem::where('id', $id)->where('resort_id', $resortId)->exists()) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Folder not found.'
+                    ], 404);
+                }
+
                     DB::beginTransaction();
-                    try 
+                    try
                     {
                         FilemangementSystem::updateOrCreate(["id"=>$id],[
                                 'resort_id' =>$resortId ,
