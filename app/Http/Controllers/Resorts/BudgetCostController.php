@@ -123,8 +123,9 @@ class BudgetCostController extends Controller
 
     public function inlinecostUpdate(Request $request, $id)
     {
-        // Find the division by ID
-        $cost = ResortBudgetCost::find($id);
+        // Scoped — bare find($id) let any resort-admin rewrite another
+        // resort's budget cost line item.
+        $cost = ResortBudgetCost::where('resort_id', Auth::guard('resort-admin')->user()->resort_id)->find($id);
 
         if (!$cost) {
             return response()->json(['success' => false, 'message' => 'Cost not found.']);
@@ -183,7 +184,9 @@ class BudgetCostController extends Controller
     public function destroy_costs($id)
     {
         try {
-            $cost = ResortBudgetCost::findOrFail($id);
+            // Scoped — bare findOrFail($id) let any resort-admin delete
+            // another resort's budget cost line item.
+            $cost = ResortBudgetCost::where('resort_id', Auth::guard('resort-admin')->user()->resort_id)->findOrFail($id);
             $cost->delete();  // Soft delete if you're using soft deletes, otherwise use forceDelete()
 
             return response()->json(['success' => true, 'message' => 'Cost deleted successfully.']);

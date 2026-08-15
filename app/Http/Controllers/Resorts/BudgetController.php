@@ -1513,6 +1513,15 @@ class BudgetController extends Controller
 
     public function viewConsolidatedBudget(Request $request, $resortId)
     {
+        // {resortId} is a client-supplied URL segment — checkResortPermission
+        // only validates page-level permission, never that this segment
+        // matches the logged-in admin's own resort. Without this guard any
+        // resort-admin could read another resort's full consolidated budget
+        // by editing the URL.
+        if ((int) $resortId !== (int) $this->resort->resort_id) {
+            abort(403, 'You do not have access to this resort.');
+        }
+
         $selectedYear = $request->get('year', Carbon::now()->year);
         $employeeRankPosition = Common::getEmployeeRankPosition( $this->resort->getEmployee);
 
@@ -2350,6 +2359,12 @@ class BudgetController extends Controller
             $monthdata= $request->month_data;
             $Total_Department_budget= $request->grand_total;
             $parent_id =0;
+            // Sibling of ManningResponseController::updateBudgetData/
+            // updateParentTotal — same StoreManningResponseChild/Parent
+            // entities, same missing-filter shape: smrpChildId was a bare
+            // client id with no resort check, letting a caller rewrite
+            // another resort's budget line item.
+            $resortId = $this->resort->resort_id;
 
             foreach($basic_salary as $key=>$basic)
             {
@@ -2359,7 +2374,14 @@ class BudgetController extends Controller
                 {
                     // echo  $ProposedBasicsalary[$key]['value'];
                     // echo "<pre>";
-                        $StoreManningResponseChild = StoreManningResponseChild::where("id",$basic['smrpChildId'])->first();
+                        $StoreManningResponseChild = StoreManningResponseChild::where("id",$basic['smrpChildId'])
+                            ->whereIn('Parent_SMRP_id', function ($q) use ($resortId) {
+                                $q->select('id')->from('store_manning_response_parents')->where('Resort_id', $resortId);
+                            })
+                            ->first();
+                        if (!$StoreManningResponseChild) {
+                            continue;
+                        }
                         $StoreManningResponseChild->Current_Basic_salary  =  $basic['value'];
                         $StoreManningResponseChild->Proposed_Basic_salary =  $ProposedBasicsalary[$key]['value'];
                         $StoreManningResponseChild->Months =  json_encode($monthdata[$basic['smrpChildId']]) ;// $monthdata[$basic['smrpChildId']];
@@ -2369,7 +2391,9 @@ class BudgetController extends Controller
                     }
             }
 
-            StoreManningResponseParent::where("id",$parent_id)->update(["Total_Department_budget"=>$Total_Department_budget]);
+            StoreManningResponseParent::where("id",$parent_id)
+                ->where('Resort_id', $resortId)
+                ->update(["Total_Department_budget"=>$Total_Department_budget]);
             return response()->json(['success' => true, 'message' => 'Budget updated successfully']);
         }
         catch   (\Exception $e) {
@@ -2394,9 +2418,14 @@ class BudgetController extends Controller
             $departmentId = $request->input('department_id');
             $year = $request->input('year');
 
+            // Sibling of the other ManningResponse lookups in this file —
+            // dept_id/year alone don't prove the row belongs to the caller's
+            // resort, letting a resort-admin approve another resort's budget
+            // by guessing budget_id/department_id/year.
             $manningResponse = ManningResponse::where('id', $budgetId)
                                             ->where('dept_id', $departmentId)
                                             ->where('year', $year)
+                                            ->where('resort_id', $this->resort->resort_id)
                                             ->first();
 
             if (!$manningResponse) {
@@ -2448,6 +2477,14 @@ class BudgetController extends Controller
      */
     public function saveBudgetCostAssignment(Request $request, $resortId)
     {
+        // {resortId} is a client-supplied URL segment — never compared to
+        // the logged-in admin's own resort. Without this guard any
+        // resort-admin could write another resort's budget-cost
+        // configuration by editing the URL.
+        if ((int) $resortId !== (int) $this->resort->resort_id) {
+            return response()->json(['success' => false, 'message' => 'You do not have access to this resort.'], 403);
+        }
+
         try {
             // Validate the incoming request
             $validator = Validator::make($request->all(), [
@@ -2483,7 +2520,13 @@ class BudgetController extends Controller
             $selectedYear = $request->input('year', Carbon::now()->year);
 
             // Get the actual department_id from manning_responses table
-            $manningResponse = ManningResponse::find($departmentId);
+            // (scoped — $departmentId here is actually a manning_response id,
+            // and without the resort_id filter a caller could pass another
+            // resort's manning_response id and have its dept_id/resort mixed
+            // into their own resort's budget-cost-config rows below).
+            $manningResponse = ManningResponse::where('id', $departmentId)
+                ->where('resort_id', $resortId)
+                ->first();
             if (!$manningResponse) {
                 return response()->json([
                     'success' => false,
@@ -2708,6 +2751,14 @@ class BudgetController extends Controller
      */
     public function getConfiguration(Request $request, $resortId)
     {
+        // {resortId} is a client-supplied URL segment — never compared to
+        // the logged-in admin's own resort. Without this guard any
+        // resort-admin could read another resort's budget-cost
+        // configuration by editing the URL.
+        if ((int) $resortId !== (int) $this->resort->resort_id) {
+            return response()->json(['success' => false, 'message' => 'You do not have access to this resort.'], 403);
+        }
+
         try {
             $validator = Validator::make($request->all(), [
                 'department_id' => 'required|integer',
@@ -2733,7 +2784,10 @@ class BudgetController extends Controller
             $selectedYear = $request->input('year', Carbon::now()->year);
 
             // Get the actual department_id from manning_responses table
-            $manningResponse = ManningResponse::find($departmentId);
+            // (scoped — see saveBudgetCostAssignment for why).
+            $manningResponse = ManningResponse::where('id', $departmentId)
+                ->where('resort_id', $resortId)
+                ->first();
             if (!$manningResponse) {
                 return response()->json([
                     'success' => false,
@@ -2885,7 +2939,7 @@ class BudgetController extends Controller
             $year = $request->input('year', date('Y'));
             $resortId = auth()->guard('resort-admin')->user()->resort_id;
 
-            $position = ResortPosition::find($positionId);
+            $position = ResortPosition::where('resort_id', $resortId)->find($positionId);
             if (!$position) {
                 return response()->json(['success' => false, 'message' => 'Position not found']);
             }
@@ -2909,6 +2963,7 @@ class BudgetController extends Controller
                 ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
                 ->where('e.Position_id', $positionId)
                 ->where('e.Dept_id', $position->dept_id)
+                ->where('e.resort_id', $resortId)
                 ->where('e.status', 'Active')
                 ->get([
                     'e.resort_id',
@@ -3044,6 +3099,7 @@ class BudgetController extends Controller
             $employee = DB::table('employees as e')
                 ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
                 ->where('e.id', $employeeId)
+                ->where('e.resort_id', $resortId)
                 ->first([
                     'e.*',
                     'ra.first_name',
@@ -3054,7 +3110,7 @@ class BudgetController extends Controller
                 return response()->json(['success' => false, 'message' => 'Employee not found']);
             }
 
-            $position = ResortPosition::find($positionId);
+            $position = ResortPosition::where('resort_id', $resortId)->find($positionId);
             if (!$position) {
                 return response()->json(['success' => false, 'message' => 'Position not found']);
             }
@@ -3261,7 +3317,7 @@ class BudgetController extends Controller
             $year = $request->input('year', date('Y'));
             $resortId = auth()->guard('resort-admin')->user()->resort_id;
 
-            $position = ResortPosition::find($positionId);
+            $position = ResortPosition::where('resort_id', $resortId)->find($positionId);
             if (!$position) {
                 return response()->json(['success' => false, 'message' => 'Position not found']);
             }
@@ -3650,6 +3706,15 @@ class BudgetController extends Controller
             $year = $request->year;
             $resortId = auth()->guard('resort-admin')->user()->resort_id;
 
+            // employee_id was never checked against the caller's resort —
+            // a crafted request could write budget-cost-config rows (tagged
+            // with the caller's own resort_id) that reference another
+            // resort's employee. Confirm the employee belongs to this resort
+            // before writing anything.
+            if (!Employee::where('id', $employeeId)->where('resort_id', $resortId)->exists()) {
+                return response()->json(['success' => false, 'message' => 'Employee not found'], 404);
+            }
+
             // Per-month salary override — write to resort_employee_monthly_salaries
             // for the specific month being saved. The employees.basic_salary /
             // proposed_salary record is left alone; the View Budget read path
@@ -3739,7 +3804,7 @@ class BudgetController extends Controller
                 // If "Overtime - Holiday" is selected, automatically calculate and add it for all 12 months
                 if ($overtimeHolidayConfig && $overtimeHolidayCostId) {
                     // Get employee basic salary for calculation
-                    $employee = DB::table('employees')->where('id', $employeeId)->first();
+                    $employee = DB::table('employees')->where('id', $employeeId)->where('resort_id', $resortId)->first();
                     $employeeBasicSalary = $employee->basic_salary ?? 0;
                     $budgetCost = ResortBudgetCost::find($overtimeHolidayCostId);
                     $multiplier = $budgetCost->amount ?? 1.5; // Default 1.5 for holiday OT
@@ -3856,7 +3921,7 @@ class BudgetController extends Controller
 
             // Update vacant budget cost record with details if provided
             if ($details) {
-                $vacantBudgetCost = ResortVacantBudgetCost::find($vacantBudgetCostId);
+                $vacantBudgetCost = ResortVacantBudgetCost::where('resort_id', $resortId)->find($vacantBudgetCostId);
                 if ($vacantBudgetCost) {
                     $vacantBudgetCost->details = $details;
                     $vacantBudgetCost->save();
@@ -3867,7 +3932,7 @@ class BudgetController extends Controller
             // resort_vacant_monthly_salaries for the specific month being saved.
             // resort_vacant_budget_costs.basic_salary / .current_salary is the
             // shared fallback used when no per-month override exists.
-            $vacantBudgetCostRow = ResortVacantBudgetCost::find($vacantBudgetCostId);
+            $vacantBudgetCostRow = ResortVacantBudgetCost::where('resort_id', $resortId)->find($vacantBudgetCostId);
             $vacantIndex = $vacantBudgetCostRow ? (int) $vacantBudgetCostRow->vacant_index : (int) $request->input('vacant_index', 0);
 
             if (!empty($request->monthly_data) && $vacantIndex > 0) {
@@ -3963,7 +4028,7 @@ class BudgetController extends Controller
                 // If "Overtime - Holiday" is selected, automatically calculate and add it for all 12 months
                 if ($overtimeHolidayConfig && $overtimeHolidayCostId) {
                     // Get vacant budget cost basic salary for calculation
-                    $vacantBudgetCost = ResortVacantBudgetCost::find($vacantBudgetCostId);
+                    $vacantBudgetCost = ResortVacantBudgetCost::where('resort_id', $resortId)->find($vacantBudgetCostId);
                     $vacantBasicSalary = $vacantBudgetCost->basic_salary ?? 0;
                     $budgetCost = ResortBudgetCost::find($overtimeHolidayCostId);
                     $multiplier = $budgetCost->amount ?? 1.5; // Default 1.5 for holiday OT
