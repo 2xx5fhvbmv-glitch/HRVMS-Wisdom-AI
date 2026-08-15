@@ -847,6 +847,15 @@ class ComplianceController extends Controller
      
 
      public function checkCompliance(Request $request){
+          if (!$this->resort) {
+               abort(403, 'Unauthorized access');
+          }
+          // Unlike regenerateAi()/runAnomalyScan() in this same file, this
+          // route previously had no permission gate at all — any logged-in
+          // resort-admin could trigger the full rules engine run.
+          if (Common::checkRouteWisePermission('people.compliance.index', config('settings.resort_permissions.create')) == false) {
+               abort(403, 'Unauthorized access');
+          }
           $resort = $this->resort;
 
           // Reset the per-run active-breach tracker. Every breach re-detected
@@ -1621,7 +1630,13 @@ class ComplianceController extends Controller
           // Incident Compliance Start
                $fourtieenEightHoursAgo = Carbon::now()->subHours(48);
                $Incidentemployees= array();
-               $incidents = incidents::with(['Investigation','victim.resortAdmin','victim.position','victim.department'])->where('priority', 'high')
+               // Missing resort scope — every resort's compliance run pulled
+               // EVERY resort's severe/high-priority incidents and wrote new
+               // Compliance rows for those other resorts' employees. Same bug
+               // as the People Module block above, just not fixed here yet.
+               $incidents = incidents::with(['Investigation','victim.resortAdmin','victim.position','victim.department'])
+                                   ->where('resort_id', $this->resort->resort_id)
+                                   ->where('priority', 'high')
                                    ->where('severity', 'Severe')
                                    ->where('created_at', '<=', $fourtieenEightHoursAgo)
                                    ->whereHas( 'Investigation', function ($query) use ($fourtieenEightHoursAgo) {

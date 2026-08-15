@@ -6408,7 +6408,14 @@ class Common
     }
 
     public static function getServiceCharge($employee_id, $resortId,$payrollId){
-        $service_charge = PayrollServiceCharge::where('payroll_id',$payrollId)->where('employee_id',$employee_id)->first();
+        // $resortId was accepted but never used — payroll_service_charges
+        // has no resort_id column of its own, so ownership is verified via
+        // its parent payroll row instead.
+        $service_charge = PayrollServiceCharge::join('payroll', 'payroll.id', '=', 'payroll_service_charges.payroll_id')
+            ->where('payroll_service_charges.payroll_id', $payrollId)
+            ->where('payroll_service_charges.employee_id', $employee_id)
+            ->where('payroll.resort_id', $resortId)
+            ->first(['payroll_service_charges.*']);
 
         return $service_charge ? (float) $service_charge['service_charge_amount'] : 0;
     }
