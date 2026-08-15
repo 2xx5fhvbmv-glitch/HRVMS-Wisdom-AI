@@ -228,7 +228,7 @@ class ConfigurationController extends Controller
                 'errors' => $validator->errors()
             ], 422);
         }
-        $visa = VisaNationality::findOrFail($Main_id);
+        $visa = VisaNationality::where('resort_id', $this->resort->resort_id)->findOrFail($Main_id);
         $visa->update([
             'nationality' => $request->nationality,
             'amt' => $request->amt,
@@ -246,7 +246,7 @@ class ConfigurationController extends Controller
         DB::beginTransaction();
         try
         {
-            VisaNationality::where("id",$id)->delete();
+            VisaNationality::where("id",$id)->where('resort_id', $this->resort->resort_id)->delete();
             DB::commit();
             return response()->json([
                 'success' => true,
@@ -345,7 +345,7 @@ class ConfigurationController extends Controller
             {
                 // Visa fees are stored in MVR (entered in MVR on the config
                 // screen) — no MVR->USD conversion; stays MVR permanently.
-                ResortBudgetCost::where('id',$id)->update(['amount'=>$amount1,'amount_unit'=>'MVR']);
+                ResortBudgetCost::where('id',$id)->where('resort_id', $this->resort->resort_id)->update(['amount'=>$amount1,'amount_unit'=>'MVR']);
             }
         }
         DB::beginTransaction();
@@ -605,7 +605,7 @@ class ConfigurationController extends Controller
                 'errors' => $validator->errors()
             ], 422);
         }
-        $visa = VisaDocumentType::findOrFail($Main_id);
+        $visa = VisaDocumentType::where('resort_id', $this->resort->resort_id)->findOrFail($Main_id);
         $visa->update([
             'documentname' => $request->documentname,
         ]);
@@ -622,7 +622,7 @@ class ConfigurationController extends Controller
         DB::beginTransaction();
         try
         {
-            VisaDocumentType::where("id",$id)->delete();
+            VisaDocumentType::where("id",$id)->where('resort_id', $this->resort->resort_id)->delete();
             DB::commit();
             return response()->json([
                 'success' => true,
@@ -811,7 +811,7 @@ class ConfigurationController extends Controller
                 'errors' => $validator->errors()
             ], 422);
         }
-        $visa = VisaWallets::findOrFail($Main_id);
+        $visa = VisaWallets::where('resort_id', $this->resort->resort_id)->findOrFail($Main_id);
         $visa->update([
             'WalletName' => ucfirst($request->WalletName),
             'Amt' =>$request->Amt,
@@ -829,7 +829,7 @@ class ConfigurationController extends Controller
         DB::beginTransaction();
         try
         {
-            VisaWallets::where("id",$id)->delete();
+            VisaWallets::where("id",$id)->where('resort_id', $this->resort->resort_id)->delete();
             DB::commit();
             return response()->json([
                 'success' => true,

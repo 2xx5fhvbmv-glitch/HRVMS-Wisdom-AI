@@ -123,7 +123,7 @@ class FundTransferController extends Controller
 
                 if (!$t->to_wallet) {
                     // Deposit refund — money left the wallet and went to an employee.
-                    $emp = Employee::with(['resortAdmin'])->where('id', $t->Employee_id)->first();
+                    $emp = Employee::with(['resortAdmin'])->where('id', $t->Employee_id)->where('resort_id', $resort_id)->first();
                     $toLabel = ($emp && $emp->resortAdmin)
                         ? trim($emp->resortAdmin->first_name . ' ' . $emp->resortAdmin->last_name) . ' (Deposit Refund)'
                         : 'Employee Not Found';
