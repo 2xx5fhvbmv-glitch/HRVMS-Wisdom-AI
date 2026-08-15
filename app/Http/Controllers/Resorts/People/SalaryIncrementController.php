@@ -391,7 +391,14 @@ class SalaryIncrementController extends Controller
             return abort(403, 'Unauthorized access');
         }
         $incrementTypes = IncrementType::where('resort_id', $this->resort->resort_id)->where('status','Active')->get();
-        $peopleSalaryIncrement = PeopleSalaryIncrement::with(['employee.resortAdmin:id,first_name,last_name', 'employee.department:id,name', 'employee.position:id,position_title'])->find($id);
+        // Was ->find($id) with no resort filter — unscoped read leaked
+        // another resort's increment (salary, employee) into this modal.
+        $peopleSalaryIncrement = PeopleSalaryIncrement::with(['employee.resortAdmin:id,first_name,last_name', 'employee.department:id,name', 'employee.position:id,position_title'])
+            ->where('resort_id', $this->resort->resort_id)
+            ->find($id);
+        if (!$peopleSalaryIncrement) {
+            return response()->json(['status' => 'error', 'message' => 'Not found.'], 404);
+        }
         $payIncreaseTypes = PeopleSalaryIncrement::PAY_INCREASE_TYPES;
          $html = view('resorts.people.salary-increment.includes.edit-modal', ['peopleSalaryIncrement'=>$peopleSalaryIncrement,'incrementTypes'=>$incrementTypes,'payIncreaseTypes'=>$payIncreaseTypes])->render();
 
@@ -407,13 +414,15 @@ class SalaryIncrementController extends Controller
      */
     public function viewDetail($id)
     {
+        // Was ->find($id) with no resort filter — unscoped read leaked
+        // another resort's full approval trail (salary + reasons).
         $peopleSalaryIncrement = PeopleSalaryIncrement::with([
             'employee.resortAdmin:id,first_name,last_name',
             'employee.department:id,name',
             'employee.position:id,position_title',
             'peopleSalaryIncrementStatusFinance',
             'peopleSalaryIncrementStatusGM',
-        ])->find($id);
+        ])->where('resort_id', $this->resort->resort_id)->find($id);
 
         if (!$peopleSalaryIncrement) {
             return response()->json(['status' => 'error', 'message' => 'Not found.'], 404);
@@ -438,7 +447,13 @@ class SalaryIncrementController extends Controller
 
     public function update(Request $request,$id){
 
-        $peopleSalaryIncrement = PeopleSalaryIncrement::find($id);
+        // Was ->find($id) with no resort filter — unscoped write let a
+        // foreign resort's increment id/value/salary be overwritten and
+        // its approval chain reset to Pending.
+        $peopleSalaryIncrement = PeopleSalaryIncrement::where('resort_id', $this->resort->resort_id)->find($id);
+        if (!$peopleSalaryIncrement) {
+            return response()->json(['success' => false, 'status' => 'error', 'message' => 'Not found.'], 404);
+        }
 
         $effectiveDate = Carbon::createFromFormat('d/m/Y', $request->effective_date)->format('Y-m-d');
 
@@ -711,7 +726,10 @@ class SalaryIncrementController extends Controller
         $arr_increments = []; // Initialize an array to store increment data
 
         foreach ($request->increments as $inc) {
-            $employee = Employee::find($inc['emp_id']);
+            // Was Employee::find($inc['emp_id']) with no resort filter —
+            // unscoped read pulled a foreign resort's employee salary/
+            // identity into this resort's session summary view.
+            $employee = Employee::where('resort_id', $this->resort->resort_id)->find($inc['emp_id']);
             if (!$employee) {
                 continue;
             }
@@ -831,7 +849,14 @@ class SalaryIncrementController extends Controller
 
         foreach ($request->employee_data as $inc) {
 
-            $employee = Employee::find($inc['emp_id']);
+            // Most severe finding in this file per the audit: was
+            // Employee::find($inc['emp_id']) with no resort filter — an
+            // attacker could pass a foreign resort's employee id here and
+            // this would create a REAL, persisted PeopleSalaryIncrement row
+            // (tagged with the attacker's own resort_id) against that
+            // employee. If later approved via updateStatus(), that writes
+            // the new salary onto the foreign employee's real record.
+            $employee = Employee::where('resort_id', $resortId)->find($inc['emp_id']);
             if (!$employee) {
                 continue;
             }
@@ -916,7 +941,12 @@ class SalaryIncrementController extends Controller
         $payIncreaseType = $request->pay_increase_type ?: PeopleSalaryIncrement::PAY_INCREASE_TYPE_FIXED;
 
         foreach ($ids as $id) {
-            $peopleSalaryIncrement = PeopleSalaryIncrement::find($id);
+            // Was ->find($id) with no resort filter — unscoped write let
+            // client-posted ids from another resort be mutated in bulk.
+            $peopleSalaryIncrement = PeopleSalaryIncrement::where('resort_id', $this->resort->resort_id)->find($id);
+            if (!$peopleSalaryIncrement) {
+                continue;
+            }
             if($payIncreaseType == PeopleSalaryIncrement::PAY_INCREASE_TYPE_PERCENTAGE){
                $value = $peopleSalaryIncrement->previous_salary * $request->value / 100;
             } else {
@@ -944,8 +974,13 @@ class SalaryIncrementController extends Controller
         $ids = $request->ids;
         
         foreach ($ids as $id) {
-            $peopleSalaryIncrement = PeopleSalaryIncrement::find($id);
-           
+            // Was ->find($id) with no resort filter — unscoped write let
+            // client-posted ids from another resort be mutated in bulk.
+            $peopleSalaryIncrement = PeopleSalaryIncrement::where('resort_id', $this->resort->resort_id)->find($id);
+            if (!$peopleSalaryIncrement) {
+                continue;
+            }
+
             $peopleSalaryIncrement->update([
                 'status'=> 'Pending'
             ]);
@@ -1306,8 +1341,15 @@ class SalaryIncrementController extends Controller
         
         if (is_array($paylaod)) {
             foreach ($paylaod as $incrementData) {
-                $increment = PeopleSalaryIncrement::find($incrementData['id']);
-                
+                // Approver identity above is correctly scoped to this
+                // resort, but this was PeopleSalaryIncrement::find($id) with
+                // no resort filter on the TARGET row — the most severe gap
+                // in this flow: a foreign resort's increment id, once
+                // GM-approved here, would write the new salary onto that
+                // foreign employee's real basic_salary. Scope before any
+                // approver-identity/status logic runs.
+                $increment = PeopleSalaryIncrement::where('resort_id', $this->resort->resort_id)->find($incrementData['id']);
+
                 if ($increment) {
                     $peopleSalaryIncrementStatus = PeopleSalaryIncrementStatus::where('people_salary_increment_id', $increment->id);
                     if($incrementData['approval_rank']){
@@ -1460,9 +1502,12 @@ class SalaryIncrementController extends Controller
 
         if (is_array($paylaod)) {
             foreach ($paylaod as $incrementData) {
-                
-                $increment = PeopleSalaryIncrement::find($incrementData['id']);
-                
+
+                // Was ->find($id) with no resort filter — unscoped write
+                // let another resort's increment row be pushed to
+                // Change-Request.
+                $increment = PeopleSalaryIncrement::where('resort_id', $this->resort->resort_id)->find($incrementData['id']);
+
                 if ($increment) {
                    $peopleSalaryIncrementStatus = PeopleSalaryIncrementStatus::where('people_salary_increment_id', $increment->id);
                     if($incrementData['approval_rank']){
@@ -1573,9 +1618,11 @@ class SalaryIncrementController extends Controller
         if (is_array($paylaod)) {
             
             foreach ($paylaod as $incrementData) {
-       
-                $increment = PeopleSalaryIncrement::find($incrementData['id']);
-                
+
+                // Was ->find($id) with no resort filter — unscoped write
+                // let another resort's increment row be put on Hold.
+                $increment = PeopleSalaryIncrement::where('resort_id', $this->resort->resort_id)->find($incrementData['id']);
+
                 if ($increment) {
                    $peopleSalaryIncrementStatus = PeopleSalaryIncrementStatus::where('people_salary_increment_id', $increment->id);
                     if($approval_rank){
