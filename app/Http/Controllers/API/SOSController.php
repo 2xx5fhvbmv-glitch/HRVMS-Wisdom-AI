@@ -439,7 +439,12 @@ class SOSController extends Controller
         $isHOD                                          =   ($available_rank === "HOD");
 
         try {
+            // No resort ownership check at all — any authenticated user,
+            // any resort, could pull live GPS + name/photo for every
+            // employee/SOS-team member tied to another resort's active
+            // emergency just by enumerating sos_id.
             $SOSHistoryModel                            =   SOSHistoryModel::where('id', $sosId)
+                                                                ->where('resort_id', $this->resort_id)
                                                                 ->whereIn('sos_history.status',['Active','Drill-Active','In-Progress'])
                                                                 ->first();
 
@@ -531,6 +536,7 @@ class SOSController extends Controller
             $sosData                                    =   SOSHistoryModel::join('sos_team_member_activity as stma', 'sos_history.id', '=', 'stma.sos_history_id')
                                                                 ->join('sos_emergency_types as set', 'sos_history.emergency_id', '=', 'set.id')
                                                                 ->where('sos_history.id', $sosId)
+                                                                ->where('sos_history.resort_id', $this->resort_id)
                                                                 ->where('stma.emp_id', $this->user->id)
                                                                 ->whereIn('sos_history.status',['Active','Drill-Active','In-Progress'])
                                                                 ->select('sos_history.*','stma.status as team_member_status', 'stma.address as team_member_address', 'stma.latitude as team_member_latitude', 'stma.longitude as team_member_longitude','stma.id as team_member_id','stma.emp_id as team_member_emp_id','set.name as emergency_name')
@@ -903,6 +909,13 @@ class SOSController extends Controller
         }
         
         $sosId                                          =   base64_decode($sosId);
+
+        // Same gap as employeeAndTeamLocation() — no resort ownership
+        // check at all, so this leaked acknowledged/unacknowledged SOS
+        // team member names/photos/division/rank for any resort's event.
+        if (!SOSHistoryModel::where('id', $sosId)->where('resort_id', $this->resort_id)->exists()) {
+            return response()->json(['success' => false, 'message' => 'SOS event not found.'], 404);
+        }
 
         try{
             $sosTeamMemberAcknowledged                  =   SosTeamMemberActivity::join('resort_admins as ra', 'sos_team_member_activity.emp_id', '=', 'ra.id')
@@ -1294,6 +1307,13 @@ class SOSController extends Controller
 
         if ($validator->fails()) {
             return response()->json(['success' => false, 'message' => $validator->errors()->first()], 422);
+        }
+
+        // sos_history_id was never checked against the resort before
+        // insert — a message could be attached to another resort's SOS
+        // event log.
+        if (!SOSHistoryModel::where('id', $request->sos_history_id)->where('resort_id', $this->resort_id)->exists()) {
+            return response()->json(['success' => false, 'message' => 'SOS event not found.'], 404);
         }
 
         try {

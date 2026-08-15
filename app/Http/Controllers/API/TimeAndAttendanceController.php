@@ -2591,11 +2591,15 @@ class TimeAndAttendanceController extends Controller
             $WeekendDate                                    =   '';
             $startOfMonth                                   =   '';
             $endOfMonth                                     =   '';
+            // HOD-only route, but employee_id was unchecked — an HOD on
+            // Resort A could view name/photo/position for an employee id
+            // belonging to Resort B.
             $Rosterdata                                     =   Employee::join('resort_admins as t1', "t1.id", "=", "employees.Admin_Parent_id")
                                                                     ->join('resort_positions as t2', "t2.id", "=", "employees.Position_id")
                                                                     ->join('duty_rosters as t3', "t3.Emp_id", "=", "employees.id")
                                                                     ->select('t3.id as duty_roster_id', 't3.DayOfDate', 't1.first_name', 't1.last_name', 't1.profile_picture', 'employees.id as emp_id', 't2.position_title')
                                                                     ->where('employees.id', $employee_id)
+                                                                    ->where('employees.resort_id', $user->resort_id)
                                                                     ->get();
 
             $WeekstartDate                                  =   Carbon::now()->startOfWeek();

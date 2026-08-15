@@ -136,7 +136,14 @@ class DisciplinaryController extends Controller
         try
         {
             $employee_id                                        =   $this->user->GetEmployee->id;
-            $DisciplinaryModel                                  =   disciplinarySubmit::find($request->disciplinary_id);
+            // Was find()-only — no resort filter and no check that the
+            // caller is even the subject of this case, so any
+            // authenticated user could overwrite the acknowledgment on
+            // any disciplinary record, any resort, any employee.
+            $DisciplinaryModel                                  =   disciplinarySubmit::where('id', $request->disciplinary_id)
+                                                                        ->where('resort_id', $this->resort_id)
+                                                                        ->where('Employee_id', $employee_id)
+                                                                        ->first();
 
             if (!$DisciplinaryModel) {
                 return response()->json([
