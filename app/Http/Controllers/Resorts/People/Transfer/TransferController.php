@@ -51,19 +51,24 @@ class TransferController extends Controller
     public function store(Request $request)
     {
         // Validate input
+        // employee_name/target_dep/*_section_id/target_pos/reporting_manager
+        // were all only checked for existence anywhere in the table (the
+        // UI dropdown is correctly resort-scoped, but the server never
+        // re-checked on submit) — scope every one to the caller's resort.
+        $resortId = $this->resort->resort_id;
         $validated = $request->validate([
-            'employee_name' => 'required|exists:employees,id',
+            'employee_name' => ['required', Rule::exists('employees', 'id')->where('resort_id', $resortId)],
             'current_dep_id' => 'nullable',
-            'target_dep' => 'required|exists:resort_departments,id',
-            'current_section_id' => 'nullable|exists:resort_sections,id',
-            'target_section_id'  => 'nullable|exists:resort_sections,id',
+            'target_dep' => ['required', Rule::exists('resort_departments', 'id')->where('resort_id', $resortId)],
+            'current_section_id' => ['nullable', Rule::exists('resort_sections', 'id')->where('resort_id', $resortId)],
+            'target_section_id'  => ['nullable', Rule::exists('resort_sections', 'id')->where('resort_id', $resortId)],
             'current_pos_id' => 'nullable',
-            'target_pos' => 'required|exists:resort_positions,id',
+            'target_pos' => ['required', Rule::exists('resort_positions', 'id')->where('resort_id', $resortId)],
             'reason_transfer' => 'nullable|string|max:255',
             'effective_date' => ['required', 'date_format:d/m/Y'],
             'transfer_status' => 'required|in:Permanent,Temporary',
             'additional_notes' => 'nullable|string|max:255',
-            'reporting_manager' => 'required|exists:employees,id',
+            'reporting_manager' => ['required', Rule::exists('employees', 'id')->where('resort_id', $resortId)],
             // Item 2 — proposed salary for the transferred employee.
             // Forbidden on Temporary transfers (the employee returns to the
             // original role + salary at temporary_to, so changing pay would
@@ -751,8 +756,11 @@ class TransferController extends Controller
     {
         $employeeId = $request->employee_id;
 
+        // Was unscoped — leaked another resort's employee transfer history
+        // for any guessed employee_id.
         $transfers = EmployeeTransfer::with(['currentDepartment', 'targetDepartment'])
             ->where('employee_id', $employeeId)
+            ->where('resort_id', $this->resort->resort_id)
             ->orderBy('effective_date', 'desc')
             ->get()
             ->map(function ($item) {
@@ -825,7 +833,14 @@ class TransferController extends Controller
             ], 422);
         }
 
-        $transfer = EmployeeTransfer::with(['approvals', 'employee', 'targetPosition', 'targetDepartment'])->findOrFail($id);
+        // Was unscoped — combined with the approver-identity checks below
+        // only ever verifying the caller's own rank/position (never that
+        // caller and transfer share a resort), this let a Finance/GM-rank
+        // employee at ANY resort approve/reject/hold ANY other resort's
+        // pending transfer by guessing its id.
+        $transfer = EmployeeTransfer::with(['approvals', 'employee', 'targetPosition', 'targetDepartment'])
+            ->where('resort_id', $this->resort->resort_id)
+            ->findOrFail($id);
         $comments = $request->input('reason', null);
         $currentEmployee = $this->resort->GetEmployee;
 
@@ -1093,8 +1108,11 @@ class TransferController extends Controller
         $month = now()->format('m');
         $year = now()->format('Y');
 
+        // Was unscoped — leaked a "budget available" boolean for another
+        // resort's department by guessing dept_id.
         $manning = ManningResponse::where('dept_id', $deptId)
             ->where('year', $year)
+            ->where('resort_id', $this->resort->resort_id)
             ->first();
 
         if (!$manning) {

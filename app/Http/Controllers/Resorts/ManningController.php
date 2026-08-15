@@ -182,8 +182,9 @@ class ManningController extends Controller
     public function inlineDivisionUpdate(Request $request, $id)
     {
 
-        // Find the division by ID
-        $division = ResortDivision::find($id);
+        // Find the division by ID, scoped to this resort — bare find($id)
+        // let any resort-admin edit another resort's division.
+        $division = ResortDivision::where('resort_id', $this->resort_id)->find($id);
 
         if (!$division) {
             return response()->json(['success' => false, 'message' => 'Division not found.']);
@@ -245,8 +246,9 @@ class ManningController extends Controller
     public function destroy_division($id)
     {
         try {
-            // Find the division
-            $division = ResortDivision::findOrFail($id);
+            // Find the division, scoped to this resort — bare findOrFail($id)
+            // let any resort-admin delete another resort's division.
+            $division = ResortDivision::where('resort_id', $this->resort_id)->findOrFail($id);
 
             // Check if there are departments associated with this division
             $departments = ResortDepartment::where('division_id', $division->id)->get();
@@ -393,8 +395,9 @@ class ManningController extends Controller
 
     public function inlineDepartmentUpdate(Request $request, $id)
     {
-        // Find the division by ID
-        $dept = ResortDepartment::find($id);
+        // Find the division by ID, scoped to this resort — bare find($id)
+        // let any resort-admin edit another resort's department.
+        $dept = ResortDepartment::where('resort_id', $this->resort_id)->find($id);
 
         if (!$dept) {
             return response()->json(['success' => false, 'message' => 'Department not found.']);
@@ -471,7 +474,9 @@ class ManningController extends Controller
     public function destroy_department($id)
     {
         try {
-            $dept = ResortDepartment::findOrFail($id);
+            // Scoped to this resort — bare findOrFail($id) let any
+            // resort-admin delete another resort's department.
+            $dept = ResortDepartment::where('resort_id', $this->resort_id)->findOrFail($id);
 
             $hasPositions = ResortPosition::where('dept_id', $dept->id)->exists();
 
@@ -628,7 +633,9 @@ class ManningController extends Controller
     {
 
 
-         $section = ResortSection::find($request->id);
+         // Scoped to this resort — bare find($request->id) let any
+         // resort-admin edit another resort's section.
+         $section = ResortSection::where('resort_id', $this->resort_id)->find($request->id);
 
         if (!$section) {
             return response()->json(['success' => false, 'message' => 'Section not found.']);
@@ -707,7 +714,9 @@ class ManningController extends Controller
     public function destroy_sections($id)
     {
         try {
-            $section = ResortSection::findOrFail($id);
+            // Scoped to this resort — bare findOrFail($id) let any
+            // resort-admin delete another resort's section.
+            $section = ResortSection::where('resort_id', $this->resort_id)->findOrFail($id);
             $section->delete();  // Soft delete if you're using soft deletes, otherwise use forceDelete()
 
             return response()->json(['success' => true, 'message' => 'Section deleted successfully.']);
@@ -873,7 +882,9 @@ class ManningController extends Controller
         if ($request->has('short_name')) {
             $request->merge(['short_title' => $request->short_name]);
         }
-        $position = ResortPosition::find($id);
+        // Scoped to this resort — bare find($id) let any resort-admin edit
+        // another resort's position.
+        $position = ResortPosition::where('resort_id', $this->resort_id)->find($id);
         if (!$position) {
             return response()->json(['success' => false, 'message' => 'Position not found.']);
         }
@@ -970,7 +981,9 @@ class ManningController extends Controller
     public function destroy_position($id)
     {
         try {
-            $position = ResortPosition::findOrFail($id);
+            // Scoped to this resort — bare findOrFail($id) let any
+            // resort-admin delete another resort's position.
+            $position = ResortPosition::where('resort_id', $this->resort_id)->findOrFail($id);
 
             $associatedPermissions = ResortInteralPagesPermission::where('position_id', $position->id)->count();
 
