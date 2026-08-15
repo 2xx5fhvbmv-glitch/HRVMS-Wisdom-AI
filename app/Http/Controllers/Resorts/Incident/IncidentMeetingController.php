@@ -201,14 +201,19 @@ class IncidentMeetingController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'incidentId' => 'required|integer|exists:incidents,id',
+            'incidentId' => [
+                'required', 'integer',
+                Rule::exists('incidents', 'id')->where('resort_id', $this->resort->resort_id),
+            ],
             'meeting_subject' => 'required|string|max:255',
             'meeting_date' => 'required|date_format:d/m/Y',
             'meeting_time' => 'required',
             'location' => 'nullable|string|max:255',
             'meeting_type' => 'required|in:Online,Physical',
             'participants' => 'nullable|array',
-            'participants.*' => 'exists:employees,id',
+            'participants.*' => [
+                Rule::exists('employees', 'id')->where('resort_id', $this->resort->resort_id),
+            ],
             'roles' => 'nullable|array',
             'roles.*' => 'nullable|string|max:255',
             'ext_participants' => 'nullable|array',
@@ -301,7 +306,7 @@ class IncidentMeetingController extends Controller
 
                     // Email — same content as the bell notification.
                     try {
-                        $partEmp   = \App\Models\Employee::find($participant_id);
+                        $partEmp   = \App\Models\Employee::where('resort_id', $this->resort->resort_id)->find($participant_id);
                         $partAdmin = $partEmp ? \App\Models\ResortAdmin::find($partEmp->Admin_Parent_id) : null;
                         if ($partAdmin && filter_var($partAdmin->email ?? '', FILTER_VALIDATE_EMAIL)) {
                             $name = trim(($partAdmin->first_name ?? '') . ' ' . ($partAdmin->last_name ?? '')) ?: 'there';
