@@ -30,16 +30,29 @@ class SupportChatController extends Controller
         $page_title = 'Support Chat';
         // return view('admin.manufecturers.index');
         $supportId = base64_decode($support_id);
-        $support = Support::with(['support_category','createdBy','assignedAdmin'])->where('id',base64_decode($support_id))->first();
+        $support = Support::with(['support_category','createdBy','assignedAdmin'])->where('id',$supportId)->where('resort_id', $this->resort->resort_id)->first();
+        if (!$support) {
+            abort(404, 'Support ticket not found.');
+        }
         // dd($support->assignedAdmin->first_name);
-        $messages = SupportChatMessage::where('support_id', base64_decode($support_id))->orderBy('created_at', 'asc')->get();
+        $messages = SupportChatMessage::where('support_id', $supportId)->orderBy('created_at', 'asc')->get();
         return view('resorts.support.chat',compact('messages','support','supportId','page_title'));
     }
 
     public function fetchMessages($support_id)
     {
-        $messages = SupportChatMessage::where('support_id', base64_decode($support_id))->orderBy('created_at', 'asc')->get();
-        
+        $supportId = base64_decode($support_id);
+        // support_chat_messages has no resort_id column — tenancy is
+        // resolved through support_id -> support.resort_id. Without this
+        // check any authenticated resort-admin could poll another
+        // resort's live support chat by guessing/incrementing the id.
+        $supportExists = Support::where('id', $supportId)->where('resort_id', $this->resort->resort_id)->exists();
+        if (!$supportExists) {
+            return response()->json(['success' => false, 'message' => 'Support ticket not found.'], 404);
+        }
+
+        $messages = SupportChatMessage::where('support_id', $supportId)->orderBy('created_at', 'asc')->get();
+
         return response()->json($messages);
     }
 
@@ -55,7 +68,7 @@ class SupportChatController extends Controller
         // an admin yet have no concrete recipient. We still record the
         // employee's outbound message and notify the support pool generically.
         $validatedData = $request->validate([
-            'support_id'     => 'required|exists:support,id',
+            'support_id'     => ['required', \Illuminate\Validation\Rule::exists('support', 'id')->where('resort_id', $this->resort->resort_id)],
             'senderId'       => 'required',
             'senderType'     => 'required|string',
             'receiverId'     => 'nullable',
