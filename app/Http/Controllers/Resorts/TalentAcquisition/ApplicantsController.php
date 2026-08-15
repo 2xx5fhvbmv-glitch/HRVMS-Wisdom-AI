@@ -461,7 +461,11 @@ class ApplicantsController extends Controller
         try
         {
 
-            $Applicant_form_data = Applicant_form_data::find( $Applicant_id);
+            $Applicant_form_data = Applicant_form_data::where('resort_id', $this->resort->resort_id)->find( $Applicant_id);
+            if (!$Applicant_form_data) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'Applicant not found.'], 404);
+            }
             // Store notes as JSON keyed by user_id so each user has their own note
             $existingNotes = json_decode($Applicant_form_data->notes, true) ?? [];
             if (!is_array($existingNotes) || (is_array($existingNotes) && !empty($existingNotes) && !array_key_exists(array_key_first($existingNotes), $existingNotes))) {
@@ -566,6 +570,7 @@ class ApplicantsController extends Controller
                         applicant_form_data.ai_analysis_generated_at
                     ') // Removed the trailing comma here
                     ->where('t1.id', base64_decode($id))
+                    ->where('applicant_form_data.resort_id', $this->resort->resort_id)
                     ->first();
 
             if (!$Applicant_form_data) {
@@ -718,7 +723,7 @@ class ApplicantsController extends Controller
     public function GenerateApplicantAiAnalysis($id)
     {
         $applicantId = base64_decode($id);
-        $applicant = Applicant_form_data::find($applicantId);
+        $applicant = Applicant_form_data::where('resort_id', $this->resort->resort_id)->find($applicantId);
         if (!$applicant) {
             return response()->json(['success' => false, 'message' => 'Applicant not found.'], 404);
         }
@@ -915,7 +920,10 @@ class ApplicantsController extends Controller
     {
 
         try{
-            $Applicant_form_data =  Applicant_form_data::find(base64_decode($id));
+            $Applicant_form_data =  Applicant_form_data::where('resort_id', $this->resort->resort_id)->find(base64_decode($id));
+            if (!$Applicant_form_data) {
+                return response()->json(['success' => false, 'message' => 'Applicant not found.'], 404);
+            }
             return response()->json(['success' => true, 'notes' => $Applicant_form_data->notes], 200);
         }
         catch( \Exception $e )
@@ -1258,7 +1266,9 @@ class ApplicantsController extends Controller
         $InterviewDate = $request->InterviewDate;
         $ApplicantID = base64_decode($request->ApplicantID);
         $Applicant_form_data = Applicant_form_data::leftJoin('countries as t1', "t1.id", "=", "applicant_form_data.country")
-            ->where('applicant_form_data.id', $ApplicantID)->first(['applicant_form_data.*', 't1.flag_url']);
+            ->where('applicant_form_data.id', $ApplicantID)
+            ->where('applicant_form_data.resort_id', $this->resort->resort_id)
+            ->first(['applicant_form_data.*', 't1.flag_url']);
 
         $Round = $request->Round;
         $InterviewType = $request->InterviewType;
@@ -1309,7 +1319,10 @@ class ApplicantsController extends Controller
             $TimeSlotsFormdate = $request->TimeSlotsFormdate;
             $ApplicantID = base64_decode($request->ApplicantID);
             $ApplicantStatus_id = base64_decode($request->ApplicantStatus_id);
-            $Resort_id = $request->Resort_id;
+            // Resort_id must be the authenticated caller's own resort — it was
+            // previously taken straight from the POST body, letting a client
+            // schedule/overwrite interview records for any other resort's applicant.
+            $Resort_id = $this->resort->resort_id;
 
             // Fetch resort details
             $resort_details = Resort::find($Resort_id); // Use find() instead of where()->get() for a single result.
@@ -1536,7 +1549,7 @@ class ApplicantsController extends Controller
         $interviewId = base64_decode($request->interview_id);
         $templateId = $request->email_template_id;
 
-        $interview = ApplicantInterViewDetails::find($interviewId);
+        $interview = ApplicantInterViewDetails::where('resort_id', $this->resort->resort_id)->find($interviewId);
         if (!$interview) {
             return response()->json(['success' => false, 'message' => 'Interview record not found.']);
         }
@@ -1594,7 +1607,7 @@ class ApplicantsController extends Controller
     public function DeletePendingInterview(Request $request)
     {
         $interviewId = base64_decode($request->interview_id);
-        $interview = ApplicantInterViewDetails::find($interviewId);
+        $interview = ApplicantInterViewDetails::where('resort_id', $this->resort->resort_id)->find($interviewId);
 
         if (!$interview) {
             return response()->json(['success' => false, 'message' => 'Interview record not found.']);
@@ -1637,13 +1650,18 @@ class ApplicantsController extends Controller
         $Progress_Rank = $request->Progress_Rank;
         $interviewRound = $request->interviewRound;
 
-        $ApplicantWiseStatus = ApplicantWiseStatus::find($applicantstatusid);
+        // applicant_wise_statuses has no resort_id column of its own — scope
+        // via the owning applicant_form_data row (Applicant_id) so this can't
+        // read/flip another resort's applicant status by guessing the id.
+        $ApplicantWiseStatus = ApplicantWiseStatus::where('id', $applicantstatusid)
+            ->whereIn('Applicant_id', Applicant_form_data::where('resort_id', $Resort_id)->select('id'))
+            ->first();
         if (!$ApplicantWiseStatus) {
             return response()->json(['success' => false, 'message' => 'Applicant status not found.'], 404);
         }
 
         // Get dynamic final round rank for this applicant's position
-        $applicant = Applicant_form_data::find($ApplicantID);
+        $applicant = Applicant_form_data::where('resort_id', $Resort_id)->find($ApplicantID);
         $vacancyRank = null;
         if ($applicant && $applicant->Parent_v_id) {
             $vacancy = \App\Models\Vacancies::find($applicant->Parent_v_id);
@@ -1799,7 +1817,16 @@ class ApplicantsController extends Controller
         DB::beginTransaction();
         try
         {
-            $ApplicantWiseStatus = ApplicantWiseStatus::find($ApplicantID);
+            // applicant_wise_statuses has no resort_id column of its own —
+            // scope via the owning applicant_form_data row so a client can't
+            // inject comments onto another resort's applicant status.
+            $ApplicantWiseStatus = ApplicantWiseStatus::where('id', $ApplicantID)
+                ->whereIn('Applicant_id', Applicant_form_data::where('resort_id', $this->resort->resort_id)->select('id'))
+                ->first();
+            if (!$ApplicantWiseStatus) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'Applicant status not found.'], 404);
+            }
             // Store comments as JSON array so multiple users can comment without overwriting
             $existingComments = json_decode($ApplicantWiseStatus->Comments, true) ?? [];
             if (!is_array($existingComments) || (!empty($existingComments) && !isset($existingComments[0]))) {
@@ -1845,7 +1872,11 @@ class ApplicantsController extends Controller
         DB::beginTransaction();
         try
         {
-            $Applicant_form_data = Applicant_form_data::find($id);
+            $Applicant_form_data = Applicant_form_data::where('resort_id', $this->resort->resort_id)->find($id);
+            if (!$Applicant_form_data) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'Applicant not found.'], 404);
+            }
             $Applicant_form_data->delete();
                 DB::table('applicant_form_job_assessment')::where('applicant_form_id',$Applicant_form_data->id)->delete();
                 DB::table('applicant_inter_view_details')::where('Applicant_id',$Applicant_form_data->id)->delete();
@@ -1877,11 +1908,12 @@ class ApplicantsController extends Controller
     {
         $date = $request->date ? Carbon::parse($request->date) : null;
         // Some master dashboards (e.g. master/hr-dashboard) don't render the
-        // #Dasboard_resort_id hidden input, so the AJAX POST arrives without
-        // Resort_id. Fall back to the authenticated user's resort_id so the
-        // query isn't silently scoped to nothing — that was the source of
-        // "No Record Found" even when the user clearly had matching items.
-        $resort_id = $request->Resort_id ?: (optional($this->resort)->resort_id ?? null);
+        // #Dasboard_resort_id hidden input, so the AJAX POST used to arrive
+        // without Resort_id. Client-supplied Resort_id was previously trusted
+        // as-is whenever present, letting any caller pull another resort's
+        // upcoming-interview data — always use the authenticated user's own
+        // resort_id instead, ignoring whatever the client sends.
+        $resort_id = optional($this->resort)->resort_id ?? null;
         $currentMonthStart = $request->start ? Carbon::parse($request->start) : Carbon::now()->startOfMonth();
         $currentMonthEnd = $request->end ? Carbon::parse($request->end) : Carbon::now()->endOfMonth();
 
@@ -2553,7 +2585,17 @@ class ApplicantsController extends Controller
         try
         {
             $applicant_status_id = $request->applicant_status_id;
-            $Applicant_wise_statuses = ApplicantWiseStatus::find($applicant_status_id)->update(['status'=>"Sortlisted By Wisdom AI"]);
+            // applicant_wise_statuses has no resort_id column of its own —
+            // scope via the owning applicant_form_data row so a client can't
+            // revert another resort's applicant status.
+            $Applicant_wise_status = ApplicantWiseStatus::where('id', $applicant_status_id)
+                ->whereIn('Applicant_id', Applicant_form_data::where('resort_id', $this->resort->resort_id)->select('id'))
+                ->first();
+            if (!$Applicant_wise_status) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'Applicant status not found.'], 404);
+            }
+            $Applicant_wise_status->update(['status'=>"Sortlisted By Wisdom AI"]);
             DB::commit();
 
 
@@ -2603,7 +2645,13 @@ class ApplicantsController extends Controller
             $wherefind = "full_length_photo";
         }
 
-        $applicant = Applicant_form_data::where('id', $ApplicantID)->select($wherefind)->first();
+        $applicant = Applicant_form_data::where('id', $ApplicantID)
+            ->where('resort_id', $this->resort->resort_id)
+            ->select($wherefind)->first();
+
+        if (!$applicant) {
+            return response()->json(['success' => false, 'message' => 'Applicant Not Found!']);
+        }
 
         // Handle other_document (JSON array of paths)
         if ($flag == "other_document") {
@@ -2643,7 +2691,9 @@ class ApplicantsController extends Controller
     {
         $ApplicantID = base64_decode($request->id);
         $fields = ['curriculum_vitae', 'passport_img', 'passport_photo', 'full_length_photo', 'other_document'];
-        $applicant = Applicant_form_data::where('id', $ApplicantID)->select($fields)->first();
+        $applicant = Applicant_form_data::where('id', $ApplicantID)
+            ->where('resort_id', $this->resort->resort_id)
+            ->select($fields)->first();
 
         if (!$applicant) {
             return response()->json(['success' => false, 'message' => 'Applicant Not Found!']);
@@ -2870,7 +2920,7 @@ class ApplicantsController extends Controller
         $applicant_id = base64_decode($request->applicant_id);
         $applicant_status_id = base64_decode($request->applicant_status_id);
 
-        $applicant = Applicant_form_data::find($applicant_id);
+        $applicant = Applicant_form_data::where('resort_id', $resort_id)->find($applicant_id);
         if (!$applicant) {
             return response()->json(['success' => false, 'message' => 'Applicant not found.'], 404);
         }
@@ -2999,7 +3049,7 @@ class ApplicantsController extends Controller
         $applicant_id = base64_decode($request->applicant_id);
         $applicant_status_id = base64_decode($request->applicant_status_id);
 
-        $applicant = Applicant_form_data::find($applicant_id);
+        $applicant = Applicant_form_data::where('resort_id', $resort_id)->find($applicant_id);
         if (!$applicant) {
             return response()->json(['success' => false, 'message' => 'Applicant not found.'], 404);
         }
@@ -3123,7 +3173,7 @@ class ApplicantsController extends Controller
         }
 
         $applicant_id = base64_decode($request->applicant_id);
-        $applicant = Applicant_form_data::find($applicant_id);
+        $applicant = Applicant_form_data::where('resort_id', $this->resort->resort_id)->find($applicant_id);
         if (!$applicant) {
             return response()->json(['success' => false, 'message' => 'Applicant not found.'], 404);
         }
@@ -3169,7 +3219,7 @@ class ApplicantsController extends Controller
         }
 
         $applicant_id = base64_decode($request->applicant_id);
-        $applicant = Applicant_form_data::find($applicant_id);
+        $applicant = Applicant_form_data::where('resort_id', $this->resort->resort_id)->find($applicant_id);
         if (!$applicant) {
             return response()->json(['success' => false, 'message' => 'Applicant not found.'], 404);
         }
@@ -3275,6 +3325,7 @@ class ApplicantsController extends Controller
         $applicant = Applicant_form_data::leftJoin('vacancies as v', 'v.id', '=', 'applicant_form_data.Parent_v_id')
             ->leftJoin('resort_positions as p', 'p.id', '=', 'v.position')
             ->where('applicant_form_data.id', $applicantId)
+            ->where('applicant_form_data.resort_id', $resortId)
             ->first(['applicant_form_data.id', 'p.id as position_id', 'p.dept_id', 'v.budgeted_salary', 'v.allowance as vacancy_allowance', 'v.amount_unit as vacancy_currency']);
 
         if (!$applicant) {

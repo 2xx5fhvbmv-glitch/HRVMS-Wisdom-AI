@@ -143,7 +143,7 @@ class InterviewAssessmentController extends Controller
         }
         $page_title = "Edit Interview Assessment";
         $resortId = $this->resort->resort_id;
-        $form = InterviewAssessmentForm::findOrFail($id);
+        $form = InterviewAssessmentForm::where('resort_id', $resortId)->findOrFail($id);
         $form->form_structure = json_decode($form->form_structure, true);
 
 
@@ -182,7 +182,7 @@ class InterviewAssessmentController extends Controller
 
     public function delete($id)
     {
-        $form = InterviewAssessmentForm::findOrFail($id);
+        $form = InterviewAssessmentForm::where('resort_id', $this->resort->resort_id)->findOrFail($id);
         $form->delete();
 
         return response()->json(['success' => 'Form deleted successfully.']);
@@ -194,7 +194,7 @@ class InterviewAssessmentController extends Controller
         $position_id = base64_decode($position_id);
         $applicant_id = base64_decode($applicant_id);
 
-        $form = InterviewAssessmentForm::where('position',$position_id)->get();
+        $form = InterviewAssessmentForm::where('position',$position_id)->where('resort_id', $this->resort->resort_id)->get();
 
         if ($form->isEmpty()) {
             return redirect()->back()->with('error', 'Interview Assessment Form has not been created for this job position yet. Please create one first from the Interview Assessment section.');
@@ -328,9 +328,14 @@ class InterviewAssessmentController extends Controller
 
     public function saveResponse(Request $request, $formId)
     {
-        // Validate the incoming request data
+        // Validate the incoming request data. exists: alone isn't tenant-scoped —
+        // without the resort_id constraint a client could submit an interviewee_id
+        // belonging to another resort's applicant.
         $validated = $request->validate([
-            'interviewee_id' => 'required|exists:applicant_form_data,id',
+            'interviewee_id' => [
+                'required',
+                \Illuminate\Validation\Rule::exists('applicant_form_data', 'id')->where('resort_id', $this->resort->resort_id),
+            ],
         ]);
 
         try {
@@ -362,7 +367,16 @@ class InterviewAssessmentController extends Controller
             // the viewer (or fields with no role restriction at all).
             // Without this guard a savvy user could POST a hidden field
             // name from another role's section.
-            $formRow = InterviewAssessmentForm::find($formId);
+            // Scope by resort_id so a client can't inject a fake response
+            // against another resort's interview assessment form.
+            $formRow = InterviewAssessmentForm::where('resort_id', $this->resort->resort_id)->find($formId);
+            if (!$formRow) {
+                $msg = 'Interview assessment form not found.';
+                if ($request->ajax()) {
+                    return response()->json(['success' => false, 'message' => $msg], 404);
+                }
+                return redirect()->back()->with('error', $msg);
+            }
             if ($formRow) {
                 $structure = json_decode(json_decode($formRow->form_structure), true) ?: [];
                 $rankConfig = config('settings.Position_Rank');
@@ -465,10 +479,15 @@ class InterviewAssessmentController extends Controller
             $page_title = "View Interview Assessment Response";
             $formId = base64_decode($formId);
             $responseId = base64_decode($responseId);
-            // Fetch the response along with the form structure for rendering
+            // Fetch the response along with the form structure for rendering.
+            // whereHas('form', ...resort_id) — without it, any responseId/formId
+            // pair leaks another resort's full interview assessment answers.
             $response = InterviewAssessmentResponseForm::with(['interviewer', 'interviewee', 'form'])
                 ->where('id', $responseId)
                 ->where('form_id', $formId)
+                ->whereHas('form', function ($q) {
+                    $q->where('resort_id', $this->resort->resort_id);
+                })
                 ->firstOrFail();
 
             // dd($response);
@@ -477,7 +496,7 @@ class InterviewAssessmentController extends Controller
             $responses = json_decode($response->responses, true);
 
             // Fetch the form structure
-            $form = InterviewAssessmentForm::findOrFail($formId);
+            $form = InterviewAssessmentForm::where('resort_id', $this->resort->resort_id)->findOrFail($formId);
             $formStructure = json_decode($form->form_structure, true);
 
             return view('resorts.talentacquisition.interview-assessment.viewResponse', compact('response', 'responses', 'formStructure','page_title'));
