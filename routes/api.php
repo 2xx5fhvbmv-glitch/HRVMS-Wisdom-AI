@@ -462,6 +462,7 @@ use Illuminate\Support\Facades\Route;
 		Route::get('sos/get-team-acknowledged/{sos_id}', [App\Http\Controllers\API\SOSController::class, 'getTeamAcknowledged']);
 		Route::post('sos/drill-real-sos', [App\Http\Controllers\API\SOSController::class, 'drillRealSOS']);
 		Route::post('sos/complete-sos-update-status', [App\Http\Controllers\API\SOSController::class, 'completeSOSUpdateStatus']);
+		Route::post('sos/location-update', [App\Http\Controllers\API\SOSController::class, 'SOSLocationUpdate']);
 
 		// Mobile-audit P1: new endpoints
 		Route::get('sos/fire-team-members', [App\Http\Controllers\API\SOSController::class, 'fireTeamMembers']);

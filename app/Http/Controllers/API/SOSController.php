@@ -425,6 +425,83 @@ class SOSController extends Controller
         }
     }
 
+    /**
+     * Continuous live-location ping during an active SOS. The triggering
+     * employee's (and any responding team member's) app calls this on an
+     * interval while the event is open; it overwrites the "last known
+     * location" already read by employeeAndTeamLocation/showMap/
+     * filterMapEmployeeList — no new trail table, those endpoints already
+     * render off sos_history_employee_status / sos_team_member_activity's
+     * current lat/lng, so updating the same rows in place is all a live
+     * map needs. sos_history_id is resort-and-status gated the same way
+     * as employeeAndTeamLocation/getTeamAcknowledged (this session's fix
+     * pattern) so a ping can never be written into another resort's, or a
+     * closed-out, SOS event.
+     */
+    public function SOSLocationUpdate(Request $request)
+    {
+        if (!Auth::guard('api')->check()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $validator                                      =   Validator::make($request->all(), [
+            'sos_history_id'                            =>  'required',
+            'latitude'                                  =>  'required',
+            'longitude'                                 =>  'required',
+            'address'                                   =>  'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
+        }
+
+        try {
+            $sosHistory                                 =   SOSHistoryModel::where('id', $request->sos_history_id)
+                                                                ->where('resort_id', $this->resort_id)
+                                                                ->whereNotIn('status', ['Completed', 'Rejected', 'Drill-Completed', 'Drill-Rejected'])
+                                                                ->first();
+
+            if (!$sosHistory) {
+                return response()->json(['success' => false, 'message' => 'SOS event not found or no longer active.'], 404);
+            }
+
+            $employeeStatus                             =   SosHistoryEmployeeStatus::updateOrCreate(
+                                                                [
+                                                                    'sos_history_id'     =>  $request->sos_history_id,
+                                                                    'emp_id'             =>  $this->user->GetEmployee->id,
+                                                                ],
+                                                                [
+                                                                    'latitude'           =>  $request->latitude,
+                                                                    'longitude'          =>  $request->longitude,
+                                                                    'address'            =>  $request->address,
+                                                                ]
+                                                            );
+
+            // Also refresh the caller's team-activity pin if they're a
+            // responding team member on this event — employeeAndTeamLocation
+            // merges both sources for the live map.
+            SosTeamMemberActivity::where('sos_history_id', $request->sos_history_id)
+                                                                ->where('emp_id', $this->user->id)
+                                                                ->update([
+                                                                    'latitude'           =>  $request->latitude,
+                                                                    'longitude'          =>  $request->longitude,
+                                                                    'address'            =>  $request->address,
+                                                                ]);
+
+            return response()->json([
+                'success'                               =>  true,
+                'message'                               =>  "Location updated successfully.",
+                'data'                                  =>  $employeeStatus,
+            ], 200);
+
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
     public function employeeAndTeamLocation($sosId)
     {
         if (!Auth::guard('api')->check()) {
