@@ -88,7 +88,10 @@ class BoardingPassController extends Controller
                                                                     // $query->where('emergency_cancel_status', '=', 'Cancel');
                                                                 },
                                                             'DepartureResortTransportation:id,resort_id,transportation_option',
-                                                            'ArrivalResortTransportation:id,resort_id,transportation_option'
+                                                            'ArrivalResortTransportation:id,resort_id,transportation_option',
+                                                            // Sibling of boardingPassView's manifest_confirmation
+                                                            // below — this listing endpoint was missing it entirely.
+                                                            'manifest:id,transportation_mode,transportation_name,manifest_type,date,time',
                                                             ])
                                                             ->where('employee_id',$employeeId)
                                                             ->where('resort_id', $this->resort_id)
@@ -149,6 +152,19 @@ class BoardingPassController extends Controller
                 // guard above).
                 $pass->can_modify                  =   ($pass->overall_status === 'Pending');
                 $pass->can_cancel                  =   ($pass->overall_status === 'Pending');
+
+                // Once HR/Security have confirmed this pass on a manifest,
+                // surface the confirmed time + mode of transportation + boat/
+                // vessel name here too — matches boardingPassView's shape.
+                $manifest                           =   $pass->manifest;
+                $pass->manifest_confirmation        =   $manifest ? [
+                    'manifest_id'                   =>  $manifest->id,
+                    'manifest_type'                 =>  $manifest->manifest_type,
+                    'confirmed_departure_time'      =>  $manifest->manifest_type === 'departure' ? $pass->departure_time : null,
+                    'confirmed_arrival_time'        =>  $manifest->manifest_type === 'arrival' ? $pass->arrival_time : null,
+                    'transportation_mode'           =>  $manifest->transportation_mode,
+                    'vessel_name'                   =>  $manifest->transportation_name,
+                ] : null;
             }
             $dahsboardArr                           =   [
                 'departed_count'                    =>  $EmployeeTravelDepartedCount,
@@ -1483,12 +1499,8 @@ class BoardingPassController extends Controller
         $isHOD   = ($rank == 2 || $rank === '2');
         $isEXCOM = ($rank == 1 || $rank === '1');
 
-        $department = $employee->Dept_id
-            ? \App\Models\ResortDepartment::where('id', $employee->Dept_id)->where('resort_id', $this->resort_id)->first(['name'])
-            : null;
-        $deptName       = strtolower(trim($department->name ?? ''));
-        $isHRDept       = in_array($deptName, ['human resources', 'hr']);
-        $isSecurityDept = strpos($deptName, 'security') !== false;
+        $isHRDept       = Common::isHRDepartment($employee->Dept_id);
+        $isSecurityDept = Common::isSecurityDepartment($employee->Dept_id);
 
         return ($isHRDept && ($isHOD || $isEXCOM)) || $isSecurityDept;
     }
@@ -1518,7 +1530,16 @@ class BoardingPassController extends Controller
                                                             'employee:id,Admin_Parent_id',
                                                             'employee.resortAdmin:id,first_name,last_name'
                                                         ])
-                                                        ->where('status', 'Approved');
+                                                        ->where('resort_id', $this->resort_id)
+                                                        ->where('status', 'Approved')
+                                                        // Don't trust the parent's denormalized status alone —
+                                                        // re-verify against the real per-step approval rows
+                                                        // (HOD -> HR -> SM) so a stale/short-circuited status
+                                                        // can't surface a not-actually-fully-approved pass.
+                                                        ->whereHas('employeeTravelPassStatusData')
+                                                        ->whereDoesntHave('employeeTravelPassStatusData', function ($q) {
+                                                            $q->where('status', '!=', 'Approved');
+                                                        });
             // Filter by arrival or departure
             if ($request->type === 'arrival') {
                 $query->where('arrival_date', $request->date)->where('arrival_mode', $request->transportation_id);
@@ -1707,16 +1728,12 @@ class BoardingPassController extends Controller
 
             // Also notify HR and Security — the ticket's spec is that
             // manifest creation notifies the included employees AND these
-            // two groups, not just the employees.
+            // two groups, not just the employees. Both fan-outs reuse the
+            // same Common:: helper pattern (alias-matching department
+            // lookup + active-employee filter) instead of an inline query
+            // that only matched a department literally named "Security".
             $hrEmployeeIds = Common::getResortHrEmployeeIds($this->resort_id);
-            $securityDeptIds = \App\Models\ResortDepartment::where('resort_id', $this->resort_id)
-                ->where('name', 'Security')
-                ->pluck('id');
-            $securityEmployeeIds = Employee::where('resort_id', $this->resort_id)
-                ->whereIn('Dept_id', $securityDeptIds)
-                ->where('status', 'Active')
-                ->pluck('id')
-                ->toArray();
+            $securityEmployeeIds = Common::getResortSecurityEmployeeIds($this->resort_id);
             $staffNotifyIds = array_values(array_unique(array_merge($hrEmployeeIds, $securityEmployeeIds)));
 
             if (!empty($staffNotifyIds)) {

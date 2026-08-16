@@ -4440,6 +4440,33 @@ class Common
     }
 
     /**
+     * Active employees in the resort's Security department(s). Used to fan
+     * out Island Pass Manifest creation notifications to Security, mirroring
+     * getResortFinanceEmployeeIds. Department matching reuses the same
+     * aliases as isSecurityDepartment.
+     */
+    public static function getResortSecurityEmployeeIds($resortId)
+    {
+        $secDeptIds = \App\Models\ResortDepartment::where('resort_id', $resortId)
+            ->pluck('id')
+            ->filter(fn($id) => self::isSecurityDepartment($id))
+            ->all();
+
+        if (empty($secDeptIds)) {
+            return [];
+        }
+
+        return \App\Models\Employee::where('resort_id', $resortId)
+            ->whereIn('Dept_id', $secDeptIds)
+            ->where(function ($q) {
+                $q->whereNull('status')->orWhere('status', 'Active')->orWhere('status', 'Probationary');
+            })
+            ->pluck('id')
+            ->map(fn($v) => (int) $v)
+            ->all();
+    }
+
+    /**
      * Active GM (rank 8) employees in the resort. Mirrors getResortHrEmployeeIds/
      * getResortFinanceEmployeeIds for fanning out approval-chain notifications
      * (e.g. Salary Advance/Loan) to the GM as well as HR/Finance.
@@ -4692,6 +4719,36 @@ class Common
             foreach (['finance', 'accounting', 'accounts'] as $needle) {
                 if (strpos($val, $needle) !== false) return true;
             }
+            return false;
+        };
+        return $matches($name) || $matches($short) || $matches($code);
+    }
+
+    /**
+     * True when the given department id refers to the Security department.
+     * Mirrors isFinanceDepartment/isHRDepartment's alias-matching approach.
+     * Used to grant Security department employees (any rank) Island Pass
+     * Manifest access — see BoardingPassController::userCanManageManifests().
+     */
+    public static function isSecurityDepartment($deptId)
+    {
+        if (!$deptId) return false;
+
+        $dept = \App\Models\ResortDepartment::find($deptId);
+        if (!$dept) return false;
+
+        $name  = strtolower(trim($dept->name ?? ''));
+        $short = strtolower(trim($dept->short_name ?? ''));
+        $code  = strtolower(trim($dept->code ?? ''));
+
+        $aliases = ['security', 'sec'];
+        $matches = function ($val) use ($aliases) {
+            if ($val === '') return false;
+            if (in_array($val, $aliases, true)) return true;
+            // Loose contains check on the full word only — "sec" is left
+            // out of this check on purpose so departments like "Secretary"
+            // don't false-positive.
+            if (strpos($val, 'security') !== false) return true;
             return false;
         };
         return $matches($name) || $matches($short) || $matches($code);
