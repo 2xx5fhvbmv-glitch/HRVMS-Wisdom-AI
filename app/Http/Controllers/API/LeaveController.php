@@ -864,6 +864,15 @@ class LeaveController extends Controller
                                                             ->where('resort_benefit_grid_child.rank', $benefit_grid->emp_grade)
                                                             ->where('resort_benefit_grid_child.benefit_grid_id', $benefit_grid->id)
                                                             ->where('lc.resort_id', $resort_id)
+                                                            // lc.eligibility is a comma-separated list of rank ids the
+                                                            // web portal's leave-category config restricts this leave
+                                                            // to (e.g. "8,1,2" = GM/EXCOM/HOD only). The mobile API
+                                                            // never checked it, so a rank not in the list (e.g. a Line
+                                                            // Worker, rank 6) still saw the category returned — this
+                                                            // was true even though resort_benefit_grid_child.rank
+                                                            // matched, since that table controls day allocation, not
+                                                            // the category's own rank restriction.
+                                                            ->whereRaw('FIND_IN_SET(?, lc.eligibility)', [$rank])
                                                             ->where(function ($query) use ($religion, $gender) {
                                                                 $query->where('resort_benefit_grid_child.eligible_emp_type', $gender)
                                                                     ->orWhere('resort_benefit_grid_child.eligible_emp_type', 'all');

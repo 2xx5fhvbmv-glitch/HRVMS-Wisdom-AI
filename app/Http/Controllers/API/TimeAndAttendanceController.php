@@ -3653,9 +3653,16 @@ class TimeAndAttendanceController extends Controller
 
         try {
             // Get employee details
+            // duty_rosters was an INNER join — any employee with zero roster
+            // rows (new hire, no roster assigned yet) silently vanished from
+            // this query entirely, surfacing as a false "Employee not found"
+            // even though the employee genuinely exists. duty_roster_id is
+            // only consumed by GetAttandanceRegister's "weekly" branch below,
+            // never by "Monthwise" (the flag actually passed here), so a
+            // left join is safe.
             $employee = Employee::join('resort_admins as t1', "t1.id", "=", "employees.Admin_Parent_id")
                 ->join('resort_positions as t2', "t2.id", "=", "employees.Position_id")
-                ->join('duty_rosters as t3', "t3.Emp_id", "=", "employees.id")
+                ->leftJoin('duty_rosters as t3', "t3.Emp_id", "=", "employees.id")
                 ->select(
                     't1.id as Parentid',
                     't1.first_name',
