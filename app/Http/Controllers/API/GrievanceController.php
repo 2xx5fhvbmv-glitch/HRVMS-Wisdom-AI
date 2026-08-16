@@ -151,7 +151,13 @@ class GrievanceController extends Controller
             'location'                                      =>  'required',
             'witness_id'                                    =>  'required',
             'Grivance_Eexplination_description'             =>  'required',
-            'Confidential'                                  =>  'required',
+            // Neither box checked ("Neutral" — not confidential, not
+            // anonymous) is a legitimate third submission type that already
+            // stores/returns correctly as "NotApplicable" below, but marking
+            // this field itself required blocked that case with a 400
+            // before the fallback branch ever ran. Anonymous is already
+            // unvalidated/optional for the same reason.
+            'Confidential'                                  =>  'nullable',
             'grievance_informally'                          =>  'required',
         ]);
 
