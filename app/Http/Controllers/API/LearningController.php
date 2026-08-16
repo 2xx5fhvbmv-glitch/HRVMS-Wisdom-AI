@@ -19,8 +19,12 @@ use App\Models\TrainingAttendance;
 use App\Models\TrainingFeedbackForm;
 use App\Models\TrainingParticipant;
 use App\Models\TrainingFeedbackResponse;
+use App\Models\EmployeeItineraries;
+use App\Models\LearningMaterials;
 use App\Helpers\Common;
+use App\Helpers\StorageHelper;
 use Carbon\Carbon;
+use Illuminate\Validation\Rule;
 use Validator;
 use Auth;
 use DB;
@@ -766,6 +770,492 @@ class LearningController extends Controller
                 'feedback_form_res_view'            =>  $trainingFeedbackResponse
             ], 200);
         
+
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    /**
+     * L&D Manager identity check — mirrors the exact pattern established in
+     * Resorts\Learning\LearningController (web) and Common::hasFullDataAccess's
+     * L&D branch: position title match OR L&D department membership.
+     * Deliberately NOT rank-based (no HOD/EXCOM/HR/GM shortcut) — the mobile
+     * L&D Manager screens are scoped to the actual L&D Manager only. Routes
+     * are already gated by the 'ld.manager' middleware; this is a second,
+     * defence-in-depth check at the controller level, matching how the web
+     * LearningController re-checks the same thing inline in every action.
+     */
+    private function isLdManager($employee)
+    {
+        if (!$employee) return false;
+        $ldManagerTitles = ['Training Director', 'L&D Manager', 'Learning & Development Head'];
+        $positionTitle = optional($employee->position)->position_title;
+        return in_array($positionTitle, $ldManagerTitles, true)
+            || Common::isLDDepartment($employee->Dept_id ?? null);
+    }
+
+    /**
+     * L&D Manager dashboard (mobile). "New arrivals" = employees who have an
+     * onboarding itinerary (employee_itineraries row) — the same cohort the
+     * HR onboarding dashboard tracks. "Onboarding trainings ... for new
+     * arrivals" = training_schedules with at least one participant from that
+     * cohort (there is no separate "onboarding training" flag on
+     * learning_programs/training_schedules, so schedule-to-arrival overlap
+     * is the closest real signal in the existing schema).
+     */
+    public function ldManagerDashboard()
+    {
+        if (!$this->user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $employee = $this->user->GetEmployee ?? null;
+        if (!$this->isLdManager($employee)) {
+            return response()->json(['success' => false, 'message' => 'Forbidden: L&D Manager access only'], 403);
+        }
+
+        try {
+            $resort_id = $this->resort_id;
+            $today = Carbon::today()->format('Y-m-d');
+
+            $itineraries = EmployeeItineraries::with(['employee.resortAdmin', 'pickupemployee.resortAdmin', 'accompanymedicalemployee.resortAdmin'])
+                ->where('resort_id', $resort_id)
+                ->get();
+
+            $upcomingItineraries = $itineraries->filter(fn($i) => $i->arrival_date >= $today)->values();
+            $arrivalEmployeeIds = $itineraries->pluck('employee_id')->filter()->unique()->values()->all();
+
+            $onboardingSchedulesQuery = TrainingSchedule::where('resort_id', $resort_id)
+                ->whereHas('participants', fn($q) => $q->whereIn('employee_id', $arrivalEmployeeIds));
+
+            $onboardingTrainingsScheduled = empty($arrivalEmployeeIds) ? 0 : (clone $onboardingSchedulesQuery)->count();
+            $pendingOnboardingTrainings   = empty($arrivalEmployeeIds) ? 0 : (clone $onboardingSchedulesQuery)->where('start_date', '>', $today)->count();
+
+            // Which arrivals already have at least one training scheduled —
+            // drives the "Status: Training Scheduled" label on the list below.
+            $scheduledParticipantEmpIds = empty($arrivalEmployeeIds) ? [] : TrainingParticipant::whereIn('employee_id', $arrivalEmployeeIds)
+                ->whereHas('schedule', fn($q) => $q->where('resort_id', $resort_id))
+                ->pluck('employee_id')->unique()->all();
+
+            $upcomingArrivals = $upcomingItineraries->map(function ($itinerary) use ($scheduledParticipantEmpIds) {
+                $employee = $itinerary->employee;
+                $pickup = $itinerary->pickupemployee;
+                $medical = $itinerary->accompanymedicalemployee;
+
+                return [
+                    'itinerary_id'    => $itinerary->id,
+                    'employee_id'     => $employee->id ?? null,
+                    'employee_name'   => ($employee && $employee->resortAdmin) ? $employee->resortAdmin->full_name : 'Unknown',
+                    'employee_photo'  => Common::getResortUserPicture($employee->Admin_Parent_id ?? null),
+                    'arrival_date'    => $itinerary->arrival_date,
+                    'arrival_time'    => $itinerary->arrival_time,
+                    'representatives' => array_values(array_filter([
+                        $pickup ? ['role' => 'Pickup', 'name' => optional($pickup->resortAdmin)->full_name ?? 'Unknown', 'contact' => optional($pickup->resortAdmin)->personal_phone] : null,
+                        $medical ? ['role' => 'Medical Escort', 'name' => optional($medical->resortAdmin)->full_name ?? 'Unknown', 'contact' => optional($medical->resortAdmin)->personal_phone] : null,
+                    ])),
+                    'flight_ticket_available' => !empty($itinerary->flight_ticket_file),
+                    'status'          => 'Itinerary Created',
+                    'training_status' => in_array($employee->id ?? null, $scheduledParticipantEmpIds, true) ? 'Training Scheduled' : 'Not Scheduled',
+                ];
+            })->values();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'L&D Manager dashboard fetched successfully.',
+                'stats' => [
+                    'total_upcoming_arrivals'                      => $upcomingItineraries->count(),
+                    'average_time_days'                            => Common::averageOnboardingLeadDays($resort_id),
+                    'onboarding_trainings_scheduled_count'         => $onboardingTrainingsScheduled,
+                    'pending_onboarding_trainings_scheduled_count' => $pendingOnboardingTrainings,
+                    'total_itineraries_created_count'              => $itineraries->count(),
+                ],
+                'upcoming_arrivals' => $upcomingArrivals,
+            ], 200);
+
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    /**
+     * L&D Manager Training Calendar (mobile). Month-grid by default; `view`
+     * = day|weekly|monthly picks the window around `date` (defaults to
+     * today). `category_id` filters to one learning_categories row ("All
+     * Category" = omit the param). Also returns a per-arrival "upcoming
+     * training" summary card for the L&D Manager's new-arrival cohort.
+     */
+    public function ldManagerTrainingCalendar(Request $request)
+    {
+        if (!$this->user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $employee = $this->user->GetEmployee ?? null;
+        if (!$this->isLdManager($employee)) {
+            return response()->json(['success' => false, 'message' => 'Forbidden: L&D Manager access only'], 403);
+        }
+
+        try {
+            $resort_id = $this->resort_id;
+            $today = Carbon::today()->format('Y-m-d');
+            $view = in_array($request->query('view'), ['day', 'weekly', 'monthly'], true) ? $request->query('view') : 'monthly';
+            $refDate = $request->query('date') ? Carbon::parse($request->query('date')) : Carbon::now();
+            $categoryId = $request->query('category_id');
+
+            if ($view === 'day') {
+                $startDate = $refDate->copy()->startOfDay()->format('Y-m-d');
+                $endDate   = $refDate->copy()->endOfDay()->format('Y-m-d');
+            } elseif ($view === 'weekly') {
+                $startDate = $refDate->copy()->startOfWeek()->format('Y-m-d');
+                $endDate   = $refDate->copy()->endOfWeek()->format('Y-m-d');
+            } else {
+                $startDate = $refDate->copy()->startOfMonth()->format('Y-m-d');
+                $endDate   = $refDate->copy()->endOfMonth()->format('Y-m-d');
+            }
+
+            $sessions = TrainingSchedule::where('resort_id', $resort_id)
+                ->where(function ($query) use ($startDate, $endDate) {
+                    $query->whereBetween('start_date', [$startDate, $endDate])
+                        ->orWhereBetween('end_date', [$startDate, $endDate])
+                        ->orWhere(function ($sub) use ($startDate, $endDate) {
+                            $sub->where('start_date', '<=', $startDate)->where('end_date', '>=', $endDate);
+                        });
+                })
+                ->when($categoryId, function ($q) use ($categoryId) {
+                    $q->whereHas('learningProgram', fn($lp) => $lp->where('learning_category_id', $categoryId));
+                })
+                ->with(['learningProgram.category', 'participants'])
+                ->get();
+
+            $events = $sessions->map(function ($session) {
+                return [
+                    'training_schedule_id' => $session->id,
+                    'training_id'          => $session->learningProgram->id ?? null,
+                    'title'                => $session->learningProgram->name ?? null,
+                    'category'             => optional(optional($session->learningProgram)->category)->category,
+                    'session_date'         => $session->start_date,
+                    'end_date'             => $session->end_date,
+                    'start_time'           => $session->start_time ? date('h:i A', strtotime($session->start_time)) : null,
+                    'end_time'             => $session->end_time ? date('h:i A', strtotime($session->end_time)) : null,
+                    'participants_count'   => $session->participants->count(),
+                ];
+            })->values();
+
+            $categoriesList = LearningCategory::where('resort_id', $resort_id)
+                ->get(['id', 'category'])
+                ->map(fn($c) => ['id' => $c->id, 'category' => $c->category])
+                ->values()->all();
+            array_unshift($categoriesList, ['id' => null, 'category' => 'All Category']);
+
+            // Per-arrival upcoming-training card.
+            $arrivalEmployeeIds = EmployeeItineraries::where('resort_id', $resort_id)
+                ->pluck('employee_id')->filter()->unique()->values()->all();
+
+            $employeeCards = collect();
+            if (!empty($arrivalEmployeeIds)) {
+                $employeeCards = Employee::with('resortAdmin')
+                    ->where('resort_id', $resort_id)
+                    ->whereIn('id', $arrivalEmployeeIds)
+                    ->get()
+                    ->map(function ($emp) use ($resort_id, $today) {
+                        $participantSchedules = TrainingSchedule::where('resort_id', $resort_id)
+                            ->whereHas('participants', fn($q) => $q->where('employee_id', $emp->id))
+                            ->with('learningProgram')
+                            ->get();
+
+                        $upcoming = $participantSchedules->filter(fn($s) => $s->start_date >= $today)->sortBy('start_date')->first();
+
+                        return [
+                            'employee_id'    => $emp->id,
+                            'employee_name'  => optional($emp->resortAdmin)->full_name ?? 'Unknown',
+                            'employee_photo' => Common::getResortUserPicture($emp->Admin_Parent_id ?? null),
+                            'upcoming_training' => $upcoming ? [
+                                'title' => optional($upcoming->learningProgram)->name,
+                                'date'  => $upcoming->start_date,
+                                'time'  => $upcoming->start_time ? date('h:i A', strtotime($upcoming->start_time)) : null,
+                            ] : null,
+                            'on_boarding_trainings_count' => $participantSchedules->count(),
+                            'completed_count' => $participantSchedules->filter(fn($s) => $s->end_date < $today)->count(),
+                            'pending_count'   => $participantSchedules->filter(fn($s) => $s->start_date >= $today)->count(),
+                        ];
+                    })->values();
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Training calendar fetched successfully.',
+                'view' => $view,
+                'start_date' => $startDate,
+                'end_date' => $endDate,
+                'categories' => $categoriesList,
+                'events' => $events,
+                'employee_cards' => $employeeCards,
+            ], 200);
+
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    /**
+     * L&D Manager Mark Attendance — Step 1: "Select Training" dropdown.
+     * Deliberately NOT filtering on the `status` column like the legacy
+     * trainingList() does: every training_schedules row in this app is
+     * still 'Scheduled' regardless of its actual dates — nothing ever
+     * advances it (same finding already documented in
+     * employeeLearningDashbaord() above). Mirroring that fix here: "ongoing"
+     * is derived from start_date/end_date vs today, not the status column.
+     */
+    public function ldManagerMarkAttendanceTrainings()
+    {
+        if (!$this->user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $employee = $this->user->GetEmployee ?? null;
+        if (!$this->isLdManager($employee)) {
+            return response()->json(['success' => false, 'message' => 'Forbidden: L&D Manager access only'], 403);
+        }
+
+        try {
+            $today = Carbon::today()->format('Y-m-d');
+            $trainings = TrainingSchedule::with('learningProgram')
+                ->where('resort_id', $this->resort_id)
+                ->where('start_date', '<=', $today)
+                ->where('end_date', '>=', $today)
+                ->get()
+                ->map(fn($t) => [
+                    'training_schedule_id' => $t->id,
+                    'name'                 => optional($t->learningProgram)->name,
+                    'start_date'           => $t->start_date,
+                    'end_date'             => $t->end_date,
+                ])->values();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Trainings fetched successfully.',
+                'trainings' => $trainings,
+            ], 200);
+
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    /**
+     * L&D Manager Mark Attendance — Step 2: the employee checklist for a
+     * chosen training. Each row's checkbox is pre-checked ("is_present")
+     * only when a TrainingAttendance row already exists for TODAY with
+     * status Present — giving the Figma's "some already checked" mixed
+     * default for free, rather than assuming everyone defaults to Present.
+     */
+    public function ldManagerMarkAttendanceParticipants($training_schedule_id)
+    {
+        if (!$this->user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $employee = $this->user->GetEmployee ?? null;
+        if (!$this->isLdManager($employee)) {
+            return response()->json(['success' => false, 'message' => 'Forbidden: L&D Manager access only'], 403);
+        }
+
+        try {
+            $resort_id = $this->resort_id;
+
+            $schedule = TrainingSchedule::with('learningProgram')
+                ->where('resort_id', $resort_id)
+                ->find($training_schedule_id);
+
+            if (!$schedule) {
+                return response()->json(['success' => false, 'message' => 'Training schedule not found'], 404);
+            }
+
+            $today = Carbon::today()->format('Y-m-d');
+            $todaysAttendance = TrainingAttendance::where('training_schedule_id', $schedule->id)
+                ->where('attendance_date', $today)
+                ->get()
+                ->keyBy('employee_id');
+
+            $participants = TrainingParticipant::with(['employee.resortAdmin', 'employee.position', 'employee.department'])
+                ->where('training_schedule_id', $schedule->id)
+                ->get()
+                ->filter(fn($p) => $p->employee)
+                ->map(function ($p) use ($todaysAttendance) {
+                    $emp = $p->employee;
+                    $existing = $todaysAttendance->get($emp->id);
+                    return [
+                        'employee_id' => $emp->id,
+                        'name'        => optional($emp->resortAdmin)->full_name ?? 'Unknown',
+                        'photo'       => Common::getResortUserPicture($emp->Admin_Parent_id ?? null),
+                        'department'  => optional($emp->department)->name,
+                        'position'    => optional($emp->position)->position_title,
+                        'is_present'  => $existing ? ($existing->status === 'Present') : false,
+                    ];
+                })->values();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Participants fetched successfully.',
+                'training' => [
+                    'training_schedule_id' => $schedule->id,
+                    'name'       => optional($schedule->learningProgram)->name,
+                    'start_date' => $schedule->start_date,
+                    'end_date'   => $schedule->end_date,
+                ],
+                'participants' => $participants,
+            ], 200);
+
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    /**
+     * L&D Manager Mark Attendance — Step 3: submit. Unlike the legacy
+     * markAttendance(), every id is resort_id-scoped in the validator itself
+     * (Rule::exists()->where('resort_id', ...)) — no cross-tenant gap.
+     */
+    public function ldManagerMarkAttendanceStore(Request $request)
+    {
+        if (!$this->user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $employee = $this->user->GetEmployee ?? null;
+        if (!$this->isLdManager($employee)) {
+            return response()->json(['success' => false, 'message' => 'Forbidden: L&D Manager access only'], 403);
+        }
+
+        $resort_id = $this->resort_id;
+
+        $validator = Validator::make($request->all(), [
+            'training_schedule_id'     => ['required', Rule::exists('training_schedules', 'id')->where('resort_id', $resort_id)],
+            'employees'                => 'required|array|min:1',
+            'employees.*.employee_id'  => ['required', Rule::exists('employees', 'id')->where('resort_id', $resort_id)],
+            'employees.*.status'       => 'required|in:Present,Absent',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            $today = Carbon::today()->format('Y-m-d');
+            foreach ($request->employees as $row) {
+                TrainingAttendance::updateOrCreate(
+                    [
+                        'training_schedule_id' => $request->training_schedule_id,
+                        'employee_id'          => $row['employee_id'],
+                        'attendance_date'      => $today,
+                    ],
+                    [
+                        'status' => $row['status'],
+                    ]
+                );
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Attendance marked successfully.',
+            ], 200);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    /**
+     * L&D Manager's incoming Training Request list — read-only. Gated by the
+     * 'ld.manager' route middleware (L&D position/department, not rank), so
+     * only the true L&D Manager reaches this method; HOD/EXCOM/HR/GM 403 at
+     * the middleware before this code runs.
+     *
+     * Mirrors Resorts\Learning\LearningController::list()'s data shape for the
+     * L&D-manager branch, but unlike the web screen this is view-only: no
+     * approve/reject/schedule action exists here (that stays web-only per spec),
+     * so requests are scoped to Pending only and no action metadata is returned.
+     */
+    public function managerRequestList(Request $request)
+    {
+        if (!$this->user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        try {
+            $requests = LearningRequest::where('learning_requests.resort_id', $this->resort_id)
+                ->where('learning_requests.status', 'Pending')
+                ->with(['learning', 'employees.employee.resortAdmin'])
+                ->orderByDesc('learning_requests.id')
+                ->get();
+
+            $data = $requests->map(function ($req) {
+                $creator = ResortAdmin::find($req->created_by);
+
+                $suggestedEmployees = $req->employees->map(function ($lre) {
+                    $employee = $lre->employee;
+                    if (!$employee) return null;
+                    $name = $employee->resortAdmin
+                        ? trim($employee->resortAdmin->first_name . ' ' . $employee->resortAdmin->last_name)
+                        : trim($employee->first_name . ' ' . $employee->last_name);
+                    return [
+                        'employee_id' => $employee->id,
+                        'name'        => $name,
+                    ];
+                })->filter()->values();
+
+                $attachments = LearningMaterials::where('learning_program_id', $req->learning_id)
+                    ->get()
+                    ->map(function ($material) {
+                        return [
+                            'id'  => $material->id,
+                            'url' => StorageHelper::url($material->file_path),
+                        ];
+                    })->values();
+
+                return [
+                    'id'                  => $req->id,
+                    'learning_name'       => $req->learning->name ?? 'N/A',
+                    'suggested_employees' => $suggestedEmployees,
+                    'requested_by'        => $creator ? trim($creator->first_name . ' ' . $creator->last_name) : 'N/A',
+                    'reason'              => $req->reason,
+                    'start_date'          => $req->start_date,
+                    'end_date'            => $req->end_date,
+                    // Read-only screen — approve/reject/schedule stays web-only.
+                    'action_note'         => 'To approve, reject, or schedule this training, please use the web portal.',
+                    'attachments'         => $attachments,
+                ];
+            })->values();
+
+            return response()->json([
+                'success'              => true,
+                'message'              => 'Learning request list fetched successfully',
+                'learning_request_list' => $data,
+            ], 200);
 
         } catch (\Exception $e) {
             \Log::emergency("File: " . $e->getFile());

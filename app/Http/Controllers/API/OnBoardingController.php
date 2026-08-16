@@ -1427,4 +1427,176 @@ class OnBoardingController extends Controller
             return response()->json(['success' => false, 'message' => 'Server error'], 500);
         }
     }
+
+    /**
+     * HR dashboard for the Onboarding module (mobile). Gate: any employee in
+     * the HR department (any rank) — mirrors the isHRDepartment convention
+     * TimeAndAttendanceController already uses for its own HR-wide mobile
+     * dashboards (resort-wide visibility once you're an HR-department
+     * member, not just HR rank/HOD/EXCOM).
+     *
+     * Onboarding is company-wide, not owned by the arriving employee's own
+     * department, so this does NOT further restrict by
+     * Common::getScopedDepartmentIds() — every HR-department member sees
+     * every itinerary in the resort.
+     */
+    public function hrDashboard()
+    {
+        if (!Auth::guard('api')->check()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $employee = $this->user->GetEmployee ?? null;
+        if (!$employee || !Common::isHRDepartment($employee->Dept_id ?? null)) {
+            return response()->json(['success' => false, 'message' => 'Forbidden: HR department access only'], 403);
+        }
+
+        try {
+            $resort_id = $this->resort_id;
+            $today = Carbon::today()->format('Y-m-d');
+
+            $itineraries = EmployeeItineraries::with([
+                    'employee.resortAdmin',
+                    'pickupemployee.resortAdmin',
+                    'accompanymedicalemployee.resortAdmin',
+                    'meetings',
+                ])
+                ->where('resort_id', $resort_id)
+                ->get();
+
+            $upcomingItineraries = $itineraries->filter(fn($i) => $i->arrival_date >= $today)->values();
+
+            // Assigned Tasks — every pickup + medical-escort assignment across
+            // all itineraries, split Completed/Pending by whether the task's
+            // own date has passed.
+            $completedTasks = 0;
+            $pendingTasks = 0;
+            $assignedTasks = [];
+            foreach ($itineraries as $itinerary) {
+                $employeeName = $this->employeeDisplayName($itinerary->employee);
+
+                if ($itinerary->pickup_employee_id) {
+                    $isCompleted = $itinerary->arrival_date < $today;
+                    $isCompleted ? $completedTasks++ : $pendingTasks++;
+                    $assignedTasks[] = [
+                        'itinerary_id' => $itinerary->id,
+                        'task'         => 'Pick up ' . $employeeName . ' at the Airport',
+                        'date'         => $itinerary->arrival_date,
+                        'time'         => $itinerary->arrival_time,
+                        'assignee'     => $this->employeeDisplayName($itinerary->pickupemployee),
+                        'assignee_contact' => optional($itinerary->pickupemployee)->resortAdmin->personal_phone ?? null,
+                        'status'       => $isCompleted ? 'Completed' : 'Pending',
+                    ];
+                }
+
+                if ($itinerary->accompany_medical_employee_id) {
+                    $isCompleted = !empty($itinerary->medical_date) && $itinerary->medical_date < $today;
+                    $isCompleted ? $completedTasks++ : $pendingTasks++;
+                    $assignedTasks[] = [
+                        'itinerary_id' => $itinerary->id,
+                        'task'         => 'Accompany ' . $employeeName . ' to Medical Center',
+                        'date'         => $itinerary->medical_date,
+                        'time'         => $itinerary->approx_time,
+                        'assignee'     => $this->employeeDisplayName($itinerary->accompanymedicalemployee),
+                        'assignee_contact' => optional($itinerary->accompanymedicalemployee)->resortAdmin->personal_phone ?? null,
+                        'status'       => $isCompleted ? 'Completed' : 'Pending',
+                    ];
+                }
+            }
+
+            // Upcoming Arrivals list
+            $upcomingArrivals = $upcomingItineraries->map(function ($itinerary) {
+                $employee = $itinerary->employee;
+                $pickup = $itinerary->pickupemployee;
+                $medical = $itinerary->accompanymedicalemployee;
+
+                return [
+                    'itinerary_id'    => $itinerary->id,
+                    'employee_id'     => $employee->id ?? null,
+                    'employee_name'   => $this->employeeDisplayName($employee),
+                    'employee_photo'  => Common::getResortUserPicture($employee->Admin_Parent_id ?? null),
+                    'arrival_date'    => $itinerary->arrival_date,
+                    'arrival_time'    => $itinerary->arrival_time,
+                    'representatives' => array_values(array_filter([
+                        $pickup ? [
+                            'role'    => 'Pickup',
+                            'name'    => $this->employeeDisplayName($pickup),
+                            'contact' => optional($pickup->resortAdmin)->personal_phone,
+                        ] : null,
+                        $medical ? [
+                            'role'    => 'Medical Escort',
+                            'name'    => $this->employeeDisplayName($medical),
+                            'contact' => optional($medical->resortAdmin)->personal_phone,
+                        ] : null,
+                    ])),
+                    'send_my_selfie_available' => empty($employee->selfie_image ?? null),
+                    'flight_ticket_available'  => !empty($itinerary->flight_ticket_file),
+                    'status'                   => 'Itinerary Created',
+                ];
+            })->values();
+
+            // Onboarding Itinerary list — pending tasks count per itinerary
+            // (own pickup task + own medical task + own meetings still ahead
+            // of today).
+            $itineraryList = $itineraries->map(function ($itinerary) use ($today) {
+                $pending = 0;
+                if ($itinerary->arrival_date >= $today) $pending++;
+                if (!empty($itinerary->medical_date) && $itinerary->medical_date >= $today) $pending++;
+                $pending += $itinerary->meetings->filter(fn($m) => $m->meeting_date >= $today)->count();
+
+                return [
+                    'itinerary_id'        => $itinerary->id,
+                    'date'                => $itinerary->arrival_date,
+                    'itinerary_title'     => 'Onboarding — ' . $this->employeeDisplayName($itinerary->employee),
+                    'pending_tasks_count' => $pending,
+                ];
+            })->values();
+
+            // Upcoming Meetings list
+            $upcomingMeetings = EmployeeItinerariesMeeting::whereHas('itiernary', fn($q) => $q->where('resort_id', $resort_id))
+                ->where('meeting_date', '>=', $today)
+                ->orderBy('meeting_date')
+                ->get()
+                ->map(fn($m) => [
+                    'meeting_id'   => $m->id,
+                    'title'        => $m->meeting_title,
+                    'date'         => $m->meeting_date,
+                    'time'         => $m->meeting_time,
+                    'meeting_link' => $m->meeting_link,
+                ])->values();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'HR onboarding dashboard fetched successfully.',
+                'stats' => [
+                    'total_upcoming_arrivals' => $upcomingItineraries->count(),
+                    'completed_tasks'         => $completedTasks,
+                    'pending_tasks'           => $pendingTasks,
+                    'average_time_days'       => Common::averageOnboardingLeadDays($resort_id),
+                ],
+                'upcoming_arrivals'      => $upcomingArrivals,
+                'onboarding_itineraries' => $itineraryList,
+                'assigned_tasks'         => $assignedTasks,
+                'upcoming_meetings'      => $upcomingMeetings,
+            ], 200);
+
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    /**
+     * Null-safe "Employee -> resortAdmin -> full_name" lookup shared by the
+     * HR dashboard's several list builders above.
+     */
+    private function employeeDisplayName($employee)
+    {
+        if (!$employee || !$employee->resortAdmin) {
+            return 'Unknown';
+        }
+        return $employee->resortAdmin->full_name;
+    }
 }

@@ -4829,6 +4829,33 @@ class Common
     }
 
     /**
+     * Average number of days between an onboarding itinerary being created
+     * (HR/L&D building the arrival logistics) and the employee's
+     * arrival_date. Backs the "Average Time (days)" tile on both the HR and
+     * L&D Manager mobile onboarding dashboards. Reads the raw
+     * employee_itineraries.created_at column via the query builder (not the
+     * Eloquent model) because EmployeeItineraries re-formats created_at into
+     * a display string via an accessor — the raw DB column is a normal
+     * datetime and parses safely.
+     */
+    public static function averageOnboardingLeadDays($resortId)
+    {
+        $rows = \DB::table('employee_itineraries')
+            ->where('resort_id', $resortId)
+            ->whereNotNull('arrival_date')
+            ->get(['created_at', 'arrival_date']);
+
+        if ($rows->isEmpty()) return 0;
+
+        $totalDays = $rows->sum(function ($row) {
+            return abs(\Carbon\Carbon::parse($row->created_at)->startOfDay()
+                ->diffInDays(\Carbon\Carbon::parse($row->arrival_date)->startOfDay()));
+        });
+
+        return round($totalDays / $rows->count(), 1);
+    }
+
+    /**
      * Great-circle distance between two lat/long points, in meters. Free —
      * no external API call, just arithmetic. Used to check a punch-in/out
      * location against a circle geofence's center+radius.

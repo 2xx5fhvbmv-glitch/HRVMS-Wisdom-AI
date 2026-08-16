@@ -77,6 +77,7 @@ class Kernel extends HttpKernel
         'check.rank' => \App\Http\Middleware\CheckUserRankForAPI::class,
         'clinic.manager' => \App\Http\Middleware\EnsureClinicManagerAccess::class,
         'clinic.capability' => \App\Http\Middleware\EnsureClinicCapability::class,
+        'ld.manager' => \App\Http\Middleware\EnsureLDManagerAccess::class,
 
 
 

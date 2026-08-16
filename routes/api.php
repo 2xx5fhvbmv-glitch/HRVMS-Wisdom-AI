@@ -341,6 +341,19 @@ use Illuminate\Support\Facades\Route;
 		Route::get('learning/feedback-from-list', [App\Http\Controllers\API\LearningController::class, 'feedbackformListing']);
 		Route::post('learning/feedback-data-store', [App\Http\Controllers\API\LearningController::class, 'feedbackStore']);
 
+		//L&D Manager module + HR onboarding dashboard (position/department gated, not rank)
+		Route::middleware(['ld.manager'])->group(function () {
+			Route::get('ld-manager/dashboard', [App\Http\Controllers\API\LearningController::class, 'ldManagerDashboard']);
+			Route::get('ld-manager/training-calendar', [App\Http\Controllers\API\LearningController::class, 'ldManagerTrainingCalendar']);
+			Route::get('ld-manager/mark-attendance/trainings', [App\Http\Controllers\API\LearningController::class, 'ldManagerMarkAttendanceTrainings']);
+			Route::get('ld-manager/mark-attendance/participants/{training_schedule_id}', [App\Http\Controllers\API\LearningController::class, 'ldManagerMarkAttendanceParticipants']);
+			Route::post('ld-manager/mark-attendance', [App\Http\Controllers\API\LearningController::class, 'ldManagerMarkAttendanceStore']);
+			Route::get('learning/manager-request-list', [App\Http\Controllers\API\LearningController::class, 'managerRequestList']);
+		});
+
+		// HR onboarding dashboard — self-gated on HR department inside the controller.
+		Route::get('on-boarding/hr-dashboard', [App\Http\Controllers\API\OnBoardingController::class, 'hrDashboard']);
+
 		//Incident
 		Route::post('incident/add-incident', [App\Http\Controllers\API\IncidentController::class, 'AddIncident']);
 		Route::get('incident/get-categories', [App\Http\Controllers\API\IncidentController::class, 'getCategories']);
