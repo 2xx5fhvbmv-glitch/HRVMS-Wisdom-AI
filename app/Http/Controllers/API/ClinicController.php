@@ -695,7 +695,7 @@ class ClinicController extends Controller
             // all — a treatment record could be created against an
             // employee id from another resort.
             'employee_id'                               => ['required', Rule::exists('employees', 'id')->where('resort_id', $this->resort_id)],
-            'appointment_category_id'                   => 'required',
+            'appointment_category_id'                   => ['required', Rule::exists('clinic_appointment_categories', 'id')->where('resort_id', $this->resort_id)],
             'date'                                      => 'required',
             'time'                                      => 'required',
             'treatment_provided'                        => 'required',
@@ -717,8 +717,8 @@ class ClinicController extends Controller
                 'appointment_id'                        =>  $request->appointment_id ?? null,
                 'employee_id'                           =>  $request->employee_id ,
                 'appointment_category_id'               =>  $request->appointment_category_id,
-                'date'                                  =>  now(),
-                'time'                                  =>  now(),
+                'date'                                  =>  $request->date,
+                'time'                                  =>  $request->time,
                 'treatment_provided'                    =>  $request->treatment_provided,
                 'additional_notes'                      =>  $request->additional_notes,
                 'external_consultation'                 =>  $request->external_consultation ?? null,
@@ -728,10 +728,19 @@ class ClinicController extends Controller
             if($request->hasFile('attachments')) {
                     $emp_id                             =   Employee::where('id',$request->employee_id)->first();
 
-                    foreach($request->attachments as $file)
-                    {
-                       $file = $request->file('attachments');
+                    // $request->attachments is a single UploadedFile object
+                    // for a single-file submit (the common client shape),
+                    // which foreach silently iterates zero times over — the
+                    // attachment was dropped with no error. Normalize to an
+                    // array so both single-file and attachments[] uploads
+                    // are actually saved.
+                    $files = $request->file('attachments');
+                    if (!is_array($files)) {
+                        $files = [$files];
+                    }
 
+                    foreach($files as $file)
+                    {
                         $SubFolder                      =   "clinicTreatmentAttachment";
                         $status                         =   Common::AWSEmployeeFileUpload($this->resort_id,$file, $emp_id->Emp_id,$SubFolder,true);
 
@@ -760,8 +769,10 @@ class ClinicController extends Controller
                                                             ->where('resort_id', $this->resort_id)
                                                             ->first();
 
-                $appointment->status                =   'Treatment';
-                $appointment->save();
+                if ($appointment) {
+                    $appointment->status             =   'Treatment';
+                    $appointment->save();
+                }
             }
             DB::commit();
             return response()->json([
@@ -770,7 +781,7 @@ class ClinicController extends Controller
                 'treatment_data'                    => $treatmentData
             ], 200);
 
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             DB::rollBack();
             \Log::emergency("File: " . $e->getFile());
             \Log::emergency("Line: " . $e->getLine());

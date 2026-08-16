@@ -418,12 +418,24 @@ use Illuminate\Support\Facades\Route;
 
 		});
 
-		Route::get('clinic/appointment-categories', [App\Http\Controllers\API\ClinicController::class, 'appointmentCategories']);
+		// Deliberately unrestricted by rank — any employee needs to view
+		// categories to self-book an appointment. Guard widened to also
+		// accept temp-clinic-doctor so the duplicate, rank-12-gated
+		// registration of this same URI further down (which was silently
+		// shadowing this one — Laravel keeps only the last-registered route
+		// per URI+method, 403-ing every non-clinic-staff employee) could be
+		// removed instead of overriding it.
+		Route::middleware(['auth:api,temp-clinic-doctor'])->get('clinic/appointment-categories', [App\Http\Controllers\API\ClinicController::class, 'appointmentCategories']);
 		Route::post('clinic/appointment-store', [App\Http\Controllers\API\ClinicController::class, 'appointmentStore']);
 		Route::get('clinic/employee-clinic-dashboard', [App\Http\Controllers\API\ClinicController::class, 'employeeClinicDashboard']);
-		Route::get('clinic/appointment-details/{appointment_id}', [App\Http\Controllers\API\ClinicController::class, 'appointmentDetails']);
+		// Same shadowing bug as appointment-categories above — this was
+		// duplicated under the rank-12-only clinic.manager gate further
+		// down, which shadowed this open registration and 403'd any
+		// non-clinic-staff employee trying to view their own appointment.
+		Route::middleware(['auth:api,temp-clinic-doctor'])->get('clinic/appointment-details/{appointment_id}', [App\Http\Controllers\API\ClinicController::class, 'appointmentDetails']);
 		Route::post('clinic/appointment-status-update', [App\Http\Controllers\API\ClinicController::class, 'appointmentStatusUpdate']);
-		Route::get('clinic/treatment-details/{treatment_id}', [App\Http\Controllers\API\ClinicController::class, 'treatmentDetails']);
+		// Same shadowing bug — see appointment-details above.
+		Route::middleware(['auth:api,temp-clinic-doctor'])->get('clinic/treatment-details/{treatment_id}', [App\Http\Controllers\API\ClinicController::class, 'treatmentDetails']);
 		Route::get('clinic/medical-certificate-details/{medical_cert_id}', [App\Http\Controllers\API\ClinicController::class, 'medicalCertificateDetail']);
 		Route::get('clinic/past-medical-history', [App\Http\Controllers\API\ClinicController::class, 'pastMedicalHistory']);
 
@@ -567,19 +579,25 @@ use Illuminate\Support\Facades\Route;
 	// permanent category list. Those two stay auth:api-only (real
 	// employees, unchanged).
 	Route::middleware(['auth:api,temp-clinic-doctor', 'applyResortSmtp', 'clinic.manager'])->group(function () {
-		Route::get('clinic/appointment-categories', [App\Http\Controllers\API\ClinicController::class, 'appointmentCategories']);
+		// clinic/appointment-categories moved to the unrestricted
+		// registration above (its own guard now covers temp-clinic-doctor
+		// too) — it was duplicated here under the rank-12-only
+		// clinic.manager gate, which shadowed the open route and 403'd
+		// every non-clinic-staff employee trying to self-book.
 
 		Route::middleware(['clinic.capability:can_view_appointments'])->group(function () {
 			Route::get('clinic/clinic-staff-dashboard', [App\Http\Controllers\API\ClinicController::class, 'clinicStaffDashboard']);
 			Route::post('clinic/appointment-list-based-filter', [App\Http\Controllers\API\ClinicController::class, 'appointmentListBasedonFilter']);
 			Route::get('clinic/appointment-and-leave-list', [App\Http\Controllers\API\ClinicController::class, 'appointmentAndLeaveList']);
-			Route::get('clinic/appointment-details/{appointment_id}', [App\Http\Controllers\API\ClinicController::class, 'appointmentDetails']);
+			// clinic/appointment-details moved to the unrestricted
+			// registration above — see the comment there.
 		});
 
 		Route::middleware(['clinic.capability:can_manage_treatment'])->group(function () {
 			Route::post('clinic/treatment-add', [App\Http\Controllers\API\ClinicController::class, 'treatmentAdd']);
 			Route::post('clinic/treatment-additional-note-update', [App\Http\Controllers\API\ClinicController::class, 'treatmentAdditionalNoteUpdate']);
-			Route::get('clinic/treatment-details/{treatment_id}', [App\Http\Controllers\API\ClinicController::class, 'treatmentDetails']);
+			// clinic/treatment-details moved to the unrestricted
+			// registration above — see the comment there.
 		});
 
 		Route::middleware(['clinic.capability:can_view_medical_history'])->group(function () {

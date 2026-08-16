@@ -38,7 +38,13 @@ class EmployeeController extends Controller
 
             // Fetch rank and determine role
             $employeeRankPosition = Common::getEmployeeRankPosition($employee);
-            $isHOD           = ($employeeRankPosition['rank'] === "HOD");
+            // An HOD whose own department IS HR must get org-wide visibility
+            // (same rule used elsewhere: HR HOD/EXCOM → unrestricted), not
+            // restricted to their own subordinates — without this check, an
+            // HR-department HOD creating an "Entire Organization" calendar
+            // event only saw their own direct reports instead of every
+            // employee in the resort.
+            $isHOD           = ($employeeRankPosition['rank'] === "HOD") && !Common::isHRDepartment($employee->Dept_id ?? null);
             $isHR            = ($employeeRankPosition['rank'] === "HR");
 
             // Fetch employees based on role
