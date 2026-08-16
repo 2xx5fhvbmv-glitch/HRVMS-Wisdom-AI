@@ -509,6 +509,20 @@ use Illuminate\Support\Facades\Route;
 		Route::post('on-boarding/store-acknowledgement', [App\Http\Controllers\API\OnBoardingController::class, 'storeAcknowledgement']);
 		Route::get('on-boarding/acknowledgement-view-files', [App\Http\Controllers\API\OnBoardingController::class, 'acknowledgementViewFiles']);
 
+		// Mobile onboarding P3: remaining Figma screens — thin reads over the
+		// same employee_itineraries / employee_itineraries_meeting /
+		// onboarding_contents rows above, plus task actions for assigned staff.
+		Route::get('on-boarding/accommodation-detail', [App\Http\Controllers\API\OnBoardingController::class, 'accommodationDetail']);
+		Route::get('on-boarding/key-contacts', [App\Http\Controllers\API\OnBoardingController::class, 'keyContacts']);
+		Route::get('on-boarding/hotel-details', [App\Http\Controllers\API\OnBoardingController::class, 'hotelDetails']);
+		Route::get('on-boarding/cultural-insights', [App\Http\Controllers\API\OnBoardingController::class, 'culturalInsights']);
+		Route::get('on-boarding/employee-handbook', [App\Http\Controllers\API\OnBoardingController::class, 'employeeHandbookList']);
+		Route::get('on-boarding/policy-content/{type}', [App\Http\Controllers\API\OnBoardingController::class, 'policyContent']);
+		Route::get('on-boarding/itinerary-timeline', [App\Http\Controllers\API\OnBoardingController::class, 'itineraryTimeline']);
+		Route::post('on-boarding/task-action', [App\Http\Controllers\API\OnBoardingController::class, 'taskAction']);
+		Route::get('on-boarding/meetings', [App\Http\Controllers\API\OnBoardingController::class, 'meetings']);
+		Route::post('on-boarding/meetings/add-link', [App\Http\Controllers\API\OnBoardingController::class, 'addMeetingLink']);
+
 		//Announcement
 		Route::get('announcement/announcement-list', [App\Http\Controllers\API\AnnouncementController::class, 'announcementListing']);
 		Route::get('announcement/send-congratulation/{announcementId}', [App\Http\Controllers\API\AnnouncementController::class, 'sendCongratulation']);
