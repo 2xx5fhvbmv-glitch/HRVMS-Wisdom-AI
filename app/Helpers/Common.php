@@ -1507,6 +1507,26 @@ class Common
             $message1 = ResortNotification::create([ 'type' =>  $name,'user_id'=>$sendto,'module'=>$moduleName, 'resort_id' => $resortid, 'message' => $message ,'request_id' => $request_id, 'page_id' => $pageId]);
             $view = view('resorts.renderfiles.birthday_notification',compact('name','message','other','message1'))->render();
             $response['sendto'] =$sendto;
+
+            // Every one of this type's ~20+ call sites across the app only
+            // ever did the DB insert above (plus a Pusher broadcast via
+            // ResortNotificationEvent for the web bell) and never actually
+            // pushed to the phone — the employee only ever saw it after
+            // force-closing and reopening the app, since that's the only
+            // time the in-app notification list gets fetched. Send the real
+            // FCM push here once, so every existing and future type=10
+            // caller gets it for free instead of each having to remember to
+            // also call sendMobileNotification().
+            if (!empty($sendto)) {
+                try {
+                    $recipient = Employee::find($sendto);
+                    if ($recipient && !empty($recipient->device_token)) {
+                        self::sendPushNotificationForMobile([$recipient->device_token], $name, $message, $moduleName, null, null, null, null);
+                    }
+                } catch (\Exception $e) {
+                    \Log::warning('nofitication() type=10 push failed: ' . $e->getMessage());
+                }
+            }
         }
         if($type == 11)
         {
@@ -8569,13 +8589,14 @@ class Common
                         'title' => $title,
                         'body'  => $body,
                     ],
-                    // 'android' => [
-                    //     'notification' => [
-                    //         'channel_id' => $custom_sound_channel,
-                    //         'sound' => $sound,
-                    //         'type'  => $mass,
-                    //     ],
-                    // ],
+                    // Without this, FCM defaults Android to normal priority,
+                    // which Doze/App-Standby can defer by several minutes —
+                    // iOS (APNs) isn't affected by this field, which is why
+                    // delivery was instant on iOS but delayed ~3min on
+                    // Android for the exact same call.
+                    'android' => [
+                        'priority' => 'high',
+                    ],
                     'data' => [
                         'title'  => $title,
                         'module' => $module,
