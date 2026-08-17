@@ -3582,7 +3582,7 @@ class Common
     private static function getLeaveRegisterEntries($resortId, $empId, $startDate, $endDate)
     {
         $rows = DB::select("
-            SELECT el.from_date, el.to_date, lc.leave_type, lc.color
+            SELECT el.from_date, el.to_date, el.leave_category_id, el.total_days, lc.leave_type, lc.color
             FROM employees_leaves el
             JOIN leave_categories lc ON lc.id = el.leave_category_id
             WHERE el.Emp_id = ?
@@ -3645,7 +3645,20 @@ class Common
                         'ApprovedName' => '',
                         'differenceInHours' => null,
                         'msg' => null,
-                        'LeaveData' => [],
+                        // Kept in the same shape the array-of-leaves loop in
+                        // getEmployeeMonthDataPreviewList() reads elsewhere
+                        // (from_date/to_date/leave_cat_id/total_days), so a
+                        // day with no underlying duty-roster/attendance row
+                        // still resolves full leave_info instead of the
+                        // scalar Leave*/empty-LeaveData shape below silently
+                        // being ignored by that consumer.
+                        'LeaveData' => [[
+                            'leave_cat_id' => $row->leave_category_id ?? null,
+                            'leave_type' => $row->leave_type ?? 'On Leave',
+                            'from_date' => $row->from_date,
+                            'to_date' => $row->to_date,
+                            'total_days' => $row->total_days ?? null,
+                        ]],
                         'LeaveFirstName' => substr($row->leave_type ?? 'On Leave', 0, 1),
                         'LeaveColor' => $row->color ?? '',
                         'LeaveType' => $row->leave_type ?? 'On Leave',
