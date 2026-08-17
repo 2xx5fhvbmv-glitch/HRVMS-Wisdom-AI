@@ -214,6 +214,16 @@ class PayrollController extends Controller
                     'pension_percentage'                => '7%',
                     ],
                     'city_ledger'                       => round($payroll->city_ledger ?? 0, 2),
+                    // Tuck Shop expenses. pd.staff_shop was already selected
+                    // above but never made it into the response — city_ledger
+                    // and staff_shop are two separate deduction columns (see
+                    // PayrollDeduction's fillable list / the web export's
+                    // separate 'city_ledger'/'staff_shop' columns), not the
+                    // same figure under two names. This was the actual "Tuck
+                    // Shop / City Ledger data missing" gap — city_ledger
+                    // being legitimately 0 for this employee/period is
+                    // correct; staff_shop was the field nobody was reading.
+                    'staff_shop'                        => round($payroll->staff_shop ?? 0, 2),
                     'payslip_details'                   => [
                     'payslip_total'                     => round($totalAmount, 2),
                     'payslip_start_date'                => $payroll->start_date ?? 0 ,
