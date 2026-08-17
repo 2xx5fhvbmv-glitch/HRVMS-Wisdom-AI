@@ -265,6 +265,35 @@ class MonthlyCheckInController extends Controller
                     "employee_id"                           =>  $request->emp_id,
                     "learning_request_id"                   =>  $l->id,
                 ]);
+
+                // The L&D Manager (learning_manager_id) was never notified
+                // that a training request now exists — the only
+                // notification sent from this method went to the employee
+                // being reviewed, about the meeting itself, not the
+                // training suggestion. This is what the L&D Manager's
+                // learning/manager-request-list queue needs a push for.
+                $trainingProgram                    =   LearningProgram::find($request->tranining_id);
+                $suggestedEmployee                  =   Employee::with('resortAdmin')->find($request->emp_id);
+                $suggestedEmployeeName              =   $suggestedEmployee && $suggestedEmployee->resortAdmin
+                                                            ? $suggestedEmployee->resortAdmin->full_name
+                                                            : 'an employee';
+                $ldTitle                            =   'New Training Request';
+                $ldMsg                              =   $this->user->first_name . ' ' . $this->user->last_name
+                                                            . ' has requested "' . ($trainingProgram->name ?? 'a training program')
+                                                            . '" for ' . $suggestedEmployeeName . ' via Monthly Check-In.';
+                Common::sendMobileNotification(
+                    $this->resort_id,
+                    2,
+                    null,
+                    null,
+                    $ldTitle,
+                    $ldMsg,
+                    'Learning',
+                    [$request->learning_manager_id],
+                    $l->id,
+                    false,
+                    'learning-request-created',
+                );
             }
 
             $msg                                =   'Meeting scheduled by HR for Monthly Check-In. Subject: ' . ($request->Area_of_Improvement ?? $request->Area_of_Discussion);
