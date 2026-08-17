@@ -65,6 +65,35 @@ class TemporaryClinicDoctorAuthController extends Controller
         }
     }
 
+    // Doctor-facing "my profile" screen — the app gets this same shape from
+    // the login response already, but has no way to re-fetch it (e.g. after
+    // a silent token-based app reopen) without this.
+    public function profile(Request $request)
+    {
+        $doctor = Auth::guard('temp-clinic-doctor')->user();
+        if (!$doctor) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Profile fetched successfully',
+            'doctor' => [
+                'id' => $doctor->id,
+                'name' => $doctor->name,
+                'email' => $doctor->email,
+                'agency_name' => $doctor->agency_name,
+                'contact_no' => $doctor->contact_no,
+                'permissions' => [
+                    'can_view_appointments' => $doctor->can_view_appointments,
+                    'can_manage_treatment' => $doctor->can_manage_treatment,
+                    'can_view_medical_history' => $doctor->can_view_medical_history,
+                    'can_issue_medical_certificate' => $doctor->can_issue_medical_certificate,
+                ],
+            ],
+        ]);
+    }
+
     public function logout(Request $request)
     {
         $doctor = Auth::guard('temp-clinic-doctor')->user();
