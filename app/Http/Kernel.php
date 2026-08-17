@@ -78,6 +78,8 @@ class Kernel extends HttpKernel
         'clinic.manager' => \App\Http\Middleware\EnsureClinicManagerAccess::class,
         'clinic.capability' => \App\Http\Middleware\EnsureClinicCapability::class,
         'ld.manager' => \App\Http\Middleware\EnsureLDManagerAccess::class,
+        'sos.manager' => \App\Http\Middleware\EnsureSOSSecurityManagerAccess::class,
+        'sos.security' => \App\Http\Middleware\EnsureSOSSecurityStaffAccess::class,
 
 
 

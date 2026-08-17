@@ -102,9 +102,15 @@ class SOSController extends Controller
                 'emergency_description'                 =>  $request->emergency_description,
             ]);
 
+            // rank==4 (MGR) used to be required here too, but no Security
+            // Manager record in the DB actually carries rank 4 — the real
+            // seeded example is rank 2/HOD — so that condition never
+            // matched and every SOS trigger silently skipped notifying
+            // anyone. Title alone is the real signal (matches
+            // EnsureSOSSecurityManagerAccess, which gates the
+            // approve/dispatch endpoints this employee is routed to).
             $smEmployeeModel                            =   Employee::join('resort_positions as rp', 'employees.Position_id', '=', 'rp.id')
                                                                 ->where('employees.resort_id', $this->resort_id)
-                                                                ->where('employees.rank',4)
                                                                 ->where('employees.status', 'Active')
                                                                 ->where('rp.position_title', 'Security Manager')
                                                                 ->select('employees.id','employees.Admin_Parent_id','employees.Emp_id','employees.Position_id','employees.device_token')
