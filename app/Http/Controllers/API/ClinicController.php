@@ -58,6 +58,38 @@ class ClinicController extends Controller
         return optional($this->user->GetEmployee)->id;
     }
 
+    // clinic_appointment_attechements.attachment and
+    // clinic_treatment_attachments.attachment both hold JSON written by
+    // Common::AWSEmployeeFileUpload(), but not in the same shape as each
+    // other — appointment attachments are a JSON array of
+    // {Filename,Child_id} objects, treatment attachments are one bare
+    // {Filename,Child_id} object per row. Normalizes both into
+    // GetAWSFile()-resolved [{filename,url}] entries.
+    private function resolveClinicAttachments($rawValues)
+    {
+        $items = [];
+        foreach ($rawValues as $raw) {
+            if (empty($raw)) {
+                continue;
+            }
+            $decoded = json_decode($raw, true);
+            if (!is_array($decoded)) {
+                continue;
+            }
+            $decoded = array_key_exists('Child_id', $decoded) ? [$decoded] : $decoded;
+            foreach ($decoded as $item) {
+                if (empty($item['Child_id'])) {
+                    continue;
+                }
+                $aws = Common::GetAWSFile($item['Child_id'], $this->resort_id);
+                if (!empty($aws['success'])) {
+                    $items[] = ['filename' => $item['Filename'] ?? null, 'url' => $aws['NewURLshow']];
+                }
+            }
+        }
+        return $items;
+    }
+
     public function appointmentCategoriesStore(Request $request)
     {
         if (!$this->user) {
@@ -353,14 +385,43 @@ class ClinicController extends Controller
                                                             ->where('resort_id', $this->resort_id)
                                                             ->where('id', $appointment_id)
                                                             ->first();
+
+            if (!$appointment) {
+                return response()->json(['success' => false, 'message' => 'Appointment not found'], 200);
+            }
+
             $age                                    =   null;
 
-            if ($appointment && $appointment->employee && $appointment->employee->dob) {
+            if ($appointment->employee && $appointment->employee->dob) {
                 $age                                =   Carbon::parse($appointment->employee->dob)->age;
             }
 
             $appointment->employee_age              =   $age;
-            $appointment->employee->resortAdmin->profile_picture =   Common::getResortUserPicture( $appointment->employee->resortAdmin->id);
+            if ($appointment->employee && $appointment->employee->resortAdmin) {
+                $appointment->employee->resortAdmin->profile_picture =   Common::getResortUserPicture( $appointment->employee->resortAdmin->id);
+            }
+
+            // Dynamic appointment-details screen needs the treatment record
+            // (if the appointment has progressed to/past "Treatment" status)
+            // and both the appointment's own and the treatment's attachments
+            // — this used to be a stub that only returned the bare
+            // appointment + patient info.
+            $treatment                              =   ClinicTreatment::where('resort_id', $this->resort_id)
+                                                            ->where('appointment_id', $appointment->id)
+                                                            ->first();
+
+            if ($treatment) {
+                $treatment->attachments             =   $this->resolveClinicAttachments(
+                                                            ClinicTreatmentAttachments::where('clinic_treatment_id', $treatment->id)->pluck('attachment')
+                                                        );
+            }
+            $appointment->treatment                 =   $treatment;
+
+            $appointment->attachments               =   $this->resolveClinicAttachments(
+                                                            ClinicAppointmentAttachment::where('resort_id', $this->resort_id)
+                                                                ->where('appointment_id', $appointment->id)
+                                                                ->pluck('attachment')
+                                                        );
 
             return response()->json([
                 'success'                           =>  true,
@@ -387,10 +448,27 @@ class ClinicController extends Controller
                                                                 ->whereDate('date', '>=', Carbon::today())
                                                                 ->count();
 
+            $todayAppointmentCount                      =   ClinicAppointment::where('resort_id', $this->resort_id)
+                                                                ->whereDate('date', Carbon::today())
+                                                                ->count();
+
+            // "Approved" is the appointment status right after HR/doctor
+            // acceptance and before a ClinicTreatment row exists for it
+            // (see appointmentStatusUpdate's allowed-transitions map) —
+            // i.e. the treatment backlog the dashboard needs to surface.
+            $pendingTreatmentsCount                     =   ClinicAppointment::where('resort_id', $this->resort_id)
+                                                                ->where('status', 'Approved')
+                                                                ->count();
+
+            $totalPatientsThisMonth                     =   ClinicTreatment::where('resort_id', $this->resort_id)
+                                                                ->whereBetween('date', [Carbon::now()->startOfMonth(), Carbon::now()->endOfMonth()])
+                                                                ->distinct('employee_id')
+                                                                ->count('employee_id');
+
             $treatmentCount                             =   ClinicTreatment::where('resort_id', $this->resort_id)
                                                                 ->distinct('employee_id')
                                                                 ->count();
-           
+
             $categories                                 =   ClinicAppointmentCategories::select(
                                                                 'clinic_appointment_categories.id',
                                                                 'clinic_appointment_categories.appointment_type',
@@ -452,6 +530,9 @@ class ClinicController extends Controller
 
             $appArray                                   =   [
                 'upcoming_appointments_count'           =>  $upcomingAppointmentsCount,
+                'today_appointment_count'                =>  $todayAppointmentCount,
+                'pending_treatments_count'               =>  $pendingTreatmentsCount,
+                'total_patients_this_month'              =>  $totalPatientsThisMonth,
                 'medical_history_count'                 =>  $treatmentCount,
                 'medical_certificate_daily'             =>  $medicalCertificateDailyCount,
                 'medical_certificate_weekly'            =>  $medicalCertificateWeeklyCount,
@@ -490,6 +571,11 @@ class ClinicController extends Controller
                 $date   = [now()->startOfWeek(), now()->endOfWeek()];
             } elseif ($request->filter == 'monthly') {
                 $date   = [now()->startOfMonth(), now()->endOfMonth()];
+            } elseif ($request->filter == 'date' && $request->filled('date')) {
+                // Doctor's schedule/queue for one specific day (mobile
+                // sends an arbitrary date, not just the today/weekly/
+                // monthly presets above).
+                $date   = [Carbon::parse($request->date)->startOfDay(), Carbon::parse($request->date)->endOfDay()];
             } else {
                $date    = [now()->startOfDay(), now()->endOfDay()];
             }

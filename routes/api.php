@@ -591,6 +591,7 @@ use Illuminate\Support\Facades\Route;
 	// Login can't require auth, so it stays outside the auth:api group.
 	Route::post('clinic-doctor/login', [App\Http\Controllers\API\TemporaryClinicDoctorAuthController::class, 'login']);
 	Route::post('clinic-doctor/logout', [App\Http\Controllers\API\TemporaryClinicDoctorAuthController::class, 'logout'])->middleware('auth:temp-clinic-doctor');
+	Route::get('clinic-doctor/profile', [App\Http\Controllers\API\TemporaryClinicDoctorAuthController::class, 'profile'])->middleware('auth:temp-clinic-doctor');
 
 	// Clinic Manager tier, reachable by either identity — 'clinic.manager'
 	// accepts a real rank-12 employee (unrestricted, same as before) OR an
