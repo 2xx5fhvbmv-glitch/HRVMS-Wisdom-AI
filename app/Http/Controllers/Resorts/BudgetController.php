@@ -797,7 +797,15 @@ class BudgetController extends Controller
     {
         $employeeRankPosition = Common::getEmployeeRankPosition($this->resort->getEmployee);
 
-        if ($this->resort->is_master_admin == 0) {
+        // config('settings.eligibilty') (the map getEmployeeRankPosition()
+        // reads 'rank' from) has no entry for rank 3 (HR) or rank 8 (GM) —
+        // both resolve to a null rank label, so isHodOrXcom below is always
+        // false for them and they fell into the "own dept only" branch.
+        // Common::hasFullDataAccess() is the canonical rank-3/rank-8/HR-HOD
+        // full-access check (see CLAUDE.md invariant #5) and catches both
+        // correctly without touching the shared eligibilty config used by
+        // 20+ other controllers.
+        if ($this->resort->is_master_admin == 0 && !Common::hasFullDataAccess()) {
             $isHodOrXcom = in_array($employeeRankPosition['rank'], ['HOD', 'XCOM'], true);
             if (!($isHodOrXcom && in_array($employeeRankPosition['position'], ['HR', 'GM', 'Finance'], true))) {
                 $rank_wise_departments = ResortDepartment::where('id', $this->resort->getEmployee->Dept_id)

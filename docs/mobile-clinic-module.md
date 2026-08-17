@@ -1,20 +1,34 @@
 # Clinic Module API — Mobile Team Guide
 
-Controller: `app/Http/Controllers/API/ClinicController.php`
-Routes: `routes/api.php` (Clinic section, ~lines 390-412)
+Controller: `app/Http/Controllers/API/ClinicController.php`,
+`app/Http/Controllers/API/TemporaryClinicDoctorAuthController.php`
+Routes: `routes/api.php` (Clinic section, lines ~406-428 and ~548-596)
 
-## Two role tiers
+## Two role tiers — and a route-override mechanic to know about
 
 The Clinic module has two access tiers on the same controller:
 
 1. **Employee Clinic APIs** — plain `auth:api` middleware. Any authenticated
    employee can call these (book an appointment, view their own history,
-   etc.). Routes at `routes/api.php:405-412`.
-2. **Clinic Manager APIs** — gated behind `['auth:api', 'check.rank:CLINIC_STAFF']`
-   (`routes/api.php:391-401`). Only an employee whose `rank` resolves to
-   `CLINIC_STAFF` via `config('settings.Position_Rank')` can call these — this
-   is the clinic doctor/nurse-facing side (dashboard, treatment records,
-   medical certificates, leave sign-off).
+   etc.). Routes at `routes/api.php:421-428`.
+2. **Clinic Manager APIs** — the doctor/nurse-facing side (dashboard,
+   treatment records, medical certificates, leave sign-off). These URIs are
+   registered **twice**:
+   - Once at `routes/api.php:407-419` behind `['auth:api', 'check.rank:CLINIC_STAFF']`
+     (rank-12 employee only).
+   - Again at `routes/api.php:569-594` behind
+     `['auth:api,temp-clinic-doctor', 'applyResortSmtp', 'clinic.manager']`,
+     further split per-endpoint by `clinic.capability:{flag}` (see the
+     temp-doctor section below).
+
+   Laravel keeps only the **last-registered** route for a given URI+method,
+   so the second registration wins for every URI it re-declares — a real
+   rank-12 employee still reaches these fine (their `auth:api` token matches
+   the combined `auth:api,temp-clinic-doctor` guard), this purely *adds* the
+   temp-doctor path. Only two Clinic Manager endpoints are **not**
+   re-registered in the second group and so stay reachable by a real rank-12
+   employee only: `clinic/appointment-categories-store` and
+   `clinic/clinic-staff-leave-action`.
 
 `CheckUserRankForAPI` (`app/Http/Middleware/CheckUserRankForAPI.php`) is what
 enforces tier 2: it loads `config('settings.Position_Rank')`, looks up the
@@ -569,14 +583,8 @@ The Clinic Manager's home-screen dashboard.
 
 **Controller:** `clinicStaffDashboard()`.
 
-**Known issue — missing resort scoping:** `upcoming_appointments_count` is
-computed as `ClinicAppointment::whereDate('date', '>=', Carbon::today())->count()`
-with **no `resort_id` filter**, unlike every other metric in this same
-method (`medical_history_count`, the medical-certificate counts, the leave
-counts — all correctly scoped to `resort_id` / the caller). On any DB with
-more than one resort's clinic data, this count will include other resorts'
-upcoming appointments. Worth flagging to mobile QA if the number looks too
-high in a multi-resort test environment.
+Fully scoped to the caller's `resort_id` on every metric, including
+`upcoming_appointments_count`.
 
 **Response:**
 ```json
@@ -616,11 +624,8 @@ Filtered appointment list for the manager's calendar/list view.
 | `filter` | not validated (no `Validator::make` call) | `"today"`, `"weekly"`, or `"monthly"`; anything else (including missing) falls back to today's range |
 
 **Controller:** `appointmentListBasedonFilter(Request $request)`. Only
-`Pending` and `Reschedule` status appointments are included.
-
-**Known issue — missing resort scoping:** like the dashboard above, this
-query has **no `resort_id` filter at all** — it will return matching
-appointments across every resort in the system, not just the caller's own.
+`Pending` and `Reschedule` status appointments are included, correctly
+scoped to the caller's `resort_id`.
 
 **Response:**
 ```json
@@ -900,15 +905,10 @@ to the general response-shape rule at the top of this doc, alongside
 certificate that isn't tied to an existing leave request id**, regardless of
 what the validation rules imply.
 
-**Critical quirk — attachment field-name mismatch:** the code checks
-`$request->hasFile('attachment')` (singular) but then reads
-`$request->file('attachments')` (**plural**) to get the actual file. If the
-client sends the file under the key `attachment` (singular — which is what
-the `hasFile` check implies it should be named), `$request->file('attachments')`
-will return `null`, and the subsequent `$file->getClientOriginalName()` call
-will error on `null`. **Mobile must send the attachment under the field name
-`attachments` (plural)** for the upload path to work at all; sending it as
-`attachment` will not be recognized correctly.
+**Attachment field name:** send the file under the key `attachments`
+(plural) — the code's own `hasFile`/`file` check both read that key
+consistently now. (This used to be a singular/plural mismatch between the
+two calls; fixed.)
 
 Also: `clinic_treatment_id` existence is only checked if provided; if the
 resolved `clinic_treatment_id` doesn't belong to this resort:

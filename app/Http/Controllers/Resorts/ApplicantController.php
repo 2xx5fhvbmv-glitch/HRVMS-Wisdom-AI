@@ -36,6 +36,7 @@ use App\Models\ApplicantWiseStatus;
 use App\Models\FilemangementSystem;
 use App\Models\ApplicationLink;
 use App\Helpers\Common;
+use App\Events\ResortNotificationEvent;
 class ApplicantController extends Controller
 {
     public function showapplicantForm(Request $request,$id)
@@ -678,6 +679,35 @@ class ApplicantController extends Controller
                 'As_ApprovedBy' => 0,
                 'status' => 'Sortlisted By Wisdom AI',
             ]);
+
+            // Notify HR — this endpoint is candidate-facing/unauthenticated
+            // (no resort-admin session), so the type=7 "FreshVacancies"
+            // pattern VacancyController uses doesn't fit: it reads
+            // Auth::guard('resort-admin')->user() internally. type=10 is the
+            // generic, session-free notification type (see
+            // PaymentRequestController.php:1287-1298 for the same
+            // getResortHrEmployeeIds + type=10 combo) — self-contained DB
+            // insert + push, no session dependency. A new application never
+            // triggered any notification before; this adds it.
+            try {
+                $hrIds = Common::getResortHrEmployeeIds($request->resort_id);
+                $applicantName = trim($applicant->first_name . ' ' . $applicant->last_name);
+                $title = 'New Job Application';
+                $msg = $applicantName . ' applied for a job vacancy.';
+                foreach ($hrIds as $hr_id) {
+                    event(new ResortNotificationEvent(Common::nofitication(
+                        $request->resort_id,
+                        10,
+                        $title,
+                        $msg,
+                        0,
+                        $hr_id,
+                        'Talent Acquisition'
+                    )));
+                }
+            } catch (\Exception $e) {
+                \Log::warning('Applicant notification failed: ' . $e->getMessage());
+            }
 
             DB::commit();
 
