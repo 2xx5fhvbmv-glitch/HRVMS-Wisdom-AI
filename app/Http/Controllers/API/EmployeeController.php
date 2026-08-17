@@ -78,7 +78,16 @@ class EmployeeController extends Controller
                 $employeesAndLeaveData = $employeesAndLeaveData->where('e.deleted_at', null)
                 ->select(
                     'ra.id',
+                    // 'emp_id' is employees.id (the primary key) — kept as-is,
+                    // it's the id every subsequent mobile call (leave-add,
+                    // task-action, etc.) actually needs and this convention
+                    // is used across the app. 'employee_code' is new: the
+                    // real human-readable Employee ID (e.g. "DR-15") the
+                    // ticket asked for — was missing from this response
+                    // entirely, so the UI had nothing to show but the
+                    // technical id.
                     'e.id as emp_id',
+                    'e.Emp_id as employee_code',
                     'e.resort_id',
                     'e.rank',
                     'e.religion',
