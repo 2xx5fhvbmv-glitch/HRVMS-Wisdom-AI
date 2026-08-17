@@ -642,7 +642,18 @@ class BoardingPassController extends Controller
 
         try {
             $employeeId = $this->user->GetEmployee->id;
+            $currentRank = $this->user->GetEmployee->rank;
 
+            // Was whereIn('employee_id', $this->underEmp_id) — the caller's
+            // own org-chart subordinates. Correct for a plain department
+            // HOD, but a cross-department approver (HR, or the Security
+            // Manager's final stage) never has the requesting employee in
+            // their own reporting tree, so this silently returned zero rows
+            // for those roles (reported: SM's queue always empty despite
+            // real pending approvals). Same fix boardingHODDashboard()
+            // already applies a few methods up — approver_id/approver_rank
+            // on employee_travel_pass_status is the real authorization
+            // signal, not the org hierarchy.
             $query = EmployeeTravelPass::with([
                     'employeeTravelPassStatusData' => function ($q) {
                         $q->orderBy('id', 'desc');
@@ -652,8 +663,10 @@ class BoardingPassController extends Controller
                     'DepartureResortTransportation:id,resort_id,transportation_option',
                     'ArrivalResortTransportation:id,resort_id,transportation_option',
                 ])
-                ->whereIn('employee_id', $this->underEmp_id)
-                ->where('resort_id', $this->resort_id);
+                ->where('resort_id', $this->resort_id)
+                ->whereHas('employeeTravelPassStatusData', function ($q) use ($employeeId, $currentRank) {
+                    $q->where('approver_id', $employeeId)->where('approver_rank', $currentRank);
+                });
 
             if ($status !== 'all') {
                 $query->where('status', $statusMap[$status]);
