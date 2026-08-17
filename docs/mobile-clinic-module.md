@@ -2,7 +2,30 @@
 
 Controller: `app/Http/Controllers/API/ClinicController.php`,
 `app/Http/Controllers/API/TemporaryClinicDoctorAuthController.php`
-Routes: `routes/api.php` (Clinic section, lines ~406-428 and ~548-596)
+Routes: `routes/api.php` (Clinic section, lines ~406-453 and ~599-646)
+
+## Figma screen → endpoint map
+
+| Figma screen | Endpoint(s) |
+|---|---|
+| `clinic-dashboard` | `GET clinic/clinic-staff-dashboard` |
+| `appointments-request` (list, Approve/Reject/View) | `POST clinic/appointment-list-based-filter` (list) + `POST clinic/appointment-status-update` (Approve/Reject) |
+| `appointments-view-details` | `GET clinic/appointment-details/{appointment_id}` |
+| `Treatment` (select employee, date/time, symptoms, treatment, notes, attachments, external consultation, priority, submit) | `POST clinic/treatment-add` |
+| `Employee-Medical-History` (index — appointment/certificate counts, sick-leave days, history list) | `GET clinic/medical-history-details/{emp_id}` |
+| `Employee-Medical-History` (detail card — doctor name, licence no., clinic notes, follow-up) | `GET clinic/treatment-details/{treatment_id}` for a treatment row, `GET clinic/medical-certificate-details/{medical_cert_id}` for a certificate row |
+| `medical-certificates` (select employee, HOD, dates, category, description, upload, Approve & Send) | `POST clinic/medical-certificate-store` |
+| Doctor's own profile (temp/agency doctor login persistence) | `GET clinic-doctor/profile` |
+
+All of the above except `clinic-doctor/profile` are **Clinic Manager tier**
+(see role tiers below) — reachable by a real rank-12 employee or a
+capability-granted temporary doctor account, not a plain employee.
+
+**Figma's "Licence No."** field on the Employee-Medical-History detail card
+has no backing column anywhere in this schema (`TemporaryClinicDoctor` has
+no licence field, neither does `Employee`) — `treatment-details`' `doctor_name`
+is the only doctor-identifying data available. Flag if a real licence-number
+field is needed; not guessed at here.
 
 ## Two role tiers — and a route-override mechanic to know about
 
@@ -314,6 +337,14 @@ client must base64-encode the numeric id before building the URL).
 **Access-scope note:** the query filters only by `resort_id` + `id`, **not**
 by the calling employee's own `employee_id`. Any authenticated employee in
 the resort can fetch any appointment's details by id, not just their own.
+Now 404-shaped (`{"success": false, "message": "Appointment not found"}`)
+instead of crashing on a bad id.
+
+**Now dynamic (was a stub before today):** the response includes the linked
+`ClinicTreatment` record (if the appointment has progressed to/past
+"Treatment" status) plus resolved attachments for both the appointment
+itself and its treatment — this is what backs the `appointments-view-details`
+Figma screen's full content, not just the bare appointment header.
 
 **Response:**
 ```json
@@ -338,12 +369,20 @@ the resort can fetch any appointment's details by id, not just their own.
       "dob": "1992-03-14",
       "resortAdmin": { "id": 500, "first_name": "Roshan", "last_name": "...", "profile_picture": "https://.../pic.jpg", "gender": "Male" },
       "position": { "id": 12, "position_title": "Housekeeping Attendant" }
-    }
+    },
+    "treatment": {
+      "id": 7, "appointment_id": 10, "treatment_provided": "Paracetamol prescribed",
+      "additional_notes": "Follow up in 3 days", "priority": "Normal",
+      "attachments": [ { "filename": "note.pdf", "url": "https://..." } ]
+    },
+    "attachments": [ { "filename": "photo.jpg", "url": "https://..." } ]
   }
 }
 ```
 `profile_picture` is overwritten with a resolved URL from
-`Common::getResortUserPicture()` before the response is built.
+`Common::getResortUserPicture()` before the response is built. `treatment`
+is `null` if no treatment has been recorded yet — use its presence to decide
+whether the screen shows "Add Treatment" or the filled-in treatment card.
 
 ---
 
@@ -593,6 +632,9 @@ Fully scoped to the caller's `resort_id` on every metric, including
   "message": "Employee Clinic Dashboard Fetched Successfully",
   "dashboard_data": {
     "upcoming_appointments_count": 5,
+    "today_appointment_count": 2,
+    "pending_treatments_count": 3,
+    "total_patients_this_month": 9,
     "medical_history_count": 12,
     "medical_certificate_daily": 1,
     "medical_certificate_weekly": 4,
@@ -609,7 +651,12 @@ Fully scoped to the caller's `resort_id` on every metric, including
 }
 ```
 `appointment_requests` is limited to the 2 soonest non-cancelled/rejected
-appointments (`->limit(2)`).
+appointments (`->limit(2)`). `today_appointment_count` is exact-day (unlike
+`upcoming_appointments_count`, which is `>= today`); `pending_treatments_count`
+counts `Approved`-status appointments awaiting a treatment record;
+`total_patients_this_month` is distinct patients treated this calendar month
+— all three added today, back the "Common Illness Categories"/summary tiles
+on the `clinic-dashboard` Figma screen.
 
 ---
 
@@ -621,7 +668,7 @@ Filtered appointment list for the manager's calendar/list view.
 
 | Field | Rule | Notes |
 |---|---|---|
-| `filter` | not validated (no `Validator::make` call) | `"today"`, `"weekly"`, or `"monthly"`; anything else (including missing) falls back to today's range |
+| `filter` | not validated (no `Validator::make` call) | `"today"`, `"weekly"`, `"monthly"`, or **`"date"`** (new — send `date=YYYY-MM-DD` alongside it for a doctor's schedule/queue on one arbitrary day, not just the three presets); anything else (including missing) falls back to today's range |
 
 **Controller:** `appointmentListBasedonFilter(Request $request)`. Only
 `Pending` and `Reschedule` status appointments are included, correctly
@@ -734,17 +781,17 @@ appointment).
 | `external_consultation` | optional | |
 | `attachments` | optional, file(s) | See quirk below |
 
-**Known quirk — `date`/`time` are validated but discarded:** the create call
-always sets `'date' => now(), 'time' => now()` on the `ClinicTreatment` row,
-ignoring the submitted `date`/`time` values entirely, even though they're
-`required` in the validator. The treatment record's date/time will always
-be "now", not whatever the client sent.
-
-**Known quirk — attachment loop:** the code does
-`foreach($request->attachments as $file) { $file = $request->file('attachments'); ... }`
-— it reassigns `$file` from `$request->file('attachments')` inside the loop
-instead of using the loop's `$file`, so multi-file upload semantics aren't
-reliable. Treat this endpoint as effectively single-attachment for now.
+**Fixed (both were live bugs, now resolved):** the create call now stores the
+submitted `date`/`time` values as sent, instead of always overwriting them
+with `now()`. The attachment handling now normalizes both a single-file
+submit and a real `attachments[]` array into the same loop, so multi-file
+upload works correctly (previously reassigned `$file` from
+`$request->file('attachments')` inside the loop, breaking multi-file
+semantics). `employee_id` is now also resort-ownership-checked
+(`Rule::exists('employees','id')->where('resort_id', ...)`) and errors are
+caught with `catch (\Throwable $e)` instead of `\Exception` (a `TypeError`
+used to surface as a raw uncaught fatal instead of the standard `{"success":
+false, "message": "Server error"}` shape).
 
 **Response (success):**
 ```json
@@ -968,3 +1015,31 @@ to this approver), you get:
 - On `Approved`: sent to the *other* still-pending approvers for that leave
   request (excluding the calling manager), same title/module, `pageId` =
   `leave-approved`.
+
+---
+
+### GET `clinic-doctor/profile`
+
+**New.** Lets a temporary (agency) doctor re-fetch their own profile/
+capabilities without re-authenticating (e.g. after a silent token-based app
+reopen) — same shape the login response already returns under `doctor`.
+Guard: `auth:temp-clinic-doctor` only — a real rank-12 employee has no use
+for this (their own profile is the normal employee profile endpoint).
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Profile fetched successfully",
+  "doctor": {
+    "id": 3, "name": "Dr. Jane Doe", "email": "jane@agency.example",
+    "agency_name": "Island Medical Partners", "contact_no": "+960...",
+    "permissions": {
+      "can_view_appointments": true,
+      "can_manage_treatment": true,
+      "can_view_medical_history": false,
+      "can_issue_medical_certificate": false
+    }
+  }
+}
+```
