@@ -460,10 +460,9 @@ use Illuminate\Support\Facades\Route;
 		Route::get('request/salary-advance-details/{id}', [App\Http\Controllers\API\RequestController::class, 'salaryAdvanceDetails']);
 		Route::get('request/guarantor-employee-list', [App\Http\Controllers\API\RequestController::class, 'GuarantorEmployeeList']);
 
-		//SOS
+		//SOS — general employee-facing (any authenticated employee)
 		Route::get('sos/emergency-types', [App\Http\Controllers\API\SOSController::class, 'getEmergencyTypes']);
 		Route::post('sos/sos-store', [App\Http\Controllers\API\SOSController::class, 'SOSStore']);
-		Route::post('sos/handle-sos-action-with-team', [App\Http\Controllers\API\SOSController::class, 'handleSOSActionWithTeam']);
 		Route::get('sos/sos-team-listing', [App\Http\Controllers\API\SOSController::class, 'SOSTeamListing']);
 		Route::post('sos/sos-safe-status', [App\Http\Controllers\API\SOSController::class, 'SOSSafeStatus']);
 		Route::get('sos/employee-team-location/{sos_id}', [App\Http\Controllers\API\SOSController::class, 'employeeAndTeamLocation']);
@@ -473,16 +472,24 @@ use Illuminate\Support\Facades\Route;
 		Route::get('sos/sos-history-details/{sos_id}', [App\Http\Controllers\API\SOSController::class, 'SOSHistoryDetails']);
 		Route::get('sos/get-any-sos-emergency', [App\Http\Controllers\API\SOSController::class, 'getAnySOSEmergency']);
 		Route::get('sos/get-team-acknowledged/{sos_id}', [App\Http\Controllers\API\SOSController::class, 'getTeamAcknowledged']);
-		Route::post('sos/drill-real-sos', [App\Http\Controllers\API\SOSController::class, 'drillRealSOS']);
-		Route::post('sos/complete-sos-update-status', [App\Http\Controllers\API\SOSController::class, 'completeSOSUpdateStatus']);
 		Route::post('sos/location-update', [App\Http\Controllers\API\SOSController::class, 'SOSLocationUpdate']);
-
-		// Mobile-audit P1: new endpoints
 		Route::get('sos/fire-team-members', [App\Http\Controllers\API\SOSController::class, 'fireTeamMembers']);
-		Route::get('sos/security-staff-dashboard', [App\Http\Controllers\API\SOSController::class, 'securityStaffDashboard']);
-		Route::get('sos/manager-dashboard', [App\Http\Controllers\API\SOSController::class, 'managerDashboard']);
 		Route::get('sos/chat-logs/{sos_id}', [App\Http\Controllers\API\SOSController::class, 'sosChatLogs']);
 		Route::post('sos/send-chat-message', [App\Http\Controllers\API\SOSController::class, 'sosSendChatMessage']);
+
+		// SOS — Security Manager only (approve/reject/dispatch/complete an
+		// incident). Previously reachable by any authenticated employee.
+		Route::middleware(['sos.manager'])->group(function () {
+			Route::post('sos/handle-sos-action-with-team', [App\Http\Controllers\API\SOSController::class, 'handleSOSActionWithTeam']);
+			Route::post('sos/drill-real-sos', [App\Http\Controllers\API\SOSController::class, 'drillRealSOS']);
+			Route::post('sos/complete-sos-update-status', [App\Http\Controllers\API\SOSController::class, 'completeSOSUpdateStatus']);
+			Route::get('sos/manager-dashboard', [App\Http\Controllers\API\SOSController::class, 'managerDashboard']);
+		});
+
+		// SOS — Security department staff (view-only incident roster).
+		Route::middleware(['sos.security'])->group(function () {
+			Route::get('sos/security-staff-dashboard', [App\Http\Controllers\API\SOSController::class, 'securityStaffDashboard']);
+		});
 
 		// Mobile-audit P1: aliases for already-implemented methods, under the
 		// route names the mobile team's audit doc expects — avoids duplicating
