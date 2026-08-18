@@ -528,7 +528,13 @@ class SOSController extends Controller
             // emergency just by enumerating sos_id.
             $SOSHistoryModel                            =   SOSHistoryModel::where('id', $sosId)
                                                                 ->where('resort_id', $this->resort_id)
-                                                                ->whereIn('sos_history.status',['Active','Drill-Active','In-Progress'])
+                                                                // 'Real-Active' (a genuine, non-drill emergency — see
+                                                                // drillRealSOS()) was missing from this list, so live
+                                                                // location tracking silently refused to show anyone's
+                                                                // position for exactly the emergencies where it matters
+                                                                // most, returning a misleading "No employee location
+                                                                // found" instead.
+                                                                ->whereIn('sos_history.status',['Active','Drill-Active','Real-Active','In-Progress'])
                                                                 ->first();
 
 
@@ -621,7 +627,13 @@ class SOSController extends Controller
                                                                 ->where('sos_history.id', $sosId)
                                                                 ->where('sos_history.resort_id', $this->resort_id)
                                                                 ->where('stma.emp_id', $this->user->id)
-                                                                ->whereIn('sos_history.status',['Active','Drill-Active','In-Progress'])
+                                                                // 'Real-Active' (a genuine, non-drill emergency — see
+                                                                // drillRealSOS()) was missing from this list, so live
+                                                                // location tracking silently refused to show anyone's
+                                                                // position for exactly the emergencies where it matters
+                                                                // most, returning a misleading "No employee location
+                                                                // found" instead.
+                                                                ->whereIn('sos_history.status',['Active','Drill-Active','Real-Active','In-Progress'])
                                                                 ->select('sos_history.*','stma.status as team_member_status', 'stma.address as team_member_address', 'stma.latitude as team_member_latitude', 'stma.longitude as team_member_longitude','stma.id as team_member_id','stma.emp_id as team_member_emp_id','set.name as emergency_name')
                                                                 ->first();
             if (!$sosData) {
