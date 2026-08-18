@@ -1448,21 +1448,35 @@ class DutyRosterController extends Controller
             return response()->json(['success' => false, 'message' => 'This day employee not present in duty roster.']);
         }
 
-        if ($DutyRosterEntry->Status == 'DayOff') {
-            return response()->json(['success' => false, 'message' => 'There is a day off on this date.']);
-        }
-
-        $shiftId = $DutyRosterEntry->Shift_id ?? null;
-        if (!$shiftId) {
-            return response()->json(['success' => false, 'message' => 'Shift information not found for this date.']);
-        }
-
-        // Get existing overtime entries for this date and employee
+        // Get existing overtime entries for this date and employee — fetched
+        // before the DayOff check below so that check can tell a pure
+        // reject-existing-entries request apart from a create/approve one.
         $existingEntries = EmployeeOvertime::where('Emp_id', $Emp_id)
             ->where('resort_id', $resort_id)
             ->whereDate('date', $dateCarbon)
             ->get()
             ->keyBy('id');
+
+        // A day off blocks creating new overtime hours or approving them —
+        // an employee shouldn't earn/get paid OT for a day they weren't
+        // scheduled to work. But an already-logged entry on that date
+        // (created before the roster was marked DayOff, or entered in
+        // error) still needs to be rejectable, or a bad entry on a day-off
+        // date could never be cleared out. Only bypass the block when
+        // every submitted entry is an existing one being set to rejected.
+        $isRejectingOnlyExistingEntries = collect($entries)->isNotEmpty() && collect($entries)->every(function ($entry) use ($existingEntries) {
+            $entryId = $entry['id'] ?? null;
+            return $entryId && $existingEntries->has($entryId) && ($entry['status'] ?? null) === 'rejected';
+        });
+
+        if ($DutyRosterEntry->Status == 'DayOff' && !$isRejectingOnlyExistingEntries) {
+            return response()->json(['success' => false, 'message' => 'There is a day off on this date.']);
+        }
+
+        $shiftId = $DutyRosterEntry->Shift_id ?? null;
+        if (!$shiftId && !$isRejectingOnlyExistingEntries) {
+            return response()->json(['success' => false, 'message' => 'Shift information not found for this date.']);
+        }
 
         $entryIds = [];
         foreach ($entries as $entry) {
@@ -1499,10 +1513,15 @@ class DutyRosterController extends Controller
             $totalMins = $totalMinutes % 60;
             $totalTime = sprintf('%02d:%02d', $totalHours, $totalMins);
 
+            // On a day off being rejected, $shiftId is null (no shift is
+            // assigned) — don't clobber an existing entry's own Shift_id
+            // with null, keep whatever it was created with.
+            $entryShiftId = $shiftId ?? ($isExistingEntry ? $existingEntries[$entryId]->Shift_id : null);
+
             $overtimeData = [
                 'resort_id' => $resort_id,
                 'Emp_id' => $Emp_id,
-                'Shift_id' => $shiftId,
+                'Shift_id' => $entryShiftId,
                 'roster_id' => $DutyRosterEntry->roster_id ?? null,
                 'date' => $dateCarbon->format('Y-m-d'),
                 'start_time' => $startTime,
