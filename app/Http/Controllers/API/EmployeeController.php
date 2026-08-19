@@ -26,13 +26,25 @@ class EmployeeController extends Controller
         }
 
         try {
-            // $resortId       = $request->query('resort_id');
+            // $resortId was trusted directly from the URL with no
+            // cross-check — any authenticated user could pull any other
+            // resort's employee/leave-benefit data by changing this path
+            // segment. The caller's own resort is the only trustworthy
+            // source; the path param is kept only because the route/view
+            // still passes one, but it's never used below this point.
             $user           = Auth::guard('api')->user();
+            $resortId       = $user->resort_id;
             $employee       = $user->GetEmployee;
 
             // Fetch rank and determine role
             $employeeRankPosition = Common::getEmployeeRankPosition($employee);
-            $isHOD           = ($employeeRankPosition['rank'] === "HOD");
+            // An HOD whose own department IS HR must get org-wide visibility
+            // (same rule used elsewhere: HR HOD/EXCOM → unrestricted), not
+            // restricted to their own subordinates — without this check, an
+            // HR-department HOD creating an "Entire Organization" calendar
+            // event only saw their own direct reports instead of every
+            // employee in the resort.
+            $isHOD           = ($employeeRankPosition['rank'] === "HOD") && !Common::isHRDepartment($employee->Dept_id ?? null);
             $isHR            = ($employeeRankPosition['rank'] === "HR");
 
             // Fetch employees based on role
@@ -66,7 +78,16 @@ class EmployeeController extends Controller
                 $employeesAndLeaveData = $employeesAndLeaveData->where('e.deleted_at', null)
                 ->select(
                     'ra.id',
+                    // 'emp_id' is employees.id (the primary key) — kept as-is,
+                    // it's the id every subsequent mobile call (leave-add,
+                    // task-action, etc.) actually needs and this convention
+                    // is used across the app. 'employee_code' is new: the
+                    // real human-readable Employee ID (e.g. "DR-15") the
+                    // ticket asked for — was missing from this response
+                    // entirely, so the UI had nothing to show but the
+                    // technical id.
                     'e.id as emp_id',
+                    'e.Emp_id as employee_code',
                     'e.resort_id',
                     'e.rank',
                     'e.religion',
@@ -174,10 +195,19 @@ class EmployeeController extends Controller
             $user           = Auth::guard('api')->user();
             $resortId       = $user->resort_id;
 
+            // $emp_id is a raw path param — the caller's own resort_id was
+            // fetched above but never actually checked against this
+            // target employee, so any authenticated user could view any
+            // other resort's employee's name/leave-balance breakdown by
+            // changing the id in the URL.
             $profile        =   Employee::join('resort_admins', 'employees.Admin_Parent_id', '=', 'resort_admins.id')
                                     ->where('employees.id', $emp_id)
+                                    ->where('employees.resort_id', $resortId)
                                     ->select('employees.*','resort_admins.first_name','resort_admins.last_name','resort_admins.profile_picture')
                                     ->first();
+            if (!$profile) {
+                return response()->json(['success' => false, 'message' => 'Employee not found.'], 404);
+            }
             $gender         = $profile->gender;
             $religion       = $profile->religion;
 

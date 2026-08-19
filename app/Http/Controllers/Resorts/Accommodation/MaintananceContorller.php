@@ -297,10 +297,21 @@ class MaintananceContorller extends Controller
         $HOD_id = $request->HOD_id;
         $task_id = base64_decode($request->task_id);
 
+        // task_id/HOD_id were never checked against the caller's resort —
+        // let a caller reassign/reopen another resort's maintenance
+        // request to an arbitrary employee id.
+        $mainRequest = MaintanaceRequest::where('id', $task_id)->where('resort_id', $this->resort->resort_id)->first();
+        if (!$mainRequest) {
+            return response()->json(['success' => false, 'message' => 'Maintenance request not found'], 404);
+        }
+        if (!Employee::where('id', $HOD_id)->where('resort_id', $this->resort->resort_id)->exists()) {
+            return response()->json(['success' => false, 'message' => 'Employee not found'], 404);
+        }
+
         DB::beginTransaction();
         try{
-            MaintanaceRequest::where('id',$task_id)->update(['status'=>'Open','date'=>date('Y-m-d'),'Assigned_To'=>$HOD_id]);
-            ChildMaintananceRequest::where("maintanance_request_id",$task_id)->update(['ApprovedBy'=>$this->resort->GetEmployee->id,'Status'=>'Open']);
+            $mainRequest->update(['status'=>'Open','date'=>date('Y-m-d'),'Assigned_To'=>$HOD_id]);
+            ChildMaintananceRequest::where("maintanance_request_id",$task_id)->where('resort_id', $this->resort->resort_id)->update(['ApprovedBy'=>$this->resort->GetEmployee->id,'Status'=>'Open']);
             ChildMaintananceRequest::create([
                 'maintanance_request_id' => $task_id,
                 'resort_id' => $this->resort->resort_id,
@@ -313,7 +324,6 @@ class MaintananceContorller extends Controller
 
             // Notify HOD (createNotification() now sends the push too)
             try {
-                $mainRequest = MaintanaceRequest::find($task_id);
                 $this->createNotification($HOD_id, 'Maintenance Forwarded', 'A maintenance request has been forwarded to you: ' . ($mainRequest->descriptionIssues ?? ''), $task_id);
             } catch (\Exception $e) {
                 \Log::warning('Notification failed: ' . $e->getMessage());
@@ -410,9 +420,11 @@ class MaintananceContorller extends Controller
                             $row->EffectedAmenity = $InventoryModule ? ucfirst($InventoryModule->ItemName) : 'N/A';
                             if(isset($row->Assigned_To) && $row->Assigned_To !=0)                            
                             {
-                                $emp = Common::GetEmployeeDetails($row->Assigned_To);
-                                $row->Assign_profileImg = Common::getResortUserPicture($emp->Parent_id);
-                                $row->Assign_toName     = $emp->first_name.' '.$emp->last_name;
+                                $emp = Common::GetEmployeeDetails($row->Assigned_To, $this->resort->resort_id);
+                                if ($emp) {
+                                    $row->Assign_profileImg = Common::getResortUserPicture($emp->Parent_id);
+                                    $row->Assign_toName     = $emp->first_name.' '.$emp->last_name;
+                                }
                             }
                             return $row;
                         });
@@ -543,10 +555,11 @@ class MaintananceContorller extends Controller
                             ->first('ItemName');
                         $row->EffectedAmenity = $InventoryModule ? ucfirst($InventoryModule->ItemName) : 'N/A';
                         if(isset($row->Assigned_To) && $row->Assigned_To !=0)                        {
-                            $emp = Common::GetEmployeeDetails($row->Assigned_To);
-
-                            $row->Assign_profileImg = Common::getResortUserPicture($emp->Parent_id);
-                            $row->Assign_toName     = $emp->first_name.' '.$emp->last_name;
+                            $emp = Common::GetEmployeeDetails($row->Assigned_To, $this->resort->resort_id);
+                            if ($emp) {
+                                $row->Assign_profileImg = Common::getResortUserPicture($emp->Parent_id);
+                                $row->Assign_toName     = $emp->first_name.' '.$emp->last_name;
+                            }
                         }
                         return $row;
                     });
@@ -724,6 +737,13 @@ class MaintananceContorller extends Controller
         $task_id = base64_decode($request->task_id);
         $flag = $request->flag;
 
+        // task_id was never checked against the caller's resort — let a
+        // caller hold/close any other resort's maintenance request.
+        $mainRequest = MaintanaceRequest::where('id', $task_id)->where('resort_id', $this->resort->resort_id)->first();
+        if (!$mainRequest) {
+            return response()->json(['success' => false, 'message' => 'Maintenance request not found'], 404);
+        }
+
         if($flag=='On-Hold')
         {
             $msgs ='The request has been successfully placed on hold.';
@@ -742,21 +762,20 @@ class MaintananceContorller extends Controller
             {
                 $status ="On-Hold";
                 $reason = $request->input('reason');
-                MaintanaceRequest::where('id',$task_id)->update(['status'=>$status,"ReasonOnHold"=>$reason]);
+                $mainRequest->update(['status'=>$status,"ReasonOnHold"=>$reason]);
             }
             else
             {
                 $status="Closed";
-                MaintanaceRequest::where('id',$task_id)->update(['status'=>$status]);
+                $mainRequest->update(['status'=>$status]);
 
-                ChildMaintananceRequest::where("maintanance_request_id",$task_id)->update(['Status'=>'Closed']);
+                ChildMaintananceRequest::where("maintanance_request_id",$task_id)->where('resort_id', $this->resort->resort_id)->update(['Status'=>'Closed']);
 
             }
 
 
             // Notify the employee who raised the request
             try {
-                $mainRequest = MaintanaceRequest::find($task_id);
                 $notifType = $flag == 'On-Hold' ? 'Maintenance On Hold' : 'Maintenance Resolved';
                 $notifMsg = $flag == 'On-Hold' ? 'Your maintenance request has been placed on hold.' : 'Your maintenance request has been resolved and closed.';
                 $this->createNotification($mainRequest->Raised_By, $notifType, $notifMsg, $task_id);
@@ -1058,7 +1077,9 @@ class MaintananceContorller extends Controller
         try
         {
             $check = ChildMaintananceRequest::where('maintanance_request_id',$task_id)->where('resort_id',$this->resort->resort_id)->where('ApprovedBy',0)->first();
-            if(isset($check))
+            // emp_id (the assignee) was never checked against the caller's
+            // resort before being written as Assigned_To.
+            if(isset($check) && Employee::where('id', $emp_id)->where('resort_id', $this->resort->resort_id)->exists())
             {
                 $check->ApprovedBy= $this->resort->GetEmployee->id;
                 $check->Status= 'Assinged';
@@ -1388,10 +1409,11 @@ class MaintananceContorller extends Controller
                                                                     $row->EffectedAmenity = $InventoryModule ? ucfirst($InventoryModule->ItemName) : 'N/A';
                                                                     if(isset($row->Assigned_To) && $row->Assigned_To !=0)
                                                                     {
-                                                                        $emp = Common::GetEmployeeDetails($row->Assigned_To);
-
+                                                                        $emp = Common::GetEmployeeDetails($row->Assigned_To, $this->resort->resort_id);
+                                                                        if ($emp) {
                                                                         $row->Assign_profileImg = Common::getResortUserPicture($emp->Parent_id);
                                                                         $row->Assign_toName     = $emp->first_name.' '.$emp->last_name;
+                                                                        }
                                                                     }
                                                                     return $row;
                                                                 });
@@ -1555,10 +1577,11 @@ class MaintananceContorller extends Controller
                                                                         ->first('ItemName');
                                                                     $row->EffectedAmenity = $InventoryModule ? ucfirst($InventoryModule->ItemName) : 'N/A';
                                                                     if(isset($row->Assigned_To) && $row->Assigned_To !=0)                                                                    {
-                                                                        $emp = Common::GetEmployeeDetails($row->Assigned_To);
-
+                                                                        $emp = Common::GetEmployeeDetails($row->Assigned_To, $this->resort->resort_id);
+                                                                        if ($emp) {
                                                                         $row->Assign_profileImg = Common::getResortUserPicture($emp->Parent_id);
                                                                         $row->Assign_toName     = $emp->first_name.' '.$emp->last_name;
+                                                                        }
                                                                     }
                                                                     return $row;
                                                                 });

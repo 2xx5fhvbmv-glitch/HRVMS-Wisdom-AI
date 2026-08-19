@@ -454,7 +454,9 @@ class OnboardingController extends Controller
     public function getTemplatesForEmployees(Request $request)
     {
         $employeeId = $request->input('employee_id');
-        $employee = Employee::with('position')->find($employeeId);
+        // Was unscoped — minimal exposure (only rank/position drives the
+        // template picked, nothing echoed back), but scope anyway.
+        $employee = Employee::with('position')->where('resort_id', $this->resort->resort_id)->find($employeeId);
         if (!$employee) {
             return response()->json(['templates' => []]);
         }
@@ -584,7 +586,7 @@ class OnboardingController extends Controller
         $page_title ='Edit Itinerary Template';
         $resort_id = $this->resort->resort_id;
 
-        $templates = ItineraryTemplate::find(base64_decode($id));
+        $templates = ItineraryTemplate::where('resort_id', $resort_id)->find(base64_decode($id));
         if(!$templates){
             return response()->json([
                 'success' => false,
@@ -600,7 +602,7 @@ class OnboardingController extends Controller
         if(!is_numeric($id)){
             $id = base64_decode($id);
         }
-        $template = ItineraryTemplate::find($id);
+        $template = ItineraryTemplate::where('resort_id', $this->resort->resort_id)->find($id);
 
         if($template){
             $template->template_type = $request->template_type;
@@ -623,7 +625,7 @@ class OnboardingController extends Controller
         if(!is_numeric($id)){
             $id = base64_decode($id);
         }
-        $template = ItineraryTemplate::find($id);
+        $template = ItineraryTemplate::where('resort_id', $this->resort->resort_id)->find($id);
 
         if ($template) {
             $template->delete();
@@ -792,8 +794,11 @@ class OnboardingController extends Controller
             $employeeId = $request->input('employee_id');
             
             // Adjust this query based on your actual database structure
+            // Was unscoped — returned name, emp_id, position, department,
+            // profile photo, joining date for any employee id, any resort.
             $employee = Employee::with(['resortAdmin','position', 'department'])
                 ->where('id', $employeeId)
+                ->where('resort_id', $this->resort->resort_id)
                 ->first();
             
             if (!$employee) {
@@ -832,8 +837,10 @@ class OnboardingController extends Controller
             }
             
             // Adjust this query based on your actual database structure
+            // Was unscoped — same leak as getEmployeeDetails, plural form.
             $participants = Employee::with(['resortAdmin', 'position', 'department'])
                 ->whereIn('id', $participantIds)
+                ->where('resort_id', $this->resort->resort_id)
                 ->get();
             
             $participantsData = $participants->map(function ($participant) {
@@ -1216,7 +1223,14 @@ class OnboardingController extends Controller
     {
         try {
             // dd($request->all()); // For debugging purposes, remove this line in production
-            $employee = Employee::find($request->input('employee_id'));
+            // Was unscoped — the itinerary created below is tagged with
+            // $employee->resort_id (whatever resort the attacker-supplied
+            // employee belongs to, not the caller's own), letting an
+            // attacker attach a bogus onboarding itinerary to another
+            // resort's employee.
+            $employee = Employee::where('id', $request->input('employee_id'))
+                ->where('resort_id', $this->resort->resort_id)
+                ->first();
 
             if (!$employee) {
                 return response()->json([
@@ -1229,7 +1243,7 @@ class OnboardingController extends Controller
             $request->validate([
                 'participants' => 'required|array',
                 'participants.*' => 'required|array|min:1',
-                'participants.*.*' => 'required|exists:employees,id',
+                'participants.*.*' => ['required', Rule::exists('employees', 'id')->where('resort_id', $this->resort->resort_id)],
             ], [
                 'participants.required' => 'Meeting participants are required.',
                 'participants.*.required' => 'Each meeting must have participants.',
@@ -1239,10 +1253,10 @@ class OnboardingController extends Controller
 
             // Main validation rules
             $validatedData = $request->validate([
-                'employee_id' => 'required|exists:employees,id',
-                'template_id' => 'required|exists:itinerary_templates,id',
+                'employee_id' => ['required', Rule::exists('employees', 'id')->where('resort_id', $this->resort->resort_id)],
+                'template_id' => ['required', Rule::exists('itinerary_templates', 'id')->where('resort_id', $this->resort->resort_id)],
                 'greeting_message' => 'required|string|max:500',
-                'resort_transportaion_id' => 'required|exists:resort_transportations,id', // Fixed spelling
+                'resort_transportaion_id' => ['required', Rule::exists('resort_transportations', 'id')->where('resort_id', $this->resort->resort_id)], // Fixed spelling
 
                 // Arrival details (always required). The arrival date is no
                 // longer forced to be before the joining date — that constraint
@@ -1603,7 +1617,7 @@ class OnboardingController extends Controller
     {
         $request->validate([
             'participant_ids' => 'required|array',
-            'participant_ids.*' => 'exists:employees,id',
+            'participant_ids.*' => Rule::exists('employees', 'id')->where('resort_id', $this->resort->resort_id),
             'meeting_date' => 'required|date_format:Y-m-d',
             'meeting_time' => 'required|date_format:H:i',
             'current_meeting_id' => 'nullable|exists:employee_itineraries_meetings,id'
@@ -1614,11 +1628,27 @@ class OnboardingController extends Controller
         $meetingTime = $request->meeting_time;
 
         foreach ($request->participant_ids as $participantId) {
-            $query = EmployeeItinerariesMeeting::whereHas('itinerary', function($q) use ($participantId) {
-                    $q->where('pickup_employee_id', $participantId)
-                    ->orWhere('accompany_medical_employee_id', $participantId);
+            // Was unscoped — since employee ids are global, submitting
+            // another resort's employee id as a participant could return
+            // that resort's meeting title/time as a "conflict." Grouped the
+            // OR into one clause so meeting_date/meeting_time apply to both
+            // branches, and required each branch's itinerary to belong to
+            // the caller's resort.
+            $query = EmployeeItinerariesMeeting::where(function ($outer) use ($participantId) {
+                    $outer->whereHas('itinerary', function($q) use ($participantId) {
+                            $q->where('resort_id', $this->resort->resort_id)
+                              ->where(function ($qq) use ($participantId) {
+                                  $qq->where('pickup_employee_id', $participantId)
+                                     ->orWhere('accompany_medical_employee_id', $participantId);
+                              });
+                        })
+                        ->orWhere(function ($q) use ($participantId) {
+                            $q->whereRaw("FIND_IN_SET(?, meeting_participant_ids)", [$participantId])
+                              ->whereHas('itinerary', function ($iq) {
+                                  $iq->where('resort_id', $this->resort->resort_id);
+                              });
+                        });
                 })
-                ->orWhereRaw("FIND_IN_SET(?, meeting_participant_ids)", [$participantId])
                 ->where('meeting_date', $meetingDate)
                 ->where('meeting_time', $meetingTime);
 
@@ -1632,7 +1662,7 @@ class OnboardingController extends Controller
             foreach ($existingMeetings as $meeting) {
                 $conflicts[] = [
                     'employee_id' => $participantId,
-                    'employee_name' => Employee::find($participantId)->full_name ?? 'Unknown',
+                    'employee_name' => Employee::where('id', $participantId)->where('resort_id', $this->resort->resort_id)->first()->full_name ?? 'Unknown',
                     'date' => $meeting->meeting_date,
                     'time' => $meeting->meeting_time,
                     'existing_meeting' => $meeting->meeting_title,
@@ -1785,7 +1815,11 @@ class OnboardingController extends Controller
     public function updateItinerary(Request $request, $id)
     {
         try {
-            $employee = Employee::find($request->input('employee_id'));
+            // Was unscoped — same cross-tenant itinerary-write gap as
+            // storeItinerary.
+            $employee = Employee::where('id', $request->input('employee_id'))
+                ->where('resort_id', $this->resort->resort_id)
+                ->first();
 
             if (!$employee) {
                 return response()->json([
@@ -1798,7 +1832,7 @@ class OnboardingController extends Controller
             $request->validate([
                 'participants' => 'required|array',
                 'participants.*' => 'required|array|min:1',
-                'participants.*.*' => 'required|exists:employees,id',
+                'participants.*.*' => ['required', Rule::exists('employees', 'id')->where('resort_id', $this->resort->resort_id)],
             ], [
                 'participants.required' => 'Meeting participants are required.',
                 'participants.*.required' => 'Each meeting must have participants.',
@@ -1809,7 +1843,7 @@ class OnboardingController extends Controller
             // Main validation rules
             $validatedData = $request->validate([
                 'greeting_message' => 'required|string|max:500',
-                'resort_transportaion_id' => 'required|exists:resort_transportations,id',
+                'resort_transportaion_id' => ['required', Rule::exists('resort_transportations', 'id')->where('resort_id', $this->resort->resort_id)],
                 
                 // Arrival details (always required)
                 'arrival_date' => ['required', 'date_format:Y-m-d', function ($attribute, $value, $fail) use ($employee) {
@@ -1950,8 +1984,9 @@ class OnboardingController extends Controller
 
             DB::beginTransaction();
             
-            // Find the itinerary
-            $itinerary = EmployeeItineraries::findOrFail($id);
+            // Find the itinerary — was unscoped, cross-tenant write of
+            // hotel/medical/pickup/escort/files.
+            $itinerary = EmployeeItineraries::where('resort_id', $this->resort->resort_id)->findOrFail($id);
 
             // Handle file uploads - only if new files are provided
             $entryPassFile = $request->hasFile('entry_pass_file') 

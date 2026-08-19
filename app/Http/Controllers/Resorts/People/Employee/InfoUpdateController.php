@@ -115,7 +115,13 @@ class InfoUpdateController extends Controller
    
      public function statusChange(Request $request){
           if($request->status == 'approve'){
-               $employeeinfoUpdateRequest = EmployeeInfoUpdateRequest::where('id',$request->id)->first();
+               // Was unscoped — no tenant check on the request row, then
+               // approve loops the stored info_payload and writes each
+               // field straight onto the target employee/resortAdmin
+               // record: an arbitrary-field cross-tenant write.
+               $employeeinfoUpdateRequest = EmployeeInfoUpdateRequest::where('id',$request->id)
+                    ->where('resort_id', $this->resort->resort_id)
+                    ->first();
 
                // Was dereferencing info_payload on a possibly-null result
                // with no guard — an unmatched/already-processed id fatals
@@ -229,7 +235,10 @@ class InfoUpdateController extends Controller
 
      // Reject Request
      public function rejectRequest(Request $request){
-          $employeeinfoUpdateRequest = EmployeeInfoUpdateRequest::where('id',$request->id)->first();
+          // Same missing tenant filter as statusChange's approve branch.
+          $employeeinfoUpdateRequest = EmployeeInfoUpdateRequest::where('id',$request->id)
+               ->where('resort_id', $this->resort->resort_id)
+               ->first();
           if (!$employeeinfoUpdateRequest) {
                return redirect()->route('people.info-update.index')->with('error','Request not found.');
           }

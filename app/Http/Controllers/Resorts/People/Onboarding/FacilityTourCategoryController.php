@@ -136,7 +136,9 @@ class FacilityTourCategoryController extends Controller
        
         $page_title = 'Facility Tour Category Details';
         $resort = $this->resort;
-        $facilityTourCategory = FacilityTourCategories::findOrFail($id);
+        // Was unscoped — cross-tenant CRUD on facility-tour content (not
+        // employee PII, but still).
+        $facilityTourCategory = FacilityTourCategories::where('resort_id', $this->resort->resort_id)->findOrFail($id);
         $facilityTourImages = FacilityTourImages::where('facility_tour_category_id', $id)->get();
         return view('resorts.people.onboarding.facility_tour_category.view', compact('facilityTourCategory', 'facilityTourImages','resort', 'page_title'));
     }
@@ -144,7 +146,7 @@ class FacilityTourCategoryController extends Controller
 
     public function edit($id)
     {
-        $facilityTourCategory = FacilityTourCategories::findOrFail($id);
+        $facilityTourCategory = FacilityTourCategories::where('resort_id', $this->resort->resort_id)->findOrFail($id);
         $facilityTourImages = FacilityTourImages::where('facility_tour_category_id', $id)->get();
         return view('resorts.people.onboarding.facility_tour_categories.edit', compact('facilityTourCategory', 'facilityTourImages'));
     }
@@ -152,10 +154,10 @@ class FacilityTourCategoryController extends Controller
     public function update(Request $request, $id)
     {
        
-        $facilityTourCategory = FacilityTourCategories::findOrFail($id);
+        $facilityTourCategory = FacilityTourCategories::where('resort_id', $this->resort->resort_id)->findOrFail($id);
 
         if($facilityTourCategory) {
-            
+
             $facilityTourCategory->update([
                 'name' => $request->name,
                 'status' => $request->status,
@@ -168,7 +170,7 @@ class FacilityTourCategoryController extends Controller
 
     public function destroy($id)
     {
-        $facilityTourCategory = FacilityTourCategories::findOrFail($id);    
+        $facilityTourCategory = FacilityTourCategories::where('resort_id', $this->resort->resort_id)->findOrFail($id);
     
         if ($facilityTourCategory->image) {
             Common::deleteFile($facilityTourCategory->image);
@@ -196,7 +198,7 @@ class FacilityTourCategoryController extends Controller
             return response()->json(['success' => false, 'message' => $validator->errors()], 422);
         }
 
-        $facilityTourCategory = FacilityTourCategories::findOrFail($request->id);
+        $facilityTourCategory = FacilityTourCategories::where('resort_id', $this->resort->resort_id)->findOrFail($request->id);
 
         $fileManagement = FilemangementSystem::where('Folder_Name','facilityTourCategory')->first();
         if($fileManagement){
@@ -218,7 +220,7 @@ class FacilityTourCategoryController extends Controller
             ]);
         }elseif($request->type == 'tour_image'){
 
-            $facilityTourImage = FacilityTourImages::findOrFail($request->image_id);
+            $facilityTourImage = FacilityTourImages::where('facility_tour_category_id', $facilityTourCategory->id)->findOrFail($request->image_id);
 
             $facilityTourImage->update([
                 'image' => $aws_tour['path'],
@@ -239,7 +241,7 @@ class FacilityTourCategoryController extends Controller
     public function imageDelete(Request $request)
     {
         if($request->type == 'thumbnail'){
-            $facilityTourCategory = FacilityTourCategories::findOrFail($request->id);
+            $facilityTourCategory = FacilityTourCategories::where('resort_id', $this->resort->resort_id)->findOrFail($request->id);
             if($facilityTourCategory){
                 $facilityTourCategory->update([
                     'thumbnail_image' => null,
@@ -247,7 +249,12 @@ class FacilityTourCategoryController extends Controller
             }
             return response()->json(['success' => true, 'message' => 'Facility Tour Image deleted successfully.']);
         }else{
-            $facilityTourImages = FacilityTourImages::findOrFail($request->id);
+            // FacilityTourImages has no resort_id of its own and no model
+            // relation to its category — scope via a subquery on the
+            // owning category's resort_id.
+            $facilityTourImages = FacilityTourImages::whereIn('facility_tour_category_id', function ($q) {
+                    $q->select('id')->from('facility_tour_categories')->where('resort_id', $this->resort->resort_id);
+                })->findOrFail($request->id);
             if($facilityTourImages){
                 $facilityTourImages->delete();
             }

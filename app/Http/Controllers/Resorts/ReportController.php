@@ -169,7 +169,7 @@ class ReportController extends Controller
         }
     
         $page_title = 'Report Details';
-        $report = ResortReports::findOrFail(base64_decode($id));
+        $report = ResortReports::where('resort_id', $this->resort->resort_id)->findOrFail(base64_decode($id));
         $form_date =  $report->from_date ? Carbon::parse($report->from_date)->format('d/m/Y') : '';
         $to_date =  $report->to_date ? Carbon::parse($report->to_date)->format('d/m/Y') : '';
         return view('resorts.reports.show',compact('report','form_date','to_date','page_title'));
@@ -177,7 +177,7 @@ class ReportController extends Controller
     public function FetchReportData(Request $request)
     {
 
-        $report = ResortReports::findOrFail($request->report_id);
+        $report = ResortReports::where('resort_id', $this->resort->resort_id)->findOrFail($request->report_id);
         $result  = $this->runReport($request->report_id, $request->todate, $request->formdate);
         $columns = $result['columns'];
         $data    = $result['rows'];
@@ -200,7 +200,7 @@ class ReportController extends Controller
      */
     private function runReport($id, $fromDate, $toDate): array
     {
-        $report = ResortReports::where('id', $id)->first();
+        $report = ResortReports::where('id', $id)->where('resort_id', $this->resort->resort_id)->first();
         $params = $report->query_params ?? [];
 
         $def = $this->findEntityDef($params['module'] ?? null, $params['entity'] ?? null);
@@ -511,7 +511,7 @@ class ReportController extends Controller
     public function export(Request $request)
     {
         
-        $report = ResortReports::findOrFail(base64_decode($request->report_id));
+        $report = ResortReports::where('resort_id', $this->resort->resort_id)->findOrFail(base64_decode($request->report_id));
         $result = $this->runReport(base64_decode($request->report_id),$request->Form_todate,$request->Form_formdate);
         return $this->exportReport($result, $report, $request->format);
     }
@@ -665,7 +665,7 @@ class ReportController extends Controller
     public function edit($id)
     {
         $page_title = 'Edit Report';
-        $report = ResortReports::findOrFail(base64_decode($id));
+        $report = ResortReports::where('resort_id', $this->resort->resort_id)->findOrFail(base64_decode($id));
         // Same curated vocabulary as create — never expose raw tables/columns.
         $catalog = $this->reportFieldCatalog();
         $params  = $report->query_params ?? [];
@@ -693,7 +693,7 @@ class ReportController extends Controller
         $report_id  = base64_decode($request->report_id);
         $todate     = $request->todate;
         $formdate   = $request->formdate;
-        $report = ResortReports::findOrFail($report_id);
+        $report = ResortReports::where('resort_id', $this->resort->resort_id)->findOrFail($report_id);
 
         // Data is already resolved to business labels -> display values.
         $result  = $this->runReport($report_id, $todate, $formdate);

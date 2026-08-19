@@ -162,7 +162,12 @@ class ConfigController extends Controller
         }
         $validatedData['eligibility'] = implode(',', $request->eligibility);
 
-        $leaveCategory = LeaveCategory::findOrFail($id);
+        $leaveCategory = LeaveCategory::where('id', $id)
+            ->where('resort_id', $this->resort->resort_id)
+            ->first();
+        if (!$leaveCategory) {
+            return response()->json(['success' => false, 'message' => 'Leave category not found.'], 404);
+        }
         $leaveCategory->update($validatedData);
         return response()->json(['success' => true,'message' => 'Leave category updated successfully!']);
     }
@@ -172,7 +177,16 @@ class ConfigController extends Controller
         DB::beginTransaction();
         try {
             $resort_id = $this->resort->resort_id;
-    
+
+            // Check if the leave category exists and belongs to this resort
+            $leaveCategory = LeaveCategory::where('id', $id)->where('resort_id', $resort_id)->first();
+            if (!$leaveCategory) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Leave category not found.'
+                ], 404);
+            }
+
             // Check if the leave category is in use
             if (ResortBenifitGridChild::where('leave_cat_id', $id)->exists()) {
                 return response()->json([
@@ -180,16 +194,7 @@ class ConfigController extends Controller
                     'message' => 'Cannot delete leave category because it is in use.'
                 ], 400);
             }
-    
-            // Check if the leave category exists
-            $leaveCategory = LeaveCategory::find($id);
-            if (!$leaveCategory) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Leave category not found.'
-                ], 404);
-            }
-    
+
             // Delete the leave category
             $leaveCategory->delete();
             DB::commit();

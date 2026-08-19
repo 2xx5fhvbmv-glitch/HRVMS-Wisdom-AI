@@ -1,20 +1,57 @@
 # Clinic Module API — Mobile Team Guide
 
-Controller: `app/Http/Controllers/API/ClinicController.php`
-Routes: `routes/api.php` (Clinic section, ~lines 390-412)
+Controller: `app/Http/Controllers/API/ClinicController.php`,
+`app/Http/Controllers/API/TemporaryClinicDoctorAuthController.php`
+Routes: `routes/api.php` (Clinic section, lines ~406-453 and ~599-646)
 
-## Two role tiers
+## Figma screen → endpoint map
+
+| Figma screen | Endpoint(s) |
+|---|---|
+| `clinic-dashboard` | `GET clinic/clinic-staff-dashboard` |
+| `appointments-request` (list, Approve/Reject/View) | `POST clinic/appointment-list-based-filter` (list) + `POST clinic/appointment-status-update` (Approve/Reject) |
+| `appointments-view-details` | `GET clinic/appointment-details/{appointment_id}` |
+| `Treatment` (select employee, date/time, symptoms, treatment, notes, attachments, external consultation, priority, submit) | `POST clinic/treatment-add` |
+| `Employee-Medical-History` (index — appointment/certificate counts, sick-leave days, history list) | `GET clinic/medical-history-details/{emp_id}` |
+| `Employee-Medical-History` (detail card — doctor name, licence no., clinic notes, follow-up) | `GET clinic/treatment-details/{treatment_id}` for a treatment row, `GET clinic/medical-certificate-details/{medical_cert_id}` for a certificate row |
+| `medical-certificates` (select employee, HOD, dates, category, description, upload, Approve & Send) | `POST clinic/medical-certificate-store` |
+| Doctor's own profile (temp/agency doctor login persistence) | `GET clinic-doctor/profile` |
+
+All of the above except `clinic-doctor/profile` are **Clinic Manager tier**
+(see role tiers below) — reachable by a real rank-12 employee or a
+capability-granted temporary doctor account, not a plain employee.
+
+**Figma's "Licence No."** field on the Employee-Medical-History detail card
+has no backing column anywhere in this schema (`TemporaryClinicDoctor` has
+no licence field, neither does `Employee`) — `treatment-details`' `doctor_name`
+is the only doctor-identifying data available. Flag if a real licence-number
+field is needed; not guessed at here.
+
+## Two role tiers — and a route-override mechanic to know about
 
 The Clinic module has two access tiers on the same controller:
 
 1. **Employee Clinic APIs** — plain `auth:api` middleware. Any authenticated
    employee can call these (book an appointment, view their own history,
-   etc.). Routes at `routes/api.php:405-412`.
-2. **Clinic Manager APIs** — gated behind `['auth:api', 'check.rank:CLINIC_STAFF']`
-   (`routes/api.php:391-401`). Only an employee whose `rank` resolves to
-   `CLINIC_STAFF` via `config('settings.Position_Rank')` can call these — this
-   is the clinic doctor/nurse-facing side (dashboard, treatment records,
-   medical certificates, leave sign-off).
+   etc.). Routes at `routes/api.php:421-428`.
+2. **Clinic Manager APIs** — the doctor/nurse-facing side (dashboard,
+   treatment records, medical certificates, leave sign-off). These URIs are
+   registered **twice**:
+   - Once at `routes/api.php:407-419` behind `['auth:api', 'check.rank:CLINIC_STAFF']`
+     (rank-12 employee only).
+   - Again at `routes/api.php:569-594` behind
+     `['auth:api,temp-clinic-doctor', 'applyResortSmtp', 'clinic.manager']`,
+     further split per-endpoint by `clinic.capability:{flag}` (see the
+     temp-doctor section below).
+
+   Laravel keeps only the **last-registered** route for a given URI+method,
+   so the second registration wins for every URI it re-declares — a real
+   rank-12 employee still reaches these fine (their `auth:api` token matches
+   the combined `auth:api,temp-clinic-doctor` guard), this purely *adds* the
+   temp-doctor path. Only two Clinic Manager endpoints are **not**
+   re-registered in the second group and so stay reachable by a real rank-12
+   employee only: `clinic/appointment-categories-store` and
+   `clinic/clinic-staff-leave-action`.
 
 `CheckUserRankForAPI` (`app/Http/Middleware/CheckUserRankForAPI.php`) is what
 enforces tier 2: it loads `config('settings.Position_Rank')`, looks up the
@@ -44,9 +81,83 @@ also seeded 5 default appointment categories per resort: **General Checkup**
 should expect `GET clinic/appointment-categories` to return these out of the
 box on any resort, even before a Clinic Manager adds their own.
 
-No employee currently has `rank = 12` in the local DB. The Clinic Manager
-endpoints won't be callable until someone is promoted to that rank via the
-web admin panel — no sample login credentials exist yet for that role.
+A real rank-12 test employee now exists locally (from
+`2026_08_09_233000_seed_clinic_module_test_accounts.php`), so the Clinic
+Manager endpoints are reachable today via the normal `POST login` flow with
+that employee's `emp_id`/password — no separate setup needed for that path.
+
+## Temporary (third-party/agency) doctor accounts — a second way into the Clinic Manager tier
+
+Some resorts contract a clinic doctor from an outside agency rather than
+employing one directly. That account is **not** an `Employee` row — it's a
+standalone identity (`temporary_clinic_doctors` table /
+`App\Models\TemporaryClinicDoctor`), created and managed entirely from the
+web portal by HR (Clinic > Temporary Doctors). Mobile only needs to know how
+it authenticates and what it can/can't do — HR password management, session
+revocation, and account creation are all web-side, not mobile endpoints.
+
+### Login — separate endpoint, separate guard
+
+```
+POST clinic-doctor/login
+Body: { "email": "...", "password": "..." }
+```
+Same token mechanics as the regular `POST login` (`$model->createToken()->accessToken`
+— no OAuth client/password-grant flow, use the returned `token` directly as
+a Bearer token). Response also includes the account's granted capabilities
+so the app can build its own UI without a separate permissions call:
+```json
+{
+  "success": true,
+  "message": "Login successful",
+  "token": "...",
+  "doctor": {
+    "id": 3, "name": "Dr. Jane Doe", "email": "jane@agency.example", "agency_name": "Island Medical Partners",
+    "permissions": {
+      "can_view_appointments": true,
+      "can_manage_treatment": true,
+      "can_view_medical_history": false,
+      "can_issue_medical_certificate": false
+    }
+  }
+}
+```
+`POST clinic-doctor/logout` (Bearer token required) revokes the token, same
+as the regular logout.
+
+**Do not reuse the regular `POST login` endpoint for this account type** —
+it looks up an `Employee` by `emp_id`, which this account will never have.
+
+### What this account can reach
+
+All of the existing Clinic Manager + a few Employee-tier "detail" endpoints
+documented below are reachable by this identity too — same URLs, same
+request/response shapes, no separate versions. Two exceptions, gated by two
+new middlewares (`clinic.manager`, `clinic.capability:{flag}`):
+
+| Endpoint | Reachable by a temporary doctor? |
+|---|---|
+| `clinic/appointment-categories` (read) | Always, regardless of capabilities |
+| `clinic/clinic-staff-dashboard`, `clinic/appointment-list-based-filter`, `clinic/appointment-and-leave-list`, `clinic/appointment-details/{id}` | Only if `can_view_appointments` |
+| `clinic/treatment-add`, `clinic/treatment-additional-note-update`, `clinic/treatment-details/{id}` | Only if `can_manage_treatment` |
+| `clinic/medical-history-list`, `clinic/medical-history-details/{emp_id}` | Only if `can_view_medical_history` |
+| `clinic/medical-certificate-store`, `clinic/medical-certificate-details/{id}` | Only if `can_issue_medical_certificate` |
+| `clinic/appointment-categories-store` | **Never** — taxonomy/config is HR-only regardless of capabilities |
+| `clinic/clinic-staff-leave-action` | **Never** — this account has no employee/approver identity, so it can never validly appear as `approver_id` in the leave chain |
+| Every Employee-tier endpoint not listed above (`appointment-store`, `appointment-status-update`, `employee-clinic-dashboard`, `past-medical-history`) | Never — those are patient-facing; a doctor account isn't a patient |
+
+A capability the account doesn't have returns:
+```json
+{ "success": false, "message": "Your account does not have access to this feature." }
+```
+HTTP 403. Calling one of the two fully-excluded endpoints returns a plain
+`401 Unauthenticated` — those routes only accept the regular employee guard.
+
+On `clinicStaffDashboard`/`appointmentAndLeaveList`, the leave-related
+sub-fields (`medical_leave_requests_pending`, `medical_leave_requests_approved`,
+`leave_request`) will always be `0`/empty for this account type, since it
+has no employee id to match against `approver_id` — this is expected, not a
+bug to report.
 
 ### General response-shape notes (apply across all 18 endpoints)
 
@@ -226,6 +337,14 @@ client must base64-encode the numeric id before building the URL).
 **Access-scope note:** the query filters only by `resort_id` + `id`, **not**
 by the calling employee's own `employee_id`. Any authenticated employee in
 the resort can fetch any appointment's details by id, not just their own.
+Now 404-shaped (`{"success": false, "message": "Appointment not found"}`)
+instead of crashing on a bad id.
+
+**Now dynamic (was a stub before today):** the response includes the linked
+`ClinicTreatment` record (if the appointment has progressed to/past
+"Treatment" status) plus resolved attachments for both the appointment
+itself and its treatment — this is what backs the `appointments-view-details`
+Figma screen's full content, not just the bare appointment header.
 
 **Response:**
 ```json
@@ -250,12 +369,20 @@ the resort can fetch any appointment's details by id, not just their own.
       "dob": "1992-03-14",
       "resortAdmin": { "id": 500, "first_name": "Roshan", "last_name": "...", "profile_picture": "https://.../pic.jpg", "gender": "Male" },
       "position": { "id": 12, "position_title": "Housekeeping Attendant" }
-    }
+    },
+    "treatment": {
+      "id": 7, "appointment_id": 10, "treatment_provided": "Paracetamol prescribed",
+      "additional_notes": "Follow up in 3 days", "priority": "Normal",
+      "attachments": [ { "filename": "note.pdf", "url": "https://..." } ]
+    },
+    "attachments": [ { "filename": "photo.jpg", "url": "https://..." } ]
   }
 }
 ```
 `profile_picture` is overwritten with a resolved URL from
-`Common::getResortUserPicture()` before the response is built.
+`Common::getResortUserPicture()` before the response is built. `treatment`
+is `null` if no treatment has been recorded yet — use its presence to decide
+whether the screen shows "Add Treatment" or the filled-in treatment card.
 
 ---
 
@@ -495,14 +622,8 @@ The Clinic Manager's home-screen dashboard.
 
 **Controller:** `clinicStaffDashboard()`.
 
-**Known issue — missing resort scoping:** `upcoming_appointments_count` is
-computed as `ClinicAppointment::whereDate('date', '>=', Carbon::today())->count()`
-with **no `resort_id` filter**, unlike every other metric in this same
-method (`medical_history_count`, the medical-certificate counts, the leave
-counts — all correctly scoped to `resort_id` / the caller). On any DB with
-more than one resort's clinic data, this count will include other resorts'
-upcoming appointments. Worth flagging to mobile QA if the number looks too
-high in a multi-resort test environment.
+Fully scoped to the caller's `resort_id` on every metric, including
+`upcoming_appointments_count`.
 
 **Response:**
 ```json
@@ -511,6 +632,9 @@ high in a multi-resort test environment.
   "message": "Employee Clinic Dashboard Fetched Successfully",
   "dashboard_data": {
     "upcoming_appointments_count": 5,
+    "today_appointment_count": 2,
+    "pending_treatments_count": 3,
+    "total_patients_this_month": 9,
     "medical_history_count": 12,
     "medical_certificate_daily": 1,
     "medical_certificate_weekly": 4,
@@ -527,7 +651,12 @@ high in a multi-resort test environment.
 }
 ```
 `appointment_requests` is limited to the 2 soonest non-cancelled/rejected
-appointments (`->limit(2)`).
+appointments (`->limit(2)`). `today_appointment_count` is exact-day (unlike
+`upcoming_appointments_count`, which is `>= today`); `pending_treatments_count`
+counts `Approved`-status appointments awaiting a treatment record;
+`total_patients_this_month` is distinct patients treated this calendar month
+— all three added today, back the "Common Illness Categories"/summary tiles
+on the `clinic-dashboard` Figma screen.
 
 ---
 
@@ -539,14 +668,11 @@ Filtered appointment list for the manager's calendar/list view.
 
 | Field | Rule | Notes |
 |---|---|---|
-| `filter` | not validated (no `Validator::make` call) | `"today"`, `"weekly"`, or `"monthly"`; anything else (including missing) falls back to today's range |
+| `filter` | not validated (no `Validator::make` call) | `"today"`, `"weekly"`, `"monthly"`, or **`"date"`** (new — send `date=YYYY-MM-DD` alongside it for a doctor's schedule/queue on one arbitrary day, not just the three presets); anything else (including missing) falls back to today's range |
 
 **Controller:** `appointmentListBasedonFilter(Request $request)`. Only
-`Pending` and `Reschedule` status appointments are included.
-
-**Known issue — missing resort scoping:** like the dashboard above, this
-query has **no `resort_id` filter at all** — it will return matching
-appointments across every resort in the system, not just the caller's own.
+`Pending` and `Reschedule` status appointments are included, correctly
+scoped to the caller's `resort_id`.
 
 **Response:**
 ```json
@@ -655,17 +781,17 @@ appointment).
 | `external_consultation` | optional | |
 | `attachments` | optional, file(s) | See quirk below |
 
-**Known quirk — `date`/`time` are validated but discarded:** the create call
-always sets `'date' => now(), 'time' => now()` on the `ClinicTreatment` row,
-ignoring the submitted `date`/`time` values entirely, even though they're
-`required` in the validator. The treatment record's date/time will always
-be "now", not whatever the client sent.
-
-**Known quirk — attachment loop:** the code does
-`foreach($request->attachments as $file) { $file = $request->file('attachments'); ... }`
-— it reassigns `$file` from `$request->file('attachments')` inside the loop
-instead of using the loop's `$file`, so multi-file upload semantics aren't
-reliable. Treat this endpoint as effectively single-attachment for now.
+**Fixed (both were live bugs, now resolved):** the create call now stores the
+submitted `date`/`time` values as sent, instead of always overwriting them
+with `now()`. The attachment handling now normalizes both a single-file
+submit and a real `attachments[]` array into the same loop, so multi-file
+upload works correctly (previously reassigned `$file` from
+`$request->file('attachments')` inside the loop, breaking multi-file
+semantics). `employee_id` is now also resort-ownership-checked
+(`Rule::exists('employees','id')->where('resort_id', ...)`) and errors are
+caught with `catch (\Throwable $e)` instead of `\Exception` (a `TypeError`
+used to surface as a raw uncaught fatal instead of the standard `{"success":
+false, "message": "Server error"}` shape).
 
 **Response (success):**
 ```json
@@ -826,15 +952,10 @@ to the general response-shape rule at the top of this doc, alongside
 certificate that isn't tied to an existing leave request id**, regardless of
 what the validation rules imply.
 
-**Critical quirk — attachment field-name mismatch:** the code checks
-`$request->hasFile('attachment')` (singular) but then reads
-`$request->file('attachments')` (**plural**) to get the actual file. If the
-client sends the file under the key `attachment` (singular — which is what
-the `hasFile` check implies it should be named), `$request->file('attachments')`
-will return `null`, and the subsequent `$file->getClientOriginalName()` call
-will error on `null`. **Mobile must send the attachment under the field name
-`attachments` (plural)** for the upload path to work at all; sending it as
-`attachment` will not be recognized correctly.
+**Attachment field name:** send the file under the key `attachments`
+(plural) — the code's own `hasFile`/`file` check both read that key
+consistently now. (This used to be a singular/plural mismatch between the
+two calls; fixed.)
 
 Also: `clinic_treatment_id` existence is only checked if provided; if the
 resolved `clinic_treatment_id` doesn't belong to this resort:
@@ -894,3 +1015,31 @@ to this approver), you get:
 - On `Approved`: sent to the *other* still-pending approvers for that leave
   request (excluding the calling manager), same title/module, `pageId` =
   `leave-approved`.
+
+---
+
+### GET `clinic-doctor/profile`
+
+**New.** Lets a temporary (agency) doctor re-fetch their own profile/
+capabilities without re-authenticating (e.g. after a silent token-based app
+reopen) — same shape the login response already returns under `doctor`.
+Guard: `auth:temp-clinic-doctor` only — a real rank-12 employee has no use
+for this (their own profile is the normal employee profile endpoint).
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Profile fetched successfully",
+  "doctor": {
+    "id": 3, "name": "Dr. Jane Doe", "email": "jane@agency.example",
+    "agency_name": "Island Medical Partners", "contact_no": "+960...",
+    "permissions": {
+      "can_view_appointments": true,
+      "can_manage_treatment": true,
+      "can_view_medical_history": false,
+      "can_issue_medical_certificate": false
+    }
+  }
+}
+```

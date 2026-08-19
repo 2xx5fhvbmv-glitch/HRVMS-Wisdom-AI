@@ -14,6 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Carbon\Carbon;
 
 class GrievanceAppealController extends Controller
@@ -198,7 +199,12 @@ class GrievanceAppealController extends Controller
             'hearing_time' => 'nullable|string|max:8',
             'location'     => 'nullable|string|max:255',
             'participants' => 'nullable|array',
-            'participants.*' => 'integer|exists:employees,id',
+            // exists:employees,id only proves the row exists somewhere,
+            // never that it belongs to this resort — scope it.
+            'participants.*' => [
+                'integer',
+                Rule::exists('employees', 'id')->where('resort_id', $this->resort->resort_id),
+            ],
         ]);
         $appeal = $this->loadAppealForWrite($id);
         if (in_array($appeal->status, ['Resolved', 'Rejected', 'Withdrawn'], true)) {

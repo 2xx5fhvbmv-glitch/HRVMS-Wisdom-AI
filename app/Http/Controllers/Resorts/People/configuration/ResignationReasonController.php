@@ -109,12 +109,16 @@ class ResignationReasonController extends Controller
 
     public function update(Request $request){
          $id = base64_decode($request->Main_id);
-        
-        $employeeResignationReason = EmployeeResignationReason::where('id', $id)->update([
-                'reason' => $request->reason, 
-                'status' => $request->status, 
+
+        // Was ->where('id', $id)->update(...) with no resort filter — any
+        // resort-admin could update another resort's resignation reason.
+        $employeeResignationReason = EmployeeResignationReason::where('id', $id)
+            ->where('resort_id', $this->resort->resort_id)
+            ->update([
+                'reason' => $request->reason,
+                'status' => $request->status,
             ]);
-        
+
          return response()->json([
             'success' => true,
             'status' => 'success',
@@ -125,7 +129,11 @@ class ResignationReasonController extends Controller
     public function destroy(Request $request){
         $id = base64_decode($request->id);
 
-        EmployeeResignationReason::where('id', $id)->delete();
+        // Was ->where('id', $id)->delete() with no resort filter — same
+        // cross-tenant gap as update() above.
+        EmployeeResignationReason::where('id', $id)
+            ->where('resort_id', $this->resort->resort_id)
+            ->delete();
 
         return response()->json([
             'success' => true,

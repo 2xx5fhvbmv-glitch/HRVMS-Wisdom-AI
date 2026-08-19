@@ -163,8 +163,9 @@ class ConfigurationController extends Controller
                 'errors' => $validator->errors()
             ], 422);
         }
-        // Find the division by ID
-        $category = LearningCategory::find($id);
+        // Find the division by ID — scoped to this resort so a client-supplied
+        // id belonging to another resort can't be read/written from here.
+        $category = LearningCategory::where('resort_id', $resort_id)->find($id);
         // dd($request);
 
         if (!$category) {
@@ -194,7 +195,14 @@ class ConfigurationController extends Controller
         DB::beginTransaction();
         try{
 
-            LearningCategory::find($id)->delete();
+            // Scoped — bare find($id) let any resort-admin delete another
+            // resort's learning category.
+            $category = LearningCategory::where('resort_id', $this->resort->resort_id)->find($id);
+            if (!$category) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'msg' => 'Category not found.'], 404);
+            }
+            $category->delete();
             DB::commit();
             return response()->json(['success' => true, 'msg' => 'category Deleted successfully.'], 200);
 
@@ -221,7 +229,9 @@ class ConfigurationController extends Controller
             return response()->json(['success' => false, 'message' => 'Invalid department ID']);
         }
 
-        $positions = ResortPosition::where('dept_id', $departmentId)->get(['id', 'position_title']);
+        $positions = ResortPosition::where('dept_id', $departmentId)
+            ->where('resort_id', $this->resort->resort_id)
+            ->get(['id', 'position_title']);
 
         if ($positions->isEmpty()) {
             return response()->json(['success' => false, 'message' => 'No positions found']);

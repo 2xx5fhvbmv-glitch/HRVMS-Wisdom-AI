@@ -690,6 +690,9 @@ class PromotionController extends Controller
     public function approval($id){
         $page_title = "Promotion Review";
         $promotionId = base64_decode($id);
+        // Was missing the resort_id filter — unscoped read leaked full
+        // promotion review (salary before/after, budget, approval history)
+        // cross-tenant.
         $promotion = EmployeePromotion::with([
             'employee.position',
             'employee.department',
@@ -703,7 +706,11 @@ class PromotionController extends Controller
             'approvals.approver.department',
             'createdBy.GetEmployee',
             'modifiedBy'
-        ])->where('id',$promotionId)->first();
+        ])->where('id',$promotionId)->where('resort_id', $this->resort->resort_id)->first();
+
+        if (!$promotion) {
+            abort(404, 'Promotion not found.');
+        }
 
         // Live fallback for the budget-exceed warning — promotions submitted
         // before the budgeted_salary column existed have NULL there, so the
@@ -776,7 +783,20 @@ class PromotionController extends Controller
                 $resolvedId = $decoded;
             }
         }
-        $promotion = EmployeePromotion::with(['approvals', 'employee'])->findOrFail($resolvedId);
+        // Was EmployeePromotion::findOrFail($resolvedId) with no resort
+        // filter — authorization below only checks whether the caller's own
+        // employee id matches an approver slot; since employee ids are a
+        // global sequence (not per-tenant), a cross-resort id collision
+        // could let a foreign resort's approver act on / finalize this
+        // promotion. Scope the initial lookup so it 404s before any
+        // approver-identity check runs.
+        $promotion = EmployeePromotion::with(['approvals', 'employee'])
+            ->where('id', $resolvedId)
+            ->where('resort_id', $this->resort->resort_id)
+            ->first();
+        if (!$promotion) {
+            return response()->json(['status' => 'error', 'message' => 'Promotion not found.'], 404);
+        }
         $comments = $request->input('comments', null);
         $currentEmployee = $this->resort->GetEmployee; // Assuming current logged-in employee
         // Eager-load relations the actor descriptor needs ($actorLabel below
@@ -1022,6 +1042,8 @@ class PromotionController extends Controller
     public function detail($id){
         $page_title = "Promotion Details";
         $promotionId = base64_decode($id);
+        // Was missing the resort_id filter — same cross-tenant leak as
+        // approval() above.
         $promotion = EmployeePromotion::with([
             'employee.position',
             'employee.department',
@@ -1033,7 +1055,11 @@ class PromotionController extends Controller
             'approvals.approver.department',
             'createdBy.GetEmployee',
             'modifiedBy'
-        ])->where('id',$promotionId)->first();
+        ])->where('id',$promotionId)->where('resort_id', $this->resort->resort_id)->first();
+
+        if (!$promotion) {
+            abort(404, 'Promotion not found.');
+        }
 
         // Live fallback so the budget-exceed warning fires even on promotions
         // submitted before the budgeted_salary column existed.
@@ -1053,17 +1079,23 @@ class PromotionController extends Controller
     
     public function sendPromotionLetter(Request $request)
     {
+        // Was missing the resort_id filter — unscoped read let a foreign
+        // resort's promotionId trigger a real promotion-letter email.
         $promotion = EmployeePromotion::with([
             'employee.position',
             'employee.department',
             'employee.resortAdmin',
-            'currentPosition', 
+            'currentPosition',
             'newPosition',
             'approvals',
-            'createdBy.GetEmployee', 
+            'createdBy.GetEmployee',
             'modifiedBy'
-        ])->where('id',$request->promotionId)->first();   
-            
+        ])->where('id',$request->promotionId)->where('resort_id', $this->resort->resort_id)->first();
+
+        if (!$promotion) {
+            return response()->json(['error' => 'Promotion not found.'], 404);
+        }
+
         $type = $request->type;
         $resort = Resort::findOrFail($promotion->resort_id);
 
@@ -1111,16 +1143,35 @@ class PromotionController extends Controller
 
     public function confirmPromotion(Request $request)
     {
+        // Most severe finding in this file per the audit: was
+        // EmployeePromotion::findOrFail($request->promotionId) with no
+        // resort filter, then directly overwrote the target employee's
+        // Dept_id/Position_id/division_id/rank/basic_salary — a foreign
+        // resort's promotionId could rewrite that employee's real salary.
         $promotion = EmployeePromotion::with(['employee.position',
             'employee.department',
             'employee.resortAdmin',
-            'currentPosition', 
+            'currentPosition',
             'newPosition',
             'approvals',
-            'createdBy.GetEmployee', 
-            'modifiedBy'])->findOrFail($request->promotionId);
+            'createdBy.GetEmployee',
+            'modifiedBy'])
+            ->where('id', $request->promotionId)
+            ->where('resort_id', $this->resort->resort_id)
+            ->first();
+        if (!$promotion) {
+            return response()->json(['message' => 'Promotion not found.'], 404);
+        }
         // dd( $promotion->newPosition->department->division->id);
-        $employee = Employee::findOrFail($promotion->employee_id);
+        // Belt-and-suspenders on top of the promotion-row scoping above:
+        // also verify the target employee itself belongs to this resort
+        // before writing rank/department/salary onto it.
+        $employee = Employee::where('id', $promotion->employee_id)
+            ->where('resort_id', $this->resort->resort_id)
+            ->first();
+        if (!$employee) {
+            return response()->json(['message' => 'Employee not found.'], 404);
+        }
         $employee->Dept_id = $promotion->newPosition->department->id;
         $employee->Position_id = $promotion->newPosition->id;
         $employee->division_id = $promotion->newPosition->department->division_id;
@@ -1168,7 +1219,15 @@ class PromotionController extends Controller
     public function inlineUpdate(Request $request)
     {
         try {
-            $promotion = EmployeePromotion::findOrFail($request->id);
+            // Was EmployeePromotion::findOrFail($request->id) with no
+            // resort filter — unscoped write let another resort's
+            // promotion salary/position figures be mutated.
+            $promotion = EmployeePromotion::where('id', $request->id)
+                ->where('resort_id', $this->resort->resort_id)
+                ->first();
+            if (!$promotion) {
+                return response()->json(['success' => false, 'message' => 'Promotion not found.'], 404);
+            }
             $oldSalary = $promotion->current_salary;
             $newSalary = $request->new_salary;
 

@@ -36,7 +36,11 @@ class AnnouncementController extends Controller
         $categories = AnnouncementCategory::where('resort_id',$resort_id)->get();
         $departments = ResortDepartment::where('resort_id',$resort_id)->where('status','active')->get();
         if ($request->ajax()) {
-            $query = Announcement::with(['employee.position','employee.resortAdmin','employee.department','category']);
+            // Was missing the resort filter entirely (contrast with
+            // create()/edit() in this same file, which correctly scope the
+            // employee dropdown) — leaked other resorts' announcements.
+            $query = Announcement::with(['employee.position','employee.resortAdmin','employee.department','category'])
+                ->where('resort_id', $resort_id);
 
             if ($request->searchTerm) {
                 $searchTerm = $request->searchTerm;
@@ -237,7 +241,8 @@ class AnnouncementController extends Controller
 
     public function archive(Request $request)
     {
-        $announcement = Announcement::find($request->id);
+        // Was unscoped — cross-tenant IDOR on Announcement rows.
+        $announcement = Announcement::where('resort_id', $this->resort->resort_id)->find($request->id);
 
         if (!$announcement) {
             return response()->json(['status' => false, 'message' => 'Announcement not found.']);
@@ -251,7 +256,8 @@ class AnnouncementController extends Controller
 
     public function restore(Request $request)
     {
-        $announcement = Announcement::findOrFail($request->id);
+        // Was unscoped — same IDOR pattern as archive().
+        $announcement = Announcement::where('resort_id', $this->resort->resort_id)->findOrFail($request->id);
         $announcement->archived = false;
         $announcement->save();
 
@@ -266,7 +272,8 @@ class AnnouncementController extends Controller
         $page_title ='Edit Announcement';
         $categories = AnnouncementCategory::where('resort_id',$this->resort->resort_id)->get();
         $employees = Employee::with('resortAdmin')->where('resort_id',$this->resort->resort_id)->whereIn('status',['Active','OnLeave','Probationary','Resigned','contractual'])->get();
-        $announcement = Announcement::findOrFail(base64_decode($id));
+        // Was unscoped — same IDOR pattern as archive()/restore().
+        $announcement = Announcement::where('resort_id', $this->resort->resort_id)->findOrFail(base64_decode($id));
 
         return view('resorts.people.announcement.edit', compact('announcement','page_title','categories','employees'));
     }
@@ -274,12 +281,13 @@ class AnnouncementController extends Controller
     public function update(Request $request, $id)
     {
         $announcementId = base64_decode($id); // Decode the ID
-        $announcement = Announcement::findOrFail($announcementId);
+        // Was unscoped — same IDOR pattern as archive()/restore()/edit().
+        $announcement = Announcement::where('resort_id', $this->resort->resort_id)->findOrFail($announcementId);
 
         // Validate the request
         $validated = $request->validate([
-            'announcement_title' => 'required|exists:announcement_category,id',
-            'employee_name' => 'required|exists:employees,id',
+            'announcement_title' => ['required', \Illuminate\Validation\Rule::exists('announcement_category', 'id')->where('resort_id', $this->resort->resort_id)],
+            'employee_name' => ['required', \Illuminate\Validation\Rule::exists('employees', 'id')->where('resort_id', $this->resort->resort_id)],
             'congratulatory_message' => 'required|string',
             'action_type' => 'required|in:Draft,Scheduled,Published',
             'published_date' => 'nullable|date'
@@ -336,7 +344,8 @@ class AnnouncementController extends Controller
     {
         $page_title ='Announcement Details';
 
-        $announcement = Announcement::with(['category','employee.resortAdmin','employee.position','employee.department'])->where('id',base64_decode($id))->first();
+        // Was unscoped — same IDOR pattern as archive()/restore()/edit()/update().
+        $announcement = Announcement::with(['category','employee.resortAdmin','employee.position','employee.department'])->where('id',base64_decode($id))->where('resort_id', $this->resort->resort_id)->first();
         return view('resorts.people.announcement.detail', compact('announcement','page_title'));
     }
 
@@ -344,8 +353,11 @@ class AnnouncementController extends Controller
     public function getEmployeeDetails(Request $request)
     {
         $employeeId = $request->input('employee_id');
+        // Was unscoped — name/position/department/photo/emp_id for any
+        // employee, any resort.
         $employee = Employee::with(['resortAdmin', 'position', 'department'])
             ->where('id', $employeeId)
+            ->where('resort_id', $this->resort->resort_id)
             ->first();
         if (!$employee) {
             return response()->json(['status' => false, 'message' => 'Employee not found.']);

@@ -1507,6 +1507,26 @@ class Common
             $message1 = ResortNotification::create([ 'type' =>  $name,'user_id'=>$sendto,'module'=>$moduleName, 'resort_id' => $resortid, 'message' => $message ,'request_id' => $request_id, 'page_id' => $pageId]);
             $view = view('resorts.renderfiles.birthday_notification',compact('name','message','other','message1'))->render();
             $response['sendto'] =$sendto;
+
+            // Every one of this type's ~20+ call sites across the app only
+            // ever did the DB insert above (plus a Pusher broadcast via
+            // ResortNotificationEvent for the web bell) and never actually
+            // pushed to the phone — the employee only ever saw it after
+            // force-closing and reopening the app, since that's the only
+            // time the in-app notification list gets fetched. Send the real
+            // FCM push here once, so every existing and future type=10
+            // caller gets it for free instead of each having to remember to
+            // also call sendMobileNotification().
+            if (!empty($sendto)) {
+                try {
+                    $recipient = Employee::find($sendto);
+                    if ($recipient && !empty($recipient->device_token)) {
+                        self::sendPushNotificationForMobile([$recipient->device_token], $name, $message, $moduleName, null, null, null, null);
+                    }
+                } catch (\Exception $e) {
+                    \Log::warning('nofitication() type=10 push failed: ' . $e->getMessage());
+                }
+            }
         }
         if($type == 11)
         {
@@ -3562,7 +3582,7 @@ class Common
     private static function getLeaveRegisterEntries($resortId, $empId, $startDate, $endDate)
     {
         $rows = DB::select("
-            SELECT el.from_date, el.to_date, lc.leave_type, lc.color
+            SELECT el.from_date, el.to_date, el.leave_category_id, el.total_days, lc.leave_type, lc.color
             FROM employees_leaves el
             JOIN leave_categories lc ON lc.id = el.leave_category_id
             WHERE el.Emp_id = ?
@@ -3625,7 +3645,20 @@ class Common
                         'ApprovedName' => '',
                         'differenceInHours' => null,
                         'msg' => null,
-                        'LeaveData' => [],
+                        // Kept in the same shape the array-of-leaves loop in
+                        // getEmployeeMonthDataPreviewList() reads elsewhere
+                        // (from_date/to_date/leave_cat_id/total_days), so a
+                        // day with no underlying duty-roster/attendance row
+                        // still resolves full leave_info instead of the
+                        // scalar Leave*/empty-LeaveData shape below silently
+                        // being ignored by that consumer.
+                        'LeaveData' => [[
+                            'leave_cat_id' => $row->leave_category_id ?? null,
+                            'leave_type' => $row->leave_type ?? 'On Leave',
+                            'from_date' => $row->from_date,
+                            'to_date' => $row->to_date,
+                            'total_days' => $row->total_days ?? null,
+                        ]],
                         'LeaveFirstName' => substr($row->leave_type ?? 'On Leave', 0, 1),
                         'LeaveColor' => $row->color ?? '',
                         'LeaveType' => $row->leave_type ?? 'On Leave',
@@ -3960,7 +3993,7 @@ class Common
     }
 
 
-    public static function getSubordinates($employeeId, $subordinates = [], $visited = [])
+    public static function getSubordinates($employeeId, $subordinates = [], $visited = [], $resortId = null)
     {
         // Prevent infinite loops from circular reporting structures
         if (in_array($employeeId, $visited)) {
@@ -3970,7 +4003,18 @@ class Common
         // Mark this employee as visited
         $visited[] = $employeeId;
 
-        $directSubordinates = Employee::where('reporting_to', $employeeId)->pluck('id')->toArray();
+        // No resort_id filter on `reporting_to` — safe today only because
+        // reporting_to values happen to be set within a resort's own org
+        // chart. Resolve the root employee's own resort_id once and pin
+        // every level of the recursion to it, so a stray cross-resort
+        // reporting_to value can't leak that employee's subordinate chain.
+        if ($resortId === null) {
+            $resortId = Employee::where('id', $employeeId)->value('resort_id');
+        }
+
+        $directSubordinates = Employee::where('reporting_to', $employeeId)
+                                    ->where('resort_id', $resortId)
+                                    ->pluck('id')->toArray();
 
         foreach ($directSubordinates as $subordinateId) {
             // Only add if not already in subordinates list
@@ -3978,7 +4022,7 @@ class Common
                 $subordinates[] = $subordinateId;
             }
             // Pass visited array to prevent cycles
-            $subordinates = self::getSubordinates($subordinateId, $subordinates, $visited);
+            $subordinates = self::getSubordinates($subordinateId, $subordinates, $visited, $resortId);
         }
 
         return $subordinates;
@@ -4317,11 +4361,26 @@ class Common
     public static function resolveEmpMainIdToNumeric($value, $resortId = null)
     {
         if ($value === null || $value === '') return null;
-        if (is_numeric($value)) return (int) $value;
+
+        // $resortId was accepted but silently ignored on these two
+        // branches — every caller resolving a numeric/base64 Emp_main_id
+        // inherited a gap where a cross-resort id would resolve without
+        // any ownership check.
+        if (is_numeric($value)) {
+            $id = (int) $value;
+            if ($resortId && !\App\Models\Employee::where('id', $id)->where('resort_id', $resortId)->exists()) {
+                return null;
+            }
+            return $id;
+        }
 
         $decoded = base64_decode($value, true);
         if ($decoded !== false && is_numeric($decoded)) {
-            return (int) $decoded;
+            $id = (int) $decoded;
+            if ($resortId && !\App\Models\Employee::where('id', $id)->where('resort_id', $resortId)->exists()) {
+                return null;
+            }
+            return $id;
         }
 
         $query = \App\Models\Employee::where('Emp_id', $value);
@@ -4385,6 +4444,33 @@ class Common
 
         return \App\Models\Employee::where('resort_id', $resortId)
             ->whereIn('Dept_id', $finDeptIds)
+            ->where(function ($q) {
+                $q->whereNull('status')->orWhere('status', 'Active')->orWhere('status', 'Probationary');
+            })
+            ->pluck('id')
+            ->map(fn($v) => (int) $v)
+            ->all();
+    }
+
+    /**
+     * Active employees in the resort's Security department(s). Used to fan
+     * out Island Pass Manifest creation notifications to Security, mirroring
+     * getResortFinanceEmployeeIds. Department matching reuses the same
+     * aliases as isSecurityDepartment.
+     */
+    public static function getResortSecurityEmployeeIds($resortId)
+    {
+        $secDeptIds = \App\Models\ResortDepartment::where('resort_id', $resortId)
+            ->pluck('id')
+            ->filter(fn($id) => self::isSecurityDepartment($id))
+            ->all();
+
+        if (empty($secDeptIds)) {
+            return [];
+        }
+
+        return \App\Models\Employee::where('resort_id', $resortId)
+            ->whereIn('Dept_id', $secDeptIds)
             ->where(function ($q) {
                 $q->whereNull('status')->orWhere('status', 'Active')->orWhere('status', 'Probationary');
             })
@@ -4652,6 +4738,36 @@ class Common
     }
 
     /**
+     * True when the given department id refers to the Security department.
+     * Mirrors isFinanceDepartment/isHRDepartment's alias-matching approach.
+     * Used to grant Security department employees (any rank) Island Pass
+     * Manifest access — see BoardingPassController::userCanManageManifests().
+     */
+    public static function isSecurityDepartment($deptId)
+    {
+        if (!$deptId) return false;
+
+        $dept = \App\Models\ResortDepartment::find($deptId);
+        if (!$dept) return false;
+
+        $name  = strtolower(trim($dept->name ?? ''));
+        $short = strtolower(trim($dept->short_name ?? ''));
+        $code  = strtolower(trim($dept->code ?? ''));
+
+        $aliases = ['security', 'sec'];
+        $matches = function ($val) use ($aliases) {
+            if ($val === '') return false;
+            if (in_array($val, $aliases, true)) return true;
+            // Loose contains check on the full word only — "sec" is left
+            // out of this check on purpose so departments like "Secretary"
+            // don't false-positive.
+            if (strpos($val, 'security') !== false) return true;
+            return false;
+        };
+        return $matches($name) || $matches($short) || $matches($code);
+    }
+
+    /**
      * True if the logged-in resort user has unrestricted access to all departments
      * (Super admin, master admin, GM, or anyone in the HR department).
      */
@@ -4723,6 +4839,33 @@ class Common
         if (!$emp || !$emp->Dept_id) return [];
 
         return [(int) $emp->Dept_id];
+    }
+
+    /**
+     * Average number of days between an onboarding itinerary being created
+     * (HR/L&D building the arrival logistics) and the employee's
+     * arrival_date. Backs the "Average Time (days)" tile on both the HR and
+     * L&D Manager mobile onboarding dashboards. Reads the raw
+     * employee_itineraries.created_at column via the query builder (not the
+     * Eloquent model) because EmployeeItineraries re-formats created_at into
+     * a display string via an accessor — the raw DB column is a normal
+     * datetime and parses safely.
+     */
+    public static function averageOnboardingLeadDays($resortId)
+    {
+        $rows = \DB::table('employee_itineraries')
+            ->where('resort_id', $resortId)
+            ->whereNotNull('arrival_date')
+            ->get(['created_at', 'arrival_date']);
+
+        if ($rows->isEmpty()) return 0;
+
+        $totalDays = $rows->sum(function ($row) {
+            return abs(\Carbon\Carbon::parse($row->created_at)->startOfDay()
+                ->diffInDays(\Carbon\Carbon::parse($row->arrival_date)->startOfDay()));
+        });
+
+        return round($totalDays / $rows->count(), 1);
     }
 
     /**
@@ -5082,12 +5225,20 @@ class Common
 
 
 
-    public static function GetEmployeeDetails($emp_id)
+    public static function GetEmployeeDetails($emp_id, $resortId = null)
     {
-
-      return  ResortAdmin::join('employees as t1', 't1.Admin_Parent_id', '=', 'resort_admins.id')
-        ->where('t1.id', $emp_id)
-        ->first(['resort_admins.id as Parent_id','resort_admins.first_name','resort_admins.last_name']);
+        // $emp_id values passed in today all originate from an
+        // already-resort-scoped row (Assigned_To/Raised_By/ApprovedBy on a
+        // resort-filtered maintenance query), so this is safe by
+        // construction under normal data — but the helper itself had no
+        // defensive tenant boundary. $resortId is optional so existing
+        // callers keep working; pass it to close the gap defense-in-depth.
+        $query = ResortAdmin::join('employees as t1', 't1.Admin_Parent_id', '=', 'resort_admins.id')
+            ->where('t1.id', $emp_id);
+        if ($resortId !== null) {
+            $query->where('t1.resort_id', $resortId);
+        }
+        return $query->first(['resort_admins.id as Parent_id','resort_admins.first_name','resort_admins.last_name']);
     }
     private function getNextApprover($leave)
     {
@@ -6374,7 +6525,14 @@ class Common
     }
 
     public static function getServiceCharge($employee_id, $resortId,$payrollId){
-        $service_charge = PayrollServiceCharge::where('payroll_id',$payrollId)->where('employee_id',$employee_id)->first();
+        // $resortId was accepted but never used — payroll_service_charges
+        // has no resort_id column of its own, so ownership is verified via
+        // its parent payroll row instead.
+        $service_charge = PayrollServiceCharge::join('payroll', 'payroll.id', '=', 'payroll_service_charges.payroll_id')
+            ->where('payroll_service_charges.payroll_id', $payrollId)
+            ->where('payroll_service_charges.employee_id', $employee_id)
+            ->where('payroll.resort_id', $resortId)
+            ->first(['payroll_service_charges.*']);
 
         return $service_charge ? (float) $service_charge['service_charge_amount'] : 0;
     }
@@ -8528,13 +8686,14 @@ class Common
                         'title' => $title,
                         'body'  => $body,
                     ],
-                    // 'android' => [
-                    //     'notification' => [
-                    //         'channel_id' => $custom_sound_channel,
-                    //         'sound' => $sound,
-                    //         'type'  => $mass,
-                    //     ],
-                    // ],
+                    // Without this, FCM defaults Android to normal priority,
+                    // which Doze/App-Standby can defer by several minutes —
+                    // iOS (APNs) isn't affected by this field, which is why
+                    // delivery was instant on iOS but delayed ~3min on
+                    // Android for the exact same call.
+                    'android' => [
+                        'priority' => 'high',
+                    ],
                     'data' => [
                         'title'  => $title,
                         'module' => $module,

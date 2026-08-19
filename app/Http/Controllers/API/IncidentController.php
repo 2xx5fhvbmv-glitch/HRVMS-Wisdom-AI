@@ -16,6 +16,7 @@ use App\Models\Employee;
 use App\Models\IncidentsMeeting;
 use App\Models\IncidentsEmployeeStatements;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 
 if (!function_exists('parseIds')) {
     function parseIds($value): array
@@ -292,8 +293,12 @@ class IncidentController extends Controller
         $validator = Validator::make($request->all(), [
             'reporting_for_someone'         => 'required|in:Yes,No',
             'incident_name'                 => 'required|string',
-            'victim_ids'                    => 'required_if:reporting_for_someone,Yes|array',   
-            'victim_ids.*'                  => 'exists:employees,id',   
+            'victim_ids'                    => 'required_if:reporting_for_someone,Yes|array',
+            // exists:employees,id only proves the row exists somewhere —
+            // never that it belongs to the caller's resort. An employee
+            // from any resort could be named as a victim/witness/involved
+            // party on an incident.
+            'victim_ids.*'                  => [Rule::exists('employees', 'id')->where('resort_id', $this->resort_id)],
             'date'                          => 'required|date_format:Y-m-d',
             'time'                          => 'required|date_format:h:i A',
             'location'                      => 'nullable|string',
@@ -301,9 +306,9 @@ class IncidentController extends Controller
             'subcategory_id'                => 'required|exists:incident_subcategories,id',
             'isWitness'                     => 'required|in:Yes,No',
             'witness_id'                    => 'required_if:isWitness,Yes|array',
-            'witness_id.*'                  => 'exists:employees,id',
+            'witness_id.*'                  => [Rule::exists('employees', 'id')->where('resort_id', $this->resort_id)],
             'involved_emp_ids'              => 'required|array',
-            'involved_emp_ids.*'            => 'exists:employees,id',
+            'involved_emp_ids.*'            => [Rule::exists('employees', 'id')->where('resort_id', $this->resort_id)],
             'description'                   => 'nullable|string',
             'attatchements.*'               => 'nullable|file|mimes:jpeg,png,jpg,heic,heif,mp4,mov,doc,docx,pdf'
         ]);
@@ -473,9 +478,14 @@ class IncidentController extends Controller
                     ->toArray();
             }
 
+            // No resort filter here compounded I1 above — once a
+            // cross-resort id got into victims/involved_employees/witness_id
+            // (fixed above), viewing the incident leaked that other
+            // resort's employee's name/photo/position.
             $employeeDetailsFor = function (array $ids) {
                 if (empty($ids)) return collect();
                 return Employee::whereIn('employees.id', $ids)
+                    ->where('employees.resort_id', $this->resort_id)
                     ->join('resort_admins as t1', "t1.id", "=", "employees.Admin_Parent_id")
                     ->join('resort_positions as t2', "t2.id", "=", "employees.Position_id")
                     ->select(['employees.id',

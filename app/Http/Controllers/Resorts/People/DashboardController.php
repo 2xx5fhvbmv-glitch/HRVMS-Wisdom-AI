@@ -358,10 +358,13 @@ class DashboardController extends Controller
         $withdraw_resignations = EmployeeResignation::where('resort_id', $this->resort->resort_id)
            ->where('status','Withdraw')->count();
 
+        // Was missing the resort_id filter every other query in this method
+        // has, aggregating counts across ALL resorts.
         $resignationCounts = \App\Models\EmployeeResignation::select(
                 DB::raw("DATE_FORMAT(resignation_date, '%b %Y') as month"),
                 DB::raw("COUNT(*) as count")
             )
+            ->where('resort_id', $this->resort->resort_id)
             ->where('resignation_date', '>=', Carbon::now()->subMonths(5)->startOfMonth())
             ->groupBy('month')
             ->orderByRaw("MIN(resignation_date)")
@@ -734,10 +737,13 @@ class DashboardController extends Controller
         $withdraw_resignations = EmployeeResignation::where('resort_id', $this->resort->resort_id)
            ->where('status','Withdraw')->count();
 
+        // Was missing the resort_id filter every other query in this method
+        // has, aggregating counts across ALL resorts.
         $resignationCounts = \App\Models\EmployeeResignation::select(
                 DB::raw("DATE_FORMAT(resignation_date, '%b %Y') as month"),
                 DB::raw("COUNT(*) as count")
             )
+            ->where('resort_id', $this->resort->resort_id)
             ->where('resignation_date', '>=', Carbon::now()->subMonths(5)->startOfMonth())
             ->groupBy('month')
             ->orderByRaw("MIN(resignation_date)")

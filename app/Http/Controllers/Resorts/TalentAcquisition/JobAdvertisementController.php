@@ -197,7 +197,14 @@ class JobAdvertisementController extends Controller
                 {
                     $new_link_Expiry_date = Carbon::createFromFormat('d/m/Y', $request->link_Expiry_date)->format('Y-m-d');
 
-                    $a = ApplicationLink::find($request->ApplicationId);
+                    // Scope by resort_id — sibling of the Resort_id-from-client
+                    // bug below; without this a client could extend/write
+                    // another resort's application link by guessing its id.
+                    $a = ApplicationLink::where('Resort_id', $this->resort->resort_id)->find($request->ApplicationId);
+                    if (!$a) {
+                        DB::rollBack();
+                        return response()->json(['success' => false, 'message' => 'Application link not found.'], 404);
+                    }
 
                     if(isset($a) &&  $a->link_Expiry_date == $new_link_Expiry_date)
                     {
@@ -233,13 +240,17 @@ class JobAdvertisementController extends Controller
                 }
                 else // New Application Link Genrate
                 {
+                    // Resort_id must be the authenticated caller's own resort —
+                    // it was previously taken straight from the request body,
+                    // letting a client create/overwrite an application link
+                    // (and its ta_child_id linkage) under any other resort.
                     ApplicationLink::updateOrCreate([
-                        "Resort_id"=> $request->Resort_id,
+                        "Resort_id"=> $this->resort->resort_id,
                     "ta_child_id" =>  $request->ta_child_id,
                 ],[
                     "link_Expiry_date"=> Carbon::createFromFormat('d/m/Y', $request->link_Expiry_date)->format('Y-m-d'),
                     "link"=> $request->link,
-                    "Resort_id"=> $request->Resort_id,
+                    "Resort_id"=> $this->resort->resort_id,
                     "ta_child_id" =>  $request->ta_child_id,
                 ]);
                 DB::commit();

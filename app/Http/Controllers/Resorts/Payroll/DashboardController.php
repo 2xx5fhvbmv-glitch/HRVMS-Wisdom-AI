@@ -178,6 +178,58 @@ class DashboardController extends Controller
      * describe the exact same period as the headline card, never a
      * different one.
      */
+    /**
+     * Same "Last Payroll" / "Upcoming Payroll (Estimated)" figures the
+     * dashboard cards show (HR_Dashobard() lines ~39-106), exposed for
+     * Wisdom AI (WisdomTools::getPayrollSummary) so the chatbot reports the
+     * same numbers instead of reading an arbitrary stored Payroll row by id
+     * — the previous approach could land on a draft/zero row.
+     */
+    public function getPayrollDashboardSummary(int $resortId): array
+    {
+        $today = now();
+        $committedStatuses = ['approved', 'locked'];
+
+        $lastPayroll = Payroll::where('resort_id', $resortId)
+            ->where('end_date', '<', $today)
+            ->whereIn('status', $committedStatuses)
+            ->orderBy('end_date', 'desc')
+            ->first();
+        if (!$lastPayroll) {
+            $lastPayroll = Payroll::where('resort_id', $resortId)
+                ->where('end_date', '<', $today)
+                ->orderBy('end_date', 'desc')
+                ->first();
+        }
+        if ($lastPayroll && (float) $lastPayroll->total_payroll <= 0) {
+            $lastPayroll->total_payroll = (float) DB::table('payroll_reviews')
+                ->where('payroll_id', $lastPayroll->id)
+                ->sum('net_salary');
+        }
+
+        $cutoffPeriod = $this->resolveUpcomingCutoffPeriod($resortId);
+        $upcomingPayroll = $cutoffPeriod['payroll'];
+        $isEstimated = !$upcomingPayroll || $upcomingPayroll->total_payroll <= 0;
+        $upcomingAmount = $isEstimated
+            ? $this->estimateUpcomingPayrollLive($resortId, $cutoffPeriod['start'], $cutoffPeriod['end'])
+            : (float) $upcomingPayroll->total_payroll;
+
+        return [
+            'last_payroll' => $lastPayroll ? [
+                'period_start'  => $lastPayroll->getRawOriginal('start_date'),
+                'period_end'    => $lastPayroll->getRawOriginal('end_date'),
+                'status'        => $lastPayroll->status,
+                'total_payroll' => (float) $lastPayroll->total_payroll,
+            ] : null,
+            'upcoming_payroll' => [
+                'period_start' => $cutoffPeriod['start']->format('Y-m-d'),
+                'period_end'   => $cutoffPeriod['end']->format('Y-m-d'),
+                'is_estimated' => $isEstimated,
+                'total_payroll' => $upcomingAmount,
+            ],
+        ];
+    }
+
     private function resolveUpcomingCutoffPeriod(int $resortId): array
     {
         $payrollConfig = \App\Models\PayrollConfig::where('resort_id', $resortId)->first();

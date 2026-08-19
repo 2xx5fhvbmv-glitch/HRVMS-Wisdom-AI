@@ -150,8 +150,12 @@ class ReviewController extends Controller
     public function submitSelfReview(Request $request, $id)
     {
         $id = base64_decode($id);
+        // Was missing the resort filter its read-side sibling showSelfReview
+        // has — add it to match, rather than relying solely on the
+        // participant-id comparison below.
         $childCycle = PerformaChildCycle::join('performance_cycles as pc', 'pc.id', '=', 'performa_child_cycles.Parent_cycle_id')
             ->where('performa_child_cycles.id', $id)
+            ->where('pc.resort_id', $this->resort->resort_id)
             ->first(['performa_child_cycles.*', 'pc.Cycle_Name', 'pc.Self_Activity_Start_Date', 'pc.Self_Activity_End_Date']);
 
         if (!$childCycle) {
@@ -341,8 +345,11 @@ class ReviewController extends Controller
     public function submitManagerReview(Request $request, $id)
     {
         $id = base64_decode($id);
+        // Was missing the resort filter its read-side sibling
+        // showManagerReview has.
         $childCycle = PerformaChildCycle::join('performance_cycles as pc', 'pc.id', '=', 'performa_child_cycles.Parent_cycle_id')
             ->where('performa_child_cycles.id', $id)
+            ->where('pc.resort_id', $this->resort->resort_id)
             ->first(['performa_child_cycles.*', 'pc.Cycle_Name', 'pc.Manager_Activity_Start_Date', 'pc.Manager_Activity_End_Date']);
 
         if (!$childCycle) {

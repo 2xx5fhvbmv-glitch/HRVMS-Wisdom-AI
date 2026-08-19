@@ -175,7 +175,7 @@ class ShopkeeperController extends Controller
     public function inlineUpdate(Request $request, $id)
     {
         // Find the division by ID
-        $shopkeeper = Shopkeeper::find($id);
+        $shopkeeper = Shopkeeper::where('id', $id)->where('resort_id', $this->resort->resort_id)->first();
 
         if (!$shopkeeper) {
             return response()->json(['success' => false, 'message' => 'shopkeeper not found.']);
@@ -211,7 +211,7 @@ class ShopkeeperController extends Controller
     public function destroy($id)
     {
         try {
-            $shopkeeper = Shopkeeper::findOrFail($id);
+            $shopkeeper = Shopkeeper::where('id', $id)->where('resort_id', $this->resort->resort_id)->firstOrFail();
             $shopkeeper->delete();  // Soft delete if you're using soft deletes, otherwise use forceDelete()
 
             return response()->json(['success' => true, 'message' => 'Shopkeeper deleted successfully.']);

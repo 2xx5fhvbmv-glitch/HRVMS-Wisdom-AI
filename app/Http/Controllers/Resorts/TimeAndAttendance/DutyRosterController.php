@@ -22,6 +22,7 @@ use App\Models\ResortSection;
 use Illuminate\Support\Facades\Auth;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use App\Models\Compliance;
 use App\Models\ResortHoliday;
 use App\Models\EmployeeOvertime;
@@ -334,7 +335,11 @@ class DutyRosterController extends Controller
 
 
         $TotalHours = $request->TotalHours; // Shift total hours
-        $resort_id  = $request->resort_id;
+        // $request->resort_id was fully client-controlled and never
+        // cross-checked — any resort-admin could tag a new duty roster row
+        // to ANY resort_id for ANY employee id. Always use the caller's own
+        // resort, never trust the posted value.
+        $resort_id  = $this->resort->resort_id;
         $DefaultShiftTime = $request->DefaultShiftTime; // its checked and all theet all for the weekdays
         $MakeShift  = $request->MakeShift;// Shift date
         $hiddenInput = $request->hiddenInput; // total Week are Selected
@@ -362,7 +367,7 @@ class DutyRosterController extends Controller
             ],
             'Emp_id.*' => [
                 'required',
-                'exists:employees,id',
+                Rule::exists('employees', 'id')->where('resort_id', $this->resort->resort_id),
             ],
         ]);
 
@@ -659,7 +664,18 @@ class DutyRosterController extends Controller
         $DayOfDate = $request->DayOfDate;
         $DayWiseTotalHours = $request->TotalHoursModel;
         $DayOfDateModel = $request->DayOfDateModel;
-        $DutyRosterEntry = DutyRosterEntry::find($Attd_id);
+
+        // Attd_id is client-supplied; if present it must already belong to
+        // this resort — otherwise the updateOrCreate() below would silently
+        // edit another resort's duty-roster-entry row.
+        if (!empty($Attd_id)) {
+            $ownedEntry = DutyRosterEntry::where('id', $Attd_id)
+                ->where('resort_id', $this->resort->resort_id)
+                ->first();
+            if (!$ownedEntry) {
+                return response()->json(['success' => false, 'message' => 'Record not found.'], 404);
+            }
+        }
 
         try{
 
@@ -748,7 +764,9 @@ class DutyRosterController extends Controller
                 DB::commit();
 
 
-                DutyRoster::where("id",$DutyRosterEntry->roster_id)->update(["DayOfDate"=>$DayOfDateModel]);
+                DutyRoster::where("id",$DutyRosterEntry->roster_id)
+                    ->where('resort_id', $this->resort->resort_id)
+                    ->update(["DayOfDate"=>$DayOfDateModel]);
                 return response()->json(['success' => true, 'message' => "Duty roster updated successfully"]);
         }
         catch (\Exception $e) {
@@ -767,16 +785,27 @@ class DutyRosterController extends Controller
      */
     public function UpdateDutyRosterGeofence(Request $request)
     {
+        // exists:duty_rosters,id / exists:resort_geofences,id were not
+        // tenant-scoped, and the update below had no resort_id check at
+        // all — any resort-admin could repoint another resort's duty-roster
+        // row's geofence to arbitrary geofence ids.
         $request->validate([
-            'roster_id' => 'required|integer|exists:duty_rosters,id',
+            'roster_id' => ['required', 'integer', Rule::exists('duty_rosters', 'id')->where('resort_id', $this->resort->resort_id)],
             'geofence_zone_ids' => 'nullable|array',
-            'geofence_zone_ids.*' => 'integer|exists:resort_geofences,id',
+            'geofence_zone_ids.*' => ['integer', Rule::exists('resort_geofences', 'id')->where('resort_id', $this->resort->resort_id)],
         ]);
 
         try {
-            DutyRoster::where('id', $request->roster_id)->update([
-                'geofence_zone_id' => !empty($request->geofence_zone_ids) ? json_encode($request->geofence_zone_ids) : null,
-            ]);
+            $updated = DutyRoster::where('id', $request->roster_id)
+                ->where('resort_id', $this->resort->resort_id)
+                ->update([
+                    'geofence_zone_id' => !empty($request->geofence_zone_ids) ? json_encode($request->geofence_zone_ids) : null,
+                ]);
+
+            if (!$updated) {
+                return response()->json(['success' => false, 'message' => 'Duty roster not found.'], 404);
+            }
+
             return response()->json(['success' => true, 'message' => 'Geofence zone updated successfully']);
         } catch (\Exception $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
@@ -1392,17 +1421,26 @@ class DutyRosterController extends Controller
             return response()->json(['success' => false, 'message' => 'Please provide at least one overtime entry.']);
         }
 
-        // Department validation: everyone can only approve OT for their own department
+        // Department validation: everyone can only approve OT for their own department.
+        // Dept_id is not resort-namespaced, so this alone doesn't prove
+        // Emp_id belongs to this resort (see audit "LIKELY" finding) — verify
+        // the employee is actually in this resort before trusting Dept_id.
         $loggedInDeptId = $this->resort->GetEmployee->Dept_id ?? '';
-        $targetEmpDeptId = Employee::where('id', $Emp_id)->value('Dept_id');
-        if ($loggedInDeptId != $targetEmpDeptId) {
+        $targetEmployee = Employee::where('id', $Emp_id)->where('resort_id', $resort_id)->first();
+        if (!$targetEmployee) {
+            return response()->json(['success' => false, 'message' => 'Employee not found.'], 404);
+        }
+        if ($loggedInDeptId != $targetEmployee->Dept_id) {
             return response()->json(['success' => false, 'message' => 'You can only manage overtime for employees in your own department.']);
         }
 
         $dateCarbon = Carbon::parse($date);
 
-        // Check if employee has duty roster entry for this date
+        // Check if employee has duty roster entry for this date — was
+        // unscoped by resort_id, so it could match another resort's roster
+        // entry for the same Emp_id/date and write OT onto it below.
         $DutyRosterEntry = DutyRosterEntry::where('Emp_id', $Emp_id)
+            ->where('resort_id', $resort_id)
             ->whereDate('date', $dateCarbon)
             ->first();
 
@@ -1410,21 +1448,35 @@ class DutyRosterController extends Controller
             return response()->json(['success' => false, 'message' => 'This day employee not present in duty roster.']);
         }
 
-        if ($DutyRosterEntry->Status == 'DayOff') {
-            return response()->json(['success' => false, 'message' => 'There is a day off on this date.']);
-        }
-
-        $shiftId = $DutyRosterEntry->Shift_id ?? null;
-        if (!$shiftId) {
-            return response()->json(['success' => false, 'message' => 'Shift information not found for this date.']);
-        }
-
-        // Get existing overtime entries for this date and employee
+        // Get existing overtime entries for this date and employee — fetched
+        // before the DayOff check below so that check can tell a pure
+        // reject-existing-entries request apart from a create/approve one.
         $existingEntries = EmployeeOvertime::where('Emp_id', $Emp_id)
             ->where('resort_id', $resort_id)
             ->whereDate('date', $dateCarbon)
             ->get()
             ->keyBy('id');
+
+        // A day off blocks creating new overtime hours or approving them —
+        // an employee shouldn't earn/get paid OT for a day they weren't
+        // scheduled to work. But an already-logged entry on that date
+        // (created before the roster was marked DayOff, or entered in
+        // error) still needs to be rejectable, or a bad entry on a day-off
+        // date could never be cleared out. Only bypass the block when
+        // every submitted entry is an existing one being set to rejected.
+        $isRejectingOnlyExistingEntries = collect($entries)->isNotEmpty() && collect($entries)->every(function ($entry) use ($existingEntries) {
+            $entryId = $entry['id'] ?? null;
+            return $entryId && $existingEntries->has($entryId) && ($entry['status'] ?? null) === 'rejected';
+        });
+
+        if ($DutyRosterEntry->Status == 'DayOff' && !$isRejectingOnlyExistingEntries) {
+            return response()->json(['success' => false, 'message' => 'There is a day off on this date.']);
+        }
+
+        $shiftId = $DutyRosterEntry->Shift_id ?? null;
+        if (!$shiftId && !$isRejectingOnlyExistingEntries) {
+            return response()->json(['success' => false, 'message' => 'Shift information not found for this date.']);
+        }
 
         $entryIds = [];
         foreach ($entries as $entry) {
@@ -1461,10 +1513,15 @@ class DutyRosterController extends Controller
             $totalMins = $totalMinutes % 60;
             $totalTime = sprintf('%02d:%02d', $totalHours, $totalMins);
 
+            // On a day off being rejected, $shiftId is null (no shift is
+            // assigned) — don't clobber an existing entry's own Shift_id
+            // with null, keep whatever it was created with.
+            $entryShiftId = $shiftId ?? ($isExistingEntry ? $existingEntries[$entryId]->Shift_id : null);
+
             $overtimeData = [
                 'resort_id' => $resort_id,
                 'Emp_id' => $Emp_id,
-                'Shift_id' => $shiftId,
+                'Shift_id' => $entryShiftId,
                 'roster_id' => $DutyRosterEntry->roster_id ?? null,
                 'date' => $dateCarbon->format('Y-m-d'),
                 'start_time' => $startTime,

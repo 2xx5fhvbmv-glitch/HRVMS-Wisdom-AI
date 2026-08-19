@@ -115,7 +115,9 @@ class NoticePeriodController extends Controller
     public function update(Request $request){
         $id = base64_decode($request->id);
 
-        $emp_notice_period = EmployeeNoticePeriod::find($id);
+        // Was ->find($id) with no resort filter — any resort-admin could
+        // update another resort's notice-period rule by id.
+        $emp_notice_period = EmployeeNoticePeriod::where('resort_id', $this->resort->resort_id)->find($id);
 
         if(!$emp_notice_period){
             return response()->json([
@@ -150,7 +152,9 @@ class NoticePeriodController extends Controller
 
     public function destroy(Request $request){
         $id = base64_decode($request->id);
-        $emp_notice_period = EmployeeNoticePeriod::find($id);
+        // Was ->find($id) with no resort filter — same cross-tenant gap
+        // as update() above.
+        $emp_notice_period = EmployeeNoticePeriod::where('resort_id', $this->resort->resort_id)->find($id);
         if($emp_notice_period){
             $emp_notice_period->delete();
         }

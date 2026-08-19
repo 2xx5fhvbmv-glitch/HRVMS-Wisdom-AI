@@ -344,7 +344,7 @@ class SupportController extends Controller
         $resort = Resort::findOrFail( $this->resort->resort_id);
         $loggedInEmployee = $this->resort->getEmployee->id;
         $page_title ="Support Email View";
-        $support = Support::findOrFail(base64_decode($ticketId));
+        $support = Support::where('id', base64_decode($ticketId))->where('resort_id', $this->resort->resort_id)->firstOrFail();
         $supportEmails = SupportMessages::where('ticket_id',base64_decode($ticketId))->get();
         return view('resorts.support.email-ticket',compact('page_title','support','supportEmails','loggedInEmployee'));
     }
@@ -356,7 +356,7 @@ class SupportController extends Controller
         // otherwise hit "property on null" before the page can render.
         $loggedInEmployee = optional($this->resort->getEmployee)->id ?? 0;
         $page_title = 'Support Email View';
-        $support = Support::findOrFail($ticketId);
+        $support = Support::where('id', $ticketId)->where('resort_id', $this->resort->resort_id)->firstOrFail();
         // Resort user opened the email-reply page → mark every admin-sent
         // message for this ticket as read so the resort-side bell stops
         // showing the unread count.
@@ -373,7 +373,7 @@ class SupportController extends Controller
     public function sendReply(Request $request)
     {
         $request->validate([
-            'ticket_id'      => 'required|exists:support,id',
+            'ticket_id'      => ['required', Rule::exists('support', 'id')->where('resort_id', $this->resort->resort_id)],
             'to_email'       => 'required|email',
             'subject'        => 'required|string|max:255',
             'message'        => 'required|string',
@@ -383,7 +383,7 @@ class SupportController extends Controller
             'attachments.*'  => 'nullable|file|max:25600',
         ]);
 
-        $ticket = Support::findOrFail($request->ticket_id);
+        $ticket = Support::where('id', $request->ticket_id)->where('resort_id', $this->resort->resort_id)->firstOrFail();
         $resort = Resort::findOrFail($ticket->resort_id);
 
         $uploadedFiles = [];

@@ -482,7 +482,17 @@ class AccommodationMasterController extends Controller
         }
         
         $id = base64_decode($id);
-        $employee = Employee::with(['resortAdmin','position'])->find($id);
+        // Was find()-only — no resort filter, and rendered by the view
+        // regardless of whether $data (the resort-scoped accommodation
+        // lookup below) came back null. Leaked any employee's name,
+        // position, and resort-admin data by id.
+        $employee = Employee::with(['resortAdmin','position'])
+                        ->where('id', $id)
+                        ->where('resort_id', $this->resort->resort_id)
+                        ->first();
+        if (!$employee) {
+            abort(404);
+        }
         $BuildingModel = BuildingModel::join('bulidng_and_floor_and_rooms as t1', 't1.building_id', '=', 'building_models.id')
                                     ->where("building_models.resort_id", $this->resort->resort_id)
                                     ->groupBy('building_models.id','building_models.id')
@@ -570,6 +580,13 @@ class AccommodationMasterController extends Controller
     {
         $id = $request->AvailableAccommodation_ID;
         $items = $request->InventoryModule;
+
+        // $id was never checked against the caller's resort before being
+        // used to attach inventory items to it — cross-tenant write onto
+        // another resort's room record.
+        if (!AvailableAccommodationModel::where('id', $id)->where('resort_id', $this->resort->resort_id)->exists()) {
+            return response()->json(['success' => false, 'message' => 'Accommodation not found'], 404);
+        }
 
         // Start a database transaction
         DB::beginTransaction();

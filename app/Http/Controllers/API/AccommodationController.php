@@ -195,10 +195,11 @@ class AccommodationController extends Controller
                                                                             ->first('ItemName');
 
                                                                         if (isset($row->Assigned_To)) {
-                                                                            $emp = Common::GetEmployeeDetails($row->Assigned_To);
-
-                                                                            $row->Assign_profileImg = Common::getResortUserPicture($emp->Parent_id);
-                                                                            $row->Assign_toName     = $emp->first_name . ' ' . $row->last_name;
+                                                                            $emp = Common::GetEmployeeDetails($row->Assigned_To, $this->resort_id);
+                                                                            if ($emp) {
+                                                                                $row->Assign_profileImg = Common::getResortUserPicture($emp->Parent_id);
+                                                                                $row->Assign_toName     = $emp->first_name . ' ' . $row->last_name;
+                                                                            }
                                                                         }
                                                                         $row->EffectedAmenity = isset($InventoryModule) ? ucfirst($InventoryModule->ItemName) : '';
                                                                         return  $row;
@@ -633,10 +634,12 @@ class AccommodationController extends Controller
         $row->EffectedAmenity                               =   ucfirst($inventoryItems[$row->item_id] ?? 'N/A');
 
         // **Assigned Staff Details**
-        if (!empty($row->Assigned_To)) { 
-            $emp                                            =   Common::GetEmployeeDetails($row->Assigned_To);
-            $row->Assign_profileImg                         =   Common::getResortUserPicture($emp->Parent_id);
-            $row->Assign_toName                             =   $emp->first_name . ' ' . $emp->last_name;
+        if (!empty($row->Assigned_To)) {
+            $emp                                            =   Common::GetEmployeeDetails($row->Assigned_To, $this->resort_id);
+            if ($emp) {
+                $row->Assign_profileImg                     =   Common::getResortUserPicture($emp->Parent_id);
+                $row->Assign_toName                         =   $emp->first_name . ' ' . $emp->last_name;
+            }
         }
 
         return $row;
@@ -770,7 +773,10 @@ class AccommodationController extends Controller
         }
 
         try {
-            $employeeRank                                   =   Employee::find($empId);
+            $employeeRank                                   =   Employee::where('resort_id', $this->resort_id)->find($empId);
+            if (!$employeeRank) {
+                return response()->json(['success' => false, 'message' => 'Employee not found.'], 404);
+            }
             $availableAccommodation                         =   AvailableAccommodationModel::join('accommodation_types as at', 'at.id', '=', 'available_accommodation_models.Accommodation_type_id')
                                                                     ->join('building_models as bm', 'bm.id', '=', 'available_accommodation_models.BuildingName')
                                                                     ->leftJoin('bulidng_and_floor_and_rooms as bf', function ($join) {
@@ -885,12 +891,22 @@ class AccommodationController extends Controller
         $assignId                                           =   $request->assign_id;
         $emp_id                                             =   $request->emp_id;
 
+        // Neither the bed record nor the target employee were checked
+        // against this resort — a bed could be assigned an emp_id from
+        // another resort, or another resort's bed record hijacked by id.
+        if (!AssingAccommodation::where('id', $assignId)->where('resort_id', $this->resort_id)->exists()) {
+            return response()->json(['success' => false, 'message' => 'Accommodation not found.'], 404);
+        }
+        if (!Employee::where('id', $emp_id)->where('resort_id', $this->resort_id)->exists()) {
+            return response()->json(['success' => false, 'message' => 'Employee not found.'], 404);
+        }
+
         try {
             DB::beginTransaction();
 
-            $anyAssigned                                    =   AssingAccommodation::where('emp_id', $emp_id)->first();
+            $anyAssigned                                    =   AssingAccommodation::where('emp_id', $emp_id)->where('resort_id', $this->resort_id)->first();
             if (!$anyAssigned) {
-                AssingAccommodation::where("id", $assignId)->update(['emp_id' => $emp_id, "effected_date" => date('Y-m-d')]);
+                AssingAccommodation::where("id", $assignId)->where('resort_id', $this->resort_id)->update(['emp_id' => $emp_id, "effected_date" => date('Y-m-d')]);
 
                 $Employeelist                           =   Employee::join('resort_admins as t1', "t1.id", "=", "employees.Admin_Parent_id")
                                                                 ->join('resort_positions as t2', "t2.id", "=", "employees.Position_id")
@@ -1071,12 +1087,19 @@ class AccommodationController extends Controller
                     return strtolower($value);
                 });
 
+            // The resort_id filter only appeared inside the LEFT JOIN
+            // condition on assing_accommodations, not on employees itself
+            // — every employee company-wide (any resort) matching
+            // gender+rank with no bed row in the caller's own resort
+            // (i.e. every employee outside the caller's resort) was
+            // returned, with name/photo/Emp_id.
             $Employees                                          =   Employee::leftJoin('assing_accommodations as t3', function ($join) {
                 $join->on('t3.emp_id', '=', 'employees.id')
                     ->where('t3.resort_id', '=', $this->resort_id);
             })
                 ->join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
                 ->join('resort_positions as t2', 't2.id', '=', 'employees.Position_id')
+                ->where('employees.resort_id', $this->resort_id)
                 ->select(
                     't1.id as Parentid',
                     't1.first_name',

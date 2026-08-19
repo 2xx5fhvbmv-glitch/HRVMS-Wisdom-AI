@@ -352,7 +352,19 @@ class ProbationController extends Controller
         }
         $page_title ='Probation Details';
         $employeeId = base64_decode($id);
-        $employee = Employee::with(['resortAdmin','position','department','section','reportingTo.position','reportingTo.department','reportingToAdmin'])->findOrFail($employeeId);
+        // Sibling gap found beyond the audit doc: this was an unscoped
+        // findOrFail() on a client-supplied (base64-decoded) id — any
+        // resort-admin could view another resort's employee probation
+        // detail page (salary progression, performance cycles, etc.) by
+        // crafting the id. Scope to this resort like every other lookup
+        // in this file.
+        $employee = Employee::with(['resortAdmin','position','department','section','reportingTo.position','reportingTo.department','reportingToAdmin'])
+            ->where('resort_id', $this->resort->resort_id)
+            ->where('id', $employeeId)
+            ->first();
+        if (!$employee) {
+            abort(404, 'Employee not found.');
+        }
         // Probation is a 3-month window. The end date is probation_end_date
         // when set, otherwise joining_date + 3 months. Carbon::parse(null)
         // silently returns "now", so guard against a missing joining date —
@@ -570,7 +582,13 @@ class ProbationController extends Controller
 
     public function confirmProbation(Request $request, $id)
     {
-        $employee = Employee::findOrFail($id);
+        // Was Employee::findOrFail($id) with no resort filter — any
+        // resort-admin could confirm another resort's employee's
+        // probation by id (raw, unencoded per the blade template).
+        $employee = Employee::where('id', $id)->where('resort_id', $this->resort->resort_id)->first();
+        if (!$employee) {
+            return response()->json(['message' => 'Employee not found.'], 404);
+        }
         $employee->probation_status = 'Confirmed';
         $employee->employment_type = $request->employment_type ?? 'Full-time'; // default fallback
         $employee->status = 'Active';
@@ -582,7 +600,12 @@ class ProbationController extends Controller
 
     public function failProbation(Request $request, $id)
     {
-        $employee = Employee::findOrFail($id);
+        // Was Employee::findOrFail($id) with no resort filter — same
+        // cross-tenant gap as confirmProbation().
+        $employee = Employee::where('id', $id)->where('resort_id', $this->resort->resort_id)->first();
+        if (!$employee) {
+            return response()->json(['message' => 'Employee not found.'], 404);
+        }
         $employee->probation_status = 'Failed';
         $employee->employment_type = 'Probationary';
         // Mark the employee as Offboarding (not Terminated yet) — the
@@ -654,7 +677,12 @@ class ProbationController extends Controller
     public function extendProbation(Request $request, $id)
     {
         $formattedProbationEndDate = $request->extension_date ? \Carbon\Carbon::createFromFormat('d/m/Y', $request->extension_date)->format('Y-m-d') : null;
-        $employee = Employee::findOrFail($id);
+        // Was Employee::findOrFail($id) with no resort filter — same
+        // cross-tenant gap as confirmProbation()/failProbation().
+        $employee = Employee::where('id', $id)->where('resort_id', $this->resort->resort_id)->first();
+        if (!$employee) {
+            return response()->json(['message' => 'Employee not found.'], 404);
+        }
         $employee->probation_status = 'Extended';
         $employee->employment_type = "Probationary";
         $employee->status = 'Active';
@@ -839,7 +867,17 @@ class ProbationController extends Controller
 
     public function sendProbationLetter(Request $request)
     {
-        $employee = Employee::with('position', 'resortAdmin', 'department')->findOrFail($request->employee_id);
+        // Was Employee::findOrFail($request->employee_id) with no resort
+        // filter — a client-supplied employee_id from another resort would
+        // send a real letter email + mutate that foreign employee's
+        // probation/employment fields.
+        $employee = Employee::with('position', 'resortAdmin', 'department')
+            ->where('resort_id', $this->resort->resort_id)
+            ->where('id', $request->employee_id)
+            ->first();
+        if (!$employee) {
+            return response()->json(['error' => 'Employee not found.'], 404);
+        }
         $type = $request->type;
         $resort = Resort::findOrFail($employee->resort_id);
         // dd($resort);
@@ -954,9 +992,16 @@ class ProbationController extends Controller
 
     public function exportProbationPdf($employeeId)
     {
+        // Was Employee::findOrFail($employeeId) with no resort filter —
+        // downloadable PDF leak of another resort's employee identity.
         $employee = Employee::with([
             'resortAdmin', 'department', 'position'
-        ])->findOrFail($employeeId);
+        ])->where('resort_id', $this->resort->resort_id)
+          ->where('id', $employeeId)
+          ->first();
+        if (!$employee) {
+            abort(404, 'Employee not found.');
+        }
 
         $pdf = Pdf::loadView('resorts.people.probation.probation_pdf', compact('employee'));
         return $pdf->download('Probation_Details_' . $employee->Emp_id . '.pdf');

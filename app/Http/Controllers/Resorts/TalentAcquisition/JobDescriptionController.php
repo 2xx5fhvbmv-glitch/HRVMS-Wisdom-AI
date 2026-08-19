@@ -362,7 +362,10 @@ class JobDescriptionController extends Controller
 
         try{
 
-            $j = JobDescription::find($id);
+            $j = JobDescription::where('Resort_id', $this->resort->resort_id)->find($id);
+            if (!$j) {
+                return response()->json(['success' => false, 'message' => 'Job description not found.'], 404);
+            }
             return response()->json(['success' => true, 'data'=> strip_tags($j->jobdescription)],200);
 
         }
@@ -388,7 +391,10 @@ class JobDescriptionController extends Controller
     {
         try{
 
-            $j = JobDescription::find($id);
+            $j = JobDescription::where('Resort_id', $this->resort->resort_id)->find($id);
+            if (!$j) {
+                return response()->json(['success' => false, 'message' => 'Job description not found.'], 404);
+            }
             return response()->json(['success' => true, 'data'=> $j->jobdescription],200);
 
         }
@@ -417,7 +423,11 @@ class JobDescriptionController extends Controller
         DB::beginTransaction();
         try{
 
-            $j = JobDescription::find($id);
+            $j = JobDescription::where('Resort_id', $this->resort->resort_id)->find($id);
+            if (!$j) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'Job description not found.'], 404);
+            }
             $j->jobdescription = $request->jobdescription;
             $j->save();
             DB::commit();
@@ -447,7 +457,11 @@ class JobDescriptionController extends Controller
         DB::beginTransaction();
         try{
 
-            $j = JobDescription::find($id);
+            $j = JobDescription::where('Resort_id', $this->resort->resort_id)->find($id);
+            if (!$j) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'Job description not found.'], 404);
+            }
             $j->delete();
             DB::commit();
             return response()->json(['success' => true, 'message' => 'Suceessfully Removed Job description  .'],200);

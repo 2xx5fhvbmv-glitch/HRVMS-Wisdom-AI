@@ -1100,7 +1100,11 @@ class WorkforcePlanningDashboardController extends Controller
     {
         try
         {
-            $ResortId =  $request->ResortId;
+            // Never trust the resort id from the request body — it's an
+            // easy cross-tenant lever (POST any other resort's id, get its
+            // positions/headcount/employee names back). Always use the
+            // authenticated resort-admin's own resort_id.
+            $ResortId = $this->globalUser->resort_id;
             $Position_id = $request->Position_id;
             $Dept_id = $request->Dept_id;
             $year = (int) $request->year;
