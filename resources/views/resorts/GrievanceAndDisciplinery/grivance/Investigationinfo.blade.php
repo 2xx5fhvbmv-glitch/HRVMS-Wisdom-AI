@@ -165,7 +165,10 @@
                                         <td>{{ $value->follow_up_action }}</td>
                                         <td>{{ $value->follow_up_description }}</td>
                                         <td>{{ $value->investigation_stage }}</td>
-                                        <td>{{ $value->inves_find_recommendations }}</td>
+                                        {{-- CKEditor-produced rich text (see investigationreport.blade.php's
+                                             own use of {!! !!} for this exact field) — {{ }} escaped the
+                                             HTML tags into literal text instead of rendering them. --}}
+                                        <td>{!! $value->inves_find_recommendations !!}</td>
                                         <td>{{ $value->first_name }} {{ $value->last_name }} </td>
                                     </tr>
                                 @endforeach
