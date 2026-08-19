@@ -850,23 +850,29 @@ $(document).on("click",".RequestForStatement",function() {
     });
     
     $(document).on("click",".RequestIdentity",function(){
-    
-    
+        var $requestBtn = $(this);
+
         $.ajax({
-            url: "{{ route('GrievanceAndDisciplinery.grivance.RequestIdentity') }}", 
+            url: "{{ route('GrievanceAndDisciplinery.grivance.RequestIdentity') }}",
             type: 'POST',
-            data: {"_token":"{{ csrf_token()}}","id":$(this).data("id")},
+            data: {"_token":"{{ csrf_token()}}","id":$requestBtn.data("id")},
             success: function(response) {
-                console.log(response.success);
                 if (response.success) {
                     toastr.success(response.message,"Success",
                     {
                         positionClass: 'toast-bottom-right'
                     });
 
-                    $(".align-self-end").hide();
-                } 
-                else 
+                    // Was $(".align-self-end").hide() — an unscoped class
+                    // selector that hid the whole button/status wrapper
+                    // instead of showing the pending state, so a successful
+                    // request left no visible trace at all once the toast
+                    // faded. Replace just the clicked button with the same
+                    // "awaiting response" status a page reload would show
+                    // (Request_Identity_Disclosure == 'Requested').
+                    $requestBtn.replaceWith('<span class="text-muted">Identity disclosure requested — awaiting response</span>');
+                }
+                else
                 {
                         toastr.error(response.message, "Error",
                         {
