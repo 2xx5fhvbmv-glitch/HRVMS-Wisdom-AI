@@ -186,8 +186,22 @@ class GrivanceController extends Controller
             {
                 return $row->category->Category_Name;
             })
-            ->addColumn('Grivance_EmployeeName', function ($row)
+            ->addColumn('Grivance_EmployeeName', function ($row) use ($assinged_id)
             {
+                // Confidential submission (Grivance_Submission_Type == "Yes")
+                // never showed anything but the real name here — this list
+                // was the actual leak the investigation page's own
+                // $canViewIdentity gate was built to prevent, just never
+                // applied to this column. Same rule: hidden unless this
+                // viewer's employee id is in Identity_Disclosed_To (granted
+                // via an approved identity-disclosure request).
+                $canViewIdentity = $row->Grivance_Submission_Type != "Yes"
+                    || in_array($assinged_id, $row->Identity_Disclosed_To ?? []);
+
+                if (!$canViewIdentity) {
+                    return '<span class="text-muted">Confidential</span>';
+                }
+
                 $admin = optional($row->GetEmployee)->resortAdmin;
                 return $admin ? $admin->first_name.' '.$admin->last_name : 'N/A';
             })
@@ -223,7 +237,7 @@ class GrivanceController extends Controller
             ->addColumn('CreatedAt', function ($row) {
                 return $row->created_at ? $row->created_at->format('d M Y') : '—';
             })
-            ->rawColumns(['Grivance_id','Category_Name','Employee_Name','Confidentiality','Status','CreatedAt','Action'])
+            ->rawColumns(['Grivance_id','Category_Name','Grivance_EmployeeName','Confidentiality','Status','CreatedAt','Action'])
             ->make(true);
         }
         return view('resorts.GrievanceAndDisciplinery.grivance.index',compact('page_title'));
