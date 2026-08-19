@@ -51,7 +51,7 @@
                                     <td>
                                         @if($Grivance_Parent->Grivance_Submission_Type =="Yes")
                                         <span class="text-themeGreen text-nowrap">
-                                            <img src="assets/images/check-circle-themeGreen.svg" alt="">Confidentiality
+                                            <img src="{{ asset('resorts_assets/images/check-circle-themeGreen.svg') }}" alt="">Confidentiality
                                         </span>
                                         @elseif($Grivance_Parent->Grivance_Submission_Type =="No")
                                             <span class="text-themeprimary text-nowrap" style="color: red;">
@@ -89,7 +89,7 @@
                     <div class="col-lg-6">
                         <h6 class="mb-md-3 mb-2">Employee Details: @if($Grivance_Parent->Grivance_Submission_Type =="Yes")
                                         <span class="text-themeGreen text-nowrap">
-                                            <img src="assets/images/check-circle-themeGreen.svg" alt="">Confidentiality
+                                            <img src="{{ asset('resorts_assets/images/check-circle-themeGreen.svg') }}" alt="">Confidentiality
                                         </span>
                                         @elseif($Grivance_Parent->Grivance_Submission_Type =="No")
                                             <span class="text-themeprimary text-nowrap" style="color: red;">
