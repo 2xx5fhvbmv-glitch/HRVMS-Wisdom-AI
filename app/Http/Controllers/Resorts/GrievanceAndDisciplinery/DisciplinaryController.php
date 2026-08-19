@@ -286,6 +286,23 @@ class DisciplinaryController extends Controller
     public function StoreDisciplinary(Request $request)
     {
         $Employee_id = base64_decode($request->Employee_id);
+        // Was written into disciplinarySubmit below before the (only)
+        // resort-scoped lookup of this same id even ran, and that lookup's
+        // failure only broke notification code, never blocked the write —
+        // an id from another resort saved successfully either way.
+        if (!Employee::where('id', $Employee_id)->where('resort_id', $this->resort->resort_id)->exists()) {
+            return response()->json(['success' => false, 'message' => 'Invalid employee.'], 422);
+        }
+        $witnessIds = [];
+        if (!empty($request->select_witness)) {
+            foreach ((array) $request->select_witness as $wid) {
+                $witnessIds[] = base64_decode($wid);
+            }
+            $validWitnessCount = Employee::whereIn('id', $witnessIds)->where('resort_id', $this->resort->resort_id)->count();
+            if ($validWitnessCount !== count(array_unique($witnessIds))) {
+                return response()->json(['success' => false, 'message' => 'One or more witnesses are invalid.'], 422);
+            }
+        }
         $Category_id = base64_decode($request->Category_id);
         $Offence_id =  base64_decode($request->Offence_id);
         $Action_id =  base64_decode($request->Action_id);
@@ -396,15 +413,13 @@ class DisciplinaryController extends Controller
         }
         if($witnessisapplicable =="Yes")
         {
-            foreach($request->select_witness   as $id)
-            {   
-
-   
-                $Wintness_Status = ($Request_For_Statement =="Yes") ?'Requested' : ''; 
+            foreach($witnessIds as $witnessId)
+            {
+                $Wintness_Status = ($Request_For_Statement =="Yes") ?'Requested' : '';
                 DisciplinaryWitness::create([
                                                 "resort_id"=>$this->resort->resort_id,
                                                 'Disciplinary_id'=>$disciplinarySubmit->Disciplinary_id,
-                                                'Employee_id'=>base64_decode($id),
+                                                'Employee_id'=>$witnessId,
                                             ]);
             }
         }

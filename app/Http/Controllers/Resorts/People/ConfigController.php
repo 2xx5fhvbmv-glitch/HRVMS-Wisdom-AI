@@ -162,7 +162,11 @@ class ConfigController extends Controller
         DB::beginTransaction();
         try
         {
-            AnnouncementCategory::where("id",$id)->delete();
+            // Was ->where("id",$id)->delete() with no resort filter — any
+            // resort-admin could delete another resort's announcement
+            // category by id. Scope like the sibling CategoryinlineUpdate().
+            AnnouncementCategory::where('resort_id', $this->resort->resort_id)
+                ->where("id",$id)->delete();
 
             DB::commit();
             return response()->json([

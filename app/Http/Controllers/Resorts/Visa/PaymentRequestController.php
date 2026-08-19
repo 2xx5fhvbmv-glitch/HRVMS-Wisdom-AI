@@ -849,8 +849,8 @@ class PaymentRequestController extends Controller
        $id = base64_decode($request->Payment_id);
 
 
-         $PaymentRequest = PaymentRequest::find($id);
-        if (!$PaymentRequest) 
+         $PaymentRequest = PaymentRequest::where('id', $id)->where('resort_id', $this->resort->resort_id)->first();
+        if (!$PaymentRequest)
         {
             return response()->json(['success' => false,'msg' => 'Payment Request not found'], 404); 
         }   
@@ -870,8 +870,8 @@ class PaymentRequestController extends Controller
             return abort(403, 'Unauthorized action.');
         }
         
-        $PaymentRequest = PaymentRequest::find(base64_decode($id));
-        if (!$PaymentRequest) 
+        $PaymentRequest = PaymentRequest::where('id', base64_decode($id))->where('resort_id', $this->resort->resort_id)->first();
+        if (!$PaymentRequest)
         {
             return redirect()->route('resort.Visa.PaymentRequestIndex')->with('error', 'Payment Request not found');
         }
@@ -947,11 +947,11 @@ class PaymentRequestController extends Controller
     public function DownloadPymentRequest($id)
     {
 
-        $PaymentRequest = PaymentRequest::find(base64_decode($id));
-        if (!$PaymentRequest) 
+        $PaymentRequest = PaymentRequest::where('id', base64_decode($id))->where('resort_id', $this->resort->resort_id)->first();
+        if (!$PaymentRequest)
         {
             return redirect()->back()->with('error', 'Payment Request not found');
-        }  
+        }
         else
         {
             $PaymentRequestChildren = PaymentRequestChild::where('Requested_Id', $PaymentRequest->id)
@@ -976,8 +976,10 @@ class PaymentRequestController extends Controller
         $page_title = 'Renewal Payment Request';
         
         $ResortBudgetCost = Common::VisaRenewalCost($this->resort->resort_id);
-        $PaymentRequest = PaymentRequest::find(base64_decode($id));
-        $child = PaymentRequestChild::where("id", base64_decode($childId))->first();
+        $PaymentRequest = PaymentRequest::where('resort_id', $this->resort->resort_id)->find(base64_decode($id));
+        $child = PaymentRequestChild::whereHas('RequestedEmployees', function ($q) {
+            $q->where('resort_id', $this->resort->resort_id);
+        })->find(base64_decode($childId));
         $start_date= carbon::now()->format('Y-m-d');
         $start = Carbon::parse($start_date);
         if($child)

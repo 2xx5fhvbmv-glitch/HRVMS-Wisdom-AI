@@ -95,7 +95,9 @@ class ManningResponseController extends Controller
     {
         $currentYear = Carbon::now()->year; // Get the current year
         $dept_id = $request->input('dept_id');
-        $resort_id = $request->input('resort_id');  // Assuming you have a resort ID to filter
+        // resort_id was accepted as plain client input — always derive it
+        // from the authenticated resort-admin instead.
+        $resort_id = Auth::guard('resort-admin')->user()->resort_id;
 
         // Fetch manning response for the current year and position
         // Use first() to get a single record
@@ -146,6 +148,12 @@ class ManningResponseController extends Controller
                 'total_filled_headcount' => 'required|integer',
                 'total_vacant_headcount' =>'required|integer',
             ]);
+
+            // resort_id was accepted as plain client input and used directly
+            // everywhere below — a hostile request from Resort A could wipe
+            // and rewrite Resort B's workforce-planning numbers. Always
+            // derive it from the authenticated resort-admin instead.
+            $validated['resort_id'] = Auth::guard('resort-admin')->user()->resort_id;
 
             // Check if a ManningResponse already exists for the given resort, department, and year
             $manningResponse = ManningResponse::where('resort_id', $validated['resort_id'])
@@ -256,6 +264,12 @@ class ManningResponseController extends Controller
                 'total_vacant_headcount' =>'required|integer',
             ]);
 
+            // resort_id was accepted as plain client input — a hostile
+            // request from Resort A could wipe and rewrite Resort B's
+            // workforce-planning draft. Always derive it from the
+            // authenticated resort-admin instead.
+            $validated['resort_id'] = Auth::guard('resort-admin')->user()->resort_id;
+
             // Save or update the ManningResponse
             $manningResponse = ManningResponse::updateOrCreate(
                 [
@@ -307,6 +321,11 @@ class ManningResponseController extends Controller
 
     public function getDraft($resortId, $deptId, $year)
     {
+        // {resortId} is a client-supplied URL segment — never trust it.
+        // Always resolve the draft against the authenticated resort-admin's
+        // own resort so a crafted URL can't read another resort's draft.
+        $resortId = Auth::guard('resort-admin')->user()->resort_id;
+
         // Prepare the manning response query
         $manningResponseQuery = ManningResponse::where('resort_id', $resortId)
             ->where('dept_id', $deptId)
@@ -579,7 +598,20 @@ class ManningResponseController extends Controller
         }
 
         // If validation passes, continue with your update logic
-        $budget = StoreManningResponseChild::findOrFail($id);
+        // Scoped via the parent record's Resort_id — bare findOrFail($id)
+        // let a caller load and overwrite any resort's salary/budget line
+        // item.
+        $resortId = Auth::guard('resort-admin')->user()->resort_id;
+        $budget = StoreManningResponseChild::where('id', $id)
+            ->whereIn('Parent_SMRP_id', function ($q) use ($resortId) {
+                $q->select('id')->from('store_manning_response_parents')->where('Resort_id', $resortId);
+            })
+            ->first();
+
+        if (!$budget) {
+            return response()->json(['message' => 'Budget item not found.'], 404);
+        }
+
         $budget->Current_Basic_salary = $request->input('basic_salary');
         $budget->Proposed_Basic_salary = $request->input('proposed_basic_salary');
         $budget->Months = json_encode($request->input('month_data')); // Save months as JSON
@@ -595,8 +627,13 @@ class ManningResponseController extends Controller
     public function updateParentTotal(Request $request)
     {
         try {
+            // Budget_id/Department_id alone don't prove the row belongs to
+            // the caller's resort — scope by Resort_id too so a guessed
+            // Budget_id+Department_id pair from another resort can't be
+            // overwritten.
             $parent = StoreManningResponseParent::where('Budget_id', $request->Budget_id)
                 ->where('Department_id', $request->Department_id)
+                ->where('Resort_id', Auth::guard('resort-admin')->user()->resort_id)
                 ->first();
 
             if ($parent) {

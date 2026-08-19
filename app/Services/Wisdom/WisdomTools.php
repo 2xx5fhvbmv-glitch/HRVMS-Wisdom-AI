@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Schema;
 use App\Helpers\Common;
 use App\Models\Employee;
 use App\Models\EmployeeLeave;
+use App\Models\ResortHoliday;
 use App\Models\Payroll;
 use App\Models\ParentAttendace;
 use App\Models\Vacancies;
@@ -87,9 +88,18 @@ class WisdomTools
             self::fn('count_employees_by_status',
                 'Get counts of employees grouped by their employment status (Active, Resigned, etc.).', []),
             self::fn('get_employees_on_leave',
-                'List employees who are on approved leave on a given date (defaults to today).',
+                'List employees who are/were on approved leave. Pass `date` for a single day (defaults to today) — e.g. "who is on leave today". Pass `from`/`to` for a range instead — e.g. "who was on leave last month", "staff on leave/vacation this week" — matches any leave that overlaps the range, not just leave spanning the whole range.',
                 [
-                    'date' => ['type' => 'string', 'description' => 'Date in YYYY-MM-DD format. Defaults to today.'],
+                    'date' => ['type' => 'string', 'description' => 'Single date in YYYY-MM-DD format. Defaults to today. Ignored if from/to are given.'],
+                    'from' => ['type' => 'string', 'description' => 'Range start, YYYY-MM-DD. Use with `to` for "last month", "this week", etc.'],
+                    'to'   => ['type' => 'string', 'description' => 'Range end, YYYY-MM-DD. Use with `from`.'],
+                ]),
+            self::fn('get_public_holidays',
+                'Public holidays for the resort — official non-working days. "PH" is a common HR-staff abbreviation for "Public Holiday" — treat any mention of "PH" as this topic (NOT birthdays, NOT performance meetings). Pass `date` to check one specific date ("any PH on 14th Sep 2026"); pass `year` to list all holidays for a calendar year ("list of all public holidays for this year"); pass `within_days` for a look-ahead window from today ("how many PH in the next 2 months" → within_days=60). Omit all three for the next 90 days by default.',
+                [
+                    'date'        => ['type' => 'string', 'description' => 'YYYY-MM-DD — check whether this specific date is a public holiday.'],
+                    'year'        => ['type' => 'integer', 'description' => 'Calendar year to list all holidays for, e.g. 2026.'],
+                    'within_days' => ['type' => 'integer', 'description' => 'Look-ahead window in days from today for upcoming holidays. Default 90.'],
                 ]),
             self::fn('get_pending_leave_approvals',
                 'Leave requests that are still awaiting approval (employee, leave type, dates, days, status). Use for "which leave requests are pending approval", "pending leave". Do NOT confuse with who is on leave today.', []),
@@ -112,9 +122,9 @@ class WisdomTools
             self::fn('get_nationality_breakdown',
                 'Count active employees grouped by nationality, including a local (Maldivian) vs foreign split. Use this for "how many are local/foreign/expat" questions.', []),
             self::fn('find_employee',
-                'Look up an employee by name, employee ID, OR passport number (reverse lookup — "whose passport is X"). Returns profile: department, position, status, joining date, nationality, date-of-birth/birthday, reporting manager, passport number, and on_probation (true/false, already computed — trust it over the raw probation_status). Does NOT return salary. If several employees match a partial name, ALL matches are returned — list them and ask the user which one rather than guessing.',
+                'Look up an employee by name, employee ID, passport number (reverse lookup — "whose passport is X"), OR job/position title (e.g. "who is the finance director", "who is the HR manager"). Returns profile: department, position, status, joining date, nationality, date-of-birth/birthday, reporting manager, passport number, and on_probation (true/false, already computed — trust it over the raw probation_status). Does NOT return salary. If several employees match, ALL matches are returned — list them and ask the user which one rather than guessing.',
                 [
-                    'name' => ['type' => 'string', 'description' => 'Full/partial name, employee ID, or a passport number.'],
+                    'name' => ['type' => 'string', 'description' => 'Full/partial name, employee ID, passport number, or job/position title.'],
                 ], ['name']),
             self::fn('get_recruitment_pipeline',
                 'Get a summary of the recruitment pipeline: vacancies grouped by status and applicants grouped by status.', []),
@@ -226,7 +236,7 @@ class WisdomTools
                     'type' => ['type' => 'string', 'description' => 'One of: localization, minimum_wage. Default localization.'],
                 ]),
             self::fn('get_compliance_issues',
-                'Flagged compliance breaches from the compliance directory, prioritised by severity (Critical→High→Medium/Low), with counts by severity and by module and a top actionable list (issue, module, employee, suggested fix). Use for "what compliance issues should I resolve first", "compliance violations", "which non-compliant cases to address". Do NOT answer this with just localization %.', []),
+                'Flagged compliance breaches from the general HR compliance directory (minimum wage, overtime eligibility, salary outliers, etc.), prioritised by severity (Critical→High→Medium/Low), with counts by severity and by module and a top actionable list (issue, module, employee, suggested fix). Use for "what compliance issues should I resolve first", "compliance violations", "which non-compliant cases to address". Do NOT answer this with just localization %. Do NOT use this for immigration/visa/work-permit/expat compliance questions — use get_visa_summary or get_employee_immigration for those instead.', []),
             self::fn('get_workforce_status_summary',
                 'A single "today\'s workforce status" snapshot: total active headcount, employees on leave today, employees on probation, open vacancies, and localization %. Use this whenever asked for a general workforce/HR summary, "summarize workforce status", "give me an HR overview" — call THIS instead of guessing numbers or combining other tools yourself.', []),
 
@@ -271,7 +281,7 @@ class WisdomTools
 
             // ---- Visa / Immigration Management ----
             self::fn('get_visa_summary',
-                'Immigration/visa dashboard summary: expat employee count, employees with work permits, documents expiring in 30 days, unpaid work-permit & slot fees, and pending payment requests. Use for "give me a visa summary", "current immigration status", "what compliance items need attention".', []),
+                'Immigration/visa dashboard summary: expat employee count, employees with work permits, documents expiring in 30 days, unpaid work-permit & slot fees, and pending payment requests. Use for "give me a visa summary", "current immigration status", "are we immigration compliant", "immigration compliance", "visa/work-permit compliance" — ANY compliance question that mentions immigration, visa, work permit, or expat. Do NOT use get_compliance_issues for these; that tool is for the separate general HR compliance directory (minimum wage, overtime, salary outliers), not immigration.', []),
             self::fn('get_visa_expiries',
                 'Visa/immigration documents (visa, work permit, insurance, medical, slot fee) by expiry status, for active expats. Each item has employee, document type, expiry date and days left (negative = already expired); the expiry shown is the SAME current date the Xpat employee page shows. Use `status=upcoming` (default) for "which documents expire this week/month", "upcoming expiries", "urgent renewals"; `status=expired` for "which documents/work permits are expired", "overdue documents", "how many work permits expired"; `status=all` for both. Filter to one kind with doc_type. One employee can own several expiring documents, so the result also has `distinct_employees` and a `by_employee` roll-up (employee, documents count, types) — when listing names, use this roll-up and say e.g. "10 expired across 4 employees: Anastasia (5), Priya (3)…"; do NOT repeat the same name once per row.',
                 [
@@ -435,7 +445,7 @@ class WisdomTools
         // Payroll tools — HR / FULL tier only.
         if (!empty($ctx['can_payroll'])) {
             $tools[] = self::fn('get_payroll_summary',
-                'Get the latest payroll summary for the resort: pay period, status, total employees and total payroll amount.', []);
+                'Payroll dashboard figures: the last processed/locked payroll (period, status, total paid) AND the upcoming payroll for the current cutoff period — which is often an ESTIMATE computed live from attendance/OT/deductions (not yet a finalized payroll run) when the period has not been locked yet. Use for "upcoming payroll", "estimated payroll this month", "last payroll", "what does the payroll dashboard show". `upcoming_payroll.is_estimated=true` means the figure is a live estimate, not a finalized amount — say so.', []);
             $tools[] = self::fn('get_employee_salary',
                 'Get the basic salary / compensation for a specific employee by name. Payroll-restricted.',
                 [
@@ -517,6 +527,7 @@ class WisdomTools
                 case 'get_department_breakdown': return self::getDepartmentBreakdown($rid);
                 case 'count_employees_by_status':return self::countByStatus($rid);
                 case 'get_employees_on_leave':   return self::getEmployeesOnLeave($rid, $args);
+                case 'get_public_holidays':      return self::getPublicHolidays($rid, $args);
                 case 'get_pending_leave_approvals': return self::getPendingLeaveApprovals($rid, $args);
                 case 'get_leave_balance':        return self::getLeaveBalance($rid, $args);
                 case 'get_boarding_pass_requests': return self::getBoardingPassRequests($rid, $args);
@@ -669,15 +680,88 @@ class WisdomTools
         return ['by_status' => $rows->toArray()];
     }
 
+    private static function getPublicHolidays(int $rid, array $args): array
+    {
+        $query = ResortHoliday::where('resort_id', $rid);
+
+        if (!empty($args['date'])) {
+            $date = self::cleanDate($args['date']);
+            $holiday = (clone $query)->whereDate('PublicHolidaydate', $date)->first();
+            return [
+                'date' => $date,
+                'is_public_holiday' => (bool) $holiday,
+                'name' => $holiday->PublicHolidayName ?? null,
+            ];
+        }
+
+        if (!empty($args['year'])) {
+            $list = $query->whereRaw('YEAR(PublicHolidaydate) = ?', [(int) $args['year']])
+                ->orderBy('PublicHolidaydate')
+                ->get(['PublicHolidayName', 'PublicHolidaydate']);
+        } else {
+            $days = (int) ($args['within_days'] ?? 90);
+            $list = $query->whereDate('PublicHolidaydate', '>=', Carbon::today())
+                ->whereDate('PublicHolidaydate', '<=', Carbon::today()->addDays($days))
+                ->orderBy('PublicHolidaydate')
+                ->get(['PublicHolidayName', 'PublicHolidaydate']);
+        }
+
+        $mapped = $list->map(fn ($h) => [
+            'name' => $h->PublicHolidayName,
+            'date' => self::fmtDate($h->getRawOriginal('PublicHolidaydate')),
+        ])->values();
+
+        return [
+            'count'    => $mapped->count(),
+            'holidays' => $mapped,
+        ];
+    }
+
     private static function getEmployeesOnLeave(int $rid, array $args): array
     {
+        // Range mode — "who was on leave last month/this week" etc. Any
+        // overlap with [from, to] counts, not just leave spanning the whole
+        // range.
+        if (!empty($args['from']) || !empty($args['to'])) {
+            $from = self::cleanDate($args['from'] ?? ($args['to'] ?? null));
+            $to   = self::cleanDate($args['to'] ?? ($args['from'] ?? null));
+
+            $leaves = EmployeeLeave::where('resort_id', $rid)
+                ->where('status', 'Approved')
+                ->whereDate('from_date', '<=', $to)
+                ->whereDate('to_date', '>=', $from)
+                ->with(['employee:id,Emp_id,Admin_Parent_id,Dept_id', 'employee.resortAdmin:id,first_name,last_name', 'employee.department:id,name', 'LeaveCategory:id,leave_type'])
+                ->limit(200)
+                ->get();
+
+            $list = $leaves->map(function ($l) {
+                $emp = $l->employee;
+                return [
+                    'name'       => $emp ? self::empName($emp) : 'Unknown',
+                    'department' => $emp && $emp->department ? $emp->department->name : null,
+                    'leave_type' => $l->LeaveCategory->leave_type ?? null,
+                    'from'       => $l->getRawOriginal('from_date'),
+                    'to'         => $l->getRawOriginal('to_date'),
+                    'total_days' => $l->total_days,
+                ];
+            })->values();
+
+            return [
+                'from' => $from,
+                'to'   => $to,
+                'distinct_employees' => $list->pluck('name')->unique()->count(),
+                'leave_requests'     => $list->count(),
+                'employees' => $list,
+            ];
+        }
+
         $date = self::cleanDate($args['date'] ?? null);
 
         $leaves = EmployeeLeave::where('resort_id', $rid)
             ->where('status', 'Approved')
             ->whereDate('from_date', '<=', $date)
             ->whereDate('to_date', '>=', $date)
-            ->with(['employee:id,Emp_id,Admin_Parent_id,Dept_id', 'employee.resortAdmin:id,first_name,last_name', 'employee.department:id,name', 'LeaveCategory:id,name'])
+            ->with(['employee:id,Emp_id,Admin_Parent_id,Dept_id', 'employee.resortAdmin:id,first_name,last_name', 'employee.department:id,name', 'LeaveCategory:id,leave_type'])
             ->limit(100)
             ->get();
 
@@ -686,7 +770,7 @@ class WisdomTools
             return [
                 'name'       => $emp ? self::empName($emp) : 'Unknown',
                 'department' => $emp && $emp->department ? $emp->department->name : null,
-                'leave_type' => $l->LeaveCategory->name ?? null,
+                'leave_type' => $l->LeaveCategory->leave_type ?? null,
                 'from'       => $l->getRawOriginal('from_date'),
                 'to'         => $l->getRawOriginal('to_date'),
             ];
@@ -714,7 +798,17 @@ class WisdomTools
                           ->orWhereRaw("CONCAT(first_name,' ',last_name) LIKE ?", ["%{$term}%"]);
                     })
                   ->orWhere('Emp_id', 'like', "%{$term}%")
-                  ->orWhere('passport_number', 'like', "%{$term}%"); // reverse passport lookup
+                  ->orWhere('passport_number', 'like', "%{$term}%") // reverse passport lookup
+                  ->orWhereHas('position', function ($p) use ($term) {
+                        // Word-order independent: "finance director" must
+                        // still match a title stored as "Director Of
+                        // Finance" — AND each word as its own LIKE rather
+                        // than requiring the whole phrase contiguously.
+                        $words = preg_split('/\s+/', trim($term), -1, PREG_SPLIT_NO_EMPTY);
+                        foreach ($words as $word) {
+                            $p->where('position_title', 'like', "%{$word}%");
+                        }
+                    }); // "who is the finance director" — lookup by job title
             })
             ->with(['resortAdmin:id,first_name,last_name', 'department:id,name', 'position:id,position_title'])
             ->limit(10)
@@ -1418,23 +1512,37 @@ class WisdomTools
 
     private static function getPayrollSummary(int $rid): array
     {
-        $p = Payroll::where('resort_id', $rid)->orderByDesc('id')->first();
-        if (!$p) {
-            return ['message' => 'No payroll records found for this resort yet.'];
+        // Delegates to the same resolution the Payroll HR dashboard cards
+        // use (DashboardController::getPayrollDashboardSummary) instead of
+        // guessing off the latest Payroll row by id — that could land on an
+        // empty draft and always read 0, which is what was happening here.
+        $summary = app(\App\Http\Controllers\Resorts\Payroll\DashboardController::class)
+            ->getPayrollDashboardSummary($rid);
+
+        $rate = self::dollarToMvr($rid);
+        $result = ['conversion_rate' => '1 USD = ' . number_format($rate, 4) . ' MVR'];
+
+        if ($summary['last_payroll']) {
+            $lp = $summary['last_payroll'];
+            $result['last_payroll'] = [
+                'period_start'  => $lp['period_start'],
+                'period_end'    => $lp['period_end'],
+                'status'        => $lp['status'],
+                'total_payroll' => self::dualMoney($lp['total_payroll'], $rate, 'USD'),
+            ];
+        } else {
+            $result['last_payroll'] = ['message' => 'No processed payroll found for this resort yet.'];
         }
 
-        $unit = $p->payroll_unit ?: 'USD';
-        $rate = self::dollarToMvr($rid);
-
-        return [
-            'period_start'    => $p->getRawOriginal('start_date'),
-            'period_end'      => $p->getRawOriginal('end_date'),
-            'status'          => $p->status,
-            'payment_date'    => $p->getRawOriginal('payment_date'),
-            'total_employees' => $p->total_employees,
-            'conversion_rate' => '1 USD = ' . number_format($rate, 4) . ' MVR',
-            'total_payroll'   => self::dualMoney((float) $p->total_payroll, $rate, $unit),
+        $up = $summary['upcoming_payroll'];
+        $result['upcoming_payroll'] = [
+            'period_start'  => $up['period_start'],
+            'period_end'    => $up['period_end'],
+            'is_estimated'  => $up['is_estimated'],
+            'total_payroll' => self::dualMoney($up['total_payroll'], $rate, 'USD'),
         ];
+
+        return $result;
     }
 
     private static function getEmployeeSalary(int $rid, array $args): array

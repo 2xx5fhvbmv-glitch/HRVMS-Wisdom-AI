@@ -124,7 +124,7 @@ class RequestController extends Controller
         $validator = Validator::make($request->all(), [
             'request_type'                              =>  'required',
             'guarantor_id'                              =>  'required_if:request_type,Salary Advance,Loan Request|array',
-            'guarantor_id.*'                            =>  'integer|exists:employees,id',
+            'guarantor_id.*'                            =>  ['integer', \Illuminate\Validation\Rule::exists('employees', 'id')->where('resort_id', $this->resort_id)],
             'request_amount'                            =>  'required_if:request_type,Salary Advance,Loan Request',
             'currency'                                  =>  'nullable|in:MVR,USD',
             'priority'                                  =>  'required',

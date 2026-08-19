@@ -186,8 +186,22 @@ class GrivanceController extends Controller
             {
                 return $row->category->Category_Name;
             })
-            ->addColumn('Grivance_EmployeeName', function ($row)
+            ->addColumn('Grivance_EmployeeName', function ($row) use ($assinged_id)
             {
+                // Confidential submission (Grivance_Submission_Type == "Yes")
+                // never showed anything but the real name here — this list
+                // was the actual leak the investigation page's own
+                // $canViewIdentity gate was built to prevent, just never
+                // applied to this column. Same rule: hidden unless this
+                // viewer's employee id is in Identity_Disclosed_To (granted
+                // via an approved identity-disclosure request).
+                $canViewIdentity = $row->Grivance_Submission_Type != "Yes"
+                    || in_array($assinged_id, $row->Identity_Disclosed_To ?? []);
+
+                if (!$canViewIdentity) {
+                    return '<span class="text-muted">Confidential</span>';
+                }
+
                 $admin = optional($row->GetEmployee)->resortAdmin;
                 return $admin ? $admin->first_name.' '.$admin->last_name : 'N/A';
             })
@@ -223,7 +237,7 @@ class GrivanceController extends Controller
             ->addColumn('CreatedAt', function ($row) {
                 return $row->created_at ? $row->created_at->format('d M Y') : '—';
             })
-            ->rawColumns(['Grivance_id','Category_Name','Employee_Name','Confidentiality','Status','CreatedAt','Action'])
+            ->rawColumns(['Grivance_id','Category_Name','Grivance_EmployeeName','Confidentiality','Status','CreatedAt','Action'])
             ->make(true);
         }
         return view('resorts.GrievanceAndDisciplinery.grivance.index',compact('page_title'));
@@ -241,17 +255,31 @@ class GrivanceController extends Controller
     public function GetEmployeeDetails(Request $request)
     {
         $emp_id = base64_decode($request->emp);
-    
-        
+
+
         try
-        { 
-            $Employee =  Employee::with(['resortAdmin','department','position'])->where('id',$emp_id)->first();
+        {
+            // Tenant-scoped — this endpoint is reachable directly (not just
+            // through the already-scoped dropdown that normally feeds it)
+            // and previously returned any resort's employee by id.
+            $Employee =  Employee::with(['resortAdmin','department','position'])
+                            ->where('id',$emp_id)
+                            ->where('resort_id', $this->resort->resort_id)
+                            ->first();
+
+            if (!$Employee) {
+                return response()->json(['error' => 'Failed to Find Employee Details'], 404);
+            }
 
             $Employee->DepartmentName = $Employee->department->name;
             $Employee->PositionName = $Employee->position->position_title;
             $Superviser = Employee::with(['resortAdmin'])
-                            ->where('id',$Employee->reporting_to)->first();
-            $Superviser->Main_Name = $Superviser->resortAdmin->first_name.' '. $Superviser->resortAdmin->last_name;
+                            ->where('id',$Employee->reporting_to)
+                            ->where('resort_id', $this->resort->resort_id)
+                            ->first();
+            if ($Superviser) {
+                $Superviser->Main_Name = $Superviser->resortAdmin->first_name.' '. $Superviser->resortAdmin->last_name;
+            }
             $data=[
                 'Employee'=>$Employee,
                 'Superviser'=>$Superviser
@@ -273,7 +301,24 @@ class GrivanceController extends Controller
 
     public function GrievanceSubmiteStore(Request $request)
     {
-
+        // Neither the grievant nor any witness id was ever checked against
+        // the caller's resort — any employee id from any resort could be
+        // written in here (the actual storage-side mechanism behind
+        // cross-resort witnesses/grievants showing up).
+        $employeeId = base64_decode($request->Employee_id);
+        if (!Employee::where('id', $employeeId)->where('resort_id', $this->resort->resort_id)->exists()) {
+            return response()->json(['success' => false, 'message' => 'Invalid employee.'], 422);
+        }
+        $witnessIds = [];
+        if (!empty($request->witness_id)) {
+            foreach ($request->witness_id as $v) {
+                $witnessIds[] = base64_decode($v);
+            }
+            $validWitnessCount = Employee::whereIn('id', $witnessIds)->where('resort_id', $this->resort->resort_id)->count();
+            if ($validWitnessCount !== count(array_unique($witnessIds))) {
+                return response()->json(['success' => false, 'message' => 'One or more witnesses are invalid.'], 422);
+            }
+        }
 
         $path = config('settings.GrivanceAttachments');
         if($request->Confidential =="option1")
@@ -283,18 +328,18 @@ class GrivanceController extends Controller
         else if($request->Anonymous =="option2")
         {
             $Grivance_Submission_Type =  "No";
-        } 
+        }
         else
         {
             $Grivance_Submission_Type =  "NotApplicable";
         }
 
-      
+
         $GrivanceSubmission = GrivanceSubmissionModel::create([
                                             "Grivance_id"=>Common::getGriveanceID(),
                                             'Grivance_Cat_id'=>$request->Grivance_Cat_id,
                                             'Grivance_Sub_cat'=>$request->Grivance_Sub_cat,
-                                            'Employee_id'=>base64_decode($request->Employee_id),
+                                            'Employee_id'=>$employeeId,
                                             'status'=>'pending',
                                             'date'=> date('Y-m-d',strtotime($request->date)),
                                             'Grivance_description'=>$request->Grivance_description,
@@ -320,12 +365,8 @@ class GrivanceController extends Controller
             GrivanceSubmissionModel::where('Grivance_id', $GrivanceSubmission->Grivance_id)
             ->update(['Attachements' => implode(",", $collection)]);
         }
-        if(!empty($request->witness_id))
-        {
-            foreach($request->witness_id as $v)
-            {
-                GrivanceSubmissionWitness::create(["Witness_id" => base64_decode($v),"G_S_Parent_id" => $GrivanceSubmission->id,'Wintness_Status'=>'Active']);
-            }
+        foreach ($witnessIds as $witnessId) {
+            GrivanceSubmissionWitness::create(["Witness_id" => $witnessId,"G_S_Parent_id" => $GrivanceSubmission->id,'Wintness_Status'=>'Active']);
         }
 
         // Web submission path never notified HR at all (mobile's

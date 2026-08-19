@@ -53,6 +53,7 @@ class PaymentConsentController extends Controller
                 ->join('products as p', 'p.id', '=', 'payments.product_id')
                 ->join('shopkeepers as s', 's.id', '=', 'payments.shopkeeper_id')
                 ->where('payments.emp_id', base64_decode($employee_id))
+                ->where('e.resort_id', $resort_id)
                 ->select([
                     'payments.id',
                     'payments.order_id',
@@ -98,9 +99,14 @@ class PaymentConsentController extends Controller
     public function confirmPurchased(Request $request)
     {
         $id = $request->input('paymentID');
+        $resort_id = $this->resort->resort_id;
         // dd($id);
-        // Find the payment by ID or fail
-        $payment = Payment::findOrFail(base64_decode($id));
+        // Find the payment by ID or fail. Payment has no resort_id column
+        // of its own — scope it via the owning employee's resort_id.
+        $payment = Payment::whereHas('employee', function ($q) use ($resort_id) {
+                $q->where('resort_id', $resort_id);
+            })
+            ->findOrFail(base64_decode($id));
 
         // Update the status
         $payment->status = "Consented";

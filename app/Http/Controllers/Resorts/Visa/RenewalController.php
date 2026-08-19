@@ -718,11 +718,20 @@ class RenewalController extends Controller
     {
         $emp_id = base64_decode($request->emp_id);
         $flag = $request->flag;
-    
+
         $payment_type = $request->payment_type;
-        
+
+        // Unlike every sibling renewal method in this file, this endpoint never
+        // verified the submitted employee id belongs to the current resort before
+        // writing WorkPermit/QuotaSlotRenewal rows tagged with this resort's id —
+        // a cross-resort employee id would create fee rows pointing at someone
+        // else's employee record. Guard it like the rest of the file does.
+        if (!Employee::where('id', $emp_id)->where('resort_id', $this->resort->resort_id)->exists()) {
+            return response()->json(['success' => false, 'message' => 'Employee not found.', 'status' => 404]);
+        }
+
         $ResortBudgetCost = Common::VisaRenewalCost($this->resort->resort_id);
-   
+
         $start_date = Carbon::today();
        
         if($flag == "WorkPermit")

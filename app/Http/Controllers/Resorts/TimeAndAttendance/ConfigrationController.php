@@ -102,16 +102,25 @@ class ConfigrationController extends Controller
                 'ShiftName' => $shiftName,
                 'StartTime' => $request->input('StartTime.' . $index),
                 'EndTime' => $request->input('EndTime.' . $index),
-                'resort_id' => $request->input('resort_id'),
+                // Was $request->input('resort_id') — fully client-controlled,
+                // letting any resort-admin create/reassign a shift under any
+                // resort_id. $resort_id (above) is the caller's own resort.
+                'resort_id' => $resort_id,
                 'TotalHours' => $TotalHours
             ];
 
             // Check if this is an update or a new record
             if (!empty($Shiftid) && isset($Shiftid[$index])) {
-                // Update existing shift
-                $shift = ShiftSettings::find($Shiftid[$index]);
-                $shift->update($shiftData);
-            } 
+                // Update existing shift — was ShiftSettings::find() with zero
+                // ownership check, letting any resort-admin edit (and via the
+                // resort_id above, even re-tag) another resort's shift.
+                $shift = ShiftSettings::where('id', $Shiftid[$index])
+                    ->where('resort_id', $resort_id)
+                    ->first();
+                if ($shift) {
+                    $shift->update($shiftData);
+                }
+            }
             else
             {
                 $ShiftSettings = ShiftSettings::where('ShiftName', $shiftName)->where('resort_id', $resort_id)->first();  
@@ -129,7 +138,14 @@ class ConfigrationController extends Controller
         {
             DB::beginTransaction();
             $id = $request->id;
-            ShiftSettings::find($id)->delete();
+            // Was ShiftSettings::find($id) — no resort_id check, letting any
+            // resort-admin delete another resort's shift.
+            $shift = ShiftSettings::where('id', $id)->where('resort_id', $this->resort->resort_id)->first();
+            if (!$shift) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'Shift not found.'], 404);
+            }
+            $shift->delete();
 
             DB::commit();
             return response()->json([
@@ -156,7 +172,10 @@ class ConfigrationController extends Controller
         {
             DB::beginTransaction();
             $page_title = "Geo Location";
-            $resort_id = $request->resort_id;
+            // Was $request->resort_id — fully client-controlled, letting any
+            // resort-admin overwrite another resort's base geofence
+            // location/polygon. Always use the caller's own resort.
+            $resort_id = $this->resort->resort_id;
             $latitude = $request->latitude;
             $longitude = $request->longitude;
 
@@ -334,7 +353,13 @@ class ConfigrationController extends Controller
     }
     public function ResortHoliday(Request $request)
     {
-            $resort_id = $request->resort_id;
+            // Was $request->resort_id — fully client-controlled. It's used
+            // both to stamp new holidays AND, further down, to scope the
+            // update-by-id query, so an attacker could create holidays under
+            // an arbitrary resort_id or, by passing the target resort's real
+            // id, pass the where('resort_id',...) check and edit another
+            // resort's holiday. Always use the caller's own resort.
+            $resort_id = $this->resort->resort_id;
             $PublicHoliday = $request->PublicHoliday; // Default Super Admin Resort data
             $ResortPublicHolidayDate = $request->ResortPublicHolidayDate;  // Default Super Admin Resort data
             $holiday_date = $request->holiday_date;
@@ -432,7 +457,14 @@ class ConfigrationController extends Controller
         {
             DB::beginTransaction();
             $id = $request->id;
-            $resortHoliday = ResortHoliday::find($id)->delete();
+            // Was ResortHoliday::find($id) — no resort_id check, letting any
+            // resort-admin delete another resort's holiday.
+            $resortHoliday = ResortHoliday::where('id', $id)->where('resort_id', $this->resort->resort_id)->first();
+            if (!$resortHoliday) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'Holiday not found.'], 404);
+            }
+            $resortHoliday->delete();
             DB::commit();
             return response()->json(['success' => true, 'message' => 'Holiday Removed Succesfully.']);
 
@@ -450,12 +482,13 @@ class ConfigrationController extends Controller
     }
     public function ResortHolidayUpdate(Request $request)
     {
-            $resort_id = $request->resort_id;
+            // Was $request->resort_id (twice) — fully client-controlled;
+            // always use the caller's own resort.
+            $resort_id = $this->resort->resort_id;
             $PublicHoliday = $request->PublicHoliday; // Default Super Admin Resort data
             $ResortPublicHolidayDate = $request->ResortPublicHolidayDate;  // Default Super Admin Resort data
             $holiday_date = $request->holiday_date;
             $id = $request->id;
-            $resort_id = $request->resort_id;
             $validator = Validator::make($request->all(), [
                 'PublicHolidayName' => [
                     'required',
@@ -493,8 +526,10 @@ class ConfigrationController extends Controller
             try{
                 DB::beginTransaction();
 
-                // Proceed with the update logic
-                $resortHoliday = ResortHoliday::find($id);
+                // Proceed with the update logic — was ResortHoliday::find($id)
+                // with zero resort ownership check, letting any resort-admin
+                // edit another resort's holiday.
+                $resortHoliday = ResortHoliday::where('id', $id)->where('resort_id', $resort_id)->first();
                 if (!$resortHoliday)
                 {
                     return response()->json(['success' => false, 'message' => 'Holiday not found.']);
@@ -616,8 +651,10 @@ class ConfigrationController extends Controller
     {
         $themeId = $request->input('theme_id');
         // dd($themeId);
-        // Check if theme exists and delete it
-        $theme = ColorTheme::find($themeId);
+        // Check if theme exists and delete it — was ColorTheme::find($themeId)
+        // with no resort_id check, letting any resort-admin delete another
+        // resort's color theme.
+        $theme = ColorTheme::where('id', $themeId)->where('resort_id', $this->resort->resort_id)->first();
 
         if ($theme) {
             $theme->delete();

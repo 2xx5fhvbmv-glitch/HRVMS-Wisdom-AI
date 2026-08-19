@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use App\Exports\SelectedEmployeesExport;
 use Illuminate\Support\Facades\Session;
 use App\Models\Employee;
@@ -972,6 +973,7 @@ class EmployeeController extends Controller
         $resort_allowances = ResortBudgetCost::where('resort_id', $resort_id)->where('is_payroll_allowance',1)->get();
         $employee = Employee::with(['resortAdmin','position','department','division','section','education','experiance','allowance','language','sosTeams','document','bankDetails','reportingTo.resortAdmin'])
             ->where('id',base64_decode($id))
+            ->where('resort_id', $resort_id)
             ->when(is_array($scopedDeptIds), fn($q) => $q->whereIn('Dept_id', $scopedDeptIds))
             ->first();
         if (!$employee) {
@@ -1418,12 +1420,12 @@ class EmployeeController extends Controller
     public function changeStatus(Request $request)
     {
         $request->validate([
-            'emp_id' => 'required|exists:employees,id',
+            'emp_id' => ['required', Rule::exists('employees', 'id')->where('resort_id', $this->resort->resort_id)],
             'status' => 'required|in:Active,Onboarding,Probationary,Inactive,Terminated,Resigned,On Leave,Suspended'
         ]);
 
 
-        $employee = Employee::find($request->emp_id);
+        $employee = Employee::where('resort_id', $this->resort->resort_id)->find($request->emp_id);
         if (!$employee) {
             return response()->json(['success' => false, 'message' => 'Employee not found.'], 404);
         }
@@ -1439,7 +1441,14 @@ class EmployeeController extends Controller
     {
         try {
 
-            $employee = Employee::with('resortAdmin')->findOrFail($request->employee_id);
+            $employee = Employee::with('resortAdmin')->where('resort_id', $this->resort->resort_id)->find($request->employee_id);
+
+            if (!$employee) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Employee not found.'
+                ], 404);
+            }
 
             if (!$employee->resortAdmin || !$employee->resortAdmin->email) {
                 return response()->json([
@@ -1612,7 +1621,7 @@ class EmployeeController extends Controller
     {
         $formattedDOB = \Carbon\Carbon::createFromFormat('d/m/Y', $request->dob)->format('Y-m-d');
 
-        $employee = Employee::findOrFail($request->employee_id);
+        $employee = Employee::where('resort_id', $this->resort->resort_id)->findOrFail($request->employee_id);
         $employee->title = $request->title;
         $employee->dob = $formattedDOB;
         $employee->marital_status = $request->marital_status;
@@ -1639,7 +1648,7 @@ class EmployeeController extends Controller
     public function updateContacts(Request $request)
     {
 
-        $employee = Employee::findOrFail($request->employee_id);
+        $employee = Employee::where('resort_id', $this->resort->resort_id)->findOrFail($request->employee_id);
 
         // Snapshot the audit-loggable fields BEFORE save so we can diff
         // them after. Previously this endpoint silently updated
@@ -1678,7 +1687,7 @@ class EmployeeController extends Controller
     public function updateEmergencyContacts(Request $request)
     {
 
-        $employee = Employee::findOrFail($request->employee_id);
+        $employee = Employee::where('resort_id', $this->resort->resort_id)->findOrFail($request->employee_id);
         $employee->emg_cont_first_name = $request->emg_cont_first_name;
         $employee->emg_cont_last_name = $request->emg_cont_last_name;
         $employee->emg_cont_no = $request->emg_cont_no;
@@ -1699,7 +1708,7 @@ class EmployeeController extends Controller
             'languages.*.proficiency_level' => 'required|string',
         ]);
 
-        $employee = Employee::findOrFail($request->employee_id);
+        $employee = Employee::where('resort_id', $this->resort->resort_id)->findOrFail($request->employee_id);
         $employee->leave_destination = $request->leave_destination;
 
         $encodedEmployeeID = base64_encode($request->employee_id);
@@ -1778,8 +1787,15 @@ class EmployeeController extends Controller
         $formattedTerminationDate = $request->termination_date ? \Carbon\Carbon::createFromFormat('d/m/Y', $request->termination_date)->format('Y-m-d') : null;
 
 
-        $position = ResortPosition::find($request->Position_id);
-        $employee = Employee::findOrFail($request->employee_id);
+        $position = ResortPosition::where('resort_id', $this->resort->resort_id)->find($request->Position_id);
+        $employee = Employee::where('resort_id', $this->resort->resort_id)->findOrFail($request->employee_id);
+
+        if (!$position) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Position not found.',
+            ], 422);
+        }
 
         // Resolve the grade using the level HR is actively choosing on this
         // same form (falls back to the position's rank default when no
@@ -1843,12 +1859,12 @@ class EmployeeController extends Controller
         $employee->resortAdmin->save();
 
         // ---------- Write audit log rows for every changed field --------
-        $newPosition = ResortPosition::find($request->Position_id);
-        $newSection  = $request->Section_id ? ResortSection::find($request->Section_id) : null;
-        $newDept     = $request->Dept_id ? ResortDepartment::find($request->Dept_id) : null;
-        $newDivision = $request->division_id ? ResortDivision::find($request->division_id) : null;
+        $newPosition = ResortPosition::where('resort_id', $this->resort->resort_id)->find($request->Position_id);
+        $newSection  = $request->Section_id ? ResortSection::where('resort_id', $this->resort->resort_id)->find($request->Section_id) : null;
+        $newDept     = $request->Dept_id ? ResortDepartment::where('resort_id', $this->resort->resort_id)->find($request->Dept_id) : null;
+        $newDivision = $request->division_id ? ResortDivision::where('resort_id', $this->resort->resort_id)->find($request->division_id) : null;
         $newReporter = $request->reporting_to
-            ? Employee::with('resortAdmin')->find($request->reporting_to)
+            ? Employee::with('resortAdmin')->where('resort_id', $this->resort->resort_id)->find($request->reporting_to)
             : null;
 
         $newSnapshot = [
@@ -1968,7 +1984,7 @@ class EmployeeController extends Controller
             $pensionFinal = round(($basicSalaryInMVR * 0.07), 2);
 
             // Update employee
-            $employee = Employee::findOrFail($employeeId);
+            $employee = Employee::where('resort_id', $this->resort->resort_id)->findOrFail($employeeId);
             $employee->basic_salary = $basicSalary;
             $employee->basic_salary_currency = $basicSalaryCurrency;
             $employee->payment_mode = $request->input('payment_mode');
@@ -2032,7 +2048,9 @@ class EmployeeController extends Controller
     public function updateBankDetails(Request $request, $id)
     {
         // Find the education record by ID
-        $bank_details = EmployeeBankDetails::find($id);
+        $bank_details = EmployeeBankDetails::whereHas('employee', function ($q) {
+                $q->where('resort_id', $this->resort->resort_id);
+            })->find($id);
 
         if (!$bank_details) {
             return response()->json([
@@ -2063,6 +2081,7 @@ class EmployeeController extends Controller
     public function addBankDetails(Request $request)
     {
         $request->validate([
+            'employee_id' => ['required', Rule::exists('employees', 'id')->where('resort_id', $this->resort->resort_id)],
             'bank_name' => 'required|string|max:255',
             'bank_branch' => 'required|string|max:255',
             'account_type' => 'nullable|string|max:255',
@@ -2097,7 +2116,9 @@ class EmployeeController extends Controller
     public function updateEducationDetails(Request $request, $id)
     {
         // Find the education record by ID
-        $education = EmployeeEducation::find($id);
+        $education = EmployeeEducation::whereHas('employee', function ($q) {
+                $q->where('resort_id', $this->resort->resort_id);
+            })->find($id);
 
         if (!$education) {
             return response()->json([
@@ -2154,6 +2175,7 @@ class EmployeeController extends Controller
     public function addEducationDetails(Request $request)
     {
         $request->validate([
+            'employee_id' => ['required', Rule::exists('employees', 'id')->where('resort_id', $this->resort->resort_id)],
             'education_level' => 'required|string|max:255',
             'institution_name' => 'required|string|max:255',
             'field_of_study' => 'nullable|string|max:255',
@@ -2214,7 +2236,9 @@ class EmployeeController extends Controller
     public function updateExperianceDetails(Request $request, $id)
     {
         // Find the education record by ID
-        $exp = EmployeeExperiance::find($id);
+        $exp = EmployeeExperiance::whereHas('employee', function ($q) {
+                $q->where('resort_id', $this->resort->resort_id);
+            })->find($id);
 
         if (!$exp) {
             return response()->json([
@@ -2245,6 +2269,7 @@ class EmployeeController extends Controller
     public function addExperianceDetails(Request $request)
     {
         $request->validate([
+            'employee_id' => ['required', Rule::exists('employees', 'id')->where('resort_id', $this->resort->resort_id)],
             'company_name' => 'required|string|max:255',
             'job_title' => 'required|string|max:255',
             'employment_type' => 'nullable|string|max:255',
@@ -2283,7 +2308,7 @@ class EmployeeController extends Controller
         $expiryDates = $request->expiry_dates;
 
         foreach ($documentIds as $index => $docId) {
-            $document = EmployeesDocument::find($docId);
+            $document = EmployeesDocument::where('resort_id', $this->resort->resort_id)->find($docId);
             if ($document) {
                 $document->document_title = $documentTitles[$index];
                 $document->expiry_date = \Carbon\Carbon::createFromFormat('d/m/Y', $expiryDates[$index])->format('Y-m-d');
@@ -2437,7 +2462,11 @@ class EmployeeController extends Controller
     public function getBenefitGridByPosition(Request $request){
 
         $positionId = $request->position_id;
-        $position = ResortPosition::find($positionId);
+        $position = ResortPosition::where('resort_id', $this->resort->resort_id)->find($positionId);
+
+        if (!$position) {
+            return response()->json(['success' => false, 'message' => 'Position not found.'], 404);
+        }
 
         // A rank can now map to more than one grade (e.g. "HOD L1" and
         // "HOD L2" both rank=HOD) — return every active grid that matches,
@@ -2544,7 +2573,7 @@ class EmployeeController extends Controller
 
     public function delete(Request $request)
     {
-        $employee = Employee::find($request->id);
+        $employee = Employee::where('resort_id', $this->resort->resort_id)->find($request->id);
 
         if (!$employee) {
             return response()->json(['message' => 'Employee not found.'], 404);
@@ -2568,7 +2597,7 @@ class EmployeeController extends Controller
 
         DB::beginTransaction();
         try {
-            $employees = Employee::whereIn('id', $ids)->get();
+            $employees = Employee::whereIn('id', $ids)->where('resort_id', $this->resort->resort_id)->get();
 
             foreach ($employees as $employee) {
                 $employee->status = 'Inactive';

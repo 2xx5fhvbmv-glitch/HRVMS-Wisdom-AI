@@ -359,7 +359,9 @@ class LearningProgramController extends Controller
 
     public function getProgramDetails(Request $request)
     {
-        $program = LearningProgram::with('category')->find($request->program_id);
+        $program = LearningProgram::with('category')
+            ->where('resort_id', $this->resort->resort_id)
+            ->find($request->program_id);
 
         if (!$program) {
             return response()->json(['success' => false, 'message' => 'Program not found']);

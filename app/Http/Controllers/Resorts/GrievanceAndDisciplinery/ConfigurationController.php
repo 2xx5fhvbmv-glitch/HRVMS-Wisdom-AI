@@ -1315,6 +1315,18 @@ class ConfigurationController extends Controller
             ],
             422);
         }
+
+        // Committee member ids were never checked against the resort at
+        // all (not even exists:employees,id) — any id, any resort, could
+        // be assigned to this resort's committee.
+        $allMemberIds = collect($request->MemberId ?? [])->flatten()->unique()->values();
+        if ($allMemberIds->isNotEmpty()) {
+            $validCount = \App\Models\Employee::whereIn('id', $allMemberIds)->where('resort_id', $this->resort->resort_id)->count();
+            if ($validCount !== $allMemberIds->count()) {
+                return response()->json(['success' => false, 'message' => 'One or more committee members are invalid.'], 422);
+            }
+        }
+
             DB::beginTransaction();
             try
             {
@@ -1449,11 +1461,27 @@ class ConfigurationController extends Controller
             ],
             422);
         }
+        // Same gap as DisciplinaryCommittees()/GrievanceCommitteeStore()
+        // (create paths) — the update path had it too, twice: the update
+        // itself had no resort_id filter (cross-tenant committee rename by
+        // id), and assign_members was never checked against the resort.
+        if (!DisciplineryAssignCommittee::where('id', $id)->where('resort_id', $this->resort->resort_id)->exists()) {
+            return response()->json(['success' => false, 'message' => 'Committee not found.'], 404);
+        }
+        if (count($assign_members) > 0) {
+            $memberIds = collect($assign_members)->unique()->values();
+            $validCount = \App\Models\Employee::whereIn('id', $memberIds)->where('resort_id', $this->resort->resort_id)->count();
+            if ($validCount !== $memberIds->count()) {
+                return response()->json(['success' => false, 'message' => 'One or more committee members are invalid.'], 422);
+            }
+        }
         DB::beginTransaction();
             try
             {
 
-                    $newCommittee = DisciplineryAssignCommittee::where('id',$id)->update([
+                    $newCommittee = DisciplineryAssignCommittee::where('id',$id)
+                                ->where('resort_id', $this->resort->resort_id)
+                                ->update([
                                     'CommitteeName' => $CommitteeName
                                 ]);
 
@@ -1491,8 +1519,14 @@ class ConfigurationController extends Controller
         try
         {
 
+            // Sibling of Create/Update above — same missing resort_id
+            // filter, but for delete (cross-tenant committee deletion).
+            if (!DisciplineryAssignCommittee::where('id', $id)->where('resort_id', $this->resort->resort_id)->exists()) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'Committee not found.'], 404);
+            }
             DisciplineryCommitteeMembers::where("Parent_committee_id",$id)->delete();
-            DisciplineryAssignCommittee::where("id",$id)->delete();
+            DisciplineryAssignCommittee::where("id",$id)->where('resort_id', $this->resort->resort_id)->delete();
             DB::commit();
             return response()->json([
                 'success' => true,
@@ -3276,6 +3310,15 @@ class ConfigurationController extends Controller
                 'errors' => $validator->errors()
             ], 422);
         }
+
+        // GrieanceCommitteeMembers.* was only ever validated as `integer`
+        // — any employee id, from any resort, could be assigned here.
+        $memberIds = collect($request->GrieanceCommitteeMembers)->unique()->values();
+        $validCount = \App\Models\Employee::whereIn('id', $memberIds)->where('resort_id', $this->resort->resort_id)->count();
+        if ($validCount !== $memberIds->count()) {
+            return response()->json(['success' => false, 'message' => 'One or more committee members are invalid.'], 422);
+        }
+
         DB::beginTransaction();
         try
         {
@@ -3401,11 +3444,26 @@ class ConfigurationController extends Controller
             ],
             422);
         }
+        // Same gap as the disciplinary-side sibling
+        // (CommitteeinlineUpdate): no resort filter on the update itself,
+        // and member ids were never checked against the resort at all.
+        if (!GrievanceCommitteeMemberParent::where('id', $id)->where('resort_id', $this->resort->resort_id)->exists()) {
+            return response()->json(['success' => false, 'message' => 'Committee not found.'], 404);
+        }
+        if (count($assign_members) > 0) {
+            $memberIds = collect($assign_members)->unique()->values();
+            $validCount = \App\Models\Employee::whereIn('id', $memberIds)->where('resort_id', $this->resort->resort_id)->count();
+            if ($validCount !== $memberIds->count()) {
+                return response()->json(['success' => false, 'message' => 'One or more committee members are invalid.'], 422);
+            }
+        }
         DB::beginTransaction();
             try
             {
 
-                    $newCommittee = GrievanceCommitteeMemberParent::where('id',$id)->update([
+                    $newCommittee = GrievanceCommitteeMemberParent::where('id',$id)
+                                ->where('resort_id', $this->resort->resort_id)
+                                ->update([
                                     'Grivance_CommitteeName' => $CommitteeName
                                 ]);
 
@@ -3454,8 +3512,14 @@ class ConfigurationController extends Controller
         try
         {
 
+            // Sibling of Create/Update above — same missing resort_id
+            // filter, but for delete (cross-tenant committee deletion).
+            if (!GrievanceCommitteeMemberParent::where('id', $id)->where('resort_id', $this->resort->resort_id)->exists()) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'Committee not found.'], 404);
+            }
             GrievanceCommitteeMemberChild::where("Parent_id",$id)->delete();
-            GrievanceCommitteeMemberParent::where("id",$id)->delete();
+            GrievanceCommitteeMemberParent::where("id",$id)->where('resort_id', $this->resort->resort_id)->delete();
             DB::commit();
             return response()->json([
                 'success' => true,

@@ -298,7 +298,11 @@ class ConfigurationController extends Controller
         try
         {
 
-            SOSRolesAndPermission::where("id",$id)->delete();
+            $deleted = SOSRolesAndPermission::where("id",$id)->where('resort_id', $this->resort->resort_id)->delete();
+            if (!$deleted) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'SOS Role not found.'], 404);
+            }
 
             DB::commit();
             return response()->json([
@@ -465,7 +469,11 @@ class ConfigurationController extends Controller
         try
         {
 
-            $team = SOSTeamManagementModel::where("id",$id)->delete();
+            $team = SOSTeamManagementModel::where("id",$id)->where('resort_id', $this->resort->resort_id)->delete();
+            if (!$team) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'SOS Team not found.'], 404);
+            }
 
             if ($team) {
                 SOSTeamMemeberModel::where("team_id",$id)->delete();
@@ -549,7 +557,10 @@ class ConfigurationController extends Controller
         $id = base64_decode($id);
         $resort_id = $this->resort->resort_id;
 
-        $team = SOSTeamManagementModel::with(['members', 'members.teamMember'])->where('id',$id)->first();
+        $team = SOSTeamManagementModel::with(['members', 'members.teamMember'])->where('id',$id)->where('resort_id',$resort_id)->first();
+        if(!$team){
+            abort(404, 'SOS Team not found.');
+        }
         $Roles = SOSRolesAndPermission::where("resort_id",$this->resort->resort_id)->get();
         $getMembers = ResortAdmin::where("resort_id",$this->resort->resort_id)
                             ->where("is_employee",'1')
@@ -562,6 +573,11 @@ class ConfigurationController extends Controller
 
     public function get_team_details($id, Request $request)
     {
+        $teamExists = SOSTeamManagementModel::where('id', $id)->where('resort_id', $this->resort->resort_id)->exists();
+        if (!$teamExists) {
+            abort(404, 'SOS Team not found.');
+        }
+
         $team_members = SOSTeamMemeberModel::with(['teamMember', 'memberRole'])->where('team_id',$id)->get();
 
         if($request->ajax())
@@ -601,8 +617,12 @@ class ConfigurationController extends Controller
         DB::beginTransaction();
         try
         {
-            $team = SOSTeamMemeberModel::where("id",$id)->delete();
-            
+            $team = SOSTeamMemeberModel::where("id",$id)->where('resort_id', $this->resort->resort_id)->delete();
+            if (!$team) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'SOS Team Member not found.'], 404);
+            }
+
             DB::commit();
             return response()->json([
                 'success' => true,
@@ -662,12 +682,17 @@ class ConfigurationController extends Controller
         DB::beginTransaction();
         try
         {
-            SOSTeamMemeberModel::where('id', $Main_id)
+            $updated = SOSTeamMemeberModel::where('id', $Main_id)
+            ->where('resort_id', $this->resort->resort_id)
             ->update([
                 'emp_id' => $request->member_id,
                 'role_id' => $request->role_id,
             ]);
-            
+            if (!$updated) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'SOS Team Member not found.'], 404);
+            }
+
             DB::commit();
             return response()->json([
                 'success' => true,
@@ -688,7 +713,7 @@ class ConfigurationController extends Controller
     {
         $id = base64_decode($id);
 
-        $team = SOSTeamManagementModel::with(['members','members.teamMember'])->findOrFail($id);
+        $team = SOSTeamManagementModel::with(['members','members.teamMember'])->where('resort_id', $this->resort->resort_id)->findOrFail($id);
 
         $allEmployees = ResortAdmin::where("resort_id",$this->resort->resort_id)
                             ->where("is_employee",'1')
@@ -790,15 +815,20 @@ class ConfigurationController extends Controller
         DB::beginTransaction();
         try
         {
-            $SOSTeamExists = SOSTeamManagementModel::findOrFail($id);
+            $SOSTeamExists = SOSTeamManagementModel::where('resort_id', $resort_id)->find($id);
+            if (!$SOSTeamExists) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'SOS Team not found.'], 404);
+            }
             if ($SOSTeamExists) {
                 SOSTeamManagementModel::where('id', $id)
+                    ->where('resort_id', $resort_id)
                     ->update([
                         'name' => $request->team_name,
                         'description' => strip_tags($request->description),
                     ]);
 
-                SOSTeamMemeberModel::where("team_id", $id)->delete();
+                SOSTeamMemeberModel::where("team_id", $id)->where('resort_id', $resort_id)->delete();
 
                 foreach($request->employee as $block) {
                     $roleId = $block['member_role'];
@@ -850,7 +880,7 @@ class ConfigurationController extends Controller
             ],
             'description' => ['required', 'string'],
             'assign_default_team' => 'required|array|min:1',
-            'assign_default_team.*' => 'required|integer|exists:sos_teams,id',
+            'assign_default_team.*' => ['required', 'integer', Rule::exists('sos_teams', 'id')->where('resort_id', $resort_id)],
         ], [
             'emergency_name.required' => 'The Emergency Type field is required.',
             'assign_default_team.required' => 'Please select at least one team.',
@@ -976,8 +1006,12 @@ class ConfigurationController extends Controller
         DB::beginTransaction();
         try
         {
-            SOSEmergencyTypesModel::where("id",$id)->delete();
-            
+            $deleted = SOSEmergencyTypesModel::where("id",$id)->where('resort_id', $this->resort->resort_id)->delete();
+            if (!$deleted) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'SOS Emergency Type not found.'], 404);
+            }
+
             DB::commit();
             return response()->json([
                 'success' => true,
@@ -1009,7 +1043,7 @@ class ConfigurationController extends Controller
             ],
             'description' => ['required', 'string'],
             'assign_default_team' => 'required|array|min:1',
-            'assign_default_team.*' => 'required|integer|exists:sos_teams,id',
+            'assign_default_team.*' => ['required', 'integer', Rule::exists('sos_teams', 'id')->where('resort_id', $resort_id)],
         ], [
             'emergency_name.required' => 'The Emergency Type field is required.',
             'assign_default_team.required' => 'Please select at least one team.',
@@ -1027,7 +1061,11 @@ class ConfigurationController extends Controller
         DB::beginTransaction();
         try
         {
-            $SOSEmergencyExists = SOSEmergencyTypesModel::findOrFail($id);
+            $SOSEmergencyExists = SOSEmergencyTypesModel::where('resort_id', $resort_id)->find($id);
+            if (!$SOSEmergencyExists) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'SOS Emergency Type not found.'], 404);
+            }
             if ($SOSEmergencyExists) {
                 $customFields = [];
                 if ($request->has('custom_field_names') && $request->has('custom_field_values')) {
@@ -1041,6 +1079,7 @@ class ConfigurationController extends Controller
                     }
                 }
                 SOSEmergencyTypesModel::where('id', $id)
+                ->where('resort_id', $resort_id)
                 ->update([
                     'name' => $request->emergency_name,
                     'description' => strip_tags($request->description),

@@ -51,7 +51,7 @@
                                     <td>
                                         @if($Grivance_Parent->Grivance_Submission_Type =="Yes")
                                         <span class="text-themeGreen text-nowrap">
-                                            <img src="assets/images/check-circle-themeGreen.svg" alt="">Confidentiality
+                                            <img src="{{ asset('resorts_assets/images/check-circle-themeGreen.svg') }}" alt="">Confidentiality
                                         </span>
                                         @elseif($Grivance_Parent->Grivance_Submission_Type =="No")
                                             <span class="text-themeprimary text-nowrap" style="color: red;">
@@ -89,7 +89,7 @@
                     <div class="col-lg-6">
                         <h6 class="mb-md-3 mb-2">Employee Details: @if($Grivance_Parent->Grivance_Submission_Type =="Yes")
                                         <span class="text-themeGreen text-nowrap">
-                                            <img src="assets/images/check-circle-themeGreen.svg" alt="">Confidentiality
+                                            <img src="{{ asset('resorts_assets/images/check-circle-themeGreen.svg') }}" alt="">Confidentiality
                                         </span>
                                         @elseif($Grivance_Parent->Grivance_Submission_Type =="No")
                                             <span class="text-themeprimary text-nowrap" style="color: red;">
@@ -221,7 +221,7 @@
                                         <option value=""></option>
                                         @if($GrievanceCommitteeMemberParent)
                                             @foreach ($GrievanceCommitteeMemberParent as $c)
-                                                <option value="{{ $c->id }}">{{ $c->Grivance_CommitteeName }}</option>
+                                                <option value="{{ $c->id }}" {{ $c->id == $Grivance_Parent->Committee_id ? 'selected' : '' }}>{{ $c->Grivance_CommitteeName }}</option>
                                             @endforeach
                                         @endif
                                     </select>
@@ -299,6 +299,17 @@
                         <div class="alert alert-warning">You are not part of the assigned investigation committee for this grievance.</div>
                         @endif
 
+                        {{-- Outcome Type / Action Taken / Status / Approval / File Upload
+                             are all investigation-decision fields — same restriction as the
+                             Assign To and investigation-dates/findings sections above, which
+                             already correctly hide behind $isCommitteeMember. These four were
+                             left unguarded, so a non-committee viewer (any HR/GM/EXCOM opening
+                             the page) saw the "not part of the assigned investigation
+                             committee" notice right above a fully live outcome/upload/submit
+                             form for the exact same investigation. Request Identity Disclosure
+                             below stays outside this gate on purpose — it's a Key Personnel
+                             permission, a separate role from committee membership. --}}
+                        @if($isCommitteeMember)
                             @if($Grivance_Parent->Assigned == "Yes")
                                 <div class="col-lg-4 col-sm-6">
                                     <label for="outcome_type" class="form-label">OUTCOME TYPE</label>
@@ -391,6 +402,7 @@
                                     </div>
                                 </div>
                             @endif
+                        @endif
                             @if($Grivance_Parent->Grivance_Submission_Type == "Yes" && !$canViewIdentity && in_array($auth_id, $GrivanceKeys) && !isset($Grivance_Parent->Gm_Decision))
                                 <div class="col-lg-4 col-sm-6 align-self-end">
                                     @if($Grivance_Parent->Request_Identity_Disclosure == 'Requested')
@@ -404,9 +416,11 @@
                         </div>
                     @endif
                 
+                    @if($isCommitteeMember)
                     <div class="card-footer text-end">
                         <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                     </div>
+                    @endif
                 </form>
 
         </div>
@@ -851,23 +865,29 @@ $(document).on("click",".RequestForStatement",function() {
     });
     
     $(document).on("click",".RequestIdentity",function(){
-    
-    
+        var $requestBtn = $(this);
+
         $.ajax({
-            url: "{{ route('GrievanceAndDisciplinery.grivance.RequestIdentity') }}", 
+            url: "{{ route('GrievanceAndDisciplinery.grivance.RequestIdentity') }}",
             type: 'POST',
-            data: {"_token":"{{ csrf_token()}}","id":$(this).data("id")},
+            data: {"_token":"{{ csrf_token()}}","id":$requestBtn.data("id")},
             success: function(response) {
-                console.log(response.success);
                 if (response.success) {
                     toastr.success(response.message,"Success",
                     {
                         positionClass: 'toast-bottom-right'
                     });
 
-                    $(".align-self-end").hide();
-                } 
-                else 
+                    // Was $(".align-self-end").hide() — an unscoped class
+                    // selector that hid the whole button/status wrapper
+                    // instead of showing the pending state, so a successful
+                    // request left no visible trace at all once the toast
+                    // faded. Replace just the clicked button with the same
+                    // "awaiting response" status a page reload would show
+                    // (Request_Identity_Disclosure == 'Requested').
+                    $requestBtn.replaceWith('<span class="text-muted">Identity disclosure requested — awaiting response</span>');
+                }
+                else
                 {
                         toastr.error(response.message, "Error",
                         {

@@ -35,6 +35,7 @@ use App\Models\FinalSettlementEarnings;
 use App\Models\EmployeePromotion;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Validation\Rule;
 use App\Services\FinalSettlementService;
 
 use App\Mail\SharePayslipMail; // Import your Mailable class
@@ -140,10 +141,18 @@ class PayslipController extends Controller
         $employeeId = $request->employee_id;
         $month = $request->month;
         $year = $request->year;
+        $resort_id = $this->resort->resort_id;
+
+        // Employee must belong to this resort before we even look at payroll.
+        $employeeExists = Employee::where('id', $employeeId)->where('resort_id', $resort_id)->exists();
+        if (!$employeeExists) {
+            return response()->json(['success' => false, 'message' => 'Payslip not found']);
+        }
 
         // Fetch payroll details — prioritize locked/completed payrolls over drafts
         $payroll = Payroll::join('payroll_employees as pe', 'pe.payroll_id', '=', 'payroll.id')
             ->where('pe.employee_id', $employeeId)
+            ->where('payroll.resort_id', $resort_id)
             ->where(function($q) use ($month, $year) {
                 $q->where(function($q2) use ($month, $year) {
                     $q2->whereMonth('payroll.end_date', $month)->whereYear('payroll.end_date', $year);
@@ -173,10 +182,11 @@ class PayslipController extends Controller
         $employeeId = session('payslip_employee_id');
         $month = session('payslip_month');
         $year = session('payslip_year');
+        $resort_id = $this->resort->resort_id;
 
         // dd($employeeId,$month, $year );
 
-        $employee = Employee::with('resortAdmin')->find($employeeId);
+        $employee = Employee::with('resortAdmin')->where('id', $employeeId)->where('resort_id', $resort_id)->first();
         if (!$employee) {
             return redirect()->back()->with('error', 'Employee not found.');
         }
@@ -248,6 +258,7 @@ class PayslipController extends Controller
                 $query->where('employee_id', $employeeId);
             }
         ])
+        ->where('resort_id', $resort_id)
         ->where(function($q) use ($month, $year) {
             // Match by end_date month/year (payroll is identified by its end period)
             $q->where(function($q2) use ($month, $year) {
@@ -305,8 +316,12 @@ class PayslipController extends Controller
         $employeeId = $request->employee_id;
         $month = $request->month;
         $year = $request->year;
+        $resort_id = $this->resort->resort_id;
 
-        $employee = Employee::with(['resortAdmin', 'position', 'department', 'bankDetails'])->find($employeeId);
+        $employee = Employee::with(['resortAdmin', 'position', 'department', 'bankDetails'])
+            ->where('id', $employeeId)
+            ->where('resort_id', $resort_id)
+            ->first();
 
         if (!$employee || !$employee->resortAdmin) {
             return response()->json(['success' => false, 'message' => 'Employee not found or not assigned to any resort.']);
@@ -324,6 +339,7 @@ class PayslipController extends Controller
             'serviceCharges' => fn($q) => $q->where('employee_id', $employeeId),
             'timeAndAttendances' => fn($q) => $q->where('employee_id', $employeeId)
         ])
+            ->where('resort_id', $resort_id)
             ->whereMonth('start_date', $month)
             ->whereYear('end_date', $year)
             ->whereHas('employees', fn($q) => $q->where('employee_id', $employeeId))
@@ -426,6 +442,7 @@ class PayslipController extends Controller
     {
         $resort_id = $this->resort->resort_id;
         $employee = Employee::where('id', $request->employee_id)
+            ->where('resort_id', $resort_id)
             ->with(['resortAdmin', 'position', 'department','section','resignation','allowance','advancedPaymentRecovey'])
             ->first();
     
@@ -500,7 +517,11 @@ class PayslipController extends Controller
         // /resort/final-settlement is normally hidden behind a list-page
         // click, but a stale tab or a direct POST would otherwise sail
         // through updateOrCreate() and silently rewrite the row.
-        $existing = FinalSettlement::where('employee_id', $request->input('select_emp'))->first();
+        $existing = FinalSettlement::where('employee_id', $request->input('select_emp'))
+            ->whereHas('employee', function ($q) {
+                $q->where('resort_id', $this->resort->resort_id);
+            })
+            ->first();
         if ($existing && $existing->status === 'finalized') {
             return response()->json([
                 'success' => false,
@@ -510,7 +531,10 @@ class PayslipController extends Controller
         }
 
         $validated = $request->validate([
-            'select_emp' => 'required|exists:employees,id',
+            'select_emp' => [
+                'required',
+                Rule::exists('employees', 'id')->where('resort_id', $this->resort->resort_id),
+            ],
             'pension' => 'required|numeric|min:0',
             'tax' => 'required|numeric|min:0',
             'leave_balance' => 'required|numeric|min:0',
@@ -536,7 +560,9 @@ class PayslipController extends Controller
         $deductions = json_decode($request->input('deductions'), true) ?? [];
         $earnings = json_decode($request->input('allowances'), true) ?? [];
 
-        $employee = Employee::findOrFail($validated['select_emp']);
+        $employee = Employee::where('id', $validated['select_emp'])
+            ->where('resort_id', $this->resort->resort_id)
+            ->firstOrFail();
         $settings = ResortSiteSettings::where('resort_id', $this->resort->resort_id)->first();
         $usdToMvr = $settings->DollertoMVR ?? 15.42; // fallback rate
 
@@ -731,8 +757,12 @@ class PayslipController extends Controller
             'employee.resignation.reason_title',
             'earnings',
             'deductions',
-        ])->findOrFail($id);
-        $today = Carbon::now(); 
+        ])
+        ->whereHas('employee', function ($q) {
+            $q->where('resort_id', $this->resort->resort_id);
+        })
+        ->findOrFail($id);
+        $today = Carbon::now();
         // dd($finalSettlement->employee->resignation->reason_title->reason);
         $service = new FinalSettlementService();
         $calculated = $service->calculateFinalMonthData($finalSettlement->employee, $this->resort->resort_id);
@@ -808,7 +838,10 @@ class PayslipController extends Controller
      */
     public function submit(Request $request)
     {
-        $finalSettlement = FinalSettlement::find($request->final_settlement_id);
+        $finalSettlement = FinalSettlement::whereHas('employee', function ($q) {
+                $q->where('resort_id', $this->resort->resort_id);
+            })
+            ->find($request->final_settlement_id);
 
         if (!$finalSettlement) {
             return response()->json(['success' => false, 'message' => 'No settlement record found.'], 404);

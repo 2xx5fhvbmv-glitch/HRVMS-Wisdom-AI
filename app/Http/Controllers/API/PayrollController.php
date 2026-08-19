@@ -214,6 +214,16 @@ class PayrollController extends Controller
                     'pension_percentage'                => '7%',
                     ],
                     'city_ledger'                       => round($payroll->city_ledger ?? 0, 2),
+                    // Tuck Shop expenses. pd.staff_shop was already selected
+                    // above but never made it into the response — city_ledger
+                    // and staff_shop are two separate deduction columns (see
+                    // PayrollDeduction's fillable list / the web export's
+                    // separate 'city_ledger'/'staff_shop' columns), not the
+                    // same figure under two names. This was the actual "Tuck
+                    // Shop / City Ledger data missing" gap — city_ledger
+                    // being legitimately 0 for this employee/period is
+                    // correct; staff_shop was the field nobody was reading.
+                    'staff_shop'                        => round($payroll->staff_shop ?? 0, 2),
                     'payslip_details'                   => [
                     'payslip_total'                     => round($totalAmount, 2),
                     'payslip_start_date'                => $payroll->start_date ?? 0 ,
@@ -224,6 +234,41 @@ class PayrollController extends Controller
             
         return response()->json(['success' => true, 'message' => 'Payroll Employee Dashboard', 'payroll_data' => $data], 200);
 
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    /**
+     * Distinct years this employee has a PROCESSED (locked) payroll for —
+     * backs the payslip screen's year filter so it never offers a year with
+     * only a draft/pending/approved-but-not-yet-locked run (nothing to show
+     * a payslip for yet).
+     */
+    public function payslipYears()
+    {
+        if (!$this->user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $employee_id = $this->user->GetEmployee->id;
+
+        try {
+            $years = Payroll::join('payroll_employees as pe', 'pe.payroll_id', '=', 'payroll.id')
+                ->where('pe.employee_id', $employee_id)
+                ->where('payroll.status', 'locked')
+                ->selectRaw('DISTINCT YEAR(payroll.start_date) as year')
+                ->orderByDesc('year')
+                ->pluck('year');
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Payslip years fetched successfully',
+                'years'   => $years,
+            ], 200);
         } catch (\Exception $e) {
             \Log::emergency("File: " . $e->getFile());
             \Log::emergency("Line: " . $e->getLine());

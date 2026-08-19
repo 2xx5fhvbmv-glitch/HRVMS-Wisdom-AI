@@ -162,10 +162,13 @@ class DashboardController extends Controller
     public function destroy($id)
     {
       try {
-          $data = SOSHistoryModel::whereId($id)->first();
+          $data = SOSHistoryModel::where('resort_id', $this->resort->resort_id)->whereId($id)->first();
           if(!$data){
-            $data = SOSHistoryModel::withTrashed()->whereId($id)->first();
+            $data = SOSHistoryModel::withTrashed()->where('resort_id', $this->resort->resort_id)->whereId($id)->first();
 
+          }
+          if(!$data){
+            return response()->json(['success' => false, 'msg' => 'SOS record not found.'], 404);
           }
           // Soft delete the emergency (sos)
           $data->delete();
@@ -226,8 +229,11 @@ class DashboardController extends Controller
         $id = base64_decode($id);
         $resort_id = $this->resort->resort_id;
 
-        $getSOSDetails = SOSHistoryModel::with(['getSos','employee','employee.resortAdmin'])->where('id',$id)->first();  
-  
+        $getSOSDetails = SOSHistoryModel::with(['getSos','employee','employee.resortAdmin'])->where('id',$id)->where('resort_id',$resort_id)->first();
+        if(!$getSOSDetails){
+            abort(404, 'SOS record not found.');
+        }
+
         return view('resorts.SOS.dashboard.view-sos-detail',compact('page_title','getSOSDetails'));
     }
 
@@ -240,7 +246,10 @@ class DashboardController extends Controller
         $id = base64_decode($id);
         $resort_id = $this->resort->resort_id;
 
-        $sosDetails = SOSHistoryModel::with(['getSos','employee','employee.resortAdmin'])->where('id',$id)->first();
+        $sosDetails = SOSHistoryModel::with(['getSos','employee','employee.resortAdmin'])->where('id',$id)->where('resort_id',$resort_id)->first();
+        if(!$sosDetails){
+            abort(404, 'SOS record not found.');
+        }
 
         $teamMembersQuery = SosTeamMemberActivity::with(['team', 'resortAdmin', 'resortAdmin.GetEmployee', 'memberRole'])
         ->where('sos_history_id', $id);
@@ -262,6 +271,11 @@ class DashboardController extends Controller
         if(Common::checkRouteWisePermission('sos.dashboard.index',config('settings.resort_permissions.view')) == false){
             return abort(403, 'Unauthorized action.');
         }
+        $sosExists = SOSHistoryModel::where('id', $id)->where('resort_id', $this->resort->resort_id)->exists();
+        if (!$sosExists) {
+            return response()->json(['success' => false, 'message' => 'SOS record not found.'], 404);
+        }
+
         $teamId = $request->teamId;
         $showUnack = $request->show_status;
 
@@ -297,7 +311,10 @@ class DashboardController extends Controller
         $id = base64_decode($id);
         $resort_id = $this->resort->resort_id;
 
-        $sosDetails = SOSHistoryModel::with(['getSos'])->where('id',$id)->first();
+        $sosDetails = SOSHistoryModel::with(['getSos'])->where('id',$id)->where('resort_id',$resort_id)->first();
+        if(!$sosDetails){
+            abort(404, 'SOS record not found.');
+        }
 
         $employeeListQuery = SosHistoryEmployeeStatus::with(['employee', 'employee.resortAdmin', 'employee.department', 'employee.position'])
         ->where('sos_history_id', $id);
@@ -318,6 +335,11 @@ class DashboardController extends Controller
         if(Common::checkRouteWisePermission('sos.dashboard.index',config('settings.resort_permissions.view')) == false){
             return abort(403, 'Unauthorized action.');
         }
+        $sosExists = SOSHistoryModel::where('id', $id)->where('resort_id', $this->resort->resort_id)->exists();
+        if (!$sosExists) {
+            return response()->json(['success' => false, 'message' => 'SOS record not found.'], 404);
+        }
+
         $departmentId = $request->departmentId;
         $showUnsafe = $request->show_status;
 
@@ -344,11 +366,12 @@ class DashboardController extends Controller
     public function updateMassInstruction(Request $request)
     {
         $request->validate([
-            'sos_history_id' => 'required|exists:sos_history,id',
+            'sos_history_id' => ['required', Rule::exists('sos_history', 'id')->where('resort_id', $this->resort->resort_id)],
             'mass_instruction' => 'required|string|max:255',
         ]);
 
         $update = SOSHistoryModel::where('id', $request->sos_history_id)
+            ->where('resort_id', $this->resort->resort_id)
             ->update(['mass_instructions' => $request->mass_instruction]);
 
         if ($update) {
@@ -370,6 +393,13 @@ class DashboardController extends Controller
             return abort(403, 'Unauthorized action.');
         }
         $id = base64_decode($id);
+
+        //get lat lng of sos event
+        $geoLocation = SOSHistoryModel::where('id',$id)->where('resort_id', $this->resort->resort_id)->first();
+        if(!$geoLocation){
+            abort(404, 'SOS record not found.');
+        }
+
         $employeesStatusList = SosHistoryEmployeeStatus::with(['employee', 'employee.resortAdmin', 'employee.department', 'employee.position'])->where('sos_history_id', $id)
         // ->whereHas('sosHistory', function ($query) {
         //     $query->where('status', 'active');
@@ -380,9 +410,6 @@ class DashboardController extends Controller
 
         //get lat lng of resort
         // $geoLocation = ResortGeoLocation::where('resort_id', $this->resort->resort_id)->first();
-
-        //get lat lng of sos event
-        $geoLocation = SOSHistoryModel::where('id',$id)->first();
 
 
         $lat = $geoLocation && $geoLocation->latitude ? $geoLocation->latitude : '22.31514320';
@@ -396,6 +423,11 @@ class DashboardController extends Controller
         if(Common::checkRouteWisePermission('sos.dashboard.index',config('settings.resort_permissions.view')) == false){
             return abort(403, 'Unauthorized action.');
         }
+        $sosExists = SOSHistoryModel::where('id', $id)->where('resort_id', $this->resort->resort_id)->exists();
+        if (!$sosExists) {
+            return response()->json(['success' => false, 'message' => 'SOS record not found.'], 404);
+        }
+
         $roleId = $request->roleId;
         $teamId = $request->teamId;
         $safetyStatus = $request->safety_status;

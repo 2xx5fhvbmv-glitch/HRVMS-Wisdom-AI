@@ -397,7 +397,10 @@ class ConfigurationController extends Controller
             ],
             'members'   => ['required', 'array', 'min:1'], // Ensure members is an array
             'members.*' => ['required', 'array'], // Each index must contain an array
-            'members.*.*' => ['required', 'integer', 'exists:employees,id'], // Each member ID must be valid
+            'members.*.*' => [
+                'required', 'integer',
+                Rule::exists('employees', 'id')->where('resort_id', $this->resort->resort_id),
+            ], // Each member ID must be valid AND belong to this resort
         ], [
             'CommitteeName.required' => 'Committee Name is required.',
             'CommitteeName.*.required' => 'Each Committee Name is required.',

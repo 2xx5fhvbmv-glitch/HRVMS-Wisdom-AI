@@ -64,7 +64,12 @@ class FeedbackFormController extends Controller
     {
         $page_title = "Create Feedback Form";
         $resort_id = $this->resort->resort_id;
-        $trainings = TrainingSchedule::with(['learningProgram', 'participants.employee.resortAdmin'])->where('status','Completed')->orwhere('status','Ongoing')->where('resort_id',$this->resort->resort_id)->get();
+        $trainings = TrainingSchedule::with(['learningProgram', 'participants.employee.resortAdmin'])
+            ->where('resort_id', $this->resort->resort_id)
+            ->where(function ($q) {
+                $q->where('status', 'Completed')->orWhere('status', 'Ongoing');
+            })
+            ->get();
         // dd($trainings);
         return view('resorts.learning.feedbackform.create',compact('resort_id','trainings','page_title'));
     }
@@ -88,7 +93,10 @@ class FeedbackFormController extends Controller
     {
         $page_title = "Edit Feedback Form";
         $resortId = $this->resort->resort_id;
-        $form = TrainingFeedbackForm::findOrFail($id);
+        $form = TrainingFeedbackForm::where('resort_id', $resortId)->find($id);
+        if (!$form) {
+            abort(404, 'Feedback form not found.');
+        }
         $form->form_structure = json_decode($form->form_structure, true);
         return view('resorts.learning.feedbackform.edit',compact('resortId','form','page_title'));
     }
@@ -105,7 +113,10 @@ class FeedbackFormController extends Controller
 
     public function update(Request $request, $id)
     {
-        $form = TrainingFeedbackForm::findOrFail($id);
+        $form = TrainingFeedbackForm::where('resort_id', $this->resort->resort_id)->find($id);
+        if (!$form) {
+            abort(404, 'Feedback form not found.');
+        }
 
         $validatedData = $request->validate([
             'form_name' => 'required|string|max:255',
@@ -122,7 +133,10 @@ class FeedbackFormController extends Controller
 
     public function delete($id)
     {
-        $form = TrainingFeedbackForm::findOrFail($id);
+        $form = TrainingFeedbackForm::where('resort_id', $this->resort->resort_id)->find($id);
+        if (!$form) {
+            return response()->json(['success' => false, 'message' => 'Form not found.'], 404);
+        }
         $form->delete();
 
         return response()->json(['success' => 'Form deleted successfully.']);

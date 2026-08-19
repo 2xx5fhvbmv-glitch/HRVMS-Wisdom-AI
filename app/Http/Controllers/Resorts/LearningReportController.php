@@ -482,6 +482,7 @@ class LearningReportController extends Controller
             ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
             ->leftJoin('training_schedules as ts', 'ts.id', '=', 'fr.training_id')
             ->leftJoin('learning_programs as lp', 'lp.id', '=', 'ts.training_id')
+            ->where('ts.resort_id', $rid)
             ->when($f['program'], fn($q) => $q->where('lp.id', $f['program']))
             ->when(true, fn($q) => $this->applyDuration($q, $f, 'fr.created_at'))
             ->orderByDesc('fr.created_at')->limit(1000)

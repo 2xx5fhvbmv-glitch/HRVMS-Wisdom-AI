@@ -691,6 +691,7 @@ class EmployeeController extends Controller
             ->leftjoin('duty_rosters as t3', 't3.Emp_id', '=', 'employees.id')
             ->leftjoin('shift_settings as ss', 'ss.id', '=', 't3.Shift_id')
             ->where('employees.id', $id)
+            ->where('t1.resort_id', $resortId)
             ->select(array_merge([
                 't3.id as duty_roster_id',
                 't3.DayOfDate',
@@ -708,6 +709,11 @@ class EmployeeController extends Controller
                 'employees.Dept_id',
             ], $detailCols))
             ->first();
+
+            if (!$employee) {
+                abort(404, 'Employee not found.');
+            }
+
             $department  = ResortDepartment::where('id', $employee->Dept_id)->value('name');
 
             if ($employee)
@@ -1027,7 +1033,20 @@ class EmployeeController extends Controller
             $Notes = $request->notes;
             $ParentAttd_id = base64_decode($request->ParentAttd_id);
 
-            $ChildAttendace = ChildAttendace::find($child_id);
+            $ParentAttendace = ParentAttendace::where('id', $ParentAttd_id)
+                ->where('resort_id', $this->resort->resort_id)
+                ->first();
+
+            if (!$ParentAttendace) {
+                DB::rollback();
+                return response()->json(['success'=>false,'message' => 'Record not found.'], 404);
+            }
+
+            // ChildAttendace has no resort_id column of its own — it's scoped
+            // by belonging to the already resort-verified ParentAttendace row.
+            $ChildAttendace = ChildAttendace::where('id', $child_id)
+                ->where('Parent_attd_id', $ParentAttd_id)
+                ->first();
 
             if($ChildAttendace)
             {
@@ -1037,7 +1056,7 @@ class EmployeeController extends Controller
                 $ChildAttendace->save();
             }
 
-            ParentAttendace::where('id', $ParentAttd_id)->update(['OverTime' => $OverTime,"CheckingOutTime"=>$CheckingOutTime,"CheckingTime"=>$CheckingTime,"note"=>$Notes]);
+            $ParentAttendace->update(['OverTime' => $OverTime,"CheckingOutTime"=>$CheckingOutTime,"CheckingTime"=>$CheckingTime,"note"=>$Notes]);
 
             DB::commit();
 
@@ -1059,9 +1078,18 @@ class EmployeeController extends Controller
             $action = $request->action;
             $Approved_id = $this->resort->id;
             $action == 'approve' ? $action = 'Approved' : $action = 'Rejected';
+
+            $ParentAttendace = ParentAttendace::where('id', $AttdanceId)
+                ->where('resort_id', $this->resort->resort_id)
+                ->first();
+
+            if (!$ParentAttendace) {
+                DB::rollback();
+                return response()->json(['success'=>false,'message' => 'Record not found.'], 404);
+            }
+
             if($action =="Rejected")
             {
-                $ParentAttendace = ParentAttendace::where('id', $AttdanceId)->first();
                 $Shift_id = $ParentAttendace->Shift_id;
                 $ShiftSettings = ShiftSettings::find($Shift_id);
 
@@ -1092,7 +1120,7 @@ class EmployeeController extends Controller
             }
             else
             {
-                ParentAttendace::where('id', $AttdanceId)->update(["OTApproved_By"=>$Approved_id,'OTStatus' => $action]);
+                $ParentAttendace->update(["OTApproved_By"=>$Approved_id,'OTStatus' => $action]);
             }
             DB::commit();
             return response()->json(['success'=>true,'message' => 'OT '.$action.' successfully.']);
@@ -1183,6 +1211,7 @@ class EmployeeController extends Controller
                 ->leftjoin('duty_rosters as t3', 't3.Emp_id', '=', 'employees.id')
                 ->leftjoin('shift_settings as ss', 'ss.id', '=', 't3.Shift_id')
                 ->where('employees.id', $id)
+                ->where('t1.resort_id', $resortId)
                 ->select(array_merge([
                     't3.id as duty_roster_id',
                     't3.DayOfDate',
@@ -1200,6 +1229,11 @@ class EmployeeController extends Controller
                     'employees.Dept_id',
                 ], $detailCols))
                 ->first();
+
+                if (!$employee) {
+                    abort(404, 'Employee not found.');
+                }
+
                 $department  = ResortDepartment::where('id', $employee->Dept_id)->value('name');
 
                 if ($employee)
@@ -1298,6 +1332,7 @@ class EmployeeController extends Controller
                                         ->leftjoin('child_attendaces as t2', 't2.Parent_attd_id', '=', 'parent_attendaces.id')
                                         ->whereIn('parent_attendaces.Status', ['On-Time', 'Present', 'Late', 'DayOff', 'Absent', 'ShortLeave', 'HalfDayLeave'])
                                         ->where('t1.id', $id)
+                                        ->where('parent_attendaces.resort_id', $resortId)
                                         ->whereBetween('parent_attendaces.date', [$monthStartingDate, $monthEndingDate])  // Filter based on the selected month
                                         ->get(['t2.InTime_Location', 't2.OutTime_Location', 'parent_attendaces.note', 'parent_attendaces.date', 'ss.ShiftName', 'ss.StartTime', 'parent_attendaces.CheckingTime', 't2.id as Child_id', 'parent_attendaces.CheckingOutTime', 'parent_attendaces.OverTime', 'parent_attendaces.id as ParentAttd_id', 'parent_attendaces.Status', 'parent_attendaces.DayWiseTotalHours'])
                                         ->map(function($h) use($currentMonthDays) {
@@ -1754,6 +1789,7 @@ class EmployeeController extends Controller
             ->leftjoin('duty_rosters as t3', 't3.Emp_id', '=', 'employees.id')
             ->leftjoin('shift_settings as ss', 'ss.id', '=', 't3.Shift_id')
             ->where('employees.id', $id)
+            ->where('t1.resort_id', $resortId)
             ->select(array_merge([
                 't3.id as duty_roster_id',
                 't3.DayOfDate',
@@ -1770,6 +1806,10 @@ class EmployeeController extends Controller
                 't2.code as PositionCode',
             ], $detailCols))
             ->first();
+
+            if (!$employee) {
+                return response()->json(['success' => false, 'message' => 'Employee not found.'], 404);
+            }
 
             if ($employee)
             {
@@ -2118,6 +2158,7 @@ public function attandanceHisotryExport(Request $request)
         ->leftJoin('resort_departments as rd', 'rd.id', '=', 'e.Dept_id')
         ->join('shift_settings as ss', 'ss.id', '=', 'pa.Shift_id')
         ->where('e.id', $id)
+        ->where('pa.resort_id', $this->resort->resort_id)
         ->whereBetween('pa.date', [$start, $end])
         ->select(
             'pa.date',

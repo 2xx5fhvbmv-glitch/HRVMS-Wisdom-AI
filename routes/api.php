@@ -313,6 +313,7 @@ use Illuminate\Support\Facades\Route;
 
 		//Payroll
 		Route::get('payroll/payroll-dashboard', [App\Http\Controllers\API\PayrollController::class, 'payrollDashboard']);
+		Route::get('payroll/payslip-years', [App\Http\Controllers\API\PayrollController::class, 'payslipYears']);
 		Route::post('payroll/payslip-list', [App\Http\Controllers\API\PayrollController::class, 'paySlipList']);
 		Route::post('payroll/payslip-details', [App\Http\Controllers\API\PayrollController::class, 'paySlipDetails']);
 		Route::post('payroll/payslip-pdf-download', [App\Http\Controllers\API\PayrollController::class, 'downloadPayslip']);
@@ -340,6 +341,19 @@ use Illuminate\Support\Facades\Route;
 		Route::get('learning/emp-lt-dashboard', [App\Http\Controllers\API\LearningController::class, 'employeeLearningDashbaord']);
 		Route::get('learning/feedback-from-list', [App\Http\Controllers\API\LearningController::class, 'feedbackformListing']);
 		Route::post('learning/feedback-data-store', [App\Http\Controllers\API\LearningController::class, 'feedbackStore']);
+
+		//L&D Manager module + HR onboarding dashboard (position/department gated, not rank)
+		Route::middleware(['ld.manager'])->group(function () {
+			Route::get('ld-manager/dashboard', [App\Http\Controllers\API\LearningController::class, 'ldManagerDashboard']);
+			Route::get('ld-manager/training-calendar', [App\Http\Controllers\API\LearningController::class, 'ldManagerTrainingCalendar']);
+			Route::get('ld-manager/mark-attendance/trainings', [App\Http\Controllers\API\LearningController::class, 'ldManagerMarkAttendanceTrainings']);
+			Route::get('ld-manager/mark-attendance/participants/{training_schedule_id}', [App\Http\Controllers\API\LearningController::class, 'ldManagerMarkAttendanceParticipants']);
+			Route::post('ld-manager/mark-attendance', [App\Http\Controllers\API\LearningController::class, 'ldManagerMarkAttendanceStore']);
+			Route::get('learning/manager-request-list', [App\Http\Controllers\API\LearningController::class, 'managerRequestList']);
+		});
+
+		// HR onboarding dashboard — self-gated on HR department inside the controller.
+		Route::get('on-boarding/hr-dashboard', [App\Http\Controllers\API\OnBoardingController::class, 'hrDashboard']);
 
 		//Incident
 		Route::post('incident/add-incident', [App\Http\Controllers\API\IncidentController::class, 'AddIncident']);
@@ -418,12 +432,24 @@ use Illuminate\Support\Facades\Route;
 
 		});
 
-		Route::get('clinic/appointment-categories', [App\Http\Controllers\API\ClinicController::class, 'appointmentCategories']);
+		// Deliberately unrestricted by rank — any employee needs to view
+		// categories to self-book an appointment. Guard widened to also
+		// accept temp-clinic-doctor so the duplicate, rank-12-gated
+		// registration of this same URI further down (which was silently
+		// shadowing this one — Laravel keeps only the last-registered route
+		// per URI+method, 403-ing every non-clinic-staff employee) could be
+		// removed instead of overriding it.
+		Route::middleware(['auth:api,temp-clinic-doctor'])->get('clinic/appointment-categories', [App\Http\Controllers\API\ClinicController::class, 'appointmentCategories']);
 		Route::post('clinic/appointment-store', [App\Http\Controllers\API\ClinicController::class, 'appointmentStore']);
 		Route::get('clinic/employee-clinic-dashboard', [App\Http\Controllers\API\ClinicController::class, 'employeeClinicDashboard']);
-		Route::get('clinic/appointment-details/{appointment_id}', [App\Http\Controllers\API\ClinicController::class, 'appointmentDetails']);
+		// Same shadowing bug as appointment-categories above — this was
+		// duplicated under the rank-12-only clinic.manager gate further
+		// down, which shadowed this open registration and 403'd any
+		// non-clinic-staff employee trying to view their own appointment.
+		Route::middleware(['auth:api,temp-clinic-doctor'])->get('clinic/appointment-details/{appointment_id}', [App\Http\Controllers\API\ClinicController::class, 'appointmentDetails']);
 		Route::post('clinic/appointment-status-update', [App\Http\Controllers\API\ClinicController::class, 'appointmentStatusUpdate']);
-		Route::get('clinic/treatment-details/{treatment_id}', [App\Http\Controllers\API\ClinicController::class, 'treatmentDetails']);
+		// Same shadowing bug — see appointment-details above.
+		Route::middleware(['auth:api,temp-clinic-doctor'])->get('clinic/treatment-details/{treatment_id}', [App\Http\Controllers\API\ClinicController::class, 'treatmentDetails']);
 		Route::get('clinic/medical-certificate-details/{medical_cert_id}', [App\Http\Controllers\API\ClinicController::class, 'medicalCertificateDetail']);
 		Route::get('clinic/past-medical-history', [App\Http\Controllers\API\ClinicController::class, 'pastMedicalHistory']);
 
@@ -435,10 +461,9 @@ use Illuminate\Support\Facades\Route;
 		Route::get('request/salary-advance-details/{id}', [App\Http\Controllers\API\RequestController::class, 'salaryAdvanceDetails']);
 		Route::get('request/guarantor-employee-list', [App\Http\Controllers\API\RequestController::class, 'GuarantorEmployeeList']);
 
-		//SOS
+		//SOS — general employee-facing (any authenticated employee)
 		Route::get('sos/emergency-types', [App\Http\Controllers\API\SOSController::class, 'getEmergencyTypes']);
 		Route::post('sos/sos-store', [App\Http\Controllers\API\SOSController::class, 'SOSStore']);
-		Route::post('sos/handle-sos-action-with-team', [App\Http\Controllers\API\SOSController::class, 'handleSOSActionWithTeam']);
 		Route::get('sos/sos-team-listing', [App\Http\Controllers\API\SOSController::class, 'SOSTeamListing']);
 		Route::post('sos/sos-safe-status', [App\Http\Controllers\API\SOSController::class, 'SOSSafeStatus']);
 		Route::get('sos/employee-team-location/{sos_id}', [App\Http\Controllers\API\SOSController::class, 'employeeAndTeamLocation']);
@@ -448,15 +473,24 @@ use Illuminate\Support\Facades\Route;
 		Route::get('sos/sos-history-details/{sos_id}', [App\Http\Controllers\API\SOSController::class, 'SOSHistoryDetails']);
 		Route::get('sos/get-any-sos-emergency', [App\Http\Controllers\API\SOSController::class, 'getAnySOSEmergency']);
 		Route::get('sos/get-team-acknowledged/{sos_id}', [App\Http\Controllers\API\SOSController::class, 'getTeamAcknowledged']);
-		Route::post('sos/drill-real-sos', [App\Http\Controllers\API\SOSController::class, 'drillRealSOS']);
-		Route::post('sos/complete-sos-update-status', [App\Http\Controllers\API\SOSController::class, 'completeSOSUpdateStatus']);
-
-		// Mobile-audit P1: new endpoints
+		Route::post('sos/location-update', [App\Http\Controllers\API\SOSController::class, 'SOSLocationUpdate']);
 		Route::get('sos/fire-team-members', [App\Http\Controllers\API\SOSController::class, 'fireTeamMembers']);
-		Route::get('sos/security-staff-dashboard', [App\Http\Controllers\API\SOSController::class, 'securityStaffDashboard']);
-		Route::get('sos/manager-dashboard', [App\Http\Controllers\API\SOSController::class, 'managerDashboard']);
 		Route::get('sos/chat-logs/{sos_id}', [App\Http\Controllers\API\SOSController::class, 'sosChatLogs']);
 		Route::post('sos/send-chat-message', [App\Http\Controllers\API\SOSController::class, 'sosSendChatMessage']);
+
+		// SOS — Security Manager only (approve/reject/dispatch/complete an
+		// incident). Previously reachable by any authenticated employee.
+		Route::middleware(['sos.manager'])->group(function () {
+			Route::post('sos/handle-sos-action-with-team', [App\Http\Controllers\API\SOSController::class, 'handleSOSActionWithTeam']);
+			Route::post('sos/drill-real-sos', [App\Http\Controllers\API\SOSController::class, 'drillRealSOS']);
+			Route::post('sos/complete-sos-update-status', [App\Http\Controllers\API\SOSController::class, 'completeSOSUpdateStatus']);
+			Route::get('sos/manager-dashboard', [App\Http\Controllers\API\SOSController::class, 'managerDashboard']);
+		});
+
+		// SOS — Security department staff (view-only incident roster).
+		Route::middleware(['sos.security'])->group(function () {
+			Route::get('sos/security-staff-dashboard', [App\Http\Controllers\API\SOSController::class, 'securityStaffDashboard']);
+		});
 
 		// Mobile-audit P1: aliases for already-implemented methods, under the
 		// route names the mobile team's audit doc expects — avoids duplicating
@@ -495,6 +529,20 @@ use Illuminate\Support\Facades\Route;
 		Route::post('on-boarding/send-selfie-image', [App\Http\Controllers\API\OnBoardingController::class, 'sendSelfiImage']);
 		Route::post('on-boarding/store-acknowledgement', [App\Http\Controllers\API\OnBoardingController::class, 'storeAcknowledgement']);
 		Route::get('on-boarding/acknowledgement-view-files', [App\Http\Controllers\API\OnBoardingController::class, 'acknowledgementViewFiles']);
+
+		// Mobile onboarding P3: remaining Figma screens — thin reads over the
+		// same employee_itineraries / employee_itineraries_meeting /
+		// onboarding_contents rows above, plus task actions for assigned staff.
+		Route::get('on-boarding/accommodation-detail', [App\Http\Controllers\API\OnBoardingController::class, 'accommodationDetail']);
+		Route::get('on-boarding/key-contacts', [App\Http\Controllers\API\OnBoardingController::class, 'keyContacts']);
+		Route::get('on-boarding/hotel-details', [App\Http\Controllers\API\OnBoardingController::class, 'hotelDetails']);
+		Route::get('on-boarding/cultural-insights', [App\Http\Controllers\API\OnBoardingController::class, 'culturalInsights']);
+		Route::get('on-boarding/employee-handbook', [App\Http\Controllers\API\OnBoardingController::class, 'employeeHandbookList']);
+		Route::get('on-boarding/policy-content/{type}', [App\Http\Controllers\API\OnBoardingController::class, 'policyContent']);
+		Route::get('on-boarding/itinerary-timeline', [App\Http\Controllers\API\OnBoardingController::class, 'itineraryTimeline']);
+		Route::post('on-boarding/task-action', [App\Http\Controllers\API\OnBoardingController::class, 'taskAction']);
+		Route::get('on-boarding/meetings', [App\Http\Controllers\API\OnBoardingController::class, 'meetings']);
+		Route::post('on-boarding/meetings/add-link', [App\Http\Controllers\API\OnBoardingController::class, 'addMeetingLink']);
 
 		//Announcement
 		Route::get('announcement/announcement-list', [App\Http\Controllers\API\AnnouncementController::class, 'announcementListing']);
@@ -543,6 +591,61 @@ use Illuminate\Support\Facades\Route;
 			return \Illuminate\Support\Facades\Broadcast::auth($request);
 		});
 
+	});
+
+	// Temporary Clinic Doctor (third-party/agency) — mobile-app only,
+	// separate Passport guard from the ResortAdmin-backed 'api' guard above
+	// (config/auth.php: 'temp-clinic-doctor' / 'temporary-clinic-doctors').
+	// Login can't require auth, so it stays outside the auth:api group.
+	Route::post('clinic-doctor/login', [App\Http\Controllers\API\TemporaryClinicDoctorAuthController::class, 'login']);
+	Route::post('clinic-doctor/logout', [App\Http\Controllers\API\TemporaryClinicDoctorAuthController::class, 'logout'])->middleware('auth:temp-clinic-doctor');
+	Route::get('clinic-doctor/profile', [App\Http\Controllers\API\TemporaryClinicDoctorAuthController::class, 'profile'])->middleware('auth:temp-clinic-doctor');
+
+	// Clinic Manager tier, reachable by either identity — 'clinic.manager'
+	// accepts a real rank-12 employee (unrestricted, same as before) OR an
+	// active TemporaryClinicDoctor, further limited per-endpoint by
+	// 'clinic.capability' to whatever HR granted that account. These
+	// re-register the SAME URIs as the auth:api-only group above; Laravel
+	// keeps only the last-registered route per URI+method, so real
+	// employee callers are unaffected (their ResortAdmin token still
+	// matches 'auth:api' first) — this purely ADDS the temp-doctor path.
+	// appointment-categories-store (category/taxonomy config) and
+	// clinic-staff-leave-action (leave-approval chain) are deliberately
+	// NOT re-registered here — a third-party doctor has no employee/
+	// approver identity to act as, and shouldn't be editing the resort's
+	// permanent category list. Those two stay auth:api-only (real
+	// employees, unchanged).
+	Route::middleware(['auth:api,temp-clinic-doctor', 'applyResortSmtp', 'clinic.manager'])->group(function () {
+		// clinic/appointment-categories moved to the unrestricted
+		// registration above (its own guard now covers temp-clinic-doctor
+		// too) — it was duplicated here under the rank-12-only
+		// clinic.manager gate, which shadowed the open route and 403'd
+		// every non-clinic-staff employee trying to self-book.
+
+		Route::middleware(['clinic.capability:can_view_appointments'])->group(function () {
+			Route::get('clinic/clinic-staff-dashboard', [App\Http\Controllers\API\ClinicController::class, 'clinicStaffDashboard']);
+			Route::post('clinic/appointment-list-based-filter', [App\Http\Controllers\API\ClinicController::class, 'appointmentListBasedonFilter']);
+			Route::get('clinic/appointment-and-leave-list', [App\Http\Controllers\API\ClinicController::class, 'appointmentAndLeaveList']);
+			// clinic/appointment-details moved to the unrestricted
+			// registration above — see the comment there.
+		});
+
+		Route::middleware(['clinic.capability:can_manage_treatment'])->group(function () {
+			Route::post('clinic/treatment-add', [App\Http\Controllers\API\ClinicController::class, 'treatmentAdd']);
+			Route::post('clinic/treatment-additional-note-update', [App\Http\Controllers\API\ClinicController::class, 'treatmentAdditionalNoteUpdate']);
+			// clinic/treatment-details moved to the unrestricted
+			// registration above — see the comment there.
+		});
+
+		Route::middleware(['clinic.capability:can_view_medical_history'])->group(function () {
+			Route::get('clinic/medical-history-list', [App\Http\Controllers\API\ClinicController::class, 'medicalHistoryList']);
+			Route::get('clinic/medical-history-details/{emp_id}', [App\Http\Controllers\API\ClinicController::class, 'medicalHistoryDetails']);
+		});
+
+		Route::middleware(['clinic.capability:can_issue_medical_certificate'])->group(function () {
+			Route::post('clinic/medical-certificate-store', [App\Http\Controllers\API\ClinicController::class, 'medicalCertificateStore']);
+			Route::get('clinic/medical-certificate-details/{medical_cert_id}', [App\Http\Controllers\API\ClinicController::class, 'medicalCertificateDetail']);
+		});
 	});
 
 // });

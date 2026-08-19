@@ -1257,7 +1257,8 @@ class LeaveController extends Controller
                      ->whereRaw('els.id = (SELECT MAX(id) FROM employees_leaves_status WHERE leave_request_id = employees_leaves.id AND status != "Pending")');
             })
             ->where('employees_leaves.flag', null)
-            ->where('employees_leaves.emp_id', $empID);
+            ->where('employees_leaves.emp_id', $empID)
+            ->where('employees_leaves.resort_id', $this->resort->resort_id);
 
         // Apply category filter if provided
         if (!empty($leave_catId)) {
@@ -2211,7 +2212,9 @@ class LeaveController extends Controller
         }
 
         // Find the leave categories by IDs
-        $leaveCategories = LeaveCategory::whereIn('id', $categoryId)->get();
+        $leaveCategories = LeaveCategory::whereIn('id', $categoryId)
+            ->where('resort_id', $this->resort->resort_id)
+            ->get();
 
         // Check for any relation: leave_category can be comma-separated IDs (e.g. "1,3,5"); at least one selected category must list another selected ID in its leave_category
         $hasRelation = $leaveCategories->contains(function ($category) use ($categoryId) {
@@ -2530,7 +2533,7 @@ class LeaveController extends Controller
         $comments = $request->input('reason', null); // Optional comments
         $currentApproverId = $this->resort->GetEmployee->id;// Assuming the logged-in user is the approver
 
-        $leave = EmployeeLeave::find($leaveId);
+        $leave = EmployeeLeave::where('id', $leaveId)->where('resort_id', $this->resort->resort_id)->first();
 
         if (!$leave) {
             return response()->json([
@@ -2771,7 +2774,7 @@ class LeaveController extends Controller
         $altEndDate = \Carbon\Carbon::createFromFormat('m/d/Y', $request->input('alt_end_date'));
         $comments = $request->input('comments');
 
-        $leave = EmployeeLeave::find($leaveId);
+        $leave = EmployeeLeave::where('id', $leaveId)->where('resort_id', $this->resort->resort_id)->first();
 
         if (!$leave) {
             return response()->json([
@@ -2814,6 +2817,7 @@ class LeaveController extends Controller
             ->join('resort_admins as ra','ra.id','=','e.Admin_Parent_id')
             ->join('resort_positions as rp','rp.id','=','e.Position_id')
             ->where('employees_leaves.id', $leaveId)
+            ->where('employees_leaves.resort_id', $this->resort->resort_id)
             ->select('employees_leaves.*', 'ra.first_name as admin_first_name', 'ra.last_name as admin_last_name', 'rp.position_title','e.Emp_id','elt.transportation as transportation_mode','elt.trans_arrival_date','elt.trans_departure_date')
             ->first();
 

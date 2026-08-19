@@ -864,6 +864,15 @@ class LeaveController extends Controller
                                                             ->where('resort_benefit_grid_child.rank', $benefit_grid->emp_grade)
                                                             ->where('resort_benefit_grid_child.benefit_grid_id', $benefit_grid->id)
                                                             ->where('lc.resort_id', $resort_id)
+                                                            // lc.eligibility is a comma-separated list of rank ids the
+                                                            // web portal's leave-category config restricts this leave
+                                                            // to (e.g. "8,1,2" = GM/EXCOM/HOD only). The mobile API
+                                                            // never checked it, so a rank not in the list (e.g. a Line
+                                                            // Worker, rank 6) still saw the category returned — this
+                                                            // was true even though resort_benefit_grid_child.rank
+                                                            // matched, since that table controls day allocation, not
+                                                            // the category's own rank restriction.
+                                                            ->whereRaw('FIND_IN_SET(?, lc.eligibility)', [$rank])
                                                             ->where(function ($query) use ($religion, $gender) {
                                                                 $query->where('resort_benefit_grid_child.eligible_emp_type', $gender)
                                                                     ->orWhere('resort_benefit_grid_child.eligible_emp_type', 'all');
@@ -2220,10 +2229,15 @@ class LeaveController extends Controller
         try {
             DB::beginTransaction();
 
-            // Validate transportation ID
+            // Validate transportation ID — 'transportation' is nullable
+            // (most leave updates have no travel component), but this was
+            // missing the isset() guard that leaveAdd() (the create path,
+            // line ~115) already has. where('id', null)->exists() is always
+            // false, so every update with no transportation unconditionally
+            // failed with "Invalid transportation ID provided."
             $transportationId                           =   $request->transportation;
 
-            if (!ResortTransportation::where('id', $transportationId)->exists()) {
+            if (isset($transportationId) && !ResortTransportation::where('id', $transportationId)->exists()) {
                 return response()->json([
                     'success'                           =>  false,
                     'message'                           =>  'Invalid transportation ID provided.',

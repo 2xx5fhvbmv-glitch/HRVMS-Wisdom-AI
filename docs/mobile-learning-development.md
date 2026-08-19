@@ -1,8 +1,74 @@
-# Learning & Development — Employee Mobile API
+# Learning & Development — Employee + Manager Mobile API
 
 For the mobile team. Controller: `app/Http/Controllers/API/LearningController.php`.
 This module is already fully built on the backend — this doc is the
-employee-facing integration reference.
+integration reference for both the employee-facing and manager-facing
+Figma screen sets.
+
+## Figma screen → endpoint map
+
+**L&D (Employee)** — any authenticated employee, no rank/role gate:
+
+| Screen | Endpoint |
+|---|---|
+| `employee-dashboard` | `GET learning/employee-learning-dashboard` (alias `learning/emp-lt-dashboard`) |
+| `Training-calendar` | `POST learning/employee-training-calendar` |
+| `Training-details-employee` | `GET learning/training-details/{schedule_id}` |
+| `Feedback Form Screen` (submit) | `GET learning/feedback-from-list` (form to render) + `POST learning/feedback-data-store` (submit) |
+
+**L&D Manager** — gated by role/position (`check.rank:EXCOM` for the two
+`manager-*` endpoints below; `ld.manager` — L&D position title or L&D
+department, not rank — for everything under `ld-manager/*`, documented in
+full in `docs/mobile-hr-ld-onboarding-manager.md`):
+
+| Screen | Endpoint |
+|---|---|
+| `training-calendar` (general — every training + approved learning request, with participant avatars) | `POST learning/manager-training-calendar` |
+| `Training-details` (Trainer, Participants, Present/Absent) | `GET learning/training-details/{schedule_id}` — same endpoint as the employee screen |
+| `l&d-manager-mark-attendance` | `GET ld-manager/mark-attendance/trainings` → `GET ld-manager/mark-attendance/participants/{id}` → `POST ld-manager/mark-attendance` — see `docs/mobile-hr-ld-onboarding-manager.md` |
+| `feedback-form` (manager reviewing everyone's responses for a session) | `POST learning/participant-feedback-from-list` |
+| L&D Request screen (**new — see below**) | `GET learning/manager-request-list` |
+
+**Two different "manager calendar" endpoints exist — don't conflate them:**
+`learning/manager-training-calendar` (this doc) is the general resort-wide
+L&D calendar shown in this Figma set. `ld-manager/training-calendar`
+(the *other* doc) is a purpose-built variant scoped to the new-hire
+onboarding cohort, built for the onboarding module's L&D Manager dashboard
+— different data, different screen, same-sounding name. Use
+`manager-training-calendar` for this Figma set.
+
+**"Evaluation" button** on the manager `Training-details` screen has no
+backing endpoint anywhere in this controller — flagging, not guessing at
+what it should do. If it's meant to be a separate scoring/assessment step
+distinct from the feedback form, that needs a real spec before it can be
+built.
+
+## L&D Request screen — already built
+
+`GET learning/manager-request-list` (gated by `ld.manager`, same as the
+other `ld-manager/*` endpoints) returns exactly the fields asked for:
+```json
+{
+  "success": true,
+  "message": "Learning request list fetched successfully",
+  "learning_request_list": [
+    {
+      "id": 68,
+      "learning_name": "Customer Service with a Smile",
+      "suggested_employees": [ { "employee_id": 205, "name": "Christian Slatter" } ],
+      "requested_by": "Roshan Faruk",
+      "reason": "...",
+      "start_date": "2026-08-20",
+      "end_date": "2026-08-21",
+      "action_note": "To approve, reject, or schedule this training, please use the web portal.",
+      "attachments": [ { "id": 4, "url": "https://..." } ]
+    }
+  ]
+}
+```
+Scoped to `Pending` requests only — this is a read-only queue, matching the
+tooltip requirement exactly (`action_note` is that tooltip's text; approve/
+reject/schedule stays web-only, no mobile write endpoint for it).
 
 ## GET learning/employee-learning-dashboard (alias: learning/emp-lt-dashboard)
 
@@ -129,7 +195,60 @@ Absent," only from `mark-attendance`'s own POST body.
 
 ## Manager/HOD-facing (same controller, not employee self-service)
 
-`managerTrainingCalendar` (`POST learning/manager-training-calendar`) is the
-resort-wide version of the calendar (every employee's sessions + approved
-learning requests, not just the caller's own) — for a manager/HOD dashboard
-view, not the individual employee screen.
+### POST `learning/manager-training-calendar`
+
+Gate: `check.rank:EXCOM`. Resort-wide version of the calendar — every
+scheduled training session **and** every approved standalone learning
+request, not just the caller's own, each carrying its full participant list
+for the stacked-avatar display. Body same as `employee-training-calendar`
+(`start_date`/`end_date`, both optional, defaults to current month).
+```json
+{
+  "success": true,
+  "message": "Calender Traning data fetched Successfully",
+  "calender_learning_data": [
+    {
+      "id": 12, "title": "Fire Safety Refresher", "session_date": "2026-08-05",
+      "start_time": "09:00 AM", "end_time": "11:00 AM", "description": "...",
+      "color": "#28a745",
+      "participants": [ { "name": "John Doe", "image": "https://...", "position": "Sheaf" } ]
+    },
+    {
+      "id": 20, "title": "Learning Request: Customer Service with a Smile",
+      "session_date": "2026-08-20", "start_time": "09:00 AM", "end_time": "05:00 PM",
+      "description": "Learning request from Roshan Faruk. ...",
+      "color": "#ff9800",
+      "participants": [ { "name": "Christian Slatter", "image": "https://...", "position": "Sheaf" } ]
+    }
+  ]
+}
+```
+`color` distinguishes the two source types on the calendar grid (`#28a745`
+green = a real scheduled training, `#ff9800` orange = an approved learning
+request not yet turned into a scheduled session) — same id-space caveat as
+the employee dashboard's `assign_trainig_programs` applies here too.
+
+### POST `learning/participant-feedback-from-list`
+
+Gate: plain `auth:api` (no explicit rank check in the method itself — reachable
+by any authenticated user, though only meaningful for whoever manages the
+training). Body: `{"training_schedule_id": 45}`. Every participant's
+submitted feedback-form response for that session — backs the manager
+`feedback-form` review screen (distinct from the employee's own single-form
+*submit* screen above):
+```json
+{
+  "success": true,
+  "message": "Feedback data retrieved successfully",
+  "feedback_listing": [
+    {
+      "id": 9, "training_id": 45, "participant_id": 88, "feedback_form_id": 3,
+      "responses": { "q1": "5", "q2": "Great session" },
+      "emp_id": 88, "first_name": "John", "last_name": "Doe",
+      "position_title": "Sheaf", "profile_picture": "https://..."
+    }
+  ]
+}
+```
+Empty array (not an error) if nobody's submitted feedback for that session
+yet.

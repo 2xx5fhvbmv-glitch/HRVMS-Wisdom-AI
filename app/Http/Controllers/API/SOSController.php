@@ -102,9 +102,15 @@ class SOSController extends Controller
                 'emergency_description'                 =>  $request->emergency_description,
             ]);
 
+            // rank==4 (MGR) used to be required here too, but no Security
+            // Manager record in the DB actually carries rank 4 — the real
+            // seeded example is rank 2/HOD — so that condition never
+            // matched and every SOS trigger silently skipped notifying
+            // anyone. Title alone is the real signal (matches
+            // EnsureSOSSecurityManagerAccess, which gates the
+            // approve/dispatch endpoints this employee is routed to).
             $smEmployeeModel                            =   Employee::join('resort_positions as rp', 'employees.Position_id', '=', 'rp.id')
                                                                 ->where('employees.resort_id', $this->resort_id)
-                                                                ->where('employees.rank',4)
                                                                 ->where('employees.status', 'Active')
                                                                 ->where('rp.position_title', 'Security Manager')
                                                                 ->select('employees.id','employees.Admin_Parent_id','employees.Emp_id','employees.Position_id','employees.device_token')
@@ -425,6 +431,83 @@ class SOSController extends Controller
         }
     }
 
+    /**
+     * Continuous live-location ping during an active SOS. The triggering
+     * employee's (and any responding team member's) app calls this on an
+     * interval while the event is open; it overwrites the "last known
+     * location" already read by employeeAndTeamLocation/showMap/
+     * filterMapEmployeeList — no new trail table, those endpoints already
+     * render off sos_history_employee_status / sos_team_member_activity's
+     * current lat/lng, so updating the same rows in place is all a live
+     * map needs. sos_history_id is resort-and-status gated the same way
+     * as employeeAndTeamLocation/getTeamAcknowledged (this session's fix
+     * pattern) so a ping can never be written into another resort's, or a
+     * closed-out, SOS event.
+     */
+    public function SOSLocationUpdate(Request $request)
+    {
+        if (!Auth::guard('api')->check()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $validator                                      =   Validator::make($request->all(), [
+            'sos_history_id'                            =>  'required',
+            'latitude'                                  =>  'required',
+            'longitude'                                 =>  'required',
+            'address'                                   =>  'nullable|string',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
+        }
+
+        try {
+            $sosHistory                                 =   SOSHistoryModel::where('id', $request->sos_history_id)
+                                                                ->where('resort_id', $this->resort_id)
+                                                                ->whereNotIn('status', ['Completed', 'Rejected', 'Drill-Completed', 'Drill-Rejected'])
+                                                                ->first();
+
+            if (!$sosHistory) {
+                return response()->json(['success' => false, 'message' => 'SOS event not found or no longer active.'], 404);
+            }
+
+            $employeeStatus                             =   SosHistoryEmployeeStatus::updateOrCreate(
+                                                                [
+                                                                    'sos_history_id'     =>  $request->sos_history_id,
+                                                                    'emp_id'             =>  $this->user->GetEmployee->id,
+                                                                ],
+                                                                [
+                                                                    'latitude'           =>  $request->latitude,
+                                                                    'longitude'          =>  $request->longitude,
+                                                                    'address'            =>  $request->address,
+                                                                ]
+                                                            );
+
+            // Also refresh the caller's team-activity pin if they're a
+            // responding team member on this event — employeeAndTeamLocation
+            // merges both sources for the live map.
+            SosTeamMemberActivity::where('sos_history_id', $request->sos_history_id)
+                                                                ->where('emp_id', $this->user->id)
+                                                                ->update([
+                                                                    'latitude'           =>  $request->latitude,
+                                                                    'longitude'          =>  $request->longitude,
+                                                                    'address'            =>  $request->address,
+                                                                ]);
+
+            return response()->json([
+                'success'                               =>  true,
+                'message'                               =>  "Location updated successfully.",
+                'data'                                  =>  $employeeStatus,
+            ], 200);
+
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
     public function employeeAndTeamLocation($sosId)
     {
         if (!Auth::guard('api')->check()) {
@@ -439,8 +522,19 @@ class SOSController extends Controller
         $isHOD                                          =   ($available_rank === "HOD");
 
         try {
+            // No resort ownership check at all — any authenticated user,
+            // any resort, could pull live GPS + name/photo for every
+            // employee/SOS-team member tied to another resort's active
+            // emergency just by enumerating sos_id.
             $SOSHistoryModel                            =   SOSHistoryModel::where('id', $sosId)
-                                                                ->whereIn('sos_history.status',['Active','Drill-Active','In-Progress'])
+                                                                ->where('resort_id', $this->resort_id)
+                                                                // 'Real-Active' (a genuine, non-drill emergency — see
+                                                                // drillRealSOS()) was missing from this list, so live
+                                                                // location tracking silently refused to show anyone's
+                                                                // position for exactly the emergencies where it matters
+                                                                // most, returning a misleading "No employee location
+                                                                // found" instead.
+                                                                ->whereIn('sos_history.status',['Active','Drill-Active','Real-Active','In-Progress'])
                                                                 ->first();
 
 
@@ -531,8 +625,15 @@ class SOSController extends Controller
             $sosData                                    =   SOSHistoryModel::join('sos_team_member_activity as stma', 'sos_history.id', '=', 'stma.sos_history_id')
                                                                 ->join('sos_emergency_types as set', 'sos_history.emergency_id', '=', 'set.id')
                                                                 ->where('sos_history.id', $sosId)
+                                                                ->where('sos_history.resort_id', $this->resort_id)
                                                                 ->where('stma.emp_id', $this->user->id)
-                                                                ->whereIn('sos_history.status',['Active','Drill-Active','In-Progress'])
+                                                                // 'Real-Active' (a genuine, non-drill emergency — see
+                                                                // drillRealSOS()) was missing from this list, so live
+                                                                // location tracking silently refused to show anyone's
+                                                                // position for exactly the emergencies where it matters
+                                                                // most, returning a misleading "No employee location
+                                                                // found" instead.
+                                                                ->whereIn('sos_history.status',['Active','Drill-Active','Real-Active','In-Progress'])
                                                                 ->select('sos_history.*','stma.status as team_member_status', 'stma.address as team_member_address', 'stma.latitude as team_member_latitude', 'stma.longitude as team_member_longitude','stma.id as team_member_id','stma.emp_id as team_member_emp_id','set.name as emergency_name')
                                                                 ->first();
             if (!$sosData) {
@@ -904,6 +1005,13 @@ class SOSController extends Controller
         
         $sosId                                          =   base64_decode($sosId);
 
+        // Same gap as employeeAndTeamLocation() — no resort ownership
+        // check at all, so this leaked acknowledged/unacknowledged SOS
+        // team member names/photos/division/rank for any resort's event.
+        if (!SOSHistoryModel::where('id', $sosId)->where('resort_id', $this->resort_id)->exists()) {
+            return response()->json(['success' => false, 'message' => 'SOS event not found.'], 404);
+        }
+
         try{
             $sosTeamMemberAcknowledged                  =   SosTeamMemberActivity::join('resort_admins as ra', 'sos_team_member_activity.emp_id', '=', 'ra.id')
                                                                     ->where('sos_team_member_activity.sos_history_id', $sosId)
@@ -1044,7 +1152,11 @@ class SOSController extends Controller
         try {
             $sosHistory                                 =   SOSHistoryModel::where('id', $request->sos_id)
                                                                 ->where('resort_id', $this->resort_id)
-                                                                ->whereIn('status',['Active', 'Drill-Active', 'In-Progress'])
+                                                                // 'Real-Active' (a real, non-drill SOS) was missing here —
+                                                                // same class of bug fixed for employee-team-location/
+                                                                // SOSDetails: a live SOS could never be marked Completed
+                                                                // by the security manager, only a drill could.
+                                                                ->whereIn('status',['Active', 'Drill-Active', 'Real-Active', 'In-Progress'])
                                                                 ->first();
             if (!$sosHistory) {
                 return response()->json(['success' => false, 'message' => 'SOS Not Found'], 200);
@@ -1294,6 +1406,13 @@ class SOSController extends Controller
 
         if ($validator->fails()) {
             return response()->json(['success' => false, 'message' => $validator->errors()->first()], 422);
+        }
+
+        // sos_history_id was never checked against the resort before
+        // insert — a message could be attached to another resort's SOS
+        // event log.
+        if (!SOSHistoryModel::where('id', $request->sos_history_id)->where('resort_id', $this->resort_id)->exists()) {
+            return response()->json(['success' => false, 'message' => 'SOS event not found.'], 404);
         }
 
         try {

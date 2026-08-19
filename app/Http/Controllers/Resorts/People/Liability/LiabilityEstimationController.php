@@ -1248,7 +1248,10 @@ class LiabilityEstimationController extends Controller
 
     public function getLiabilityEmployeeData($empId)
     {
-        $employee = Employee::findOrFail($empId);
+        $employee = Employee::where('resort_id', $this->resort->resort_id)->find($empId);
+        if (!$employee) {
+            return response()->json(['message' => 'Employee not found.'], 404);
+        }
         $currentYear = now()->year;
 
         // Fetch all distinct allowance types
@@ -1301,6 +1304,7 @@ class LiabilityEstimationController extends Controller
                 ->sum('Amt');
 
             $budgetAllowances = DB::table('resort_budget_costs')
+                ->where('resort_id', $this->resort->resort_id)
                 ->whereYear('created_at', $currentYear)
                 ->select('particulars', DB::raw('SUM(amount) as total'))
                 ->groupBy('particulars')

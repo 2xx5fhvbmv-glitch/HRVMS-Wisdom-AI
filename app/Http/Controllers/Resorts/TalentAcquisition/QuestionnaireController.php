@@ -330,17 +330,24 @@ class QuestionnaireController extends Controller
                 ], 422);
             }
 
-            $p = Questionnaire::find($editQuestionnaire_id);
+            // Scope by resort_id — without this, a client can pass any
+            // Questionnaire id and the update below (which also writes
+            // Resort_id back) would hijack another resort's questionnaire
+            // row over to the attacker's own resort.
+            $p = Questionnaire::where('Resort_id', $this->resort->resort_id)->find($editQuestionnaire_id);
 
-            if ($p) {
-                $p->update([
-                    "Resort_id" => $this->resort->resort_id,
-                    "Division_id" => $Division,
-                    "Department_id" => $Department,
-                    "Position_id" => $Position,
-                    "video" => $video_Avilable_question,
-                ]);
+            if (!$p) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'Questionnaire not found.'], 404);
             }
+
+            $p->update([
+                "Resort_id" => $this->resort->resort_id,
+                "Division_id" => $Division,
+                "Department_id" => $Department,
+                "Position_id" => $Position,
+                "video" => $video_Avilable_question,
+            ]);
 
             if(!empty($AddQuestion))
             {

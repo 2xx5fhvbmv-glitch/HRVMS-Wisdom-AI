@@ -265,6 +265,35 @@ class MonthlyCheckInController extends Controller
                     "employee_id"                           =>  $request->emp_id,
                     "learning_request_id"                   =>  $l->id,
                 ]);
+
+                // The L&D Manager (learning_manager_id) was never notified
+                // that a training request now exists — the only
+                // notification sent from this method went to the employee
+                // being reviewed, about the meeting itself, not the
+                // training suggestion. This is what the L&D Manager's
+                // learning/manager-request-list queue needs a push for.
+                $trainingProgram                    =   LearningProgram::find($request->tranining_id);
+                $suggestedEmployee                  =   Employee::with('resortAdmin')->find($request->emp_id);
+                $suggestedEmployeeName              =   $suggestedEmployee && $suggestedEmployee->resortAdmin
+                                                            ? $suggestedEmployee->resortAdmin->full_name
+                                                            : 'an employee';
+                $ldTitle                            =   'New Training Request';
+                $ldMsg                              =   $this->user->first_name . ' ' . $this->user->last_name
+                                                            . ' has requested "' . ($trainingProgram->name ?? 'a training program')
+                                                            . '" for ' . $suggestedEmployeeName . ' via Monthly Check-In.';
+                Common::sendMobileNotification(
+                    $this->resort_id,
+                    2,
+                    null,
+                    null,
+                    $ldTitle,
+                    $ldMsg,
+                    'Learning',
+                    [$request->learning_manager_id],
+                    $l->id,
+                    false,
+                    'learning-request-created',
+                );
             }
 
             $msg                                =   'Meeting scheduled by HR for Monthly Check-In. Subject: ' . ($request->Area_of_Improvement ?? $request->Area_of_Discussion);
@@ -328,7 +357,15 @@ class MonthlyCheckInController extends Controller
             $msg                                =   'Meeting Rescheduled by HR for Monthly Check-In Date '.$request->date_discussion;
             $title                              =   'Monthly check-in Meeting Rescheduled';
             $ModuleName                         =   'Performance';
-            $sendMobileNotification             =   Common::sendMobileNotification($this->resort_id,null,null,$title,$msg,$ModuleName,[$meeting->emp_id],null,false,'monthly-checkin-reschedule');
+            // Was missing the $type argument entirely (compare the sibling
+            // call above at line ~273) — every argument from $title onward
+            // shifted one position left: $title landed in $trainingId,
+            // $msg became the "title", $ModuleName became the "message",
+            // and the [$meeting->emp_id] recipient array landed in
+            // $module, which would throw when used in a where('module', ...)
+            // clause. $sendto ended up null, so no recipient/notification
+            // was actually sent even before that crash.
+            $sendMobileNotification             =   Common::sendMobileNotification($this->resort_id,2,null,null,$title,$msg,$ModuleName,[$meeting->emp_id],null,false,'monthly-checkin-reschedule');
 
             DB::commit();
             $response['status']                             =   true;

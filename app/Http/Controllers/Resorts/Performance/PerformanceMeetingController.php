@@ -444,7 +444,13 @@ class PerformanceMeetingController extends Controller
         ]);
 
         foreach ($request->Emp_id as $encodedId) {
-            $employee = Employee::with(['resortAdmin', 'position'])->find(base64_decode($encodedId));
+            // Was unscoped — any resort's employee id could be invited,
+            // enrolled into this resort's calendar, and emailed a real
+            // meeting invite with their own name/position.
+            $employee = Employee::with(['resortAdmin', 'position'])
+                ->where('id', base64_decode($encodedId))
+                ->where('resort_id', $this->resort->resort_id)
+                ->first();
 
             if (!$employee || !$employee->resortAdmin) continue;
 

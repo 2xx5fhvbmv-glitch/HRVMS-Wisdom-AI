@@ -41,6 +41,7 @@ use App\Models\Compliance;
 use App\Events\ResortNotificationEvent;
 
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 use PhpOffice\PhpSpreadsheet\Writer\Xlsx;
 use PhpOffice\PhpSpreadsheet\Style\Fill;
@@ -453,6 +454,16 @@ class PayrollController extends Controller
     public function saveEmployeesToPayroll(Request $request)
     {
         try {
+            $resortId = $this->resort->resort_id;
+
+            // payroll_id is the write key for every PayrollEmployees row
+            // below — verify it belongs to this resort before attaching
+            // anyone to it, otherwise a caller could attach an employee to
+            // (or pull employees from) another resort's draft payroll.
+            if (!Payroll::where('id', $request->payroll_id)->where('resort_id', $resortId)->exists()) {
+                return response()->json(['success' => false, 'message' => 'Payroll not found.'], 404);
+            }
+
             $employeeIds = $request->employee_ids ?? [];
 
             // Support legacy format (array of objects with 'id' key)
@@ -464,7 +475,10 @@ class PayrollController extends Controller
 
             foreach ($employeeIds as $empId) {
                 // Fetch Employee details along with position, department and section
-                $emp_detail = Employee::with(['position', 'department', 'section'])->find($empId);
+                $emp_detail = Employee::with(['position', 'department', 'section'])
+                    ->where('id', $empId)
+                    ->where('resort_id', $resortId)
+                    ->first();
 
                 // Fallback: try by Emp_id if not found by primary key
                 if (!$emp_detail) {
@@ -517,6 +531,14 @@ class PayrollController extends Controller
         DB::beginTransaction(); // ✅ Start transaction for data consistency
 
         try {
+            // payroll_id is the write key below — verify it belongs to this
+            // resort before writing, otherwise a caller could pollute
+            // another resort's draft payroll with attendance data.
+            if (!Payroll::where('id', $request->payroll_id)->where('resort_id', $this->resort->resort_id)->exists()) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'Payroll not found.'], 404);
+            }
+
             $activityLog = []; // ✅ Array to track changes
 
             foreach ($request->attendance as $attendance) {
@@ -608,6 +630,12 @@ class PayrollController extends Controller
     public function saveAttendanceNote(Request $request)
     {
         try {
+            // payroll_id is the write key below — verify it belongs to
+            // this resort before writing/creating an attendance row for it.
+            if (!Payroll::where('id', $request->payroll_id)->where('resort_id', $this->resort->resort_id)->exists()) {
+                return response()->json(['success' => false, 'message' => 'Payroll not found.'], 404);
+            }
+
             // ✅ Fetch attendance record (DO NOT reset existing data)
             $attendance = PayrollTimeAndAttendance::where([
                 'payroll_id' => $request->payroll_id,
@@ -715,7 +743,11 @@ class PayrollController extends Controller
     public function saveServiceChargesToPayroll(Request $request)
     {
         DB::beginTransaction(); // ✅ Start transaction for data consistency
-        $payroll = Payroll::findOrFail($request->payroll_id);
+        // resort_id scope: payroll_id is the write key for every
+        // ServiceCharges/PayrollServiceCharge row below.
+        $payroll = Payroll::where('id', $request->payroll_id)
+            ->where('resort_id', $this->resort->resort_id)
+            ->firstOrFail();
         // Extract month and year from payroll dates for service charge calculations
         $payrollDate = Carbon::parse($payroll->start_date);
         $month = $payrollDate->month;
@@ -829,6 +861,13 @@ class PayrollController extends Controller
         DB::beginTransaction(); // ✅ Start transaction for data consistency
         // dd($request->all());
         try {
+            // payroll_id is the write key below — verify it belongs to
+            // this resort before writing deduction rows against it.
+            if (!Payroll::where('id', $request->payroll_id)->where('resort_id', $this->resort->resort_id)->exists()) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'Payroll not found.'], 404);
+            }
+
             foreach ($request->DeductionData as $deduction) {
                 // ✅ Fetch Employee details — resort_id scoped.
                 $emp_detail = Employee::with(['position', 'department'])
@@ -924,6 +963,13 @@ class PayrollController extends Controller
         DB::beginTransaction(); // ✅ Start transaction for data consistency
         // dd($request->reviewData);
         try {
+            // payroll_id is the write key below — verify it belongs to
+            // this resort before writing review rows against it.
+            if (!Payroll::where('id', $request->payroll_id)->where('resort_id', $this->resort->resort_id)->exists()) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'Payroll not found.'], 404);
+            }
+
             foreach ($request->reviewData as $review) {
                 // Use earningsNormal (Total Earnings from DOM) directly — it already includes all components
                 $total_earnings = (float)($review['earningsNormal'] ?? 0);
@@ -1035,7 +1081,10 @@ class PayrollController extends Controller
     public function fetchTotalPayrollAmount(Request $request)
     {
         $request->validate([
-            'payrollId' => 'required|exists:payroll,id',
+            'payrollId' => [
+                'required',
+                Rule::exists('payroll', 'id')->where('resort_id', $this->resort->resort_id),
+            ],
         ]);
 
         $payrollId = $request->payrollId;
@@ -1071,6 +1120,16 @@ class PayrollController extends Controller
         try {
             $payrollId = $request->payroll_id;
 
+            // This locks/finalizes a payroll purely by client-supplied id,
+            // then marks that payroll's salary-advance recovery schedules
+            // and staff-shop payments "Paid" below — verify it belongs to
+            // this resort first, or a caller could lock/corrupt another
+            // resort's payroll.
+            if (!Payroll::where('id', $payrollId)->where('resort_id', $this->resort->resort_id)->exists()) {
+                DB::rollBack();
+                return response()->json(['success' => false, 'message' => 'Payroll not found.'], 404);
+            }
+
             // Calculate totals from DB (don't trust frontend values which may have comma formatting issues)
             $totalPayroll = PayrollReview::where('payroll_id', $payrollId)->sum('net_salary');
             $totalEmployees = PayrollReview::where('payroll_id', $payrollId)->count();
@@ -1086,7 +1145,7 @@ class PayrollController extends Controller
                     'status' => 'locked'
                 ]
             );
-            $payroll = Payroll::findOrFail($payrollId);
+            $payroll = Payroll::where('id', $payrollId)->where('resort_id', $this->resort->resort_id)->firstOrFail();
             $deductions = PayrollDeduction::where('payroll_id', $payrollId)->get();
             foreach ($deductions as $deduction) {
                 $employeeId = $deduction->employee_id;
@@ -1202,7 +1261,12 @@ class PayrollController extends Controller
             return response()->json(['success' => false, 'message' => 'You are not authorized to approve this payroll.'], 403);
         }
 
+        // resort_id scoped so a Finance/HR EXCOM/GM whose rank matches the
+        // step can't approve/reject another resort's pending approval row
+        // by guessing its payroll_id — this check must happen before the
+        // ->update() below, not after.
         $approval = PayrollApproval::where('payroll_id', $payrollId)
+            ->where('resort_id', $resortId)
             ->where('step_order', $approvalStep)
             ->where('status', 'pending')
             ->first();
@@ -1927,13 +1991,22 @@ class PayrollController extends Controller
 
     public function fetchTimeAttendance(Request $request)
     {
+        $resortId = $this->resort->resort_id;
+
         // Quick lookup: return employee IDs + dates from saved payroll (for page refresh recovery)
         if ($request->has('getEmployeesOnly') && $request->payrollId) {
+            // Resort-scope the payroll before touching its child rows — a
+            // bare payroll_id lookup would otherwise dump another resort's
+            // payroll_employees list to any caller who guesses the id.
+            $payrollOwned = Payroll::where('id', $request->payrollId)->where('resort_id', $resortId)->exists();
+            if (!$payrollOwned) {
+                return response()->json(['success' => false, 'employee_ids' => [], 'date_range' => '']);
+            }
             $empIds = DB::table('payroll_employees')
                 ->where('payroll_id', $request->payrollId)
                 ->pluck('employee_id')
                 ->toArray();
-            $payroll = DB::table('payroll')->where('id', $request->payrollId)->first(['start_date', 'end_date']);
+            $payroll = DB::table('payroll')->where('id', $request->payrollId)->where('resort_id', $resortId)->first(['start_date', 'end_date']);
             $dateRange = '';
             if ($payroll) {
                 $dateRange = \Carbon\Carbon::parse($payroll->start_date)->format('d M Y') . ' - ' . \Carbon\Carbon::parse($payroll->end_date)->format('d M Y');
@@ -1947,6 +2020,11 @@ class PayrollController extends Controller
 
         // Return saved service charge data for step restore
         if ($request->has('getServiceChargeOnly') && $request->payrollId) {
+            // Same resort-scope requirement as the branch above.
+            $payrollOwned = Payroll::where('id', $request->payrollId)->where('resort_id', $resortId)->exists();
+            if (!$payrollOwned) {
+                return response()->json(['success' => false, 'data' => [], 'total_amount' => 0]);
+            }
             $scData = DB::table('payroll_service_charges')
                 ->where('payroll_id', $request->payrollId)
                 ->get(['Emp_id', 'total_working_days', 'service_charge_amount']);
@@ -1968,19 +2046,30 @@ class PayrollController extends Controller
             'endDate'   => 'required|date|after_or_equal:startDate',
         ]);
 
-        $resortId = $this->resort->resort_id;
         $currency = $request->input('currency', 'Dollar');
         $settings = ResortSiteSettings::where('resort_id', $resortId)->first();
 
+        // Every query below (ParentAttendace, EmployeeLeave, Employee, the
+        // activity log) trusts this employee id list at face value with no
+        // resort filter of its own. Sanitize it once, up front, down to
+        // only ids that actually belong to this resort, and use that
+        // sanitized list everywhere instead of the raw request input —
+        // otherwise a client can post another resort's employee ids and
+        // pull their full attendance/salary data through this endpoint.
+        $scopedEmployeeIds = Employee::where('resort_id', $resortId)
+            ->whereIn('id', $request->employees)
+            ->pluck('id')
+            ->all();
+
         $latestAttendanceUpdates = DB::table('payroll_attendance_activity_log')
-            ->whereIn('employee_id', $request->employees)
+            ->whereIn('employee_id', $scopedEmployeeIds)
             ->where('resort_id', $resortId)
             ->where('payroll_id', $request->payrollId)
             ->orderBy('created_at', 'desc')
             ->get()
             ->groupBy('employee_id');
 
-        $attendanceRecords = ParentAttendace::whereIn('Emp_id', $request->employees)
+        $attendanceRecords = ParentAttendace::whereIn('Emp_id', $scopedEmployeeIds)
             ->whereBetween('date', [$request->startDate, $request->endDate])
             ->get();
 
@@ -1988,7 +2077,7 @@ class PayrollController extends Controller
             return response()->json(['success' => false, 'message' => 'No attendance records found.'], 404);
         }
 
-        $pendingLeaves = EmployeeLeave::whereIn('emp_id', $request->employees)
+        $pendingLeaves = EmployeeLeave::whereIn('emp_id', $scopedEmployeeIds)
             ->where('status', 'Pending')
             ->where(function ($query) use ($request) {
                 $query->whereBetween('from_date', [$request->startDate, $request->endDate])
@@ -2010,7 +2099,7 @@ class PayrollController extends Controller
             ], 422);
         }
 
-        $invalidOTs = ParentAttendace::whereIn('Emp_id', $request->employees)
+        $invalidOTs = ParentAttendace::whereIn('Emp_id', $scopedEmployeeIds)
             ->whereBetween('date', [$request->startDate, $request->endDate])
             ->whereNotNull('OverTime')
             ->where('OverTime', '!=', '')
@@ -2036,7 +2125,7 @@ class PayrollController extends Controller
         }
 
         // Block if any record has no Status at all
-        $missingStatus = ParentAttendace::whereIn('Emp_id', $request->employees)
+        $missingStatus = ParentAttendace::whereIn('Emp_id', $scopedEmployeeIds)
             ->whereBetween('date', [$request->startDate, $request->endDate])
             ->where(function ($query) {
                 $query->whereNull('Status')->orWhere('Status', '');
@@ -2054,7 +2143,7 @@ class PayrollController extends Controller
         }
 
         // Only Present employees require both CheckingTime and CheckingOutTime
-        $invalidAttendance = ParentAttendace::whereIn('Emp_id', $request->employees)
+        $invalidAttendance = ParentAttendace::whereIn('Emp_id', $scopedEmployeeIds)
             ->whereBetween('date', [$request->startDate, $request->endDate])
             ->where('Status', 'Present')
             ->where(function ($query) {
@@ -2086,7 +2175,7 @@ class PayrollController extends Controller
 
         // Load employee data
         $employees = Employee::with(['resortAdmin', 'department', 'position', 'allowance'])
-            ->whereIn('id', $request->employees)
+            ->whereIn('id', $scopedEmployeeIds)
             ->get()
             ->keyBy('id');
 
@@ -2482,11 +2571,17 @@ class PayrollController extends Controller
 
     public function fetchServiceCharge(Request $request)
     {
-        
+
         $selectedEmployeeIds = $request->employees;
 
-       
-        $employees = Employee::with(['resortAdmin','department','position'])->whereIn('id', $request->employees)->get()->keyBy('id');
+
+        // resort_id scoped — otherwise any posted id, cross-resort or not,
+        // returned that employee's full record (salary, allowances, etc).
+        $employees = Employee::with(['resortAdmin','department','position'])
+            ->where('resort_id', $this->resort->resort_id)
+            ->whereIn('id', $request->employees)
+            ->get()
+            ->keyBy('id');
 
         
         $totalWorkdays = $employees->sum('workdays');
@@ -2551,6 +2646,7 @@ class PayrollController extends Controller
         $transactions = Payment::whereIn('payments.emp_id', $employeeIds)
             ->join('employees as e', 'e.id', '=', 'payments.emp_id')
             ->join('products as p', 'p.id', '=', 'payments.product_id')
+            ->where('e.resort_id', $resortId)
             ->whereIn('payments.status', ['Consented', 'Partial Paid'])
             ->select(
                 'e.Emp_id',
@@ -2569,6 +2665,7 @@ class PayrollController extends Controller
         // Get totals per employee
         $staffShopData = Payment::whereIn('payments.emp_id', $employeeIds)
             ->join('employees as e', 'e.id', '=', 'payments.emp_id')
+            ->where('e.resort_id', $resortId)
             ->whereIn('payments.status', ['Consented', 'Partial Paid'])
             ->select(
                 'e.Emp_id',
@@ -2768,9 +2865,13 @@ class PayrollController extends Controller
         $payrollId = $request->input('payrollId');
         $employeeData = $request->input('employees'); // array of ['id' => ..., 'earned_salary' => ...]
         // dd($employeeData);
-        $employees = collect($employeeData)->map(function ($emp) {
+        $employees = collect($employeeData)->map(function ($emp) use ($resortId) {
+        // resort_id scoped — otherwise any posted employee id returned that
+        // employee's nationality/salary/allowance data for the pension &
+        // EWT breakdown, regardless of resort.
         $employee = Employee::with('allowance.allowanceName','resortAdmin','department', 'position')
             ->select('id', 'emp_id', 'basic_salary', 'basic_salary_currency', 'nationality','ewt_status')
+            ->where('resort_id', $resortId)
             ->find($emp['id']);
 
             if ($employee) {
@@ -2972,7 +3073,7 @@ class PayrollController extends Controller
             'serviceCharges',
             'deductions',
             'reviews'
-        ])->findOrFail($payroll_id);
+        ])->where('resort_id', $resort_id)->findOrFail($payroll_id);
 
         $start_date = $payroll->start_date;
         $end_date = $payroll->end_date;
@@ -2993,7 +3094,7 @@ class PayrollController extends Controller
             'reviews',
             'reviews.allowances' // <-- correct relationship name
 
-        ])->findOrFail($payroll_id);
+        ])->where('resort_id', $resortId)->findOrFail($payroll_id);
 
         // dd($payroll);
         $resortId = is_array($resortId) ? $resortId : [$resortId];
@@ -3344,7 +3445,9 @@ class PayrollController extends Controller
 
     public function getPayrollColumns($payroll_id)
     {
-        $payroll = Payroll::with('reviews.allowances')->findOrFail($payroll_id);
+        $payroll = Payroll::with('reviews.allowances')
+            ->where('resort_id', $this->resort->resort_id)
+            ->findOrFail($payroll_id);
 
         if (!$payroll) {
             return response()->json([
@@ -3381,6 +3484,7 @@ class PayrollController extends Controller
             // Join resort_admins for the user who made the change
             ->join('resort_admins as user_admin', 'user_admin.id', '=', 'user.Admin_Parent_id')
             ->where('paal.payroll_id', $payroll_id)
+            ->where('p.resort_id', $this->resort->resort_id)
             ->orderBy('paal.updated_at', 'desc')
             ->select(
                 'paal.*',
@@ -3503,14 +3607,22 @@ class PayrollController extends Controller
 
     public function getNotes($payroll_id)
     {
+        $resortId = $this->resort->resort_id;
+
+        // resort_id scoped so a payroll_id from another resort can't be
+        // used to pull that resort's attendance notes here.
+        if (!Payroll::where('id', $payroll_id)->where('resort_id', $resortId)->exists()) {
+            return response()->json(['success' => false, 'data' => []]);
+        }
+
         $notes = DB::table('payroll_time_and_attandance')
             ->where('payroll_id', $payroll_id)
             ->whereNotNull('notes')
             ->get(['employee_id', 'notes']);
-    
+
         // Attach Employee Names
-        $notes->transform(function ($note) {
-            $employee = Employee::with('resortAdmin')->find($note->employee_id);
+        $notes->transform(function ($note) use ($resortId) {
+            $employee = Employee::with('resortAdmin')->where('id', $note->employee_id)->where('resort_id', $resortId)->first();
             $note->employee_name = $employee ? $employee->resortAdmin->first_name . " " . $employee->resortAdmin->last_name : "Unknown";
             return $note;
         });
@@ -3533,7 +3645,7 @@ class PayrollController extends Controller
                 'deductions',
                 'reviews',
                 'reviews.allowances' // Ensure this relationship is defined in your Payroll model
-            ])->findOrFail($payroll_id);
+            ])->where('resort_id', $this->resort->resort_id)->findOrFail($payroll_id);
 
             // Initialize query for employees
             $employees = $payroll->employees;
@@ -3694,12 +3806,21 @@ class PayrollController extends Controller
 
     public function fetchAdvanceRecovery(Request $request)
     {
-        $employeeIds = $request->employee_ids;
         $startDate = $request->start_date;
         $endDate = $request->end_date;
         $currency = $request->input('currency', 'Dollar'); // Default currency is USD
         $conversionRate = floatval($request->input('conversionRate', 1)); // Default 1 (no conversion)
-        $salary_currency = "Dollar"; 
+        $salary_currency = "Dollar";
+
+        // payroll_recovery_schedule has no resort_id column of its own —
+        // sanitize the posted employee_ids down to ones that actually
+        // belong to this resort before summing loan-recovery amounts for
+        // them, otherwise another resort's outstanding advance/loan
+        // balances would be exposed here.
+        $employeeIds = Employee::where('resort_id', $this->resort->resort_id)
+            ->whereIn('id', $request->employee_ids)
+            ->pluck('id')
+            ->all();
 
         $recoveryData = PayrollRecoverySchedule::whereIn('employee_id', $employeeIds)
             ->where('status', 'Pending')
@@ -3742,7 +3863,7 @@ class PayrollController extends Controller
                 'employees.employee.position',
                 'employees.employee.bankDetails', // required
                 'reviews.allowances'
-            ])->findOrFail($payroll_id);
+            ])->where('resort_id', $this->resort->resort_id)->findOrFail($payroll_id);
 
             $spreadsheet = new Spreadsheet();
 

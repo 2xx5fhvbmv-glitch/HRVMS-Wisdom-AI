@@ -1035,7 +1035,13 @@ class DashboardController extends Controller
             return abort(403, 'Unauthorized access');
         }
         $page_title ='Details';
-        $request_detail = LearningRequest::with('learning','employees.employee.resortAdmin')->where('id',$id)->first();
+        $request_detail = LearningRequest::with('learning','employees.employee.resortAdmin')
+            ->where('id',$id)
+            ->where('resort_id', $this->resort->resort_id)
+            ->first();
+        if (!$request_detail) {
+            abort(404, 'Learning request not found.');
+        }
         $createdBy = ResortAdmin::where('id',$request_detail->created_by)->first();
         // dd($request_detail);
         return view('resorts.learning.request.detail',compact('page_title','request_detail','createdBy'));

@@ -619,9 +619,11 @@ class PayrollReportController extends Controller
         $scoped = Common::getScopedDepartmentIds();
         $records = DB::table('payroll_review_allowances as a')
             ->join('payroll_reviews as pr', 'pr.id', '=', 'a.payroll_review_id')
+            ->join('payroll as pay', 'pay.id', '=', 'pr.payroll_id')
             ->join('employees as e', 'e.id', '=', 'pr.employee_id')
             ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
             ->leftJoin('resort_positions as p', 'p.id', '=', 'e.Position_id')
+            ->where('pay.resort_id', $this->resort->resort_id)
             ->whereIn('pr.payroll_id', (array) $pid)
             ->when($scoped !== null, fn($q) => $q->whereIn('e.Dept_id', $scoped))
             ->when($filters['department'], fn($q) => $q->where('e.Dept_id', $filters['department']))
@@ -1086,11 +1088,11 @@ class PayrollReportController extends Controller
 
         // Who submitted the payroll — the first ("submitted"/initiating) approval step's
         // actor if recorded; the payroll table itself stores no submitter column.
-        $submittedBy = DB::table('payroll_approvals')->whereIn('payroll_id', (array) $pid)
+        $submittedBy = DB::table('payroll_approvals')->where('resort_id', $this->resort->resort_id)->whereIn('payroll_id', (array) $pid)
             ->whereNotNull('approver_name')->where('approver_name', '<>', '')
             ->orderBy('step_order')->value('approver_name') ?: 'N/A';
 
-        $rows = DB::table('payroll_approvals')->whereIn('payroll_id', (array) $pid)
+        $rows = DB::table('payroll_approvals')->where('resort_id', $this->resort->resort_id)->whereIn('payroll_id', (array) $pid)
             ->orderBy('step_order')->get()
             ->map(fn($a) => [
                 'Payroll Period' => $label,
@@ -1144,7 +1146,9 @@ class PayrollReportController extends Controller
 
         $scoped = Common::getScopedDepartmentIds();
         $d = DB::table('payroll_deductions as pd')
+            ->join('payroll as pay', 'pay.id', '=', 'pd.payroll_id')
             ->join('employees as e', 'e.id', '=', 'pd.employee_id')
+            ->where('pay.resort_id', $this->resort->resort_id)
             ->whereIn('pd.payroll_id', (array) $pid)
             ->when($scoped !== null, fn($q) => $q->whereIn('e.Dept_id', $scoped))
             ->when($filters['department'], fn($q) => $q->where('e.Dept_id', $filters['department']))

@@ -75,6 +75,11 @@ class Kernel extends HttpKernel
 
         // Add rank-check middleware here
         'check.rank' => \App\Http\Middleware\CheckUserRankForAPI::class,
+        'clinic.manager' => \App\Http\Middleware\EnsureClinicManagerAccess::class,
+        'clinic.capability' => \App\Http\Middleware\EnsureClinicCapability::class,
+        'ld.manager' => \App\Http\Middleware\EnsureLDManagerAccess::class,
+        'sos.manager' => \App\Http\Middleware\EnsureSOSSecurityManagerAccess::class,
+        'sos.security' => \App\Http\Middleware\EnsureSOSSecurityStaffAccess::class,
 
 
 

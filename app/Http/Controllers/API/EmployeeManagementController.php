@@ -146,7 +146,7 @@ class EmployeeManagementController extends Controller
                                                                             DB::raw('COALESCE(resort_sections.name, "") as section_name'), // Convert NULL to ''
                                                                             DB::raw('COUNT(employees.emp_id) as employee_count')
                                                                         )
-                                                                        ->where('employees.resort_id', 1)
+                                                                        ->where('employees.resort_id', $this->resort_id)
                                                                         ->groupBy('employees.resort_id', 'resort_departments.name', 'resort_divisions.name','resort_sections.name')
                                                                         ->get();
 

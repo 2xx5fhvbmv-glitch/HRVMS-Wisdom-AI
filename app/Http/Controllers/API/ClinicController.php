@@ -20,6 +20,7 @@ use App\Models\LeaveCategory;
 use App\Models\EmployeeLeaveStatus;
 use App\Helpers\Common;
 use Carbon\Carbon;
+use Illuminate\Validation\Rule;
 use Validator;
 use DB;
 
@@ -31,11 +32,62 @@ class ClinicController extends Controller
 
     public function __construct()
     {
-
+        // Clinic Manager-tier routes are reachable by either a real
+        // rank-12 employee (guard 'api') or an HR-managed third-party
+        // TemporaryClinicDoctor (guard 'temp-clinic-doctor', mobile-only,
+        // never an Employee row — see EnsureClinicManagerAccess). Every
+        // Employee-tier method below only ever sees an 'api' actor, since
+        // those routes never accept the second guard.
         if (Auth::guard('api')->check()) {
             $this->user                             =   Auth::guard('api')->user();
             $this->resort_id                        =   $this->user->resort_id;
+        } elseif (Auth::guard('temp-clinic-doctor')->check()) {
+            $this->user                             =   Auth::guard('temp-clinic-doctor')->user();
+            $this->resort_id                        =   $this->user->resort_id;
         }
+    }
+
+    // A TemporaryClinicDoctor actor has no Employee row, so GetEmployee is
+    // null — bare `$this->user->GetEmployee->id` reads a property off null,
+    // which is only a non-fatal warning locally but a fatal error under
+    // prod's stricter handling (confirmed: 500 on live, 200 locally for the
+    // identical call). optional() gives the same "no employee, no id" outcome
+    // without ever dereferencing the null.
+    private function actorEmployeeId()
+    {
+        return optional($this->user->GetEmployee)->id;
+    }
+
+    // clinic_appointment_attechements.attachment and
+    // clinic_treatment_attachments.attachment both hold JSON written by
+    // Common::AWSEmployeeFileUpload(), but not in the same shape as each
+    // other — appointment attachments are a JSON array of
+    // {Filename,Child_id} objects, treatment attachments are one bare
+    // {Filename,Child_id} object per row. Normalizes both into
+    // GetAWSFile()-resolved [{filename,url}] entries.
+    private function resolveClinicAttachments($rawValues)
+    {
+        $items = [];
+        foreach ($rawValues as $raw) {
+            if (empty($raw)) {
+                continue;
+            }
+            $decoded = json_decode($raw, true);
+            if (!is_array($decoded)) {
+                continue;
+            }
+            $decoded = array_key_exists('Child_id', $decoded) ? [$decoded] : $decoded;
+            foreach ($decoded as $item) {
+                if (empty($item['Child_id'])) {
+                    continue;
+                }
+                $aws = Common::GetAWSFile($item['Child_id'], $this->resort_id);
+                if (!empty($aws['success'])) {
+                    $items[] = ['filename' => $item['Filename'] ?? null, 'url' => $aws['NewURLshow']];
+                }
+            }
+        }
+        return $items;
     }
 
     public function appointmentCategoriesStore(Request $request)
@@ -154,7 +206,10 @@ class ClinicController extends Controller
                 $message                            =   'Appointment updated successfully';
 
             } else {
-                $fetchDoctorId                      =   Employee::where('rank', 12)->first();
+                // Was picking whichever rank-12 employee happened to be
+                // first in the ENTIRE employees table (any resort), not
+                // this resort's own clinic doctor.
+                $fetchDoctorId                      =   Employee::where('rank', 12)->where('resort_id', $this->resort_id)->first();
 
                 $AppointmentExist                   =   ClinicAppointment::where('employee_id', $employee_id)
                                                             ->where('doctor_id', $fetchDoctorId->id)
@@ -330,14 +385,43 @@ class ClinicController extends Controller
                                                             ->where('resort_id', $this->resort_id)
                                                             ->where('id', $appointment_id)
                                                             ->first();
+
+            if (!$appointment) {
+                return response()->json(['success' => false, 'message' => 'Appointment not found'], 200);
+            }
+
             $age                                    =   null;
 
-            if ($appointment && $appointment->employee && $appointment->employee->dob) {
+            if ($appointment->employee && $appointment->employee->dob) {
                 $age                                =   Carbon::parse($appointment->employee->dob)->age;
             }
 
             $appointment->employee_age              =   $age;
-            $appointment->employee->resortAdmin->profile_picture =   Common::getResortUserPicture( $appointment->employee->resortAdmin->id);
+            if ($appointment->employee && $appointment->employee->resortAdmin) {
+                $appointment->employee->resortAdmin->profile_picture =   Common::getResortUserPicture( $appointment->employee->resortAdmin->id);
+            }
+
+            // Dynamic appointment-details screen needs the treatment record
+            // (if the appointment has progressed to/past "Treatment" status)
+            // and both the appointment's own and the treatment's attachments
+            // — this used to be a stub that only returned the bare
+            // appointment + patient info.
+            $treatment                              =   ClinicTreatment::where('resort_id', $this->resort_id)
+                                                            ->where('appointment_id', $appointment->id)
+                                                            ->first();
+
+            if ($treatment) {
+                $treatment->attachments             =   $this->resolveClinicAttachments(
+                                                            ClinicTreatmentAttachments::where('clinic_treatment_id', $treatment->id)->pluck('attachment')
+                                                        );
+            }
+            $appointment->treatment                 =   $treatment;
+
+            $appointment->attachments               =   $this->resolveClinicAttachments(
+                                                            ClinicAppointmentAttachment::where('resort_id', $this->resort_id)
+                                                                ->where('appointment_id', $appointment->id)
+                                                                ->pluck('attachment')
+                                                        );
 
             return response()->json([
                 'success'                           =>  true,
@@ -364,10 +448,27 @@ class ClinicController extends Controller
                                                                 ->whereDate('date', '>=', Carbon::today())
                                                                 ->count();
 
+            $todayAppointmentCount                      =   ClinicAppointment::where('resort_id', $this->resort_id)
+                                                                ->whereDate('date', Carbon::today())
+                                                                ->count();
+
+            // "Approved" is the appointment status right after HR/doctor
+            // acceptance and before a ClinicTreatment row exists for it
+            // (see appointmentStatusUpdate's allowed-transitions map) —
+            // i.e. the treatment backlog the dashboard needs to surface.
+            $pendingTreatmentsCount                     =   ClinicAppointment::where('resort_id', $this->resort_id)
+                                                                ->where('status', 'Approved')
+                                                                ->count();
+
+            $totalPatientsThisMonth                     =   ClinicTreatment::where('resort_id', $this->resort_id)
+                                                                ->whereBetween('date', [Carbon::now()->startOfMonth(), Carbon::now()->endOfMonth()])
+                                                                ->distinct('employee_id')
+                                                                ->count('employee_id');
+
             $treatmentCount                             =   ClinicTreatment::where('resort_id', $this->resort_id)
                                                                 ->distinct('employee_id')
                                                                 ->count();
-           
+
             $categories                                 =   ClinicAppointmentCategories::select(
                                                                 'clinic_appointment_categories.id',
                                                                 'clinic_appointment_categories.appointment_type',
@@ -416,19 +517,22 @@ class ClinicController extends Controller
             $leaveRequestPendingCount                  =   DB::table('employees_leaves as el')
                                                                 ->join('employees_leaves_status as els', 'els.leave_request_id', '=', 'el.id')
                                                                 ->where('els.status', 'Pending')
-                                                                ->where('els.approver_id', $this->user->GetEmployee->id)
+                                                                ->where('els.approver_id', $this->actorEmployeeId())
                                                                 ->where('el.resort_id', $this->resort_id)
                                                                 ->count();
 
             $leaveRequestApproveCount                   =   DB::table('employees_leaves as el')
                                                                 ->join('employees_leaves_status as els', 'els.leave_request_id', '=', 'el.id')
                                                                 ->where('els.status', 'Approved')
-                                                                ->where('els.approver_id', $this->user->GetEmployee->id)
+                                                                ->where('els.approver_id', $this->actorEmployeeId())
                                                                 ->where('el.resort_id', $this->resort_id)
                                                                 ->count();
 
             $appArray                                   =   [
                 'upcoming_appointments_count'           =>  $upcomingAppointmentsCount,
+                'today_appointment_count'                =>  $todayAppointmentCount,
+                'pending_treatments_count'               =>  $pendingTreatmentsCount,
+                'total_patients_this_month'              =>  $totalPatientsThisMonth,
                 'medical_history_count'                 =>  $treatmentCount,
                 'medical_certificate_daily'             =>  $medicalCertificateDailyCount,
                 'medical_certificate_weekly'            =>  $medicalCertificateWeeklyCount,
@@ -467,6 +571,11 @@ class ClinicController extends Controller
                 $date   = [now()->startOfWeek(), now()->endOfWeek()];
             } elseif ($request->filter == 'monthly') {
                 $date   = [now()->startOfMonth(), now()->endOfMonth()];
+            } elseif ($request->filter == 'date' && $request->filled('date')) {
+                // Doctor's schedule/queue for one specific day (mobile
+                // sends an arbitrary date, not just the today/weekly/
+                // monthly presets above).
+                $date   = [Carbon::parse($request->date)->startOfDay(), Carbon::parse($request->date)->endOfDay()];
             } else {
                $date    = [now()->startOfDay(), now()->endOfDay()];
             }
@@ -502,8 +611,7 @@ class ClinicController extends Controller
         if (!$this->user) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
-        $employee                                       =   $this->user->GetEmployee;
-        $emp_id                                         =   $employee->id;
+        $emp_id                                         =   $this->actorEmployeeId();
         try {
             
             $treatmentSubquery                          =   ClinicTreatment::select('id')
@@ -669,8 +777,11 @@ class ClinicController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'employee_id'                               => 'required',
-            'appointment_category_id'                   => 'required',
+            // employee_id (the patient) had no resort ownership check at
+            // all — a treatment record could be created against an
+            // employee id from another resort.
+            'employee_id'                               => ['required', Rule::exists('employees', 'id')->where('resort_id', $this->resort_id)],
+            'appointment_category_id'                   => ['required', Rule::exists('clinic_appointment_categories', 'id')->where('resort_id', $this->resort_id)],
             'date'                                      => 'required',
             'time'                                      => 'required',
             'treatment_provided'                        => 'required',
@@ -692,8 +803,8 @@ class ClinicController extends Controller
                 'appointment_id'                        =>  $request->appointment_id ?? null,
                 'employee_id'                           =>  $request->employee_id ,
                 'appointment_category_id'               =>  $request->appointment_category_id,
-                'date'                                  =>  now(),
-                'time'                                  =>  now(),
+                'date'                                  =>  $request->date,
+                'time'                                  =>  $request->time,
                 'treatment_provided'                    =>  $request->treatment_provided,
                 'additional_notes'                      =>  $request->additional_notes,
                 'external_consultation'                 =>  $request->external_consultation ?? null,
@@ -703,10 +814,19 @@ class ClinicController extends Controller
             if($request->hasFile('attachments')) {
                     $emp_id                             =   Employee::where('id',$request->employee_id)->first();
 
-                    foreach($request->attachments as $file)
-                    {
-                       $file = $request->file('attachments');
+                    // $request->attachments is a single UploadedFile object
+                    // for a single-file submit (the common client shape),
+                    // which foreach silently iterates zero times over — the
+                    // attachment was dropped with no error. Normalize to an
+                    // array so both single-file and attachments[] uploads
+                    // are actually saved.
+                    $files = $request->file('attachments');
+                    if (!is_array($files)) {
+                        $files = [$files];
+                    }
 
+                    foreach($files as $file)
+                    {
                         $SubFolder                      =   "clinicTreatmentAttachment";
                         $status                         =   Common::AWSEmployeeFileUpload($this->resort_id,$file, $emp_id->Emp_id,$SubFolder,true);
 
@@ -735,8 +855,10 @@ class ClinicController extends Controller
                                                             ->where('resort_id', $this->resort_id)
                                                             ->first();
 
-                $appointment->status                =   'Treatment';
-                $appointment->save();
+                if ($appointment) {
+                    $appointment->status             =   'Treatment';
+                    $appointment->save();
+                }
             }
             DB::commit();
             return response()->json([
@@ -745,7 +867,7 @@ class ClinicController extends Controller
                 'treatment_data'                    => $treatmentData
             ], 200);
 
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             DB::rollBack();
             \Log::emergency("File: " . $e->getFile());
             \Log::emergency("Line: " . $e->getLine());
@@ -925,6 +1047,7 @@ class ClinicController extends Controller
             $treatmentData->age                         =   $age;
             $fetchDoctorName                            =   Employee::join('resort_admins as ra', 'ra.id', '=', 'employees.Admin_Parent_id')
                                                                 ->where('employees.rank', 12)
+                                                                ->where('employees.resort_id', $this->resort_id)
                                                                 ->first(['ra.first_name', 'ra.last_name']);
 
             $MedicalCertificate                         =   ClinicMedicalCertificate::where('resort_id', $this->resort_id)
@@ -936,7 +1059,7 @@ class ClinicController extends Controller
                 $treatmentData->medical_certificate_issue   =   'No';
             }
 
-            $treatmentData->doctor_name                 =   $fetchDoctorName->first_name . ' ' . $fetchDoctorName->last_name;
+            $treatmentData->doctor_name                 =   $fetchDoctorName ? ($fetchDoctorName->first_name . ' ' . $fetchDoctorName->last_name) : null;
 
             $emp_id                                     =   Employee::where('id',$treatmentData->employee_id)->first();
 
@@ -1012,7 +1135,10 @@ class ClinicController extends Controller
         }
 
         $validator = Validator::make($request->all(), [
-            'employee_id'                               =>  'required',
+            // employee_id was written with no resort check — leaked that
+            // foreign employee's name/photo/dob/gender/position when the
+            // certificate was later viewed.
+            'employee_id'                               =>  ['required', Rule::exists('employees', 'id')->where('resort_id', $this->resort_id)],
             'start_date'                                =>  'required',
             'end_date'                                  =>  'required',
             'appointment_category_id'                   =>  'required',
@@ -1108,7 +1234,7 @@ class ClinicController extends Controller
 
             if($request->leave_request_id) {
                 $leaveApprvEmpIds                   =   EmployeeLeaveStatus::where('leave_request_id', $request->leave_request_id)
-                                                                ->where('approver_id','!=', $this->user->GetEmployee->id)
+                                                                ->where('approver_id','!=', $this->actorEmployeeId())
                                                                 ->where('status','Pending')
                                                                 ->pluck('approver_id')
                                                                 ->toArray();

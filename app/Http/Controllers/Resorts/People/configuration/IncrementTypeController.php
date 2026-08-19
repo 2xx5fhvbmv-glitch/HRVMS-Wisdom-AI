@@ -91,12 +91,16 @@ class IncrementTypeController extends Controller
 
     public function update(Request $request){
          $id = base64_decode($request->Main_id);
-        
-        $incrementType = IncrementType::where('id', $id)->update([
-                'name' => $request->title, 
-                'status' => $request->status, 
+
+        // Was ->where('id', $id)->update(...) with no resort filter — any
+        // resort-admin could update another resort's increment type by id.
+        $incrementType = IncrementType::where('id', $id)
+            ->where('resort_id', $this->resort->resort_id)
+            ->update([
+                'name' => $request->title,
+                'status' => $request->status,
             ]);
-        
+
          return response()->json([
             'success' => true,
             'status' => 'success',
@@ -107,7 +111,11 @@ class IncrementTypeController extends Controller
     public function destroy(Request $request){
         $id = base64_decode($request->id);
 
-        IncrementType::where('id', $id)->delete();
+        // Was ->where('id', $id)->delete() with no resort filter — same
+        // cross-tenant gap as update() above.
+        IncrementType::where('id', $id)
+            ->where('resort_id', $this->resort->resort_id)
+            ->delete();
 
         return response()->json([
             'success' => true,

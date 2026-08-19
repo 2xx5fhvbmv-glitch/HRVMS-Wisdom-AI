@@ -57,6 +57,16 @@ return [
             'driver' => 'session',
             'provider' => 'shopkeeper',
         ],
+        // Third-party/agency clinic doctor — mobile-app only, never an
+        // Employee row. Same Passport personal-access-token pattern as
+        // 'api' (createToken() on login, no OAuth client/password-grant
+        // setup needed), just a separate provider so this identity never
+        // resolves through the resort-admins/Employee tables.
+        'temp-clinic-doctor' => [
+            'driver' => 'passport',
+            'provider' => 'temporary-clinic-doctors',
+            'hash' => false,
+        ],
     ],
 
     /*
@@ -92,6 +102,10 @@ return [
         'shopkeeper'=> [
             'driver' => 'eloquent',
             'model' => App\Models\Shopkeeper::class,
+        ],
+        'temporary-clinic-doctors' => [
+            'driver' => 'eloquent',
+            'model' => App\Models\TemporaryClinicDoctor::class,
         ],
     ],
 
