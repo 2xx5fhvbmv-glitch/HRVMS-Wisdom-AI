@@ -1152,7 +1152,11 @@ class SOSController extends Controller
         try {
             $sosHistory                                 =   SOSHistoryModel::where('id', $request->sos_id)
                                                                 ->where('resort_id', $this->resort_id)
-                                                                ->whereIn('status',['Active', 'Drill-Active', 'In-Progress'])
+                                                                // 'Real-Active' (a real, non-drill SOS) was missing here —
+                                                                // same class of bug fixed for employee-team-location/
+                                                                // SOSDetails: a live SOS could never be marked Completed
+                                                                // by the security manager, only a drill could.
+                                                                ->whereIn('status',['Active', 'Drill-Active', 'Real-Active', 'In-Progress'])
                                                                 ->first();
             if (!$sosHistory) {
                 return response()->json(['success' => false, 'message' => 'SOS Not Found'], 200);

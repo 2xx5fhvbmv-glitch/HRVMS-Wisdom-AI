@@ -242,6 +242,41 @@ class PayrollController extends Controller
         }
     }
 
+    /**
+     * Distinct years this employee has a PROCESSED (locked) payroll for —
+     * backs the payslip screen's year filter so it never offers a year with
+     * only a draft/pending/approved-but-not-yet-locked run (nothing to show
+     * a payslip for yet).
+     */
+    public function payslipYears()
+    {
+        if (!$this->user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $employee_id = $this->user->GetEmployee->id;
+
+        try {
+            $years = Payroll::join('payroll_employees as pe', 'pe.payroll_id', '=', 'payroll.id')
+                ->where('pe.employee_id', $employee_id)
+                ->where('payroll.status', 'locked')
+                ->selectRaw('DISTINCT YEAR(payroll.start_date) as year')
+                ->orderByDesc('year')
+                ->pluck('year');
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Payslip years fetched successfully',
+                'years'   => $years,
+            ], 200);
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
     public function paySlipList(Request $request)
     {
 

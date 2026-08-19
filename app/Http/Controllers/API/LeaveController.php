@@ -2229,10 +2229,15 @@ class LeaveController extends Controller
         try {
             DB::beginTransaction();
 
-            // Validate transportation ID
+            // Validate transportation ID — 'transportation' is nullable
+            // (most leave updates have no travel component), but this was
+            // missing the isset() guard that leaveAdd() (the create path,
+            // line ~115) already has. where('id', null)->exists() is always
+            // false, so every update with no transportation unconditionally
+            // failed with "Invalid transportation ID provided."
             $transportationId                           =   $request->transportation;
 
-            if (!ResortTransportation::where('id', $transportationId)->exists()) {
+            if (isset($transportationId) && !ResortTransportation::where('id', $transportationId)->exists()) {
                 return response()->json([
                     'success'                           =>  false,
                     'message'                           =>  'Invalid transportation ID provided.',
