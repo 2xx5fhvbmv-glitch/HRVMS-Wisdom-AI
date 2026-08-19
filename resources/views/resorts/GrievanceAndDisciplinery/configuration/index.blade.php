@@ -585,7 +585,15 @@
                                         <select class="form-select" id="KeyPersonnel" name="KeyPersonnel[]" multiple aria-label="Default select example">
                                         @if($KeyPerson->isNotEmpty())
                                             @foreach($KeyPerson as $k)
-                                                <option value="{{ $k->Admin_id }}" {{in_array($k->id,$GrivanceKeys) ? 'selected' : '' }}>
+                                                {{-- Value must be the employees.id, not resort_admins.id
+                                                     (Admin_id) — RequestIdentity() and every other
+                                                     Grievance identity-disclosure check compare against
+                                                     the employee id, so saving Admin_id here meant a
+                                                     saved "key person" almost never matched the person
+                                                     who was actually supposed to get access, and this
+                                                     dropdown could never show a saved selection either
+                                                     (that already correctly compared against $k->id). --}}
+                                                <option value="{{ $k->id }}" {{in_array($k->id,$GrivanceKeys) ? 'selected' : '' }}>
                                                     {{ $k->first_name }} {{ $k->last_name }}
                                                 </option>
                                             @endforeach
