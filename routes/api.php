@@ -313,6 +313,7 @@ use Illuminate\Support\Facades\Route;
 
 		//Payroll
 		Route::get('payroll/payroll-dashboard', [App\Http\Controllers\API\PayrollController::class, 'payrollDashboard']);
+		Route::get('payroll/payslip-years', [App\Http\Controllers\API\PayrollController::class, 'payslipYears']);
 		Route::post('payroll/payslip-list', [App\Http\Controllers\API\PayrollController::class, 'paySlipList']);
 		Route::post('payroll/payslip-details', [App\Http\Controllers\API\PayrollController::class, 'paySlipDetails']);
 		Route::post('payroll/payslip-pdf-download', [App\Http\Controllers\API\PayrollController::class, 'downloadPayslip']);
