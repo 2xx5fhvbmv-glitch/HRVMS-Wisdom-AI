@@ -221,7 +221,7 @@
                                         <option value=""></option>
                                         @if($GrievanceCommitteeMemberParent)
                                             @foreach ($GrievanceCommitteeMemberParent as $c)
-                                                <option value="{{ $c->id }}">{{ $c->Grivance_CommitteeName }}</option>
+                                                <option value="{{ $c->id }}" {{ $c->id == $Grivance_Parent->Committee_id ? 'selected' : '' }}>{{ $c->Grivance_CommitteeName }}</option>
                                             @endforeach
                                         @endif
                                     </select>
