@@ -299,6 +299,17 @@
                         <div class="alert alert-warning">You are not part of the assigned investigation committee for this grievance.</div>
                         @endif
 
+                        {{-- Outcome Type / Action Taken / Status / Approval / File Upload
+                             are all investigation-decision fields — same restriction as the
+                             Assign To and investigation-dates/findings sections above, which
+                             already correctly hide behind $isCommitteeMember. These four were
+                             left unguarded, so a non-committee viewer (any HR/GM/EXCOM opening
+                             the page) saw the "not part of the assigned investigation
+                             committee" notice right above a fully live outcome/upload/submit
+                             form for the exact same investigation. Request Identity Disclosure
+                             below stays outside this gate on purpose — it's a Key Personnel
+                             permission, a separate role from committee membership. --}}
+                        @if($isCommitteeMember)
                             @if($Grivance_Parent->Assigned == "Yes")
                                 <div class="col-lg-4 col-sm-6">
                                     <label for="outcome_type" class="form-label">OUTCOME TYPE</label>
@@ -391,6 +402,7 @@
                                     </div>
                                 </div>
                             @endif
+                        @endif
                             @if($Grivance_Parent->Grivance_Submission_Type == "Yes" && !$canViewIdentity && in_array($auth_id, $GrivanceKeys) && !isset($Grivance_Parent->Gm_Decision))
                                 <div class="col-lg-4 col-sm-6 align-self-end">
                                     @if($Grivance_Parent->Request_Identity_Disclosure == 'Requested')
@@ -404,9 +416,11 @@
                         </div>
                     @endif
                 
+                    @if($isCommitteeMember)
                     <div class="card-footer text-end">
                         <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
                     </div>
+                    @endif
                 </form>
 
         </div>
