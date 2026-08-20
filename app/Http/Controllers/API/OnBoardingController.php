@@ -453,52 +453,51 @@ class OnBoardingController extends Controller
                     $pickUpViewSelfieImage              =   asset('/' . $dynamic_path . '/' . $user->selfie_image);
                 }
 
-                if ($itinerary->arrival_date >= $today) {
-                    // Pickup Task
+                // Pickup Task — was gated on arrival_date >= today, so a
+                // still-Pending (never actioned) task whose date had simply
+                // passed vanished from "Assigned Tasks" entirely instead of
+                // showing as overdue. pickup_status/medical_escort_status
+                // already track real completion state; the date only
+                // decides whether a task ALSO counts as "upcoming" (this
+                // week), not whether it's assigned at all.
+                if ($itinerary->pickup_employee_id == $employee->id) {
+                    $pickupTask                         =   [
+                        'itinerary_id'                  =>  $itinerary->id,
+                        'task_type'                     =>  'pickup',
+                        'status'                        =>  $itinerary->pickup_status,
+                        'type'                          =>  'Pick up at the Airport',
+                        'name'                          =>  $name,
+                        'profile_picture'               =>  $profile_picture,
+                        'date'                          =>  $itinerary->arrival_date,
+                        'time'                          =>  $itinerary->arrival_time,
+                        'view_selfie'                   =>  $pickUpViewSelfieImage,
+                        'download_pdf'                  =>  $this->resolveItineraryDownloads($itinerary),
+                    ];
+                    $tasks[]                            =   $pickupTask;
 
-                    if ($itinerary->pickup_employee_id == $employee->id) {
-                        $pickupTask                         =   [
-                            'itinerary_id'                  =>  $itinerary->id,
-                            'task_type'                     =>  'pickup',
-                            'status'                        =>  $itinerary->pickup_status,
-                            'type'                          =>  'Pick up at the Airport',
-                            'name'                          =>  $name,
-                            'profile_picture'               =>  $profile_picture,
-                            'date'                          =>  $itinerary->arrival_date,
-                            'time'                          =>  $itinerary->arrival_time,
-                            'view_selfie'                   =>  $pickUpViewSelfieImage,
-                            'download_pdf'                  =>  $this->resolveItineraryDownloads($itinerary),
-                        ];
-                        $tasks[]                            =   $pickupTask;
-
-                        // Check if within upcoming week range
-                        if ($itinerary->arrival_date >= $today && $itinerary->arrival_date <= $endOfWeek) {
-                            $upcoming_tasks[]                =   $pickupTask;
-                        }
+                    // Check if within upcoming week range
+                    if ($itinerary->arrival_date >= $today && $itinerary->arrival_date <= $endOfWeek) {
+                        $upcoming_tasks[]                =   $pickupTask;
                     }
                 }
 
-                // Upcoming Medical Escort Task
-                if ($itinerary->medical_date >= $today)
-                {
-                    // Medical Escort Task
-                    if ($itinerary->accompany_medical_employee_id == $employee->id) {
-                        $medicalTask = [
-                            'itinerary_id'                  =>  $itinerary->id,
-                            'task_type'                     =>  'medical',
-                            'status'                        =>  $itinerary->medical_escort_status,
-                            'type'                          =>  $itinerary->medical_center_name.' To Medical Center',
-                            'name'                          =>  $name,
-                            'profile_picture'               =>  $profile_picture,
-                            'date'                          =>  $itinerary->medical_date,
-                            'time'                          =>  $itinerary->approx_time,
-                            'location'                      =>  $itinerary->medical_center_name,
-                        ];
-                        $tasks[]                            =   $medicalTask;
-                        
-                        if ($itinerary->medical_date >= $today && $itinerary->medical_date <= $endOfWeek) {
-                            $upcoming_tasks[]                =   $medicalTask;
-                        }
+                // Medical Escort Task — same fix as pickup above.
+                if ($itinerary->accompany_medical_employee_id == $employee->id) {
+                    $medicalTask = [
+                        'itinerary_id'                  =>  $itinerary->id,
+                        'task_type'                     =>  'medical',
+                        'status'                        =>  $itinerary->medical_escort_status,
+                        'type'                          =>  $itinerary->medical_center_name.' To Medical Center',
+                        'name'                          =>  $name,
+                        'profile_picture'               =>  $profile_picture,
+                        'date'                          =>  $itinerary->medical_date,
+                        'time'                          =>  $itinerary->approx_time,
+                        'location'                      =>  $itinerary->medical_center_name,
+                    ];
+                    $tasks[]                            =   $medicalTask;
+
+                    if ($itinerary->medical_date >= $today && $itinerary->medical_date <= $endOfWeek) {
+                        $upcoming_tasks[]                =   $medicalTask;
                     }
                 }
             }
