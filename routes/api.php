@@ -432,24 +432,21 @@ use Illuminate\Support\Facades\Route;
 
 		});
 
-		// Deliberately unrestricted by rank — any employee needs to view
-		// categories to self-book an appointment. Guard widened to also
-		// accept temp-clinic-doctor so the duplicate, rank-12-gated
-		// registration of this same URI further down (which was silently
-		// shadowing this one — Laravel keeps only the last-registered route
-		// per URI+method, 403-ing every non-clinic-staff employee) could be
-		// removed instead of overriding it.
-		Route::middleware(['auth:api,temp-clinic-doctor'])->get('clinic/appointment-categories', [App\Http\Controllers\API\ClinicController::class, 'appointmentCategories']);
+		// appointment-categories, appointment-details/{id} and
+		// treatment-details/{id} used to sit here too, widened to
+		// 'auth:api,temp-clinic-doctor' — but this whole block is inside
+		// the outer Route::middleware(['auth:api', 'applyResortSmtp'])
+		// group opened above (search "'applyResortSmtp'])->group"). Group
+		// middleware ADDS to a route's own middleware, it doesn't get
+		// replaced by it — so the outer group's plain 'auth:api' still
+		// ran first and 401'd any temp-clinic-doctor token unconditionally,
+		// no matter how the route's own guard list was widened. Moved to
+		// after this group closes (see "Deliberately unrestricted" comment
+		// there), which is the only way a temp-doctor token can actually
+		// reach them.
 		Route::post('clinic/appointment-store', [App\Http\Controllers\API\ClinicController::class, 'appointmentStore']);
 		Route::get('clinic/employee-clinic-dashboard', [App\Http\Controllers\API\ClinicController::class, 'employeeClinicDashboard']);
-		// Same shadowing bug as appointment-categories above — this was
-		// duplicated under the rank-12-only clinic.manager gate further
-		// down, which shadowed this open registration and 403'd any
-		// non-clinic-staff employee trying to view their own appointment.
-		Route::middleware(['auth:api,temp-clinic-doctor'])->get('clinic/appointment-details/{appointment_id}', [App\Http\Controllers\API\ClinicController::class, 'appointmentDetails']);
 		Route::post('clinic/appointment-status-update', [App\Http\Controllers\API\ClinicController::class, 'appointmentStatusUpdate']);
-		// Same shadowing bug — see appointment-details above.
-		Route::middleware(['auth:api,temp-clinic-doctor'])->get('clinic/treatment-details/{treatment_id}', [App\Http\Controllers\API\ClinicController::class, 'treatmentDetails']);
 		Route::get('clinic/medical-certificate-details/{medical_cert_id}', [App\Http\Controllers\API\ClinicController::class, 'medicalCertificateDetail']);
 		Route::get('clinic/past-medical-history', [App\Http\Controllers\API\ClinicController::class, 'pastMedicalHistory']);
 
@@ -600,6 +597,17 @@ use Illuminate\Support\Facades\Route;
 	Route::post('clinic-doctor/login', [App\Http\Controllers\API\TemporaryClinicDoctorAuthController::class, 'login']);
 	Route::post('clinic-doctor/logout', [App\Http\Controllers\API\TemporaryClinicDoctorAuthController::class, 'logout'])->middleware('auth:temp-clinic-doctor');
 	Route::get('clinic-doctor/profile', [App\Http\Controllers\API\TemporaryClinicDoctorAuthController::class, 'profile'])->middleware('auth:temp-clinic-doctor');
+
+	// Deliberately unrestricted by rank — any employee needs to view
+	// categories to self-book an appointment, or their own appointment/
+	// treatment record — AND a temp-clinic-doctor needs the same three.
+	// Must live out here, genuinely outside the outer auth:api-only
+	// group above (not just re-widened in place inside it — that alone
+	// doesn't work, see the comment left where these used to be), or a
+	// temp-clinic-doctor's token can never reach them.
+	Route::middleware(['auth:api,temp-clinic-doctor'])->get('clinic/appointment-categories', [App\Http\Controllers\API\ClinicController::class, 'appointmentCategories']);
+	Route::middleware(['auth:api,temp-clinic-doctor'])->get('clinic/appointment-details/{appointment_id}', [App\Http\Controllers\API\ClinicController::class, 'appointmentDetails']);
+	Route::middleware(['auth:api,temp-clinic-doctor'])->get('clinic/treatment-details/{treatment_id}', [App\Http\Controllers\API\ClinicController::class, 'treatmentDetails']);
 
 	// Clinic Manager tier, reachable by either identity — 'clinic.manager'
 	// accepts a real rank-12 employee (unrestricted, same as before) OR an

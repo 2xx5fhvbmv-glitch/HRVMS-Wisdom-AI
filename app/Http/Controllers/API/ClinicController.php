@@ -1039,6 +1039,10 @@ class ClinicController extends Controller
                                                                 ->where('clinic_treatment.id', $treatment_id)
                                                                 ->first(['clinic_treatment.*', 'e.Admin_Parent_id','e.rank','e.dob','ra.gender','ra.personal_phone','ra.first_name', 'ra.last_name', 'rp.position_title as position', 'cac.appointment_type']);
 
+            if (!$treatmentData) {
+                return response()->json(['success' => false, 'message' => 'Treatment not found'], 200);
+            }
+
             $treatmentData->profile_picture             =   Common::getResortUserPicture($treatmentData->Admin_Parent_id);
             $rankConfig                                 =   config('settings.Position_Rank');
             $availableRank                              =   $rankConfig[$treatmentData->rank] ?? '';
