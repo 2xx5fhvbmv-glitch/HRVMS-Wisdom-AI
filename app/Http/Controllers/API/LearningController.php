@@ -188,16 +188,23 @@ class LearningController extends Controller
                                                             ->where('training_schedules.resort_id', $resort_id)
                                                             ->where('training_schedules.training_id', $scheduleId)
                                                             ->first();
+
+            // Was dereferencing $sessions->learningProgram->trainer (and
+            // several other $sessions->learningProgram-> fields below)
+            // BEFORE this check ever ran — a scheduleId that doesn't
+            // resolve to a real session, or a session whose learningProgram
+            // relation is missing, crashed with a 500 ("Learning request
+            // doesn't have the session details" on the client) instead of
+            // a clean "not found".
+            if (!$sessions || !$sessions->learningProgram) {
+                return response()->json(['success' => false, 'message' => 'Training session not found'], 200);
+            }
+
             $trainerData                            =   Employee::with('resortAdmin')->where('id',$sessions->learningProgram->trainer)
                                                             ->first();
 
             if ($trainerData) {
                 $trainerData->profile = Common::getResortUserPicture($trainerData->Admin_Parent_id);
-            }
-
-            //Check if session exists
-            if (!$sessions) {
-                return response()->json(['success' => false, 'message' => 'Training session not found'], 200);
             }
 
             $data = [
@@ -209,9 +216,9 @@ class LearningController extends Controller
                 'training_end_time'                 =>  $sessions->end_time,
                 'category'                          =>  $sessions->learningProgram->category->category ?? 'N/A',
                 'description'                       =>  $sessions->learningProgram->description ?? '',
-                'trainer_first_name'                =>  $trainerData->resortAdmin->first_name,
-                'trainer_last_name'                 =>  $trainerData->resortAdmin->last_name,
-                'trainer_profile'                   =>  $trainerData->profile,
+                'trainer_first_name'                =>  optional(optional($trainerData)->resortAdmin)->first_name,
+                'trainer_last_name'                 =>  optional(optional($trainerData)->resortAdmin)->last_name,
+                'trainer_profile'                   =>  optional($trainerData)->profile,
             ];
 
             $data['participants'] = [];
