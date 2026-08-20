@@ -110,6 +110,7 @@ class ConversationController extends Controller
      */
     private function messageThread($resort, $type, $otherPartyId)
     {
+        $readAt = null;
         if ($type === 'group') {
             $messages = Conversation::where('resort_id', $resort->resort_id)
                 ->where('type', 'group')
@@ -130,15 +131,33 @@ class ConversationController extends Controller
                 ->get(['id','type', 'type_id', 'sender_id', 'message','attachment', 'created_at']);
 
             $messages = $sent->merge($received)->sortBy('created_at')->values();
+
+            // markAsRead() is thread-level, not per-message — it flips one
+            // chat_message_read row (conversation_id = the thread partner's
+            // id) to Read with a read_at timestamp. That was never surfaced
+            // back in the message list at all, so a sender's message stayed
+            // "sent" forever even after the recipient opened and read it —
+            // this is what actually determines the tick shown. Any message
+            // I (the caller) sent with created_at <= the other party's
+            // read_at (on THEIR record of reading MY thread, i.e.
+            // conversation_id = my own id) counts as read by them.
+            $theirReadRecord = ChatMessageRead::where('conversation_id', $resort->id)
+                ->where('user_id', $otherPartyId)
+                ->where('status', 'Read')
+                ->first();
+            $readAt = $theirReadRecord ? $theirReadRecord->read_at : null;
         }
 
         // 'attachment' stores the raw disk path AWSEmployeeFileUpload() returned
         // (e.g. "26/public/EmployeesChatAttachments/.../file.jpg") — not a URL
         // the app can load directly, same as every other tenant-uploaded file;
         // must go through StorageHelper (per house convention), never raw.
-        return $messages->map(function ($message) {
+        return $messages->map(function ($message) use ($resort, $readAt) {
             if (!empty($message->attachment)) {
                 $message->attachment = \App\Helpers\StorageHelper::temporaryUrl($message->attachment);
+            }
+            if ((int) $message->sender_id === (int) $resort->id) {
+                $message->read_status = ($readAt && $message->created_at <= $readAt) ? 'read' : 'sent';
             }
             return $message;
         })->values()->all();
