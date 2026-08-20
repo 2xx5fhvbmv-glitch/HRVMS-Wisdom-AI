@@ -160,13 +160,21 @@ class ChatController extends Controller
 
           $employees = $employees->get();
 
+          // getResortUserPicture() runs one query per call — on a resort
+          // with hundreds of employees this was one query per row (the
+          // reported 3-4s load), all to build a picture URL. Batch-resolve
+          // every picture in a single query instead, same pattern already
+          // used elsewhere via getResortUserPicturesBatch().
+          $adminIds = $employees->pluck('resortAdmin.id')->filter()->values()->all();
+          $pictures = Common::getResortUserPicturesBatch($adminIds);
+
           $datas = [];
           foreach ($employees as $employee) {
                if($employee->resortAdmin != null ){
                     $datas[] = [
                          'id' => $employee->resortAdmin->id,
                          'name' => $employee->resortAdmin->full_name,
-                         'profile' => Common::getResortUserPicture($employee->resortAdmin->id),
+                         'profile' => $pictures[$employee->resortAdmin->id] ?? Common::getResortUserPicture($employee->resortAdmin->id),
                          'type' => 'individual',
                     ];
                }
@@ -297,13 +305,16 @@ class ChatController extends Controller
                          $query->whereNotIn('id', $members);
                     })->get();
 
+               $adminIds = $newMemberList->pluck('resortAdmin.id')->filter()->values()->all();
+               $pictures = Common::getResortUserPicturesBatch($adminIds);
+
                $datas = [];
                foreach ($newMemberList as $employee) {
                          if($employee->resortAdmin != null ){
                               $datas[] = [
                                    'id' => $employee->resortAdmin->id,
                                    'name' => $employee->resortAdmin->full_name,
-                                   'profile' => Common::getResortUserPicture($employee->resortAdmin->id),
+                                   'profile' => $pictures[$employee->resortAdmin->id] ?? Common::getResortUserPicture($employee->resortAdmin->id),
                               ];
                          }
                     }
