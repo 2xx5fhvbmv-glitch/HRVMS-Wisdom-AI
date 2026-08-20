@@ -63,6 +63,16 @@ use Illuminate\Support\Facades\Route;
 		Route::get('performance/review/{id}', [App\Http\Controllers\API\PerformanceReviewController::class, 'reviewDetail']);
 		Route::post('performance/review/{id}/submit', [App\Http\Controllers\API\PerformanceReviewController::class, 'submitReview']);
 
+		//PIP / PDP (self-service — an employee's own plans, any rank)
+		Route::get('performance/my-pip-plans', [App\Http\Controllers\API\PipPdpController::class, 'myPipPlans']);
+		Route::get('performance/pip-plan/{id}', [App\Http\Controllers\API\PipPdpController::class, 'pipPlanDetail']);
+		Route::post('performance/pip-plan/{id}/submit', [App\Http\Controllers\API\PipPdpController::class, 'submitPipPlan']);
+		Route::get('performance/pip-plan/{id}/file/{field}', [App\Http\Controllers\API\PipPdpController::class, 'pipPlanFile']);
+		Route::get('performance/my-pdp-plans', [App\Http\Controllers\API\PipPdpController::class, 'myPdpPlans']);
+		Route::get('performance/pdp-plan/{id}', [App\Http\Controllers\API\PipPdpController::class, 'pdpPlanDetail']);
+		Route::post('performance/pdp-plan/{id}/submit', [App\Http\Controllers\API\PipPdpController::class, 'submitPdpPlan']);
+		Route::get('performance/pdp-plan/{id}/file/{field}', [App\Http\Controllers\API\PipPdpController::class, 'pdpPlanFile']);
+
 		//File Management (mobile parity for the web File Management module)
 		Route::get('resort/filemanagement/my-folder', [App\Http\Controllers\API\FileManagementController::class, 'myFolder']);
 		Route::get('resort/filemanagement/shared-with-me', [App\Http\Controllers\API\FileManagementController::class, 'sharedWithMe']);
