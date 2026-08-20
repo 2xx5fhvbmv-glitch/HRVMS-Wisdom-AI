@@ -318,6 +318,22 @@ class BoardingPassController extends Controller
                 // completes — confirmed against real data where a
                 // department had 3 rank=2 employees, only one Active).
                 $hodApprover                             =   Common::FindResortHODDepartment($this->resort_id, $employee->Dept_id);
+
+                // FindResortHODDepartment() has no self-exclusion — an HOD
+                // (or EXCOM, via its rank-1 fallback) requesting their own
+                // Island Pass got themselves back as "the department HOD"
+                // and could approve their own request. Route this stage to
+                // their reporting manager instead when that happens.
+                if ($hodApprover && (int) $hodApprover->id === (int) $employee->id) {
+                    $hodApprover                         =   $employee->reporting_to
+                                                                ? Employee::select('id', 'rank')
+                                                                    ->where('id', $employee->reporting_to)
+                                                                    ->where('resort_id', $this->resort_id)
+                                                                    ->where('status', 'Active')
+                                                                    ->first()
+                                                                : null;
+                }
+
                 if ($hodApprover ) {
                     $hodApprover->approver_role          =   'HOD';
                     $passApprovalFlow->push($hodApprover); // Second approver: HOD
