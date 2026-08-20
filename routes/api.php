@@ -566,6 +566,9 @@ use Illuminate\Support\Facades\Route;
 		//employeeInAppNotification
 		Route::get('notification/employee-in-app-notification', [App\Http\Controllers\API\InAppNotificationController::class, 'employeeInAppNotification']);
 		Route::post('notification/delete-message-read', [App\Http\Controllers\API\InAppNotificationController::class, 'deleteMessageRead']);
+		Route::get('notification/active-list', [App\Http\Controllers\API\InAppNotificationController::class, 'activeNotifications']);
+		Route::get('notification/inactive-list', [App\Http\Controllers\API\InAppNotificationController::class, 'inactiveNotifications']);
+		Route::post('notification/mark-read', [App\Http\Controllers\API\InAppNotificationController::class, 'markRead']);
 
 
 

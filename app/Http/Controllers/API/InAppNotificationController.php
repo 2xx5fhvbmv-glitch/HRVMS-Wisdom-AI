@@ -28,6 +28,33 @@ class InAppNotificationController extends Controller
 
   public function employeeInAppNotification()
   {
+    return $this->buildNotificationList(['unread', 'read']);
+  }
+
+  /**
+   * GET notification/active-list — unread only. Backs the "active
+   * notification panel" — a notification tapped/marked read via
+   * mark-read (or the older delete-message-read) drops out of this list
+   * immediately without needing to reload the whole notification set.
+   */
+  public function activeNotifications()
+  {
+    return $this->buildNotificationList(['unread']);
+  }
+
+  /**
+   * GET notification/inactive-list — read/handled history. The
+   * retained audit trail the ticket asked for: nothing is hard-deleted
+   * when a notification is read, it just moves out of the active list
+   * and into this one.
+   */
+  public function inactiveNotifications()
+  {
+    return $this->buildNotificationList(['read']);
+  }
+
+  private function buildNotificationList(array $statuses)
+  {
     if (!Auth::guard('api')->check()) {
       return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
     }
@@ -35,7 +62,7 @@ class InAppNotificationController extends Controller
     try {
         $notifications                                  = ResortNotification::where('user_id', $this->user->GetEmployee->id)
                                                             ->where('resort_id', $this->resort_id)
-                                                            ->where('status', '!=', 'deleted')
+                                                            ->whereIn('status', $statuses)
                                                             ->orderBy('created_at', 'desc')
                                                             ->get()->map(function ($notification) {
                                                                 if($notification->module == 'Birthday') {
@@ -67,7 +94,7 @@ class InAppNotificationController extends Controller
         $Announcement                                   = Announcement::join('announcement_notification as an','an.announcement_id','=','announcement.id')
                                                             ->where('announcement.employee_id',$this->user->GetEmployee->id)
                                                             ->where('announcement.resort_id', $this->resort_id)
-                                                            ->where('an.status', '!=', 'deleted')
+                                                            ->whereIn('an.status', $statuses)
                                                             ->orderby('an.created_at', 'desc')
                                                             ->get(['announcement.*','an.status','an.id'])->map(function ($announcement) {
                                                               $employee    = Employee::join('resort_admins as ra', 'ra.id', '=', 'employees.Admin_Parent_id')
@@ -117,6 +144,44 @@ class InAppNotificationController extends Controller
       \Log::error($e->getMessage());
       return response()->json(['success' => false, 'message' => 'Server error'], 500);
     }
+  }
+
+  /**
+   * POST notification/mark-read — the clear, single-purpose entry point
+   * the ticket asked for (deleteMessageRead below already supported this
+   * via module:'other', but that generic multi-purpose shape is easy to
+   * get wrong client-side). Body: {"notification_id": 123}. Flips
+   * unread -> read; never deletes the row, so it still shows up in
+   * inactive-list for history/audit.
+   */
+  public function markRead(Request $request)
+  {
+    if (!Auth::guard('api')->check()) {
+      return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+    }
+
+    $validator = \Validator::make($request->all(), [
+      'notification_id' => 'required',
+    ]);
+    if ($validator->fails()) {
+      return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
+    }
+
+    $notification = ResortNotification::where('id', $request->notification_id)
+      ->where('resort_id', $this->resort_id)
+      ->where('user_id', $this->user->GetEmployee->id)
+      ->first();
+
+    if (!$notification) {
+      return response()->json(['success' => false, 'message' => 'Notification not found'], 404);
+    }
+
+    if ($notification->status === 'unread') {
+      $notification->status = 'read';
+      $notification->save();
+    }
+
+    return response()->json(['success' => true, 'message' => 'Notification marked as read']);
   }
 
   public function deleteMessageRead(Request $request)
