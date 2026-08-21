@@ -136,8 +136,35 @@ class RequestController extends Controller
             return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
         }
 
+        $employee                                       =  $this->user->GetEmployee;
+        $employee_id                                    =  $employee->id;
+
+        // Benefit Grid's "Staff Loan & salary advance" flag was saved and
+        // displayed everywhere but never actually gated a request — an
+        // employee whose grid says n/a could still submit one. Same grade
+        // resolution pattern as every other benefit-grid lookup (employee's
+        // own benefit_grid_level wins, else rank-based default).
+        if (in_array($request->request_type, ['Salary Advance', 'Loan Request'])) {
+            $empGrade                                   =   Common::resolveEmpGrade($this->resort_id, $employee->rank, $employee->benefit_grid_level);
+            $benefitGrid                                =   $empGrade
+                                                                ? \App\Models\ResortBenifitGrid::where('resort_id', $this->resort_id)
+                                                                    ->where('emp_grade', $empGrade)
+                                                                    ->where('status', 'Active')
+                                                                    ->first()
+                                                                : null;
+            // Only block on an explicit 'n/a' — some existing grids have an
+            // empty value from a form bug (the "No" option used to submit
+            // an invalid "no" for this yes/n/a enum column, silently
+            // coerced to '' on save, now fixed separately). Treating that
+            // pre-existing blank as ineligible would lock out employees
+            // whose grid was never a deliberate "not eligible" in the
+            // first place.
+            if ($benefitGrid && $benefitGrid->loan_and_salary_advanced === 'n/a') {
+                return response()->json(['success' => false, 'message' => 'You are not eligible for Staff Loan / Salary Advance requests under your current benefit grid.'], 403);
+            }
+        }
+
         DB::beginTransaction();
-        $employee_id                                    =  $this->user->GetEmployee->id;
         try {
             $PayrollAdvance                             =   PayrollAdvance::create([
                 'resort_id'                             =>  $this->resort_id,
