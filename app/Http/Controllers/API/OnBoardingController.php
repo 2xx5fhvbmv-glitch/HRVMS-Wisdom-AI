@@ -120,8 +120,15 @@ class OnBoardingController extends Controller
             $EmployeeItineraries->key_contacts              =   $this->resolveKeyContacts($employee);
 
             $EmployeeItineraries->cultural_insights         =   $CulturalInsights ? $CulturalInsights->cultural_insights : '';
-            $EmployeeItineraries->itinerary_template        =   $ItineraryTemplate;  
-            $EmployeeItineraries->meeting_schedule          =   $meetingSchedule;  
+            $EmployeeItineraries->itinerary_template        =   $ItineraryTemplate;
+            $EmployeeItineraries->meeting_schedule          =   $meetingSchedule;
+            // entry_pass_file/flight_ticket_file/domestic_flight_ticket
+            // came through as raw child_file_management ids — never
+            // resolved to an actual downloadable URL. The resolver
+            // already exists and is wired into 3 sibling endpoints
+            // (culturalInsights, AssignedStaffDashboard, itineraryTimeline)
+            // but was never called from this, the main dashboard.
+            $EmployeeItineraries->download_all               =   $this->resolveItineraryDownloads($EmployeeItineraries);
             // $EmployeeItineraries->facility_tour_categories_image  =   $FacilityTourCategories;  
 
             return response()->json([
