@@ -3821,6 +3821,11 @@ class TimeAndAttendanceController extends Controller
                                     'from_date' => $leaveData['from_date'],
                                     'to_date' => $leaveData['to_date'],
                                     'total_days' => $leaveData['total_days'] ?? null,
+                                    // Already flowed this far through
+                                    // Common::GetAttandanceRegister()'s own
+                                    // ->only([...,'status']) select, just
+                                    // never read into the response here.
+                                    'status' => $leaveData['status'] ?? null,
                                 ];
                                 break;
                             }
@@ -3850,6 +3855,12 @@ class TimeAndAttendanceController extends Controller
                     $dayData['check_out_longitude'] = null;
                     $dayData['check_in_geofence_name'] = null;
                     $dayData['check_out_geofence_name'] = null;
+                    // A leave day with no punch already gets a synthesized
+                    // row from Common::getLeaveRegisterEntries() (merged
+                    // into $RosterInternalDataMonth unconditionally), which
+                    // takes the $shiftData branch above — this null is only
+                    // reached for a date with genuinely no roster,
+                    // attendance, absence, or leave activity at all.
                     $dayData['leave_info'] = null;
                     $dayData['is_day_off'] = false;
                 }
