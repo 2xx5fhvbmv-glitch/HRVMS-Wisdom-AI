@@ -796,7 +796,15 @@ class ClinicController extends Controller
 
         DB::beginTransaction();
         try {
-            $employee_id                                =   $this->user->GetEmployee->id;
+            // Dead: never read again below (the treatment's own employee_id
+            // comes from $request->employee_id). Left in place, it fatals
+            // for a TemporaryClinicDoctor caller — treatment-add's real,
+            // reachable-by-doctor registration is the SECOND one in
+            // routes/api.php (Laravel keeps only the last-registered route
+            // per URI+method) — GetEmployee is null for that guard, so
+            // ->id on it is a null-dereference that's a fatal error under
+            // prod's stricter handling (confirmed elsewhere in this file,
+            // see actorEmployeeId()'s docblock above).
 
             $treatmentData                              =   ClinicTreatment::create([
                 'resort_id'                             =>  $this->resort_id,
