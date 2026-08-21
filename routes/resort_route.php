@@ -1633,15 +1633,6 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
 
        Route::post('/people/configuration/resignation-withdrawal', 'People\ConfigController@EmployeeResignationWithdrawalConfigStore')->name('people.config.resignation-withdrawal-config');
 
-       //Benefit Grade Levels (resort-configurable grade tags for Benefit Grid, e.g. "HOD L1")
-       Route::get('/people/benefit-grade-level', 'People\BenefitGradeLevelController@index')->name('resort.benefitgradelevel.index');
-       Route::get('/people/benefit-grade-level/list', 'People\BenefitGradeLevelController@list')->name('resort.benefitgradelevel.list');
-       Route::post('/people/benefit-grade-level/store', 'People\BenefitGradeLevelController@store')->name('resort.benefitgradelevel.store');
-       Route::put('/people/benefit-grade-level/inline-update/{id}', 'People\BenefitGradeLevelController@inlineUpdate')->name('resort.benefitgradelevel.inlineUpdate');
-       Route::delete('/people/benefit-grade-level/destroy/{id}', 'People\BenefitGradeLevelController@destroy')->name('resort.benefitgradelevel.destroy');
-       Route::post('/people/benefit-grade-level/update-ranks/{id}', 'People\BenefitGradeLevelController@updateRanks')->name('resort.benefitgradelevel.updateRanks');
-       Route::get('/people/benefit-grade-level/ranks-for/{id}', 'People\BenefitGradeLevelController@ranksFor')->name('resort.benefitgradelevel.ranksFor');
-
        // Letterhead & E-signature configuration (used by document/letter PDFs).
        Route::get('/people/configuration/letterhead', 'People\ConfigController@letterheadIndex')->name('people.config.letterhead');
        Route::post('/people/configuration/letterhead/store', 'People\ConfigController@letterheadStore')->name('people.config.letterhead.store');
