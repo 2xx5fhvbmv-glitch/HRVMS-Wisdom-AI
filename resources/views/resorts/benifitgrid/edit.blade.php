@@ -46,7 +46,7 @@
                                 @endforeach
                             </select>
                             <div id="div-ranks"></div>
-                            <small class="text-muted">A rank can only belong to one grade at a time — selecting it here moves it off whatever grade currently holds it.</small>
+                            <small class="text-muted">A rank can belong to more than one grade. When it does, an employee's own assigned grade (if set) wins; otherwise the oldest grade this rank was assigned to applies by default.</small>
                         </div>
                     </div>
                     <div class="col-sm-6">
