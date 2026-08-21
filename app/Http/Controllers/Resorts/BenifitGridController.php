@@ -413,6 +413,16 @@ class BenifitGridController extends Controller
         try {
             $resort_id = Auth::guard('resort-admin')->user()->resort_id;
 
+            // The grid being edited is identified by $id — everything below
+            // used to re-resolve it purely from the submitted Employee
+            // Grade name via updateOrCreate(['emp_grade' => ...]), with $id
+            // never actually used. If that free-text name normalized to a
+            // DIFFERENT existing grade (typo, stale prefill, copy-paste),
+            // this silently wrote the submitted changes onto that OTHER
+            // grade's grid row instead of the one being edited, leaving
+            // grid #$id untouched. Load the real target row up front.
+            $benefitgrid = ResortBenifitGrid::where('resort_id', $resort_id)->findOrFail($id);
+
             // See store() — Employee Grade is a free-text name, resolved
             // to (or created as) the matching grade-level row.
             $gradeLevel = ResortBenefitGradeLevel::firstOrCreate(
@@ -420,6 +430,25 @@ class BenifitGridController extends Controller
                 ['status' => 'active']
             );
             $empGrade = (string) $gradeLevel->id;
+
+            // Renaming this grid to a name that resolves to a DIFFERENT
+            // grade that already has its own grid would otherwise leave two
+            // rows sharing one emp_grade (this row's, plus the other
+            // grade's own) — an ambiguous state every emp_grade lookup
+            // elsewhere assumes can't happen. Reject instead of merging.
+            if ($empGrade !== $benefitgrid->emp_grade) {
+                $collision = ResortBenifitGrid::where('resort_id', $resort_id)
+                    ->where('emp_grade', $empGrade)
+                    ->where('id', '!=', $benefitgrid->id)
+                    ->exists();
+                if ($collision) {
+                    DB::rollBack();
+                    return response()->json([
+                        'success' => false,
+                        'msg' => 'Another benefit grid already uses the grade name "' . trim($request->emp_grade) . '". Choose a different name.'
+                    ]);
+                }
+            }
 
             // See store() — ranks submitted on the same form, same shared
             // assignment logic as the standalone config screen.
@@ -439,9 +468,9 @@ class BenifitGridController extends Controller
                 }
             }
 
-            // ✅ Update or create main benefit grid
-            $benefitgrid = ResortBenifitGrid::updateOrCreate(
-                ["resort_id" => $resort_id, "emp_grade" => $empGrade],
+            // ✅ Update the grid identified by $id in place (not re-matched
+            // by emp_grade — see the collision guard above for why).
+            $benefitgrid->update(
                 [
                     'resort_id' => $resort_id,
                     'emp_grade' => $empGrade,
