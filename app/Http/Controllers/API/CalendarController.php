@@ -1534,10 +1534,14 @@ class CalendarController extends Controller
         $participants = ChildEvents::where('event_id', $event->id)
             ->join('employees as e', 'e.id', '=', 'child_events.employee_id')
             ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
-            ->select('e.id as employee_id', 'ra.first_name', 'ra.last_name')
+            ->select('e.id as employee_id', 'e.Admin_Parent_id', 'ra.first_name', 'ra.last_name')
             ->get()
             ->map(function ($p) {
-                $p->profile_picture = Common::getResortUserPicture($p->employee_id);
+                // getResortUserPicture() looks up resort_admins.id, not
+                // employees.id — was passed employee_id, which almost never
+                // matches an admin row, so this always fell back to the
+                // default placeholder image.
+                $p->profile_picture = Common::getResortUserPicture($p->Admin_Parent_id);
                 return $p;
             });
 
