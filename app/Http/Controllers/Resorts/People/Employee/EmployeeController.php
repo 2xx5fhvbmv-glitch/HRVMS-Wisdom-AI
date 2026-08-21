@@ -1848,7 +1848,13 @@ class EmployeeController extends Controller
         if( $benefitGrid)
         {
             $employee->entitled_service_charge = $benefitGrid->service_charge == 1 ? 'yes' : 'no';
-            $employee->entitled_overtime = $benefitGrid->overtime;
+            // employees.entitled_overtime is a strict enum('yes','no') — the
+            // benefit grid's own overtime field is 'yes'/'n/a', so copying it
+            // verbatim wrote an invalid value (silently coerced to '' by
+            // MySQL) that never matched DutyRosterController's `== "no"`
+            // check. That's why setting a grade's Overtime to "Not
+            // Applicable" never blocked overtime entries on the roster.
+            $employee->entitled_overtime = $benefitGrid->overtime == 'yes' ? 'yes' : 'no';
             $employee->entitled_public_holiday = $benefitGrid->paid_worked_public_holiday_and_friday == 1 ? 'yes' : 'no';
         }
         $employee->save();

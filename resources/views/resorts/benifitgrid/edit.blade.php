@@ -146,7 +146,7 @@
                                                 name="LeaveCat[{{$leave->id}}][{{$leave->eligibility}}][]" 
                                                 class="form-control" value="{{ $allocatedDays }}"
                                                 @if(isset($isViewMode) && $isViewMode) disabled @endif
-                                                max="{{$leave->number_of_days}}" required/>
+                                                required/>
                                         </div>
                                         <div class="col-lg-6 form-group mb-2">
                                             <label class="form-label" for="eligible_emp_type_{{$key}}">Eligible Employee Type</label>
@@ -899,7 +899,6 @@
                                                         name="LeaveCat[${leave.id}][${leave.eligibility}][]"
                                                         class="form-control"
                                                         value="${leave.number_of_days}"
-                                                        max="${leave.number_of_days}"
                                                         ${response.isViewMode ? 'disabled' : ''} />
                                                 </div>
                                                 <div class="col-lg-6 form-group mb-2">
