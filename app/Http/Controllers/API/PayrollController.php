@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Storage;
 use App\Models\Employee;
 use App\Models\Payroll;
+use App\Models\PayrollReviewAllowances;
 use App\Helpers\Common;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Dompdf\Options;
@@ -465,18 +466,18 @@ class PayrollController extends Controller
                                                                 ->select(
                                                                     'payroll.*', 'ra.first_name', 'ra.last_name', 'ra.profile_picture',
                                                                     'ra.id as admin_id', 'rp.position_title as position', 'rd.name as department', 'e.joining_date',
-                                                                    'e.Emp_id', 'psc.total_working_days', 'psc.service_charge_amount', 'pr.earnings_basic',
-                                                                    'pr.earnings_allowance', 'pd.ewt', 'pd.staff_shop', 'pd.pension',
+                                                                    'e.Emp_id', 'psc.total_working_days', 'psc.service_charge_amount', 'pr.id as review_id', 'pr.earnings_basic',
+                                                                    'pr.earnings_allowance', 'pd.ewt', 'pd.staff_shop', 'pd.pension', 'pd.advance_loan',
                                                                     'pd.attendance_deduction','pd.city_ledger', 'pd.other', 'pd.total_deductions'
                                                                 )->first();
             if (!$payroll) {
                 return response()->json(['success' => false, 'error' => 'Payroll data not found'], 200);
             }
-                                                        
+
             $totalAmount                                =   ($payroll->earnings_basic ?? 0) + ($payroll->service_charge_amount ?? 0) + ($payroll->earnings_allowance ?? 0) - ($payroll->total_deductions ?? 0);
             $earningtotalAmount                         =   ($payroll->earnings_basic ?? 0) + ($payroll->earnings_allowance?? 0);
             $payrollNetSalary                           =   ($payroll->earnings_allowance ?? 0) + ($payroll->earnings_basic ?? 0) - ($payroll->total_deductions ?? 0);
-           
+
             $payrollEmpData                             =   [
                 'Emp_id'                                =>  $payroll->Emp_id,
                 'first_name'                            =>  $payroll->first_name,
@@ -487,25 +488,66 @@ class PayrollController extends Controller
                 'joining_date'                          =>  $payroll->joining_date,
                 'start_date'                            =>  $payroll->start_date,
                 'end_date'                              =>  $payroll->end_date,
-                'profile_picture'                       =>  Common::getResortUserPicture($payroll->id),
+                // Was passing the payroll RUN's own id, not an admin id —
+                // getResortUserPicture() looks up resort_admins.id, so this
+                // almost never matched and always fell back to the default
+                // picture (same bug shape found elsewhere this session).
+                'profile_picture'                       =>  Common::getResortUserPicture($payroll->admin_id),
             ];
 
             $bankDetails                                =   [
                 'total_amount'                          =>  number_format($totalAmount, 2),
             ];
 
+            // Named allowance line items — payroll_review_allowances is
+            // the actual source pr.earnings_allowance is summed FROM, but
+            // was never surfaced here, only the pre-summed total. Zero-
+            // amount rows (an allowance type that doesn't apply this
+            // period) are dropped rather than shown as empty lines.
+            $allowanceLines                             =   $payroll->review_id
+                                                                ? PayrollReviewAllowances::where('payroll_review_id', $payroll->review_id)
+                                                                    ->where('amount', '>', 0)
+                                                                    ->get(['allowance_type', 'amount', 'amount_unit'])
+                                                                    ->map(fn ($a) => [
+                                                                        'type'   => $a->allowance_type,
+                                                                        'amount' => (float) $a->amount,
+                                                                        'unit'   => $a->amount_unit,
+                                                                    ])->values()
+                                                                : collect();
+
             $earningDetails                             =   [
                 'basic_pay'                             =>  $payroll->earnings_basic,
-                'allowance'                             =>  $payroll->earnings_allowance,
+                'allowances'                            =>  $allowanceLines,
+                'allowance_total'                       =>  $payroll->earnings_allowance,
                 'bonus'                                 =>  '',
                 'earning_total_amount'                  =>  number_format($earningtotalAmount,2),
             ];
 
+            // Named deduction line items — payroll_deductions carries these
+            // as separate columns, but only ewt/city_ledger were ever
+            // surfaced (plus two permanently-blank placeholder fields,
+            // "insurance"/"loans", that never had a real source). Any
+            // deduction outside those two — pension, staff_shop,
+            // advance_loan, attendance_deduction, other — was silently
+            // missing from the breakdown while still counted in
+            // total_deductions, which is exactly why the breakdown so
+            // often didn't add up to the total.
+            $deductionLabels                            =   [
+                'ewt'                   => 'Tax (EWT)',
+                'pension'               => 'Pension',
+                'staff_shop'            => 'Staff Shop',
+                'advance_loan'          => 'Advance / Loan',
+                'attendance_deduction'  => 'Attendance Deduction',
+                'city_ledger'           => 'City Ledger',
+                'other'                 => 'Other',
+            ];
+            $deductionLines                             =   collect($deductionLabels)
+                                                                ->map(fn ($label, $field) => ['type' => $label, 'amount' => (float) ($payroll->$field ?? 0)])
+                                                                ->filter(fn ($row) => $row['amount'] > 0)
+                                                                ->values();
+
             $deductionsDetails                          =   [
-                'monthly_tax_deduction:'                =>  $payroll->ewt,
-                'insurance:'                            =>  '',
-                'loans'                                 =>  '',
-                'city_ledger'                           =>  $payroll->city_ledger,
+                'deductions'                            =>  $deductionLines,
                 'total_deductions'                      =>  $payroll->total_deductions ?? 0,
             ];
 
