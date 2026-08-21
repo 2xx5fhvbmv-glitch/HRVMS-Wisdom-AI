@@ -42,13 +42,20 @@ class RequestController extends Controller
 
             $employee_id                                =   $this->user->GetEmployee->id;
 
-            // Fetch all in one query for efficiency
+            // Letter-type requests (Employment Verification Letter, etc.)
+            // never get a payroll_advance_guarantor row — only Salary
+            // Advance/Loan Request do (see RequestStore's required_if).
+            // An INNER JOIN against that table dropped every letter-type
+            // request from this list entirely; a request with more than
+            // one guarantor would also have fanned out into duplicate
+            // rows here. Fetch guarantors separately instead, same
+            // pattern as the attachments fetch right below, so a request
+            // shows up regardless of whether/how many guarantors it has.
             $requests                                   =   PayrollAdvance::join('employees', 'payroll_advance.employee_id', '=', 'employees.id')
-                                                                ->join('payroll_advance_guarantor as pag', 'payroll_advance.id', '=', 'pag.payroll_advance_id')
                                                                 ->where('payroll_advance.employee_id', $employee_id)
                                                                 ->where('payroll_advance.resort_id', $this->resort_id)
                                                                 ->orderBy('payroll_advance.created_at', 'desc')
-                                                                ->get(['payroll_advance.*','employees.Emp_id', 'pag.status as guarantor_status', 'pag.guarantor_id']);
+                                                                ->get(['payroll_advance.*','employees.Emp_id']);
 
             // The upload endpoint's response includes payroll_advance_attachment,
             // but this dashboard/listing never surfaced it at all — a file
@@ -57,9 +64,19 @@ class RequestController extends Controller
                                                                 ->get()
                                                                 ->groupBy('payroll_advance_id');
 
-            $requests                                   =   $requests->map(function ($req) use ($attachmentsByAdvanceId) {
+            $guarantorsByAdvanceId                       =   PayrollAdvanceGuarantor::whereIn('payroll_advance_id', $requests->pluck('id'))
+                                                                ->get()
+                                                                ->groupBy('payroll_advance_id');
+
+            $requests                                   =   $requests->map(function ($req) use ($attachmentsByAdvanceId, $guarantorsByAdvanceId) {
                 $rows                                   =   $attachmentsByAdvanceId->get($req->id, collect());
                 $req->attachments                       =   $this->resolveAttachments($rows);
+                // Kept as a single scalar pair (not an array) to match the
+                // existing response shape every client already reads —
+                // first guarantor only when a request has more than one.
+                $guarantor                               =   $guarantorsByAdvanceId->get($req->id, collect())->first();
+                $req->guarantor_status                   =   $guarantor->status ?? null;
+                $req->guarantor_id                       =   $guarantor->guarantor_id ?? null;
                 return $req;
             });
 
