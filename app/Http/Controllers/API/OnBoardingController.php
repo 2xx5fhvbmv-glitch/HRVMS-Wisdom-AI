@@ -19,6 +19,7 @@ use App\Models\EmployeeOnboardingAcknowledgements;
 use App\Models\CulturalInsights;
 use App\Models\Employee;
 use App\Models\ChildFileManagement;
+use App\Models\FilemangementSystem;
 use App\Models\FacilityTourCategories;
 use App\Models\FacilityTourImages;
 use App\Models\JobDescription;
@@ -1092,7 +1093,6 @@ class OnBoardingController extends Controller
      * written yet instead of opening to a blank screen.
      */
     private const HANDBOOK_CATEGORIES = [
-        'code_of_conduct'             => 'Code of Conduct',
         'non_discrimination'         => 'Non-Discrimination Policy',
         'harassment_prevention'      => 'Harassment Prevention',
         'job_roles_responsibilities' => 'Job Roles & Responsibilities',
@@ -1126,10 +1126,37 @@ class OnBoardingController extends Controller
                 ];
             }
 
+            // Employee Handbook now also surfaces real uploaded documents
+            // instead of only free-text categories — HR manages this via
+            // a resort-wide File Management folder named exactly "Employee
+            // Handbook" (Folder_Type=uncategorized, same convention as the
+            // existing facilityTourCategory folder), matched by name since
+            // there's no dedicated "handbook folder" concept in the schema.
+            $handbookFolder = FilemangementSystem::where('resort_id', $this->resort_id)
+                ->where('Folder_Type', 'uncategorized')
+                ->where('Folder_Name', 'Employee Handbook')
+                ->first();
+
+            $handbookFiles = $handbookFolder
+                ? ChildFileManagement::where('Parent_File_ID', $handbookFolder->id)
+                    ->where('resort_id', $this->resort_id)
+                    ->orderByDesc('id')
+                    ->get()
+                    ->map(function ($file) {
+                        $aws = Common::GetAWSFile($file->id, $this->resort_id);
+                        return [
+                            'id'   => $file->id,
+                            'name' => $file->NewFileName ?: $file->File_Name,
+                            'url'  => !empty($aws['success']) ? $aws['NewURLshow'] : null,
+                        ];
+                    })->values()
+                : collect();
+
             return response()->json([
                 'success' => true,
                 'message' => 'Employee handbook categories retrieved successfully.',
                 'data'    => $list,
+                'handbook_files' => $handbookFiles,
             ], 200);
         } catch (\Exception $e) {
             \Log::emergency("File: " . $e->getFile());
