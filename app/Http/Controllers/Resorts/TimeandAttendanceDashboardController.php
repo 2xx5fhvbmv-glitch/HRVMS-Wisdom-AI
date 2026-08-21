@@ -206,7 +206,8 @@ class TimeandAttendanceDashboardController extends Controller
      *   - Excessive Overtime   : more than 3 hours overtime today.
      *   - Mandatory Break      : worked more than 5 hours today with no break.
      *   - Day-Off Balance      : more than 4 unused day-offs in the current
-     *     employment-year cycle (accrued 1/week minus taken).
+     *     employment-year cycle (accrued per the employee's benefit grid's
+     *     Day Off Per Week, fallback 1/week, minus taken).
      *
      * @return array<string,array{count:int,employees:array}>
      */
@@ -335,6 +336,14 @@ class TimeandAttendanceDashboardController extends Controller
             $dayOffCatId = LeaveCategory::where('resort_id', $resortId)
                 ->where('leave_type', 'Day Off')
                 ->value('id');
+            // Per-grade day-off entitlement (fallback 1/week) — this used to
+            // be hardcoded to exactly 1 day/week for every employee
+            // regardless of their grid's Day Off Per Week setting, so an
+            // employee entitled to 2/week always showed a balance computed
+            // as if they only accrued 1/week.
+            $dayOffPerWeekLimits = ResortBenifitGrid::where('resort_id', $resortId)
+                ->whereNotNull('day_off_per_week')
+                ->pluck('day_off_per_week', 'emp_grade');
             $now = Carbon::now();
             foreach ($employees as $emp) {
                 if (empty($emp->joining_date)) {
@@ -350,7 +359,12 @@ class TimeandAttendanceDashboardController extends Controller
                 if ($cycleStart->greaterThan($now)) {
                     $cycleStart = $joining->copy()->addYears(max(0, $completedYears - 1));
                 }
-                $accrued = (int) floor($cycleStart->floatDiffInDays($now) / 7);
+                $grade = Common::resolveEmpGrade($resortId, $emp->rank, $emp->benefit_grid_level);
+                $daysOffPerWeek = (float) ($dayOffPerWeekLimits[$grade] ?? 1);
+                if ($daysOffPerWeek <= 0) {
+                    $daysOffPerWeek = 1;
+                }
+                $accrued = (int) floor($cycleStart->floatDiffInDays($now) / 7 * $daysOffPerWeek);
 
                 $usedLeaves = 0;
                 if ($dayOffCatId) {
