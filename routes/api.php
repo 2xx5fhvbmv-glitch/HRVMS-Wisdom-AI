@@ -456,7 +456,15 @@ use Illuminate\Support\Facades\Route;
 		// reach them.
 		Route::post('clinic/appointment-store', [App\Http\Controllers\API\ClinicController::class, 'appointmentStore']);
 		Route::get('clinic/employee-clinic-dashboard', [App\Http\Controllers\API\ClinicController::class, 'employeeClinicDashboard']);
-		Route::post('clinic/appointment-status-update', [App\Http\Controllers\API\ClinicController::class, 'appointmentStatusUpdate']);
+		// clinic/appointment-status-update moved to the Clinic Manager tier
+		// group below (clinic.capability:can_manage_treatment) — this is
+		// the doctor's own "approve/reject/move to treatment" action on
+		// an appointment, not a self-service action any employee should
+		// be able to call on any appointment_id. It had no rank check at
+		// all here (any authenticated employee could approve/reject
+		// someone else's appointment) AND a TemporaryClinicDoctor 401'd
+		// before ever reaching it, since this whole block sits inside the
+		// outer auth:api-only group.
 		Route::get('clinic/medical-certificate-details/{medical_cert_id}', [App\Http\Controllers\API\ClinicController::class, 'medicalCertificateDetail']);
 		Route::get('clinic/past-medical-history', [App\Http\Controllers\API\ClinicController::class, 'pastMedicalHistory']);
 
@@ -654,6 +662,7 @@ use Illuminate\Support\Facades\Route;
 		Route::middleware(['clinic.capability:can_manage_treatment'])->group(function () {
 			Route::post('clinic/treatment-add', [App\Http\Controllers\API\ClinicController::class, 'treatmentAdd']);
 			Route::post('clinic/treatment-additional-note-update', [App\Http\Controllers\API\ClinicController::class, 'treatmentAdditionalNoteUpdate']);
+			Route::post('clinic/appointment-status-update', [App\Http\Controllers\API\ClinicController::class, 'appointmentStatusUpdate']);
 			// clinic/treatment-details moved to the unrestricted
 			// registration above — see the comment there.
 		});
