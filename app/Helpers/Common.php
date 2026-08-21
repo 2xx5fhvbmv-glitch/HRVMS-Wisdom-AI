@@ -3658,6 +3658,10 @@ class Common
                             'from_date' => $row->from_date,
                             'to_date' => $row->to_date,
                             'total_days' => $row->total_days ?? null,
+                            // The query above only ever selects rows where
+                            // el.status = 'Approved', so this is the only
+                            // value a row reaching this point can have.
+                            'status' => 'Approved',
                         ]],
                         'LeaveFirstName' => substr($row->leave_type ?? 'On Leave', 0, 1),
                         'LeaveColor' => $row->color ?? '',
