@@ -470,7 +470,10 @@
                             <select id="loan-and-salary-advanced-select" name="loan_and_salary_advanced" class="form-select select2t-none" @if(isset($isViewMode) && $isViewMode) disabled @endif>
                                 <option value="">Staff Loan & salary advance</option>
                                 <option value="yes" @if($benefit_grid->loan_and_salary_advanced == "yes") selected @endif>Yes</option>
-                                <option value="no" @if($benefit_grid->loan_and_salary_advanced == "no") selected @endif>No</option>
+                                {{-- Column is enum('yes','n/a') — "no" isn't a valid member, so
+                                     selecting it silently coerced to '' on save (same bug shape
+                                     as the Overtime field, which already uses n/a correctly). --}}
+                                <option value="n/a" @if($benefit_grid->loan_and_salary_advanced == "n/a") selected @endif>No</option>
                             </select>
                         </div>
                     </div>

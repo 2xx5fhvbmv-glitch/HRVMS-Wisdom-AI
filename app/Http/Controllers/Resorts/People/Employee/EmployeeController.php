@@ -1856,6 +1856,19 @@ class EmployeeController extends Controller
             // Applicable" never blocked overtime entries on the roster.
             $employee->entitled_overtime = $benefitGrid->overtime == 'yes' ? 'yes' : 'no';
             $employee->entitled_public_holiday = $benefitGrid->paid_worked_public_holiday_and_friday == 1 ? 'yes' : 'no';
+            $employee->entitled_annual_leave_ticket = $benefitGrid->annual_leave_ticket == 'yes' ? 'yes' : 'no';
+
+            // basic_salary_currency has a DB default ('USD') rather than a
+            // true null/unset state, so an employee who's never had their
+            // salary configured yet still reads as 'USD'. Only sync the
+            // grid's Salary Paid In while basic_salary is still empty —
+            // once a real salary has been entered via the dedicated
+            // salary/entitlements screen, that currency choice was
+            // deliberate and a later grid reassignment must not silently
+            // flip it under existing pay data.
+            if (empty($employee->basic_salary) && in_array($benefitGrid->salary_paid_in, ['USD', 'MVR'])) {
+                $employee->basic_salary_currency = $benefitGrid->salary_paid_in;
+            }
         }
         $employee->save();
 
