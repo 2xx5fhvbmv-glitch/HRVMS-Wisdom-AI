@@ -4,6 +4,8 @@ namespace App\Providers;
 
 use Illuminate\Foundation\Support\Providers\RouteServiceProvider as ServiceProvider;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Cache\RateLimiting\Limit;
 
 class RouteServiceProvider extends ServiceProvider
 {
@@ -30,7 +32,20 @@ class RouteServiceProvider extends ServiceProvider
      */
     public function boot()
     {
-        //
+        // Kernel.php's 'api' group throttle ran before any auth middleware,
+        // so Laravel's bare 'throttle:180,1' always keyed on $request->ip()
+        // — every employee on the same resort's shared/NAT'd WiFi drew from
+        // ONE 180/min bucket collectively, not 180/min each. A handful of
+        // staff refreshing dashboards on-site could 429 an unrelated
+        // employee's single request. Key by the authenticated mobile user
+        // when the Bearer token resolves one (works even before 'auth:api'
+        // middleware runs — guard resolution from the token is on-demand,
+        // not dependent on middleware order), falling back to IP only for
+        // truly unauthenticated calls (login, forgot-password).
+        RateLimiter::for('mobile-api', function ($request) {
+            $key = optional($request->user('api'))->id ?: $request->ip();
+            return Limit::perMinute(180)->by($key);
+        });
 
         parent::boot();
     }
