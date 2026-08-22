@@ -390,6 +390,15 @@ class ClinicController extends Controller
                 return response()->json(['success' => false, 'message' => 'Appointment not found'], 200);
             }
 
+            // Same reachability as treatmentDetails() — patient employee OR
+            // clinic staff/doctor. Was scoped only by resort_id, so any
+            // employee could view any other employee's appointment by
+            // guessing the id.
+            $isClinicStaff = Auth::guard('temp-clinic-doctor')->check() || (int) ($this->user->GetEmployee->rank ?? 0) === 12;
+            if (!$isClinicStaff && (int) $appointment->employee_id !== (int) $this->actorEmployeeId()) {
+                return response()->json(['success' => false, 'message' => 'Appointment not found'], 200);
+            }
+
             $age                                    =   null;
 
             if ($appointment->employee && $appointment->employee->dob) {
@@ -1048,6 +1057,15 @@ class ClinicController extends Controller
                                                                 ->first(['clinic_treatment.*', 'e.Admin_Parent_id','e.rank','e.dob','ra.gender','ra.personal_phone','ra.first_name', 'ra.last_name', 'rp.position_title as position', 'cac.appointment_type']);
 
             if (!$treatmentData) {
+                return response()->json(['success' => false, 'message' => 'Treatment not found'], 200);
+            }
+
+            // This route is reachable by a patient employee (to view their
+            // own treatment) as well as clinic staff/doctor (to view any
+            // patient's) — was scoped only by resort_id, so any employee
+            // could view any other employee's treatment by guessing the id.
+            $isClinicStaff = Auth::guard('temp-clinic-doctor')->check() || (int) ($this->user->GetEmployee->rank ?? 0) === 12;
+            if (!$isClinicStaff && (int) $treatmentData->employee_id !== (int) $this->actorEmployeeId()) {
                 return response()->json(['success' => false, 'message' => 'Treatment not found'], 200);
             }
 
