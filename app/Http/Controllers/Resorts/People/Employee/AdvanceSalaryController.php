@@ -284,7 +284,21 @@ class AdvanceSalaryController extends Controller
         $remaining_balance = $amount;
         $month_year_array = [];
 
-        if ($monthly_installment > $employee->basic_salary) {
+        // The requested amount is in whatever currency the employee picked
+        // (payroll_advance.currency), but basic_salary is in the
+        // employee's own basic_salary_currency — these were compared as
+        // raw numbers with no conversion, so a 2000 MVR loan (667/month
+        // over 3 months) failed against a $600 USD salary just because
+        // 667 > 600 numerically, even though $600 USD is actually ~9,252
+        // MVR at the resort's own rate — nowhere close to too high.
+        // Normalize both to MVR via the same DollertoMVR rate used
+        // everywhere else in this app before comparing.
+        $rate = Common::getUsdToMvrRate();
+        $toMvr = fn ($value, $currency) => strtoupper($currency ?: 'USD') === 'USD' ? $value * $rate : $value;
+        $monthlyInstallmentMvr = $toMvr($monthly_installment, $payroll_advance_data->currency);
+        $basicSalaryMvr = $toMvr($employee->basic_salary, $employee->basic_salary_currency);
+
+        if ($monthlyInstallmentMvr > $basicSalaryMvr) {
             return response()->json([
                 'success' => false,
                 'status' => 'error',
