@@ -109,8 +109,10 @@
     $(document).ready(function () {
         $("#hiddenInput").daterangepicker({
             autoApply: true,
-            startDate: moment().startOf('month'),  // First day of the current month
-            endDate: moment().endOf('month'),
+            // Matches the resort's actual payroll cycle (e.g. 26th-25th),
+            // same as the Dashboard page, instead of the calendar month.
+            startDate: moment("{{ \Carbon\Carbon::parse($payrollStartDate)->format('Y-m-d') }}"),
+            endDate: moment("{{ \Carbon\Carbon::parse($payrollEndDate)->format('Y-m-d') }}"),
             opens: 'right',
             parentEl: '#datapicker',
             alwaysShowCalendars: true,
