@@ -42,7 +42,10 @@
                             data-parsley-required-message="Please select at least one rank"
                             @if(isset($isViewMode) && $isViewMode) disabled @endif>
                                 @foreach($rankConfig ?? [] as $rankValue => $rankLabel)
-                                    <option value="{{ $rankValue }}" @if(in_array($rankValue, $currentGradeRanks ?? [])) selected @endif>{{ $rankLabel }}</option>
+                                    @php $rankUsage = ($rankPositionSummary ?? collect())->get((int) $rankValue); @endphp
+                                    <option value="{{ $rankValue }}"
+                                        @if(in_array($rankValue, $currentGradeRanks ?? [])) selected @endif
+                                        @if($rankUsage) title="{{ $rankUsage['names'] }}" @endif>{{ $rankLabel }}@if($rankUsage) ({{ $rankUsage['count'] }} position{{ $rankUsage['count'] == 1 ? '' : 's' }})@endif</option>
                                 @endforeach
                             </select>
                             <div id="div-ranks"></div>
