@@ -61,6 +61,30 @@ class ManningController extends Controller
         );
     }
 
+    /**
+     * Position -> Rank -> Employee Grade is the real mapping chain (an
+     * employee assigned this position inherits its Rank, and the Benefit
+     * Grid that applies to them is resolved from that rank) — but picking
+     * a rank here gave no indication of which grade(s) it maps to. A rank
+     * can be shared by more than one grade (documented, intentional), so
+     * this returns every grade name currently mapped to it, not just one.
+     */
+    public function getRankGradeMapping(Request $request)
+    {
+        $resort_id = Auth::guard('resort-admin')->user()->resort_id;
+        $rank = $request->input('rank');
+
+        $gradeLevelIds = \App\Models\ResortBenefitGradeLevelRank::where('resort_id', $resort_id)
+            ->where('rank', (int) $rank)
+            ->pluck('grade_level_id');
+
+        $gradeNames = \App\Models\ResortBenefitGradeLevel::where('resort_id', $resort_id)
+            ->whereIn('id', $gradeLevelIds)
+            ->pluck('name');
+
+        return response()->json(['grades' => $gradeNames->values()]);
+    }
+
     public function getDropdownData()
     {
         $resort_id = Auth::guard('resort-admin')->user()->resort_id;
