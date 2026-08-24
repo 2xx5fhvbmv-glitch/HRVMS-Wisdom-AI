@@ -498,6 +498,18 @@ $(document).ready(function () {
      });
 });
 
+// User picks which month an installment falls in (e.g. take September,
+// skip October) instead of the schedule always being consecutive months
+// from today — keep the paired interest-input's data-month/name in sync
+// so the recalculation + final save reflect the chosen month.
+$(document).on('change', '.repay-month-select', function () {
+     let newMonth = $(this).val();
+     let interestInput = $(this).closest('tr').find('.interest-input');
+     interestInput.attr('data-month', newMonth);
+     interestInput.attr('name', newMonth + '-interest');
+     interestInput.trigger('keyup');
+});
+
 $(document).on('keyup', '.interest-input', function () {
      let allData = [];
 
