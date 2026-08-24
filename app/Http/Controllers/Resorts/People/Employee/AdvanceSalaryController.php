@@ -70,10 +70,20 @@ class AdvanceSalaryController extends Controller
             // undefined for roles outside HR/Finance/GM/master (e.g. a Finance
             // HOD/XCOM whose RANK maps to "HOD"/"EXCOM", not "Finance"), which
             // previously threw and surfaced as a DataTables "Ajax error".
+            // Sort by id, not created_at — the query below is materialized
+            // with ->get() before reaching datatables()->of(), so the
+            // frontend's requested sort re-orders the resulting Collection
+            // in PHP using each row's created_at ATTRIBUTE, which goes
+            // through PayrollAdvance::getCreatedAtAttribute() and returns a
+            // pre-formatted display string (d/m/Y H:i) — sorted lexically,
+            // not chronologically, so a newer record could land below an
+            // older one whenever their day-of-month digits don't happen to
+            // agree with real date order. id is monotonic with real
+            // creation order and has no accessor to trip over.
             $payroll_data_query = PayrollAdvance::where('resort_id', $resort_id)
                 ->with(['employee.resortAdmin', 'employee.position', 'employee.department'])
                 ->whereHas('employee.resortAdmin')
-                ->orderBy('created_at', 'DESC');
+                ->orderBy('id', 'DESC');
 
             // Stage filters: Finance sees HR-approved; GM sees Finance-approved.
             // HR / master / other authorised roles see the full resort list.
