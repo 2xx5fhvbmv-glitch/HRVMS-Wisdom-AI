@@ -110,13 +110,13 @@ class JobDescriptionController extends Controller
                     $deleteUrl = asset('resorts_assets/images/trash-red.svg');
                     $redirectToMe = route('resort.ta.jobdescription.download', $row->slug);
                     return '
-                            <a href="javscript:void(0)" class="btn-tableIcon btnIcon-orange viewJobDesc " data-id="' . htmlspecialchars($row->id, ENT_QUOTES, 'UTF-8').'"><i class="fa-regular fa-eye"></i></a>
+                            <a href="javascript:void(0)" class="btn-tableIcon btnIcon-orange viewJobDesc " data-id="' . htmlspecialchars($row->id, ENT_QUOTES, 'UTF-8').'"><i class="fa-regular fa-eye"></i></a>
                             <a target="_blank" href="'.$redirectToMe.'" class="btn-tableIcon btnIcon-skyblue"><i class="fa-regular fa-download"></i></a>
-                            <a href="javscript:void(0)" class="btn-lg-icon icon-bg-green me-1 edit-row-btn '.$edit_class.'"
+                            <a href="javascript:void(0)" class="btn-lg-icon icon-bg-green me-1 edit-row-btn '.$edit_class.'"
                             data-id="' . htmlspecialchars($row->id, ENT_QUOTES, 'UTF-8') . '">
                                 <img src="' . $editUrl . '" alt="Edit" class="img-fluid" />
                             </a>
-                            <a href="javscript:void(0)" class="btn-lg-icon icon-bg-red delete-row-btn '.$delete_class.'"
+                            <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-row-btn '.$delete_class.'"
                            data-id="'. htmlspecialchars($row->id, ENT_QUOTES, 'UTF-8') . '" >
                                 <img src="' . $deleteUrl . '" alt="Delete" class="img-fluid" />
                             </a>
