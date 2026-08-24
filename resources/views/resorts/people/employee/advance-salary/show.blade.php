@@ -154,36 +154,41 @@
                                         <div class="col-auto">
                                               <div class="attachPdf-block">
                                                     @php
+                                                          // public/assets/icons/*.svg never existed in this app at
+                                                          // all (confirmed — no such directory), so every one of
+                                                          // these icons was always broken regardless of the
+                                                          // attachment-resolution bug above. Font Awesome is
+                                                          // already loaded and used everywhere else in this app.
                                                           $fileExtension = pathinfo($attachmentFile['filename'], PATHINFO_EXTENSION);
-                                                          $iconPath = asset('assets/icons/default-icon.svg'); // Default icon path
+                                                          $iconClass = 'fa-file'; // Default icon
                                                           switch (strtolower($fileExtension)) {
                                                                   case 'pdf':
-                                                                         $iconPath = asset('assets/icons/file-pdf.svg');
+                                                                         $iconClass = 'fa-file-pdf';
                                                                          break;
                                                                   case 'doc':
                                                                   case 'docx':
-                                                                         $iconPath = asset('assets/icons/file-word.svg');
+                                                                         $iconClass = 'fa-file-word';
                                                                          break;
                                                                   case 'xls':
                                                                   case 'xlsx':
-                                                                         $iconPath = asset('assets/icons/file-excel.svg');
+                                                                         $iconClass = 'fa-file-excel';
                                                                          break;
                                                                   case 'jpg':
                                                                   case 'jpeg':
                                                                   case 'png':
-                                                                         $iconPath = asset('assets/icons/file-image.svg');
+                                                                         $iconClass = 'fa-file-image';
                                                                        break;
                                                                  // Add more cases for other file types as needed
                                                           }
                                                     @endphp
                                                     @if($attachmentFile['url'])
                                                     <a href="{{ $attachmentFile['url'] }}" target="_blank">
-                                                          <img src="{{ $iconPath }}" alt="icon">
+                                                          <i class="fa-solid {{ $iconClass }} me-1"></i>
                                                           {{ $attachmentFile['filename'] }}
                                                     </a>
                                                     @else
                                                     <span class="text-muted">
-                                                          <img src="{{ $iconPath }}" alt="icon">
+                                                          <i class="fa-solid {{ $iconClass }} me-1"></i>
                                                           {{ $attachmentFile['filename'] }} (unavailable)
                                                     </span>
                                                     @endif
