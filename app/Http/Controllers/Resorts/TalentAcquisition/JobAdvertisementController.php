@@ -135,17 +135,32 @@ class JobAdvertisementController extends Controller
                 if ($request->hasFile('Jobadvimg'))
                 {
 
-                    $path_profile_image = config('settings.Resort_JobAdvertisement').'/'. Auth::guard('resort-admin')->user()->resort->resort_id;
-
-
+                    // Was Auth::...->user()->resort->resort_id — the
+                    // resort's STRING slug (e.g. "87fca1b014"), not the
+                    // numeric id. The DB row's Resort_id (used by the list
+                    // and delete methods, and by every GetJobAdvertisementImage()
+                    // caller) is the numeric $resort_id computed above —
+                    // so every fresh upload was written to
+                    // .../JobAdvertisement/87fca1b014/... while every read
+                    // looked in .../JobAdvertisement/26/..., a guaranteed
+                    // NoSuchKey on every single upload. Reuse the same
+                    // numeric $resort_id the DB save already uses below.
+                    $path_profile_image = config('settings.Resort_JobAdvertisement').'/'.$resort_id;
 
                     // A vacancy-specific poster and the resort-wide default
                     // share this same flat folder with no per-vacancy
                     // namespacing — two different vacancies uploading a
                     // same-named file would otherwise silently overwrite
                     // each other's file on disk even though they're
-                    // different job_advertisements rows.
-                    $fileName  = ($vacancy_id ?? 'default') . '_' . $request->file('Jobadvimg')->getClientOriginalName();
+                    // different job_advertisements rows. Also sanitize the
+                    // filename to a safe ASCII key — a macOS screenshot's
+                    // default name embeds a narrow no-break space
+                    // (U+202F), not a regular space, which is safest not to
+                    // trust as a raw storage key.
+                    $originalName = $request->file('Jobadvimg')->getClientOriginalName();
+                    $extension    = strtolower($request->file('Jobadvimg')->getClientOriginalExtension());
+                    $safeBaseName = preg_replace('/[^A-Za-z0-9_-]+/', '_', pathinfo($originalName, PATHINFO_FILENAME));
+                    $fileName     = ($vacancy_id ?? 'default') . '_' . $safeBaseName . '.' . $extension;
 
                         // Common::uploadFile() only moves the file to local
                         // disk — on live (STORAGE_DRIVER=wasabi) that left
