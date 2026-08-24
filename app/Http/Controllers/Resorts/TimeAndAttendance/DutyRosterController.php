@@ -767,7 +767,12 @@ class DutyRosterController extends Controller
                 DutyRoster::where("id",$DutyRosterEntry->roster_id)
                     ->where('resort_id', $this->resort->resort_id)
                     ->update(["DayOfDate"=>$DayOfDateModel]);
-                return response()->json(['success' => true, 'message' => "Duty roster updated successfully"]);
+                // roster_id back to the client — the "No Shift Assigned"/
+                // create-on-edit path has no roster_id available client-side
+                // until this resolves it (an existing entry's edit button
+                // doesn't carry data-roster_id at all), and the geo-fence
+                // zone follow-up save needs a real one either way.
+                return response()->json(['success' => true, 'message' => "Duty roster updated successfully", 'roster_id' => $DutyRosterEntry->roster_id]);
         }
         catch (\Exception $e) {
             DB::rollBack();
