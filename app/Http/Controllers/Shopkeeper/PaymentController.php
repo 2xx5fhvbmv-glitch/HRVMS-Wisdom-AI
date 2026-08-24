@@ -38,7 +38,21 @@ class PaymentController extends Controller
     {
         $page_title ='Payments';
         $shopkeeper = $this->shopkeeper;
-        return view('shopkeeper.payments.index',compact('page_title','shopkeeper'));
+
+        // The AJAX list() endpoint already defaults to the resort's real
+        // payroll period when no explicit range is sent — but this page's
+        // date-range picker was hardcoded to the calendar month
+        // (moment().startOf('month')/endOf('month')) and always sends
+        // that explicit range, overriding list()'s correct default. Pass
+        // the real period through so the picker opens on the same cycle
+        // the Dashboard page already shows.
+        $currentPayroll = Payroll::where('resort_id', $shopkeeper->resort_id)
+            ->orderBy('start_date', 'desc')
+            ->first();
+        $payrollStartDate = $currentPayroll->start_date ?? now()->startOfMonth()->format('Y-m-d');
+        $payrollEndDate = $currentPayroll->end_date ?? now()->endOfMonth()->format('Y-m-d');
+
+        return view('shopkeeper.payments.index',compact('page_title','shopkeeper','payrollStartDate','payrollEndDate'));
     }
 
     public function list(Request $request)
