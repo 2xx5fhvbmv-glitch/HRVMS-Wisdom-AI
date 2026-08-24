@@ -215,8 +215,31 @@ class AdvanceSalaryController extends Controller
         $guarantors = PayrollAdvanceGuarantor::where('payroll_advance_id',$id)->get();
         $recovery_schedule = PayrollRecoverySchedule::where('payroll_advance_id',$id)->get();
 
-        $request_attachment  =   config('settings.RequestAttachments');
-        $attechment_path     =   $request_attachment . '/' . $advance_salary->employee->resort_id.'/'.$advance_salary->employee->Emp_id;
+        // attachments is JSON ([{Filename,Child_id}, ...], one row can hold
+        // several files) written by the AWS/Wasabi upload flow
+        // (RequestController::RequestStore) — the blade used to treat the
+        // raw column value as if it were a plain filename (building a
+        // local-path URL and printing the JSON itself as the link text),
+        // never resolving the real Wasabi file at all. Same resolution the
+        // mobile API's resolveAttachments() already does correctly.
+        $resolvedAttachments = $advance_salary->PayrollAdvanceAttachment->flatMap(function ($row) {
+            $decoded = json_decode((string) $row->attachments, true);
+            return is_array($decoded) ? $decoded : [];
+        })->map(function ($file) use ($resort_id) {
+            $childId = $file['Child_id'] ?? null;
+            $url = null;
+            if ($childId) {
+                try {
+                    $aws = Common::GetAWSFile($childId, $resort_id);
+                    if (!empty($aws['success'])) {
+                        $url = $aws['NewURLshow'] ?? null;
+                    }
+                } catch (\Throwable $e) {
+                    // leave url null for attachments that fail to resolve
+                }
+            }
+            return ['filename' => $file['Filename'] ?? 'Attachment', 'url' => $url];
+        })->values();
 
         $total_interest = 0;
         $actual_amount = 0;
@@ -238,7 +261,7 @@ class AdvanceSalaryController extends Controller
             $availableMonths[] = $currentMonth->copy()->addMonths($i)->format('F Y');
         }
 
-        return view('resorts.people.employee.advance-salary.show',compact('page_title','advance_salary','guarantors','recovery_schedule','total_interest','actual_amount','total_recovery','attechment_path','isHR','isFinance','isGM','availableMonths'));
+        return view('resorts.people.employee.advance-salary.show',compact('page_title','advance_salary','guarantors','recovery_schedule','total_interest','actual_amount','total_recovery','resolvedAttachments','isHR','isFinance','isGM','availableMonths'));
     }
     
     public function paymentReschedule(Request $request){
