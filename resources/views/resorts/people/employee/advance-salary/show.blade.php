@@ -141,24 +141,20 @@
                             </div>
                         </div>
                     </div>
-                              @php
-                                  $attachmentFiles = $advance_salary->PayrollAdvanceAttachment;
-                              @endphp
-
-                    <div class="col-12 @if($attachmentFiles->count() <= 0) d-none @endif" >
+                    <div class="col-12 @if($resolvedAttachments->count() <= 0) d-none @endif" >
                         <div class="bg-themeGrayLight h-100">
                             <div class="card-title mb-md-3">
                                 <h3>Attachments</h3>
                             </div>
 
                             <div class="row g-1">
-                              
-                              @if($attachmentFiles->count() > 0)
-                                   @foreach($attachmentFiles as $attachmentFile)
+
+                              @if($resolvedAttachments->count() > 0)
+                                   @foreach($resolvedAttachments as $attachmentFile)
                                         <div class="col-auto">
                                               <div class="attachPdf-block">
                                                     @php
-                                                          $fileExtension = pathinfo($attachmentFile->attachments, PATHINFO_EXTENSION);
+                                                          $fileExtension = pathinfo($attachmentFile['filename'], PATHINFO_EXTENSION);
                                                           $iconPath = asset('assets/icons/default-icon.svg'); // Default icon path
                                                           switch (strtolower($fileExtension)) {
                                                                   case 'pdf':
@@ -180,10 +176,17 @@
                                                                  // Add more cases for other file types as needed
                                                           }
                                                     @endphp
-                                                    <a href="{{ url($attechment_path.'/' . $attachmentFile->attachments) }}" target="_blank">
+                                                    @if($attachmentFile['url'])
+                                                    <a href="{{ $attachmentFile['url'] }}" target="_blank">
                                                           <img src="{{ $iconPath }}" alt="icon">
-                                                          {{ $attachmentFile->attachments }}
+                                                          {{ $attachmentFile['filename'] }}
                                                     </a>
+                                                    @else
+                                                    <span class="text-muted">
+                                                          <img src="{{ $iconPath }}" alt="icon">
+                                                          {{ $attachmentFile['filename'] }} (unavailable)
+                                                    </span>
+                                                    @endif
                                               </div>
                                         </div>
                                    @endforeach
