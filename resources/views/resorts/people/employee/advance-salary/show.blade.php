@@ -381,6 +381,28 @@
                                         <div class="col-auto"><a href="javascript:void(0);" class="btn  btn-themeDanger btn-sm actionBtn" data-status='Rejected' data-action_by='gm'>Reject</a></div>
                                    </div>
                               </div>
+                         @elseif($advance_salary->status == 'In-Progress')
+                              {{-- Finance/GM's Approve/Reject only appear once
+                                   the stage ahead of them is actually done —
+                                   Finance also needs HR to have finalized the
+                                   repayment schedule, not just approved the
+                                   request. With no message here, a Finance/GM
+                                   viewer saw a blank footer with no way to
+                                   tell whether that's a bug or just not their
+                                   turn yet. --}}
+                              <div class="card-footer">
+                                   <div class="text-muted small">
+                                        @if($advance_salary->hr_status == 'Pending')
+                                             Waiting for HR review.
+                                        @elseif($advance_salary->hr_status == 'Approved' && $recovery_schedule->count() <= 0)
+                                             HR has approved this request — waiting for HR to finalize the repayment schedule before Finance can review.
+                                        @elseif($advance_salary->finance_status == 'Pending')
+                                             Waiting for Finance review.
+                                        @elseif($advance_salary->finance_status == 'Approved' && $advance_salary->gm_status == 'Pending')
+                                             Waiting for GM review.
+                                        @endif
+                                   </div>
+                              </div>
                          @endif
                     </div>
             </div>
