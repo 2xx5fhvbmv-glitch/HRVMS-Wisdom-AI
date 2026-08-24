@@ -252,7 +252,7 @@
                                         @if(isset($configset) && !empty($configset->Jobadvimg))
                                         <div class="mb-2 text-center" id="currentTemplate">
                                             <p class="mb-1 text-muted"><small>Current Template:</small></p>
-                                            <img src="{{ URL::asset(config('settings.Resort_JobAdvertisement').'/'.$configset->Resort_id.'/'.$configset->Jobadvimg) }}" alt="Job Ad Template" class="img-fluid rounded" style="max-height: 200px;">
+                                            <img src="{{ App\Helpers\Common::GetJobAdvertisementImage($configset->Resort_id, $configset->Jobadvimg) }}" alt="Job Ad Template" class="img-fluid rounded" style="max-height: 200px;">
                                         </div>
                                         @endif
                                         <div class="card-footer text-end">
