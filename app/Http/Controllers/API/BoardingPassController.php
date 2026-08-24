@@ -2500,8 +2500,18 @@ class BoardingPassController extends Controller
 
             // Set query parameters based on manifest type
             $isDeparture = $manifestType === 'departure';
+            // Same bug already fixed in the manifest-CREATE path (see the
+            // comment there: "was previously any pass anywhere with a
+            // matching arrival_date... now scoped to manifest_id") — this
+            // approve step never got the same fix. Matching purely by
+            // resort_id + date meant approving one manifest could silently
+            // touch passes belonging to a DIFFERENT manifest sharing the
+            // same date/type, and (as reported) failed entirely whenever a
+            // manifest's own date happened not to exactly equal every
+            // linked pass's date field. manifest_id is the actual FK
+            // stamped onto the pass at creation for exactly this lookup.
             $travelPassQuery = EmployeeTravelPass::where('resort_id', $this->resort_id)
-                ->where($isDeparture ? 'departure_date' : 'arrival_date', $date)
+                ->where('manifest_id', $manifestId)
                 ->where('status', 'Approved')
                 ->where($isDeparture ? 'employee_departure_status' : 'employee_arrival_status', null);
 
@@ -2510,7 +2520,7 @@ class BoardingPassController extends Controller
             if ($EmployeeTravelPass->isEmpty()) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'No travel pass found for this date.'
+                    'message' => 'No travel pass found for this manifest.'
                 ], 200);
             }
 
