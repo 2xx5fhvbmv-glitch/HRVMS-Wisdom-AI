@@ -25,6 +25,7 @@ use App\Models\ResortBenifitGridChild;
 use App\Helpers\Common;
 use App\Models\ResortSiteSettings;
 use App\Models\Resort;
+use App\Models\ResortPosition;
 use DB;
 use Carbon\Carbon;
 use DataTables;
@@ -102,6 +103,32 @@ class BenifitGridController extends Controller
                 ->make(true);
         }
     }
+
+    /**
+     * Position → Rank → Employee Grade is the real mapping chain (a
+     * Position carries its own Rank; an employee assigned that Position
+     * inherits it; the grade a Benefit Grid applies to is resolved from
+     * that rank) — but neither this form nor the Add Position screen ever
+     * showed the other side of that chain, so picking a rank here gave no
+     * hint of which positions it actually affects. [rank => ['count' =>
+     * int, 'names' => "Rooms Director, Waitress"]] for every active
+     * position in this resort, keyed the same way as rankConfig.
+     */
+    private function rankPositionSummary($resort_id)
+    {
+        return ResortPosition::where('resort_id', $resort_id)
+            ->where('status', 'active')
+            ->get(['Rank', 'position_title'])
+            // groupBy('Rank') alone keys by whatever raw type the DB driver
+            // returns — cast to int so lookups from rankConfig's array keys
+            // (plain ints) reliably match.
+            ->groupBy(fn($position) => (int) $position->Rank)
+            ->map(fn($positions) => [
+                'count' => $positions->count(),
+                'names' => $positions->pluck('position_title')->implode(', '),
+            ]);
+    }
+
     public function create()
     {
         if(Common::checkRouteWisePermission('resort.benifitgrid.index',config('settings.resort_permissions.create')) == false){
@@ -123,6 +150,7 @@ class BenifitGridController extends Controller
             $currentGradeName = '';
             $currentGradeRanks = [];
             $rankConfig = config('settings.Position_Rank');
+            $rankPositionSummary = $this->rankPositionSummary($resort_id);
 
             // Initializing arrays for form selection (empty for create)
             $selected_linen_array = [];
@@ -135,7 +163,7 @@ class BenifitGridController extends Controller
             $isViewMode = false;
             $custom_fields = [];
             return view('resorts.benifitgrid.edit', compact(
-                'page_title', 'resort_id', 'sports', 'accomodation_type','isViewMode','currentGradeName','currentGradeRanks','rankConfig', 'benefit_grid', 'selected_linen_array', 'selected_laundry', 'selected_sports','custom_leave','custom_benefits','custom_discounts','custom_fields','LeaveCategories'
+                'page_title', 'resort_id', 'sports', 'accomodation_type','isViewMode','currentGradeName','currentGradeRanks','rankConfig','rankPositionSummary', 'benefit_grid', 'selected_linen_array', 'selected_laundry', 'selected_sports','custom_leave','custom_benefits','custom_discounts','custom_fields','LeaveCategories'
             ));
         } catch (\Exception $e) {
             // Log the error for debugging
@@ -376,6 +404,7 @@ class BenifitGridController extends Controller
                 ->pluck('rank')
                 ->all();
             $rankConfig = config('settings.Position_Rank');
+            $rankPositionSummary = $this->rankPositionSummary($resort_id);
             $benefitGridChildren = ResortBenifitGridChild::where('benefit_grid_id', $id)->get();
 
             // Create a mapping of leave_cat_id to allocated_days
@@ -394,7 +423,7 @@ class BenifitGridController extends Controller
             $custom_discounts = $benefit_grid->customDiscounts;
             $custom_fields = json_decode($benefit_grid->custom_fields, true) ?? [];
             return view('resorts.benifitgrid.edit', compact(
-                'page_title', 'resort_id', 'sports','LeaveCategories','accomodation_type','currentGradeName','currentGradeRanks','rankConfig', 'benefit_grid', 'isViewMode', 'selected_linen_array', 'selected_laundry', 'selected_sports','custom_leave','custom_benefits','custom_discounts','custom_fields','benefitGridChildMap'
+                'page_title', 'resort_id', 'sports','LeaveCategories','accomodation_type','currentGradeName','currentGradeRanks','rankConfig','rankPositionSummary', 'benefit_grid', 'isViewMode', 'selected_linen_array', 'selected_laundry', 'selected_sports','custom_leave','custom_benefits','custom_discounts','custom_fields','benefitGridChildMap'
             ));
         } catch (\Exception $e) {
             // Log the error for debugging
