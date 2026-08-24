@@ -426,12 +426,18 @@
                     </div>
                     <div class="form-group mb-20">
                         <label class="position-rank-label">Select Rank <span class="red-mark">*</span></label>
-                        <select class="form-select select2-modal" name="Rank" required data-parsley-required-message="Please select a rank.">
+                        {{-- Was config('settings.eligibilty') — a stale,
+                             incomplete copy of Position_Rank missing HR,
+                             Finance, MD, SO, EDHOD, and CLINIC_STAFF
+                             entirely, so a position could never be created
+                             with any of those 6 ranks. --}}
+                        <select class="form-select select2-modal" name="Rank" id="new-position-rank" required data-parsley-required-message="Please select a rank.">
                             <option value="">Rank</option>
-                            @foreach (config('settings.eligibilty') as  $k => $item)
+                            @foreach (config('settings.Position_Rank') as  $k => $item)
                                 <option value="{{ $k }}">{{ $item }}</option>
                             @endforeach
                         </select>
+                        <small class="text-muted" id="new-position-rank-grade-hint"></small>
                     </div>
                     <div class="form-group mb-3">
                         <label class="position-status-label">Select Status <span class="red-mark">*</span></label>
@@ -869,6 +875,18 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
 
     $('#new-position-title').on('input', function() {
         togglePositionInput();
+    });
+
+    // Position -> Rank -> Employee Grade is the real mapping chain, but
+    // this form gave no indication of which grade(s) a rank maps to.
+    $('#new-position-rank').on('change', function() {
+        let rank = $(this).val();
+        let hint = $('#new-position-rank-grade-hint');
+        if (!rank) { hint.text(''); return; }
+        $.get("{{ route('manning.rank-grade-mapping') }}", { rank: rank }, function(response) {
+            let grades = response.grades || [];
+            hint.text(grades.length ? 'Employee Grade(s) currently using this rank: ' + grades.join(', ') : 'No Employee Grade currently uses this rank yet.');
+        });
     });
 
     // Function to toggle between select box and textbox
