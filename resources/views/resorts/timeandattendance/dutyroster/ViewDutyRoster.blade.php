@@ -314,6 +314,7 @@
                                                                                                                                         data-OverTime="00:00"
                                                                                                                                         data-DayOfDate="{{ $shiftData->DayOfDate ?? '' }}"
                                                                                                                                         data-Attd_id="{{ $shiftData->Attd_id ?? '' }}"
+                                                                                                                                        data-zone_ids="{{ json_encode($zoneIds ?? []) }}"
                                                                                                                                         data-DayWiseTotalHours="">
                                                                                                                                     <i class="fa fa-edit"></i>
                                                                                                                                 </button>
@@ -390,6 +391,7 @@
                                                                                                                                         data-OverTime="{{ $displayOverTime }}"
                                                                                                                                         data-DayOfDate="{{ $shiftData->DayOfDate ?? '' }}"
                                                                                                                                         data-Attd_id="{{ $shiftData->Attd_id ?? '' }}"
+                                                                                                                                        data-zone_ids="{{ json_encode($zoneIds ?? []) }}"
                                                                                                                                         data-DayWiseTotalHours="{{ $toatalHoursForDay ?? '' }}">
                                                                                                                                     <i class="fa fa-edit"></i>
                                                                                                                                 </button>
@@ -413,6 +415,7 @@
                                                                                                                                     data-Attd_id=""
                                                                                                                                     data-emp_id="{{ $r->emp_id ?? '' }}"
                                                                                                                                     data-roster_id="{{ $r->duty_roster_id ?? '' }}"
+                                                                                                                                    data-zone_ids="{{ json_encode($zoneIds ?? []) }}"
                                                                                                                                     data-DayWiseTotalHours="">
                                                                                                                                 <i class="fa fa-edit"></i>
                                                                                                                             </button>
@@ -764,6 +767,7 @@
                                                                                                                 data-OverTime="{{ $displayOverTime2 }}"
                                                                                                                 data-DayOfDate="{{ $shiftData->DayOfDate ?? '' }}"
                                                                                                                 data-Attd_id="{{ $shiftData->Attd_id ?? '' }}"
+                                                                                                                data-zone_ids="{{ json_encode($zoneIds ?? []) }}"
                                                                                                                 data-DayWiseTotalHours="{{ $toatalHoursForDay ?? '' }}">
                                                                                                             <i class="fa fa-edit"></i>
                                                                                                         </button>
@@ -786,6 +790,7 @@
                                                                                                             data-Attd_id=""
                                                                                                             data-emp_id="{{ $r->emp_id ?? '' }}"
                                                                                                             data-roster_id="{{ $r->duty_roster_id ?? '' }}"
+                                                                                                            data-zone_ids="{{ json_encode($zoneIds ?? []) }}"
                                                                                                             data-DayWiseTotalHours="">
                                                                                                         <i class="fa fa-edit"></i>
                                                                                                     </button>
@@ -964,6 +969,31 @@
                                 <input type="text" class="form-control" id="DayOffDatesModel" name="DayOffDatesModel" placeholder="Click to select day off dates" readonly style="background-color: white; cursor: pointer;">
                                 <small class="text-muted">Click to select multiple dates</small>
                             </div>
+
+                            {{-- Geo-fence zone is roster-level (one duty_rosters
+                                 row = one employee's schedule block, per the
+                                 whole-week scope this modal already edits), not
+                                 per-day — same zones apply regardless of which
+                                 day cell was clicked to open this modal.
+                                 Submitted separately to
+                                 UpdateDutyRosterGeofence so the existing,
+                                 already-tenant-scoped endpoint doesn't need
+                                 duplicating. --}}
+                            @if(isset($geofenceZones) && $geofenceZones->count())
+                            <div class="col-md-12 mt-3">
+                                <label>Geo-Fence Zone(s)</label>
+                                <div class="drc-zone-list">
+                                    @foreach($geofenceZones as $zone)
+                                    <label class="drc-zone-row gf-zone-item">
+                                        <input type="checkbox" value="{{ $zone->id }}" class="drc-zone-checkbox dr-modal-zone-checkbox">
+                                        <span class="drc-zone-dot" style="background:{{ $zone->color }};"></span>
+                                        <span class="drc-zone-name">{{ $zone->name }}</span>
+                                    </label>
+                                    @endforeach
+                                </div>
+                                <small class="text-muted">Employee can only check in/out inside selected zones.</small>
+                            </div>
+                            @endif
 
                             <div class="col-12 mt-3">
                                 <hr class="mt-0 ">
@@ -1916,6 +1946,16 @@
             $("#EditEmpId").val($(this).attr('data-emp_id') || '');
             $("#EditRosterId").val($(this).attr('data-roster_id') || '');
 
+            // Pre-check this employee's currently-assigned geo-fence
+            // zone(s) — same value every day cell for this employee
+            // carries (zone assignment is roster-level, not per-day).
+            var zoneIds = [];
+            try { zoneIds = JSON.parse($(this).attr('data-zone_ids') || '[]'); } catch (e) { zoneIds = []; }
+            $(".dr-modal-zone-checkbox").prop('checked', false);
+            zoneIds.forEach(function(id) {
+                $(".dr-modal-zone-checkbox[value='" + id + "']").prop('checked', true);
+            });
+
             if (!$("#ShiftOverTime").data("flatpickr")) {
                 flatpickr("#ShiftOverTime", {
                     enableTime: true,
@@ -2063,6 +2103,28 @@
                                         {
                                             positionClass: 'toast-bottom-right'
                                         });
+
+                                // Save geo-fence zone selection alongside the
+                                // shift/day-off update — response.roster_id
+                                // is the reliable one (the create-on-edit
+                                // path only resolves a real roster_id here,
+                                // not necessarily from the form's own hidden
+                                // field).
+                                if ($(".dr-modal-zone-checkbox").length && response.roster_id) {
+                                    var zoneIds = $(".dr-modal-zone-checkbox:checked").map(function() {
+                                        return $(this).val();
+                                    }).get();
+                                    $.ajax({
+                                        url: "{{ route('resort.timeandattendance.UpdateDutyRosterGeofence') }}",
+                                        type: "POST",
+                                        data: {
+                                            _token: "{{ csrf_token() }}",
+                                            roster_id: response.roster_id,
+                                            geofence_zone_ids: zoneIds
+                                        }
+                                    });
+                                }
+
                                 $("#editdutyRoster-modal").modal('hide')
                                 setTimeout(function() {
                                     window.location.reload();
