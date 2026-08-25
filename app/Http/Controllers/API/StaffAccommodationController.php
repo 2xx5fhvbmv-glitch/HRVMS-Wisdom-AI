@@ -74,6 +74,22 @@ class StaffAccommodationController extends Controller
                                                                     ->select('available_accommodation_models.*','t1.id as assing_acc_id','t1.BedNo','t1.emp_id','bm.BuildingName as BName')
                                                                     ->first();
 
+            // available_accommodation_models.BuildingName is actually a
+            // foreign key into building_models.id (see the join above),
+            // not the building's name — a legacy column name that never
+            // got renamed. The wildcard select above returns it under the
+            // literal key "BuildingName", which reads as if it WERE the
+            // name; the real resolved name only exists under "BName".
+            // Overwrite BuildingName with the real name so a client
+            // reading the field its name promises gets the right value.
+            // BedNo formats are inconsistent across real rows ("#2",
+            // "BedNo-1", etc.) — the section/label already says "Bed
+            // Number", so strip everything but the digits.
+            if ($accommodationDetails) {
+                $accommodationDetails->BuildingName = $accommodationDetails->BName;
+                $accommodationDetails->BedNo = preg_replace('/\D/', '', (string) $accommodationDetails->BedNo) ?: $accommodationDetails->BedNo;
+            }
+
             // Check if accommodation details exist to avoid errors
             $accommodationId = $accommodationDetails->id ?? null;
 
@@ -188,6 +204,10 @@ class StaffAccommodationController extends Controller
             if (!$accommodationDetails) {
                 return response()->json(['success' => false, 'message' => 'No accommodation details found'], 200);
             }
+
+            // Same BuildingName/BedNo display fix as staffAccommodationDashboard().
+            $accommodationDetails->BuildingName = $accommodationDetails->BName;
+            $accommodationDetails->BedNo = preg_replace('/\D/', '', (string) $accommodationDetails->BedNo) ?: $accommodationDetails->BedNo;
 
             $accommodationDetails->profileImg               =   Common::getResortUserPicture($accommodationDetails->Parentid);                                               
 
