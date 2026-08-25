@@ -78,7 +78,13 @@ class SOSController extends Controller
         
         $validator = Validator::make($request->all(), [
             'emergency_id'                              =>  'required',
-            'location'                                  =>  'required',
+            // A hard requirement on a typed location string blocked every
+            // SOS trigger that had real GPS coordinates but an empty
+            // location field — exactly backwards for a panic button, where
+            // speed matters and lat/long are the authoritative source of
+            // location anyway. Only require the text fallback when
+            // coordinates genuinely aren't available.
+            'location'                                  =>  'nullable|required_without_all:latitude,longitude',
             'latitude'                                  =>  'required',
             'longitude'                                 =>  'required',
         ]);
