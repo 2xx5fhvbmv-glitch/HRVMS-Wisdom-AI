@@ -570,30 +570,16 @@ class PayrollController extends Controller
         }
     }
 
-    public function downloadPayslip(Request $request)
+    /**
+     * Builds the payslip PDF for one employee/month/year. Shared by
+     * downloadPayslip() and shareEmailPayslip() so both render the exact
+     * same document instead of two copies that can drift apart.
+     * Returns null if there's no payroll data for that period.
+     */
+    private function buildPayslipPdf($employee_id, $year, $month)
     {
-        if (!$this->user) {
-            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
-        }
-        
-        $validator = Validator::make($request->all(), [
-            'month'                                 => 'required',
-            'year'                                  => 'required',
-           
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
-        }
-
-        $employee_id                                    =   $this->user->GetEmployee->id;
-        $year                                           =   $request->year ?? Carbon::now()->format('Y');
-        $month                                          =   $request->month;
-       
-        try {
-             
-            // Fetch Last Month's Payroll Data. Deductions/service-charge stay
-            // left-joined (a missing row there just means $0 deductions/no
+        // Fetch Last Month's Payroll Data. Deductions/service-charge stay
+        // left-joined (a missing row there just means $0 deductions/no
             // service charge, still a real payslip) — but payroll_reviews
             // must be an inner join: no payroll_reviews row means this
             // payroll_employees row is roster-only, earnings never
@@ -645,14 +631,11 @@ class PayrollController extends Controller
                                                                     'pr.earnings_allowance', 'pd.ewt', 'pd.staff_shop', 'pd.pension',
                                                                     'pd.attendance_deduction','pd.city_ledger', 'pd.other', 'pd.total_deductions'
                                                                 )->first();
-            if (!$payroll) {
-                return response()->json(['success' => false, 'error' => 'Payroll data not found'], 200);
-            }
+        if (!$payroll) {
+            return null;
+        }
 
-            
-       
-                                                        
-            $totalAmount                                =   ($payroll->earnings_basic ?? 0) + ($payroll->service_charge_amount ?? 0) + ($payroll->earnings_allowance ?? 0) - ($payroll->total_deductions ?? 0);
+        $totalAmount                                =   ($payroll->earnings_basic ?? 0) + ($payroll->service_charge_amount ?? 0) + ($payroll->earnings_allowance ?? 0) - ($payroll->total_deductions ?? 0);
             $earningtotalAmount                         =   ($payroll->earnings_basic ?? 0) + ($payroll->earnings_allowance?? 0);
             $payrollNetSalary                           =   ($payroll->earnings_allowance ?? 0) + ($payroll->earnings_basic ?? 0) - ($payroll->total_deductions ?? 0);
            
@@ -734,8 +717,36 @@ class PayrollController extends Controller
             ];
 
                         
-            $pdf                                        =   Pdf::loadView('pdf.payslippdf', compact('payrollArray'));
-            $pdf->setOptions($optionsArray);
+        $pdf                                        =   Pdf::loadView('pdf.payslippdf', compact('payrollArray'));
+        $pdf->setOptions($optionsArray);
+
+        return $pdf;
+    }
+
+    public function downloadPayslip(Request $request)
+    {
+        if (!$this->user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'month'                                 => 'required',
+            'year'                                  => 'required',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
+        }
+
+        $employee_id                                    =   $this->user->GetEmployee->id;
+        $year                                           =   $request->year ?? Carbon::now()->format('Y');
+        $month                                          =   $request->month;
+
+        try {
+            $pdf = $this->buildPayslipPdf($employee_id, $year, $month);
+            if (!$pdf) {
+                return response()->json(['success' => false, 'error' => 'Payroll data not found'], 200);
+            }
 
             // Writing to public_path()/File:: only ever works on local
             // disk — prod runs STORAGE_DRIVER=wasabi, so a raw filesystem
@@ -750,7 +761,7 @@ class PayrollController extends Controller
                 'success'                               => true,
                 'pdf_url'                               => $pdfUrl,
             ]);
-            
+
         } catch (\Exception $e) {
             \Log::emergency("File: " . $e->getFile());
             \Log::emergency("Line: " . $e->getLine());
@@ -768,7 +779,6 @@ class PayrollController extends Controller
         $validator = Validator::make($request->all(), [
             'month'                                 => 'required',
             'year'                                  => 'required',
-           
         ]);
 
         if ($validator->fails()) {
@@ -780,19 +790,35 @@ class PayrollController extends Controller
         $year                                           =   $request->year;
 
         try {
-
             $employee                                       =   Employee::with('resortAdmin')->find($employee_id);
             if (!$employee || !$employee->resortAdmin) {
                 return response()->json(['success' => false, 'message' => 'Employee not found.']);
             }
 
             $email                                          =   $employee->resortAdmin->email;
-        
-            // Generate Payslip URL
-            $payslipUrl                                     =   route('payslip.show', ['employee_id' => $employee_id, 'month' => $month, 'year' => $year]);
 
-            // Send Email (Using Laravel Mail)
-            Mail::to($email)->send(new SharePayslipMail($employee, $payslipUrl));
+            $pdf = $this->buildPayslipPdf($employee_id, $year, $month);
+            if (!$pdf) {
+                return response()->json(['success' => false, 'message' => 'Payslip not found for the selected month and year.']);
+            }
+
+            // route('payslip.show') pointed at a web-portal, resort-admin
+            // -guarded page that reads session('payslip_employee_id')/etc —
+            // never the query params this link was built with, and not
+            // reachable by an employee's mobile session anyway. Attach the
+            // PDF directly instead of linking anywhere. Mail::attach()
+            // needs a real local path, so write to a transient temp file
+            // (not StorageHelper — this isn't a stored tenant asset, it's
+            // deleted right after sending) rather than the broken link.
+            $fileName                                       =   'Payslip_' . $month . '_' . $year . '.pdf';
+            $tempPath                                        =   storage_path('app/' . uniqid('payslip_') . '.pdf');
+            file_put_contents($tempPath, $pdf->output());
+
+            try {
+                Mail::to($email)->send(new SharePayslipMail($employee, $month, $year, $tempPath, $fileName));
+            } finally {
+                @unlink($tempPath);
+            }
 
             return response()->json(['success' => true, 'message' => 'Payslip shared successfully.']);
 
@@ -802,7 +828,6 @@ class PayrollController extends Controller
             \Log::error($e->getMessage());
             return response()->json(['success' => false, 'message' => 'Failed to send email.']);
         }
-
     }
 
 }
