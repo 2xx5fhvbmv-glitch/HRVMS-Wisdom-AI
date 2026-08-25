@@ -214,6 +214,7 @@ class LearningController extends Controller
                 'training_end_date'                 =>  $sessions->end_date,
                 'training_start_time'               =>  $sessions->start_time,
                 'training_end_time'                 =>  $sessions->end_time,
+                'location'                           =>  $sessions->venue,
                 'category'                          =>  $sessions->learningProgram->category->category ?? 'N/A',
                 'description'                       =>  $sessions->learningProgram->description ?? '',
                 'trainer_first_name'                =>  optional(optional($trainerData)->resortAdmin)->first_name,
