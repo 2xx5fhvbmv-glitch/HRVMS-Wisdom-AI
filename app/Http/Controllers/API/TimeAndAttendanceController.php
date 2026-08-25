@@ -3689,7 +3689,14 @@ class TimeAndAttendanceController extends Controller
             // starts the day after last month's cutoff (e.g. cutoff 25,
             // viewing March 2026 -> 26 Feb 2026 to 25 Mar 2026).
             $cutoffDay = PayrollConfig::where('resort_id', $resort_id)->value('cutoff_day') ?? 1;
-            $baseDate = Carbon::now()->startOfMonth();
+            // month/year were accepted by nothing here — every call
+            // returned the current cutoff period regardless of what was
+            // requested, so a previous/next-month navigation UI had
+            // nothing to actually page through. Optional, defaults to the
+            // current month exactly as before when omitted.
+            $baseDate = ($request->filled('month') && $request->filled('year'))
+                ? Carbon::create((int) $request->year, (int) $request->month, 1)->startOfMonth()
+                : Carbon::now()->startOfMonth();
             $prevMonth = $baseDate->copy()->subMonthNoOverflow();
             $startOfMonth = $prevMonth->copy()->day(min($cutoffDay, $prevMonth->daysInMonth))->addDay();
             $endOfMonth = $baseDate->copy()->day(min($cutoffDay, $baseDate->daysInMonth));
