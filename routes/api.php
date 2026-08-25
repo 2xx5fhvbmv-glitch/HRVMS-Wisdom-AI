@@ -619,6 +619,14 @@ use Illuminate\Support\Facades\Route;
 	Route::post('clinic-doctor/logout', [App\Http\Controllers\API\TemporaryClinicDoctorAuthController::class, 'logout'])->middleware('auth:temp-clinic-doctor');
 	Route::get('clinic-doctor/profile', [App\Http\Controllers\API\TemporaryClinicDoctorAuthController::class, 'profile'])->middleware('auth:temp-clinic-doctor');
 
+	// add-device-token used to sit only inside the outer auth:api-only
+	// group below — every account (including a TemporaryClinicDoctor)
+	// calls this right after login, so a doctor's very first post-login
+	// request 401'd, and the app surfaced that as a forced logout even
+	// though the login itself succeeded. Same "must live outside the
+	// outer group" reasoning as the 3 routes above.
+	Route::post('add-device-token', [App\Http\Controllers\API\LoginController::class, 'addDeviceToken'])->middleware('auth:api,temp-clinic-doctor');
+
 	// Deliberately unrestricted by rank — any employee needs to view
 	// categories to self-book an appointment, or their own appointment/
 	// treatment record — AND a temp-clinic-doctor needs the same three.
