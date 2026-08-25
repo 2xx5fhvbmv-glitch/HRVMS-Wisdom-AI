@@ -739,12 +739,19 @@ class MonthlyCheckInController extends Controller
             $msg        = $this->user->first_name . ' ' . $this->user->last_name . ' has approved the monthly check-in scheduled on ' . date('d M Y', strtotime($checkin->date_discussion)) . '.';
             $ModuleName = 'Performance';
 
-            event(new ResortNotificationEvent(
-                Common::nofitication($this->resort_id, 10, $title, $msg, $checkin->id, $checkin->created_by, $ModuleName)
-            ));
-            Common::sendMobileNotification(
-                $this->resort_id, 2, null, null, $title, $msg, $ModuleName, [$checkin->created_by], $checkin->id, true, 'monthly-checkin-approved'
-            );
+            // created_by is a resort_admins.id (set in MonthlyCheckingModel::boot()),
+            // not an employees.id — passing it straight through silently
+            // notified whichever unrelated employee happened to share that
+            // numeric id instead of the actual creator.
+            $creatorEmployee = Employee::where('Admin_Parent_id', $checkin->created_by)->first();
+            if ($creatorEmployee) {
+                event(new ResortNotificationEvent(
+                    Common::nofitication($this->resort_id, 10, $title, $msg, $checkin->id, $creatorEmployee->id, $ModuleName)
+                ));
+                Common::sendMobileNotification(
+                    $this->resort_id, 2, null, null, $title, $msg, $ModuleName, [$creatorEmployee->id], $checkin->id, true, 'monthly-checkin-approved'
+                );
+            }
 
             return response()->json(['status' => true, 'message' => 'Check-in approved']);
         } catch (\Exception $e) {
@@ -798,12 +805,17 @@ class MonthlyCheckInController extends Controller
             $msg        = $this->user->first_name . ' ' . $this->user->last_name . ' has rejected the monthly check-in. Reason: ' . $request->reason;
             $ModuleName = 'Performance';
 
-            event(new ResortNotificationEvent(
-                Common::nofitication($this->resort_id, 10, $title, $msg, $checkin->id, $checkin->created_by, $ModuleName)
-            ));
-            Common::sendMobileNotification(
-                $this->resort_id, 2, null, null, $title, $msg, $ModuleName, [$checkin->created_by], $checkin->id, true, 'monthly-checkin-rejected'
-            );
+            // created_by is a resort_admins.id, not an employees.id — see
+            // the same fix in employeeApproveRequest() above.
+            $creatorEmployee = Employee::where('Admin_Parent_id', $checkin->created_by)->first();
+            if ($creatorEmployee) {
+                event(new ResortNotificationEvent(
+                    Common::nofitication($this->resort_id, 10, $title, $msg, $checkin->id, $creatorEmployee->id, $ModuleName)
+                ));
+                Common::sendMobileNotification(
+                    $this->resort_id, 2, null, null, $title, $msg, $ModuleName, [$creatorEmployee->id], $checkin->id, true, 'monthly-checkin-rejected'
+                );
+            }
 
             return response()->json(['status' => true, 'message' => 'Check-in rejected']);
         } catch (\Exception $e) {
