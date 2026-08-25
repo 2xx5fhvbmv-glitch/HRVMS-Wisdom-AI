@@ -508,6 +508,11 @@ class GrievanceController extends Controller
                         'name'        => $emp && $emp->resortAdmin
                             ? trim($emp->resortAdmin->first_name . ' ' . $emp->resortAdmin->last_name)
                             : null,
+                        // Was never returned at all, regardless of whether
+                        // the witness resolved correctly.
+                        'photo'       => $emp && $emp->resortAdmin
+                            ? Common::getResortUserPicture($emp->resortAdmin->id)
+                            : null,
                         'statement'   => $w->Statement,
                         'status'      => $w->status,
                         'attachments' => $this->resolvePlainFileUrls($w->Attachement),
