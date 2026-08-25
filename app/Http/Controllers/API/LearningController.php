@@ -184,9 +184,19 @@ class LearningController extends Controller
 
             $scheduleId                             =   base64_decode($scheduleId);
             $resort_id                              =   $this->resort_id;
+            // Route param is named "schedule_id" but callers across the app
+            // disagree on what they send: some pass the schedule's own row
+            // id (training_schedules.id), others pass training_id (the
+            // learning_programs FK, shared across every session of the same
+            // program). Match either — resolving by the schedule's own id
+            // also fixes a program with 2+ sessions always returning
+            // whichever one sorted first under a training_id-only match.
             $sessions                               =   TrainingSchedule::with(['learningProgram', 'participants.employee.resortAdmin','learningProgram.category'])
                                                             ->where('training_schedules.resort_id', $resort_id)
-                                                            ->where('training_schedules.training_id', $scheduleId)
+                                                            ->where(function ($q) use ($scheduleId) {
+                                                                $q->where('training_schedules.id', $scheduleId)
+                                                                  ->orWhere('training_schedules.training_id', $scheduleId);
+                                                            })
                                                             ->first();
 
             // Was dereferencing $sessions->learningProgram->trainer (and
