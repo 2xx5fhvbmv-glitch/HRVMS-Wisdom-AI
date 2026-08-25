@@ -254,8 +254,21 @@ class PaymentController extends Controller
             // this server (only GD is) — 'svg' renders identically as a
             // scannable QR once displayed in an <img> tag or printed, with
             // no extra extension dependency.
+            //
+            // Was encoding a bare base64 number (e.g. "ODI=") with no URL
+            // or scheme at all — nothing for a phone's camera/scanner to
+            // act on, which is why scanning it did nothing/appeared to
+            // freeze. A real https:// URL always does *something*
+            // sensible on scan (opens a browser at worst); if the mobile
+            // app registers Android App Links / iOS Universal Links for
+            // this path, scanning opens the app directly to the consent
+            // screen instead. No web page exists at this path yet — that
+            // and the app-side link registration are follow-up work, not
+            // built here.
             $qrCodeBase64 = 'data:image/svg+xml;base64,' . base64_encode(
-                QrCode::format('svg')->size(256)->generate(base64_encode((string) $payment->id))
+                QrCode::format('svg')->size(256)->generate(
+                    url('shop/consent-request/' . base64_encode((string) $payment->id))
+                )
             );
             $payment->qr_code = $qrCodeBase64;
             $payment->save();
