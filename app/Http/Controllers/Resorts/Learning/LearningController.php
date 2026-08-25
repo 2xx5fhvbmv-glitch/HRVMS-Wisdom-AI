@@ -389,6 +389,15 @@ class LearningController extends Controller
                 return response()->json(['error' => 'Sender not found.'], 404);
             }
 
+            // created_by is a resort_admins.id, not an employees.id — the
+            // notification below needs the employee record (device_token
+            // lives there) reached via Admin_Parent_id, not a direct
+            // Employee::find($sender->id) which silently resolves to
+            // whichever unrelated employee happens to share that numeric id.
+            $senderEmployee = Employee::where('Admin_Parent_id', $sender->id)
+                ->where('resort_id', $this->resort->resort_id)
+                ->first();
+
             // ✅ Save rejection reason if Denied or On Hold
             if ($request->status === 'Denied' || $request->status === 'On Hold') {
                 $learningRequest->rejection_reason = $request->reason;
@@ -417,15 +426,17 @@ class LearningController extends Controller
 
             $moduleName = "Learning";
 
-            event(new ResortNotificationEvent(Common::nofitication(
-                $this->resort->resort_id, 
-                10, 
-                $notificationTitle, 
-                $notificationMessage, 
-                'Learning', 
-                $sender->id, 
-                $moduleName
-            )));
+            if ($senderEmployee) {
+                event(new ResortNotificationEvent(Common::nofitication(
+                    $this->resort->resort_id,
+                    10,
+                    $notificationTitle,
+                    $notificationMessage,
+                    'Learning',
+                    $senderEmployee->id,
+                    $moduleName
+                )));
+            }
 
             // ✅ Notify Selected Employees (Only If Approved)
             if ($request->status === 'Approved') {
