@@ -827,7 +827,14 @@ class IncidentController extends Controller
                     return $this->formatMyStatementRow($incident, 'witness', $stmt, !empty($stmt));
                 });
 
-            $all = $involvedIncidents->merge($witnessIncidents)
+            // ->map() on an Eloquent query result keeps the Eloquent
+            // Collection class even though every item is now the plain
+            // array formatMyStatementRow() returns — Eloquent Collection's
+            // own merge() assumes Model items and calls ->getKey() on
+            // each, which crashes on a plain array. ->toBase() drops back
+            // to a plain Collection first, where merge()/unique() work on
+            // arrays fine.
+            $all = $involvedIncidents->toBase()->merge($witnessIncidents->toBase())
                 ->unique('id')
                 ->sortByDesc('id')
                 ->values();
