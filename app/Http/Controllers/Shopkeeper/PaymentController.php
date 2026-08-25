@@ -364,6 +364,13 @@ class PaymentController extends Controller
                 'message' => $message,
                 'request_id' => $payment->id,
             ]);
+
+            // Was in-app only — never actually pushed to the phone, so the
+            // employee only saw it after reopening the app.
+            $employee = Employee::find($payment->emp_id);
+            if ($employee && !empty($employee->device_token)) {
+                Common::sendPushNotificationForMobile([$employee->device_token], $title, $message, 'Payment Consent', null, null, null, null);
+            }
         } catch (\Throwable $e) {
             \Log::error('Shopkeeper sendConsent failed: ' . $e->getMessage(), ['payment_id' => $payment->id]);
             return response()->json(['success' => false, 'message' => 'Failed to send consent notification.'], 500);
