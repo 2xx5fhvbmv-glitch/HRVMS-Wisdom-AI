@@ -147,6 +147,14 @@ class RequestController extends Controller
             'priority'                                  =>  'required',
             'request_date'                              =>  'required',
             'purpose'                                   =>  'required',
+            // No size limit existed at all — a file large enough to hit
+            // nginx's client_max_body_size never reaches this validator, it
+            // 413s at the web server before Laravel sees the request. This
+            // rule can only catch files under that ceiling; it exists so
+            // those get a clean, actionable error instead of accidentally
+            // being allowed through unbounded. Matches the 20MB precedent
+            // already used for general file uploads (FileManagementController).
+            'Attachments.*'                             =>  'file|max:20480',
         ]);
 
         if ($validator->fails()) {
