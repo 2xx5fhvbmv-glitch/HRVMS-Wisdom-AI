@@ -11,6 +11,7 @@ use App\Models\Employee;
 use App\Models\Payroll;
 use App\Models\PayrollReviewAllowances;
 use App\Helpers\Common;
+use App\Helpers\StorageHelper;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Dompdf\Options;
 use Illuminate\Support\Facades\Response;
@@ -735,17 +736,15 @@ class PayrollController extends Controller
                         
             $pdf                                        =   Pdf::loadView('pdf.payslippdf', compact('payrollArray'));
             $pdf->setOptions($optionsArray);
-            $folderPath = public_path(config('settings.PayslipPdf'));
 
-            if (!File::exists($folderPath)) {
-                File::makeDirectory($folderPath, 0777, true, true);
-            }
-
-
-            $filePath                                   =   public_path(config('settings.PayslipPdf').'/'. time() . '_payslip.pdf');
-                                                            file_put_contents($filePath, $pdf->output());
-                        
-            $pdfUrl                                     =   asset(config('settings.PayslipPdf').'/'. basename($filePath));
+            // Writing to public_path()/File:: only ever works on local
+            // disk — prod runs STORAGE_DRIVER=wasabi, so a raw filesystem
+            // write here either silently disappears or errors depending on
+            // the server's filesystem, while the returned asset() URL
+            // never resolved to a real file there either way.
+            $relativePath                               =   trim(config('settings.PayslipPdf'), '/') . '/' . time() . '_payslip.pdf';
+            StorageHelper::put($relativePath, $pdf->output());
+            $pdfUrl                                     =   StorageHelper::temporaryUrl($relativePath);
 
             return response()->json([
                 'success'                               => true,
