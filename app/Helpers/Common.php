@@ -8698,6 +8698,27 @@ class Common
                     'android' => [
                         'priority' => 'high',
                     ],
+                    // No apns block at all — FCM will best-effort translate
+                    // the bare 'notification' key into an APNs alert, but
+                    // without an explicit aps.sound and apns-priority this
+                    // is unreliable (silent delivery, no sound, sometimes no
+                    // banner depending on app/OS state). This was likely the
+                    // real reason "no push notifications arrive on iOS"
+                    // while Android worked for the same call.
+                    'apns' => [
+                        'headers' => [
+                            'apns-priority' => '10',
+                        ],
+                        'payload' => [
+                            'aps' => [
+                                'alert' => [
+                                    'title' => $title,
+                                    'body'  => $body,
+                                ],
+                                'sound' => 'default',
+                            ],
+                        ],
+                    ],
                     'data' => [
                         'title'  => $title,
                         'module' => $module,
