@@ -401,12 +401,29 @@ class MonthlyCheckInController extends Controller
                                                                         'monthly_checking_models.Meeting_Place',
                                                                         'monthly_checking_models.created_by',
                                                                         'monthly_checking_models.status',
+                                                                        // Recorded meeting outcome fields — were entirely absent
+                                                                        // from every bucket below, so a Conducted meeting's
+                                                                        // actual content never reached mobile.
+                                                                        'monthly_checking_models.Area_of_Discussion',
+                                                                        'monthly_checking_models.Area_of_Improvement',
+                                                                        'monthly_checking_models.Time_Line',
+                                                                        'monthly_checking_models.comment',
+                                                                        'monthly_checking_models.employee_comment',
+                                                                        'monthly_checking_models.approval_status',
+                                                                        'monthly_checking_models.approved_at',
+                                                                        'monthly_checking_models.rejected_at',
+                                                                        'monthly_checking_models.employee_rejection_reason',
                                                                         't2.first_name',
                                                                         't2.last_name',
                                                                         'rp.position_title'
                                                                     ]);
             $pendingAcknowledgements                        =   (clone $baseQuery)
                                                                     ->whereIn('monthly_checking_models.status',['Pending','Rescheduled'])
+                                                                    // approval_status defaults to 'pending' for every row
+                                                                    // regardless of flow — once the employee has actually
+                                                                    // approved/rejected it, it must stop showing as still
+                                                                    // needing acknowledgement.
+                                                                    ->whereNotIn('monthly_checking_models.approval_status', ['approved', 'rejected'])
                                                                     ->get()->map(function($item){
                                                                         // The manager IS whoever conducted/created this check-in
                                                                         // (monthly_checking_models.created_by) — same person
@@ -475,11 +492,31 @@ class MonthlyCheckInController extends Controller
                                                                         return $item;
                                                                     });
 
+            // Once approved/rejected, a request fell out of every bucket
+            // above (approval_status left 'pending', status never touched
+            // by employeeApproveRequest/employeeRejectRequest) — it simply
+            // vanished with no record of the outcome anywhere on mobile.
+            $approvalHistory                                =   (clone $baseQuery)
+                                                                    ->whereIn('monthly_checking_models.approval_status', ['approved', 'rejected'])
+                                                                    ->get()->map(function($item){
+                                                                        $managerRecord          =   Employee::join('resort_admins as ra', 'ra.id', '=', 'employees.Admin_Parent_id')
+                                                                                                    ->join("resort_positions as rp", "rp.id", "=", "employees.Position_id")
+                                                                                                    ->where('ra.id',$item->created_by)
+                                                                                                    ->select('ra.first_name', 'ra.last_name', 'rp.position_title')
+                                                                                                    ->first();
+                                                                        $item->manager_id       =   $item->created_by;
+                                                                        $item->manager_name     =   $managerRecord ? $managerRecord->first_name . ' ' . $managerRecord->last_name : '';
+                                                                        $item->position         =   $managerRecord ? $managerRecord->position_title : '';
+                                                                        $item->manager_profile  =   Common::getResortUserPicture($item->created_by);
+                                                                        return $item;
+                                                                    });
+
             $monthlyCheckInArr = [
                 'pending_approval_requests'                 =>  $pendingApprovalRequests,
                 'pending_acknowledgements'                  =>  $pendingAcknowledgements,
                 'confirmed_meetings'                        =>  $confirmedMeetings,
                 'check_in_history'                          =>  $checkInHistory,
+                'approval_history'                          =>  $approvalHistory,
             ];
 
             $response['status']                             =   true;
