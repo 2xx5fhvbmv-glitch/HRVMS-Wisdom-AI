@@ -113,9 +113,10 @@
 
 $(document).ready(function() {
 
-    $('.datepicker').datepicker({
-        format: 'dd/mm/yyyy',
-        autoclose: true
+    flatpickr('.datepicker', {
+        dateFormat: 'd/m/Y',
+        allowInput: true,
+        appendTo: document.body
     })
     $(".ResortPosition").select2({
         placeholder: "Select a Position",

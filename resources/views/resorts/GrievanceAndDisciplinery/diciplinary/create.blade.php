@@ -326,10 +326,10 @@
         });
         
          
-        $('.Expiry_date').datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,      // Close the picker after selection
-            todayHighlight: true  // Highlight today's date
+        flatpickr('.Expiry_date', {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
         // Reverse-direction shortcut: when the user picks an Offence first,
         // auto-select its parent Category and lock it. The data-cat attribute

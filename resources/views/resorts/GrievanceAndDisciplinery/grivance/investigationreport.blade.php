@@ -59,10 +59,10 @@
                                             </span>
                                         @else
                                             <span class="text-themeprimary text-nowrap" style="color: rgb(157, 47, 82);">
-                                                Not A Applicable
+                                                Not Applicable
                                             </span>
                                         @endif
-                                            
+
                                     </td>
                                 </tr>
                               
@@ -97,7 +97,7 @@
                                             </span>
                                         @else
                                             <span class="text-themeprimary text-nowrap" style="color: rgb(157, 47, 82);">
-                                                Not A Applicable
+                                                Not Applicable
                                             </span>
                                         @endif</h6>
                                   @if($canViewIdentity)                            <div class="d-flex align-items-center mb-md-2 mb-1">
@@ -122,7 +122,7 @@
                                         <td>{{ $Grivance_Parent->personal_phone }}</td>
                                     </tr>
                                     <tr>
-                                        <th>Attachements:</th>
+                                        <th>Attachments:</th>
                                         <td>
                                             @foreach(\App\Helpers\Common::resolveGrievanceAttachments($Grivance_Parent->Attachements, $path."/".$Grivance_Parent->Grivance_id, $Grivance_Parent->resort_id) as $att)
                                                 <a target="_blank" href="{{ $att['url'] }}">{{ $att['filename'] }}</a></br>
@@ -188,12 +188,12 @@
                 @if(isset($Grivance_Parent->Gm_Decision) && !empty($Grivance_Parent->Gm_Decision))
                     <div class="bg-themeGrayLight mb-md-4 mb-3">
                         <div class="row">
-                                <h3> Gm Response</h3>
+                                <h3> GM Response</h3>
                                 <div class="table">
                                     <table class="table ">
                                         <thead>
                                             <tr>
-                                                <th>Out-come Type</th>
+                                                <th>Outcome Type</th>
                                                 <th>Action Type </th>
                                             </tr>
                                         </thead>
@@ -318,7 +318,7 @@
                                         aria-label="Default select example">
                                         <option value="">Select Outcome</option>
                                         @if($Grivance_Parent->Assigned == "Yes") 
-                                            <option value="DeliverToHr">Resolved  Send To Hr</option>
+                                            <option value="DeliverToHr">Resolved — Send To HR</option>
                                             <option value="Unresolved"  {{ ($Grivance_Parent->outcome_type == "Unresolved")  ?'selected':'' }}>Unresolved</option>
 
                                         @else
@@ -549,10 +549,10 @@ $(document).ready(function() {
         });
     });
 
-    $('.datepicker').datepicker({
-        format: 'dd/mm/yyyy',
-        autoclose: true,      // Close the picker after selection
-        todayHighlight: true  // Highlight today's date
+    flatpickr('.datepicker', {
+        dateFormat: 'd/m/Y',
+        allowInput: true,
+        appendTo: document.body
     });
     $('#Employee_id').select2({
         placeholder: 'Select Employee',
@@ -570,7 +570,7 @@ $(document).ready(function() {
         width: '100%'
     });
     $('#witness_id').select2({
-        placeholder: 'Select Wintness',
+        placeholder: 'Select Witness',
         minimumResultsForSearch: -1,
         width: '100%'
     });
@@ -585,7 +585,7 @@ $(document).ready(function() {
         width: '100%'
     });
     $('#follow_up_action').select2({
-        placeholder: 'Select follow Up Action',
+        placeholder: 'Select Follow-Up Action',
         minimumResultsForSearch: -1,
         width: '100%'
     });
@@ -819,12 +819,12 @@ $(document).on("click",".RequestForStatement",function() {
                 width: '100%'
             });
             $('#investigation_stage_'+counts).select2({
-                placeholder: 'Select Inestigation Stage',
+                placeholder: 'Select Investigation Stage',
                 minimumResultsForSearch: -1,
                 width: '100%'
             })
             $('#follow_up_action_'+counts).select2({
-                placeholder: 'Select follow Up Action',
+                placeholder: 'Select Follow-Up Action',
                 minimumResultsForSearch: -1,
                 width: '100%'
             });

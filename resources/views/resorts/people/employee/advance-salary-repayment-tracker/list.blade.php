@@ -59,7 +59,7 @@
                                 </select>
                             </div>
                             <div class="col-xl-2 col-md-3 col-sm-4 col-6">
-                                <input type="text" class="form-control datepicker" id="from_date1" placeholder="DD/MM/YYYY" name="date" data-parsley-required="true"  data-parsley-errors-container="#from-date-error1">
+                                <input type="text" class="form-control" id="from_date1" placeholder="DD/MM/YYYY" name="date" data-parsley-required="true"  data-parsley-errors-container="#from-date-error1">
                             </div>
                         </div>
                     </form>
@@ -73,7 +73,7 @@
                                 <th>Employee Name</th>
                                 <th>Position</th>
                                 <th>Department</th>
-                                <th>Total Advance/ Loan Amount</th>
+                                <th>Total Advance/Loan Amount</th>
                                 <th>Latest Deduction Month</th>
                                 <th>Repayment Status</th>
                                 <th>Action</th>
@@ -137,9 +137,10 @@ function initializeTable() {
 }
 
 $(document).ready(function() {
-    $('.datepicker').datepicker({
-          format: 'dd/mm/yyyy',
-          autoclose: true
+    flatpickr('#from_date1', {
+          dateFormat: 'd/m/Y',
+          allowInput: true,
+          appendTo: document.body
       });
     initializeTable();
 

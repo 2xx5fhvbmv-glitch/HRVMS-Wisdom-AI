@@ -66,7 +66,7 @@
                         <div class=" card-title">
                             <div class="row justify-content-between align-items-center g-md-3 g-1">
                                 <div class="col">
-                                    <h3 class="text-nowrap">Transctions</h3>
+                                    <h3 class="text-nowrap">Transactions</h3>
                                 </div>
                                 <div class="col-auto">
                                     <div class="form-group">

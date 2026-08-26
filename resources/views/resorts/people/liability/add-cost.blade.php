@@ -25,7 +25,7 @@
                 <div class="row g-md-4 g-3 mb-md-4 mb-3">
                     <div class="col-md-6 col-sm-6">
                         <label for="date" class="form-label">DATE</label>
-                        <input type="text" id="date" class="form-control datepicker" placeholder="Select Date">
+                        <input type="text" id="date" class="form-control" placeholder="Select Date">
                     </div>
                     <div class="col-md-6 col-sm-6">
                         <label for="employee_name" class="form-label">EMPLOYEE NAME</label>
@@ -67,10 +67,10 @@
 @section('import-scripts')
 <script>
     $(document).ready(function () {
-        $('.datepicker').datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,
-            todayHighlight: true
+        flatpickr('#date', {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
 
         $('.select2t-none').select2({

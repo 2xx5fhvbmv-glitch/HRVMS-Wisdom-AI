@@ -14,7 +14,7 @@
             <div class="row justify-content-between g-3">
                 <div class="col-auto">
                     <div class="page-title">
-                        <span>payroll</span>
+                        <span>Payroll</span>
                         <h1>{{ $page_title }}</h1>
                     </div>
                 </div>
@@ -31,7 +31,7 @@
                         <form id="cutOffDateForm">
                             @csrf
                             <div class="mb-3 ">
-                                <label for="cutoff_day" class="form-label">CutOff Day</label>
+                                <label for="cutoff_day" class="form-label">Cutoff Day</label>
                                 <select name="cutoff_day" id="cutoff_day" class="form-select select2t-none">
                                     @for($i=1;$i<=31;$i++)
                                         <option value="{{$i}}" @if(isset($payroll_config) && $payroll_config->cutoff_day == $i) selected @endif>{{$i}}</option>
@@ -110,7 +110,7 @@
                                             <input type="text" class="form-control deduction_name" id="deduction_name" placeholder="Deduction Name" name="deduction_name[]">
                                         </div>
                                         <div class="col-sm-6">
-                                            <label for="deduction_type" class="form-label">Deduction type</label>
+                                            <label for="deduction_type" class="form-label">DEDUCTION TYPE</label>
                                             <input type="text" class="form-control deduction_type" id="deduction_type" placeholder="Deduction type" name="deduction_type[]">
                                         </div>
                                         <div class="col">

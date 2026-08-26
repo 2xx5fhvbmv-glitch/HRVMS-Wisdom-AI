@@ -35,8 +35,8 @@
                         <td>{{$a->Department}}</td>
                     </tr>
                     <tr>
-                        <th>Documents::</th>
-                        <td><a target="_blank" href="{{URL::asset($a->curriculum_vitae)  }}" class="a-link">Curroculum Vitae</a>
+                        <th>Documents:</th>
+                        <td><a target="_blank" href="{{URL::asset($a->curriculum_vitae)  }}" class="a-link">Curriculum Vitae</a>
                             <a target="_blank" href="{{ URL::asset($a->passport_img)}}" class="a-link">Passport</a>
                            </td>
                     </tr>

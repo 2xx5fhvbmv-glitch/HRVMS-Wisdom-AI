@@ -107,7 +107,7 @@
                             </div>
                             <div class="col-lg-4 col-md-4 col-sm-6">
                                 <label for="roomNo" class=" form-label">ROOM NO.</label>
-                                <input type="number" min="1" class="form-control" id="Room" name="Room" placeholder="1st floort">
+                                <input type="number" min="1" class="form-control" id="Room" name="Room" placeholder="1st floor">
                             </div>
                         </div>
 
@@ -173,7 +173,7 @@
                                         <label for="floor" class="form-label">FLOOR</label>
                                         <select class="form-select select2t-none AvailableFloor" data-flag="A" id="AvailableFloor_1"
                                         data-id= "1" name="Floor[1]" placeholder=" Select Building" required   required 
-                                         data-parsley-trigger="keyup" data-parsley-required-message="Please Select Floor."
+                                         data-parsley-trigger="keyup" data-parsley-required-message="Please select floor."
                                              data-parsley-errors-container="#type_accom_error_2"
                                          >
 
@@ -186,7 +186,7 @@
                                         <label for="roomNo" class=" form-label">ROOM NO.</label>
                                         <select class="form-select select2t-none RoomNo" data-id= "1" id="RoomNo_1" name="RoomNo[1]" 
                                          required    data-parsley-type="digits" data-parsley-trigger="keyup" 
-                                         data-parsley-required-message="Please Select Floor."  data-parsley-errors-container="#type_accom_error_3">
+                                         data-parsley-required-message="Please select floor."  data-parsley-errors-container="#type_accom_error_3">
 
                                         </select>
                                         <div id="type_accom_error_3"></div>
@@ -404,7 +404,7 @@
             <div class="col-lg-6 ">
                 <div class="card">
                     <div class="card-title">
-                        <h3>Escalation day</h3>
+                        <h3>Escalation Day</h3>
                     </div>
                     <form id="EscalationDay">
                         <div class="mb-3">
@@ -746,7 +746,7 @@ $(document).ready(function()
                 required: "Please Enter Room Name.",
             },
             "ThresSoldLevel[]": {
-                required: "Please Enter ThreSold level.",
+                required: "Please Enter Threshold level.",
             },
         },
         submitHandler: function(form) {
@@ -1226,7 +1226,7 @@ $(document).ready(function()
                                          data-flag="A" id="AvailableFloor_${AvailableCount}"data-id= "${AvailableCount}" 
                                          name="Floor[${AvailableCount}]" placeholder=" Select Building" required   required
                                           data-parsley-errors-container="#type_accom_f_error_{{$k}}"
-                                            data-parsley-trigger="keyup" data-parsley-required-message="Please Select Floor.">
+                                            data-parsley-trigger="keyup" data-parsley-required-message="Please select floor.">
 
                                         </select>
                                         <div id="type_accom_f_error_{{$k}}"></div>
@@ -1238,7 +1238,7 @@ $(document).ready(function()
                                          name="RoomNo[${AvailableCount}]"  required   
                                           data-parsley-type="digits" data-parsley-trigger="keyup"
                                         data-parsley-errors-container="#type_accom_r_error_{{$k}}"
-                                        data-parsley-required-message="Please Select Floor.">
+                                        data-parsley-required-message="Please select floor.">
 
                                         </select>
                                         <div id="type_accom_r_error_{{$k}}"></div>

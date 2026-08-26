@@ -93,12 +93,12 @@
                                     </div>
                                     <div class="col-sm-6">
                                         <label for="start_time" class="form-label">START TIME <span class="req_span">*</span></label>
-                                        <input type="time" id="start_time" name="start_time" class="form-control"
+                                        <input type="text" id="start_time" name="start_time" class="form-control time-field"
                                             placeholder="Select Time">
                                     </div>
                                     <div class="col-sm-6">
                                         <label for="end_time" class="form-label">END TIME <span class="req_span">*</span></label>
-                                        <input type="time" id="end_time" name="end_time" class="form-control"
+                                        <input type="text" id="end_time" name="end_time" class="form-control time-field"
                                             placeholder="Select Time">
                                     </div>
                                      <div class="col-12">
@@ -165,11 +165,34 @@
 @section('import-scripts')
 <script>
     $(document).ready(function () {
-        $(".datepicker").datepicker({
-            format: 'dd-mm-yyyy',
-            autoclose: true,
-            todayHighlight: true,
-            startDate: new Date() // Only allow today and future dates
+        // Same themed flatpickr popover used app-wide — dateFormat matches the
+        // old bootstrap-datepicker's 'dd-mm-yyyy' output exactly, so the
+        // submitted string and backend parsing/validation are unchanged.
+        flatpickr(".datepicker", {
+            dateFormat: 'd-m-Y',
+            allowInput: true,
+            minDate: 'today' // Only allow today and future dates
+        });
+
+        // altInput shows 12h AM/PM (matching the old native <input type="time">
+        // display) while the real, submitted field (dateFormat) stays 24h "H:i" —
+        // exactly what training_schedules.start_time/end_time (a TIME column)
+        // already receives raw in the controller, so the backend needs no changes.
+        flatpickr(".time-field", {
+            enableTime: true,
+            noCalendar: true,
+            dateFormat: 'H:i',
+            altInput: true,
+            altFormat: 'h:i K',
+            time_24hr: false,
+            minuteIncrement: 1,
+            allowInput: true,
+            // developer.min.css force-hides .flatpickr-am-pm below 424px (a mobile
+            // tweak for the Duty Roster time pickers elsewhere in the app) — undo
+            // it just for these instances so the AM/PM toggle stays visible here.
+            onReady: function (selectedDates, dateStr, instance) {
+                instance.amPM.style.setProperty('display', 'inline-block', 'important');
+            }
         });
 
         $('.select2t-none').select2();
@@ -304,7 +327,16 @@
                             toastr.success(response.msg, "Success",{
                                 positionClass: 'toast-bottom-right',
                             });
-                            $("#training-schedule")[0].reset();
+                            form.reset();
+                            // form.reset() only clears the underlying <input> elements.
+                            // Each date/time field's flatpickr instance keeps its own
+                            // selected-date state and (for time) a separate altInput
+                            // display, neither of which reset() touches — clear() does.
+                            $(form).find('.datepicker, .time-field').each(function () {
+                                if (this._flatpickr) {
+                                    this._flatpickr.clear();
+                                }
+                            });
                         } else {
                             toastr.error(response.msg, "Error",{
                                 positionClass: 'toast-bottom-right',
@@ -323,6 +355,11 @@
                     },
                 });
             },
+            // jQuery Validate ignores :hidden fields by default. The time flatpickr's
+            // altInput turns #start_time/#end_time into type="hidden" (the visible
+            // control is a sibling altInput), which would otherwise silently drop
+            // their required/greaterThanTime rules.
+            ignore: ':hidden:not(#start_time, #end_time)',
             errorPlacement: function(error, element) {
                 if (element.attr("name") == "learning_title") {
                     error.insertAfter("#div-learning_title");
@@ -405,7 +442,16 @@
                             endMins = Math.max(0, Math.min(endMins, 24 * 60 - 1));
                             var hh = Math.floor(endMins / 60);
                             var mm = endMins % 60;
-                            $('#end_time').val((hh < 10 ? '0' + hh : hh) + ':' + (mm < 10 ? '0' + mm : mm));
+                            var endTimeStr = (hh < 10 ? '0' + hh : hh) + ':' + (mm < 10 ? '0' + mm : mm);
+                            // Plain .val() only touches the hidden real input, not the
+                            // altInput the user sees — go through the flatpickr instance
+                            // so the visible 12h field updates too.
+                            var endTimeFp = document.getElementById('end_time')._flatpickr;
+                            if (endTimeFp) {
+                                endTimeFp.setDate(endTimeStr, true, 'H:i');
+                            } else {
+                                $('#end_time').val(endTimeStr);
+                            }
                         }
                     }
                 },

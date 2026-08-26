@@ -225,7 +225,7 @@
                 }
             },
             error: function(xhr) {
-                toastr.error("An error occurred while updating the division.", "Error", {
+                toastr.error("An error occurred while updating the shopkeeper.", "Error", {
                     positionClass: 'toast-bottom-right'
                 });
             }

@@ -550,7 +550,7 @@
                                         <img src="/resorts_assets/images/pdf1.svg" alt="icon">
                                     </a>`;
                         } else {
-                            return 'No attachements';  // Return an empty string if there's no attachment
+                            return 'No attachments';  // Return an empty string if there's no attachment
                         }
                     }
                 },

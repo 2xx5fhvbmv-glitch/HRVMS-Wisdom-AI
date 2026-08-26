@@ -221,10 +221,18 @@
                             <div>
                                 <h6>{{ $leaveInsights['occupancy']['title'] ?? 'Occupancy & Leave Window' }}</h6>
                                 <p>{{ $leaveInsights['occupancy']['body'] ?? '' }}</p>
-                                @if(!empty($leaveInsights["occupancy"]["recommendation"]))<p style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $leaveInsights["occupancy"]["recommendation"] }}</p>@endif
+                                <div class="lnkrow">
+                                    @if(!empty($leaveInsights['occupancy']['recommendation']))
+                                        <button type="button" class="lnk-rec"
+                                            data-title="{{ $leaveInsights['occupancy']['title'] ?? 'Occupancy & Leave Window' }}"
+                                            data-rec="{{ $leaveInsights['occupancy']['recommendation'] }}"
+                                            data-details="leaveInsightOccupancyModal">View recommendation &rarr;</button>
+                                        <span class="sep"></span>
+                                    @endif
+                                    <a href="#" class="lnk" data-details="leaveInsightOccupancyModal">View details &rarr;</a>
+                                </div>
                             </div>
                             <div>
-                                <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#leaveInsightOccupancyModal" class="a-linkTheme">View Details</a>
                                 <a href="#" class="a-link">Request Leave</a>
                             </div>
                         </div>
@@ -235,10 +243,16 @@
                             <div>
                                 <h6>{{ $leaveInsights['peak']['title'] ?? 'AI Forecasted Peak Leave Periods' }}</h6>
                                 <p>{{ $leaveInsights['peak']['body'] ?? '' }}</p>
-                                @if(!empty($leaveInsights["peak"]["recommendation"]))<p style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $leaveInsights["peak"]["recommendation"] }}</p>@endif
-                            </div>
-                            <div>
-                                <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#leaveInsightPeakModal" class="a-linkTheme">View Details</a>
+                                <div class="lnkrow">
+                                    @if(!empty($leaveInsights['peak']['recommendation']))
+                                        <button type="button" class="lnk-rec"
+                                            data-title="{{ $leaveInsights['peak']['title'] ?? 'AI Forecasted Peak Leave Periods' }}"
+                                            data-rec="{{ $leaveInsights['peak']['recommendation'] }}"
+                                            data-details="leaveInsightPeakModal">View recommendation &rarr;</button>
+                                        <span class="sep"></span>
+                                    @endif
+                                    <a href="#" class="lnk" data-details="leaveInsightPeakModal">View details &rarr;</a>
+                                </div>
                             </div>
                         </div>
                         <div class="leaveUser-block">
@@ -248,10 +262,16 @@
                             <div>
                                 <h6>{{ $leaveInsights['behavior']['title'] ?? 'Employee Leave Behavior Analysis' }}</h6>
                                 <p>{{ $leaveInsights['behavior']['body'] ?? '' }}</p>
-                                @if(!empty($leaveInsights["behavior"]["recommendation"]))<p style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $leaveInsights["behavior"]["recommendation"] }}</p>@endif
-                            </div>
-                            <div>
-                                <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#leaveInsightBehaviorModal" class="a-linkTheme">View Details</a>
+                                <div class="lnkrow">
+                                    @if(!empty($leaveInsights['behavior']['recommendation']))
+                                        <button type="button" class="lnk-rec"
+                                            data-title="{{ $leaveInsights['behavior']['title'] ?? 'Employee Leave Behavior Analysis' }}"
+                                            data-rec="{{ $leaveInsights['behavior']['recommendation'] }}"
+                                            data-details="leaveInsightBehaviorModal">View recommendation &rarr;</button>
+                                        <span class="sep"></span>
+                                    @endif
+                                    <a href="#" class="lnk" data-details="leaveInsightBehaviorModal">View details &rarr;</a>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -342,6 +362,7 @@
 </div>
 
 @include('resorts.leaves.dashboard._insight_modals')
+@includeWhen(isset($leaveInsights), 'partials._wai_insight_modals')
 
 <!-- Modal HTML -->
 <div id="rejectionModal" class="modal fade" tabindex="-1" role="dialog">
@@ -533,7 +554,7 @@
                                     <img src="/resorts_assets/images/pdf1.svg" alt="icon">
                                 </a>`;
                     } else {
-                        return 'No attachements'; // Return an empty string if there's no attachment
+                        return 'No attachments'; // Return an empty string if there's no attachment
                     }
                 }
             },

@@ -175,10 +175,16 @@
                                     <div class="wai-row-body">
                                         <h6>{{ $incidentInsights[$ic['key']]['title'] ?? '' }}</h6>
                                         <p class="wai-row-text">{{ $incidentInsights[$ic['key']]['body'] ?? '' }}</p>
-                                        @if($hasRecommendation)
-                                            <p class="wai-row-recommendation"><strong>Recommendation:</strong> {{ $incidentInsights[$ic['key']]['recommendation'] }}</p>
-                                        @endif
-                                        <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#{{ $ic['modal'] }}" class="wai-row-link">View details &rarr;</a>
+                                        <div class="lnkrow">
+                                            @if($hasRecommendation)
+                                                <button type="button" class="lnk-rec"
+                                                    data-title="{{ $incidentInsights[$ic['key']]['title'] ?? '' }}"
+                                                    data-rec="{{ $incidentInsights[$ic['key']]['recommendation'] }}"
+                                                    data-details="{{ $ic['modal'] }}">View recommendation &rarr;</button>
+                                                <span class="sep"></span>
+                                            @endif
+                                            <a href="#" class="lnk" data-details="{{ $ic['modal'] }}">View details &rarr;</a>
+                                        </div>
                                     </div>
                                 </div>
                             @endforeach
@@ -491,6 +497,7 @@
         </div>
     </div>
 @includeWhen(isset($incidentInsights), 'resorts.incident.dashboard._insight_modals')
+@includeWhen(isset($incidentInsights), 'partials._wai_insight_modals')
 @endsection
 
 @section('import-css')
@@ -536,7 +543,6 @@
     .wai-narrative .wai-row-body { flex: 1 1 auto; min-width: 0; }
     .wai-narrative .wai-row-body h6 { margin: 0 0 4px; font-size: 13.5px; font-weight: 700; color: #14232A; }
     .wai-narrative .wai-row-text { margin: 0 0 4px; font-size: 12.5px; color: #5D6F75; line-height: 1.5; }
-    .wai-narrative .wai-row-recommendation { margin: 0 0 4px; font-size: 12.5px; color: #0e8a9e; line-height: 1.5; }
     .wai-narrative .wai-row-link { display: inline-block; margin-top: 2px; font-size: 12px; font-weight: 600; color: #014653; }
 </style>
 @endsection
@@ -546,41 +552,11 @@
         let myStackedBarChartInstance = null;
         let incidentChart;
         const meetingDetailBaseUrl = "{{ route('incident.meeting.detail', ['id' => 'MEETING_ID']) }}";
-        const incidentDetailBaseUrl = "{{ route('incident.view', ['id' => 'INCIDENT_ID']) }}";
+    </script>
 
-        function loadIncidentTodoList() {
-            $.ajax({
-                url: '{{ route("incident.todoList") }}',
-                method: 'GET',
-                success: function (data) {
-                    let html = '';
-                    if (!data || data.length === 0) {
-                        html = `<div class="text-center py-3">No incidents found.</div>`;
-                    } else {
-                        data.forEach(incident => {
-                            html += `
-                            <div class="leaveUser-block">
-                                <div>
-                                    <div class="d-flex justify-content-between">
-                                        <h6>${incident.title}</h6>
-                                        <span class="badge badge-themeNew1 border-0">${incident.time_ago}</span>
-                                    </div>
-                                    <p>${incident.description}</p>
-                                    <div>
-                                        <a href="${incidentDetailBaseUrl.replace('INCIDENT_ID', btoa(incident.id))}" class="a-linkTheme">View Details</a>
-                                    </div>
-                                </div>
-                            </div>`;
-                        });
-                    }
-                    $('#incidentTodoList').html(html);
-                },
-                error: function () {
-                    $('#incidentTodoList').html(`<div class="text-danger py-3 text-center">Error loading data.</div>`);
-                }
-            });
-        }
+    @include('resorts.incident.dashboard._incident_list_widget')
 
+    <script type="text/javascript">
         $(document).ready(function () {
             loadIncidentTodoList();
             loadParticipationChart();
@@ -796,8 +772,8 @@
                                 <div>
                                     <h6>${item.incident_name}</h6>
                                     <p>${item.investigation_findings ?? 'No findings yet.'}</p>
-                                    <p>${item.outcome_type ?? 'No Outcome type yet.'}</p>
-                                    <p>${item.action_taken ?? 'No Action taken yet.'}</p>
+                                    <p>${item.outcome_type ?? 'No outcome type yet.'}</p>
+                                    <p>${item.action_taken ?? 'No action taken yet.'}</p>
 
                                 </div>
                             </div>

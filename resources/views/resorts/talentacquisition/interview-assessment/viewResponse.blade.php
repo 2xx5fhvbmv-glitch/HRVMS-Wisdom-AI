@@ -24,9 +24,9 @@
                                 <div class="col-12"> <!-- Full width for the title section -->
                                    
                                     <div class="col-md-12">
-                                        <label class="form-label"> Interviewer : {{ $response->interviewer->first_name }} {{ $response->interviewer->last_name }}</label><br/>
-                                        <label class="form-label"> Interviewee :   {{ $response->interviewee->first_name }} {{ $response->interviewee->last_name }}</label><br/>
-                                        <label class="form-label"> Date Submitted :     {{ $response->created_at->format('d M Y') }} </label>
+                                        <label class="form-label"> Interviewer: {{ $response->interviewer->first_name }} {{ $response->interviewer->last_name }}</label><br/>
+                                        <label class="form-label"> Interviewee:   {{ $response->interviewee->first_name }} {{ $response->interviewee->last_name }}</label><br/>
+                                        <label class="form-label"> Date Submitted:     {{ $response->created_at->format('d M Y') }} </label>
                                     </div>
                                 </div>
                             </div>

@@ -126,10 +126,16 @@
                                 <div class="wai-row-body">
                                     <h6>{{ $grievanceInsights[$gc['key']]['title'] ?? '' }}</h6>
                                     <p class="wai-row-text">{{ $grievanceInsights[$gc['key']]['body'] ?? '' }}</p>
-                                    @if($hasRecommendation)
-                                        <p class="wai-row-recommendation"><strong>Recommendation:</strong> {{ $grievanceInsights[$gc['key']]['recommendation'] }}</p>
-                                    @endif
-                                    <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#{{ $gc['modal'] }}" class="wai-row-link">View details &rarr;</a>
+                                    <div class="lnkrow">
+                                        @if($hasRecommendation)
+                                            <button type="button" class="lnk-rec"
+                                                data-title="{{ $grievanceInsights[$gc['key']]['title'] ?? '' }}"
+                                                data-rec="{{ $grievanceInsights[$gc['key']]['recommendation'] }}"
+                                                data-details="{{ $gc['modal'] }}">View recommendation &rarr;</button>
+                                            <span class="sep"></span>
+                                        @endif
+                                        <a href="#" class="lnk" data-details="{{ $gc['modal'] }}">View details &rarr;</a>
+                                    </div>
                                 </div>
                             </div>
                         @endforeach
@@ -536,6 +542,7 @@
     </div>
 </div>
 @includeWhen(isset($grievanceInsights), 'resorts.GrievanceAndDisciplinery.dashboard._insight_modals')
+@includeWhen(isset($grievanceInsights), 'partials._wai_insight_modals')
 @endsection
 
 @section('import-css')
@@ -581,7 +588,6 @@
     .wai-narrative .wai-row-body { flex: 1 1 auto; min-width: 0; }
     .wai-narrative .wai-row-body h6 { margin: 0 0 4px; font-size: 13.5px; font-weight: 700; color: #14232A; }
     .wai-narrative .wai-row-text { margin: 0 0 4px; font-size: 12.5px; color: #5D6F75; line-height: 1.5; }
-    .wai-narrative .wai-row-recommendation { margin: 0 0 4px; font-size: 12.5px; color: #0e8a9e; line-height: 1.5; }
     .wai-narrative .wai-row-link { display: inline-block; margin-top: 2px; font-size: 12px; font-weight: 600; color: #014653; }
 
     /* Confidential Cases / Appeals Section / Grievances breakdown row —

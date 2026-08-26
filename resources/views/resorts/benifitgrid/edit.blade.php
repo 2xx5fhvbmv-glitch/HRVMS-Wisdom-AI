@@ -12,6 +12,11 @@
                         <h1>{{ $page_title }}</h1>
                     </div>
                 </div>
+                <div class="col-auto">
+                    <a href="{{ route('resort.budget.config') }}" class="btn btn-sm wfp-btn-neutral">
+                        <i class="fa-solid fa-arrow-left"></i> Back to Configuration
+                    </a>
+                </div>
             </div>
         </div>
         <div class="card">
@@ -363,13 +368,13 @@
                     </div>
                     <div class="col-xxl-4  col-sm-6">
                         <div class="form-group mb-2">
-                            <label  class="form-label" for="furniture-and-fixtures-select">Furnitures and Fixtures</label>
+                            <label  class="form-label" for="furniture-and-fixtures-select">Furniture and Fixtures</label>
                             <select id="furniture-and-fixtures-select" name="furniture_and_fixtures"
                             data-parsley-errors-container="#furniture_and_fixtures"
                             required
                             data-parsley-required-message="Please Select Accommodation Status"
                             class="form-select select2t-none" @if(isset($isViewMode) && $isViewMode) disabled @endif>
-                                <option value="">Select Furnitures and Fixtures</option>
+                                <option value="">Select Furniture and Fixtures</option>
                                 <option value="yes" @if($benefit_grid->furniture_and_fixtures == "yes") selected @endif>Yes</option>
                                 <option value="no" @if($benefit_grid->furniture_and_fixtures == "no") selected @endif>No</option>
                             </select>
@@ -588,7 +593,7 @@
                     </div>
                     <div class="col-xxl-4  col-sm-6">
                         <div class="form-group mb-2">
-                            <label  class="form-label" for="alchoholic_beverages_discount">Alchoholic Beverages Discount(In %)</label>
+                            <label  class="form-label" for="alchoholic_beverages_discount">Alcoholic Beverages Discount(In %)</label>
                             <input type="number" min="0" step="any" id="alchoholic_beverages_discount" name="alchoholic_beverages_discount" class="form-control" value="{{$benefit_grid->alchoholic_beverages_discount}}" @if(isset($isViewMode) && $isViewMode) disabled @endif/>
                         </div>
                     </div>
@@ -864,11 +869,13 @@
     $(document).ready(function(){
         $("#addBenifitGridForm").parsley();
 
-        $("#effective_date").datepicker({
-            dateFormat: 'dd-mm-yy'
+        var effective_date_fp = flatpickr('#effective_date', {
+            dateFormat: 'm/d/Y',
+            allowInput: true,
+            appendTo: document.body
         });
         var currentDate = new Date();
-        $("#effective_date").datepicker("setDate",currentDate);
+        effective_date_fp.setDate(currentDate, true);
         var formSubmitted = false; // Flag to track form submission
 
         function fetchEligibleLeaves(payload) {

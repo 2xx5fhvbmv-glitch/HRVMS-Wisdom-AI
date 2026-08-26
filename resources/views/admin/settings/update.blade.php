@@ -305,7 +305,7 @@
 					email: "The admin email is not valid"
 				},
 				'site_title': {
-					required: "Please Enter Site title",
+					required: "Please enter site title",
 					maxlength: "Site title must be less than 50 characters"
 				},
 				

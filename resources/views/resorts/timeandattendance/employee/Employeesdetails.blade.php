@@ -294,7 +294,7 @@
         <div class="modal-dialog modal-dialog-centered modal-small">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="staticBackdropLabel">Attendance Histroy</h5>
+                    <h5 class="modal-title" id="staticBackdropLabel">Attendance History</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <form id='AttandanceHistoryForm'>
@@ -381,6 +381,12 @@
                 dateFormat: "h:i", // 12-hour format without AM/PM
                 time_24hr: false,  // Ensures 12-hour format
                 minuteIncrement: 1, // Allows 1-minute steps
+                // developer.min.css force-hides .flatpickr-am-pm below 424px; now that
+                // flatpickr's own popover always mounts on mobile (disableMobile:true,
+                // set globally), undo that here so AM/PM stays visible on phones too.
+                onReady: function (selectedDates, dateStr, instance) {
+                    instance.amPM.style.setProperty('display', 'inline-block', 'important');
+                }
             });
 
             employeedetails();

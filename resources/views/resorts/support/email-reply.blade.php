@@ -34,7 +34,7 @@
                     @csrf
                     <input type="hidden" name="ticket_id" value="{{ $ticketId }}">
                     <input type="text" class="form-control form-control-small mb-md-3 mb-2" value="{{$supportEmail}}" name="to_email" placeholder="To" required readonly>
-                    <input type="text" class="form-control form-control-small mb-3" name="subject" placeholder="Subject:" required value="Re : {{$support->subject}}">
+                    <input type="text" class="form-control form-control-small mb-3" name="subject" placeholder="Subject:" required value="Re: {{$support->subject}}">
 
                     <div class="mb-3">
                         <textarea id="editor" name="message"></textarea>

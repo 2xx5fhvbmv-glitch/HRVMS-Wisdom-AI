@@ -47,7 +47,7 @@
                                     </div>
 
                                     <div class="col-4">
-                                        <label for="employee_type" class="form-label">Select Type :<span class="red-mark">*</span></labe>
+                                        <label for="employee_type" class="form-label">Select Type :<span class="red-mark">*</span></label>
                                         <select name="employee_type" id="employee_type" class="select2t-none" style="width: 220px;">
                                             <option selected disabled>Select Type</option>
                                                 <option value="handover" @if(@$exit_clearance->type == 'handover') selected @endif>Hand Over </option>
@@ -57,7 +57,7 @@
                                     </div>
 
                                     <div class="col-4">
-                                        <label for="department" class="form-label">Select Depatment :<span class="red-mark">*</span></labe>
+                                        <label for="department" class="form-label">Select Department :<span class="red-mark">*</span></label>
                                         <select name="department" id="department" class="select2t-none" style="width: 220px;">
                                             <option selected disabled>Select Department</option>
                                             @if($departments)
@@ -69,7 +69,7 @@
                                     </div>
 
                                     <div class="col-4">
-                                        <label for="form_name" class="form-label">Form Name :<span class="red-mark">*</span></labe>
+                                        <label for="form_name" class="form-label">Form Name :<span class="red-mark">*</span></label>
                                         <input type="text" name="form_name" id="form_name" placeholder="Enter Form Name" class="form-control" value="{{ $exit_clearance->form_name }}" required/>
                                     </div>
 

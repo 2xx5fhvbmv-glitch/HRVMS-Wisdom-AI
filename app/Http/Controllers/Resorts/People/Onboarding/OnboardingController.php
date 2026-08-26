@@ -1517,8 +1517,8 @@ class OnboardingController extends Controller
             if ($employee && $employee->resortAdmin) {
                 $msg = "📢 Your onboarding itinerary has been created.\n" .
                     "👤 Name: {$employee->resortAdmin->full_name}\n" .
-                    "📅 Arrival Date: " . Carbon::parse($onboardingItinerary->arrival_date)->format('d M Y') . "\n" .
-                    "🕒 Arrival Time: {$onboardingItinerary->arrival_time}\n";
+                    "📅 Arrival Date: " . Common::formatDate($onboardingItinerary->arrival_date) . "\n" .
+                    "🕒 Arrival Time: " . Common::formatDisplayTime($onboardingItinerary->arrival_time) . "\n";
 
                 event(new ResortNotificationEvent(Common::nofitication(
                     $this->resort->resort_id,
@@ -1536,8 +1536,8 @@ class OnboardingController extends Controller
             if ($pickupEmployee && $pickupEmployee->resortAdmin) {
                 $msg = "🚐 You have been assigned to pick up a new employee.\n" .
                     "👤 Employee: {$employee->resortAdmin->full_name}\n" .
-                    "📅 Arrival Date: " . Carbon::parse($onboardingItinerary->arrival_date)->format('d M Y'). "\n" .
-                    "🕒 Arrival Time: {$onboardingItinerary->arrival_time}\n";
+                    "📅 Arrival Date: " . Common::formatDate($onboardingItinerary->arrival_date) . "\n" .
+                    "🕒 Arrival Time: " . Common::formatDisplayTime($onboardingItinerary->arrival_time) . "\n";
 
                 event(new ResortNotificationEvent(Common::nofitication(
                     $this->resort->resort_id,
@@ -1555,8 +1555,8 @@ class OnboardingController extends Controller
             if ($medicalEmployee && $medicalEmployee->resortAdmin) {
                 $msg = "🏥 You have been assigned to medically accompany a new employee.\n" .
                     "👤 Employee: {$employee->resortAdmin->full_name}\n" .
-                    "📅 Arrival Date: " . Carbon::parse($onboardingItinerary->arrival_date)->format('d M Y'). "\n" .
-                    "🕒 Arrival Time: {$onboardingItinerary->arrival_time}\n";
+                    "📅 Arrival Date: " . Common::formatDate($onboardingItinerary->arrival_date) . "\n" .
+                    "🕒 Arrival Time: " . Common::formatDisplayTime($onboardingItinerary->arrival_time) . "\n";
 
                 event(new ResortNotificationEvent(Common::nofitication(
                     $this->resort->resort_id,
@@ -1579,8 +1579,8 @@ class OnboardingController extends Controller
                     if ($participant && $participant->resortAdmin) {
                         $msg = "📅 You are invited to a meeting.\n" .
                             "📝 Title: {$meeting->meeting_title}\n" .
-                            "📆 Date: " . Carbon::parse($meeting->meeting_date)->format('d M Y') . "\n" .
-                            "⏰ Time: " . $meeting->meeting_time . "\n" .
+                            "📆 Date: " . Common::formatDate($meeting->meeting_date) . "\n" .
+                            "⏰ Time: " . Common::formatDisplayTime($meeting->meeting_time) . "\n" .
                             "🔗 Link: {$meeting->meeting_link}";
 
                         event(new ResortNotificationEvent(Common::nofitication(
@@ -1720,10 +1720,10 @@ class OnboardingController extends Controller
                             </div>';
                 })
                 ->addColumn('arrival_date', function ($row) {
-                    return Carbon::parse($row->arrival_date)->format('d M Y');
+                    return Common::formatDate($row->arrival_date);
                 })
                 ->addColumn('arrival_time', function ($row) {
-                    return $row->arrival_time;
+                    return Common::formatDisplayTime($row->arrival_time);
                 })
                 ->addColumn('action', function ($row) use ($edit_class, $delete_class) {
                     $id = base64_encode($row->id);

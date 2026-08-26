@@ -450,7 +450,7 @@
                     @endphp
 
                     <div class="bg-themeGrayLight mb-2">
-                        <span class="fw-600">Total Net payable: </span>&nbsp;
+                        <span class="fw-600">Total Net Payable: </span>&nbsp;
                         <span id="netPayWords">{{ $payCurrency }} {{ convertToWords($totalEarnings - $totalDeductions) }} Only</span>
                     </div>
                     {{-- Bank Name + Account Number come from the employee's

@@ -197,7 +197,9 @@
                                             @else
                                                 data-time="{{ $todo->ExpectedEndTime ?? $todo->EndTime }}"
                                             @endif
-                                            data-employee-name="{{ $todo->EmployeeName }}">
+                                            data-employee-name="{{ $todo->EmployeeName }}"
+                                            data-shift-name="{{ trim(($todo->ShiftName ?? '') . ' · ' . ($todo->StartTime ?? '') . ' - ' . ($todo->ExpectedEndTime ?? $todo->EndTime ?? ''), ' ·') }}"
+                                            data-employee-image="{{ $todo->profileImg ?? '' }}">
                                             <i class="fa-solid {{ $todo->action_type == 'check_in' ? 'fa-sign-in-alt' : 'fa-sign-out-alt' }} me-1"></i>
                                             {{ $todo->action_type == 'check_in' ? 'Check-In' : 'Check-Out' }}
                                         </button>
@@ -408,6 +410,7 @@
         </div>
     </div>
 </div>
+@include('partials._checkinout_modal')
 @endsection
 
 @section('import-css')
@@ -872,36 +875,24 @@
     });
     
     // Handle manual check-in/check-out actions (same flow as HR dashboard)
+    // Confirm dialog is the shared openCheckInOutModal (see
+    // partials._checkinout_modal); submit itself is unchanged.
     $(document).on("click", ".manual-check-action", function() {
         const rosterId = $(this).data('roster-id');
         const action = $(this).data('action');
         const employeeName = $(this).data('employee-name');
+        const shiftName = $(this).data('shift-name');
+        const employeeImage = $(this).data('employee-image');
         const date = $(this).data('date');
         const time = $(this).data('time');
-        const actionText = action === 'check_in' ? 'Check-In' : 'Check-Out';
-        const button = $(this);
 
-        wisdomConfirm({
-            role: action === 'check_in' ? 'positive' : 'warning',
-            title: `Confirm ${actionText}`,
-            confirmText: `Yes, ${actionText}`,
-            extra: {
-                html: `
-                    <p>Are you sure you want to record ${actionText.toLowerCase()} for ${employeeName}?</p>
-                    <input type="text" id="manualTime" class="swal2-input" required>
-                `,
-                didOpen: () => {
-                    if (time) {
-                        document.getElementById('manualTime').value = time;
-                    }
-                }
-            }
-        }).then((result) => {
-            if (result.isConfirmed) {
-                let selectedTime = document.getElementById('manualTime').value;
-                // Disable button during request
-                button.prop('disabled', true).html('<i class="fa fa-spinner fa-spin me-1"></i>Processing...');
-
+        openCheckInOutModal({
+            action: action,
+            employeeName: employeeName,
+            shiftLabel: shiftName,
+            employeeImage: employeeImage,
+            time: time,
+            onConfirm: function (selectedTime, reset, close) {
                 $.ajax({
                     url: "{{ route('resort.timeandattendance.ManualCheckInOut') }}",
                     type: 'POST',
@@ -913,7 +904,9 @@
                         time: selectedTime
                     },
                     success: function(response) {
+                        reset();
                         if (response.success) {
+                            close();
                             wisdomAlert({
                                 type: 'success',
                                 title: 'Success!',
@@ -927,16 +920,15 @@
                                 title: 'Error!',
                                 text: response.message || 'An error occurred.'
                             });
-                            button.prop('disabled', false);
                         }
                     },
                     error: function(xhr) {
+                        reset();
                         wisdomAlert({
                             type: 'error',
                             title: 'Error!',
                             text: 'An error occurred while processing the request.'
                         });
-                        button.prop('disabled', false);
                         console.error('Error:', xhr);
                     }
                 });

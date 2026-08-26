@@ -67,12 +67,12 @@
 <script>
 
             $(".Grievance_Cat_idMain").select2({
-                placeholder: "Select Greivance Category",
+                placeholder: "Select Grievance Category",
                 allowClear: true,
                 width: '100%'        
             });
             $(".GrievanceSubcategories").select2({
-                placeholder: `Select Grieveance Sub Category `,
+                placeholder: `Select Grievance Sub Category `,
                 allowClear: true,
                 width: '100%'        
             });
@@ -224,12 +224,12 @@
                 });
                 
             $("#Grievance_Cat_idMain_1").select2({
-                placeholder: "Select Greivance Category",
+                placeholder: "Select Grievance Category",
                 allowClear: true,
                 width: '100%'        
             });
             $("#GrievanceSubcategories_1").select2({
-                placeholder: `Select Grieveance Sub Category `,
+                placeholder: `Select Grievance Sub Category `,
                 allowClear: true,
                 width: '100%'        
             });
@@ -318,7 +318,7 @@
                 });
 
                 $row.find('select[name="Gri_Sub_cat_id"]').select2({
-                    placeholder: `Select Grieveance Sub Category `,
+                    placeholder: `Select Grievance Sub Category `,
                     allowClear: true,
                     width: '100%'        
                 });

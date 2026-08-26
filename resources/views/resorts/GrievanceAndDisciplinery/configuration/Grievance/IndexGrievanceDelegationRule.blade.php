@@ -166,7 +166,7 @@
                     </td>`;
             $row.html(editRowHtml);
             $("#Grievance_Cat_id").select2({
-                placeholder: "Select Greivance Category",
+                placeholder: "Select Grievance Category",
                 allowClear: true,
                 width: '100%'        
             });

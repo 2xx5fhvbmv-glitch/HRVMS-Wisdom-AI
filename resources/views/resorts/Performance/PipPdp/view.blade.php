@@ -115,7 +115,7 @@
 
             var data = collectFormData();
             if (!validateRequired(data)) {
-                toastr.error('Please fill all required fields', 'Validation error', { positionClass: 'toast-bottom-right' });
+                toastr.error('Please fill all required fields', 'Validation Error', { positionClass: 'toast-bottom-right' });
                 return;
             }
 
@@ -153,7 +153,7 @@
                     if (payload.errors) {
                         var msg = '';
                         $.each(payload.errors, function(k, v) { msg += v + '<br>'; });
-                        toastr.error(msg, 'Validation error', { positionClass: 'toast-bottom-right' });
+                        toastr.error(msg, 'Validation Error', { positionClass: 'toast-bottom-right' });
                     } else {
                         toastr.error(payload.message || 'Failed to submit', 'Error', { positionClass: 'toast-bottom-right' });
                     }

@@ -284,7 +284,7 @@
                                     </select>
                                 </div>
                                 <div class="col-xl-2 col-md-4 col-sm-4 col-6">
-                                    <input type="text"  class="form-control  datepicker" id="DutyRosterCreateDatePickerFilter" placeholder="Select Date">
+                                    <input type="text"  class="form-control " id="DutyRosterCreateDatePickerFilter" placeholder="Select Date">
 
                                 </div>
 
@@ -2037,7 +2037,12 @@
             dateFormat: "h:i", // 12-hour format without AM/PM
             time_24hr: false,  // Ensures 12-hour format
             minuteIncrement: 1, // Allows 1-minute steps
-
+            // developer.min.css force-hides .flatpickr-am-pm below 424px; now that
+            // flatpickr's own popover always mounts on mobile (disableMobile:true,
+            // set globally), undo that here so AM/PM stays visible on phones too.
+            onReady: function (selectedDates, dateStr, instance) {
+                instance.amPM.style.setProperty('display', 'inline-block', 'important');
+            }
         });
         $('#Employee').select2({
             placeholder: "Select Employees", // Placeholder text
@@ -2087,10 +2092,10 @@
             scrollX: true,
             "iDisplayLength": 10,
         });
-        $('.datepicker').datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,      // Close the picker after selection
-            todayHighlight: true  // Highlight today's date
+        flatpickr('#DutyRosterCreateDatePickerFilter', {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
 
         // Dates that selected employee(s) already have duty roster - disable in calendar (per employee, not resort)
@@ -2385,6 +2390,12 @@
                     dateFormat: "h:i", // 12-hour format without AM/PM
                     time_24hr: false,  // Ensures 12-hour format
                     minuteIncrement: 1, // Allows 1-minute steps
+                    // developer.min.css force-hides .flatpickr-am-pm below 424px; now that
+                    // flatpickr's own popover always mounts on mobile (disableMobile:true,
+                    // set globally), undo that here so AM/PM stays visible on phones too.
+                    onReady: function (selectedDates, dateStr, instance) {
+                        instance.amPM.style.setProperty('display', 'inline-block', 'important');
+                    }
                 });
             }
             $("#ShiftOverTime").val(overtime);
@@ -2460,7 +2471,7 @@
                             }
                             else
                             {
-                                toastr.error(response.message,"error", { positionClass: 'toast-bottom-right'});
+                                toastr.error(response.message,"Error", { positionClass: 'toast-bottom-right'});
 
                             }
 

@@ -867,17 +867,19 @@ class DashboardController extends Controller
         // full-access users see all incidents, other-dept HOD/EXCOM see
         // their own dept's reported incidents.
         $incidents = $this->scopeForCurrentViewer(Incidents::query())
+            ->with('categoryName')
             ->orderBy('created_at', 'desc')
             ->limit(5)
             ->get()
             ->map(function ($item) {
                 // Combine incident_date and incident_time into full datetime
                 $datetime = Carbon::parse($item->incident_date . ' ' . $item->incident_time);
-    
+
                 return [
                     'id' => $item->id,
                     'title' => $item->incident_name,
                     'description' => $item->description,
+                    'category' => optional($item->categoryName)->category_name ?? 'Uncategorized',
                     'scheduled_time' => $datetime->format('g:i A'), // e.g., "2:00 PM"
                     'day_label' => $datetime->isToday() ? 'Today' : ($datetime->isTomorrow() ? 'Tomorrow' : $datetime->format('d M Y')),
                     'time_ago' => $datetime->diffForHumans(), // now accurate

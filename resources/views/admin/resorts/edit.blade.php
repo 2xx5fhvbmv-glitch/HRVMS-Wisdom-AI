@@ -303,7 +303,7 @@
             <hr/>
             <div class="row">
               <div class="col-lg-12">
-                <label class="form-label" for="same_billing_address">Same Resort Address in to Billing
+                <label class="form-label" for="same_billing_address">Same Resort Address into Billing
                   Address?</label>
                   <span class="red-mark">*</span>
                   <div class="row">

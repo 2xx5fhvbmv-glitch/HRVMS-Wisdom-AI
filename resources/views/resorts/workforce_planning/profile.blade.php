@@ -134,7 +134,7 @@
                             </div>
                             <div class="col-md-4">
                                 <label for="emp-grade-select" class="form-label">ATOLL <span class="req_span">*</span></label>
-                                <input type="text" id="state " name="state" class="form-control" placeholder="Please enter ATOLL " value="{{ old('ATOLL',isset($profile->state ) ? $profile->state : '') }}"/>
+                                <input type="text" id="state " name="state" class="form-control" placeholder="Please enter ATOLL " value="{{ old('state',isset($profile->state ) ? $profile->state : '') }}"/>
                             </div>
                             <div class="col-md-4">
                                 <label for="emp-grade-select" class="form-label">City <span class="req_span">*</span></label>
@@ -160,7 +160,7 @@
             @csrf
             <div class="card">
                 <div class="card-title">
-                    <h3>Change Pasword </h3>
+                    <h3>Change Password </h3>
                 </div>
 
                 <div class="talentAc-block">
@@ -189,7 +189,7 @@
 
                         <!-- Confirm Password Field -->
                         <div class="col-md-4">
-                            <label for="emp-grade-select" class="form-label">Confirm passwords <span class="req_span">*</span></label>
+                            <label for="emp-grade-select" class="form-label">Confirm Password <span class="req_span">*</span></label>
                             <div class="input-password">
                                 <input type="password" id="confirmpassword" name="confirmpassword" class="form-control" value="{{ old('confirmpassword') }}"/>
                                 <button  type="button" id="toggleConfirmPassword">

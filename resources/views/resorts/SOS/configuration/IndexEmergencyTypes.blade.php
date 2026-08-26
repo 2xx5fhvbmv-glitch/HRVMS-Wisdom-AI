@@ -104,7 +104,7 @@
                         </div>
                         <div id="custom-fields-container"></div>
                         <div class="col-12">
-                            <button id="add-custom-field" type="button" class="btn eb-btn-accent btn-sm">Add custom Field </button>
+                            <button id="add-custom-field" type="button" class="btn eb-btn-accent btn-sm">Add Custom Field</button>
                         </div>
                     </div>
                 </div>

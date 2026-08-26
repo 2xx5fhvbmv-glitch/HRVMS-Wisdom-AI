@@ -28,11 +28,94 @@
 <script src="{{ URL::asset('resorts_assets/js/toastr.min.js')}}"></script>
 {{-- <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-validate/1.19.3/jquery.validate.min.js"></script> --}}
 {{-- <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script> --}}
+<script>
+    // Toastr re-theme glue (see toastr-theme.css). One place so every existing
+    // toastr.success/error/warning/info(...) call app-wide gets the new frosted
+    // look automatically — nothing about the calls themselves changes.
+    // Pure CSS drives the countdown/hover-pause motion; this only wires the
+    // one small progress-bar element the CSS animates, since toastr's own
+    // JS-interval progress bar can't pause cleanly on hover (it resets the
+    // bar to empty instead — verified in toastr's own source), and provides
+    // wisdomToast(), the one helper for flash messages / sticky validation lists.
+    // Set by wisdomToast() immediately before calling toastr, read by onShown
+    // below — onShown fires synchronously (showMethod:'show' has no duration),
+    // during that same call, so this has to be set *before* toastr[type]() is
+    // called, not after (a .data() flag set on the returned element would be
+    // read by onShown before it was ever set).
+    var wtPendingSticky = false;
+    if (window.toastr) {
+        toastr.options.closeButton = true;
+        toastr.options.progressBar = false; // replaced by our own CSS-driven .wt-prog bar
+        toastr.options.closeOnHover = false; // toastr's native hover-pause snaps the bar to empty; ours pauses in place
+        toastr.options.showMethod = 'show';
+        toastr.options.hideMethod = 'hide';
+        toastr.options.timeOut = toastr.options.timeOut || 4500;
+        toastr.options.extendedTimeOut = toastr.options.timeOut;
+        toastr.options.onShown = function () {
+            var $t = $(this);
+            if (wtPendingSticky) { wtPendingSticky = false; return; } // sticky: no countdown, manual close only
+            $t.append(
+                $('<span class="wt-prog"></span>')
+                    .css('animation-duration', toastr.options.timeOut + 'ms')
+                    .on('animationend', function () { toastr.clear($t); })
+            );
+        };
+    }
+
+    /**
+     * wisdomToast(type, title, message, opts) — the one helper for flash
+     * messages and validation-error bags. type: 'success'|'error'|'warning'|'info'.
+     * opts.list: string[] -> rendered as a bulleted list under message and
+     * forces the toast sticky (manual close only, no countdown) since a user
+     * can't act on several errors in a few seconds.
+     */
+    function wisdomToast(type, title, message, opts) {
+        if (!window.toastr) return;
+        opts = opts || {};
+        var sticky = !!opts.sticky || !!(opts.list && opts.list.length);
+        var esc = function (s) {
+            return String(s).replace(/[&<>"']/g, function (c) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+            });
+        };
+        var html = esc(message || '');
+        if (opts.list && opts.list.length) {
+            html += '<ul class="wt-errlist">' + opts.list.map(function (i) { return '<li>' + esc(i) + '</li>'; }).join('') + '</ul>';
+        }
+        wtPendingSticky = sticky;
+        var $toast = toastr[type](html, title, {
+            timeOut: sticky ? 0 : toastr.options.timeOut,
+            extendedTimeOut: sticky ? 0 : toastr.options.timeOut,
+            escapeHtml: false
+        });
+        return $toast;
+    }
+</script>
 <script src="{{ URL::asset('applicant_form_assets/js/croppie.js')}}"></script>
 <script src="{{ URL::asset('resorts_assets/additionalJs/swatalart.min.js') }}"></script>
 <script src="{{ URL::asset('resorts_assets/additionalJs/sweetalert2.js') }}"></script>
 @include('resorts.layouts._confirm')
 <script src="{{ URL::asset('resorts_assets/js/flatpickr.min.js')}}"></script>
+<script>
+    // App-wide calendar header: plain centered "Month Year" text with only
+    // prev/next arrow navigation — no month dropdown, no year spin/edit.
+    // One place so every flatpickr instance picks it up, not per-page config.
+    if (window.flatpickr) {
+        flatpickr.setDefaults({
+            // Without this, flatpickr silently swaps to the browser's own native
+            // date/time input on any touch/mobile device — none of the teal
+            // theming (or the 12h AM/PM time UI) applies there otherwise.
+            disableMobile: true,
+            monthSelectorType: 'static',
+            onReady: [function (selectedDates, dateStr, instance) {
+                if (instance.currentYearElement) instance.currentYearElement.readOnly = true;
+            }],
+            onMonthChange: [function (selectedDates, dateStr, instance) {
+                if (instance.currentYearElement) instance.currentYearElement.readOnly = true;
+            }]
+        });
+    }
+</script>
 <script src="{{ URL::asset('resorts_assets/js/jQuery.print.js')}}"></script>
 <script src="{{ URL::asset('resorts_assets/js/chartjs-chart-treemap.js')}}"></script>
 <script src="{{ URL::asset('resorts_assets/js/socket.io.min.js')}}"></script>
@@ -671,6 +754,35 @@
         $(".select2t-none").select2({
             minimumResultsForSearch: -1,
         });
+
+        // Many .select2t-none selects use an empty-value first <option>
+        // (e.g. "Select Learning") as a placeholder, not select2's own
+        // `placeholder` config — so it renders as a normal (dark)
+        // selection, not select2's lighter placeholder text. A
+        // templateSelection callback here would fix that, but most pages
+        // also call $('.select2t-none').select2() a second time with no
+        // options in their own @section('import-scripts') (which runs
+        // after this file, per js.blade.php's own @yield('import-scripts')
+        // placement) — that reinit silently drops any callback set here.
+        // Driving it off the live <select> value instead, via delegated
+        // events, survives being reinitialized any number of times.
+        function s2SyncEmptyState($select) {
+            $select.next('.select2-container').find('.select2-selection__rendered')
+                .toggleClass('s2-empty-opt', !$select.val());
+        }
+        $(document).on('select2:select select2:unselect select2:clear change', '.select2t-none', function () {
+            s2SyncEmptyState($(this));
+        });
+        // setTimeout(0), not $(window).on('load'): most pages reinit
+        // .select2t-none a second time in their own @section('import-
+        // scripts'), which runs later in the same document.ready pass —
+        // window 'load' fires too unpredictably late (after images/etc)
+        // to be the right signal here. setTimeout(0) just needs to run
+        // after the current synchronous script pass, which is exactly
+        // where any such reinit already happened.
+        setTimeout(function () {
+            $('.select2t-none').each(function () { s2SyncEmptyState($(this)); });
+        }, 0);
         $(".switch-toggle").click(function() {
             console.log($(this));
         });
@@ -679,11 +791,19 @@
         $('#division-select').select2({
             dropdownParent: $('#add-divisionmodal')
         });
-        $(".occupancydate").datepicker({
-            dateFormat: 'dd-mm-yy'
+        // Themed flatpickr, not the unbranded bootstrap-datepicker this used
+        // before. `dateFormat: 'dd-mm-yy'` was never actually a bootstrap-
+        // datepicker option (that plugin only reads `format:`) — it was
+        // silently ignored, so this field has always submitted bootstrap-
+        // datepicker's own default m/d/Y. Matching that exactly here so the
+        // submitted value is unchanged; not "fixing" the stale option name,
+        // since that could change what gets submitted to whatever reads it.
+        var occupancydateFp = flatpickr(".occupancydate", {
+            dateFormat: 'm/d/Y',
+            allowInput: true,
+            appendTo: document.body,
+            defaultDate: new Date()
         });
-        var currentDate = new Date();
-        $(".occupancydate").datepicker("setDate",currentDate);
         // Register custom validation method
         $.validator.addMethod('greaterThanOrEqual', function(value, element, param) {
             var target = $(param);
@@ -1029,7 +1149,7 @@
                 year: { required: true },
             },
             messages: {
-                year: { required: "Please Select Year." },
+                year: { required: "Please select a year." },
             },
 
             submitHandler: function(form) {
@@ -1392,7 +1512,7 @@
             },
             messages: {
                 importFile: {
-                    required: "Please select File.",
+                    required: "Please select a file.",
                     fileType: "Please upload a file of type: .xls, .xlsx, or .csv."
     
                 }
@@ -1502,6 +1622,16 @@
                 
             }
         });
+        // Bell badge only ever counted up (live-push handler above) with
+        // nothing to count it back down on mark-as-read, so it went stale
+        // the moment a user read/cleared notifications without a page
+        // reload. Shared by both mark-read paths below.
+        function decrementNotificationBadge() {
+            var $badge = $('.notification-nav > span').first();
+            var n = parseInt($badge.text(), 10) - 1;
+            $badge.text(n > 0 ? n : '');
+        }
+
         $(document).on("click",".MarkNotification",function(){
             id = $(this).data('id');
             $.ajax({
@@ -1513,6 +1643,7 @@
                         if (response.success) {
 
                             $(".class_remove_me_"+id).remove();
+                            decrementNotificationBadge();
 
                         } else {
                             toastr.error(response.msg, "Error", {
@@ -1533,6 +1664,9 @@
                     url: "{{ route('resort.Mark.Notification') }}",
                     type: "POST",
                     data: {"_token":"{{ csrf_token() }}","id":id},
+                    success: function(response) {
+                        if (response.success) decrementNotificationBadge();
+                    }
                 });
             }
         });

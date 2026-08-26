@@ -95,7 +95,7 @@
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="form-label fw-bold" style="color:#9e9e9e;">POOR Range</label>
-                            <input type="text" name="poor_range" class="form-control" placeholder="e.g. Below than 85%">
+                            <input type="text" name="poor_range" class="form-control" placeholder="e.g. Below 85%">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold" style="color:#9e9e9e;">POOR Points</label>

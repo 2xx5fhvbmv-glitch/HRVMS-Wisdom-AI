@@ -45,7 +45,7 @@
                                 <a href="#" class="text-lightblue me-sm-3  fw-500 fs-13">WSB : $11,985</a>
                                 <a href="#bulk-incrementView-modal" data-bs-toggle="modal" class="btn btn-xs btn-themeBlue mx-2">Bulk Increment</a>
                                 <a href="{{route('resort.budget.comparebudget')}}" class="btn btn-xs btn-coolblue order-sm-last me-sm-0 me-3">
-                                    compare
+                                    Compare
                                 </a>
                             </div>
                         </div>
@@ -58,7 +58,7 @@
                             <tr>
                                 <th></th>
                                 <th class="text-nowrap">Positions</th>
-                                <th class="text-nowrap">No. of position</th>
+                                <th class="text-nowrap">No. Of Positions</th>
                                 <th class="text-nowrap">Employee Name</th>
                                 <th class="text-nowrap w-120">Rank</th>
                                 <th class="text-nowrap">Nation</th>
@@ -171,7 +171,7 @@
                                     </tr>
                                 @endforeach
                             @else
-                                <th colspan="18">No Record Found..</th>
+                                <th colspan="18">No Record Found.</th>
                             @endif
                         </tbody>
                         <tfoot>

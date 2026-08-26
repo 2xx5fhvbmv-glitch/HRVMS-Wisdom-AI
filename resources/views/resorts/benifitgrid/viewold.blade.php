@@ -81,7 +81,7 @@
                         <tr>
                             <th class="text-nowrap">Accommodation Status</th>
                             <td class="text-nowrap">{{$benefit_grid->accommodation_status}}</td>
-                            <th class="text-nowrap">Furnitures and Fixtures</th>
+                            <th class="text-nowrap">Furniture and Fixtures</th>
                             <td class="text-nowrap">{{$benefit_grid->furniture_and_fixtures}}</td>
                         </tr>
                         <tr>
@@ -125,7 +125,7 @@
                         <tr>
                             <th class="text-nowrap">Food And Beverages Discount(In %)</th>
                             <td class="text-nowrap">{{$benefit_grid->food_and_beverages_discount}}</td>
-                            <th class="text-nowrap">Alchoholic Beverages Discount(In %)</th>
+                            <th class="text-nowrap">Alcoholic Beverages Discount(In %)</th>
                             <td class="text-nowrap">{{$benefit_grid->alchoholic_beverages_discount}}</td>
                         </tr>
                         <tr>
@@ -159,7 +159,7 @@
                         <tr>
                             <th class="text-nowrap">Ticket upon termination</th>
                             <td class="text-nowrap">{{$benefit_grid->ticket_upon_termination}}</td>
-                            <th class="text-nowrap">MALE Subsistence Allowance(In Dollars)</th>
+                            <th class="text-nowrap">Male Subsistence Allowance(In Dollars)</th>
                             <td class="text-nowrap">{{$benefit_grid->male_subsistence_allowance}}</td>
                         </tr>
                         <tr>

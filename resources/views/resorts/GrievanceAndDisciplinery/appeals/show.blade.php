@@ -228,9 +228,7 @@
 $(function () {
     var appealId = '{{ base64_encode($appeal->id) }}';
 
-    if ($.fn.datepicker) {
-        $('.datepicker').datepicker({ format: 'dd/mm/yyyy', autoclose: true, todayHighlight: true });
-    }
+    flatpickr('.datepicker', { dateFormat: 'd/m/Y', allowInput: true, appendTo: document.body });
     if ($.fn.select2) {
         $('.select2-multi').select2({ width: '100%', placeholder: 'Select participants', dropdownParent: $('#scheduleHearingModal') });
     }

@@ -45,7 +45,7 @@
                         </div>
                         <div class="col-xl-2 col-md-3 col-sm-4 col-6">
                             <select class="form-select  Positions" name="Positions">
-                                <option selected disabled>Select Poitions</option>
+                                <option selected disabled>Select Positions</option>
                            </select>
                         </div>
                         {{-- <div class="col-xl-2 col-md-3 col-sm-4 col-6">
@@ -226,7 +226,7 @@
                 messages :
                 {
                     Reason: {
-                        required: "Reason is not exitest.",
+                        required: "Reason does not exist.",
                     }
                     ,
                     applicant_status_id: {

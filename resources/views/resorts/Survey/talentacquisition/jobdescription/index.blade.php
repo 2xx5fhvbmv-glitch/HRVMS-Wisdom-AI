@@ -1,5 +1,5 @@
 @extends('resorts.layouts.app')
-@section('page_tab_title' ,"Telent Acquisition ")
+@section('page_tab_title' ,"Talent Acquisition ")
 
     @if ($message = Session::get('success'))
         <div class="alert alert-success">
@@ -39,7 +39,7 @@
                             <div class="col-xl-2 col-md-3 col-sm-4 col-6">
                                 <select class="form-select" id="complianceSelect">
                                     <option value="Approved" selected>Compliance Passed</option>
-                                    <option value="Rejected">Compliance  Rejeted</option>
+                                    <option value="Rejected">Compliance Rejected</option>
                                 </select>
                             </div>
                         </div>

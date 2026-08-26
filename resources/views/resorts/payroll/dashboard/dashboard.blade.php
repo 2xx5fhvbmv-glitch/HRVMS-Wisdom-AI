@@ -56,7 +56,6 @@
     .wai-narrative .wai-row-body { flex: 1 1 auto; min-width: 0; }
     .wai-narrative .wai-row-body h6 { margin: 0 0 4px; font-size: 13.5px; font-weight: 700; color: #14232A; }
     .wai-narrative .wai-row-text { margin: 0 0 4px; font-size: 12.5px; color: #5D6F75; line-height: 1.5; }
-    .wai-narrative .wai-row-recommendation { margin: 0 0 4px; font-size: 12.5px; color: #0e8a9e; line-height: 1.5; }
     .wai-narrative .wai-row-link { display: inline-block; margin-top: 2px; font-size: 12px; font-weight: 600; color: #014653; }
 
     /* ---- Payroll Overview card (redesigned Payroll Expenses chart) ----
@@ -610,7 +609,7 @@
             <div class="col-lg-2 @if(App\Helpers\Common::checkRouteWisePermission('payroll.run',config('settings.resort_permissions.view')) == false) d-none @endif">
                 <div class="card">
                     <div class="card-title">
-                        <h3>Payroll overview</h3>
+                        <h3>Payroll Overview</h3>
                     </div>
                     <div class="mb-xl-4 mb-3">
                         <label for="month" class="form-label">MONTH</label>
@@ -661,10 +660,16 @@
                                 <div class="wai-row-body">
                                     <h6>{{ $payrollInsights[$pc['key']]['title'] ?? '' }}</h6>
                                     <p class="wai-row-text">{{ $payrollInsights[$pc['key']]['body'] ?? '' }}</p>
-                                    @if($hasRecommendation)
-                                        <p class="wai-row-recommendation"><strong>Recommendation:</strong> {{ $payrollInsights[$pc['key']]['recommendation'] }}</p>
-                                    @endif
-                                    <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#{{ $pc['modal'] }}" class="wai-row-link">View details &rarr;</a>
+                                    <div class="lnkrow">
+                                        @if($hasRecommendation)
+                                            <button type="button" class="lnk-rec"
+                                                data-title="{{ $payrollInsights[$pc['key']]['title'] ?? '' }}"
+                                                data-rec="{{ $payrollInsights[$pc['key']]['recommendation'] }}"
+                                                data-details="{{ $pc['modal'] }}">View recommendation &rarr;</button>
+                                            <span class="sep"></span>
+                                        @endif
+                                        <a href="#" class="lnk" data-details="{{ $pc['modal'] }}">View details &rarr;</a>
+                                    </div>
                                 </div>
                             </div>
                         @endforeach
@@ -1118,6 +1123,7 @@
 </div>
 
 @include('resorts.payroll.dashboard._insight_modals')
+@includeWhen(isset($payrollInsights), 'partials._wai_insight_modals')
 @include('resorts.payroll.dashboard._estimate_breakdown_modal')
 @endsection
 
@@ -1150,45 +1156,83 @@
             return $('<div>').text(s == null ? '' : s).html();
         }
 
-        function renderLineGroup($container, items, sign) {
+        // Renders the .cat rows immediately (label/count/amount only — cheap)
+        // but does NOT build each row's .emp-list content yet. The raw item
+        // is stashed on the sibling .emp-list via .data() and only turned
+        // into .er rows the first time that row is expanded (see the
+        // delegated click handler below) — keeps the collapsed popover
+        // cheap regardless of how many employees are in a category.
+        function renderCategoryList($container, items, sign) {
             $container.empty();
-            items.forEach(function (item, idx) {
-                var amtClass = sign === '+' ? 'peb-earn' : 'peb-ded';
+            items.forEach(function (item) {
+                var isZero = !item.amount || Math.abs(item.amount) < 0.005;
+                var amtClass = sign === '+' ? 'pos' : 'neg';
                 var amtDisplay = (sign === '+' ? '' : '−') + money(Math.abs(item.amount));
-                var $line = $('<div class="peb-line"></div>');
-                var $head = $(
-                    '<div class="peb-line-head">' +
-                        '<div class="peb-line-main">' +
-                            '<div class="peb-line-name">' + escapeHtml(item.label) + '</div>' +
-                            '<div class="peb-line-count">' + item.employee_count + ' employee' + (item.employee_count === 1 ? '' : 's') + '</div>' +
-                        '</div>' +
-                        '<div class="peb-line-right">' +
-                            '<div class="peb-line-amt ' + amtClass + '">' + amtDisplay + '</div>' +
-                        '</div>' +
-                        '<span class="peb-chevron">›</span>' +
-                    '</div>'
-                );
-                var $detail = $('<div class="peb-line-detail"></div>');
-                (item.employees || []).forEach(function (emp) {
-                    var ctx = emp.context ? ' <span class="peb-emp-ctx">&middot; ' + escapeHtml(emp.context) + '</span>' : '';
-                    $detail.append(
-                        '<div class="peb-emp-row">' +
-                            '<span class="peb-emp-avatar">' + escapeHtml(emp.initials) + '</span>' +
-                            '<span class="peb-emp-name">' + escapeHtml(emp.name) + ctx + '</span>' +
-                            '<span class="peb-emp-amt">' + money(emp.amount) + '</span>' +
-                        '</div>'
-                    );
-                });
-                if (item.employee_count > (item.employees || []).length) {
-                    $detail.append('<div class="peb-view-all">View all ' + item.employee_count + ' &rarr;</div>');
-                } else if (!item.employees || item.employees.length === 0) {
-                    $detail.append('<div class="peb-view-all peb-empty-line">No employees in this category yet.</div>');
+
+                var $cat = $('<div class="cat"></div>');
+                if (isZero) {
+                    $cat.addClass('zero');
+                } else {
+                    $cat.attr('data-toggle', '');
                 }
-                $line.append($head).append($detail);
-                $head.on('click', function () { $line.toggleClass('open'); });
-                $container.append($line);
+                $cat.html(
+                    '<span class="nm">' + escapeHtml(item.label) + '</span>' +
+                    '<span class="emp">' + item.employee_count + '</span>' +
+                    '<span class="amt ' + (isZero ? '' : amtClass) + '">' + amtDisplay + '</span>' +
+                    '<span class="cv">&rsaquo;</span>'
+                );
+
+                var $list = $('<div class="emp-list"></div>');
+                if (!isZero) $list.data({ item: item, sign: sign });
+
+                $container.append($cat).append($list);
             });
         }
+
+        function buildEmpList($list, item, sign) {
+            var amtClass = sign === '+' ? 'pos' : 'neg';
+            var employees = item.employees || [];
+            var $scroll = $('<div class="emp-scroll"></div>');
+            employees.forEach(function (emp) {
+                $scroll.append(
+                    '<div class="er">' +
+                        '<span class="av">' + escapeHtml(emp.initials) + '</span>' +
+                        '<span class="who">' +
+                            '<span class="n">' + escapeHtml(emp.name) + '</span>' +
+                            '<span class="dp">' + escapeHtml(emp.context || '') + '</span>' +
+                        '</span>' +
+                        '<span class="ev ' + amtClass + '">' + money(emp.amount) + '</span>' +
+                    '</div>'
+                );
+            });
+            $list.empty().append($scroll);
+            if (item.employee_count > employees.length) {
+                $list.append('<div class="viewall"><a href="#">View all ' + item.employee_count + ' &rarr;</a></div>');
+            } else if (employees.length === 0) {
+                $list.append('<div class="viewall empty-line">No employees in this category yet.</div>');
+            }
+        }
+
+        // Accordion: opening one category row closes any other open row in
+        // the same frame (Earnings and Deductions accordion independently).
+        // Delegated on the content wrapper since rows are (re)built by JS.
+        $('#pebBreakdownContent').on('click', '.cat[data-toggle]', function () {
+            var $row = $(this);
+            var $list = $row.next('.emp-list');
+            var $frame = $row.closest('.frame');
+            var wasOpen = $row.hasClass('open');
+
+            $frame.find('.cat.open').removeClass('open');
+            $frame.find('.emp-list.on').removeClass('on');
+            if (wasOpen) return;
+
+            $row.addClass('open');
+            $list.addClass('on');
+            if (!$list.data('built')) {
+                buildEmpList($list, $list.data('item'), $list.data('sign'));
+                $list.data('built', true);
+            }
+        });
 
         function loadBreakdown() {
             $('#pebBreakdownLoading').removeClass('d-none');
@@ -1206,33 +1250,41 @@
                 $('#pebPeriodLabel').text('Estimated Payroll · ' + data.period_label);
                 $('#pebCycleLabel').text('Day ' + data.day_of_period + ' of ' + data.total_days);
                 $('#pebCycleFill').css('width', Math.min(100, (data.day_of_period / data.total_days * 100)) + '%');
+                $('#pebCyclePct').text(Math.floor(Math.min(100, data.day_of_period / data.total_days * 100)) + '%');
                 $('#pebToday').text(money(data.as_of_today));
                 $('#pebNet').text(money(data.net));
-                $('#pebFootCaption').text('Computed from live payroll data · refreshed today, ' + moment().format('h:mm A') + '. Estimate until the run is finalized.');
+                var footCaption = 'Computed from live payroll data · refreshed today, ' + moment().format('h:mm A') + '. Estimate until the run is finalized.';
+                $('#pebFootCaption, #pebActivityFootCaption').text(footCaption);
 
                 if (data.as_of_yesterday !== null && data.as_of_yesterday !== undefined) {
                     $('#pebYesterday').text(money(data.as_of_yesterday));
                     $('#pebYesterdayDate').text(moment(data.as_of_yesterday_date).format('D MMM') + ', end of day');
                     var delta = data.as_of_today - data.as_of_yesterday;
-                    var $delta = $('#pebDelta').removeClass('down');
+                    var $delta = $('#pebDelta');
                     if (Math.abs(delta) >= 0.01) {
                         var pct = data.as_of_yesterday !== 0 ? (delta / Math.abs(data.as_of_yesterday) * 100) : null;
                         var pctText = pct !== null ? ' (' + Math.abs(pct).toFixed(1) + '%)' : '';
                         $delta.text((delta >= 0 ? '▲ ' : '▼ ') + money(Math.abs(delta)) + pctText + ' vs. yesterday');
-                        if (delta < 0) $delta.addClass('down');
                     } else {
                         $delta.text('No change vs. yesterday');
                     }
                 } else {
                     $('#pebYesterday').text('—');
                     $('#pebYesterdayDate').text('period just started');
-                    $('#pebDelta').removeClass('down').text('');
+                    $('#pebDelta').text('');
                 }
 
-                $('#pebEarnTotal').text(money(data.gross));
-                $('#pebDedTotal').text('−' + money(data.deductions_total));
-                renderLineGroup($('#pebEarningsList'), data.earnings, '+');
-                renderLineGroup($('#pebDeductionsList'), data.deductions, '-');
+                $('#pebEarnTotalHead, #pebEarnTotalFoot').text(money(data.gross));
+                $('#pebDedTotalHead, #pebDedTotalFoot').text('−' + money(data.deductions_total));
+                renderCategoryList($('#pebEarningsList'), data.earnings, '+');
+                renderCategoryList($('#pebDeductionsList'), data.deductions, '-');
+
+                // Single largest deduction gets the thin red left-edge flag.
+                var maxIdx = -1, maxAbs = 0;
+                data.deductions.forEach(function (d, i) {
+                    if (Math.abs(d.amount) > maxAbs) { maxAbs = Math.abs(d.amount); maxIdx = i; }
+                });
+                if (maxIdx >= 0) $('#pebDeductionsList').children('.cat').eq(maxIdx).addClass('attn');
 
                 $('#pebBreakdownContent').removeClass('d-none');
                 breakdownLoaded = true;
@@ -1242,21 +1294,26 @@
             });
         }
 
+        // Same .er row shape as the breakdown drill-down, per the design
+        // spec — enriched with a status pill on the name line and
+        // time/note on the department line, since an activity row carries
+        // more context (status, time, note) than a plain earnings row.
         function renderActivityRows(rows) {
             var $list = $('#pebActivityList');
             rows.forEach(function (row) {
                 var pillClass = row.status === 'Present' ? 'present' : (row.status === 'Absent' ? 'absent' : (row.status === 'OT' ? 'ot' : 'dayoff'));
-                var dept = row.department ? ' <span class="peb-a-dept">&middot; ' + escapeHtml(row.department) + '</span>' : '';
-                var amtClass = row.type === 'earn' ? 'peb-earn' : 'peb-ded';
-                var time = row.time ? row.time + ' · ' : '';
+                var amtClass = row.type === 'earn' ? 'pos' : 'neg';
+                var dept = row.department ? escapeHtml(row.department) : '';
+                var time = row.time ? escapeHtml(row.time) + ' · ' : '';
+                var metaBits = [dept, (time + escapeHtml(row.note || '')).trim()].filter(Boolean).join(' &middot; ');
                 $list.append(
-                    '<div class="peb-activity-row">' +
-                        '<span class="peb-a-avatar">' + escapeHtml(row.initials) + '</span>' +
-                        '<div class="peb-a-main">' +
-                            '<div class="peb-a-name">' + escapeHtml(row.name) + dept + '<span class="peb-status-pill ' + pillClass + '">' + escapeHtml(row.status) + '</span></div>' +
-                            '<div class="peb-a-meta">' + time + escapeHtml(row.note) + '</div>' +
-                        '</div>' +
-                        '<div class="peb-a-amt ' + amtClass + '">' + money(row.amount) + '</div>' +
+                    '<div class="er">' +
+                        '<span class="av">' + escapeHtml(row.initials) + '</span>' +
+                        '<span class="who">' +
+                            '<span class="n">' + escapeHtml(row.name) + '<span class="pill ' + pillClass + '">' + escapeHtml(row.status) + '</span></span>' +
+                            '<span class="dp">' + metaBits + '</span>' +
+                        '</span>' +
+                        '<span class="ev ' + amtClass + '">' + money(row.amount) + '</span>' +
                     '</div>'
                 );
             });
@@ -1308,8 +1365,18 @@
             if (!breakdownLoaded) loadBreakdown();
         });
 
-        $('#peb-tab-activity').on('shown.bs.tab', function () {
-            if ($('#pebActivityList').children().length === 0 && !activityLoading) {
+        // Plain click-based tab switch (not Bootstrap's data-bs-toggle="tab")
+        // — matches the reference's own ~25-line vanilla approach, one less
+        // thing riding on bootstrap.bundle's tab plugin.
+        $('#pebTabBar .t').on('click', function () {
+            var $btn = $(this);
+            if ($btn.hasClass('on')) return;
+            $('#pebTabBar .t').removeClass('on');
+            $('.pay-pop .panel').removeClass('on');
+            $btn.addClass('on');
+            $('#' + $btn.data('panel')).addClass('on');
+
+            if ($btn.attr('id') === 'peb-tab-activity' && $('#pebActivityList').children().length === 0 && !activityLoading) {
                 loadActivity(true);
             }
         });

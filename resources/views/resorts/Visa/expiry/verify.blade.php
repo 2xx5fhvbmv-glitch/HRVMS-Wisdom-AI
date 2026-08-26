@@ -154,10 +154,10 @@ $(document).ready(function()
     var _preSearch = new URLSearchParams(window.location.search).get('search');
     if (_preSearch) { $('.Search').val(_preSearch); }
     FetchIndexDate();
-    $("#datepickerXpact").datepicker({
-        format: 'yyyy-mm-dd',
-        autoclose: true,
-        todayHighlight: true
+    flatpickr('#datepickerXpact', {
+        dateFormat: 'Y-m-d',
+        allowInput: true,
+        appendTo: document.body
     });
     $(document).on('click', '.Categories', function(e) {
         // Remove 'active' from all

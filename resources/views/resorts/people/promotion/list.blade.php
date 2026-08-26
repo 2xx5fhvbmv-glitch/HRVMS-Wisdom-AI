@@ -85,10 +85,10 @@
 @section('import-scripts')
 <script>
     $(document).ready(function () {
-        $('.datepicker').datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,
-            todayHighlight: true
+        flatpickr('.datepicker', {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
         $('.select2t-none').select2();
         getPromotionData();

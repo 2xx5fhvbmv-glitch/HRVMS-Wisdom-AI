@@ -70,7 +70,7 @@
                                 @endif
                         </select>
                     </div>
-                    <div class="col-12"> <label class="form-label mb-2">AVAILABLE ACCOMODATION</label>
+                    <div class="col-12"> <label class="form-label mb-2">AVAILABLE ACCOMMODATION</label>
                         <div class="card card-small bg">
                             <div class="table-responsive">
                                 <table class="table table-accommodation" id="table-accommodation">
@@ -202,7 +202,7 @@ $(document).ready(function()
         },
         messages: {
             assignId: {
-                required: "Please Select Bed.",
+                required: "Please select a bed.",
             }
         },
         submitHandler: function(form) {

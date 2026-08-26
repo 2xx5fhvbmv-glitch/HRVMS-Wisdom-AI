@@ -38,7 +38,7 @@
                             </div>
                             <div class="col-xl-2 col-md-3 col-sm-4 col-6">
                                 <select class="form-select">
-                                    <option selected>All Department</option>
+                                    <option selected>All Departments</option>
                                     <option value="1">abc</option>
                                     <option value="2">abc</option>
                                 </select>

@@ -20,16 +20,52 @@
 <script src="{{URL::asset('admin_assets/js/parsley.min.js')}}"></script>
 <script src="{{ URL::asset('assets/js/bootstrap-datepicker.min.js') }}"></script>
 <script>
+  // Toastr re-theme glue (see toastr-theme.css, shared with the resort-admin
+  // portal). Pure CSS drives the countdown/hover-pause motion; this only
+  // wires the one small progress-bar element the CSS animates, since
+  // toastr's own JS-interval progress bar can't pause cleanly on hover (it
+  // resets to empty instead of pausing — verified in toastr's own source),
+  // and provides wisdomToast(), the one helper for flash messages / sticky
+  // validation-error lists. The Session::has('message') switch below is
+  // untouched — still the exact same trigger, just rendered with the new look.
   toastr.options.closeButton = true;
-  toastr.options.progressBar = true;
-  toastr.options.hideMethod = 'slideUp';
-  toastr.options.closeEasing = 'swing';
-  toastr.options.showEasing = 'easeOutBounce';
-  toastr.options.postion = 'bottom-right';
-  toastr.options.showDuration = '300';
-  toastr.options.hideDuration = '1000';
-  toastr.options.timeOut = '5000';
-  toastr.options.extendedTimeOut = '1000';
+  toastr.options.progressBar = false; // replaced by our own CSS-driven .wt-prog bar
+  toastr.options.closeOnHover = false; // toastr's native hover-pause snaps the bar to empty; ours pauses in place
+  toastr.options.showMethod = 'show';
+  toastr.options.hideMethod = 'hide';
+  toastr.options.timeOut = 4500;
+  toastr.options.extendedTimeOut = 4500;
+  var wtPendingSticky = false;
+  toastr.options.onShown = function () {
+      var $t = $(this);
+      if (wtPendingSticky) { wtPendingSticky = false; return; }
+      $t.append(
+          $('<span class="wt-prog"></span>')
+              .css('animation-duration', toastr.options.timeOut + 'ms')
+              .on('animationend', function () { toastr.clear($t); })
+      );
+  };
+
+  function wisdomToast(type, title, message, opts) {
+      opts = opts || {};
+      var sticky = !!opts.sticky || !!(opts.list && opts.list.length);
+      var esc = function (s) {
+          return String(s).replace(/[&<>"']/g, function (c) {
+              return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+          });
+      };
+      var html = esc(message || '');
+      if (opts.list && opts.list.length) {
+          html += '<ul class="wt-errlist">' + opts.list.map(function (i) { return '<li>' + esc(i) + '</li>'; }).join('') + '</ul>';
+      }
+      wtPendingSticky = sticky;
+      var $toast = toastr[type](html, title, {
+          timeOut: sticky ? 0 : toastr.options.timeOut,
+          extendedTimeOut: sticky ? 0 : toastr.options.timeOut,
+          escapeHtml: false
+      });
+      return $toast;
+  }
 
   var baseUrl = "{{url('/')}}";
   var dt_format = "{{Common::getDateAndSetFormateToDatepicker()}}";

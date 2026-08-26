@@ -155,7 +155,7 @@
                             </div>
                             <div class="col-md-3">
                                 <label for="emp-grade-select" class="form-label">ATOLL <span class="red-mark">*</span></label>
-                                <input type="text" id="state " name="state" class="form-control" placeholder="Please enter ATOLL " value="{{ old('ATOLL',isset($Resort->state ) ? $Resort->state : '') }}"/>
+                                <input type="text" id="state " name="state" class="form-control" placeholder="Please enter ATOLL " value="{{ old('state',isset($Resort->state ) ? $Resort->state : '') }}"/>
                             </div>
                             <div class="col-md-3">
                                 <label for="emp-grade-select" class="form-label">City <span class="red-mark">*</span> </label>
@@ -304,7 +304,7 @@ $(document).ready(function(){
                 },
                 messages: {
                     currency: {
-                        required: "Please chiose one at  currency.",
+                        required: "Please choose a currency.",
                         // maximum: "request massage must be less than  to 700."
                     },
                     // MVRtoDoller validator removed — the field is now a
@@ -313,13 +313,13 @@ $(document).ready(function(){
                         required: "Exchange rate must be set (1 USD = 15.42 MVR).",
                     },
                     FinalApproval:{
-                        required: "Please Select  Final Approval .",
+                        required: "Please Select Final Approval.",
                     },
                     address1:{
                         required: "Please Enter Address line One.",
                     },
                     address2:{
-                        required: "Please Enter Address line Two",
+                        required: "Please Enter Address line Two.",
                     },
                     country:{
                         required: "Please Enter Country.",

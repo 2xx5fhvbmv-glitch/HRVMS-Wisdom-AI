@@ -73,7 +73,7 @@
 
                        
                         <!-- <div class="col-xl-2 col-md-3 col-sm-4 col-6">
-                            <input type="text"  class="form-control  datepicker" id="RegisterCreateDatePickerFilter" placeholder="Select Date">
+                            <input type="text"  class="form-control " id="RegisterCreateDatePickerFilter" placeholder="Select Date">
 
                         </div> -->
 
@@ -123,7 +123,7 @@
         <div class="modal-dialog modal-dialog-centered modal-md">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="staticBackdropLabel">CheckOut Missing</h5>
+                    <h5 class="modal-title" id="staticBackdropLabel">Checkout Missing</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body ">
@@ -760,10 +760,10 @@
 
     <script type="text/javascript">
     $(document).ready(function() {
-        $('.datepicker').datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,      // Close the picker after selection
-            todayHighlight: true  // Highlight today's date
+        flatpickr('#RegisterCreateDatePickerFilter', {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
 
 

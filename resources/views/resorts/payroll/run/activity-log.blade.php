@@ -95,7 +95,7 @@
                             <th>Field</th>
                             <th>Old Value</th>
                             <th>New Value</th>
-                            <th>Update By</th>
+                            <th>Updated By</th>
                             <th>Updated At</th>
                         </tr>
                     </thead>

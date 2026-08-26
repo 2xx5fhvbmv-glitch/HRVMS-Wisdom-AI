@@ -65,14 +65,14 @@
                                 <select class="form-select select2t-none" id="reminder_frequency" name="reminder_frequency" required  aria-label="Default select example">
                                     <option selected readonly disabled>Select Reminder Frequency</option>
                                     @for($i = 1; $i <= 7; $i++)
-                                        <option value="{{ $i }}">Send Reminder in Every {{ $i }} Days</option>
+                                        <option value="{{ $i }}">Send Reminder Every {{ $i }} Days</option>
                                     @endfor
                                 </select>
                             </div>
 
                             <div class="col-xl-6 col-md-6 col-sm-6 col-12">
                                 <label for="select_dep" class="form-label">DEADLINE FOR RESPONSE <span class="req_span">*</span></label>
-                                <input type="text" class="form-control datepicker" name="deadline_date" id="datapicker_modal" placeholder="Select Date" required data-placeholder="Select Date"/>
+                                <input type="text" class="form-control" name="deadline_date" id="datapicker_modal" placeholder="Select Date" required data-placeholder="Select Date"/>
                             </div>
                             
                         </div>
@@ -98,10 +98,10 @@
 @section('import-scripts')
 <script>
    $(document).ready(function() {
-        $('.datepicker').datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,
-            todayHighlight: true
+        flatpickr('#datapicker_modal', {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
 
     });

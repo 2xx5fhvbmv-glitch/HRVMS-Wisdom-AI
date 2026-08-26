@@ -124,7 +124,7 @@
                         <input type="hidden" value="1"  id="AppendGrievanceCatAndSubCatCount">
                         <div class="row align-items-end g-md-4 g-3 mb-md-4 mb-3 AppendGrievanceCatandSubCat">
                             <div class="col-sm-6">
-                                <label for="gri_cate" class="form-label">dsff  GRIEVANCE CATEGORY <span class="red-mark">*</span></label>
+                                <label for="gri_cate" class="form-label">GRIEVANCE CATEGORY <span class="red-mark">*</span></label>
                                 <select class="form-select select2t-none  Grievance_Cat_idMain"
                                     data-parsley-required="true"
                                     data-flag="Grievance_cat_subcat_part_one"
@@ -441,7 +441,7 @@
                                                 <thead>
                                                     <tr>
                                                         <th>Category Name</th>
-                                                        <th>Templete Name</th>
+                                                        <th>Template Name</th>
                                                         <th>Action</th>
                                                 </th>
                                                 </thead>
@@ -731,7 +731,7 @@
                                             <div id="error-disciplinary_cate_error_one" class="text-danger small"></div>
                                             </div>
                                         <div class="col-sm-4">
-                                            <label for="disciplinary_cate" class="form-label"> Offenses name <span class="red-mark">*</span></label>
+                                            <label for="disciplinary_cate" class="form-label"> Offenses Name <span class="red-mark">*</span></label>
                                             <input type="text"
                                                         name="OffensesName"
                                                         class="form-control"
@@ -744,7 +744,7 @@
                                         <div class="col-sm-4">
                                             <label for="disciplinary_cate" class="form-label"> Offenses Description</label>
                                             <textarea  name="offensesdescription"  data-parsley-nohtml
-                                                    data-parsley-nohtml-message="HTML tags are not allowed." placeholder="offenses description (optional)" class="form-control"></textarea>
+                                                    data-parsley-nohtml-message="HTML tags are not allowed." placeholder="Offenses Description (optional)" class="form-control"></textarea>
                                         </div>
                                     </div>
                                     {{-- Optional defaults — auto-fill Severity / Action when this offence
@@ -1002,7 +1002,7 @@
                                 
                                 <div class="col-md-12">
                                     <label class="form-label"> </label>
-                                    <a href="javascript:void(0)"  class="btn eb-btn-accent btn-sm EmailFreshModal">Create Latter Template</a>
+                                    <a href="javascript:void(0)"  class="btn eb-btn-accent btn-sm EmailFreshModal">Create Letter Template</a>
                                 
                                 </div>
                                 <div class="col-md-12">
@@ -1285,7 +1285,7 @@
     <div class="modal-dialog modal-dialog-centered modal-xl">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="staticBackdropLabel">Letter Templete</h5>
+                <h5 class="modal-title" id="staticBackdropLabel">Letter Template</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form id="LatterTempleteSaveForm">
@@ -1293,12 +1293,12 @@
                     <div class="row mt-2">
                         <div class="col-12">
                             <div class="col-sm-6">
-                                <label for="set_rule" class="form-label">Latter Templete Name <span class="red-mark">*</span></label>
-                                <input type="text" class="form-control" id="Latter_Temp_name" placeholder="Latter Templete Name" name="Latter_Temp_name">
+                                <label for="set_rule" class="form-label">Letter Template Name <span class="red-mark">*</span></label>
+                                <input type="text" class="form-control" id="Latter_Temp_name" placeholder="Letter Template Name" name="Latter_Temp_name">
                             </div>
                         </div>
                         <div class="col-12 mt-3">
-                            <label for="set_rule" class="form-label">Templete Format <span class="red-mark">*</span></label>
+                            <label for="set_rule" class="form-label">Template Format <span class="red-mark">*</span></label>
                             <div id="Latter_Templete-builder"></div>
                         </div>
                         <input type="hidden" name="templeteFlag" id='templeteFlag'>
@@ -1317,7 +1317,7 @@
     <div class="modal-dialog modal-dialog-centered modal-xl">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="staticBackdropLabel">Hearing and Investingation Templete</h5>
+                <h5 class="modal-title" id="staticBackdropLabel">Hearing and Investigation Template</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form id="HearingTempleteSaveForm">
@@ -1325,12 +1325,12 @@
                     <div class="row mt-2">
                         <div class="col-12">
                             <div class="col-sm-6">
-                                <label for="set_rule" class="form-label"> Templete Name <span class="red-mark">*</span></label>
-                                <input type="text" class="form-control" id="Hearing_Temp_name" placeholder="Hearing Templete Name" name="Latter_Temp_name">
+                                <label for="set_rule" class="form-label"> Template Name <span class="red-mark">*</span></label>
+                                <input type="text" class="form-control" id="Hearing_Temp_name" placeholder="Hearing Template Name" name="Latter_Temp_name">
                             </div>
                         </div>
                         <div class="col-12 mt-3">
-                            <label for="set_rule" class="form-label">Templete Format <span class="red-mark">*</span></label>
+                            <label for="set_rule" class="form-label">Template Format <span class="red-mark">*</span></label>
                             <div id="Hearing_Templete-builder"></div>
                         </div>
                         <input type="hidden" name="templeteFlag" id='templeteFlag'>
@@ -1349,7 +1349,7 @@
     <div class="modal-dialog modal-dialog-centered modal-xl">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="staticBackdropLabel">Grievance  Templete Templete</h5>
+                <h5 class="modal-title" id="staticBackdropLabel">Grievance Template</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form id="GrievanceTempleteForm" data-parsley-validate>
@@ -1367,11 +1367,11 @@
                                     @endif
                                 </select>                            </div>
                             <div class="col-sm-6">
-                                <label for="set_rule" class="form-label"> Templete Name <span class="red-mark">*</span></label>
-                                <input type="text" class="form-control" id="Grievance_Temp_name" placeholder="Hearing Templete Name" name="Latter_Temp_name">
+                                <label for="set_rule" class="form-label"> Template Name <span class="red-mark">*</span></label>
+                                <input type="text" class="form-control" id="Grievance_Temp_name" placeholder="Hearing Template Name" name="Latter_Temp_name">
                             </div>
                         <div class="col-12 mt-3">
-                            <label for="set_rule" class="form-label">Templete Format <span class="red-mark">*</span></label>
+                            <label for="set_rule" class="form-label">Template Format <span class="red-mark">*</span></label>
                             <div id="Grievance_Hearing_Templete-builder"></div>
                         </div>
                         <input type="hidden" name="GrievanectempleteFlag" id='GrievanectempleteFlag'>
@@ -1744,7 +1744,7 @@
                 width: '100%'        
             });
             $("#offenses_1").select2({
-                placeholder: "Select Offens",
+                placeholder: "Select Offense",
                 allowClear: true,
                 width: '100%'        
             });
@@ -1806,7 +1806,7 @@
                 width: '100%'        
             });
             $("#high_priority").select2({
-                placeholder: "Select Heigh Priority",
+                placeholder: "Select High Priority",
                 allowClear: true,
                 width: '100%'        
             });
@@ -2025,7 +2025,7 @@
                 messages: {
                     SeverityName:
                     {
-                        required: "Please Enter severity Name.",
+                        required: "Please Enter Severity Name.",
                     },
                 },
                 submitHandler: function(form) {
@@ -2084,7 +2084,7 @@
                 messages: {
                     "KeyPersonnel[]":
                     {
-                        required: "Please select Key Personnel   .",
+                        required: "Please select Key Personnel.",
                     }
                 },
                 submitHandler: function(form) {
@@ -2482,7 +2482,7 @@
                     var Hearing_Temp_name = $('#Hearing_Temp_name').val();
                     if($.trim(Hearing_Temp_name) === "") 
                     {
-                        toastr.error('Please enter  Template Name.', "Error", {
+                        toastr.error('Please enter Template Name.', "Error", {
                             positionClass: 'toast-bottom-right'
                         });
                         return false;
@@ -2684,7 +2684,7 @@
                             width: '100%'        
                         });
                         $("#offenses_"+count).select2({
-                            placeholder: "Select Offens",
+                            placeholder: "Select Offense",
                             allowClear: true,
                             width: '100%'        
                         });
@@ -2931,17 +2931,17 @@
 
            //End of Disciplinery Part  Developer Functionality
             $("#Grievance_Cat_id").select2({
-                placeholder: "Select Greivance Category",
+                placeholder: "Select Grievance Category",
                 allowClear: true,
                 width: '100%'        
             });
             $(".Grievance_Cat_idMain").select2({
-                placeholder: "Select Greivance Category",
+                placeholder: "Select Grievance Category",
                 allowClear: true,
                 width: '100%'        
             });
             $("#GrievanceSubcategories_1").select2({
-                placeholder: `Select Grieveance Sub Category `,
+                placeholder: `Select Grievance Sub Category `,
                 allowClear: true,
                 width: '100%'        
             });
@@ -2972,7 +2972,7 @@
                         required: "Please enter the email template name.",
                     },
                     Action_id: {
-                        required: "Please Select Action .",
+                        required: "Please Select Action.",
                     },
 
                     
@@ -3341,12 +3341,12 @@
                 $(".AppendGrievanceCatandSubCat").append(row);
                 $("#AppendGrievanceCatAndSubCatCount").val(Grievance_CatCount);
                 $("#Grievance_Cat_idMain_"+Grievance_CatCount).select2({
-                    placeholder: "Select Greivance Category",
+                    placeholder: "Select Grievance Category",
                     allowClear: true,
                     width: '100%'        
                 });
                 $("#GrievanceSubcategories_"+Grievance_CatCount).select2({
-                    placeholder: `Select Grieveance Sub Category `,
+                    placeholder: `Select Grievance Sub Category `,
                     allowClear: true,
                     width: '100%'        
                 });
@@ -3566,7 +3566,7 @@
                     $(".AppendGrievanceDelegationRule").append(row);
                     $("#GrievanceDelegationRuleCount").val(count);
                     $("#Grievance_Cat_idMain_"+count).select2({
-                        placeholder: "Select Greivance Category",
+                        placeholder: "Select Grievance Category",
                         allowClear: true,
                         width: '100%'        
                     });
@@ -3908,7 +3908,7 @@
                     $(".AppendGrievanecEscalation").append(row);
                     $("#grivance_escaltion_count").val(count);
                     $("#Grievance_Invest_Cat_idMain_"+count).select2({
-                        placeholder: "Select Greivance Category",
+                        placeholder: "Select Grievance Category",
                         allowClear: true,
                         width: '100%'        
                     })

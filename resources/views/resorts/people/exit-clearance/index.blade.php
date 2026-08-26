@@ -399,7 +399,7 @@
                                 <li class="${value.status === 'Completed' ? 'active' : ''}">
                                     <div>
                                         <h6>${formName}</h6>
-                                        ${value.deadline_date ? `<p>Due Date ${value.deadline_date}</p>` : ''}
+                                        ${value.deadline_date ? `<p>Due Date: ${value.deadline_date}</p>` : ''}
                                     </div>
                                 </li>`;
                             statusList.append(statusItem);

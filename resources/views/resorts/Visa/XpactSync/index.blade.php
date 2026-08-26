@@ -31,7 +31,7 @@
                             <div class="card bg h-100">
                                 <div class="uploadFileNew-block h-100">
                                     <img src="{{URL::asset('resorts_assets/images/upload.svg')}}" alt="icon">
-                                    <h5>Upload Screenshot(S) From Xpat</h5>
+                                    <h5>Upload Screenshot(s) From Xpat</h5>
                                     <input 
                                         type="file" 
                                         id="Xpatfile" 
@@ -44,7 +44,7 @@
                                         data-parsley-fileextension-message="Only JPG, JPEG, PNG, HEIC, HEIF, or PDF files are allowed."
                                         data-parsley-trigger="change"
                                     >
-                                    <p class="mb-0">You can upload Single file.</p>
+                                    <p class="mb-0">You can upload a single file.</p>
                                 </div>
                             </div>
                         </div>
@@ -54,7 +54,7 @@
                             <div class="card bg h-100">
                                 <div class="uploadFileNew-block h-100">
                                     <img src="{{URL::asset('resorts_assets/images/upload.svg')}}" alt="icon">
-                                    <h5>Upload Screenshot(S) From Quota Slot Fees</h5>
+                                    <h5>Upload Screenshot(s) From Quota Slot Fees</h5>
                                     <input 
                                         type="file" 
                                         id="QuotaSlotFees" 
@@ -66,7 +66,7 @@
                                         data-parsley-fileextension="jpg,jpeg,png,heic,heif,pdf"
                                         data-parsley-fileextension-message="Only JPG, JPEG, PNG, HEIC, HEIF, or PDF files are allowed."
                                         data-parsley-trigger="change">
-                                    <p class="mb-0">You can upload Single files.</p>
+                                    <p class="mb-0">You can upload a single file.</p>
                                 </div>
                             </div>
                         </div>
@@ -186,7 +186,7 @@
             } 
             else
              {
-                toster.error("Unsupported file type. Please upload a valid image or PDF file.");
+                toastr.error("Unsupported file type. Please upload a valid image or PDF file.");
                 $("#XpatfilePreviewIMG").hide();
                 $("#XpatfilePreviewPDF").hide();
             }
@@ -219,7 +219,7 @@
             } 
             else
              {
-                toster.error("Unsupported file type. Please upload a valid image or PDF file.");
+                toastr.error("Unsupported file type. Please upload a valid image or PDF file.");
                 $("#QuotaSlotFeesPreviewIMG").hide();
                 $("#QuotaSlotFeesPreviewPDF").hide();
             }
@@ -281,7 +281,7 @@
         if ($(this).parsley().isValid())
         {
             $(".SubmitFile").addClass('eb-btn-critical').removeClass('eb-btn-primary')
-                   .html("Please Wait AI Insights is Working Don't Refresh Page")
+                   .html("Please Wait, AI Insights is Working. Don't Refresh Page")
                    .attr('data-processing', 'true');
             
             // Add beforeunload event to prevent page refresh

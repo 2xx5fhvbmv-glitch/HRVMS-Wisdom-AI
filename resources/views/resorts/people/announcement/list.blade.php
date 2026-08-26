@@ -97,9 +97,10 @@
     $(document).ready(function(){
        getAnnouncement();
        $('.select2t-none').select2();
-       $('#dateFilter').datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true
+       flatpickr('#dateFilter', {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
 
        $('#toggleArchivedAnnouncements').change(function () {
@@ -156,7 +157,7 @@
             wisdomConfirm({
                 role: 'positive',
                 title: 'Restore this announcement?',
-                text: 'It will be moved back to active list.',
+                text: 'It will be moved back to the active list.',
                 confirmText: 'Yes, Restore'
             }).then((result) => {
                 if (result.isConfirmed) {

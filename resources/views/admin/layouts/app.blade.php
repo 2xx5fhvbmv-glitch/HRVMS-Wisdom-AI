@@ -26,6 +26,17 @@
     @include('admin.layouts.footer')
   </div>
   @include('admin.layouts.js')
+
+  @if ($errors->any())
+  <script>
+      document.addEventListener('DOMContentLoaded', function () {
+          wisdomToast('error', 'Please fix the following', 'A few things need attention before you can continue:', {
+              list: @json($errors->all())
+          });
+      });
+  </script>
+  @endif
+
   @include('partials.global-loader')
 </body>
 </html>

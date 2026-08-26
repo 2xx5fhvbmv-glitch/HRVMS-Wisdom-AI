@@ -153,7 +153,7 @@ input[type="checkbox"].form-check-input:checked + .custom-checkbox-label::after 
                                                             </tr>
                                                         @else
                                                             <tr>
-                                                                <td>No Pages Found..</td>
+                                                                <td>No Pages Found.</td>
                                                             </tr>
                                                         @endif
                                                         <tr>

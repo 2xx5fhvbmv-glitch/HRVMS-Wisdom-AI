@@ -102,16 +102,16 @@
                                 <div class="input-group value-input-group">
                                     {{-- Currency prefix (system symbol) shown when Fixed is selected --}}
                                     <span class="input-group-text currency-prefix">{{ Common::GetResortCurrencySymbol() }}</span>
-                                    <input type="number" class="form-control value" name="value" placeholder="Enter fixed value" required min="0" max="999999.99" data-parsley-required-message="Please Enter Amout/Percentage Increment"/>
+                                    <input type="number" class="form-control value" name="value" placeholder="Enter fixed value" required min="0" max="999999.99" data-parsley-required-message="Please enter amount/percentage increment"/>
                                     {{-- Percentage suffix shown when Percentage is selected --}}
                                     <span class="input-group-text percent-suffix d-none">%</span>
                                 </div>
                             </div>
                             <div class="col-xxl col-xl-3 col-md-4 col-sm-6">
-                                <input type="text" class="form-control datepicker" name="effected_date" placeholder="Effective Date" required data-parsley-required-message="Please Select Effective Date"/>
+                                <input type="text" class="form-control datepicker" name="effected_date" placeholder="Effective Date" required data-parsley-required-message="Please select effective date"/>
                             </div>
                             <div class="col-xxl col-xl-3 col-md-4 col-sm-6">
-                                <input type="text" class="form-control" name="remark" placeholder="Remark" required data-parsley-required-message="Please Enter remarks"/>
+                                <input type="text" class="form-control" name="remark" placeholder="Remark" required data-parsley-required-message="Please enter remarks"/>
                             </div>
                         <div class="col-xxl col-xl-3 col-md-4 col-sm-6">
                             <button href="#" class="btn btn-themeBlue w-100" type="submit">Apply To Selected</button></div>
@@ -292,12 +292,11 @@
         // Initialise placeholder on first render for every form on the page.
         $('.pay-increase-type').each(function () { applyValuePlaceholder($(this)); });
 
-        $(".datepicker").datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,
-            todayHighlight: true,
-            startDate: new Date() // Disables all past dates
-
+        flatpickr(".datepicker", {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body,
+            minDate: "today" // Disables all past dates
         });
 
              $('#selectEmp').on('change', function () {

@@ -330,7 +330,9 @@ class TrainingScheduleController extends Controller
 
            
             $notificationTitle = 'Training Sceduled';
-            $notificationMessage = "Training '{$learningProgram->name}' has been scheduled from {$request->start_date} to {$request->end_date}, between {$request->start_time} - {$request->end_time}.";
+            $notificationMessage = "Training '{$learningProgram->name}' has been scheduled from "
+                . Common::formatDate($request->start_date) . " to " . Common::formatDate($request->end_date)
+                . ", between " . Common::formatDisplayTime($request->start_time) . " - " . Common::formatDisplayTime($request->end_time) . ".";
             $moduleName = "Learning";
 
             event(new ResortNotificationEvent(Common::nofitication(
@@ -554,7 +556,8 @@ class TrainingScheduleController extends Controller
 
                 // Construct the notification message
                 $notificationTitle = 'Training Schedule Updated';
-                $notificationMessage = "The schedule for '{$trainingName}' has been updated. New dates: From {$schedule->start_date} to {$schedule->end_date}.";
+                $notificationMessage = "The schedule for '{$trainingName}' has been updated. New dates: From "
+                    . Common::formatDate($schedule->start_date) . " to " . Common::formatDate($schedule->end_date) . ".";
 
                 $moduleName = "Learning";
 

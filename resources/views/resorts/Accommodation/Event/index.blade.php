@@ -164,10 +164,10 @@
         $(".RoomNo").select2({
           placeholder:'Select RoomNo',
         });
-        $("#start_date").datepicker({
-                format: 'dd/mm/yyyy',
-                autoclose: true,      // Close the picker after selection
-                todayHighlight: true  // Highlight today's date
+        flatpickr('#start_date', {
+                dateFormat: 'd/m/Y',
+                allowInput: true,
+                appendTo: document.body
             });
 
 
@@ -197,22 +197,22 @@
             },
             messages: {
                 date: {
-                    required: "Please Select date.",
+                    required: "Please select date.",
                 },
                 building_id: {
-                    required: "Please Select Building.",
+                    required: "Please select building.",
                 },
                 start_time: {
-                    required: "Please Select Start Time.",
+                    required: "Please select start time.",
                 },
                 end_time: {
-                    required: "Please Select End Time.",
+                    required: "Please select end time.",
                 },
                 descriptionIssues: {
-                    required: "Please Enter description.",
+                    required: "Please enter description.",
                 },
                 priority: {
-                    required: "Please Select Priority.",
+                    required: "Please select priority.",
                 }
             },
             submitHandler: function(form) {

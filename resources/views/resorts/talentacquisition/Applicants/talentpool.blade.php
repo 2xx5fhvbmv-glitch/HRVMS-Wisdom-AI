@@ -48,7 +48,7 @@
                         @endif
                         <div class="col-xl-2 col-md-3 col-sm-4 col-6">
                             <select class="form-select  Positions" name="Positions">
-                                <option selected disabled>Select Poitions</option>
+                                <option selected disabled>Select Positions</option>
                            </select>
                         </div>
                         {{-- <div class="col-xl-2 col-md-3 col-sm-4 col-6">
@@ -197,23 +197,7 @@
     </div>
 
     {{-- File Viewer Modal --}}
-    <div class="modal fade" id="bdVisa-iframeModel-modal-lg" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Download File</h5>
-                    <a href="" class="btn btn-sm eb-btn-secondary downloadLink" target="_blank">Download</a>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="ratio ratio-21x9" id="ViewModeOfFiles"></div>
-                </div>
-                <div class="modal-footer">
-                    <a href="javascript:void(0)" id="document-dismiss" class="btn ta-btn-secondary ms-auto">Cancel</a>
-                </div>
-            </div>
-        </div>
-    </div>
+    @include('partials._file_view_modal', ['cancelId' => 'document-dismiss'])
 
 @endsection
 
@@ -225,10 +209,11 @@
 <script>
     $(document).ready(function () {
 
-        $('#consent_expiry_date').datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,
-            startDate: 'today',
+        flatpickr('#consent_expiry_date', {
+            dateFormat: 'd/m/Y',
+            minDate: 'today',
+            allowInput: true,
+            appendTo: document.body
         });
 
         // Was firing a full grid-HTML AJAX reload on every keystroke — typing
@@ -355,7 +340,7 @@
                 messages :
                 {
                     Reason: {
-                        required: "Reason is not exitest.",
+                        required: "Reason does not exist.",
                     }
                     ,
                     applicant_status_id: {

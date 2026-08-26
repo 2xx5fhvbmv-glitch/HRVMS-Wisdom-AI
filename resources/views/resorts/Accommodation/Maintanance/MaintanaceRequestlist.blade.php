@@ -97,7 +97,7 @@
                 <div class="modal-body">
                     <div class="bg-themeGrayLight DetailsShow">
 
-                 xzc   </div>
+                    </div>
                     <div><label for="select_emp" class="form-label">SELECT EMPLOYEE</label>
                         <select class="form-select select2t-none" name="HOD_id" id="select_emp" aria-label="Default select example">
                             <option> </option>
@@ -387,7 +387,7 @@
                     $(row).addClass('danger-tr');
                     $(row).attr('data-bs-toggle', 'tooltip');
                     $(row).attr('data-bs-placement', 'top');
-                    $(row).attr('title', '{{ $EscalationDay }} day(s) has passed for this request, kindly resolve this.');
+                    $(row).attr('title', '{{ $EscalationDay }} day(s) have passed for this request, kindly resolve this.');
                     new bootstrap.Tooltip(row);
                 }
             }

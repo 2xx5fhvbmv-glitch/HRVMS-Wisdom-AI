@@ -190,6 +190,7 @@
             </div>
         </div>
     </div>
+    @include('partials._checkinout_modal')
     @endsection
     @section('import-css')
     @include('resorts.timeandattendance._taa_buttons_v2_styles')
@@ -441,40 +442,25 @@
         });
     });
 
-    // Handle manual check-in/check-out actions (same as dashboard: modal with time input)
+    // Handle manual check-in/check-out actions — confirm dialog is the shared
+    // openCheckInOutModal (see partials._checkinout_modal); submit itself is
+    // unchanged (same ManualCheckInOut endpoint/payload as before).
     $(document).on("click", ".manual-check-action", function() {
         const rosterId = $(this).data('roster-id');
         const action = $(this).data('action');
         const employeeName = $(this).data('employee-name');
+        const shiftName = $(this).data('shift-name');
+        const employeeImage = $(this).data('employee-image');
         const date = $(this).data('date');
         const time = $(this).data('time');
-        const actionText = action === 'check_in' ? 'Check-In' : 'Check-Out';
-        const button = $(this);
-        const row = button.closest('tr');
 
-        wisdomConfirm({
-            role: action === 'check_in' ? 'positive' : 'warning',
-            title: `Confirm ${actionText}`,
-            confirmText: `Yes, ${actionText}`,
-            extra: {
-                html: `
-                    <p>Are you sure you want to record ${actionText.toLowerCase()} for ${employeeName}?</p>
-                    <label class="mt-2 d-block">Time</label>
-                    <input type="text" id="manualTime" class="swal2-input" placeholder="e.g. 09:00 AM" required>
-                `,
-                didOpen: () => {
-                    const timeInput = document.getElementById('manualTime');
-                    if (timeInput && time) {
-                        timeInput.value = time;
-                    }
-                }
-            }
-        }).then((result) => {
-            if (result.isConfirmed) {
-                const selectedTime = (document.getElementById('manualTime') && document.getElementById('manualTime').value) ? document.getElementById('manualTime').value : time;
-                // Disable button during request
-                button.prop('disabled', true).html('<i class="fa fa-spinner fa-spin me-1"></i>Processing...');
-
+        openCheckInOutModal({
+            action: action,
+            employeeName: employeeName,
+            shiftLabel: shiftName,
+            employeeImage: employeeImage,
+            time: time,
+            onConfirm: function (selectedTime, reset, close) {
                 $.ajax({
                     url: "{{ route('resort.timeandattendance.ManualCheckInOut') }}",
                     type: 'POST',
@@ -486,7 +472,9 @@
                         time: selectedTime
                     },
                     success: function(response) {
+                        reset();
                         if (response.success) {
+                            close();
                             wisdomAlert({
                                 type: 'success',
                                 title: 'Success!',
@@ -501,16 +489,15 @@
                                 title: 'Error!',
                                 text: response.message || 'An error occurred.'
                             });
-                            button.prop('disabled', false);
                         }
                     },
                     error: function(xhr) {
+                        reset();
                         wisdomAlert({
                             type: 'error',
                             title: 'Error!',
                             text: 'An error occurred while processing the request.'
                         });
-                        button.prop('disabled', false);
                         console.error('Error:', xhr);
                     }
                 });

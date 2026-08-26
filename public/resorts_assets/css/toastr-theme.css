@@ -1,0 +1,176 @@
+/* Toastr re-theme — app-wide (loaded once per guard, right after toastr's own
+   CSS, so these override it). Restyles toastr's own rendered markup only — no
+   new library, no new markup beyond one small progress-bar <span> the JS
+   glue appends (see js.blade.php / js1.blade.php / admin/layouts/js.blade.php).
+   Zero blue anywhere; icons are inline SVG data-URIs, no extra requests. */
+
+#toast-container {
+    pointer-events: none;
+}
+#toast-container > div {
+    /* Reset toastr's own dark colored boxes + default PNG icon; frosted glass
+       replaces both. */
+    background-color: transparent !important;
+    background-image: none !important;
+    opacity: 1 !important;
+    pointer-events: auto;
+    position: relative;
+    overflow: hidden;
+    width: 350px;
+    max-width: calc(100vw - 44px);
+    margin: 0 0 12px;
+    padding: 15px 15px 15px 62px !important;
+    border-radius: 22px;
+    background-color: rgba(255,255,255,.74) !important;
+    -webkit-backdrop-filter: blur(26px) saturate(160%);
+    backdrop-filter: blur(26px) saturate(160%);
+    border: 1px solid rgba(255,255,255,.7);
+    box-shadow: 0 20px 50px rgba(1,70,83,.18), 0 2px 8px rgba(1,70,83,.06);
+    font-family: 'Poppins', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    animation: wt-slidein .45s cubic-bezier(.16,1,.3,1) both;
+}
+#toast-container > div:hover {
+    box-shadow: 0 20px 50px rgba(1,70,83,.18), 0 2px 8px rgba(1,70,83,.06) !important;
+    cursor: default;
+}
+@keyframes wt-slidein {
+    0%   { transform: translateX(40px) scale(.96); opacity: 0; }
+    60%  { opacity: 1; }
+    100% { transform: translateX(0) scale(1); opacity: 1; }
+}
+
+.toast-title { font-size: 13.5px; font-weight: 600; color: var(--ink, #14232A); }
+.toast-message, .toast-message a, .toast-message label {
+    font-size: 12.5px; color: var(--muted, #6B7378) !important; margin-top: 2px; line-height: 1.45;
+}
+.toast-message a:hover { color: var(--teal, #014653) !important; }
+
+/* semantic icon badge — one solid color square, white glyph, the one focal
+   point against the calm glass; drawn entirely with CSS + an inline SVG
+   data-URI, no icon font, no extra HTTP request */
+#toast-container > div::before {
+    content: '';
+    position: absolute;
+    left: 15px; top: 15px;
+    width: 34px; height: 34px;
+    border-radius: 10px;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: 17px 17px;
+}
+.toast-success::before {
+    background-color: var(--positive, #1F9D6B);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='17' height='17' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.6'%3E%3Cpath d='M20 6L9 17l-5-5'/%3E%3C/svg%3E");
+    animation: wt-glow-ok 1s ease-out .35s both;
+}
+.toast-error::before {
+    background-color: var(--error, #E5573F);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='17' height='17' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.6'%3E%3Cpath d='M18 6L6 18M6 6l12 12'/%3E%3C/svg%3E");
+}
+.toast-warning::before {
+    background-color: var(--warning, #D98A00);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='17' height='17' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.6'%3E%3Cpath d='M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z'/%3E%3C/svg%3E");
+    animation: wt-glow-warn 1s ease-out .35s both;
+}
+.toast-info::before {
+    background-color: var(--teal, #014653);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='17' height='17' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='2.6'%3E%3Cpath d='M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4'/%3E%3Cpath d='M16 17l5-5-5-5M21 12H9'/%3E%3C/svg%3E");
+    animation: wt-glow-info 1s ease-out .35s both;
+}
+/* errors get a shake too — they should demand more attention than a success */
+.toast-error {
+    animation: wt-slidein .45s cubic-bezier(.16,1,.3,1) both, wt-shake .4s ease .45s both;
+}
+.toast-error::before {
+    animation: wt-glow-err 1s ease-out .35s both;
+}
+
+@keyframes wt-glow-ok   { 0% { box-shadow: 0 0 0 3px rgba(31,157,107,.55), 0 0 22px 6px rgba(31,157,107,.5); } 100% { box-shadow: 0 0 0 0 rgba(31,157,107,0), 0 0 0 0 rgba(31,157,107,0); } }
+@keyframes wt-glow-err  { 0% { box-shadow: 0 0 0 3px rgba(229,87,63,.6), 0 0 22px 7px rgba(229,87,63,.55); } 100% { box-shadow: 0 0 0 0 rgba(229,87,63,0), 0 0 0 0 rgba(229,87,63,0); } }
+@keyframes wt-glow-warn { 0% { box-shadow: 0 0 0 3px rgba(217,138,0,.55), 0 0 22px 6px rgba(217,138,0,.5); } 100% { box-shadow: 0 0 0 0 rgba(217,138,0,0), 0 0 0 0 rgba(217,138,0,0); } }
+@keyframes wt-glow-info { 0% { box-shadow: 0 0 0 3px rgba(1,70,83,.5), 0 0 22px 6px rgba(1,70,83,.45); } 100% { box-shadow: 0 0 0 0 rgba(1,70,83,0), 0 0 0 0 rgba(1,70,83,0); } }
+@keyframes wt-shake { 0%, 100% { margin-left: 0; } 20% { margin-left: -6px; } 40% { margin-left: 5px; } 60% { margin-left: -3px; } 80% { margin-left: 2px; } }
+
+/* close button — quiet, not toastr's bold white X */
+.toast-close-button {
+    position: absolute; top: 10px; right: 10px;
+    width: 24px; height: 24px; border-radius: 7px;
+    color: var(--faint, #99A1A5) !important;
+    text-shadow: none !important;
+    opacity: 1 !important;
+    font-size: 15px;
+    display: grid; place-items: center;
+    transition: background .15s, color .15s;
+}
+.toast-close-button:hover, .toast-close-button:focus {
+    background: var(--line-2, #EEF4F4);
+    color: var(--ink, #14232A) !important;
+    opacity: 1 !important;
+}
+
+/* legacy native progress bar (any call that still gets toastr's own
+   JS-driven bar) — restyled to the thin semantic look. The JS glue disables
+   this in favor of a CSS-driven bar with true hover-pause (see below); this
+   rule is a harmless fallback if progressBar is ever left on. */
+.toast-progress {
+    height: 2.5px !important;
+    background-color: var(--muted, #6B7378) !important;
+    opacity: 1 !important;
+}
+.toast-success .toast-progress { background-color: var(--positive, #1F9D6B) !important; }
+.toast-error   .toast-progress { background-color: var(--error, #E5573F) !important; }
+.toast-warning .toast-progress { background-color: var(--warning, #D98A00) !important; }
+.toast-info    .toast-progress { background-color: var(--teal, #014653) !important; }
+
+/* CSS-driven progress bar the JS glue appends — true pause-on-hover, no JS
+   timer: the bar's own animationend event is what triggers dismissal. */
+.wt-prog {
+    position: absolute; left: 0; bottom: 0; height: 2.5px; width: 100%;
+    transform-origin: left;
+    background-color: var(--muted, #6B7378);
+    animation: wt-shrink linear forwards;
+}
+.toast-success .wt-prog { background-color: var(--positive, #1F9D6B); }
+.toast-error   .wt-prog { background-color: var(--error, #E5573F); }
+.toast-warning .wt-prog { background-color: var(--warning, #D98A00); }
+.toast-info    .wt-prog { background-color: var(--teal, #014653); }
+@keyframes wt-shrink { to { transform: scaleX(0); } }
+/* the one required behavior: pause the countdown on hover, resume on leave —
+   pure CSS, no JS timers driving it */
+#toast-container > div:hover .wt-prog { animation-play-state: paused; }
+
+/* sticky validation-error list — bulleted, scrolls if long, no progress bar
+   (manual close only; a user can't act on 6 errors in a few seconds) */
+.wt-errlist {
+    list-style: none;
+    margin-top: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 150px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+.wt-errlist li {
+    position: relative;
+    padding-left: 15px;
+    font-size: 12px;
+    color: var(--ink, #14232A) !important;
+    line-height: 1.5;
+}
+.wt-errlist li::before {
+    content: '';
+    position: absolute;
+    left: 3px; top: 7px;
+    width: 5px; height: 5px;
+    border-radius: 50%;
+    background: var(--error, #E5573F);
+}
+.wt-errlist::-webkit-scrollbar { width: 5px; }
+.wt-errlist::-webkit-scrollbar-thumb { background: var(--line, #E2EBEC); border-radius: 3px; }
+
+@media (prefers-reduced-motion: reduce) {
+    #toast-container > div, .toast-error, .toast-success::before, .toast-error::before, .toast-warning::before, .toast-info::before {
+        animation: none !important;
+    }
+}

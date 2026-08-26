@@ -47,7 +47,7 @@
                                                 @if(isset($permission['module_page']))
                                                     {{ $permission['module_page']->page_name }}
                                                 @else
-                                                    Page Not found Please Contact To Super Admin
+                                                    Page not found. Please contact the Super Admin.
                                                 @endif
                                             </td>
                                             <td>

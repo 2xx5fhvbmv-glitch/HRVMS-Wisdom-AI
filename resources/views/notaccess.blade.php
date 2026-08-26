@@ -31,7 +31,7 @@
                 </div>
 
                 <div class="card-body">
-                    <h4>This page Permission is not found. Please Contact to Resort Admin</h4>
+                    <h4>This page's permission is not found. Please contact the Resort Admin.</h4>
                 </div>
 
             </div>

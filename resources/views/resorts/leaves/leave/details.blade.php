@@ -566,8 +566,10 @@
 @section('import-scripts')
 <script type="text/javascript">
     $(document).ready(function () {
-        $('.datepicker').datepicker({
-
+        flatpickr('.datepicker', {
+            dateFormat: 'm/d/Y',
+            allowInput: true,
+            appendTo: document.body
         });
         $('#table-leaveHistory').DataTable({
             searching: false,

@@ -86,7 +86,7 @@
                                     </div>
                                     <div class="col-lg-6">
                                         <label for="start_date" class="form-label">EXPECTED START DATE <span class="req_span">*</span></label>
-                                        <input type="text" id="start_date" name="start_date" class="form-control datepicker"
+                                        <input type="text" id="start_date" name="start_date" class="form-control" autocomplete="off"
                                             placeholder="Select Expected Start Date">
                                     </div>
                                     {{-- END DATE field hidden 2026-04-26 — backing column is now nullable.
@@ -123,10 +123,18 @@
 <script>
     
     $(document).ready(function () {
-        $(".datepicker").datepicker({
-            format: 'dd-mm-yyyy',
-            autoclose: true,
-            todayHighlight: true
+        // Themed flatpickr popover, matching the rest of the app — not the
+        // unbranded bootstrap-datepicker this used before. dateFormat stays
+        // ISO ('Y-m-d'); the field is submitted as raw FormData, and the
+        // backend's Carbon::parse() + ->format('Y-m-d') (LearningController
+        // @store) already parses either format fine, so this is presentation
+        // only. altInput shows a friendly dd-mmm-yy display.
+        flatpickr('#start_date', {
+            dateFormat: 'Y-m-d',
+            altInput: true,
+            altFormat: 'd-M-y',
+            allowInput: true,
+            appendTo: document.body
         });
 
         $('.select2t-none').select2();

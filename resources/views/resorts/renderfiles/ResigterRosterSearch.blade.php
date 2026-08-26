@@ -134,8 +134,8 @@
                                             @if ($shiftData->msg =="PleaseCheckout")
                                             <div class="badge badge-themeDanger tt-hover tt-large"><img src="{{ URL::asset('resorts_assets/images/right-danger.svg')}}" alt="">--:--
                                                     <span class="tt-main"><span class="tt-inner">
-                                                        <p><b>Missing CheckOut</b>The Employee has not Checked Out at the
-                                                            expected time. would you like to assign them overtime?
+                                                        <p><b>Missing CheckOut</b> The employee has not checked out at the
+                                                            expected time. Would you like to assign them overtime?
                                                             {{ $shiftData->differenceInHours }}
                                                         </p>
                                                         {{-- <a href="#" class="btn btn-themeSkyblue">Accept</a> --}}

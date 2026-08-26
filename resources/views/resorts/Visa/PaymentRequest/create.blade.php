@@ -82,7 +82,7 @@
                             </div>
                         </div>
                         <div class="col text-end order-md-2 order-1 order-xxl-last">
-                            <span class=" Overall-tot-amount text-nowrap">Total amount: MVR 0.00</span>
+                            <span class=" Overall-tot-amount text-nowrap">Total Amount: MVR 0.00</span>
                         </div>
 
                     </div>
@@ -221,7 +221,7 @@ $(document).ready(function(){
 
         if (selectedEmployees.length === 0)
         {
-            toastr.error("Please select at least one employee", "Error", {
+            toastr.error("Please select at least one employee.", "Error", {
                             positionClass: 'toast-bottom-right'
                         });
 
@@ -249,7 +249,7 @@ $(document).ready(function(){
                 }
             },
             error: function(xhr, status, error) {
-                toster.error("An error occurred while processing your request.");
+                toastr.error("An error occurred while processing your request.");
             }
         });
 

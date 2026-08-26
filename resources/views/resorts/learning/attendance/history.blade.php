@@ -138,9 +138,10 @@
         $('#searchInput, #typeFilter,#dateFilter,#statusFilter').on('keyup change', function () {
             getAttendeesHistory();
         });
-        $('#attendanceDate,#dateFilter').datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true
+        flatpickr('#attendanceDate,#dateFilter', {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
         $('#save-attendance').on('click', function() {
             let trainingScheduleId = $('#trainingScheduleId').val();

@@ -203,7 +203,7 @@
                                 <td>
                                     @if($ApplicantLanguage->isNotEmpty())
                                         @foreach ($ApplicantLanguage as $a)
-                                            <b>Lanugage</b>:  {{ $a->language }}   - <b>Level</b>:  {{ $a->level }}<br>
+                                            <b>Language</b>:  {{ $a->language }}   - <b>Level</b>:  {{ $a->level }}<br>
                                         @endforeach
 
                                     @endif
@@ -634,7 +634,7 @@
                             @if(!empty($Applicant_form_data->InterViewDate) && $Applicant_form_data->InterViewDate != '0000-00-00' && strtotime($Applicant_form_data->InterViewDate) > 0 && !empty($Applicant_form_data->ApplicantInterviewtime))
                             <tr>
                                 <th>Interview Date & Time:</th>
-                                <td>{{ date('d/M/Y',strtotime($Applicant_form_data->InterViewDate)) }} -  <b>Applicant Time </b> :-{{ $Applicant_form_data->ApplicantInterviewtime}}  :   <b>Maldivan Time</b>:-{{ $Applicant_form_data->ResortInterviewtime}} </td>
+                                <td>{{ date('d/M/Y',strtotime($Applicant_form_data->InterViewDate)) }} -  <b>Applicant Time </b> :-{{ $Applicant_form_data->ApplicantInterviewtime}}  :   <b>Maldivian Time</b>:-{{ $Applicant_form_data->ResortInterviewtime}} </td>
                             </tr>
                             @endif
                             @if($Applicant_form_data->MeetingLink)
@@ -657,7 +657,7 @@
                                 @if(!empty($interview->InterViewDate))
                                 <tr>
                                     <th>Interviewer -  {{ $interview->rank_name }}  {{ $interview->ApplicantInterviewtime}}:</th>
-                                    <td>{{ $interview->InterViewDate}}  - <b>Applicant Time </b> :-{{ $interview->ApplicantInterviewtime}}  <b>Maldivan Time</b>:-{{ $interview->ResortInterviewtime}}
+                                    <td>{{ $interview->InterViewDate}}  - <b>Applicant Time </b> :-{{ $interview->ApplicantInterviewtime}}  <b>Maldivian Time</b>:-{{ $interview->ResortInterviewtime}}
                                         <div class="tableUser-block mt-2">
                                             <div class="img-circle"><img src="{{ URL::asset('resorts_assets/images/user-2.svg')}}" alt="user">
                                             </div>
@@ -701,7 +701,7 @@
                                 @endforeach
                             @else
                             <tr>
-                                <th colspan="2" >Interview Not Schedule at</th>
+                                <th colspan="2" >Interview Not Scheduled</th>
                             </tr>
                             @endif
 

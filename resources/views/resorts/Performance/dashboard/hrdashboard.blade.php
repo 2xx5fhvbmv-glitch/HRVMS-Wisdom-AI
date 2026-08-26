@@ -51,7 +51,6 @@
     .wai-narrative .wai-row-body { flex: 1 1 auto; min-width: 0; }
     .wai-narrative .wai-row-body h6 { margin: 0 0 4px; font-size: 13.5px; font-weight: 700; color: #14232A; }
     .wai-narrative .wai-row-text { margin: 0 0 4px; font-size: 12.5px; color: #5D6F75; line-height: 1.5; }
-    .wai-narrative .wai-row-recommendation { margin: 0 0 4px; font-size: 12.5px; color: #0e8a9e; line-height: 1.5; }
     .wai-narrative .wai-row-link { display: inline-block; margin-top: 2px; font-size: 12px; font-weight: 600; color: #014653; }
 </style>
 @include('resorts.Performance._performance_buttons_v2_styles')
@@ -264,10 +263,16 @@
                                 <div class="wai-row-body">
                                     <h6>{{ $c['title'] ?? $card['fallback'] }}</h6>
                                     <p class="wai-row-text">{{ $c['body'] ?? '' }}</p>
-                                    @if($hasRecommendation)
-                                        <p class="wai-row-recommendation"><strong>Recommendation:</strong> {{ $c['recommendation'] }}</p>
-                                    @endif
-                                    <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#{{ $card['modal'] }}" class="wai-row-link">View details &rarr;</a>
+                                    <div class="lnkrow">
+                                        @if($hasRecommendation)
+                                            <button type="button" class="lnk-rec"
+                                                data-title="{{ $c['title'] ?? $card['fallback'] }}"
+                                                data-rec="{{ $c['recommendation'] }}"
+                                                data-details="{{ $card['modal'] }}">View recommendation &rarr;</button>
+                                            <span class="sep"></span>
+                                        @endif
+                                        <a href="#" class="lnk" data-details="{{ $card['modal'] }}">View details &rarr;</a>
+                                    </div>
                                 </div>
                             </div>
                         @endforeach
@@ -472,7 +477,7 @@
                 </div>
                 <div>
                     <label for="holiday_ot" class="form-label">Holiday OT</label>
-                    <input type="text" id="holiday_ot" class="form-control" value="$142.00 (70Hrs)">
+                    <input type="text" id="holiday_ot" class="form-control" value="$142.00 (70 Hrs)">
                 </div>
 
             </div>
@@ -485,6 +490,7 @@
 </div>
 
 @include('resorts.Performance.dashboard._insight_modals')
+@includeWhen(isset($pi), 'partials._wai_insight_modals')
 @endsection
 
 @section('import-css')

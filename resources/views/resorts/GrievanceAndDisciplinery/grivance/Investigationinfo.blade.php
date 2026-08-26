@@ -57,18 +57,18 @@
                                         </span>
                                         @elseif($Grivance_Parent->Grivance_Submission_Type =="No")
                                             <span class="text-themeprimary text-nowrap" style="color: red;">
-                                                 Not a Confidentiality
+                                                 Not Confidentiality
                                             </span>
                                         @else
                                             <span class="text-themeprimary text-nowrap" style="color: rgb(157, 47, 82);">
-                                                Not A Applicable
+                                                Not Applicable
                                             </span>
                                         @endif
-                                            
+
                                     </td>
                                 </tr>
                                 <tr>
-                                    <th>Attachements:</th>
+                                    <th>Attachments:</th>
                                     <td>@foreach(\App\Helpers\Common::resolveGrievanceAttachments($Grivance_Parent->Attachements, $path."/".$Grivance_Parent->Grivance_id, $Grivance_Parent->resort_id) as $att)
                                             <a target="_blank" href="{{ $att['url'] }}">{{ $att['filename'] }}</a></br>
                                         @endforeach
@@ -105,11 +105,11 @@
                                         </span>
                                         @elseif($Grivance_Parent->Grivance_Submission_Type =="No")
                                             <span class="text-themeprimary text-nowrap" style="color: red;">
-                                                 Not a Confidentiality
+                                                 Not Confidentiality
                                             </span>
                                         @else
                                             <span class="text-themeprimary text-nowrap" style="color: rgb(157, 47, 82);">
-                                                Not A Applicable
+                                                Not Applicable
                                             </span>
                                         @endif
                                     </h6>
@@ -206,7 +206,7 @@
                             <table class="table ">
                                 <thead>
                                     <tr>
-                                        <th>Out-come Type</th>
+                                        <th>Outcome Type</th>
                                         <th>{{ ucfirst($Grivance_Parent->outcome_type) }}</th>
                                     </tr>
                                     <tr>
@@ -283,10 +283,10 @@
 $(document).ready(function() {
     $("#investigationReportSubmit").parsley();
 
-    $('.approvedrejacted').datepicker({
-        format: 'dd/mm/yyyy',
-        autoclose: true,      // Close the picker after selection
-        todayHighlight: true  // Highlight today's date
+    flatpickr('.approvedrejacted', {
+        dateFormat: 'd/m/Y',
+        allowInput: true,
+        appendTo: document.body
     });
     
 

@@ -182,7 +182,7 @@
                                         </tr>
                                         <tr>
                                             <td style="font-weight: 500;padding: 16px 4px 0 0;white-space: nowrap;vertical-align: top;">
-                                                Total Amount in word:
+                                                Total Amount in Words:
                                             </td>
 
                                             <td style="padding: 16px 0 0 4px;text-align: right;vertical-align: top;">
@@ -285,7 +285,7 @@
                                         </tr>
                                         <tr>
                                             <td style="font-weight: 500;padding: 16px 4px 16px 0;vertical-align: top;white-space: nowrap;border-bottom: 1px solid #3030301A">
-                                                City Ledger
+                                                City Ledger:
                                             </td>
 
                                             <td style="padding: 16px 0 16px 4px;text-align: right;opacity: .6;vertical-align: top;border-bottom: 1px solid #3030301A">

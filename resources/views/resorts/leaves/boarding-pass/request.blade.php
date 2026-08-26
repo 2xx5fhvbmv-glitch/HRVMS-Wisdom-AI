@@ -169,11 +169,11 @@
 <script type="text/javascript">
     // new DataTable('#example');
 $(document).ready(function () {
-    $("#datefilter").datepicker({
-        format: 'dd/mm/yyyy',
-        autoclose: true,      // Close the picker after selection
-        todayHighlight: true, // Highlight today's date
-        endDate: new Date(),
+    flatpickr('#datefilter', {
+        dateFormat: 'd/m/Y',
+        allowInput: true,
+        appendTo: document.body,
+        maxDate: 'today',
     });
     GetApprovedBoradingPasses()
 
