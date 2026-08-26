@@ -8,14 +8,19 @@
     CDN and expose a minimal Echo-compatible facade with the methods the
     existing chat code uses: Echo.channel(name).listen(event, cb).
 
-    Values are read from .env at render time so changing .env + clearing
-    config is enough — no JS rebuild required.
+    Values are read from config() at render time — NOT env() directly.
+    A Blade view is application code, not a config file: once
+    `php artisan config:cache` runs (any standard deploy), env() calls
+    outside config/*.php return null while config() keeps serving the
+    cached real value. With env() here, this whole @if evaluated false
+    on any cached-config environment and the entire script never
+    rendered — Pusher silently never even loaded, no console output at
+    all, live-only (config isn't normally cached in local dev).
 
-    Diagnostics: all subscribe/disconnect/error events are logged to the
-    console under the [pusher-shim] prefix. window.Echo.connector.pusher
-    exposes the underlying Pusher instance for ad-hoc debugging.
+    Changing .env still requires config:cache to be re-run — config()
+    always serves the cached snapshot, not live .env reads.
 --}}
-@if(env('PUSHER_APP_KEY') && env('PUSHER_APP_CLUSTER'))
+@if(config('broadcasting.connections.pusher.key') && config('broadcasting.connections.pusher.options.cluster'))
 <script src="https://js.pusher.com/8.2.0/pusher.min.js"></script>
 <script>
 (function () {
@@ -31,8 +36,8 @@
 
     var csrfToken = (document.querySelector('meta[name="csrf-token"]') || {}).content || '';
 
-    var pusher = new Pusher(@json(env('PUSHER_APP_KEY')), {
-        cluster: @json(env('PUSHER_APP_CLUSTER')),
+    var pusher = new Pusher(@json(config('broadcasting.connections.pusher.key')), {
+        cluster: @json(config('broadcasting.connections.pusher.options.cluster')),
         forceTLS: true,
         // Private/presence channels (Chat Module 1-1 + group threads) need
         // this to reach routes/web.php's /broadcasting/auth — without it
@@ -47,7 +52,7 @@
     });
 
     pusher.connection.bind('connected', function () {
-        console.log('[pusher-shim] connected to cluster ' + @json(env('PUSHER_APP_CLUSTER')));
+        console.log('[pusher-shim] connected to cluster ' + @json(config('broadcasting.connections.pusher.options.cluster')));
     });
     pusher.connection.bind('error', function (err) {
         console.warn('[pusher-shim] connection error', err);
