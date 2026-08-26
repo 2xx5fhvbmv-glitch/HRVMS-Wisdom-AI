@@ -102,7 +102,7 @@ class ResortRegistrationEmail extends ResetPasswordNotification
     // dd($data);
 
     $mail = (new MailMessage)
-    ->from( env("MAIL_FROM_ADDRESS") )
+    ->from( config('mail.from.address'), config('mail.from.name') )
     ->view( $emailPage, $data )
     ->subject(Lang::get($subject));
 

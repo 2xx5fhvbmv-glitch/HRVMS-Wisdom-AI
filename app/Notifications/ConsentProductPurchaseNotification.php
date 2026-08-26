@@ -91,7 +91,7 @@ class ConsentProductPurchaseNotification extends ResetPasswordNotification
     $data['settings'] = $settings;
 
     $mail = (new MailMessage)
-    ->from( env("MAIL_FROM_ADDRESS") )
+    ->from( config('mail.from.address'), config('mail.from.name') )
     ->view( $emailPage, $data )
     ->subject(Lang::get($subject));
     return $mail;
