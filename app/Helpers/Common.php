@@ -197,72 +197,88 @@ class Common
 	        (int) $employee->main_rank === 3 &&
 	        (int) $employee->rank === 1;
 	}
+	/**
+	 * settings is a single global row (branding + date/time format) read
+	 * by ~20 helpers below, several of them now called per-row in
+	 * DataTables columns / notification loops — memoize per request
+	 * instead of re-querying on every call.
+	 */
+	protected static $settingsCache = null;
+
+	public static function getSettings()
+	{
+		if (self::$settingsCache === null) {
+			self::$settingsCache = Settings::first();
+		}
+		return self::$settingsCache;
+	}
+
 	public static function getWebsiteLogo()
 	{
-		$settings = Settings::first();
+		$settings = self::getSettings();
 		$logo = $settings->header_logo ? url(config('settings.site_logo_folder')).'/'.$settings->header_logo : url('admin_assets/images/logo.svg');
 		return $logo;
 	}
 
 	public static function getWebsiteFavicon()
 	{
-		$settings = Settings::first();
+		$settings = self::getSettings();
 		$siteFavicon = $settings->site_favicon ? url(config('settings.site_favicon_folder'))."/".$settings->site_favicon : asset('front_assets/images/favicon.png');
 		return $siteFavicon;
 	}
 
 	public static function getAdminLogo()
 	{
-		$settings = Settings::first();
+		$settings = self::getSettings();
 		$logo = $settings->admin_logo ? url(config('settings.site_logo_folder'))."/".$settings->admin_logo : url('admin_assets/images/logo.svg');
 		return $logo;
 	}
 
 	public static function getWebsiteContact()
 	{
-		$settings = Settings::first();
+		$settings = self::getSettings();
 		$data = $settings->contact_number ? $settings->contact_number : '01223 322200';
 		return $data;
 	}
 
 	public static function getWebsiteEmail()
 	{
-		$settings = Settings::first();
+		$settings = self::getSettings();
 		$data = $settings->email_address ? $settings->email_address : 'info@rutherfordspunting.com';
 		return $data;
 	}
 
 	public static function getTwitterLink()
 	{
-		$settings = Settings::first();
+		$settings = self::getSettings();
 		$data = $settings->linkedin_link ? $settings->linkedin_link : '#';
 		return $data;
 	}
 
 	public static function getFacebookLink()
 	{
-		$settings = Settings::first();
+		$settings = self::getSettings();
 		$data = $settings->facebook_link ? $settings->facebook_link : '#';
 		return $data;
 	}
 
 	public static function getInstagramLink()
 	{
-		$settings = Settings::first();
+		$settings = self::getSettings();
 		$data = $settings->instagram_link ? $settings->instagram_link : '#';
 		return $data;
 	}
 
 	public static function getYoutubeLink()
 	{
-		$settings = Settings::first();
+		$settings = self::getSettings();
 		$data = $settings->youtube_link ? $settings->youtube_link : '#';
 		return $data;
 	}
 
 	public static function getWebsiteLink()
 	{
-		$settings = Settings::first();
+		$settings = self::getSettings();
 		$data = $settings->website ? $settings->website : 'https://projects.spaculus.live/3/wisdomAI/admin';
 		return $data;
 	}
@@ -306,7 +322,7 @@ class Common
 
 	public static function getDateFormateFromSettings()
 	{
-		$settings = Settings::first();
+		$settings = self::getSettings();
 		$format = $settings->date_format ? $settings->date_format : 'Y-m-d';
 		return $format;
 	}
@@ -323,7 +339,7 @@ class Common
 
 	public static function getDateAndSetFormateToDatepicker()
 	{
-		$settings = Settings::first();
+		$settings = self::getSettings();
 		$format = $settings->date_format ? $settings->date_format : 'Y-m-d';
 		$desiredformat = str_replace(
 			['d', 'm', 'y', 'Y'],
@@ -335,7 +351,7 @@ class Common
 
 	public static function getTimeFromSettings()
 	{
-		$settings = Settings::first();
+		$settings = self::getSettings();
 		$format = $settings->time_format ? $settings->time_format : '24';
 		return $format;
 	}
@@ -355,7 +371,7 @@ class Common
 
     public static function getTimeFromSettingsResort()
 	{
-		$settings = Settings::first();
+		$settings = self::getSettings();
 
 		$format = $settings->time_format ? $settings->time_format : '24';
 		return $format;
@@ -375,14 +391,14 @@ class Common
 
 	public static function getWebsiteHeaderLogo()
 	{
-		$settings = Settings::first();
+		$settings = self::getSettings();
 		$logo = $settings->header_logo ? url(config('settings.site_logo_folder'))."/".$settings->header_logo : url('front_assets/images/logo.svg');
 		return $logo;
 	}
 
 	public static function getWebsiteFooterLogo()
 	{
-		$settings = Settings::first();
+		$settings = self::getSettings();
 		$logo = $settings->footer_logo ? url(config('settings.site_logo_folder'))."/".$settings->footer_logo : url('files/logo.png');
 		return $logo;
 	}
@@ -414,7 +430,7 @@ class Common
 
 	public static function getAdminFavicon()
 	{
-		$settings = Settings::first();
+		$settings = self::getSettings();
 		$siteFavicon = $settings->site_favicon ? url(config('settings.site_favicon_folder'))."/".$settings->site_favicon : asset('admin_assets/images/favicon.png');
 		return $siteFavicon;
 	}
@@ -558,7 +574,7 @@ class Common
 
 	public static function cutString($string)
 	{
-		$settings = Settings::first();
+		$settings = self::getSettings();
 		$length = $settings->tour_title_length ? $settings->tour_title_length : 20;
 
 		if (strlen($string) > $length) {
@@ -571,7 +587,7 @@ class Common
 
 	public static function readMoreString($string, $rating_id)
 	{
-		$settings = Settings::first();
+		$settings = self::getSettings();
 		$length = $settings->review_length ? $settings->review_length : 50;
 
 		if (strlen($string) > $length) {
@@ -712,7 +728,7 @@ class Common
 
 	public static function getDateAndSetFormateToSql($date)
 	{
-		$settings = Settings::first();
+		$settings = self::getSettings();
 		$format = $settings->date_format ? $settings->date_format : 'Y-m-d';
 		$parsedDate = Carbon::createFromFormat($format, $date);
 		return $parsedDate->format('Y-m-d');
@@ -835,7 +851,7 @@ class Common
 
 	public static function getAuthorizedSignature()
 	{
-		$settings = Settings::first();
+		$settings = self::getSettings();
 		$authSign = $settings->auth_sign ? url(config('settings.auth_sign_folder'))."/".$settings->auth_sign : asset('front_assets/images/PowerLabs-logo.png');
 		return $authSign;
 	}
