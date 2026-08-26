@@ -1,3 +1,7 @@
+@php
+    $lh = $letterhead ?? ['configured' => false];
+    $hasLetterhead = !empty($lh['configured']) && !empty($lh['headerImage']);
+@endphp
 <html>
 
 <head>
@@ -73,6 +77,37 @@
             border: 1px solid #dcdcdc;
             box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); */
         }
+
+        .letterhead {
+            width: 100%;
+            border-bottom: 2px solid #014753;
+            padding-bottom: 12px;
+            margin: 0 0 20px 0;
+        }
+
+        .letterhead-img {
+            width: 100%;
+            max-height: 110px;
+        }
+
+        .letterhead .logo {
+            height: 56px;
+        }
+
+        .letterhead .resort-name {
+            font-size: 18px;
+            font-weight: 600;
+            color: #014753;
+            margin: 0;
+            letter-spacing: normal;
+        }
+
+        .letterhead-address {
+            font-size: 10px;
+            color: #555;
+            margin-top: 6px;
+            letter-spacing: normal;
+        }
     </style>
 </head>
 
@@ -81,6 +116,38 @@
         <table style="width: 100%;font-family: 'Poppins', sans-serif;border-spacing: 0;background-color:#F5F8F8;">
             <tr>
                 <td style="padding: 25px;">
+                    @if($hasLetterhead)
+                        <div class="letterhead">
+                            <img src="{{ $lh['headerImage'] }}" class="letterhead-img" alt="letterhead">
+                            @if(!empty($lh['addressLine1']) || !empty($lh['addressLine2']) || !empty($lh['contactPhone']) || !empty($lh['contactEmail']) || !empty($lh['website']))
+                                <div class="letterhead-address">
+                                    @if(!empty($lh['addressLine1'])) {{ $lh['addressLine1'] }}@endif
+                                    @if(!empty($lh['addressLine2'])), {{ $lh['addressLine2'] }}@endif
+                                    @if(!empty($lh['contactPhone'])) &nbsp;|&nbsp; Tel: {{ $lh['contactPhone'] }}@endif
+                                    @if(!empty($lh['contactEmail'])) &nbsp;|&nbsp; {{ $lh['contactEmail'] }}@endif
+                                    @if(!empty($lh['website'])) &nbsp;|&nbsp; {{ $lh['website'] }}@endif
+                                </div>
+                            @endif
+                        </div>
+                    @else
+                        <table class="letterhead" style="border-spacing: 0;">
+                            <tr>
+                                <td style="width: 60px;">
+                                    @if(!empty($resortLogo))
+                                        <img src="{{ $resortLogo }}" class="logo" alt="logo">
+                                    @endif
+                                </td>
+                                <td style="vertical-align: middle;padding-left: 10px;">
+                                    <p class="resort-name">{{ $resort->resort_name ?? '' }}</p>
+                                    @if(!empty($resort) && ($resort->address1 || $resort->address2 || $resort->city))
+                                        <div class="letterhead-address">
+                                            {{ collect([$resort->address1, $resort->address2, $resort->city, $resort->country])->filter()->implode(', ') }}
+                                        </div>
+                                    @endif
+                                </td>
+                            </tr>
+                        </table>
+                    @endif
                     <div style="width: 100%;background-color: #fff;margin: 0 0 24px 0;border-radius: 20px;overflow: hidden;">
                         <table style="width: 100%;border-spacing: 0;">
                             <tr>

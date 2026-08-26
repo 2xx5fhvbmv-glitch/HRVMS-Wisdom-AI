@@ -137,12 +137,22 @@ class DutyRosterController extends Controller
         }
 
 
+        // Same deterministic-latest-row fix as ViewDutyRoster() — see the
+        // comment there for why groupBy('employees.id') can't be trusted
+        // to carry the right duty_roster_id/geofence_zone_id.
+        $latestRosterPerEmp = DB::table('duty_rosters')
+                                ->select('Emp_id', DB::raw('MAX(id) as latest_id'))
+                                ->where('resort_id', $this->resort->resort_id)
+                                ->groupBy('Emp_id');
+
         $Rosterdata1 = Employee::join('resort_admins as t1',"t1.id","=","employees.Admin_Parent_id")
                                 ->join('resort_positions as t2',"t2.id","=","employees.Position_id")
-                                ->join('duty_rosters as t3',"t3.Emp_id","=","employees.id")
+                                ->joinSub($latestRosterPerEmp, 'latest_dr', function($join) {
+                                    $join->on('latest_dr.Emp_id', '=', 'employees.id');
+                                })
+                                ->join('duty_rosters as t3',"t3.id","=","latest_dr.latest_id")
                                 ->select('t3.id as duty_roster_id', 't3.DayOfDate', 't3.geofence_zone_id', 't1.id as Parentid', 't1.first_name', 't1.last_name', 't1.profile_picture', 'employees.id as emp_id', 't2.position_title')
-                                ->where('t1.resort_id', $this->resort->resort_id)
-                                ->where('t3.resort_id', $this->resort->resort_id);
+                                ->where('t1.resort_id', $this->resort->resort_id);
 
                                 if($this->resort->is_master_admin == 0){
                                     if($employeeRankPosition['position'] != "HR")
@@ -154,9 +164,7 @@ class DutyRosterController extends Controller
                                     }
                                 }
 
-                                $Rosterdata=$Rosterdata1->groupBy('employees.id')
-                                ->orderBy('t3.created_at', 'desc')
-                                ->paginate(10);
+                                $Rosterdata=$Rosterdata1->paginate(10);
         $year = now()->year; // Current year
         $month = now()->month; // Current month
         $totalDays = Carbon::createFromDate($year, $month, 1)->daysInMonth; //
@@ -828,15 +836,25 @@ class DutyRosterController extends Controller
         $Rank =  $this->resort->GetEmployee->rank ?? '';
         $employeeRankPosition = Common::getEmployeeRankPosition( $this->resort->getEmployee);
 
-        // Use the same query structure as ViewDutyRoster
+        // Use the same query structure as ViewDutyRoster — including the
+        // deterministic-latest-row subquery (see comment there); it was
+        // also missing t3.geofence_zone_id from the select entirely, so
+        // the zone badge could never render off a search/filter result.
+        $latestRosterPerEmp = DB::table('duty_rosters')
+                                ->select('Emp_id', DB::raw('MAX(id) as latest_id'))
+                                ->where('resort_id', $this->resort->resort_id)
+                                ->groupBy('Emp_id');
+
         $Rosterdata1 = Employee::join('resort_admins as t1',"t1.id","=","employees.Admin_Parent_id")
                                 ->join('resort_positions as t2',"t2.id","=","employees.Position_id")
-                                ->join('duty_rosters as t3',"t3.Emp_id","=","employees.id")
+                                ->joinSub($latestRosterPerEmp, 'latest_dr', function($join) {
+                                    $join->on('latest_dr.Emp_id', '=', 'employees.id');
+                                })
+                                ->join('duty_rosters as t3',"t3.id","=","latest_dr.latest_id")
                                 ->leftJoin('resort_departments as t4',"t4.id","=","employees.Dept_id")
                                 ->leftJoin('resort_sections as t5',"t5.id","=","t2.section_id")
-                                ->select('t3.id as duty_roster_id', 't3.DayOfDate', 't1.id as Parentid', 't1.first_name', 't1.last_name', 't1.profile_picture', 'employees.id as emp_id', 't2.position_title', 'employees.Dept_id', 't2.section_id as Section_id', 't4.name as dept_name', 't5.name as section_name')
-                                ->where('t1.resort_id', $this->resort->resort_id)
-                                ->where('t3.resort_id', $this->resort->resort_id);
+                                ->select('t3.id as duty_roster_id', 't3.DayOfDate', 't3.geofence_zone_id', 't1.id as Parentid', 't1.first_name', 't1.last_name', 't1.profile_picture', 'employees.id as emp_id', 't2.position_title', 'employees.Dept_id', 't2.section_id as Section_id', 't4.name as dept_name', 't5.name as section_name')
+                                ->where('t1.resort_id', $this->resort->resort_id);
 
         if($this->resort->is_master_admin == 0){
             if($employeeRankPosition['position'] != "HR")
@@ -887,9 +905,7 @@ class DutyRosterController extends Controller
                         ->whereBetween('t6.date', [$startDate->format('Y-m-d'), $endDate->format('Y-m-d')]);
         }
 
-        $Rosterdata = $Rosterdata1->groupBy('employees.id')
-                                ->orderBy('t3.created_at', 'desc')
-                                ->get();
+        $Rosterdata = $Rosterdata1->get();
 
         // Date calculations - use date range if provided, otherwise use current month
         if (isset($dateRange) && $dateRange != '') {
@@ -1628,14 +1644,33 @@ class DutyRosterController extends Controller
         }
 
 
+        // groupBy('employees.id') previously selected 't3.*' columns
+        // (duty_roster_id, DayOfDate, geofence_zone_id) that aren't
+        // functionally dependent on the group key — under this app's
+        // non-strict MySQL connection that's legal but the row MySQL
+        // picks for those hidden columns is arbitrary, NOT guaranteed to
+        // be the one matching the trailing orderBy (ORDER BY runs after
+        // GROUP BY collapses rows). An employee with more than one
+        // duty_rosters submission could have their zone/roster_id come
+        // from an unrelated older block, so the correct one's geofence
+        // zone badge silently fails to render ("Assign zone" shown
+        // instead). Pick the latest row per employee deterministically
+        // via a subquery instead of relying on GROUP BY's picked row.
+        $latestRosterPerEmp = DB::table('duty_rosters')
+                                ->select('Emp_id', DB::raw('MAX(id) as latest_id'))
+                                ->where('resort_id', $this->resort->resort_id)
+                                ->groupBy('Emp_id');
+
         $Rosterdata1 = Employee::join('resort_admins as t1',"t1.id","=","employees.Admin_Parent_id")
                                 ->join('resort_positions as t2',"t2.id","=","employees.Position_id")
-                                ->join('duty_rosters as t3',"t3.Emp_id","=","employees.id")
+                                ->joinSub($latestRosterPerEmp, 'latest_dr', function($join) {
+                                    $join->on('latest_dr.Emp_id', '=', 'employees.id');
+                                })
+                                ->join('duty_rosters as t3',"t3.id","=","latest_dr.latest_id")
                                 ->leftJoin('resort_departments as t4',"t4.id","=","employees.Dept_id")
                                 ->leftJoin('resort_sections as t5',"t5.id","=","t2.section_id")
                                 ->select('t3.id as duty_roster_id', 't3.DayOfDate', 't3.geofence_zone_id', 't1.id as Parentid', 't1.first_name', 't1.last_name', 't1.profile_picture', 'employees.id as emp_id', 't2.position_title', 'employees.Dept_id', 't2.section_id as Section_id', 't4.name as dept_name', 't5.name as section_name')
-                                ->where('t1.resort_id', $this->resort->resort_id)
-                                ->where('t3.resort_id', $this->resort->resort_id);
+                                ->where('t1.resort_id', $this->resort->resort_id);
 
                                 if($this->resort->is_master_admin == 0){
                                     if($employeeRankPosition['position'] != "HR")
@@ -1650,9 +1685,7 @@ class DutyRosterController extends Controller
                                     }
                                 }
 
-                                $Rosterdata=$Rosterdata1->groupBy('employees.id')
-                                ->orderBy('t3.created_at', 'desc')
-                                ->get();
+                                $Rosterdata=$Rosterdata1->get();
 
         // Determine if user can see all departments.
         // Only HR and GM are resort-wide roles. HOD/EXCOM head a single
