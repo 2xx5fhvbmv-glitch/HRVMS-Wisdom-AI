@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Storage;
 use App\Models\Employee;
 use App\Models\Payroll;
+use App\Models\Resort;
 use App\Models\PayrollReviewAllowances;
 use App\Helpers\Common;
 use App\Helpers\StorageHelper;
@@ -716,8 +717,14 @@ class PayrollController extends Controller
                 'defaultFont'                           =>  'Poppins'
             ];
 
-                        
-        $pdf                                        =   Pdf::loadView('pdf.payslippdf', compact('payrollArray'));
+            // Employer letterhead — resort logo/name fallback, or the
+            // configured Letterhead & Signature header when set (same
+            // pattern as the Probation/Transfer letter PDFs).
+            $resort                                     =   Resort::find($this->resort_id);
+            $resortLogo                                 =   Common::GetResortLogo($this->resort_id);
+            $letterhead                                 =   Common::getLetterheadData($this->resort_id);
+
+        $pdf                                        =   Pdf::loadView('pdf.payslippdf', compact('payrollArray', 'resort', 'resortLogo', 'letterhead'));
         $pdf->setOptions($optionsArray);
 
         return $pdf;
