@@ -60,6 +60,15 @@ return [
             'engine' => null,
             'options' => extension_loaded('pdo_mysql') ? array_filter([
                 PDO::MYSQL_ATTR_SSL_CA => env('MYSQL_ATTR_SSL_CA'),
+                // Remote (off-server) DB host — each PHP-FPM worker opens a
+                // fresh TCP+auth connection per request by default. Under a
+                // hosting-side max_connections_per_hour cap, that multiplies
+                // with request volume; persistent connections let each FPM
+                // worker reuse one connection across requests instead, so
+                // the ceiling becomes the FPM pool size, not request count.
+                // env-gated (default off) so it can be flipped back via
+                // .env + php-fpm restart alone if it misbehaves, no deploy.
+                PDO::ATTR_PERSISTENT => env('DB_PERSISTENT', false),
             ]) : [],
         ],
 
