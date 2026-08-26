@@ -31,7 +31,11 @@ class Kernel extends ConsoleKernel
         $schedule->command('Monthly:CheckEveryVisaModule')->monthly();
         $schedule->command('Daily:CheckVisaExpiryReminders')->dailyAt('09:00');
         $schedule->command('Daily:CheckDepositRefundReminders')->dailyAt('09:15');
-        $schedule->command('CheckHourly:IncidentCompliance')->everyMinute();
+        // Command is named CheckHourly — was wired to everyMinute(), spawning
+        // 60 extra cron PHP processes (each a new DB connection) per hour to
+        // redundantly re-run the same 48h compliance check. Matches the
+        // command's own declared cadence now.
+        $schedule->command('CheckHourly:IncidentCompliance')->hourly();
         // Day-of transfer notifications + apply the employee profile move
         // when an Approved transfer's effective_date arrives.
         $schedule->command('transfers:notify-effective')->dailyAt('06:00');
