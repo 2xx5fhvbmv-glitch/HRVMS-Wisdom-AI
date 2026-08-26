@@ -962,7 +962,15 @@
         showView(viewThread);
         loadThread();
     }
-    document.getElementById('uc-thread-back').addEventListener('click', function () { showView(viewList); loadConversations(); });
+    document.getElementById('uc-thread-back').addEventListener('click', function () {
+        // Was never cleared here — handleIncomingMessage()'s forOpenThread
+        // check kept matching the last-viewed thread indefinitely, so a
+        // new message arriving while the user was back on the LIST screen
+        // still silently re-fetched and marked that thread's messages read.
+        state.current = null;
+        showView(viewList);
+        loadConversations();
+    });
 
     function loadThread() {
         var msgsEl = document.getElementById('uc-messages');
