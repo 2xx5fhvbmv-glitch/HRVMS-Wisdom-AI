@@ -44,7 +44,7 @@
                 @if($available_rank == "HR")
                     <div class="col-auto">
                         <div class="d-flex justify-content-end">
-                            <a href="#" class="btn btn-theme">Sent To Finance</a>
+                            <a href="#" class="btn btn-theme">Send To Finance</a>
                             <a href="#revise-budgetmodal" data-bs-toggle="modal" class="btn btn-white ms-3">Revise Budget</a>
                         </div>
                     </div>

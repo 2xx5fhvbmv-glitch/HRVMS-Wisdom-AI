@@ -52,7 +52,7 @@
                                 </div>
                                 <div class="col-xl-2 col-md-3 col-sm-4 col-6">
                                     <select class="form-select">
-                                        <option selected>Poitions</option>
+                                        <option selected>Positions</option>
                                         <option value="1">abc</option>
                                         <option value="2">abc</option>
                                     </select>
@@ -90,7 +90,7 @@
                                         <td>26/09/2024</td>
                                         <td>
                                             <div class="dropdown table-dropdown">
-                                                <button class="btn btn-secondary dropdown-toggle dots-link" type="button"
+                                                <button class="btn eb-btn-ghost dropdown-toggle dots-link" type="button"
                                                     id="dropdownMenuButton1" data-bs-toggle="dropdown"
                                                     aria-expanded="false">
                                                     <i class="fa-solid fa-ellipsis"></i>
@@ -112,7 +112,7 @@
                                         <td>26/09/2024</td>
                                         <td>
                                             <div class="dropdown table-dropdown">
-                                                <button class="btn btn-secondary dropdown-toggle dots-link" type="button"
+                                                <button class="btn eb-btn-ghost dropdown-toggle dots-link" type="button"
                                                     id="dropdownMenuButton1" data-bs-toggle="dropdown"
                                                     aria-expanded="false">
                                                     <i class="fa-solid fa-ellipsis"></i>
@@ -134,7 +134,7 @@
                                         <td>26/09/2024</td>
                                         <td>
                                             <div class="dropdown table-dropdown">
-                                                <button class="btn btn-secondary dropdown-toggle dots-link" type="button"
+                                                <button class="btn eb-btn-ghost dropdown-toggle dots-link" type="button"
                                                     id="dropdownMenuButton1" data-bs-toggle="dropdown"
                                                     aria-expanded="false">
                                                     <i class="fa-solid fa-ellipsis"></i>
@@ -157,7 +157,7 @@
                                         <td>26/09/2024</td>
                                         <td>
                                             <div class="dropdown table-dropdown">
-                                                <button class="btn btn-secondary dropdown-toggle dots-link" type="button"
+                                                <button class="btn eb-btn-ghost dropdown-toggle dots-link" type="button"
                                                     id="dropdownMenuButton1" data-bs-toggle="dropdown"
                                                     aria-expanded="false">
                                                     <i class="fa-solid fa-ellipsis"></i>
@@ -180,7 +180,7 @@
                                         <td>26/09/2024</td>
                                         <td>
                                             <div class="dropdown table-dropdown">
-                                                <button class="btn btn-secondary dropdown-toggle dots-link" type="button"
+                                                <button class="btn eb-btn-ghost dropdown-toggle dots-link" type="button"
                                                     id="dropdownMenuButton1" data-bs-toggle="dropdown"
                                                     aria-expanded="false">
                                                     <i class="fa-solid fa-ellipsis"></i>
@@ -202,7 +202,7 @@
                                         <td>26/09/2024</td>
                                         <td>
                                             <div class="dropdown table-dropdown">
-                                                <button class="btn btn-secondary dropdown-toggle dots-link" type="button"
+                                                <button class="btn eb-btn-ghost dropdown-toggle dots-link" type="button"
                                                     id="dropdownMenuButton1" data-bs-toggle="dropdown"
                                                     aria-expanded="false">
                                                     <i class="fa-solid fa-ellipsis"></i>
@@ -225,7 +225,7 @@
                                         <td>26/09/2024</td>
                                         <td>
                                             <div class="dropdown table-dropdown">
-                                                <button class="btn btn-secondary dropdown-toggle dots-link" type="button"
+                                                <button class="btn eb-btn-ghost dropdown-toggle dots-link" type="button"
                                                     id="dropdownMenuButton1" data-bs-toggle="dropdown"
                                                     aria-expanded="false">
                                                     <i class="fa-solid fa-ellipsis"></i>
@@ -247,7 +247,7 @@
                                         <td>26/09/2024</td>
                                         <td>
                                             <div class="dropdown table-dropdown">
-                                                <button class="btn btn-secondary dropdown-toggle dots-link" type="button"
+                                                <button class="btn eb-btn-ghost dropdown-toggle dots-link" type="button"
                                                     id="dropdownMenuButton1" data-bs-toggle="dropdown"
                                                     aria-expanded="false">
                                                     <i class="fa-solid fa-ellipsis"></i>
@@ -269,7 +269,7 @@
                                         <td>26/09/2024</td>
                                         <td>
                                             <div class="dropdown table-dropdown">
-                                                <button class="btn btn-secondary dropdown-toggle dots-link" type="button"
+                                                <button class="btn eb-btn-ghost dropdown-toggle dots-link" type="button"
                                                     id="dropdownMenuButton1" data-bs-toggle="dropdown"
                                                     aria-expanded="false">
                                                     <i class="fa-solid fa-ellipsis"></i>
@@ -292,7 +292,7 @@
                                         <td>26/09/2024</td>
                                         <td>
                                             <div class="dropdown table-dropdown">
-                                                <button class="btn btn-secondary dropdown-toggle dots-link" type="button"
+                                                <button class="btn eb-btn-ghost dropdown-toggle dots-link" type="button"
                                                     id="dropdownMenuButton1" data-bs-toggle="dropdown"
                                                     aria-expanded="false">
                                                     <i class="fa-solid fa-ellipsis"></i>
@@ -819,7 +819,8 @@
 
             </div>
         </div>
-    @endsection
+    @include('resorts._emotional_buttons_v2_styles')
+@endsection
 
     @section('import-css')
     @endsection

@@ -40,7 +40,7 @@
                             </select>
                         </div>
                         <div class="col-xl-2 col-md-4 col-sm-4 col-6"> 
-                            <input type="text" name="dateFilter" id="dateFilter" class="form-control datepicker"/>
+                            <input type="text" name="dateFilter" id="dateFilter" class="form-control"/>
                         </div>                                               
                         <div class="col-xl-2 col-md-3 col-sm-4 col-6">
                             <button class="btn btn-themeBlue btn-sm" id="clearFilter">Clear Filter</button>
@@ -60,7 +60,7 @@
                                     <th>Request Amount</th>
                                     <th>Request Type</th>
                                     <th>Request Date</th>
-                                    <th>Pourpose</th>
+                                    <th>Purpose</th>
                                     <th>Current Status</th>
                                     <th>Rank Status</th>
                                     <th>Action</th>
@@ -79,10 +79,10 @@
 
 @section('import-scripts')
 <script>  
-    $(".datepicker").datepicker({
-        format: 'dd/mm/yyyy', 
-        autoclose: true,   // Close the picker after selection
-        todayHighlight: true  // Highlight today's date
+    flatpickr("#dateFilter", {
+        dateFormat: 'd/m/Y',
+        allowInput: true,
+        appendTo: document.body
     });
     function initializeSalaryAdvanceListTable() {
         if ($.fn.dataTable.isDataTable('#salaryAdvanceListTable')) {

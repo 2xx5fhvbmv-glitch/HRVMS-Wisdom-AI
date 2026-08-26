@@ -382,7 +382,7 @@
                                         <td>05/09/2024 - 10:00am</td>
                                     </tr>
                                     <tr>
-                                        <th>interview link:</th>
+                                        <th>Interview Link:</th>
                                         <td><a href="#" class="a-link">https://loremipsum.com</a></td>
                                     </tr>
                                     <tr>

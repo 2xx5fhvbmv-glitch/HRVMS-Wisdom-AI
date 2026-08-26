@@ -10,22 +10,15 @@
 @section('content')
 
 <style>
-    /* ---- Brand tokens — same values as View Budget's :root block
-       (view_budget_hierarchical.blade.php), copied rather than shared
-       so this page has no new cross-page CSS dependency. ---- */
+    /* Neutral/geometry tokens (--teal/--teal-2/--teal-3/--teal-soft/--lime/
+       --ink/--muted/--faint/--line/--line-2/--card) now come from the
+       shared :root palette (resorts/layouts/_design_tokens.blade.php),
+       same as view_budget_hierarchical.blade.php — this block previously
+       duplicated them (see old comment above) rather than sharing, which
+       is exactly what the shared palette now replaces. --wb-bg and the
+       semantic tokens below stay local. */
     :root {
-        --wb-teal: #014653;
-        --wb-teal-2: #035b6c;
-        --wb-teal-tint-1: #E6F0F1;
-        --wb-teal-tint-2: #F1F7F7;
-        --wb-lime: #E0FF02;
-        --wb-ink: #14232A;
-        --wb-muted: #5D6F75;
-        --wb-faint: #93A4A9;
-        --wb-line: #E2EBEC;
-        --wb-line-2: #EEF4F4;
         --wb-bg: #F2F6F6;
-        --wb-card: #FFFFFF;
         --wb-vacant: #D98A00;
         --wb-vacant-bg: #FFF6E5;
         --wb-increase: #1F9D6B;
@@ -43,23 +36,23 @@
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: .04em;
-        color: var(--wb-teal);
-        background: var(--wb-teal-tint-1);
+        color: var(--teal);
+        background: var(--teal-3);
         border-radius: 6px;
         padding: 2px 7px;
         margin-right: 8px;
         vertical-align: middle;
     }
-    .wb-group-row-name { font-size: 13.5px; font-weight: 600; color: var(--wb-ink); }
-    .wb-group-row-meta { font-size: 11px; color: var(--wb-muted); margin-top: 3px; }
-    .wb-group-row-budget { font-size: 13px; font-weight: 700; color: var(--wb-teal); flex-shrink: 0; }
+    .wb-group-row-name { font-size: 13.5px; font-weight: 600; color: var(--ink); }
+    .wb-group-row-meta { font-size: 11px; color: var(--muted); margin-top: 3px; }
+    .wb-group-row-budget { font-size: 13px; font-weight: 700; color: var(--teal); flex-shrink: 0; }
 
     /* ---- Summary cards ---- */
     .cb-summary-row { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 16px; }
     .cb-summary-card {
         flex: 1 1 220px;
-        background: var(--wb-card);
-        border: 1px solid var(--wb-line);
+        background: var(--card);
+        border: 1px solid var(--line);
         border-radius: 14px;
         padding: 16px 18px;
         box-shadow: 0 1px 3px rgba(1,70,83,0.06);
@@ -69,16 +62,16 @@
         font-weight: 700;
         letter-spacing: .04em;
         text-transform: uppercase;
-        color: var(--wb-muted);
+        color: var(--muted);
         margin-bottom: 6px;
     }
     .cb-summary-value {
         font-size: 24px;
         font-weight: 700;
-        color: var(--wb-ink);
+        color: var(--ink);
         font-variant-numeric: tabular-nums;
     }
-    .cb-summary-value.cb-money { color: var(--wb-teal); }
+    .cb-summary-value.cb-money { color: var(--teal); }
 
     /* ---- Toolbar ---- */
     .cb-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }
@@ -88,7 +81,7 @@
         height: 52px;
         border-radius: 10px;
         margin-bottom: 8px;
-        background: linear-gradient(90deg, var(--wb-line-2) 25%, var(--wb-teal-tint-1) 37%, var(--wb-line-2) 63%);
+        background: linear-gradient(90deg, var(--line-2) 25%, var(--teal-3) 37%, var(--line-2) 63%);
         background-size: 400% 100%;
         animation: cbSkeletonPulse 1.4s ease infinite;
     }

@@ -69,7 +69,7 @@
                             <div class="bg-themeGrayLight mb-md-4 mb-3">
                                     <div class="uploadFileNew-block">
                                         <img src="{{URL::asset('resorts_assets/images/upload.svg')}}" alt="icon">
-                                        <h5>Upload  Documents</h5>
+                                        <h5>Upload Documents</h5>
                                         <p>Browse or Drag the file here</p>
                                         <input type="file" id="file"  name="file" accept="image/*,application/pdf">
                                     </div>
@@ -80,8 +80,8 @@
                     
                     </div>
                     <div class="modal-footer">
-                        <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                        <button type="submit" class="btn btn-themeBlue FileUploadButton" href="javascript:void(0)">Upload File</button>
+                        <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Cancel</a>
+                        <button type="submit" class="btn eb-btn-primary FileUploadButton" href="javascript:void(0)">Upload File</button>
                     </div>
                 </form>
             </div>
@@ -126,13 +126,14 @@
                     </div>
 
                     <div class="modal-footer">
-                        <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                        <button type="submit" class="btn btn-themeBlue FileUploadButton" href="javascript:void(0)">Submit</button>
+                        <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Cancel</a>
+                        <button type="submit" class="btn eb-btn-primary FileUploadButton" href="javascript:void(0)">Submit</button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -218,7 +219,7 @@ $(document).ready(function ()
                                                 </div>
                                             </div>
                                             <div class="col-12">
-                                                <a href="javascript:void(0)" data-emp_id="${EmployeeInsurance.employee_id}" data-flag="insurance" class="SendFile btn btn-themeBlue btn-sm">
+                                                <a href="javascript:void(0)" data-emp_id="${EmployeeInsurance.employee_id}" data-flag="insurance" class="SendFile btn eb-btn-accent btn-sm">
                                                     Upload The New Insurance Policy
                                                 </a>
                                             </div>
@@ -235,7 +236,7 @@ $(document).ready(function ()
                                         <div class="card-title">
                                             <div class="row g-2 ">
                                                 <div class="col order-sm-1 order-last">
-                                                    <h3> Medical  Insurance - Internationl  Renewal</h3>
+                                                    <h3>Medical Insurance - International Renewal</h3>
                                                 </div>
                                                 <div class="col-sm-auto col-12 order-sm-last order-1 text-end">
                                                 
@@ -245,7 +246,7 @@ $(document).ready(function ()
                                         </div>
                                         <div class="card-body">
                                             <div class="row gx-2">
-                                                No  Record Found
+                                                No Record Found
                                             </div>
                                         </div>
                                     </div>
@@ -285,7 +286,7 @@ $(document).ready(function ()
                                                 </div>
                                             </div>
                                             <div class="col-12">
-                                                <a href="javascript:void(0)" data-emp_id="${WorkPermitMedicalRenewal.employee_id}" data-flag="work_permit_card_Test_Fee" class="SendFile btn btn-themeBlue btn-sm">
+                                                <a href="javascript:void(0)" data-emp_id="${WorkPermitMedicalRenewal.employee_id}" data-flag="work_permit_card_Test_Fee" class="SendFile btn eb-btn-accent btn-sm">
                                                     Upload The New Work Permit
                                                 </a>
                                             </div>
@@ -311,7 +312,7 @@ $(document).ready(function ()
                                         </div>
                                         <div class="card-body">
                                             <div class="row gx-2">
-                                                No  Record Found
+                                                No Record Found
                                             </div>
                                         </div>
                                     </div>
@@ -325,7 +326,7 @@ $(document).ready(function ()
                                     <div class="row g-2 ">
                                         <div class="col order-sm-1 order-last">
                                             <h3>Visa Renewal</h3>
-                                            <span>Current Policy Expires:${VisaRenewal.end_date}</span>
+                                            <span>Current Policy Expires: ${VisaRenewal.end_date}</span>
                                         </div>
                                         <div class="col-auto col-sm-auto col-12 order-sm-last order-1 text-end"><span
                                                 class="badge badge-themeWarning">${VisaRenewal.VisaRenewalTime}</span>
@@ -359,7 +360,7 @@ $(document).ready(function ()
                                     </div>
 
                                     <div class="col-12">
-                                        <a href="javascript:void(0)" data-emp_id="${VisaRenewal.employee_id}" data-flag="visa" class="SendFile btn btn-themeBlue btn-sm">
+                                        <a href="javascript:void(0)" data-emp_id="${VisaRenewal.employee_id}" data-flag="visa" class="SendFile btn eb-btn-accent btn-sm">
                                             Upload The New Visa Renewal
                                         </a>
                                     </div>
@@ -384,7 +385,7 @@ $(document).ready(function ()
                                         </div>
                                         <div class="card-body">
                                             <div class="row gx-2">
-                                                No  Record Found
+                                                No Record Found
                                             </div>
                                         </div>
                                     </div>
@@ -412,7 +413,7 @@ $(document).ready(function ()
                                         </div>
                                     </div>
                                     <div class="col-12">
-                                        <a href="javascript:void(0)" data-emp_id="${QuotaSlotRenewal.employee_id}" data-flag="QuotaSlot" class="QuotaSlot btn btn-themeBlue btn-sm">
+                                        <a href="javascript:void(0)" data-emp_id="${QuotaSlotRenewal.employee_id}" data-flag="QuotaSlot" class="QuotaSlot btn eb-btn-accent btn-sm">
                                             Renew
                                         </a>
                                     </div>
@@ -437,7 +438,7 @@ $(document).ready(function ()
                                         </div>
                                         <div class="card-body">
                                             <div class="row gx-2">
-                                                No  Record Found
+                                                No Record Found
                                             </div>
                                         </div>
                                     </div>
@@ -466,7 +467,7 @@ $(document).ready(function ()
                                         </div>
                                     </div>
                                     <div class="col-12">
-                                        <a href="javascript:void(0)" data-emp_id="${WorkPermitRenewal.employee_id}" data-flag="WorkPermit" class="QuotaSlot  btn btn-themeBlue btn-sm">
+                                        <a href="javascript:void(0)" data-emp_id="${WorkPermitRenewal.employee_id}" data-flag="WorkPermit" class="QuotaSlot btn eb-btn-accent btn-sm">
                                             Renew
                                         </a>
                                     </div>
@@ -491,7 +492,7 @@ $(document).ready(function ()
                                         </div>
                                         <div class="card-body">
                                             <div class="row gx-2">
-                                                No  Record Found
+                                                No Record Found
                                             </div>
                                         </div>
                                     </div>

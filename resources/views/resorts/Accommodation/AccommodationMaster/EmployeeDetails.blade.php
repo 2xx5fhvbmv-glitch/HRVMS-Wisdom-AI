@@ -131,10 +131,10 @@
             <div class="card-footer border-0 pt-2">
                 <div class="row justify-content-end g-3">
                     <div class="col-auto">
-                        <a href="javascript:void(0)"  data-AvailableAccommodation_ID="{{ $data->AvailableAccommodation_ID ?? '' }}" class="btn btn-themeSkyblue btn-sm MoveToNext @if(Common::checkRouteWisePermission('resort.accommodation.EmployeeAccommodation',config('settings.resort_permissions.edit')) == false) d-none @endif">Move In To Another</a>
+                        <a href="javascript:void(0)"  data-AvailableAccommodation_ID="{{ $data->AvailableAccommodation_ID ?? '' }}" class="btn eb-btn-secondary btn-sm MoveToNext @if(Common::checkRouteWisePermission('resort.accommodation.EmployeeAccommodation',config('settings.resort_permissions.edit')) == false) d-none @endif">Move In To Another</a>
                     </div>
                     <div class="col-auto">
-                        <a href="javascript:void(0)"  data-AvailableAccommodation_ID="{{ $data->AvailableAccommodation_ID ?? '' }}" class="btn btn-themeBlue AssignAmmenity btn-sm @if(Common::checkRouteWisePermission('resort.accommodation.EmployeeAccommodation',config('settings.resort_permissions.edit')) == false) d-none @endif">Assign Amenity</a>
+                        <a href="javascript:void(0)"  data-AvailableAccommodation_ID="{{ $data->AvailableAccommodation_ID ?? '' }}" class="btn eb-btn-accent AssignAmmenity btn-sm @if(Common::checkRouteWisePermission('resort.accommodation.EmployeeAccommodation',config('settings.resort_permissions.edit')) == false) d-none @endif">Assign Amenity</a>
                     </div>
                 </div>
             </div>
@@ -176,9 +176,9 @@
 
                     <div class="row g-2 justify-content-center mb-3">
                         <div class="col-auto">
-                            <button type="submit" class="btn btn-sm btn-theme">Submit</button>
+                            <button type="submit" class="btn btn-sm eb-btn-primary">Submit</button>
 
-                            <button type="button" class="btn btn-sm btn-themeGray me-2" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-sm eb-btn-neutral me-2" data-bs-dismiss="modal">Cancel</button>
                         </div>
                     </div>
                 </form>
@@ -214,7 +214,7 @@
                         </div>
                         <hr class="mt-2">
                         <div class="col-md-12 mt-1">
-                            <label >AVAILABLE ACCOMODATION</label>
+                            <label >AVAILABLE ACCOMMODATION</label>
                             <div class="table-responsive">
                                 <table class="table table-accommodation" id="table-accommodation">
                                     <thead>
@@ -243,9 +243,9 @@
 
                     {{-- <div class="row g-2 justify-content-center mb-3">
                         <div class="col-auto">
-                            <button type="submit" class="btn btn-sm btn-theme">Submit</button>
+                            <button type="submit" class="btn btn-sm eb-btn-primary">Submit</button>
 
-                            <button type="button" class="btn btn-sm btn-themeGray me-2" data-bs-dismiss="modal">Cancel</button>
+                            <button type="button" class="btn btn-sm eb-btn-neutral me-2" data-bs-dismiss="modal">Cancel</button>
                         </div>
                     </div> --}}
                 </form>
@@ -285,8 +285,8 @@
                 </div>
             </div>
             <div class="modal-footer">
-              <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a> 
-                <button type="submit" class="btn btn-themeBlue">Submit</button>
+              <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Cancel</a> 
+                <button type="submit" class="btn eb-btn-primary">Submit</button>
             </div>
         </form>
         </div>
@@ -305,12 +305,13 @@
 
             </div>
             <div class="modal-footer">
-                <!-- <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a> -->
-                <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-dismiss="modal" class="btn btn-themeBlue hideallthePopUp">Submit</a>
+                <!-- <a href="#" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Cancel</a> -->
+                <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-dismiss="modal" class="btn eb-btn-primary hideallthePopUp">Submit</a>
             </div>
         </div>
     </div>
 </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -342,7 +343,7 @@
                 },
                 messages: {
                     InventoryModule: {
-                        required: "Please Select Invenotory Items.",
+                        required: "Please select inventory items.",
                     }
                 },
                 submitHandler: function(form) {
@@ -390,7 +391,7 @@
                 },
                 messages: {
                     assignId: {
-                        required: "Please Select Bed.",
+                        required: "Please select a bed.",
                     }
                 },
                 submitHandler: function(form) 

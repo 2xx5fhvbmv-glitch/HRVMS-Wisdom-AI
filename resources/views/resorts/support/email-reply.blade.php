@@ -34,7 +34,7 @@
                     @csrf
                     <input type="hidden" name="ticket_id" value="{{ $ticketId }}">
                     <input type="text" class="form-control form-control-small mb-md-3 mb-2" value="{{$supportEmail}}" name="to_email" placeholder="To" required readonly>
-                    <input type="text" class="form-control form-control-small mb-3" name="subject" placeholder="Subject:" required value="Re : {{$support->subject}}">
+                    <input type="text" class="form-control form-control-small mb-3" name="subject" placeholder="Subject:" required value="Re: {{$support->subject}}">
 
                     <div class="mb-3">
                         <textarea id="editor" name="message"></textarea>
@@ -44,7 +44,7 @@
                         <div class="uploadFile-btn">
                             {{-- Anchor triggers the (hidden) file picker so users get the
                                  "Attachment" button labelling without seeing the raw input. --}}
-                            <a href="javascript:void(0)" id="attachmentPickerBtn" class="btn btn-themeBlue btn-sm">Attachment</a>
+                            <a href="javascript:void(0)" id="attachmentPickerBtn" class="btn eb-btn-accent btn-sm">Attachment</a>
                             <input type="file" id="uploadFile" name="attachments[]" multiple style="display:none;">
                             <span id="uploadFile-list" class="ms-2 small text-muted"></span>
                         </div>
@@ -54,7 +54,7 @@
                     <div class="card-footer">
                         <div class="row g-2">
                             <div class="col-auto">
-                                <button type="submit" class="btn btn-themeBlue btn-sm">Send</button>
+                                <button type="submit" class="btn eb-btn-primary btn-sm">Send</button>
                             </div>
                         </div>
                     </div>
@@ -63,6 +63,7 @@
 
         </div>
     </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')

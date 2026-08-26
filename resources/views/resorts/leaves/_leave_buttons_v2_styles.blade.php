@@ -58,11 +58,11 @@
 
     /* Affirming, the "yes" decision — Approve. */
     .leave-btn-positive {
-        background: #E4F3E9;
-        color: #2E9E5B;
+        background: var(--positive-bg);
+        color: var(--positive);
     }
     .leave-btn-positive:hover {
-        background: #2E9E5B;
+        background: var(--positive);
         color: #fff;
         transform: translateY(-2px);
         box-shadow: 0 8px 18px -8px rgba(20,35,42,.25);
@@ -131,16 +131,9 @@
     }
     .leave-btn-primary[disabled] { background: #014653; color: #fff; }
     .leave-btn-secondary[disabled] { background: transparent; color: #014653; }
-    .leave-btn-positive[disabled] { background: #E4F3E9; color: #2E9E5B; }
+    .leave-btn-positive[disabled] { background: var(--positive-bg); color: var(--positive); }
     .leave-btn-accent[disabled] { background: #E6F0F1; color: #035b6c; }
     .leave-btn-neutral[disabled] { background: #DEDEDE; color: #222; }
     .leave-btn-critical[disabled] { background: #FFDED9; color: #FF2400; }
 
-    /* View-mode switcher (Grid/List) — wayfinding, not an action, so it
-       doesn't borrow an emotional variant. Same pattern as Time and
-       Attendance's .taa-tabnav / Talent Acquisition's .ta-tabnav. */
-    .leave-tabnav { display: inline-flex; gap: 4px; background: #F5F8F8; padding: 4px; border-radius: 10px; }
-    .leave-tabnav a { padding: 6px 12px; border-radius: 7px; font-size: 13px; font-weight: 500; color: #4b5457; border: none; background: transparent; transition: background .16s ease, color .16s ease; }
-    .leave-tabnav a:hover { color: #014653; }
-    .leave-tabnav a.active { background: #fff; color: #014653; box-shadow: 0 1px 3px rgba(20,35,42,.12); }
 </style>

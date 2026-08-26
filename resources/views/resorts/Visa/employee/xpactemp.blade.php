@@ -33,7 +33,7 @@
                     </div>
                     {{-- <div class="col-xl-2 col-md-4 col-sm-4 col-6">
                         <div class="input-group">
-                            <input type="text" id="datepickerXpact" class="form-control datepickerXpact"
+                            <input type="text" id="datepickerXpact" class="form-control"
                                 placeholder="01/08/2024">
 
                         </div>
@@ -99,6 +99,7 @@
 
     </div>
 </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -122,10 +123,10 @@ $(document).ready(function()
             // re-introduce the empty-slot behaviour.
             minimumResultsForSearch: 0,
         });
-        $(".datepickerXpact").datepicker({
-            format: 'dd-mm-yyyy',
-            autoclose: true,
-            todayHighlight: true
+        flatpickr('.datepickerXpact', {
+            dateFormat: 'd-m-Y',
+            allowInput: true,
+            appendTo: document.body
         });
         
     $("#statusFilter").on("change", function() {

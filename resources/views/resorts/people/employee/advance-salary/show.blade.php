@@ -117,7 +117,7 @@
                                              @endphp
                                              <tr>
 
-                                                  <th>Gurantor Name:</th>
+                                                  <th>Guarantor Name:</th>
                                                   <td>
                                                        <div class="tableUser-block">
                                                             <div class="img-circle"><img src="{{App\Helpers\Common::getResortUserPicture($guarantor->employee->Admin_Parent_id)}}"
@@ -421,7 +421,7 @@
                 <form action="{{route('people.salary-increment.request-change')}}" id="rejectedForm">
                      @csrf
                      <input type="hidden" name="advance_salary_id" value="{{$advance_salary->id}}">
-                    <textarea id="reject_reason" class="form-control" name="reject_reason" rows="3" placeholder="write your Comment (required)" required></textarea>
+                    <textarea id="reject_reason" class="form-control" name="reject_reason" rows="3" placeholder="Write your comment (required)" required></textarea>
                 </form>
             </div>
             <div class="modal-footer">

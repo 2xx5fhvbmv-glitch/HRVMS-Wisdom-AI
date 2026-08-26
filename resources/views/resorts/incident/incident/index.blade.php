@@ -109,6 +109,7 @@
             </div>
         </div>
     </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -117,9 +118,10 @@
 @section('import-scripts')
 <script>
     $(document).ready(function () {
-        $('#dateFilter').datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true
+        flatpickr('#dateFilter', {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
         getIncidents();
 
@@ -147,27 +149,29 @@
             let id = $(this).data('id');
             let isApprove = $(this).hasClass('correct-btn');
 
-            Swal.fire({
+            wisdomConfirm({
+                role: 'confirm',
                 title: isApprove ? 'Approve Report' : 'Reject Report',
-                input: 'textarea',
-                inputLabel: 'Remarks',
-                showCancelButton: true,
-                confirmButtonText: isApprove ? 'Approve' : 'Reject',
-                preConfirm: (remarks) => {
-                    return $.ajax({
-                        url: "{{route('incident.investigation.approvedorreject')}}",
-                        method: 'POST',
-                        data: {
-                            id: id,
-                            remarks: remarks,
-                            status: isApprove ? 'approved' : 'rejected',
-                            _token: $('meta[name="csrf-token"]').attr('content')
-                        }
-                    });
+                confirmText: isApprove ? 'Approve' : 'Reject',
+                extra: {
+                    input: 'textarea',
+                    inputLabel: 'Remarks',
+                    preConfirm: (remarks) => {
+                        return $.ajax({
+                            url: "{{route('incident.investigation.approvedorreject')}}",
+                            method: 'POST',
+                            data: {
+                                id: id,
+                                remarks: remarks,
+                                status: isApprove ? 'approved' : 'rejected',
+                                _token: $('meta[name="csrf-token"]').attr('content')
+                            }
+                        });
+                    }
                 }
             }).then((result) => {
                 if (result.isConfirmed) {
-                    toastr.success('Incident ' + (isApprove ? 'approved' : 'rejected') + ' successfully', "Error", {
+                    toastr.success('Incident ' + (isApprove ? 'approved' : 'rejected') + ' successfully', "Success", {
                         positionClass: 'toast-bottom-right'
                     });
                     $('#table-incidentListing').DataTable().ajax.reload();
@@ -179,14 +183,11 @@
             e.preventDefault();
             let id = $(this).data('id');
 
-            Swal.fire({
+            wisdomConfirm({
+                role: 'destructive',
                 title: 'Are you sure?',
                 text: 'This action cannot be undone.',
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonColor: '#d33',
-                cancelButtonColor: '#3085d6',
-                confirmButtonText: 'Yes, delete it!'
+                confirmText: 'Yes, delete it!'
             }).then((result) => {
                 if (result.isConfirmed) {
                     $.ajax({
@@ -209,7 +210,7 @@
                             }
                         },
                         error: function (xhr) {
-                            toastr.error('Server error. Please try again.', " Error", "Error", {
+                            toastr.error('Server error. Please try again.', "Error", "Error", {
                                 positionClass: 'toast-bottom-right'
                             });
                         }

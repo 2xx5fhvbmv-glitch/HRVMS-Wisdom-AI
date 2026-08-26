@@ -14,14 +14,14 @@
                 </div>
                 <div class="col-auto d-flex gap-2">
                     @if($archivedView ?? false)
-                        <a href="{{ route('Performance.pip.index') }}" class="btn btn-themeGray">
+                        <a href="{{ route('Performance.pip.index') }}" class="btn perf-btn-secondary">
                             <i class="fa-solid fa-arrow-left me-1"></i> Active Plans
                         </a>
                     @else
-                        <a href="{{ route('Performance.pip.index', ['archived' => 1]) }}" class="btn btn-themeBlue">
+                        <a href="{{ route('Performance.pip.index', ['archived' => 1]) }}" class="btn perf-btn-secondary">
                             <i class="fa-solid fa-box-archive me-1"></i> View Archived
                         </a>
-                        <button type="button" class="btn btn-theme" data-bs-toggle="modal" data-bs-target="#addPipModal">
+                        <button type="button" class="btn perf-btn-accent" data-bs-toggle="modal" data-bs-target="#addPipModal">
                             <i class="fa-solid fa-plus me-1"></i> Add to PIP
                         </button>
                     @endif
@@ -101,9 +101,9 @@
                                     @endif
                                 </td>
                                 <td>
-                                    <a href="{{ route('Performance.pip.view', $plan->id) }}" class="btn-tableIcon btnIcon-blue" title="View / Fill Form"><i class="fa-solid fa-eye"></i></a>
+                                    <a href="{{ route('Performance.pip.view', $plan->id) }}" class="btn-tableIcon btnIcon-teal" title="View / Fill Form"><i class="fa-solid fa-eye"></i></a>
                                     @if($archivedView ?? false)
-                                        <a href="javascript:void(0)" class="btn-tableIcon btnIcon-green pip-restore" data-id="{{ $plan->id }}" title="Restore"><i class="fa-solid fa-rotate-left"></i></a>
+                                        <a href="javascript:void(0)" class="btn-tableIcon btnIcon-success pip-restore" data-id="{{ $plan->id }}" title="Restore"><i class="fa-solid fa-rotate-left"></i></a>
                                     @else
                                         <a href="javascript:void(0)" class="btn-tableIcon btnIcon-yellow pip-archive" data-id="{{ $plan->id }}" title="Archive"><i class="fa-solid fa-box-archive"></i></a>
                                     @endif
@@ -172,13 +172,14 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-themeGray" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-themeBlue">Submit</button>
+                    <button type="button" class="btn perf-btn-neutral" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn perf-btn-primary">Submit</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
+@include('resorts.Performance._performance_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -186,6 +187,13 @@
     .table-pip th { background: #f8f9fa; padding: 12px 16px; font-weight: 600; color: #555; }
     .table-pip td { padding: 14px 16px; vertical-align: middle; }
     .tableUser-block { display: flex; align-items: center; gap: 10px; }
+    /* The sitewide `.tableUser-block .img-circle` rule shrinks the wrapper
+       to 21x21 — overriding just the inner <img> to 36x36 isn't enough,
+       since the global `img { max-width:100% }` rule then caps the image's
+       rendered width to its (21px) parent while height stays uncapped at
+       36px, producing a 21x36 oval instead of a circle. Resize the wrapper
+       to match so both are square. */
+    .tableUser-block .img-circle { width: 36px; height: 36px; min-width: 36px; }
     .tableUser-block .img-circle img { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; }
     .form-label { font-weight: 600; font-size: 12px; color: #555; letter-spacing: 0.3px; }
 </style>

@@ -7,6 +7,14 @@
 </div>
 @endif
 
+@php
+    // Client-side needs to tell "real photo" from "no photo on file" so it can
+    // draw an initials avatar instead of the generic default image — Common::
+    // getResortUserPicture() always returns a URL, falling back to this exact
+    // one when the employee has none.
+    $ma_defaultPic = url(config('settings.default_picture'));
+@endphp
+
 @section('content')
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
@@ -21,236 +29,371 @@
                 </div>
             </div>
 
-            <div class="card">
+            <div class="card ma-panel">
                 <div class="card-header">
-                    <div class="row g-md-3 g-2 align-items-center">
-                        <div class="col-xl-3 col-lg-5 col-sm-6 ">
-                            <div class="input-group">
-                                <input type="search" class="form-control" id="searchInput" placeholder="Search" />
-                                <i class="fa-solid fa-search"></i>
+                    <!-- session header — populated live once data loads -->
+                    <div class="ma-hero" id="maHero">
+                        <div class="ma-htop">
+                            <div>
+                                <div class="ma-cat">Mark Attendance</div>
+                                <h1 class="ma-h1" id="maTitle">Loading&hellip;</h1>
+                            </div>
+                            <div class="ma-summary" id="maSummary" style="display:none">
+                                <div class="ma-ring">
+                                    <svg width="64" height="64"><circle cx="32" cy="32" r="27" fill="none" stroke="var(--line-2, #EEF4F4)" stroke-width="6"/><circle id="maRingArc" cx="32" cy="32" r="27" fill="none" stroke="var(--positive)" stroke-width="6" stroke-linecap="round" stroke-dasharray="169.6" stroke-dashoffset="169.6"/></svg>
+                                    <div class="ma-ring-c" id="maRingNum">0/0</div>
+                                </div>
+                                <div class="ma-lbl"><b id="maPresentCount">0 present</b> marked so far</div>
                             </div>
                         </div>
-                        <div class="col-xl-2 col-lg-4 col-md-5  col-sm-6">
-                            <select class="form-select select2t-none" id="trainingFilter">
-                                <option value="">All Schedules</option>
-                                @if($trainings)
-                                    @foreach($trainings as $training)
-                                        <option value="{{ $training->id }}" {{ $scheduleId == $training->id ? 'selected' : '' }}>
-                                            {{ optional($training->learningProgram)->name }}
-                                            ({{ \Carbon\Carbon::parse($training->start_date)->format('d M Y') }})
-                                        </option>
-                                    @endforeach
-                                @endif
-                            </select>
+                        <div class="ma-metastrip" id="maMetastrip" style="display:none">
+                            <div class="mi"><div class="ml">Type</div><div class="mv" id="maMetaType">&mdash;</div></div>
+                            <div class="mi"><div class="ml">Date</div><div class="mv tnum" id="maMetaDate">&mdash;</div></div>
+                            <div class="mi"><div class="ml">Time</div><div class="mv tnum" id="maMetaTime">&mdash;</div></div>
+                            <div class="mi"><div class="ml">Trainer</div><div class="mv" id="maMetaTrainer">&mdash;</div></div>
                         </div>
+                    </div>
 
-                        <div class="col-xl-5 col-lg-3 col-md-2 col-sm-6 ms-auto text-end">
-                            <button id="mark-attendance-btn" class="btn btn-themeBlue btn-sm">Mark Attendance</button>
+                    <!-- search + actions, one row — search scoped to this one session
+                         (schedule_id in the URL), so it lives next to the actions it
+                         filters rather than its own separate row above the hero -->
+                    <div class="ma-toolbar-actions">
+                        <div class="input-group ma-search">
+                            <input type="search" class="form-control" id="searchInput" placeholder="Search employees" />
+                            <i class="fa-solid fa-search"></i>
+                        </div>
+                        <div class="ma-actions-row">
+                            <button type="button" class="ma-btn-secondary" id="maAllPresent">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+                                Mark all present
+                            </button>
+                            <button type="button" class="ma-btn-primary" id="maSave">Save attendance</button>
                         </div>
                     </div>
                 </div>
-                <table id="table-attendTrack" class="table data-Table table-attendTrack w-100">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Emp ID</th>
-                            <th>Name </th>
-                            <th>Position</th>
-                            <th>Training Name</th>
-                            <th>Training Type</th>
-                            <th>Start Date</th>
-                            <th>End Date</th>
-                            <th>Start Time</th>
-                            <th>End Time</th>
-                            <th>Attendance</th>
-                            <th>Action</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-  
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
 
-    <div id="attendanceModal" class="modal fade" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Mark Attendance</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <input type="hidden" id="trainingScheduleId">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Employee Name</th>
-                                <th>Status</th>
-                            </tr>
-                        </thead>
-                        <tbody id="attendanceModalBody"></tbody>
-                    </table>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-success" id="save-attendance">Save</button>
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <div id="ma-roster"></div>
+
+                <div class="ma-footer">
+                    <span class="ma-sum" id="maFooterSum"></span>
+                    <div class="ma-pager" id="maPager"></div>
                 </div>
             </div>
         </div>
     </div>
+@include('resorts.Learning._learning_buttons_v2_styles')
 @endsection
 
 @section('import-css')
-<style></style>
+<style>
+    :root {
+        --ma-g2: var(--muted, #6B7378);
+        --ma-g3: var(--faint, #99A1A5);
+        --ma-g4: var(--line, #E2EBEC);
+    }
+
+    /* session header — first thing in the card again now that search moved
+       down next to the actions row; the 16px top margin (not full-bleed)
+       still leaves the card's own rounded top corner showing above it. */
+    .ma-hero { margin: 16px -20px 16px; padding: 24px 26px; background: linear-gradient(180deg, var(--teal-soft), #fff); border-top: 1px solid var(--ma-g4); border-bottom: 1px solid var(--ma-g4); }
+    .ma-htop { display: flex; justify-content: space-between; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
+    .ma-cat { font-size: 11px; font-weight: 600; letter-spacing: .7px; text-transform: uppercase; color: var(--teal); }
+    .ma-h1 { font-size: 20px; font-weight: 500; letter-spacing: -.01em; margin-top: 6px; color: var(--ink); }
+
+    /* segmented meta band — same shape/values as the Learning Program detail hero */
+    .ma-metastrip { display: flex; flex-wrap: wrap; gap: 0; margin-top: 20px; border: 1px solid var(--ma-g4); border-radius: 14px; background: rgba(255,255,255,.6); overflow: hidden; }
+    .ma-metastrip .mi { flex: 1; min-width: 120px; padding: 13px 16px; border-right: 1px solid var(--ma-g4); }
+    .ma-metastrip .mi:last-child { border-right: none; }
+    .ma-metastrip .mi .ml { font-size: 9.5px; font-weight: 600; letter-spacing: .5px; text-transform: uppercase; color: var(--ma-g3); margin-bottom: 4px; }
+    .ma-metastrip .mi .mv { font-size: 12.5px; color: var(--ink); font-weight: 400; display: flex; align-items: center; gap: 6px; }
+    .ma-mode { display: inline-flex; align-items: center; gap: 6px; }
+    .ma-mode .d { width: 7px; height: 7px; border-radius: 50%; }
+    .ma-mode.face .d { background: var(--teal); }
+    .ma-mode.hybrid .d { background: var(--teal-bright, #2EACB3); }
+    .ma-mode.online .d { background: var(--positive); }
+
+    /* attendance summary ring */
+    .ma-summary { flex: none; display: flex; align-items: center; gap: 14px; }
+    .ma-ring { position: relative; width: 64px; height: 64px; }
+    .ma-ring svg { transform: rotate(-90deg); }
+    .ma-ring-c { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 600; color: var(--ink); font-variant-numeric: tabular-nums; }
+    .ma-lbl { font-size: 11px; color: var(--ma-g2); font-weight: 400; }
+    .ma-lbl b { display: block; font-size: 13px; color: var(--ink); font-weight: 600; }
+
+    /* search + actions share one row, so the card isn't carrying an extra
+       row's height just for the search box. */
+    .ma-toolbar-actions { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+    .ma-search { flex: 1 1 auto; min-width: 200px; max-width: 320px; }
+    .ma-search .form-control { height: 40px; padding: 0 40px 0 14px; }
+    .ma-search.input-group > i { top: 50%; transform: translateY(-50%); font-size: 15px; }
+    .ma-actions-row { display: flex; gap: 12px; flex: none; }
+
+    /* self-contained buttons — not relying on .form-select working on a
+       <button>, that silently loses to native button chrome. */
+    .ma-btn-secondary { height: 40px; padding: 0 16px; border: 1px solid var(--ma-g4); border-radius: 12px; background: #fff; color: var(--ink); font-family: inherit; font-size: 13px; font-weight: 500; cursor: pointer; transition: .15s; display: flex; align-items: center; gap: 7px; appearance: none; -webkit-appearance: none; }
+    .ma-btn-secondary:hover { border-color: var(--teal); color: var(--teal); background: var(--teal-soft); }
+    .ma-btn-secondary:disabled { opacity: .5; cursor: not-allowed; }
+    .ma-btn-primary { height: 40px; padding: 0 20px; border: none; border-radius: 12px; background: var(--teal); color: #fff; font-family: inherit; font-size: 13px; font-weight: 500; cursor: pointer; transition: .15s; appearance: none; -webkit-appearance: none; }
+    .ma-btn-primary:hover { background: var(--teal-2); }
+    .ma-btn-primary:disabled { opacity: .5; cursor: not-allowed; background: var(--ma-g4); }
+
+    /* roster */
+    #ma-roster { margin: 0 -20px; }
+    .ma-remp { display: flex; align-items: center; gap: 16px; padding: 14px 20px; border-bottom: 1px solid var(--line-2, #EEF4F4); }
+    .ma-remp:last-child { border-bottom: none; }
+    .ma-remp:hover { background: var(--teal-soft); }
+    .ma-remp .av { flex: none; width: 38px; height: 38px; border-radius: 50%; object-fit: cover; background: var(--ma-g4); }
+    .ma-remp .av-initials { flex: none; width: 38px; height: 38px; border-radius: 50%; background: var(--teal-3); color: var(--teal); display: grid; place-items: center; font-size: 13px; font-weight: 600; }
+    .ma-remp .who { flex: 1; min-width: 0; }
+    .ma-remp .nm { font-size: 13.5px; font-weight: 500; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ma-remp .meta { font-size: 11.5px; color: var(--ma-g2); margin-top: 2px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .ma-remp .meta .sep { width: 3px; height: 3px; border-radius: 50%; background: var(--ma-g4); flex: none; }
+
+    /* present/absent segmented toggle */
+    .ma-toggle { flex: none; display: flex; border: 1px solid var(--ma-g4); border-radius: 20px; overflow: hidden; background: #fff; }
+    .ma-toggle button { border: none; background: none; font-family: inherit; font-size: 12px; font-weight: 500; color: var(--ma-g2); padding: 7px 14px; cursor: pointer; display: flex; align-items: center; gap: 6px; transition: .15s; appearance: none; -webkit-appearance: none; }
+    .ma-toggle button + button { border-left: 1px solid var(--ma-g4); }
+    .ma-toggle button:hover { background: var(--line-2, #EEF4F4); }
+    .ma-toggle button.on-present { background: var(--positive-bg); color: var(--positive); }
+    .ma-toggle button.on-absent { background: var(--critical-bg); color: var(--critical); }
+    .ma-toggle button .dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; opacity: .5; }
+    .ma-toggle button.on-present .dot, .ma-toggle button.on-absent .dot { opacity: 1; }
+
+    .ma-empty { padding: 40px 20px; text-align: center; color: var(--ma-g3); font-size: 13px; }
+
+    .ma-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 16px; padding: 0 4px; flex-wrap: wrap; gap: 10px; }
+    .ma-sum { font-size: 12px; color: var(--ma-g3); }
+    .ma-pager { display: flex; gap: 4px; }
+    .ma-pager button { min-width: 30px; height: 30px; border: 1px solid var(--ma-g4); background: #fff; border-radius: 8px; font-family: inherit; font-size: 12px; color: var(--ma-g2); cursor: pointer; font-weight: 500; appearance: none; -webkit-appearance: none; }
+    .ma-pager button:hover { border-color: var(--teal); color: var(--teal); }
+    .ma-pager button.on { background: var(--teal); color: #fff; border-color: var(--teal); }
+
+    @media(max-width: 900px) {
+        .ma-remp { flex-wrap: wrap; }
+    }
+</style>
 @endsection
 
 @section('import-scripts')
 <script>
-    $(document).ready(function(){
-        getAttendeesList();
-        $('#searchInput, #trainingFilter').on('keyup change', function () {
-            getAttendeesList();
+    var MA_DEFAULT_PIC = @json($ma_defaultPic);
+    // The page is always opened for exactly one session (schedule_id in the
+    // URL) — the only link to this page anywhere in the app always passes it.
+    var MA_SCHEDULE_ID = @json($scheduleId ?: null);
+    var MA_PAGE_SIZE = 8;
+    var maRows = [];   // all loaded rows (search scoped)
+    var maState = {};  // employee_id -> 'Present' | 'Absent'
+    var maPage = 1;
+
+    function maAttr(html, attr) {
+        var m = html && html.match(new RegExp(attr + '="([^"]*)"'));
+        return m ? m[1] : '';
+    }
+    function maImgSrc(html) {
+        var m = html && html.match(/<img src="([^"]*)"/);
+        return m ? m[1] : '';
+    }
+    function maText(html, selector) {
+        if (!html) return '';
+        var m = html.match(/<span class="userReviewTasks-btn">([^<]*)<\/span>/);
+        return m ? m[1].trim() : '';
+    }
+    function maInitials(name) {
+        var parts = (name || '').trim().split(/\s+/);
+        var a = parts[0] ? parts[0][0] : '';
+        var b = parts.length > 1 ? parts[parts.length - 1][0] : '';
+        return (a + b).toUpperCase() || '?';
+    }
+    function maAvatarNode(name, url) {
+        if (url && url !== MA_DEFAULT_PIC) {
+            return '<img class="av" src="' + url + '" alt="">';
+        }
+        return '<span class="av-initials">' + maInitials(name) + '</span>';
+    }
+
+    function maMapRow(row) {
+        return {
+            id: row.id,
+            empId: row.Emp_ID,
+            name: maText(row.employee_name) || 'Unknown',
+            avatar: maImgSrc(row.employee_name),
+            position: row.position,
+            trainingName: row.training_name,
+            trainingType: row.training_type,
+            startDate: row.start_date,
+            endDate: row.end_date,
+            startTime: row.start_time,
+            endTime: row.end_time,
+            trainer: row.trainer || ''
+        };
+    }
+
+    function maTimeDisplay(raw) {
+        if (!raw) return '';
+        var parts = String(raw).split(':');
+        var h = parseInt(parts[0], 10);
+        var m = (parts[1] || '00').padStart(2, '0');
+        if (isNaN(h)) return raw;
+        var period = h >= 12 ? 'PM' : 'AM';
+        var h12 = h % 12; if (h12 === 0) h12 = 12;
+        return String(h12).padStart(2, '0') + ':' + m + ' ' + period;
+    }
+
+    var MC = { 'face-to-face': 'face', 'hybrid': 'hybrid', 'online': 'online' };
+    var ML = { 'face-to-face': 'Face-to-face', 'hybrid': 'Hybrid', 'online': 'Online' };
+
+    function maRenderHero() {
+        var ready = !!MA_SCHEDULE_ID && maRows.length > 0;
+        document.getElementById('maSummary').style.display = ready ? 'flex' : 'none';
+        document.getElementById('maMetastrip').style.display = ready ? 'flex' : 'none';
+
+        if (ready) {
+            var r = maRows[0];
+            document.getElementById('maTitle').textContent = r.trainingName || 'Session';
+            document.getElementById('maMetaType').innerHTML = '<span class="ma-mode ' + (MC[r.trainingType] || 'face') + '"><span class="d"></span>' + (ML[r.trainingType] || r.trainingType || '-') + '</span>';
+            document.getElementById('maMetaDate').textContent = r.startDate === r.endDate ? r.startDate : (r.startDate + ' – ' + r.endDate);
+            document.getElementById('maMetaTime').textContent = maTimeDisplay(r.startTime) + ' – ' + maTimeDisplay(r.endTime);
+            document.getElementById('maMetaTrainer').textContent = r.trainer || '-';
+        } else if (!MA_SCHEDULE_ID) {
+            document.getElementById('maTitle').textContent = 'No session selected';
+        } else {
+            document.getElementById('maTitle').textContent = 'No employees found';
+        }
+    }
+
+    function maUpdateSummary() {
+        if (!MA_SCHEDULE_ID) return;
+        var total = maRows.length;
+        var present = maRows.filter(function (r) { return maState[r.id] === 'Present'; }).length;
+        document.getElementById('maRingNum').textContent = present + '/' + total;
+        document.getElementById('maPresentCount').textContent = present + ' present';
+        var circ = 2 * Math.PI * 27;
+        var offset = total > 0 ? circ * (1 - present / total) : circ;
+        document.getElementById('maRingArc').setAttribute('stroke-dashoffset', offset);
+    }
+
+    function maRowHTML(r) {
+        var s = maState[r.id];
+        return '<div class="ma-remp" data-id="' + r.id + '">' +
+            maAvatarNode(r.name, r.avatar) +
+            '<div class="who"><div class="nm">' + r.name + '</div>' +
+                '<div class="meta"><span class="tnum">' + (r.empId || '') + '</span><span class="sep"></span><span>' + (r.position || '') + '</span></div></div>' +
+            '<div class="ma-toggle">' +
+                '<button type="button" class="' + (s === 'Present' ? 'on-present' : '') + '" data-v="Present"><span class="dot"></span>Present</button>' +
+                '<button type="button" class="' + (s === 'Absent' ? 'on-absent' : '') + '" data-v="Absent"><span class="dot"></span>Absent</button>' +
+            '</div>' +
+        '</div>';
+    }
+
+    function maRender() {
+        maRenderHero();
+        var el = document.getElementById('ma-roster');
+        if (!maRows.length) {
+            el.innerHTML = '<div class="ma-empty">No employees found.</div>';
+        } else {
+            var start = (maPage - 1) * MA_PAGE_SIZE;
+            var pageRows = maRows.slice(start, start + MA_PAGE_SIZE);
+            el.innerHTML = pageRows.map(maRowHTML).join('');
+        }
+        document.getElementById('maFooterSum').textContent = maRows.length + ' employee' + (maRows.length === 1 ? '' : 's') + ' enrolled';
+        maRenderPager();
+        maUpdateSummary();
+        maBindRows();
+    }
+
+    function maRenderPager() {
+        var totalPages = Math.max(1, Math.ceil(maRows.length / MA_PAGE_SIZE));
+        var pager = document.getElementById('maPager');
+        if (totalPages <= 1) { pager.innerHTML = ''; return; }
+        var html = '<button type="button" data-p="1">&laquo;</button><button type="button" data-p="' + Math.max(1, maPage - 1) + '">&lsaquo;</button>';
+        for (var p = 1; p <= totalPages; p++) {
+            html += '<button type="button" class="' + (p === maPage ? 'on' : '') + '" data-p="' + p + '">' + p + '</button>';
+        }
+        html += '<button type="button" data-p="' + Math.min(totalPages, maPage + 1) + '">&rsaquo;</button><button type="button" data-p="' + totalPages + '">&raquo;</button>';
+        pager.innerHTML = html;
+        pager.querySelectorAll('button').forEach(function (b) {
+            b.addEventListener('click', function () { maPage = +b.dataset.p; maRender(); });
         });
+    }
 
-        $('#mark-attendance-btn').on('click', function() {
-            let selectedEmployees = [];
-            $('.attendance-checkbox:checked').each(function() {
-                let employeeId = $(this).data('employee-id');
-                let trainingScheduleId = $(this).data('training-id');
-               
-                let employeeName = $(this).closest('tr').find('.userReviewTasks-btn').text();
-                selectedEmployees.push({ id: employeeId, name: employeeName });
-                $('#trainingScheduleId').val(trainingScheduleId);
+    function maBindRows() {
+        document.querySelectorAll('.ma-remp .ma-toggle button').forEach(function (b) {
+            b.addEventListener('click', function () {
+                var id = b.closest('.ma-remp').dataset.id;
+                var v = b.dataset.v;
+                maState[id] = (maState[id] === v) ? undefined : v;
+                maRender();
             });
-
-            if (selectedEmployees.length === 0) {
-                toastr.error("Please select at least one employee.", "Error", {
-                    positionClass: 'toast-bottom-right'
-                });
-                return;
-            }
-
-            // Populate modal with employees
-            let modalBody = $('#attendanceModalBody');
-            modalBody.empty();
-            selectedEmployees.forEach(emp => {
-                modalBody.append(`
-                    <tr>
-                        <td>${emp.name}</td>
-                        <td>
-                            <select class="form-select attendance-status" data-employee-id="${emp.id}">
-                                <option value="Present">Present</option>
-                                <option value="Absent">Absent</option>
-                            </select>
-                        </td>
-                    </tr>
-                `);
-            });
-
-            // Open the modal
-            $('#attendanceModal').modal('show');
         });
+    }
 
-        $('#save-attendance').on('click', function() {
-            let trainingScheduleId = $('#trainingScheduleId').val();
-            
-            if (!trainingScheduleId) {
-                alert("Error: Training Schedule ID is missing!");
-                return;
-            }
+    document.getElementById('maAllPresent').addEventListener('click', function () {
+        if (!MA_SCHEDULE_ID) return;
+        maRows.forEach(function (r) { maState[r.id] = 'Present'; });
+        maRender();
+    });
 
-            let employees = [];
-            $('.attendance-status').each(function() {
-                employees.push({
-                    employee_id: $(this).data('employee-id'),
-                    status: $(this).val()
-                });
-            });
-
-            $.ajax({
-                url: "{{ route('attendance.mark') }}",
-                type: "POST",
-                headers: {
-                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                },
-                data: JSON.stringify({
-                    training_schedule_id: trainingScheduleId,
-                    employees: employees
-                }),
-                contentType: "application/json",
-                success: function(response) {
-                    if(response.success === false) {
-                        toastr.error(response.message, "Error", {
-                            positionClass: 'toast-bottom-right'
-                        });
-                        return;
-                    }
-                    $('#attendanceModal').modal('hide');
-                    toastr.success(response.message, "Success", {
-                        positionClass: 'toast-bottom-right'
-                    });
-                    // Refresh the table so the Attendance count (e.g. 0/2 → 1/2)
-                    // updates without a manual page reload. Clear the row
-                    // checkboxes too so the next mark starts clean.
-                    if ($.fn.DataTable.isDataTable('#table-attendTrack')) {
-                        $('#table-attendTrack').DataTable().ajax.reload(null, false);
-                    }
-                    $('.attendance-checkbox').prop('checked', false);
-                },
-                error: function(xhr) {
-                    let errs = xhr.responseJSON?.message || 'An unexpected error occurred. Please try again.';
-                    toastr.error(errs, "Error", {
-                        positionClass: 'toast-bottom-right'
-                    });
+    document.getElementById('maSave').addEventListener('click', function () {
+        if (!MA_SCHEDULE_ID) return;
+        var employees = [];
+        maRows.forEach(function (r) {
+            if (maState[r.id]) employees.push({ employee_id: r.id, status: maState[r.id] });
+        });
+        if (!employees.length) {
+            toastr.error('Mark at least one employee before saving.', 'Error', { positionClass: 'toast-bottom-right' });
+            return;
+        }
+        var $btn = $('#maSave');
+        var originalText = $btn.text();
+        $btn.prop('disabled', true);
+        $.ajax({
+            url: '{{ route("attendance.mark") }}',
+            type: 'POST',
+            headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
+            data: JSON.stringify({ training_schedule_id: MA_SCHEDULE_ID, employees: employees }),
+            contentType: 'application/json',
+            success: function (response) {
+                if (response.success === false) {
+                    toastr.error(response.message, 'Error', { positionClass: 'toast-bottom-right' });
+                    return;
                 }
-            });
+                toastr.success(response.message || 'Attendance updated successfully', 'Success', { positionClass: 'toast-bottom-right' });
+                $btn.text('Saved · ' + employees.filter(function (e) { return e.status === 'Present'; }).length + ' present');
+                setTimeout(function () { $btn.text(originalText); }, 1600);
+            },
+            error: function (xhr) {
+                var msg = (xhr.responseJSON && xhr.responseJSON.message) || 'An unexpected error occurred. Please try again.';
+                toastr.error(msg, 'Error', { positionClass: 'toast-bottom-right' });
+            },
+            complete: function () { $btn.prop('disabled', false); }
         });
     });
 
-    function getAttendeesList() {
-        if ($.fn.DataTable.isDataTable('#table-attendTrack')) {
-            $('#table-attendTrack').DataTable().destroy();
-        }
+    function maLoad() {
+        document.getElementById('ma-roster').innerHTML = '<div class="ma-empty">Loading employees&hellip;</div>';
+        maState = {};
+        maPage = 1;
 
-        $('#table-attendTrack').DataTable({
-            searching: false,
-            lengthChange: false,
-            filter: true,
-            info: true,
-            autoWidth: false,
-            scrollX: true,
-            pageLength: 6,
-            processing: true,
-            serverSide: false, // Since we are returning pre-processed data
-            order:[[12, 'desc']],
-            ajax: {
-                url: '{{ route("learning.schedule.attendance.list") }}',
-                type: 'GET',
-                data: function (d) {
-                    d.searchTerm = $('#searchInput').val();
-                    // #trainingFilter holds training_schedules.id values.
-                    d.schedule_id = $('#trainingFilter').val();
-                }
+        $.ajax({
+            url: '{{ route("learning.schedule.attendance.list") }}',
+            type: 'GET',
+            data: { searchTerm: $('#searchInput').val(), schedule_id: MA_SCHEDULE_ID },
+            success: function (response) {
+                var data = (response && response.data) ? response.data : [];
+                maRows = data.map(maMapRow);
+                maRender();
             },
-            columns: [
-                { data: 'checkbox', name: 'Select', orderable: false, searchable: false },
-                { data: 'Emp_ID', name: 'Emp_ID' },
-                { data: 'employee_name', name: 'Name', orderable: false },
-                { data: 'position', name: 'Position' },
-                { data: 'training_name', name: 'Training Name' },
-                { data: 'training_type', name: 'Training Type' },
-                { data: 'start_date', name: 'Start Date' },
-                { data: 'end_date', name: 'End Date' },
-                { data: 'start_time', name: 'Start Time' },
-                { data: 'end_time', name: 'End Time' },
-                { data: 'attendance', name: 'Attendance' },
-                { data: 'action', name: 'Action', orderable: false, searchable: false },
-                {data:'created_at',visible:false,searchable:false},
-            ]
+            error: function () {
+                document.getElementById('ma-roster').innerHTML = '<div class="ma-empty">Failed to load employees.</div>';
+            }
         });
     }
-   
+
+    $(document).ready(function () {
+        document.getElementById('maAllPresent').disabled = !MA_SCHEDULE_ID;
+        document.getElementById('maSave').disabled = !MA_SCHEDULE_ID;
+        maLoad();
+        $('#searchInput').on('keyup', function () { maLoad(); });
+    });
 </script>
 @endsection

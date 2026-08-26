@@ -315,7 +315,7 @@ class SurveyController extends Controller
             // — **bold** syntax was showing up as literal asterisks on the
             // notification list instead of being rendered.
             $notificationMessage = "Survey request for '{$survey->Surevey_title}' has been submitted for feedback. "
-                . "Dates: {$startDate} to {$endDate}. "
+                . "Dates: " . Common::formatDate($startDate) . " to " . Common::formatDate($endDate) . ". "
                 . "Please participate in the survey. If you have already participated, kindly ignore this message.";
             foreach ($Emp_id as $e) {
                 $employeeId = (int) base64_decode($e);
@@ -512,7 +512,7 @@ class SurveyController extends Controller
 
                 $notificationTitle = ' Survey Request';
                 $notificationMessage = "Survey request for '{$survey->Surevey_title}' has been submitted for feedback. "
-                    . "Dates: {$startDate} to {$endDate}. "
+                    . "Dates: " . Common::formatDate($startDate) . " to " . Common::formatDate($endDate) . ". "
                     . "Please participate in the survey. If you have already participated, kindly ignore this message.";
         
                 $moduleName = "Survey";
@@ -717,9 +717,9 @@ class SurveyController extends Controller
                 $view = route('Survey.view',$id);
                             return '
                             <div  class="d-flex align-items-center">
-                                <a target="_blank" href="'.$view.'" class="btn-lg-icon icon-bg-skyblue"><img src="' . asset("resorts_assets/images/eye.svg") . '" alt="icon"></a>
-                                <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-row-btn '.$delete_class.'" data-id="' . e($id) . '">
-                                    <img src="' . asset("resorts_assets/images/trash-red.svg") . '" alt="Delete" class="img-fluid">
+                                <a target="_blank" href="'.$view.'" class="btn-lg-icon icon-bg-skyblue"><i class="fa-regular fa-eye"></i></a>
+                                <a href="javascript:void(0)" class="btn-lg-icon eb-icon-critical delete-row-btn '.$delete_class.'" data-id="' . e($id) . '">
+                                    <i class="fa-regular fa-trash-can"></i>
                                 </a>
                             </div>';
                                                             // <a href="#" class="btn-lg-icon icon-bg-blue"><img src="' . asset("resorts_assets/images/copy.svg") . '" alt="icon"></a>
@@ -943,7 +943,7 @@ class SurveyController extends Controller
                 $view = route('Survey.GetSurveyResults',$id);
                             return '
                             <div  class="d-flex align-items-center">
-                                <a target="_blank" href="'.$view.'" class="btn-lg-icon icon-bg-skyblue"><img src="' . asset("resorts_assets/images/eye.svg") . '" alt="icon"></a>
+                                <a target="_blank" href="'.$view.'" class="btn-lg-icon icon-bg-skyblue"><i class="fa-regular fa-eye"></i></a>
                             </div>';
 
 
@@ -1032,10 +1032,10 @@ class SurveyController extends Controller
                 $edit = route('Survey.edit',$id);
                             return '
                             <div  class="d-flex align-items-center">
-                                <a target="_blank" href="'.$view.'" class="btn-lg-icon icon-bg-skyblue"><img src="' . asset("resorts_assets/images/eye.svg") . '" alt="icon"></a>
-                                <a href="'.$edit.'" class="btn-lg-icon icon-bg-blue" title="Edit Draft"><img src="' . asset("resorts_assets/images/edit.svg") . '" alt="Edit"></a>
-                                <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-row-btn '.$delete_class.'" data-id="' . e($id) . '">
-                                    <img src="' . asset("resorts_assets/images/trash-red.svg") . '" alt="Delete" class="img-fluid">
+                                <a target="_blank" href="'.$view.'" class="btn-lg-icon icon-bg-skyblue"><i class="fa-regular fa-eye"></i></a>
+                                <a href="'.$edit.'" class="btn-lg-icon icon-bg-blue" title="Edit Draft"><i class="fa-solid fa-pen-to-square"></i></a>
+                                <a href="javascript:void(0)" class="btn-lg-icon eb-icon-critical delete-row-btn '.$delete_class.'" data-id="' . e($id) . '">
+                                    <i class="fa-regular fa-trash-can"></i>
                                 </a>
                             </div>';
 
@@ -1060,7 +1060,7 @@ class SurveyController extends Controller
             }
             $notificationTitle = ' Survey Request';
             $notificationMessage = "Survey request for '{$ParentSurvey->Surevey_title}' has been submitted for feedback. "
-                . "Dates: {$ParentSurvey->Start_date} to {$ParentSurvey->End_date}. "
+                . "Dates: " . Common::formatDate($ParentSurvey->Start_date) . " to " . Common::formatDate($ParentSurvey->End_date) . ". "
                 . "Please participate in the survey. If you have already participated, kindly ignore this message.";
             
             $moduleName = "Survey";

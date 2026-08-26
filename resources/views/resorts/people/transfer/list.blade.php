@@ -76,7 +76,7 @@
                                 <th>Target Position</th>
                                 <th>Current Department</th>
                                 <th>Target Department</th>
-                                <th>Transfer date</th>
+                                <th>Transfer Date</th>
                                 <th>Reason</th>
                                 <th>Status</th>
                                 <th>Action</th>
@@ -99,10 +99,10 @@
     $(document).ready(function () {
         $('.select2t-none').select2();
 
-        $(".datepicker").datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,
-            todayHighlight: true
+        flatpickr(".datepicker", {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
 
         getTransferData();
@@ -121,24 +121,25 @@
             const action = $(this).data('action');
             const finalUrl = transferApprovalUrl.replace('__ID__', transferId).replace('__ACTION__', action);
 
-            Swal.fire({
+            wisdomConfirm({
+                role: 'confirm',
                 title: `Are you sure?`,
-                html: `
-                    <p>You want to <b>${action}</b> this transfer?</p>
-                    <textarea id="swal-reason" class="swal2-textarea" placeholder="Enter reason or comment"></textarea>
-                `,
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonText: `Yes, ${action} it!`,
-                preConfirm: () => {
-                    const reason = document.getElementById('swal-reason').value.trim();
+                confirmText: `Yes, ${action} it!`,
+                extra: {
+                    html: `
+                        <p>You want to <b>${action}</b> this transfer?</p>
+                        <textarea id="swal-reason" class="swal2-textarea" placeholder="Enter reason or comment"></textarea>
+                    `,
+                    preConfirm: () => {
+                        const reason = document.getElementById('swal-reason').value.trim();
 
-                    if ((action === 'Rejected' || action === 'On Hold') && reason === '') {
-                        Swal.showValidationMessage('Comment is required for Rejected or On Hold actions.');
-                        return false;
+                        if ((action === 'Rejected' || action === 'On Hold') && reason === '') {
+                            Swal.showValidationMessage('Comment is required for Rejected or On Hold actions.');
+                            return false;
+                        }
+
+                        return { reason };
                     }
-
-                    return { reason };
                 }
             }).then((result) => {
                 if (result.isConfirmed) {

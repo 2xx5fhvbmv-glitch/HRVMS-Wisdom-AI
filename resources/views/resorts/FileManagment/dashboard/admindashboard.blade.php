@@ -18,7 +18,7 @@
                         <h1>Dashboard</h1>
                     </div>
                 </div>
-                <div class="col-auto  ms-auto"><a class="btn btn-theme UploadDocumentbutton " href="javascript:void(0)"  >Upload Document</a></div>
+                <div class="col-auto  ms-auto"><a class="btn eb-btn-accent UploadDocumentbutton " href="javascript:void(0)"  >Upload Document</a></div>
             </div>
         </div>
 
@@ -26,7 +26,7 @@
             <div class="col-lg-3">
                 <div class="card">
                     <div class="card-title">
-                        <h3>Filles</h3>
+                        <h3>Files</h3>
                     </div>
                     <div class="row g-3 align-items-center">
                         <div class="col-lg-12 col-sm-6">
@@ -103,7 +103,7 @@
                                 <table class="table-lableNew table-docExpiring  w-100">
                                     <tr>
                                         <th>Document Type</th>
-                                        <th>No. Of Document</th>
+                                        <th>No. Of Documents</th>
                                         <th>Employee Name</th>
                                         <th>Expiry Date</th>
                                         <th>Days Left</th>
@@ -363,7 +363,7 @@
                     <div class=" card-title">
                         <div class="row justify-content-between align-items-center g-1">
                             <div class="col">
-                            <h3>File version history</h3>
+                            <h3>File Version History</h3>
                             </div>
                             <div class="col-auto">
                                 <a href="{{route('FileManage.FileVersionList')}}" class="a-link">View All</a>
@@ -403,7 +403,7 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body ">
-                    <div class="text-end mb-2"><a href="javascript:void(0)" class="btn btn-themeSkyblue btn-sm AddFolder">+ Add Folder</a>
+                    <div class="text-end mb-2"><a href="javascript:void(0)" class="btn eb-btn-accent btn-sm AddFolder">+ Add Folder</a>
                     </div>
                     <div class="AppendFolder">
 
@@ -417,8 +417,8 @@
                                         <input type="text" class="form-control d-none" placeholder="New Folder |" />
                                         <h5>{{ $f->Folder_Name}}</h5>
                                     </div>
-                                    <a href="javascript:void(0)" class="btn-lg-icon icon-bg-green selFolLoc-edit"   data-name="{{ $f->Folder_Name}}" data-id="{{  base64_encode($f->id)  }}">
-                                        <img src="{{ URL::asset('resorts_assets/images/edit.svg')}}" alt="" class="img-fluid" />
+                                    <a href="javascript:void(0)" class="btn-tableIcon btnIcon-yellow selFolLoc-edit"   data-name="{{ $f->Folder_Name}}" data-id="{{  base64_encode($f->id)  }}">
+                                        <i class="fa-solid fa-pen-to-square"></i>
                                     </a>
                                 </div>
                             @endforeach
@@ -426,8 +426,8 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                    <a class="btn btn-themeBlue FileUploadButton" href="javascript:void(0)">Upload File</a>
+                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Cancel</a>
+                    <a class="btn eb-btn-primary FileUploadButton" href="javascript:void(0)">Upload File</a>
                 </div>
             </div>
         </div>
@@ -437,7 +437,7 @@
     <div class="modal-dialog modal-dialog-centered modal-lg modal-uploadFile">
         <form class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="selectFolderLocation-modal">Upload Document sdfds</h5>
+                <h5 class="modal-title" id="selectFolderLocation-modal">Upload Document</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
          
@@ -475,8 +475,8 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                    <a href="#postUploadPrompt-modal" data-bs-toggle="modal" data-bs-dismiss="modal" class="btn btn-themeBlue UpoladInternalFileForm">Upload</a>
+                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Cancel</a>
+                    <a href="#postUploadPrompt-modal" data-bs-toggle="modal" data-bs-dismiss="modal" class="btn eb-btn-primary UpoladInternalFileForm">Upload</a>
                     </div>
             </form>
         </div>
@@ -494,8 +494,8 @@
                     <img src="{{ URL::asset('resorts_assets/images/scan.svg')}}" alt="image">
                     <h4>Would You Like To Process This File As A Scanned Document For Enhanced Clarity?</h4>
                     <div>
-                        <button  type="button" class="btn btn-themeBlue btn-sm me-md-4 me-2 SaveFiles" data-id="SaveAsStandard" >Save As Standard</button>
-                        <button  type="button" class="btn btn-themeGray btn-sm SaveFiles" data-id="EnhanceAndSave">Enhance And Save</button>
+                        <button  type="button" class="btn eb-btn-primary btn-sm me-md-4 me-2 SaveFiles" data-id="SaveAsStandard" >Save As Standard</button>
+                        <button  type="button" class="btn eb-btn-accent btn-sm SaveFiles" data-id="EnhanceAndSave">Enhance And Save</button>
                     </div>
                 </div>
             </div>
@@ -508,7 +508,7 @@
         <div class="modal-dialog modal-dialog-centered modal-small modal-CropImage">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="staticBackdropLabel">Interview Details </h5>
+                    <h5 class="modal-title" id="staticBackdropLabel">Crop Image</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
@@ -519,12 +519,13 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <a href="javascript:vpid(0)" id="close-crop-btn" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Close</a>
-                    <a href="javascript:void(0)" id="crop-btn" class="btn btn-themeBlue">Crop</a>
+                    <a href="javascript:vpid(0)" id="close-crop-btn" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Close</a>
+                    <a href="javascript:void(0)" id="crop-btn" class="btn eb-btn-primary">Crop</a>
                 </div>
             </div>
         </div>
     </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -561,7 +562,7 @@ document.getElementById("file").addEventListener("change", function (event) {
         // Create buttons column based on file type
         const actionColumn = isImage ? 
             `<td>
-                <a href="#" class="btn btn-sm btn-themeSkyblue crop-btn" data-index="${index}">Crop</a>
+                <a href="#" class="btn eb-btn-accent btn-sm crop-btn" data-index="${index}">Crop</a>
             </td>` : 
             `<td>-</td>`;
         
@@ -880,7 +881,7 @@ document.getElementById('file').addEventListener('change', function (e) {
                 $(".text-themeYellow").text("Uploaded").removeClass("text-themeYellow").addClass("text-success");
                 $("#uploadDocument-modal").modal('hide');
 
-                toastr.success("File uploaded successfuly", "Success", {
+                toastr.success("File uploaded successfully", "Success", {
                        positionClass: "toast-bottom-right",
                    });
          
@@ -906,8 +907,8 @@ document.getElementById('file').addEventListener('change', function (e) {
                                 <input type="text" class="form-control d-none" placeholder="New Folder |" />
                                 <h5>New Folder</h5>
                             </div>
-                            <a href="#" class="btn-lg-icon icon-bg-green selFolLoc-edit">
-                                <img src="{{ URL::asset('resorts_assets/images/edit.svg')}}" alt="" class="img-fluid" />
+                            <a href="#" class="btn-tableIcon btnIcon-yellow selFolLoc-edit">
+                                <i class="fa-solid fa-pen-to-square"></i>
                             </a>
                     </div>`);
     });
@@ -927,7 +928,7 @@ document.getElementById('file').addEventListener('change', function (e) {
                             <div>
                 <input type="text" class="form-control" name="FolderName" value="${name}" placeholder="New Folder " />
                             </div>
-                                        <a href="javascript:void(0)" class="btn btn-theme update-row-btn SubmitFolder" data-id="${id}">Submit</a>
+                                        <a href="javascript:void(0)" class="btn eb-btn-primary update-row-btn SubmitFolder" data-id="${id}">Submit</a>
 
         `);
        
@@ -957,7 +958,7 @@ document.getElementById('file').addEventListener('change', function (e) {
 
             // Check for reserved names
             if (reservedNames.includes(FolderName.toUpperCase())) {
-                toastr.error("This folder name is not allowed in Software!");
+                toastr.error("This folder name is not allowed in the software!");
                 return false;
             }
 

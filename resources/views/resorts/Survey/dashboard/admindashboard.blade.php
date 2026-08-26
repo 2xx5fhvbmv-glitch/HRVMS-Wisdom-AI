@@ -118,7 +118,6 @@
                                             class="fa-regular fa-eye"></i></a>
                                     <a href="javascript:void(0)" data-id="{{$id}}" class="SendNotifcation btn-tableIcon btnIcon-yellow"><i
                                             class="fa-regular fa-bell"></i></a>
-                                    {{-- <a href="#" class="btn-tableIcon btnIcon-blue"><i class="fa-regular fa-pen"></i></a> --}}
                                 </div>
                             </div>
                         </div>
@@ -303,7 +302,7 @@
                             <div class="leaveUser-block">
                                 <div>
                                     <h6>{{ $s->Surevey_title }}</h6>
-                                    <p>From :- {{ $s->Start_date }}  To :- {{ $s->End_date }}</p>
+                                    <p>From: {{ $s->Start_date }} To: {{ $s->End_date }}</p>
                                     <div>
                                         <a target="_blank" href="{{ $s->route }}" class="a-linkTheme">View Details</a>
                                     </div>
@@ -391,7 +390,7 @@
 
 
                 <div class="modal-header">
-                    <h5 class="modal-title" id="staticBackdropLabel">Pending  Participant  in survey</h5>
+                    <h5 class="modal-title" id="staticBackdropLabel">Pending Participants in Survey</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
@@ -403,11 +402,12 @@
 
                 </div>
                 <div class="modal-footer">
-                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
+                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Cancel</a>
                 </div>
         </div>
     </div>
 </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')

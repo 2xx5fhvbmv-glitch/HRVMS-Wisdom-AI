@@ -49,7 +49,7 @@
                             </select>
                         </div>
                         <div class="col-xl-1 col-md-2 col-sm-3 col-6">
-                            <button class="btn btn-themeBlue btn-sm" id="clearFilter">Clear</button>
+                            <button class="btn perf-btn-neutral btn-sm" id="clearFilter">Clear</button>
                         </div>
                         <div class="col-auto ms-auto">
                             <a href="javascript:void(0);" class="btn btn-grid active">
@@ -67,7 +67,7 @@
                         <table class="table table-collapseNew" id="employeeListTable">
                             <thead>
                                 <tr>
-                                    <th>Id</th>
+                                    <th>ID</th>
                                     <th>Employee Name</th>
                                     <th>Position</th>
                                     <th>Department</th>
@@ -100,6 +100,7 @@
             </div>
         </div>
     </div>
+@include('resorts.Performance._performance_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')

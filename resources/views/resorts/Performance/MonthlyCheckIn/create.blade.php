@@ -20,7 +20,7 @@
                     </div>
                     <div class="col-auto">
                         <div class="d-flex justify-content-end gap-2">
-                            <a href="{{ route('Performance.MonltyCheckIn.history') }}" class="btn btn-theme">View All</a>
+                            <a href="{{ route('Performance.MonltyCheckIn.history') }}" class="btn perf-btn-secondary">View All</a>
                         </div>
                     </div>
                 </div>
@@ -128,7 +128,7 @@
 
                                         <div class="row">
                                             <div class="col-md-2 mt-4 mb-3 pb-2">
-                                                <a href="javascript:void(0)" class="AddTraning btn btn-themeSkyblue btn-sm">Add Training</a>
+                                                <a href="javascript:void(0)" class="AddTraning btn perf-btn-accent btn-sm">Add Training</a>
                                             </div>
                                             <div class="col-md-5 checkTraning d-none">
                                                 <label for="select_training" class="form-label">SELECT TRAINING</label>
@@ -162,9 +162,9 @@
                         <input type="hidden" name="checkin_id" id="checkin_hidden_id">
 
                         <div class="card-footer text-end">
-                            <button type='button' id="sendApprovalBtn" class="btn btn-themeBlue btn-sm">Send for Approval</button>
-                            <button type='button' id="submitFinalBtn" class="btn btn-theme btn-sm d-none">Submit Check-In</button>
-                            <button type='button' id="cancelStage2Btn" class="btn btn-themeGray btn-sm d-none">Cancel</button>
+                            <button type='button' id="sendApprovalBtn" class="btn perf-btn-primary btn-sm">Send for Approval</button>
+                            <button type='button' id="submitFinalBtn" class="btn perf-btn-primary btn-sm d-none">Submit Check-In</button>
+                            <button type='button' id="cancelStage2Btn" class="btn perf-btn-neutral btn-sm d-none">Cancel</button>
                         </div>
                     </form>
                 </div>
@@ -183,6 +183,7 @@
 
         </div>
     </div>
+@include('resorts.Performance._performance_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -194,12 +195,12 @@ $(document).ready(function(){
     $('#MonthlyCheckinForm').parsley();
 
     $("#select_training").select2({
-        placeholder:"select Tranining"
+        placeholder:"Select Training"
     });
-    $("#date_discussion").datepicker({
-        format: 'dd/mm/yyyy',
-        autoclose: true,
-        todayHighlight: true
+    flatpickr('#date_discussion', {
+        dateFormat: 'd/m/Y',
+        allowInput: true,
+        appendTo: document.body
     });
 })
 $(document).on("click",".Employee",function(){

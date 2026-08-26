@@ -1,5 +1,5 @@
 @extends('admin.layouts.app')
-@section('page_tab_title' ,"EWt Brackets")
+@section('page_tab_title' ,"EWT Brackets")
 
 @section('content')
 <div class="content-wrapper">

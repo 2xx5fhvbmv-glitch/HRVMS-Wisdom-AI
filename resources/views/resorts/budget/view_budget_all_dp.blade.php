@@ -122,7 +122,7 @@
                                                                     <input type="hidden" class="Revise_Department_id" name="Department_id  " value="{{ $deptData->dept_id }}" >
                                                                     <input type="hidden" class="Revise_Message_id" name="Message_id" value="{{ $deptData->Message_id }}" >
                                                                     <p class="mb-0 fw-500 departmentBudget"></p>
-                                                                    <button type="submit" class=" ms-2 btn btn-xs  btn-theme SendToFinance" >Sent To Finance</button>
+                                                                    <button type="submit" class=" ms-2 btn btn-xs  btn-theme SendToFinance" >Send To Finance</button>
                                                                 </form>
                                             @endif
 
@@ -130,7 +130,7 @@
                                         data-dept_id ="{{ $deptData->dept_id}}"
                                         data-Budget_id ="{{ $deptData->Budget_id}}"
                                         class="btn btn-xs incrementView btn-themeBlue ms-2">Bulk Increment</a>
-                                        <a href="{{ route('resort.budget.comparebudget', ['id' => $deptData->id , 'budgetid' => $deptData->Budget_id ]) }}" class="btn btn-xs btn-coolblue ms-2 @if(App\Helpers\Common::checkRouteWisePermission('resort.budget.comparebudget',config('settings.resort_permissions.view')) == false) d-none @endif"> compare </a>
+                                        <a href="{{ route('resort.budget.comparebudget', ['id' => $deptData->id , 'budgetid' => $deptData->Budget_id ]) }}" class="btn btn-xs btn-coolblue ms-2 @if(App\Helpers\Common::checkRouteWisePermission('resort.budget.comparebudget',config('settings.resort_permissions.view')) == false) d-none @endif"> Compare </a>
 
 
                                         <button class="accordion-button ms-lg-2 ms-auto w-auto" type="button" data-bs-toggle="collapse"
@@ -149,7 +149,7 @@
                                             <tr>
                                                 <th></th>
                                                 <th class="text-nowrap">Positions</th>
-                                                <th class="text-nowrap">No. of position</th>
+                                                <th class="text-nowrap">No. Of Positions</th>
                                                 <th class="text-nowrap">Employee Name</th>
                                                 <th class="text-nowrap w-120">Rank</th>
                                                 <th class="text-nowrap">Nation</th>
@@ -398,7 +398,7 @@
                         <div id="collapse{{ $incrementKey}}" class="accordion-collapse collapse {{  $incrementKey == 1 ? 'show' : 'edit' }}"
                         data-bs-parent="#accordionViewBudget">
                             <div class="table-responsive">
-                                    <span class="text-danger" style="text-align: center">No Record Found..</span>
+                                    <span class="text-danger" style="text-align: center">No Record Found.</span>
                             </div>
                         </div>
                     @endif

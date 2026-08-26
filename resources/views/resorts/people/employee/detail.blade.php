@@ -26,7 +26,7 @@
                     <div class="col-md-auto">
                         <div class="empDetailPeopleEmp-sidebar">
                             <div class="dropdown table-dropdown ">
-                                <button class="btn btn-secondary dropdown-toggle dotsV-link" type="button"
+                                <button class="btn eb-btn-ghost dropdown-toggle dotsV-link" type="button"
                                     id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false">
                                     <i class="fa-solid fa-ellipsis-vertical"></i>
                                 </button>
@@ -580,7 +580,7 @@
                                         <div class="card-title mb-0">
                                             <div class="row g-md-2 g-1 align-items-center">
                                                 <div class="col">
-                                                    <h3 class="text-nowrap">Addtional Information</h3>
+                                                    <h3 class="text-nowrap">Additional Information</h3>
                                                 </div>
                                                 <div class="col-auto">
                                                     <a href="javascript:void(0);" class="btn-lg-icon icon-bg-blue edit-addition-info">
@@ -684,7 +684,7 @@
                                                                             {{-- <input type="text" name="languages[{{ $index }}][proficiency_level]" class="" value="{{ $lang->proficiency_level }}"> --}}
                                                                         </td>
                                                                         <td class="edit-mode d-none">
-                                                                            <button type="button" class="btn btn-danger btn-sm remove-language">Remove</button>
+                                                                            <button type="button" class="btn eb-btn-critical btn-sm remove-language">Remove</button>
                                                                         </td>
                                                                     </tr>
                                                                 @endforeach
@@ -859,7 +859,7 @@
                                                     <table class="table table-lable mb-1">
                                                         <tbody>
                                                             <tr>
-                                                                <th>Joining date:</th>
+                                                                <th>Joining Date:</th>
                                                                  <td>
                                                                     @if(!empty($employee->joining_date) && $employee->joining_date !== '0000-00-00' && strtotime($employee->joining_date) && strtotime($employee->joining_date) > 0)
                                                                         @php
@@ -971,21 +971,21 @@
 
                                                             </tr>
                                                             <tr id="probation-end-date-row" class="{{ $employee->employment_type == 'Probationary' ? '' : 'd-none' }}">
-                                                                <th>Probation exp date:</th>
+                                                                <th>Probation Exp Date:</th>
                                                                 <td>
                                                                     <span class="view-mode">{{ $employee->probation_end_date ? \Carbon\Carbon::parse($employee->probation_end_date)->format('d M Y') : "-" }}</span>
                                                                     <input type="text" name="probation_end_date" class="form-control edit-mode d-none datepicker" value="{{ $employee->probation_end_date ? \Carbon\Carbon::parse($employee->probation_end_date)->format('d/m/Y') : '' }}">
                                                                 </td>
                                                             </tr>
                                                             <tr>
-                                                                <th>Contract type:</th>
+                                                                <th>Contract Type:</th>
                                                                 <td>
                                                                     <span class="view-mode">{{$employee->contract_type ?? 'N/A'}}</span>
                                                                     <input type="text" name="contract_type" class="form-control edit-mode d-none" value="{{$employee->contract_type}}">
                                                                 </td>
                                                             </tr>
                                                             <tr id="termination-date-row" class="{{ $employee->status != 'Terminated' ? 'd-none' : '' }}">
-                                                                <th>Termination date:</th>
+                                                                <th>Termination Date:</th>
                                                                 <td>
                                                                     <span class="view-mode">{{ $employee->termination_date ? \Carbon\Carbon::parse($employee->termination_date)->format('d M Y') : "-" }}</span>
                                                                     <input type="text" name="termination_date" class="form-control edit-mode d-none datepicker" value="{{ $employee->termination_date ? \Carbon\Carbon::parse($employee->termination_date)->format('d/m/Y') : '' }}">
@@ -1241,7 +1241,7 @@
                                                                     </select>
                                                                 </div>
                                                                 <div class="col-2">
-                                                                    <button type="button" class="btn btn-danger btn-sm remove-allowance">
+                                                                    <button type="button" class="btn eb-btn-critical btn-sm remove-allowance">
                                                                         <i class="fa fa-times"></i>
                                                                     </button>
                                                                 </div>
@@ -1257,7 +1257,7 @@
                                                     </div>
                                                     <!-- <div class="row mt-3">
                                                         <div class="col-12">
-                                                            <button type="button" id="add-allowance" class="btn btn-sm btn-outline-primary">
+                                                            <button type="button" id="add-allowance" class="btn btn-sm eb-btn-secondary">
                                                                 <i class="fa fa-plus"></i> Add Allowance
                                                             </button>
                                                         </div>
@@ -1815,7 +1815,7 @@
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="submit" class="btn btn-primary">Assign</button>
+                        <button type="submit" class="btn eb-btn-primary">Assign</button>
                     </div>
                 </div>
             </form>
@@ -1846,7 +1846,7 @@
                 </select>
                 </div>
                 <div class="modal-footer">
-                <button type="submit" class="btn btn-primary">Update</button>
+                <button type="submit" class="btn eb-btn-primary">Update</button>
                 </div>
             </div>
             </form>
@@ -1876,7 +1876,7 @@
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="button" class="btn eb-btn-secondary" data-bs-dismiss="modal">Cancel</button>
                         <button type="submit" class="btn btn-theme">Activate</button>
                     </div>
                 </div>
@@ -1916,6 +1916,7 @@
             </div>
         </div>
     </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -2051,9 +2052,10 @@
     }
 
     $(document).ready(function(){
-        $('.datepicker').datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true
+        flatpickr('.datepicker', {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
         $(document).on('click', '.send-credentials-btn', function (e) {
             e.preventDefault();
@@ -2304,16 +2306,18 @@
 
             setTimeout(function() {
                 if(!$('#termination-date-row').hasClass('d-none')) {
-                    $('#termination-date-row .datepicker').datepicker({
-                        format: 'dd/mm/yyyy',
-                        autoclose: true
+                    flatpickr('#termination-date-row .datepicker', {
+                        dateFormat: 'd/m/Y',
+                        allowInput: true,
+                        appendTo: document.body
                     });
                 }
 
                 if(!$('#probation-end-date-row').hasClass('d-none')) {
-                    $('#probation-end-date-row .datepicker').datepicker({
-                        format: 'dd/mm/yyyy',
-                        autoclose: true
+                    flatpickr('#probation-end-date-row .datepicker', {
+                        dateFormat: 'd/m/Y',
+                        allowInput: true,
+                        appendTo: document.body
                     });
                 }
             }, 100);
@@ -2401,10 +2405,10 @@
             $('#btn-expiry-save').removeClass('d-none');
 
             // Initialize Datepickers
-            $('.datepicker').datepicker({
-                format: 'dd/mm/yyyy',
-                autoclose: true,
-                todayHighlight: true
+            flatpickr('.datepicker', {
+                dateFormat: 'd/m/Y',
+                allowInput: true,
+                appendTo: document.body
             });
         });
 
@@ -2519,7 +2523,7 @@
                         </select>
                     </div>
                     <div class="col-2">
-                        <button type="button" class="btn btn-danger btn-sm remove-allowance">
+                        <button type="button" class="btn eb-btn-critical btn-sm remove-allowance">
                             <i class="fa fa-times"></i>
                         </button>
                     </div>
@@ -2564,9 +2568,10 @@
                             positionClass: 'toast-bottom-right'
                         });
                         location.reload(); // Reload to show updated data
-                        $('.datepicker').datepicker({
-                            format: 'dd/mm/yyyy',
-                            autoclose: true
+                        flatpickr('.datepicker', {
+                            dateFormat: 'd/m/Y',
+                            allowInput: true,
+                            appendTo: document.body
                         });
                     } else {
                         toastr.error('Failed to update information.', "Error", {
@@ -2826,9 +2831,10 @@
                         // race (the full-page reload below still fires).
                         loadEmploymentLogs(1);
                         location.reload(); // Reload to show updated data
-                        $('.datepicker').datepicker({
-                            format: 'dd/mm/yyyy',
-                            autoclose: true
+                        flatpickr('.datepicker', {
+                            dateFormat: 'd/m/Y',
+                            allowInput: true,
+                            appendTo: document.body
                         });
                     } else {
                         toastr.error('Failed to update information.', "Error", {
@@ -3075,7 +3081,7 @@
             <div class="col-lg-6 bank-details-card">
                 <div class="table-responsive position-relative border rounded p-3 bg-white">
                     <button type="submit" class="btn btn-themeBlue btn-sm" id="btn-bank-info-save-${newId}">Save</button>
-                    <button type="button" id="btn-bank-info-remove-${newId}" class="btn btn-danger btn-sm position-absolute top-0 end-0 m-2 remove-bank-details"> Remove
+                    <button type="button" id="btn-bank-info-remove-${newId}" class="btn eb-btn-critical btn-sm position-absolute top-0 end-0 m-2 remove-bank-details"> Remove
                     </button>
 
                     <table class="table table-lable mb-1">
@@ -3486,7 +3492,7 @@
                                 </td>
                             </tr>
                             <tr>
-                                <th>Reference Name</th>
+                                <th>Reference Name:</th>
                                <td>
                                     <input type="text" name="reference_name" class="form-control edit-mode">
                                 </td>
@@ -3554,7 +3560,7 @@
                         <option value="Native"  >Native</option>
                     </select>
                 </td>
-                <td><button type="button" class="btn btn-danger btn-sm remove-language">Remove</button></td>
+                <td><button type="button" class="btn eb-btn-critical btn-sm remove-language">Remove</button></td>
             `;
             document.getElementById('language-rows').appendChild(row);
             languageIndex++;

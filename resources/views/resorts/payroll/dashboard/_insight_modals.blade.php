@@ -1,5 +1,8 @@
 {{-- Payroll AI-insight detail modals. Included by the payroll dashboard;
-     reads $payrollInsights. Opened by the "View Details" links. --}}
+     reads $payrollInsights. Opened by the "View Details" links via the
+     shared frosted-modal system (partials/_wai_insight_modals.blade.php).
+     Table-only body — title/issue/recommendation already live on the card
+     and the shared Recommendation modal. --}}
 <style>
     /* Keep the WAI Insights card at its fixed height and let the insight
        list scroll inside it (the AI body + recommendation can overflow). */
@@ -24,149 +27,127 @@
 @endphp
 
 <!-- Payroll cost trend -->
-<div class="modal fade" id="payrollInsightTrendModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">{{ $payrollInsights['trend']['title'] ?? 'Payroll Cost Trend' }}</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+<div class="wai-backdrop" id="payrollInsightTrendModal">
+    <div class="wai-modal wide" role="dialog" aria-modal="true">
+        <button class="m-x" aria-label="Close">&times;</button>
+        <div class="m-kicker"><span class="dot"></span>WAI Insight</div>
+        <div class="mt">{{ $payrollInsights['trend']['title'] ?? 'Payroll Cost Trend' }}</div>
+        @if(!empty($trendD['months']))
+            <div class="m-tablewrap">
+                <div class="m-tcap">Monthly payroll</div>
+                <div class="m-tscroll"><table class="m-table">
+                    <thead><tr><th>Month</th><th>Payroll</th></tr></thead>
+                    <tbody>
+                        @foreach($trendD['months'] as $mn => $tot)
+                            <tr><td>{{ $trendD['month_names'][$mn] ?? $mn }}</td><td>{{ $m($tot) }}</td></tr>
+                        @endforeach
+                    </tbody>
+                </table></div>
             </div>
-            <div class="modal-body">
-                <p class="text-muted">{{ $payrollInsights['trend']['body'] ?? '' }}</p>
-                @if(!empty($payrollInsights['trend']['recommendation']))<p style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $payrollInsights['trend']['recommendation'] }}</p>@endif
-                @if(!empty($trendD['months']))
-                    <p class="mb-1 fw-bold">Monthly payroll</p>
-                    <div class="table-responsive mb-3">
-                        <table class="table table-sm table-striped align-middle">
-                            <thead><tr><th>Month</th><th class="text-end">Payroll</th></tr></thead>
-                            <tbody>
-                                @foreach($trendD['months'] as $mn => $tot)
-                                    <tr><td>{{ $trendD['month_names'][$mn] ?? $mn }}</td><td class="text-end">{{ $m($tot) }}</td></tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                @endif
-                @if(!empty($trendD['by_dept']))
-                    <p class="mb-1 fw-bold">By department (latest payroll)</p>
-                    <div class="table-responsive">
-                        <table class="table table-sm table-striped align-middle">
-                            <thead><tr><th>Department</th><th class="text-end">Payroll</th></tr></thead>
-                            <tbody>
-                                @foreach($trendD['by_dept'] as $row)
-                                    <tr><td>{{ $row['dept'] }}</td><td class="text-end">{{ $m($row['total']) }}</td></tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                @endif
+        @endif
+        @if(!empty($trendD['by_dept']))
+            <div class="m-tablewrap">
+                <div class="m-tcap">By department (latest payroll)</div>
+                <div class="m-tscroll"><table class="m-table">
+                    <thead><tr><th>Department</th><th>Payroll</th></tr></thead>
+                    <tbody>
+                        @foreach($trendD['by_dept'] as $row)
+                            <tr><td>{{ $row['dept'] }}</td><td>{{ $m($row['total']) }}</td></tr>
+                        @endforeach
+                    </tbody>
+                </table></div>
             </div>
-        </div>
+        @endif
+        @if(empty($trendD['months']) && empty($trendD['by_dept']))
+            <p class="m-empty">No data.</p>
+        @endif
     </div>
 </div>
 
 <!-- Overtime hotspots -->
-<div class="modal fade" id="payrollInsightOvertimeModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">{{ $payrollInsights['overtime']['title'] ?? 'Overtime Spend & Hotspots' }}</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+<div class="wai-backdrop" id="payrollInsightOvertimeModal">
+    <div class="wai-modal wide" role="dialog" aria-modal="true">
+        <button class="m-x" aria-label="Close">&times;</button>
+        <div class="m-kicker"><span class="dot"></span>WAI Insight</div>
+        <div class="mt">{{ $payrollInsights['overtime']['title'] ?? 'Overtime Spend & Hotspots' }}</div>
+        @if(!empty($otD['by_dept']))
+            <div class="m-tablewrap">
+                <div class="m-tcap">Overtime by department</div>
+                <div class="m-tscroll"><table class="m-table">
+                    <thead><tr><th>Department</th><th>OT cost</th></tr></thead>
+                    <tbody>
+                        @foreach($otD['by_dept'] as $row)
+                            <tr><td>{{ $row['dept'] }}</td><td>{{ $m($row['ot']) }}</td></tr>
+                        @endforeach
+                    </tbody>
+                </table></div>
             </div>
-            <div class="modal-body">
-                <p class="text-muted">{{ $payrollInsights['overtime']['body'] ?? '' }}</p>
-                @if(!empty($payrollInsights['overtime']['recommendation']))<p style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $payrollInsights['overtime']['recommendation'] }}</p>@endif
-                @if(!empty($otD['by_dept']))
-                    <p class="mb-1 fw-bold">Overtime by department</p>
-                    <div class="table-responsive mb-3">
-                        <table class="table table-sm table-striped align-middle">
-                            <thead><tr><th>Department</th><th class="text-end">OT cost</th></tr></thead>
-                            <tbody>
-                                @foreach($otD['by_dept'] as $row)
-                                    <tr><td>{{ $row['dept'] }}</td><td class="text-end">{{ $m($row['ot']) }}</td></tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                @endif
-                @if(!empty($otD['top_emps']))
-                    <p class="mb-1 fw-bold">Top employees by overtime</p>
-                    <div class="table-responsive">
-                        <table class="table table-sm table-striped align-middle">
-                            <thead><tr><th>Employee</th><th>Department</th><th class="text-end">OT cost</th></tr></thead>
-                            <tbody>
-                                @foreach($otD['top_emps'] as $row)
-                                    <tr><td>{{ $row['name'] }}</td><td>{{ $row['dept'] }}</td><td class="text-end">{{ $m($row['ot']) }}</td></tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                @else
-                    @if(empty($otD['by_dept']))<p class="mb-0">No overtime recorded in the latest payroll.</p>@endif
-                @endif
+        @endif
+        @if(!empty($otD['top_emps']))
+            <div class="m-tablewrap">
+                <div class="m-tcap">Top employees by overtime</div>
+                <div class="m-tscroll"><table class="m-table">
+                    <thead><tr><th>Employee</th><th>Department</th><th>OT cost</th></tr></thead>
+                    <tbody>
+                        @foreach($otD['top_emps'] as $row)
+                            <tr><td>{{ $row['name'] }}</td><td>{{ $row['dept'] }}</td><td>{{ $m($row['ot']) }}</td></tr>
+                        @endforeach
+                    </tbody>
+                </table></div>
             </div>
-        </div>
+        @endif
+        @if(empty($otD['by_dept']) && empty($otD['top_emps']))
+            <p class="m-empty">No overtime recorded in the latest payroll.</p>
+        @endif
     </div>
 </div>
 
 <!-- Expat vs local -->
-<div class="modal fade" id="payrollInsightExpatModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">{{ $payrollInsights['expat']['title'] ?? 'Expat vs Local Cost' }}</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+<div class="wai-backdrop" id="payrollInsightExpatModal">
+    <div class="wai-modal" role="dialog" aria-modal="true">
+        <button class="m-x" aria-label="Close">&times;</button>
+        <div class="m-kicker"><span class="dot"></span>WAI Insight</div>
+        <div class="mt">{{ $payrollInsights['expat']['title'] ?? 'Expat vs Local Cost' }}</div>
+        @if(!empty($expD))
+            <div class="m-tablewrap">
+                <div class="m-tcap">
+                    @if(!empty($expD['operational']))Expat operational add-on (work permit / visa / insurance): ~{{ $m($expD['operational']) }}/mo @endif
+                </div>
+                <div class="m-tscroll"><table class="m-table">
+                    <thead><tr><th></th><th>Headcount</th><th>Salary cost</th></tr></thead>
+                    <tbody>
+                        <tr><td>Expat</td><td>{{ (int)($expD['expat_count'] ?? 0) }}</td><td>{{ $m($expD['expat_salary'] ?? 0) }}</td></tr>
+                        <tr><td>Local</td><td>{{ (int)($expD['local_count'] ?? 0) }}</td><td>{{ $m($expD['local_salary'] ?? 0) }}</td></tr>
+                        <tr><td>Total</td><td>{{ (int)($expD['expat_count'] ?? 0) + (int)($expD['local_count'] ?? 0) }}</td><td>{{ $m($expD['total'] ?? 0) }}</td></tr>
+                    </tbody>
+                </table></div>
             </div>
-            <div class="modal-body">
-                <p class="text-muted">{{ $payrollInsights['expat']['body'] ?? '' }}</p>
-                @if(!empty($payrollInsights['expat']['recommendation']))<p style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $payrollInsights['expat']['recommendation'] }}</p>@endif
-                @if(!empty($expD))
-                    <div class="table-responsive">
-                        <table class="table table-sm table-striped align-middle">
-                            <thead><tr><th></th><th class="text-end">Headcount</th><th class="text-end">Salary cost</th></tr></thead>
-                            <tbody>
-                                <tr><td>Expat</td><td class="text-end">{{ (int)($expD['expat_count'] ?? 0) }}</td><td class="text-end">{{ $m($expD['expat_salary'] ?? 0) }}</td></tr>
-                                <tr><td>Local</td><td class="text-end">{{ (int)($expD['local_count'] ?? 0) }}</td><td class="text-end">{{ $m($expD['local_salary'] ?? 0) }}</td></tr>
-                                <tr class="fw-bold"><td>Total</td><td class="text-end">{{ (int)($expD['expat_count'] ?? 0) + (int)($expD['local_count'] ?? 0) }}</td><td class="text-end">{{ $m($expD['total'] ?? 0) }}</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                    @if(!empty($expD['operational']))
-                        <p class="mb-0 text-muted">Expat operational add-on (work permit / visa / insurance): ~{{ $m($expD['operational']) }}/mo.</p>
-                    @endif
-                @endif
-            </div>
-        </div>
+        @else
+            <p class="m-empty">No data.</p>
+        @endif
     </div>
 </div>
 
 <!-- Allowance spend -->
-<div class="modal fade" id="payrollInsightAllowanceModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">{{ $payrollInsights['allowance']['title'] ?? 'Allowance Spend' }}</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+<div class="wai-backdrop" id="payrollInsightAllowanceModal">
+    <div class="wai-modal" role="dialog" aria-modal="true">
+        <button class="m-x" aria-label="Close">&times;</button>
+        <div class="m-kicker"><span class="dot"></span>WAI Insight</div>
+        <div class="mt">{{ $payrollInsights['allowance']['title'] ?? 'Allowance Spend' }}</div>
+        @if(!empty($alwD['types']))
+            <div class="m-tablewrap">
+                <div class="m-tcap">Allowance spend by type (total {{ $m($alwD['total'] ?? 0) }})</div>
+                <div class="m-tscroll"><table class="m-table">
+                    <thead><tr><th>Allowance type</th><th>Amount</th><th>Share</th></tr></thead>
+                    <tbody>
+                        @foreach($alwD['types'] as $row)
+                            <tr><td>{{ $row['type'] }}</td><td>{{ $m($row['amount']) }}</td><td>{{ $row['pct'] }}%</td></tr>
+                        @endforeach
+                    </tbody>
+                </table></div>
             </div>
-            <div class="modal-body">
-                <p class="text-muted">{{ $payrollInsights['allowance']['body'] ?? '' }}</p>
-                @if(!empty($payrollInsights['allowance']['recommendation']))<p style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $payrollInsights['allowance']['recommendation'] }}</p>@endif
-                @if(!empty($alwD['types']))
-                    <p class="mb-1">Allowance spend by type (total {{ $m($alwD['total'] ?? 0) }}):</p>
-                    <div class="table-responsive">
-                        <table class="table table-sm table-striped align-middle">
-                            <thead><tr><th>Allowance type</th><th class="text-end">Amount</th><th class="text-end">Share</th></tr></thead>
-                            <tbody>
-                                @foreach($alwD['types'] as $row)
-                                    <tr><td>{{ $row['type'] }}</td><td class="text-end">{{ $m($row['amount']) }}</td><td class="text-end">{{ $row['pct'] }}%</td></tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                @else
-                    <p class="mb-0">No allowances paid in the latest payroll.</p>
-                @endif
-            </div>
-        </div>
+        @else
+            <p class="m-empty">No allowances paid in the latest payroll.</p>
+        @endif
     </div>
 </div>

@@ -1,3 +1,4 @@
+@include('resorts.layouts._design_tokens')
 <link href="{{ URL::asset('resorts_assets/css/skeleton.css')}}" rel=stylesheet>
 <link href="{{ URL::asset('resorts_assets/css/bootstrap.min.css')}}" rel=stylesheet>
 <link href="{{ URL::asset('resorts_assets/css/select2.min.css')}}" rel=stylesheet>
@@ -9,15 +10,17 @@
 <link href="{{ URL::asset('resorts_assets/css/fullcalendar.min.css')}}" rel=stylesheet>
 <link href="{{ URL::asset('resorts_assets/css/daterangepicker.css')}}" rel=stylesheet>
 <link rel="stylesheet" href="{{ URL::asset('applicant_form_assets/css/croppie.css')}}">
-<link href="{{ URL::asset('resorts_assets/css/default.css')}}" rel=stylesheet>
+<link href="{{ URL::asset('resorts_assets/css/default.css')}}?v={{ @filemtime(public_path('resorts_assets/css/default.css')) }}" rel=stylesheet>
 <link href="{{ URL::asset('resorts_assets/css/developer.min.css')}}" rel="stylesheet">
 <link href="{{ URL::asset('resorts_assets/css/media.css')}}" rel=stylesheet>
 <link rel="apple-touch-icon" sizes="180x180" href="{{ URL::asset('resorts_assets/images/apple-touch-icon.png')}}">
 <link href="{{ URL::asset('resorts_assets/css/toastr.min.css')}}" rel=stylesheet>
+<link href="{{ URL::asset('resorts_assets/css/toastr-theme.css')}}" rel=stylesheet>
 <link href="{{ URL::asset('resorts_assets/css/sweetalert2.min.css')}}" rel=stylesheet>
 {{-- <link href="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.css" rel="stylesheet" /> --}}
 {{-- <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/limonte-sweetalert2/6.6.9/sweetalert2.min.css"> --}}
 <link href="{{ URL::asset('resorts_assets/css/flatpickr.min.css')}}" rel=stylesheet>
+<link href="{{ URL::asset('resorts_assets/css/flatpickr-theme.css')}}" rel=stylesheet>
 <link rel="icon" type="image/png" sizes="32x32" href="{{ Common::getWebsiteFavicon() }}">
 
 

@@ -469,7 +469,7 @@ class AccommodationMasterController extends Controller
             ->editColumn('RoomType', fn($row) => e($row->AccommodationName))
             ->editColumn('Action', function ($row) {
                     $route =route('resort.accommodation.AccommodationEmployeeDetails',base64_encode($row->employee_id));
-                return '<a target="_blank" href="'.$route.'"  class="btn btn-sm btn-themeSkyblue btn-sm">View Details</a>';
+                return '<a target="_blank" href="'.$route.'"  class="btn eb-btn-secondary btn-sm">View Details</a>';
             })
 
                 ->rawColumns(['Name','Action'])->make(true);
@@ -804,7 +804,7 @@ class AccommodationMasterController extends Controller
                     // when at least one bed is actually free.
                     if ($row->Capacity != 0 && $row->AssingAccommodationCount > 0)
                     {
-                     return'<a href="javascript:void(0)" class="btn btn-themeSkyblueLight AssingToRoom btn-small '.$edit_class.'" data-id="'.$row->available_a_id.'" data-RoomType="'.$row->RoomType_id.'">Assign</a>';
+                     return'<a href="javascript:void(0)" class="btn eb-btn-accent AssingToRoom btn-small '.$edit_class.'" data-id="'.$row->available_a_id.'" data-RoomType="'.$row->RoomType_id.'">Assign</a>';
                     }
                     else {
                         return'';

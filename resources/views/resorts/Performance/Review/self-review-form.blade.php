@@ -13,7 +13,7 @@
                     </div>
                 </div>
                 <div class="col-auto">
-                    <a href="{{ route('Performance.Review.mySelf') }}" class="btn btn-themeGray">
+                    <a href="{{ route('Performance.Review.mySelf') }}" class="btn perf-btn-secondary">
                         <i class="fa-solid fa-arrow-left me-1"></i> Back
                     </a>
                 </div>
@@ -75,7 +75,7 @@
                             </div>
                         @else
                             <div class="mt-4 text-end">
-                                <button type="submit" class="btn btn-themeBlue">Submit Self Review</button>
+                                <button type="submit" class="btn perf-btn-primary">Submit Self Review</button>
                             </div>
                         @endif
                     @else
@@ -89,6 +89,7 @@
         </div>
     </div>
 </div>
+@include('resorts.Performance._performance_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -125,7 +126,7 @@
             var formData = collectFormData();
 
             if (!validateRequired(formData)) {
-                toastr.error('Please fill all required fields', 'Validation error', { positionClass: 'toast-bottom-right' });
+                toastr.error('Please fill all required fields', 'Validation Error', { positionClass: 'toast-bottom-right' });
                 return;
             }
 
@@ -146,7 +147,7 @@
                     if (payload.errors) {
                         var msg = '';
                         $.each(payload.errors, function(field, err) { msg += err + '<br>'; });
-                        toastr.error(msg, 'Validation error', { positionClass: 'toast-bottom-right' });
+                        toastr.error(msg, 'Validation Error', { positionClass: 'toast-bottom-right' });
                     } else {
                         toastr.error(payload.message || 'Failed to submit review', 'Error', { positionClass: 'toast-bottom-right' });
                     }

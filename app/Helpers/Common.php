@@ -268,10 +268,10 @@ class Common
 	}
 
 	/**
-	 * Canonical "d M Y" display format (e.g. "29 May 2026") for any date
-	 * value — DB raw string, Carbon instance, or null. Use this instead of
-	 * printing a date column directly, which shows the raw stored format
-	 * (e.g. "2026-08-25") unformatted.
+	 * Canonical display format (settings-driven, e.g. "28-Jul-26") for any
+	 * date value — DB raw string, Carbon instance, or null. Use this
+	 * instead of printing a date column directly, which shows the raw
+	 * stored format (e.g. "2026-08-25") unformatted.
 	 */
 	public static function formatDate($date, $default = 'N/A')
 	{
@@ -279,7 +279,26 @@ class Common
 			return $default;
 		}
 		try {
-			return Carbon::parse($date)->format('d M Y');
+			return Carbon::parse($date)->format(self::getDateFormateFromSettings());
+		} catch (\Exception $e) {
+			return $default;
+		}
+	}
+
+	/**
+	 * Canonical display format for a time-only value (settings-driven —
+	 * "2:30 PM" when time_format is '12', "14:30" otherwise). Companion to
+	 * formatDate() for notification/message strings that embed a time
+	 * alongside a date.
+	 */
+	public static function formatDisplayTime($time, $default = '')
+	{
+		if (empty($time)) {
+			return $default;
+		}
+		try {
+			$timeFormat = self::getTimeFromSettings() == '12' ? 'h:i A' : 'H:i';
+			return Carbon::parse($time)->format($timeFormat);
 		} catch (\Exception $e) {
 			return $default;
 		}
@@ -6684,29 +6703,68 @@ class Common
 
                     $stickyClass = !empty($ak->is_sticky) ? ' notification-sticky' : '';
                     $stickyBadge = !empty($ak->is_sticky) ? '<span class="badge badge-warning ms-1">Pinned</span>' : '';
-                    // Profile image intentionally removed per UX request —
-                    // bell items now show only the message body + meta.
-                    $string .= ' <div class="notification-box active'.$stickyClass.' class_remove_me_'.$ak->id.'">
+                    $isSos = strtolower(trim($ak->module ?? '')) === 'sos';
+                    $sosClass = $isSos ? ' notification-critical' : '';
+                    $sosTag = $isSos ? ' <span class="ntf-sos-tag">SOS</span>' : '';
+                    $avatarHtml = Common::notificationAvatar($ak, $isSos);
+                    $string .= ' <div class="notification-box active'.$stickyClass.$sosClass.' class_remove_me_'.$ak->id.'">
                                     <a href="'.$notifUrl.'" class="d-flex profile-dropdown">
+                                        '.$avatarHtml.'
                                         <div class="flex-grow-1">
-                                            <h5>'.$ak->type.' '.$stickyBadge.'</h5>
+                                            <h5>'.$ak->type.' '.$stickyBadge.$sosTag.'</h5>
                                             <p>' .$ak->message.' </p>
-                                            <br>
                                             <span>'.$timeAgo.'</span>
                                         </div>
                                     </a>
-                                    <a href="javascript:void(0);" class="btn-lg-icon btn-light-grey MarkNotification" data-id="'.$ak->id .'">
+                                    <a href="javascript:void(0);" class="btn-lg-icon btn-light-grey MarkNotification" data-id="'.$ak->id .'" title="Mark as read">
                                         <i class="fas fa-envelope-open" aria-hidden="true"></i>
                                     </a>
                             </div>';
             }
             return $string;
         }else{
-            $string .='<div class="notification-box">
-                        <p>No Notification</p>
-                    </div>';
-                    return $string;
+            return view('partials._notifications_empty')->render();
         }
+    }
+
+    /**
+     * Bell-row avatar: SOS gets the red alert tile, a system-generated
+     * notification (no acting resort_admin — queued/console jobs, or any
+     * guard the model's boot() doesn't check) gets the Wisdom AI mark, and
+     * a person-created one gets that admin's real photo, falling back to
+     * initials only when getResortUserPicture() has nothing but the app
+     * default to show.
+     */
+    public static function notificationAvatar($notification, $isSos)
+    {
+        if ($isSos) {
+            $sosIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg>';
+            return '<div class="ntf-av ntf-av-sos">'.$sosIcon.'</div>';
+        }
+
+        $rawCreatedBy = method_exists($notification, 'getRawOriginal')
+            ? $notification->getRawOriginal('created_by')
+            : ($notification->getAttributes()['created_by'] ?? null);
+
+        if (empty($rawCreatedBy)) {
+            return '<div class="ntf-av ntf-av-wisdom"><span class="ntf-mk"></span></div>';
+        }
+
+        $photoUrl = Common::getResortUserPicture($rawCreatedBy);
+        $defaultPicture = url(config('settings.default_picture'));
+        if ($photoUrl && $photoUrl !== $defaultPicture) {
+            return '<div class="ntf-av"><img src="'.htmlspecialchars($photoUrl).'" alt="" loading="lazy"></div>';
+        }
+
+        $nameParts = preg_split('/\s+/', trim($notification->created_by));
+        $initials = '';
+        if (!empty($nameParts[0])) {
+            $initials .= mb_strtoupper(mb_substr($nameParts[0], 0, 1));
+        }
+        if (count($nameParts) > 1 && !empty(end($nameParts))) {
+            $initials .= mb_strtoupper(mb_substr(end($nameParts), 0, 1));
+        }
+        return '<div class="ntf-av ntf-av-person">'.htmlspecialchars($initials).'</div>';
     }
 
     public static function getNotificationUrl($notification)

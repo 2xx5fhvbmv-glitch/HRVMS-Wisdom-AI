@@ -9,7 +9,7 @@
                             <h3>{{ $key }}</h3>
                             <span class="badge badge-dark">Budget: $ @if(array_key_exists($key,$DepartmentTotal))  {{ $DepartmentTotal[$key]}} @endif</span>
                             <a href="#" class="text-lightblue fw-500 fs-13">WSB: $11,985</a>
-                            <a href="#" class="btn btn-xs btn-coolblue">compare</a>
+                            <a href="#" class="btn btn-xs btn-coolblue">Compare</a>
                         </button>
                     </h2>
                     <div id="collapse{{ $iteation }}" class="accordion-collapse collapse {{ ($iteation == 1)  ? 'show':''}} " aria-labelledby="heading{{ $iteation }}"
@@ -22,7 +22,7 @@
                                         <th class="text-nowrap">No. of position</th>
                                         <th class="text-nowrap w-120">Rank</th>
                                         <th class="text-nowrap">Nation</th>
-                                        <th>Current salary</th>
+                                        <th>Current Salary</th>
                                         @foreach ($header as $h)
                                             <th>{{ $h }}</th>
                                         @endforeach

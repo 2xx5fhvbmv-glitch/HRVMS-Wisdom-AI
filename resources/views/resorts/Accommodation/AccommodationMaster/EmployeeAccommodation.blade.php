@@ -99,7 +99,7 @@
                                         <tbody>
                                             <tr>
                                                 <th>Type:</th>
-                                                <td>Room In Building</td>
+                                                <td>Room in Building</td>
                                             </tr>
                                             <tr>
                                                 <th>Location:</th>
@@ -130,7 +130,7 @@
                                     </table>
 
                                     <div>
-                                        <a target="_blank" href="{{ route('resort.accommodation.AccommodationEmployeeDetails',base64_encode($d->employee_id)) }}" class="btn btn-themeSkyblue btn-sm">View Details</a>
+                                        <a target="_blank" href="{{ route('resort.accommodation.AccommodationEmployeeDetails',base64_encode($d->employee_id)) }}" class="btn eb-btn-secondary btn-sm">View Details</a>
                                     </div>
                                 </div>
 
@@ -154,6 +154,7 @@
 </div>
 
 
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')

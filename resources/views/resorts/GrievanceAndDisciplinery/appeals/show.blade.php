@@ -29,7 +29,7 @@
                 <div class="col-auto">
                     <span class="badge {{ $statusBadge }}" style="font-size:13px;padding:6px 12px;">{{ str_replace('_',' ', $appeal->status) }}</span>
                     @if(!$isClosed)
-                        <button class="btn btn-outline-secondary btn-sm ms-2" id="withdrawBtn">Withdraw Appeal</button>
+                        <button class="btn eb-btn-secondary btn-sm ms-2" id="withdrawBtn">Withdraw Appeal</button>
                     @endif
                 </div>
             </div>
@@ -92,7 +92,7 @@
                         <div class="d-flex justify-content-between align-items-center mb-3">
                             <h5 class="mb-0">Hearings</h5>
                             @if(!$isClosed)
-                                <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#scheduleHearingModal">
+                                <button class="btn eb-btn-accent btn-sm" data-bs-toggle="modal" data-bs-target="#scheduleHearingModal">
                                     <i class="fa fa-plus me-1"></i> Schedule Hearing
                                 </button>
                             @endif
@@ -121,8 +121,8 @@
                                 @endif
                                 @if(!$isClosed && $h->status === 'Scheduled')
                                     <div class="mt-2">
-                                        <button class="btn btn-sm btn-outline-success update-hearing-status" data-id="{{ $h->id }}" data-status="Completed">Mark Completed</button>
-                                        <button class="btn btn-sm btn-outline-secondary update-hearing-status" data-id="{{ $h->id }}" data-status="Cancelled">Cancel</button>
+                                        <button class="btn btn-sm eb-btn-positive update-hearing-status" data-id="{{ $h->id }}" data-status="Completed">Mark Completed</button>
+                                        <button class="btn btn-sm eb-btn-secondary update-hearing-status" data-id="{{ $h->id }}" data-status="Cancelled">Cancel</button>
                                     </div>
                                 @endif
                             </div>
@@ -162,7 +162,7 @@
                                 <label class="form-label">Decision Notes</label>
                                 <textarea class="form-control" name="decision_notes" rows="4" maxlength="5000" placeholder="Optional rationale, conditions, follow-up actions..."></textarea>
                             </div>
-                            <button type="submit" class="btn btn-primary">Record Decision</button>
+                            <button type="submit" class="btn eb-btn-primary">Record Decision</button>
                         </form>
                     </div>
                 </div>
@@ -212,14 +212,15 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Schedule</button>
+                    <button type="button" class="btn eb-btn-neutral" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn eb-btn-primary">Schedule</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 @endif
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')
@@ -227,9 +228,7 @@
 $(function () {
     var appealId = '{{ base64_encode($appeal->id) }}';
 
-    if ($.fn.datepicker) {
-        $('.datepicker').datepicker({ format: 'dd/mm/yyyy', autoclose: true, todayHighlight: true });
-    }
+    flatpickr('.datepicker', { dateFormat: 'd/m/Y', allowInput: true, appendTo: document.body });
     if ($.fn.select2) {
         $('.select2-multi').select2({ width: '100%', placeholder: 'Select participants', dropdownParent: $('#scheduleHearingModal') });
     }

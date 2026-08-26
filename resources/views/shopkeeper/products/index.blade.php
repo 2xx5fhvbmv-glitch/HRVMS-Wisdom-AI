@@ -98,7 +98,7 @@
             ProductList();
         });
      
-        $(document).on('click', '.btn-tableIcon.btnIcon-orange', function (e) {
+        $(document).on('click', '#productTable .view-row-btn', function (e) {
             e.preventDefault();
 
             // Get the product ID from the button's data attribute
@@ -137,14 +137,12 @@
             e.preventDefault();
             const productId = $(this).data('product-id');
 
-           Swal.fire({
+           wisdomConfirm({
+            role: 'destructive',
             title: 'Sure want to delete?',
             text: 'This cannot be undone',
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonText: 'Yes',
-            cancelButtonText: 'No',
-            confirmButtonColor: "#DD6B55"
+            confirmText: 'Yes',
+            cancelText: 'No'
             }).then((result) => {
                 if (result.isConfirmed) {
                     $.ajax({
@@ -207,8 +205,8 @@
                     <div class="qr-code-container"></div>
                 </td>
                 <td>
-                    <button class="btn btn-sm btn-success update-row-btn" data-product-id="${productId}">Update</button>
-                    <button class="btn btn-sm btn-secondary cancel-row-btn">Cancel</button>
+                    <button class="btn btn-sm eb-btn-positive update-row-btn" data-product-id="${productId}">Update</button>
+                    <button class="btn btn-sm eb-btn-secondary cancel-row-btn">Cancel</button>
                 </td>
             `;
             $row.html(editRowHtml);
@@ -265,7 +263,7 @@
                             </td>
                             <td>
                                 <div class="d-flex align-items-center">
-                                    <a href="#" class="btn-tableIcon btnIcon-orange" data-product-id="${productId}">
+                                    <a href="#" class="btn-tableIcon btnIcon-neutral view-row-btn" data-product-id="${productId}">
                                         <i class="fa-regular fa-eye"></i>
                                     </a>
                                     <a href="#" class="btn-lg-icon icon-bg-green me-1 edit-row-btn" data-product-id="${productId}">

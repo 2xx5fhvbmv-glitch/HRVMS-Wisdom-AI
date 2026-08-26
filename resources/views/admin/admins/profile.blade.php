@@ -372,7 +372,7 @@
 				},
 				'password_confirm': {
 					required: "This field is required",
-					equalTo: "The password field not matching",
+					equalTo: "The password field is not matching",
 					minlength: "Your password must be at least 8 characters long"
 				}
 			},

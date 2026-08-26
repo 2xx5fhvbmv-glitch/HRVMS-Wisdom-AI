@@ -149,7 +149,7 @@ class AttendanceController extends Controller
                         'end_time' => $session->end_time,
                         'attendance' => $attendance_status,
                         'created_at' => $session->created_at,
-                        'action' => '<a href="'.$historyUrl.'" class="btn-tableIcon btnIcon-orange">
+                        'action' => '<a href="'.$historyUrl.'" class="btn-tableIcon btnIcon-blue" title="View">
                             <i class="fa-regular fa-eye"></i>
                         </a>',
                     ];

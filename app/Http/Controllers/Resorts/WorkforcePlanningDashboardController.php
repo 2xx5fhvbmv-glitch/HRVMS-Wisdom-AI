@@ -713,7 +713,7 @@ class WorkforcePlanningDashboardController extends Controller
             $localEmployees=0;
             $expatEmployees=0;
             $employee_under_min_wage=0;
-            $occupancies=0;
+            $occupancies=collect();
             // Defensive defaults for the new view variables so the
             // dashboard view doesn't error in the exception path.
             $employeeMinWageList = collect();

@@ -4,7 +4,7 @@
             <div class="applicantsGrid-block">
                 @if($isHrDepartment)
                 <div class="dropdown table-dropdown ">
-                    <button class="btn btn-secondary dropdown-toggle dotsV-link" type="button"
+                    <button class="btn eb-btn-ghost dropdown-toggle dotsV-link" type="button"
                         id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false">
                         <i class="fa-solid fa-ellipsis-vertical"></i>
                     </button>
@@ -90,15 +90,15 @@
                             <td>{{ $a->Application_date  }}</td>
                         </tr>
                         <tr>
-                            <th>Passport No.</th>
+                            <th>Passport No.:</th>
                             <td>{{ $a->passport_no  }}</td>
                         </tr>
                         <tr>
-                            <th>Current Employment Status :</th>
+                            <th>Current Employment Status:</th>
                             <td>{{ ($a->employment_status  =="Available") ?"Not Employed" :"Employed"}}</td>
                         </tr>
                         <tr>
-                            <th>Current position:</th>
+                            <th>Current Position:</th>
                             <td>{{ $a->job_title  }}</td>
                         </tr>
                     </table>
@@ -124,4 +124,4 @@
     </div>
 </div>
 @endif
-
+@include('resorts._emotional_buttons_v2_styles')

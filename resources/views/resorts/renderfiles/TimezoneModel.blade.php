@@ -1,6 +1,6 @@
 <div class="head">
     <div>Your Clock</div>
-    <div>Applicant's O'clock</div>
+    <div>Applicant's Clock</div>
 </div>
 <div class="block">
     <?php

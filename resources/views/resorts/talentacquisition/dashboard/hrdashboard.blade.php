@@ -422,10 +422,16 @@
                             <div class="wai-row-body">
                                 <h6>{{ $taInsights[$tc['key']]['title'] ?? '' }}</h6>
                                 <p class="wai-row-text">{{ $taInsights[$tc['key']]['body'] ?? '' }}</p>
-                                @if($hasRecommendation)
-                                    <p class="wai-row-recommendation"><strong>Recommendation:</strong> {{ $taInsights[$tc['key']]['recommendation'] }}</p>
-                                @endif
-                                <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#{{ $tc['modal'] }}" class="wai-row-link">View details &rarr;</a>
+                                <div class="lnkrow">
+                                    @if($hasRecommendation)
+                                        <button type="button" class="lnk-rec"
+                                            data-title="{{ $taInsights[$tc['key']]['title'] ?? '' }}"
+                                            data-rec="{{ $taInsights[$tc['key']]['recommendation'] }}"
+                                            data-details="{{ $tc['modal'] }}">View recommendation &rarr;</button>
+                                        <span class="sep"></span>
+                                    @endif
+                                    <a href="#" class="lnk" data-details="{{ $tc['modal'] }}">View details &rarr;</a>
+                                </div>
                             </div>
                         </div>
                     @endforeach
@@ -727,6 +733,7 @@
 </div>
 <input type="hidden" name="Dasboard_resort_id" value="{{$resort_id}}" id="Dasboard_resort_id" >
 @includeWhen(isset($taInsights), 'resorts.talentacquisition.dashboard._insight_modals')
+@includeWhen(isset($taInsights), 'partials._wai_insight_modals')
 @include('resorts.talentacquisition.dashboard._ta_widgets_v2_styles')
 @endsection
 
@@ -780,7 +787,6 @@
     .wai-narrative .wai-row-body { flex: 1 1 auto; min-width: 0; }
     .wai-narrative .wai-row-body h6 { margin: 0 0 4px; font-size: 13.5px; font-weight: 700; color: #14232A; }
     .wai-narrative .wai-row-text { margin: 0 0 4px; font-size: 12.5px; color: #5D6F75; line-height: 1.5; }
-    .wai-narrative .wai-row-recommendation { margin: 0 0 4px; font-size: 12.5px; color: #0e8a9e; line-height: 1.5; }
     .wai-narrative .wai-row-link { display: inline-block; margin-top: 2px; font-size: 12px; font-weight: 600; color: #014653; }
     .th-upcoming-footer {
         display: flex;
@@ -1075,7 +1081,7 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
                                 </div>
                                 <div>
                                     <h6>${department} (${rank})</h6>
-                                    <p><strong>${createdBy} (${creatorRank})</strong> Requested for Hire ${NoOfVacnacy} ${position}</p>
+                                    <p><strong>${createdBy} (${creatorRank})</strong> Requested to Hire ${NoOfVacnacy} ${position}</p>
                                 </div>
 
                     </div>`;
@@ -1251,10 +1257,10 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         // End of Reject Vacanciy form
         //  Approval
 
-        $('#link_Expiry_date').datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,
-            todayHighlight: true
+        flatpickr('#link_Expiry_date', {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
         $("#ApprovedResponseModel").on("click",function(){
             var ta_id= $(this).attr('data-ta_id');
@@ -1359,7 +1365,8 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
             if (expiryDate) {
                 var parts = expiryDate.split("-");
                 var formattedDate = parts[2] + "/" + parts[1] + "/" + parts[0];
-                $("#link_Expiry_date").datepicker("setDate", formattedDate);
+                var linkExpiryFp = document.getElementById("link_Expiry_date")._flatpickr;
+                if (linkExpiryFp) { linkExpiryFp.setDate(formattedDate, true, "d/m/Y"); }
             }
 
             $(".link_Job").val(applicantLink).addClass("link_Job_");

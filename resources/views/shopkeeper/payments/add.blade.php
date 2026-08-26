@@ -72,7 +72,7 @@
                         </div>
                         <div class="d-none d-md-block" style="height: 426px;"></div>
                         <div class="card-footer text-end">
-                            <button type="submit" id="submitButton" class="btn btn-themeBlue btn-sm">Submit</button>
+                            <button type="submit" id="submitButton" class="btn eb-btn-primary btn-sm">Submit</button>
                         </div>
                     </div>
                 </form>

@@ -82,12 +82,13 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" onclick="submitStatusChange()">Submit</button>
+                    <button type="button" class="btn lnd-btn-neutral" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn lnd-btn-primary" onclick="submitStatusChange()">Submit</button>
                 </div>
             </div>
         </div>
     </div>
+@include('resorts.Learning._learning_buttons_v2_styles')
 @endsection
 
 @section('import-css')

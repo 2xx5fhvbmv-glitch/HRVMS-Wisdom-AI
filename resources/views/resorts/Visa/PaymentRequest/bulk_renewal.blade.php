@@ -28,7 +28,7 @@
                                 <label class="form-label mb-1">Receipt Number <span class="red-mark">*</span></label>
                                 <input type="text" class="form-control form-control-sm" id="bulkReceipt" placeholder="Enter receipt number">
                             </div>
-                            <button type="button" class="btn btn-themeBlue btn-sm" id="bulkPayBtn">Mark Selected as Paid</button>
+                            <button type="button" class="btn eb-btn-primary btn-sm" id="bulkPayBtn">Mark Selected as Paid</button>
                         </div>
                     </div>
                 </div>
@@ -51,6 +51,7 @@
         </div>
     </div>
 </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')

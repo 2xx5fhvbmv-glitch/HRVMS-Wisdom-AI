@@ -145,8 +145,8 @@
                                 <div class="col-lg-4 col-sm-6">
                                     <label for="resort_transportaion" class="form-label">RESORT TRANSPORTATION <span class="red-mark">*</span></label>
                                     <select class="form-select select2t-none" id="resort_transportaion_id"
-                                        placeholder="Resort Transportation" required name="resort_transportaion_id" data-parsley-required-message="Please Select resort transportation" data-parsley-errors-container="#resort_transportation-error" >
-                                        <option value="">Select Resort Transporation</option>
+                                        placeholder="Resort Transportation" required name="resort_transportaion_id" data-parsley-required-message="Please select resort transportation" data-parsley-errors-container="#resort_transportation-error" >
+                                        <option value="">Select Resort Transportation</option>
                                         @if($transportations)
                                             @foreach($transportations as $key => $value)
                                                 {{-- data-option carries the transportation NAME so the
@@ -311,7 +311,7 @@
                                      centre is the same partner each time. Test
                                      date/time stay blank (per appointment). --}}
                                 <div class="col-lg-4 col-sm-6">
-                                    <label for="medical_center_name" class="form-label">Medical center Name <span class="red-mark">*</span></label>
+                                    <label for="medical_center_name" class="form-label">Medical Center Name <span class="red-mark">*</span></label>
                                     <input type="text" class="form-control" id="medical_center_name" placeholder="Medical Center Name" required name="medical_center_name" data-parsley-required-message="Please enter medical center name" data-parsley-script-tag="true"
                                         data-parsley-html="true" value="{{ optional($lastItinerary)->medical_center_name }}">
                                 </div>
@@ -328,7 +328,7 @@
                                 <div class="col-lg-4 col-sm-6">
                                     <label for="medical_date" class="form-label">Medical Test Date <span class="red-mark">*</span></label>
                                     <input type="text" class="form-control datepicker" id="medical_date" name="medical_date"
-                                        placeholder="Medical Test Date" required data-parsley-required-message="Please enter medical type">
+                                        placeholder="Medical Test Date" required data-parsley-required-message="Please enter medical test date">
                                 </div>
                                 <div class="col-lg-4 col-sm-6">
                                     <label for="medical_time" class="form-label">Medical Test Time <span class="red-mark">*</span></label>
@@ -785,29 +785,30 @@
                 : `<p>The email <strong>${body.conflicting_email}</strong> on this candidate's Talent Acquisition record is already used by <strong>${body.owner_name}</strong>.</p>
                    <p>Enter a unique email to use for <strong>${body.applicant_name}</strong>'s new account.</p>`;
 
-            Swal.fire({
+            wisdomConfirm({
+                role: 'confirm',
                 title: 'Email Already In Use',
-                html: intro + '<input id="replacementEmail" type="email" class="swal2-input" placeholder="name@example.com" />',
-                showCancelButton: true,
-                confirmButtonText: 'Use this email',
-                cancelButtonText: 'Cancel',
-                focusConfirm: false,
-                preConfirm: function () {
-                    const value = (document.getElementById('replacementEmail').value || '').trim();
-                    if (!value) {
-                        Swal.showValidationMessage('Please enter an email address.');
-                        return false;
+                confirmText: 'Use this email',
+                extra: {
+                    html: intro + '<input id="replacementEmail" type="email" class="swal2-input" placeholder="name@example.com" />',
+                    focusConfirm: false,
+                    preConfirm: function () {
+                        const value = (document.getElementById('replacementEmail').value || '').trim();
+                        if (!value) {
+                            Swal.showValidationMessage('Please enter an email address.');
+                            return false;
+                        }
+                        // Lightweight client-side sanity check; the server still validates.
+                        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+                            Swal.showValidationMessage('Please enter a valid email address.');
+                            return false;
+                        }
+                        if (value.toLowerCase() === String(body.conflicting_email).toLowerCase()) {
+                            Swal.showValidationMessage('That is the same email — pick a different one.');
+                            return false;
+                        }
+                        return value;
                     }
-                    // Lightweight client-side sanity check; the server still validates.
-                    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
-                        Swal.showValidationMessage('Please enter a valid email address.');
-                        return false;
-                    }
-                    if (value.toLowerCase() === String(body.conflicting_email).toLowerCase()) {
-                        Swal.showValidationMessage('That is the same email — pick a different one.');
-                        return false;
-                    }
-                    return value;
                 }
             }).then(function (result) {
                 if (result.isConfirmed && result.value) {

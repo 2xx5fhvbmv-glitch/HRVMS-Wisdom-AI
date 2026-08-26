@@ -1,5 +1,8 @@
-{{-- Talent-Acquisition AI-insight detail modals. Included by the TA HR dashboard;
-     reads $taInsights. Opened by the "View Details" links. --}}
+{{-- Talent-Acquisition AI-insight detail modals. Included by the TA HR
+     dashboard; reads $taInsights. Opened by the "View Details" links via
+     the shared frosted-modal system (partials/_wai_insight_modals.blade.php).
+     Table-only body — title/issue already live on the card (this module
+     doesn't currently populate a recommendation). --}}
 @php
     $rejD = $taInsights['rejection']['details']  ?? [];
     $funD = $taInsights['funnel']['details']     ?? [];
@@ -9,159 +12,126 @@
 @endphp
 
 <!-- Top rejection reasons -->
-<div class="modal fade" id="taInsightRejectionModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">{{ $taInsights['rejection']['title'] ?? 'Top Rejection Reasons' }}</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+<div class="wai-backdrop" id="taInsightRejectionModal">
+    <div class="wai-modal wide" role="dialog" aria-modal="true">
+        <button class="m-x" aria-label="Close">&times;</button>
+        <div class="m-kicker"><span class="dot"></span>WAI Insight</div>
+        <div class="mt">{{ $taInsights['rejection']['title'] ?? 'Top Rejection Reasons' }}</div>
+        @if(!empty($rejD['rows']))
+            <div class="m-tablewrap">
+                <div class="m-tscroll"><table class="m-table">
+                    <thead><tr><th>Reason</th><th>Count</th><th>Share</th></tr></thead>
+                    <tbody>
+                        @foreach($rejD['rows'] as $row)
+                            <tr><td>{{ $row['reason'] }}</td><td>{{ $row['count'] }}</td><td>{{ $row['pct'] }}%</td></tr>
+                        @endforeach
+                    </tbody>
+                </table></div>
             </div>
-            <div class="modal-body">
-                <p class="text-muted">{{ $taInsights['rejection']['body'] ?? '' }}</p>
-                @if(!empty($taInsights['rejection']['recommendation']))<p style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $taInsights['rejection']['recommendation'] }}</p>@endif
-                @if(!empty($rejD['rows']))
-                    <div class="table-responsive">
-                        <table class="table table-sm table-striped align-middle">
-                            <thead><tr><th>Reason</th><th class="text-end">Count</th><th class="text-end">Share</th></tr></thead>
-                            <tbody>
-                                @foreach($rejD['rows'] as $row)
-                                    <tr><td>{{ $row['reason'] }}</td><td class="text-end">{{ $row['count'] }}</td><td class="text-end">{{ $row['pct'] }}%</td></tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                @else
-                    <p class="mb-0">No rejection reasons recorded.</p>
-                @endif
-            </div>
-        </div>
+        @else
+            <p class="m-empty">No rejection reasons recorded.</p>
+        @endif
     </div>
 </div>
 
 <!-- Hiring funnel & conversion -->
-<div class="modal fade" id="taInsightFunnelModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">{{ $taInsights['funnel']['title'] ?? 'Hiring Funnel & Conversion' }}</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+<div class="wai-backdrop" id="taInsightFunnelModal">
+    <div class="wai-modal" role="dialog" aria-modal="true">
+        <button class="m-x" aria-label="Close">&times;</button>
+        <div class="m-kicker"><span class="dot"></span>WAI Insight</div>
+        <div class="mt">{{ $taInsights['funnel']['title'] ?? 'Hiring Funnel & Conversion' }}</div>
+        @if(!empty($funD['stages']))
+            <div class="m-tablewrap">
+                <div class="m-tscroll"><table class="m-table">
+                    <thead><tr><th>Stage</th><th>Candidates</th><th>% of applied</th></tr></thead>
+                    <tbody>
+                        @foreach($funD['stages'] as $row)
+                            <tr><td>{{ $row['stage'] }}</td><td>{{ $row['count'] }}</td><td>{{ $row['pct'] }}%</td></tr>
+                        @endforeach
+                    </tbody>
+                </table></div>
             </div>
-            <div class="modal-body">
-                <p class="text-muted">{{ $taInsights['funnel']['body'] ?? '' }}</p>
-                @if(!empty($taInsights['funnel']['recommendation']))<p style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $taInsights['funnel']['recommendation'] }}</p>@endif
-                @if(!empty($funD['stages']))
-                    <div class="table-responsive">
-                        <table class="table table-sm table-striped align-middle">
-                            <thead><tr><th>Stage</th><th class="text-end">Candidates</th><th class="text-end">% of applied</th></tr></thead>
-                            <tbody>
-                                @foreach($funD['stages'] as $row)
-                                    <tr><td>{{ $row['stage'] }}</td><td class="text-end">{{ $row['count'] }}</td><td class="text-end">{{ $row['pct'] }}%</td></tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                @endif
-            </div>
-        </div>
+        @else
+            <p class="m-empty">No data.</p>
+        @endif
     </div>
 </div>
 
 <!-- Offer / contract acceptance -->
-<div class="modal fade" id="taInsightAcceptanceModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">{{ $taInsights['acceptance']['title'] ?? 'Offer / Contract Acceptance' }}</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+<div class="wai-backdrop" id="taInsightAcceptanceModal">
+    <div class="wai-modal wide" role="dialog" aria-modal="true">
+        <button class="m-x" aria-label="Close">&times;</button>
+        <div class="m-kicker"><span class="dot"></span>WAI Insight</div>
+        <div class="mt">{{ $taInsights['acceptance']['title'] ?? 'Offer / Contract Acceptance' }}</div>
+        @if(!empty($accD['rows']))
+            <div class="m-tablewrap">
+                <div class="m-tcap">Pending = sent but not yet responded to</div>
+                <div class="m-tscroll"><table class="m-table">
+                    <thead><tr><th>Document</th><th>Pending</th><th>Accepted</th><th>Rejected</th><th>Total</th><th>Accept rate</th></tr></thead>
+                    <tbody>
+                        @foreach($accD['rows'] as $row)
+                            <tr class="{{ $row['rate'] == 0 ? 'attn' : '' }}">
+                                <td>{{ $row['type'] }}</td>
+                                <td>{{ $row['sent'] }}</td>
+                                <td>{{ $row['accepted'] }}</td>
+                                <td>{{ $row['rejected'] }}</td>
+                                <td>{{ $row['total'] }}</td>
+                                <td class="rate {{ $row['rate'] == 0 ? 'zero' : ($row['rate'] == 100 ? 'full' : '') }}">{{ $row['rate'] }}%</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table></div>
             </div>
-            <div class="modal-body">
-                <p class="text-muted">{{ $taInsights['acceptance']['body'] ?? '' }}</p>
-                @if(!empty($taInsights['acceptance']['recommendation']))<p style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $taInsights['acceptance']['recommendation'] }}</p>@endif
-                @if(!empty($accD['rows']))
-                    <div class="table-responsive">
-                        <table class="table table-sm table-striped align-middle">
-                            <thead><tr><th>Document</th><th class="text-end">Pending</th><th class="text-end">Accepted</th><th class="text-end">Rejected</th><th class="text-end">Total</th><th class="text-end">Accept rate</th></tr></thead>
-                            <tbody>
-                                @foreach($accD['rows'] as $row)
-                                    <tr>
-                                        <td>{{ $row['type'] }}</td>
-                                        <td class="text-end">{{ $row['sent'] }}</td>
-                                        <td class="text-end">{{ $row['accepted'] }}</td>
-                                        <td class="text-end">{{ $row['rejected'] }}</td>
-                                        <td class="text-end">{{ $row['total'] }}</td>
-                                        <td class="text-end">{{ $row['rate'] }}%</td>
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                    <p class="mb-0 text-muted">Pending = sent but not yet responded to.</p>
-                @else
-                    <p class="mb-0">No offers or contracts sent yet.</p>
-                @endif
-            </div>
-        </div>
+        @else
+            <p class="m-empty">No offers or contracts sent yet.</p>
+        @endif
     </div>
 </div>
 
 <!-- Time to hire -->
-<div class="modal fade" id="taInsightTthModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">{{ $taInsights['tth']['title'] ?? 'Time to Hire' }}</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+<div class="wai-backdrop" id="taInsightTthModal">
+    <div class="wai-modal wide" role="dialog" aria-modal="true">
+        <button class="m-x" aria-label="Close">&times;</button>
+        <div class="m-kicker"><span class="dot"></span>WAI Insight</div>
+        <div class="mt">{{ $taInsights['tth']['title'] ?? 'Time to Hire' }}</div>
+        @if(!empty($tthD['rows']))
+            <div class="m-tablewrap">
+                <div class="m-tcap">Recent hires (application &rarr; contract accepted)</div>
+                <div class="m-tscroll"><table class="m-table">
+                    <thead><tr><th>Candidate</th><th>Department</th><th>Days</th></tr></thead>
+                    <tbody>
+                        @foreach($tthD['rows'] as $row)
+                            <tr><td>{{ $row['name'] }}</td><td>{{ $row['dept'] }}</td><td>{{ $row['days'] }}</td></tr>
+                        @endforeach
+                    </tbody>
+                </table></div>
             </div>
-            <div class="modal-body">
-                <p class="text-muted">{{ $taInsights['tth']['body'] ?? '' }}</p>
-                @if(!empty($taInsights['tth']['recommendation']))<p style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $taInsights['tth']['recommendation'] }}</p>@endif
-                @if(!empty($tthD['rows']))
-                    <p class="mb-1 fw-bold">Recent hires (application → contract accepted)</p>
-                    <div class="table-responsive">
-                        <table class="table table-sm table-striped align-middle">
-                            <thead><tr><th>Candidate</th><th>Department</th><th class="text-end">Days</th></tr></thead>
-                            <tbody>
-                                @foreach($tthD['rows'] as $row)
-                                    <tr><td>{{ $row['name'] }}</td><td>{{ $row['dept'] }}</td><td class="text-end">{{ $row['days'] }}</td></tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                @else
-                    <p class="mb-0">No completed hires yet to measure.</p>
-                @endif
-            </div>
-        </div>
+        @else
+            <p class="m-empty">No completed hires yet to measure.</p>
+        @endif
     </div>
 </div>
 
 <!-- Hiring demand by department -->
-<div class="modal fade" id="taInsightDemandModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">{{ $taInsights['demand']['title'] ?? 'Hiring Demand by Department' }}</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+<div class="wai-backdrop" id="taInsightDemandModal">
+    <div class="wai-modal" role="dialog" aria-modal="true">
+        <button class="m-x" aria-label="Close">&times;</button>
+        <div class="m-kicker"><span class="dot"></span>WAI Insight</div>
+        <div class="mt">{{ $taInsights['demand']['title'] ?? 'Hiring Demand by Department' }}</div>
+        @if(!empty($demD['rows']))
+            <div class="m-tablewrap">
+                <div class="m-tcap">Open positions still to fill (total {{ $demD['total'] ?? 0 }})</div>
+                <div class="m-tscroll"><table class="m-table">
+                    <thead><tr><th>Department</th><th>Open positions</th></tr></thead>
+                    <tbody>
+                        @foreach($demD['rows'] as $row)
+                            <tr><td>{{ $row['dept'] }}</td><td>{{ $row['open'] }}</td></tr>
+                        @endforeach
+                    </tbody>
+                </table></div>
             </div>
-            <div class="modal-body">
-                <p class="text-muted">{{ $taInsights['demand']['body'] ?? '' }}</p>
-                @if(!empty($taInsights['demand']['recommendation']))<p style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $taInsights['demand']['recommendation'] }}</p>@endif
-                @if(!empty($demD['rows']))
-                    <p class="mb-1">Open positions still to fill (total {{ $demD['total'] ?? 0 }}):</p>
-                    <div class="table-responsive">
-                        <table class="table table-sm table-striped align-middle">
-                            <thead><tr><th>Department</th><th class="text-end">Open positions</th></tr></thead>
-                            <tbody>
-                                @foreach($demD['rows'] as $row)
-                                    <tr><td>{{ $row['dept'] }}</td><td class="text-end">{{ $row['open'] }}</td></tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                @else
-                    <p class="mb-0">No open vacancies right now.</p>
-                @endif
-            </div>
-        </div>
+        @else
+            <p class="m-empty">No open vacancies right now.</p>
+        @endif
     </div>
 </div>

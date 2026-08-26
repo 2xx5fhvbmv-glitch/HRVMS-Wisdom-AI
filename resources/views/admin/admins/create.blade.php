@@ -263,13 +263,13 @@
 				'password': {
 					@if($admin->id == '')
 						required: "The password is required",
-						minlength: "Please Enter Password atleast 8 characters long",
+						minlength: "Please enter password at least 8 characters long",
 					@endif
 				},
 				password_confirmation:{
 					@if($admin->id == '')
 						required: "The confirm password is required",
-						minlength: "Please Enter confirm Password atleast 8 characters long",
+						minlength: "Please enter confirm password at least 8 characters long",
 						equalTo: 'The password must match',
 					@endif
 				}

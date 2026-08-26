@@ -111,7 +111,7 @@
             <div class="col-xl-3 col-lg-6 col-md-6">
                 <div class="card">
                     <div class="card-title d-flex justify-content-between">
-                        <h3>AI Insight's</h3>
+                        <h3>AI Insights</h3>
                     </div>
                 </div>
             </div>
@@ -209,12 +209,12 @@
                     <div class="row g-2 ">
                         <div class="col-auto">
                             <div class="doughnut-label">
-                                <span class="bg-theme"></span>Preplannned OT
+                                <span class="bg-theme"></span>Preplanned OT
                             </div>
                         </div>
                         <div class="col-auto">
                             <div class="doughnut-label">
-                                <span class="bg-themeLightBlue"></span>Preplannned OT
+                                <span class="bg-themeLightBlue"></span>Preplanned OT
                             </div>
                         </div>
                         <div class="col-auto">
@@ -236,7 +236,7 @@
                             <div class="col-auto">
                                 <div class="form-group">
                                     <select class="form-select" aria-label="Default select example" id="ResortPosition">
-                                        <option selected="">All Poistion</option>
+                                        <option selected="">All Positions</option>
                                         @if($ResortPosition->isNotEmpty())
                                             @foreach($ResortPosition as $position)
                                                 <option value="{{$position->id}}">{{$position->position_title}}</option>
@@ -250,7 +250,7 @@
                                     <input type="text" class="form-control datepicker RosterDate" id="RosterDate">
                                 </div>
                             </div>
-                            <div class="col-auto"><a href="{{route('resort.timeandattendance.CreateDutyRoster')}}" class="btn btn-themeSkyblue btn-sm">Create Duty
+                            <div class="col-auto"><a href="{{route('resort.timeandattendance.CreateDutyRoster')}}" class="btn perf-btn-accent btn-sm">Create Duty
                                     Roster</a>
                             </div>
                         </div>
@@ -259,7 +259,7 @@
                         <thead>
                             <tr>
                                 <th>Employee Name</th>
-                                <th>Poisition</th>
+                                <th>Position</th>
                                 <th>Shift</th>
                                 <th>Action</th>
                             </tr>
@@ -328,10 +328,10 @@
                     </div>
                     <div class="row g-2 justify-content-center mb-3">
                         <div class="col-auto">
-                            <button type="submit" class="btn btn-themeBlue btn-sm todoListApprove" data-button="approve"><i  class="fa-solid fa-check me-2"></i>Approved</button>
+                            <button type="submit" class="btn perf-btn-positive btn-sm todoListApprove" data-button="approve"><i  class="fa-solid fa-check me-2"></i>Approved</button>
                         </div>
                         <div class="col-auto">
-                            <button type="submit" class="btn btn-danger btn-sm todoListReject"  data-button="reject"><i class="fa-solid fa-xmark me-2"></i>Reject</button>
+                            <button type="submit" class="btn perf-btn-critical btn-sm todoListReject"  data-button="reject"><i class="fa-solid fa-xmark me-2"></i>Reject</button>
                         </div>
                     </div>
 
@@ -354,6 +354,7 @@
         </div>
     </div>
 </div>
+@include('resorts.Performance._performance_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -568,7 +569,7 @@
 
     $(document).ready(function () {
         $('#ResortPosition').select2({
-            placeholder: "Select a Poitions", // Placeholder text
+            placeholder: "Select a Position", // Placeholder text
             allowClear: true // Adds a clear (X) button to reset the dropdown
         });
 
@@ -582,10 +583,10 @@
 
             DutyRosterList();
         });
-        $('.datepicker').datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,      // Close the picker after selection
-            todayHighlight: true  // Highlight today's date
+        flatpickr('.datepicker', {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
 
     });
@@ -697,14 +698,11 @@
     {
         const action = flag === 'approve' ? 'approved' : 'rejected'; // Determine action based on flag
 
-        Swal.fire({
+        wisdomConfirm({
+            role: flag === 'approve' ? 'positive' : 'destructive',
             title: `Are you sure you want to ${flag} this OT?`,
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: flag === 'approve' ? '#28a745' : '#dc3545', // Green for approve, red for reject
-            cancelButtonColor: '#6c757d', // Gray for cancel
-            confirmButtonText: `Yes, ${flag} it!`,
-            cancelButtonText: 'No, cancel',
+            confirmText: `Yes, ${flag} it!`,
+            cancelText: 'No, cancel'
             }).then((result) => {
                 if (result.isConfirmed) {
                     // Perform the AJAX request
@@ -718,22 +716,22 @@
                     },
                     success: function(response) {
                         // Show success message
-                        Swal.fire(
-                            `${action.charAt(0).toUpperCase() + action.slice(1)}!`,
-                            `The OT has been successfully ${action}.`,
-                            'success'
-                        );
+                        wisdomAlert({
+                            type: 'success',
+                            title: `${action.charAt(0).toUpperCase() + action.slice(1)}!`,
+                            text: `The OT has been successfully ${action}.`
+                        });
                         window.location.reload();
 
                         // Optional: Update the UI (e.g., remove the item or update status)
                     },
                     error: function(xhr, status, error) {
                         // Show error message
-                        Swal.fire(
-                            'Error!',
-                            'An error occurred while processing the request.',
-                            'error'
-                        );
+                        wisdomAlert({
+                            type: 'error',
+                            title: 'Error!',
+                            text: 'An error occurred while processing the request.'
+                        });
 
                         console.error(error);
                     }

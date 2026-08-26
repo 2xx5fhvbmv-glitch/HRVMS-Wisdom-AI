@@ -45,9 +45,9 @@
                             </select>
                         </div>
 
-                        <div class="col-auto ms-auto leave-tabnav">
-                            <a href="#" class="btn-grid active"><img src="{{ URL::asset('resorts_assets/images/grid.svg')}}" alt="icon"></a>
-                            <a href="#" class="btn-list "><img src="{{ URL::asset('resorts_assets/images/list.svg')}}" alt="icon"></a>
+                        <div class="col-auto ms-auto">
+                            <a href="#" class="btn btn-grid active"><img src="{{ URL::asset('resorts_assets/images/grid.svg')}}" alt="icon"></a>
+                            <a href="#" class="btn btn-list "><img src="{{ URL::asset('resorts_assets/images/list.svg')}}" alt="icon"></a>
                         </div>
                     </div>
                 </div>

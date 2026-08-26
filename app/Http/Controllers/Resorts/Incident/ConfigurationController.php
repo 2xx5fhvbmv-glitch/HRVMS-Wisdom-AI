@@ -89,11 +89,11 @@ class ConfigurationController extends Controller
                 $id = base64_encode($row->id);
                 return '
                     <div  class="d-flex align-items-center">
-                        <a href="javascript:void(0)" class="btn-lg-icon icon-bg-green me-1 edit-row-btn ' . $edit_class . '" data-cat-id="' . e($id) . '">
-                            <img src="' . asset("resorts_assets/images/edit.svg") . '" alt="Edit" class="img-fluid">
+                        <a href="javascript:void(0)" class="btn-tableIcon btnIcon-yellow me-1 edit-row-btn ' . $edit_class . '" data-cat-id="' . e($id) . '">
+                            <i class="fa-solid fa-pen-to-square"></i>
                         </a>
-                        <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-row-btn ' . $delete_class . '" data-cat-id="' . e($id) . '">
-                            <img src="' . asset("resorts_assets/images/trash-red.svg") . '" alt="Delete" class="img-fluid">
+                        <a href="javascript:void(0)" class="btn-tableIcon eb-icon-critical delete-row-btn ' . $delete_class . '" data-cat-id="' . e($id) . '">
+                            <i class="fa-regular fa-trash-can"></i>
                         </a>
                     </div>';
             })
@@ -298,11 +298,11 @@ class ConfigurationController extends Controller
                     $id = base64_encode($row->id);
                     return '
                         <div class="d-flex align-items-center">
-                            <a href="javascript:void(0)" class="btn-lg-icon icon-bg-green me-1 edit-row-btn ' . $edit_class . '" data-cat-id="' . e($id) . '">
-                                <img src="' . asset("resorts_assets/images/edit.svg") . '" alt="Edit" class="img-fluid">
+                            <a href="javascript:void(0)" class="btn-tableIcon btnIcon-yellow me-1 edit-row-btn ' . $edit_class . '" data-cat-id="' . e($id) . '">
+                                <i class="fa-solid fa-pen-to-square"></i>
                             </a>
-                            <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-row-btn ' . $delete_class . '" data-cat-id="' . e($id) . '">
-                                <img src="' . asset("resorts_assets/images/trash-red.svg") . '" alt="Delete" class="img-fluid">
+                            <a href="javascript:void(0)" class="btn-tableIcon eb-icon-critical delete-row-btn ' . $delete_class . '" data-cat-id="' . e($id) . '">
+                                <i class="fa-regular fa-trash-can"></i>
                             </a>
                         </div>';
                 })
@@ -484,11 +484,11 @@ class ConfigurationController extends Controller
                     $id = base64_encode($committee->id);
                     return '
                         <div class="d-flex align-items-center">
-                            <a href="javascript:void(0)" class="btn-lg-icon icon-bg-green me-1 edit-row-btn" data-cat-id="' . e($id) . '">
-                                <img src="' . asset("resorts_assets/images/edit.svg") . '" alt="Edit" class="img-fluid">
+                            <a href="javascript:void(0)" class="btn-tableIcon btnIcon-yellow me-1 edit-row-btn" data-cat-id="' . e($id) . '">
+                                <i class="fa-solid fa-pen-to-square"></i>
                             </a>
-                            <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-row-btn" data-cat-id="' . e($id) . '">
-                                <img src="' . asset("resorts_assets/images/trash-red.svg") . '" alt="Delete" class="img-fluid">
+                            <a href="javascript:void(0)" class="btn-tableIcon eb-icon-critical delete-row-btn" data-cat-id="' . e($id) . '">
+                                <i class="fa-regular fa-trash-can"></i>
                             </a>
                         </div>';
                 })
@@ -732,11 +732,11 @@ class ConfigurationController extends Controller
                     $id = base64_encode($row->id);
                     return '
                         <div class="d-flex align-items-center">
-                            <a href="javascript:void(0)" class="btn-lg-icon icon-bg-green me-1 edit-row-btn" data-cat-id="' . e($id) . '">
-                                <img src="' . asset("resorts_assets/images/edit.svg") . '" alt="Edit" class="img-fluid">
+                            <a href="javascript:void(0)" class="btn-tableIcon btnIcon-yellow me-1 edit-row-btn" data-cat-id="' . e($id) . '">
+                                <i class="fa-solid fa-pen-to-square"></i>
                             </a>
-                            <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-row-btn" data-cat-id="' . e($id) . '">
-                                <img src="' . asset("resorts_assets/images/trash-red.svg") . '" alt="Delete" class="img-fluid">
+                            <a href="javascript:void(0)" class="btn-tableIcon eb-icon-critical delete-row-btn" data-cat-id="' . e($id) . '">
+                                <i class="fa-regular fa-trash-can"></i>
                             </a>
                         </div>';
                 })
@@ -868,11 +868,11 @@ class ConfigurationController extends Controller
                     $id = base64_encode($row->id);
                     return '
                         <div class="d-flex align-items-center">
-                            <a href="javascript:void(0)" class="btn-lg-icon icon-bg-green me-1 edit-row-btn" data-cat-id="' . e($id) . '">
-                                <img src="' . asset("resorts_assets/images/edit.svg") . '" alt="Edit" class="img-fluid">
+                            <a href="javascript:void(0)" class="btn-tableIcon btnIcon-yellow me-1 edit-row-btn" data-cat-id="' . e($id) . '">
+                                <i class="fa-solid fa-pen-to-square"></i>
                             </a>
-                            <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-row-btn" data-cat-id="' . e($id) . '">
-                                <img src="' . asset("resorts_assets/images/trash-red.svg") . '" alt="Delete" class="img-fluid">
+                            <a href="javascript:void(0)" class="btn-tableIcon eb-icon-critical delete-row-btn" data-cat-id="' . e($id) . '">
+                                <i class="fa-regular fa-trash-can"></i>
                             </a>
                         </div>';
                 })
@@ -1004,11 +1004,11 @@ class ConfigurationController extends Controller
                     $id = base64_encode($row->id);
                     return '
                         <div class="d-flex align-items-center">
-                            <a href="javascript:void(0)" class="btn-lg-icon icon-bg-green me-1 edit-row-btn" data-cat-id="' . e($id) . '">
-                                <img src="' . asset("resorts_assets/images/edit.svg") . '" alt="Edit" class="img-fluid">
+                            <a href="javascript:void(0)" class="btn-tableIcon btnIcon-yellow me-1 edit-row-btn" data-cat-id="' . e($id) . '">
+                                <i class="fa-solid fa-pen-to-square"></i>
                             </a>
-                            <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-row-btn" data-cat-id="' . e($id) . '">
-                                <img src="' . asset("resorts_assets/images/trash-red.svg") . '" alt="Delete" class="img-fluid">
+                            <a href="javascript:void(0)" class="btn-tableIcon eb-icon-critical delete-row-btn" data-cat-id="' . e($id) . '">
+                                <i class="fa-regular fa-trash-can"></i>
                             </a>
                         </div>';
                 })

@@ -20,7 +20,7 @@
                 </div>
                 <div class="col-auto">
                     <div class="d-flex justify-content-end">
-                        <a href="{{ route('visa.hr.dashboard') }}" class="btn btn-sm btn-theme">Back to Dashboard</a>
+                        <a href="{{ route('visa.hr.dashboard') }}" class="btn eb-btn-neutral">Back to Dashboard</a>
                     </div>
                 </div>
             </div>
@@ -54,6 +54,7 @@
         </div>
     </div>
 </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')

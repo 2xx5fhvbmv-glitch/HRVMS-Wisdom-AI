@@ -3,7 +3,7 @@
         <div class="col-xxl-cust5 col-xl-3 col-lg-4 col-sm-6">
             <div class="applicantsGrid-block">
                 <div class="dropdown table-dropdown ">
-                    <button class="btn btn-secondary dropdown-toggle dotsV-link" type="button"
+                    <button class="btn eb-btn-ghost dropdown-toggle dotsV-link" type="button"
                         id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false">
                         <i class="fa-solid fa-ellipsis-vertical"></i>
                     </button>
@@ -102,7 +102,7 @@
                             <td>{{ $a->passport_no  }}</td>
                         </tr>
                         <tr>
-                            <th>Current Employment Status :</th>
+                            <th>Current Employment Status:</th>
                             <td>{{ ($a->employment_status  =="Available") ?"Not Employed" :"Employed"}}</td>
                         </tr>
                         <tr>
@@ -131,4 +131,4 @@
     </div>
 </div>
 @endif
-
+@include('resorts._emotional_buttons_v2_styles')

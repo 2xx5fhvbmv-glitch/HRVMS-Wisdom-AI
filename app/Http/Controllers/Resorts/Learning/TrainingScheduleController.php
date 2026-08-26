@@ -260,13 +260,12 @@ class TrainingScheduleController extends Controller
             })
             ->addColumn('action', function ($row) use ($edit_class) {
                 $editUrl = 'javascript:void(0)';
-                $editIcon = asset("resorts_assets/images/edit.svg");
                 $attendanceUrl = route('learning.schedule.attendance', ['schedule_id' => base64_encode($row->id)]);
-            
-                return '<a href="' . $editUrl . '" title="Edit" class="btn-lg-icon icon-bg-green me-1 edit-row-btn '.$edit_class.'" data-schedule-id="' . e($row->id) . '">
-                            <img src="' . $editIcon . '" alt="Edit" class="img-fluid">
+
+                return '<a href="' . $editUrl . '" title="Edit" class="btn-tableIcon btnIcon-yellow me-1 edit-row-btn '.$edit_class.'" data-schedule-id="' . e($row->id) . '">
+                            <i class="fa-solid fa-pen-to-square"></i>
                         </a>
-                        <a href="' . $attendanceUrl . '" title="Mark Attendance" class="btn-sm-icon">
+                        <a href="' . $attendanceUrl . '" title="Mark Attendance" class="btn-tableIcon btnIcon-blue">
                             <i class="fas fa-calendar-check" aria-hidden="true"></i>
                         </a>';
             })
@@ -331,7 +330,9 @@ class TrainingScheduleController extends Controller
 
            
             $notificationTitle = 'Training Sceduled';
-            $notificationMessage = "Training '{$learningProgram->name}' has been scheduled from {$request->start_date} to {$request->end_date}, between {$request->start_time} - {$request->end_time}.";
+            $notificationMessage = "Training '{$learningProgram->name}' has been scheduled from "
+                . Common::formatDate($request->start_date) . " to " . Common::formatDate($request->end_date)
+                . ", between " . Common::formatDisplayTime($request->start_time) . " - " . Common::formatDisplayTime($request->end_time) . ".";
             $moduleName = "Learning";
 
             event(new ResortNotificationEvent(Common::nofitication(
@@ -555,7 +556,8 @@ class TrainingScheduleController extends Controller
 
                 // Construct the notification message
                 $notificationTitle = 'Training Schedule Updated';
-                $notificationMessage = "The schedule for '{$trainingName}' has been updated. New dates: From {$schedule->start_date} to {$schedule->end_date}.";
+                $notificationMessage = "The schedule for '{$trainingName}' has been updated. New dates: From "
+                    . Common::formatDate($schedule->start_date) . " to " . Common::formatDate($schedule->end_date) . ".";
 
                 $moduleName = "Learning";
 
@@ -664,7 +666,7 @@ class TrainingScheduleController extends Controller
                     return $totalExpected > 0 ? round(($actualPresent / $totalExpected) * 100, 2) . '%' : '0%';
                 })
                 ->addColumn('action', function ($row) {
-                    return '<button type="button" class="btn btn-themeBlue btn-sm" onclick="viewTrainingDetail(' . $row->id . ')">View</button>';
+                    return '<button type="button" class="btn lnd-btn-secondary btn-sm" onclick="viewTrainingDetail(' . $row->id . ')">View</button>';
                 })
                 ->rawColumns(['title', 'dates', 'time', 'venue', 'status', 'participants', 'attendance', 'action'])
                 ->make(true);

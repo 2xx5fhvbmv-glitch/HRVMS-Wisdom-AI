@@ -34,8 +34,8 @@
     .ta-btn-secondary:hover { background: #F9F8F1; border-color: #014653; color: #014653; transform: translateY(-2px); box-shadow: 0 8px 18px -8px rgba(20,35,42,.18); }
 
     /* Affirming completion — Approved (vacancy request), Set Default. */
-    .ta-btn-positive { background: #E4F3E9; color: #2E9E5B; }
-    .ta-btn-positive:hover { background: #2E9E5B; color: #fff; transform: translateY(-2px); box-shadow: 0 8px 18px -8px rgba(20,35,42,.25); }
+    .ta-btn-positive { background: var(--positive-bg); color: var(--positive); }
+    .ta-btn-positive:hover { background: var(--positive); color: #fff; transform: translateY(-2px); box-shadow: 0 8px 18px -8px rgba(20,35,42,.25); }
 
     /* Consequential/external-facing, not destructive — Send Interview,
        Send Offer Letter/Contract, On Hold, Reject request, Extend Ad Link. */

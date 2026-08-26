@@ -844,7 +844,7 @@ class MonthlyCheckingController extends Controller
                 // other caller of this route already base64_encode()s it) —
                 // this one passed the raw id, so the decoded garbage never
                 // matched a row and every "View" from History 403'd.
-                return '<a href="'.route('Performance.GetMonthlyCheckInDetails', base64_encode($row->id)).'" class="btn btn-theme btn-sm">View</a>';
+                return '<a href="'.route('Performance.GetMonthlyCheckInDetails', base64_encode($row->id)).'" class="btn perf-btn-secondary btn-sm">View</a>';
             })
             ->rawColumns(['employee', 'status_badge', 'action'])
             ->make(true);

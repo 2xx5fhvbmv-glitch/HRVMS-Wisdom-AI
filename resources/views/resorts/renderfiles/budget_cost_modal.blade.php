@@ -329,10 +329,10 @@
                         <h4 class="mb-0 text-primary"><strong>$<span id="totalSelectedAmount">0.00</span></strong></h4>
                     </div>
                     <div>
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+                        <button type="button" class="btn eb-btn-secondary" data-bs-dismiss="modal">
                             <i class="fas fa-times me-1"></i>Cancel
                         </button>
-                        <button type="button" class="btn btn-primary" id="submitBudgetCostAssignment">
+                        <button type="button" class="btn eb-btn-primary" id="submitBudgetCostAssignment">
                             <i class="fas fa-check me-1"></i>Submit Assignment
                         </button>
                     </div>
@@ -1092,4 +1092,4 @@ $(document).ready(function() {
     });
 });
 </script>
-
+@include('resorts._emotional_buttons_v2_styles')

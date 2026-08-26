@@ -91,7 +91,7 @@
                         <textarea name="reason" class="form-control" rows="4" placeholder="Please provide a reason for declining this meeting..." required>{{ old('reason') }}</textarea>
                     </div>
                     <div class="d-flex gap-2">
-                        <a href="{{ route('meeting.respond', ['token' => $participant->token]) }}" class="btn btn-secondary flex-fill">Back</a>
+                        <a href="{{ route('meeting.respond', ['token' => $participant->token]) }}" class="btn eb-btn-secondary flex-fill">Back</a>
                         <button type="submit" class="btn btn-decline text-white flex-fill">Submit Decline</button>
                     </div>
                 </form>
@@ -125,3 +125,4 @@
     </div>
 </body>
 </html>
+@include('resorts._emotional_buttons_v2_styles')

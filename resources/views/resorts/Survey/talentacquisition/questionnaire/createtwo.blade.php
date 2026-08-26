@@ -124,6 +124,7 @@
             </form>
         </div>
     </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -192,7 +193,7 @@
             $(".AppendHerer").append(` <div class="talentAc-block" id="remove_id_${nos}">
                                 <div class="title mb-2">
                                     <h5>QUESTION ${nos}</h5>
-                                    <button type="button" class="btn btn-danger btn-sm remove-btn"  data-id="${nos}">Remove</button>
+                                    <button type="button" class="btn eb-btn-critical btn-sm remove-btn"  data-id="${nos}">Remove</button>
                                 </div>
                                 <div class="row g-md-4 g-3">
                                     <div class="col-lg-3 col-sm-6">
@@ -459,7 +460,7 @@
                 let AppendVideoHerer =`  <div class="videoQuestions-block">
                                             <div class="title mb-2 d-flex justify-content-between align-items-center">
                                             <h6>Language ${nos1}</h6>
-                                                    <button type="button" class="btn btn-danger remove-btn btn-sm " data-id="${nos1}" >Remove</button>                                                </div>
+                                                    <button type="button" class="btn eb-btn-critical remove-btn btn-sm" data-id="${nos1}" >Remove</button>                                                </div>
                                                 <div class="row   g-md-4 g-3">
                                                     <div class=" col-sm-6">
                                                         <select class="form-select" name="language[]" id="Language_${nos1}" aria-label="Default select example">

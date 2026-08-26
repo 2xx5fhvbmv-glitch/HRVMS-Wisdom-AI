@@ -31,7 +31,7 @@
                             <li><span>Work Experience</span></li>
                             <li><span>Education</span></li>
                             <li><span>Job Assessment</span></li>
-                            <li><span>Preliminary questions</span></li>
+                            <li><span>Preliminary Questions</span></li>
                             <li><span>Consent and Privacy</span></li>
                         </ul>
                     </div>
@@ -55,7 +55,7 @@
                                                 <img src="{{ URL::asset('resorts_assets/images/upload.svg')}} " alt="" class="img-fluid" />
                                             </div>
                                             <div>
-                                                <h3>Upload A Curriculum Vitae</h3>
+                                                <h3>Upload a Curriculum Vitae</h3>
                                                 <span>PDF Format</span>
                                             </div>
                                         </div>
@@ -153,7 +153,7 @@
                                 </div>
                                 <div class="col-md-6 ">
                                     <label for="txt-bod" class="form-label">DOB <span class="red-mark">*</span></label>
-                                    <input type="text" name="dob" class="form-control datepicker" id="txt-bod" placeholder="DD/MM/YYYYY" required>
+                                    <input type="text" name="dob" class="form-control datepicker" id="txt-bod" placeholder="DD/MM/YYYY" required>
                                 </div>
                                 <div class="col-md-6 ">
                                     <label for="txt-mobile-number" class="form-label">MOBILE
@@ -254,7 +254,7 @@
                                 <input type="hidden" id="incrementEducation" value="1">
                             <div class="row g-md-4 g-3 work-experience-row">
                                 <div class="col-md-6 ">
-                                    <label for="txt-job-title" class="form-label">JOB TITLE*<span class="red-mark">*</span></label>
+                                    <label for="txt-job-title" class="form-label">JOB TITLE<span class="red-mark">*</span></label>
                                     <input type="text" class="form-control alpha-only" id="txt-job-title" placeholder="Job Title" name="job_title[]" value="" data-parsley-required="true" data-parsley-trigger="change" data-parsley-validate-script
                                     data-parsley-validate-script-message="Script tags are not allowed.">
                                 </div>
@@ -494,7 +494,7 @@
                                                                 </div>
 
                                                                 <div class="col-auto">
-                                                                    <button id="clearRecord-{{$key}}" onclick="clearRecording({{$key}})" class="btn btn-outline-danger btn-sm" style="display:none;">Clear Video</button>
+                                                                    <button id="clearRecord-{{$key}}" onclick="clearRecording({{$key}})" class="btn eb-btn-critical btn-sm" style="display:none;">Clear Video</button>
                                                                 </div>
 
                                                             </div>
@@ -521,7 +521,7 @@
                             <div class="card-title">
                                 <div class="row justify-content-between align-items-center g-">
                                     <div class="col">
-                                        <h3>Preliminary questions</h3>
+                                        <h3>Preliminary Questions</h3>
                                     </div>
                                 </div>
                             </div>
@@ -538,8 +538,8 @@
                                     data-parsley-validate-script-message="Script tags are not allowed.">
                                 </div>
                                 <div class="col-md-6 ">
-                                    <label for="notice_period" class="form-label">Notice Periods (In Days)<span class="red-mark">*</span></label>
-                                    <input type="number" min="0" name="notice_period" class="form-control" id="notice_period" placeholder="Notice Periods (In Days)" required>
+                                    <label for="notice_period" class="form-label">Notice Period (In Days)<span class="red-mark">*</span></label>
+                                    <input type="number" min="0" name="notice_period" class="form-control" id="notice_period" placeholder="Notice Period (In Days)" required>
                                 </div>
                                 <div class="col-md-6 ">
                                     <label for="expected_salary" class="form-label">Salary Expectation ($)<span class="red-mark">*</span></label>
@@ -608,7 +608,7 @@
                                         <input class="form-check-input" type="checkbox" name="terms_conditions" required=""
                                             value="1" id="flexCheckservicechares-yes">
                                         <label class="form-check-label"  for="flexCheckservicechares-yes">
-                                            I have accept the terms & Conditions
+                                            I have accepted the terms & conditions
                                         </label>
                                     </div>
                                 </div>
@@ -646,6 +646,7 @@
         </div>
     </div>
 </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -1227,7 +1228,7 @@
                     <input type="text" id="total-experience-${uniqueId}" class="form-control total-experience" name="total_experience[]" >
                 </div>
                 <div class="col-12 text-end">
-                    <button type="button" class="btn btn-danger btn-sm mt-2 removeRow" data-row-id="${uniqueId}">Remove</button>
+                    <button type="button" class="btn eb-btn-critical btn-sm mt-2 removeRow" data-row-id="${uniqueId}">Remove</button>
                 </div>
             </div>
         `;
@@ -1322,7 +1323,7 @@
                     <input type="number" name="pass_out_year[]" class="form-control" id="txt-pass-out-year-${uniqueId}" placeholder="e.g. 2020" min="1950" max="2099" required>
                 </div>
                 <div class="col-12 text-end">
-                    <button type="button" class="btn btn-danger btn-sm mt-2 removeRowEducation" data-row-id="${uniqueId}">Remove</button>
+                    <button type="button" class="btn eb-btn-critical btn-sm mt-2 removeRowEducation" data-row-id="${uniqueId}">Remove</button>
                 </div>
             </div>
         `;
@@ -1723,7 +1724,7 @@
                 </select>
             </div>
             <div class="col-md-2 d-flex align-items-center">
-                <button type="button" class="btn btn-danger btn-sm remove-language-btn" data-id="${languageIncrement}">Remove</button>
+                <button type="button" class="btn eb-btn-critical btn-sm remove-language-btn" data-id="${languageIncrement}">Remove</button>
             </div>
         </div>`;
 

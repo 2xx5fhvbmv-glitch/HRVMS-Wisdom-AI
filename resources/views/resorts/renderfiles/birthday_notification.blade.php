@@ -1,13 +1,14 @@
-{{-- Live (Pusher) notification card. Profile avatar removed per UX
-     request — keep the layout consistent with the on-load bell render
-     in Common::ResortNotification(). --}}
+{{-- Live (Pusher) notification card — these are system-generated events
+     (birthdays, committee assignment, exit clearance), so the avatar is
+     always the Wisdom AI mark; keep the row layout consistent with the
+     on-load bell render in Common::ResortNotification(). --}}
 @if($message1 && $name )
     <div class="notification-box active class_remove_me_{{ $message1->id }}">
         <a href="#" class="d-flex profile-dropdown">
+            <div class="ntf-av ntf-av-wisdom"><span class="ntf-mk"></span></div>
             <div class="flex-grow-1">
                 <h5>{!!$message1->Type !!}</h5>
                 <p>{!!$message1->message !!}</p>
-                <br>
                 <span>{{ \Carbon\Carbon::now()->diffForHumans() }}</span>
             </div>
         </a>

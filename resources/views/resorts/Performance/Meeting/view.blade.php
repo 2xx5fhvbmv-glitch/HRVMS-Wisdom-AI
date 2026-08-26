@@ -13,7 +13,7 @@
                     </div>
                 </div>
                 <div class="col-auto">
-                    <a href="{{ route('Performance.Meeting.list') }}" class="btn btn-themeGray">
+                    <a href="{{ route('Performance.Meeting.list') }}" class="btn perf-btn-secondary">
                         <i class="fa-solid fa-arrow-left me-1"></i> Back to List
                     </a>
                 </div>
@@ -184,6 +184,7 @@
         </div>
     </div>
 </div>
+@include('resorts.Performance._performance_buttons_v2_styles')
 @endsection
 
 @section('import-css')

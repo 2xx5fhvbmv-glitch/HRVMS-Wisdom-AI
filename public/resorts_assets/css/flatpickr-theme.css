@@ -1,0 +1,278 @@
+/* Flatpickr brand theme — app-wide. Loaded once in resources/views/resorts/
+   layouts/css.blade.php, right after flatpickr.min.css, so these overrides
+   win on tied specificity. Restyles flatpickr's own rendered markup only —
+   no config/behavior/format changes, no new calendar implementation.
+   Replaces flatpickr's default selected-day blue (#569ff7) and hover-arrow
+   red (#f64747) with teal; nothing else in the app should still show either. */
+
+.flatpickr-calendar {
+    background: var(--card, #fff);
+    border: 1px solid var(--line, #E2EBEC);
+    border-radius: 18px;
+    box-shadow: 0 20px 50px rgba(1,70,83,.18), 0 2px 8px rgba(1,70,83,.06);
+    padding: 16px;
+    font-family: inherit;
+}
+/* flatpickr.min.css hardcodes .flatpickr-days/.dayContainer at 307.875px —
+   sized for a calendar with no padding. This theme's 16px padding shrinks
+   the calendar's actual content area to 275.875px, so that hardcoded width
+   overflowed 17px past the calendar's right edge, clipping Saturday's
+   column. Both are percentage-safe (each day cell is already 14.2857%
+   flex-basis), so switching to 100% just lets them fill whatever content
+   width the padded calendar actually provides. */
+.flatpickr-days,
+.dayContainer {
+    width: 100%;
+    min-width: 0;
+    max-width: none;
+}
+.flatpickr-calendar.arrowTop:before,
+.flatpickr-calendar.arrowTop:after,
+.flatpickr-calendar.arrowBottom:before,
+.flatpickr-calendar.arrowBottom:after {
+    display: none;
+}
+
+/* header — plain centered "Month Year" text (monthSelectorType:'static' turns
+   the month into a <span>, not a <select>; the year stays a number input,
+   set read-only via the global onReady/onMonthChange in js.blade.php, and
+   styled here to be visually indistinguishable from plain text). */
+.flatpickr-months .flatpickr-month { color: var(--ink, #14232A); fill: var(--ink, #14232A); }
+/* This app has no global box-sizing:border-box reset (confirmed: content-box
+   everywhere), but flatpickr's own base CSS sets fixed pixel heights on the
+   header row assuming border-box — without it, each element's padding adds
+   ON TOP of its stated height (e.g. .flatpickr-prev-month: height:34px +
+   padding:10px top/bottom = 54px actual), throwing the whole row (month
+   label + both arrows) out of vertical alignment with each other. */
+.flatpickr-months .flatpickr-month,
+.flatpickr-current-month,
+.flatpickr-months .flatpickr-prev-month,
+.flatpickr-months .flatpickr-next-month {
+    box-sizing: border-box;
+}
+/* .flatpickr-months itself is position:static in the base CSS, so the
+   prev/next buttons' `position:absolute;top:0` anchors to the CALENDAR's
+   padding-box (the nearest positioned ancestor), skipping past the
+   calendar's own 16px top padding entirely — while .flatpickr-month (in
+   normal flow) correctly sits below that padding. Result: the arrows sat
+   ~16px higher than the month label. Giving .flatpickr-months its own
+   positioning context makes `top:0` resolve relative to it instead, where
+   both the arrows and the label agree on the same top edge. */
+.flatpickr-months {
+    position: relative;
+}
+.flatpickr-current-month {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    font-size: 13.5px;
+    font-weight: 500;
+    color: var(--ink, #14232A);
+    top: 0;
+    padding: 0;
+}
+.flatpickr-current-month span.cur-month,
+.flatpickr-current-month .flatpickr-monthDropdown-months {
+    font-weight: 500;
+    color: var(--ink, #14232A);
+    background: transparent;
+    cursor: default;
+    pointer-events: none;
+}
+.flatpickr-current-month .numInputWrapper {
+    width: auto;
+    background: transparent;
+}
+.flatpickr-current-month .numInputWrapper:hover {
+    background: transparent;
+}
+.flatpickr-current-month input.cur-year {
+    /* Native number-input intrinsic width (~150px) was far wider than "2026"
+       needs — that invisible slack skewed .flatpickr-current-month's flex
+       content off-center even though the outer box itself was centered. */
+    width: 4ch;
+    font-family: inherit;
+    font-size: inherit;
+    font-weight: 500;
+    color: var(--ink, #14232A);
+    background: transparent;
+    cursor: default;
+    padding: 0;
+    text-align: left;
+    -moz-appearance: textfield;
+}
+.flatpickr-current-month input.cur-year:hover {
+    background: transparent;
+}
+/* the little up/down spinner on the year — not needed, this page's scope
+   doesn't call for jumping years, only prev/next month */
+.flatpickr-current-month .numInputWrapper span {
+    display: none;
+}
+.flatpickr-months .flatpickr-prev-month,
+.flatpickr-months .flatpickr-next-month {
+    color: var(--muted, #6B7378);
+    fill: var(--muted, #6B7378);
+    border-radius: 9px;
+    transition: background .15s, color .15s;
+}
+.flatpickr-months .flatpickr-prev-month:hover,
+.flatpickr-months .flatpickr-next-month:hover {
+    background: var(--teal-soft, #F5F8F8);
+    color: var(--teal, #014653);
+}
+.flatpickr-months .flatpickr-prev-month:hover svg,
+.flatpickr-months .flatpickr-next-month:hover svg {
+    fill: var(--teal, #014653);
+}
+
+/* weekday labels */
+.flatpickr-weekdays { background: transparent; }
+span.flatpickr-weekday {
+    font-size: 10px;
+    font-weight: 600;
+    color: var(--faint, #99A1A5);
+    background: transparent;
+    text-transform: uppercase;
+    letter-spacing: .3px;
+}
+
+/* day cells */
+.flatpickr-day {
+    color: var(--ink, #14232A);
+    border-radius: 9px;
+    font-variant-numeric: tabular-nums;
+    font-weight: 400;
+}
+.flatpickr-day:hover,
+.flatpickr-day:focus {
+    background: var(--teal-soft, #F5F8F8);
+    border-color: var(--teal-soft, #F5F8F8);
+    color: var(--teal, #014653);
+}
+.flatpickr-day.prevMonthDay,
+.flatpickr-day.nextMonthDay {
+    color: var(--line, #E2EBEC);
+}
+
+/* today — filled brand teal, same weight as a selected day */
+.flatpickr-day.today {
+    background: var(--teal, #014653);
+    border-color: var(--teal, #014653);
+    font-weight: 600;
+    color: #fff;
+}
+.flatpickr-day.today:hover,
+.flatpickr-day.today:focus {
+    background: var(--teal-2, #035b6c);
+    border-color: var(--teal-2, #035b6c);
+    color: #fff;
+}
+.flatpickr-day.today:hover,
+.flatpickr-day.today:focus {
+    border-color: var(--teal-soft, #F5F8F8);
+    background: var(--teal-soft, #F5F8F8);
+    color: var(--teal, #014653);
+}
+.flatpickr-day.today:after {
+    content: "";
+    position: absolute;
+    bottom: 5px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--teal, #014653);
+}
+
+/* selected / range endpoints — teal, not flatpickr's default blue */
+.flatpickr-day.selected,
+.flatpickr-day.startRange,
+.flatpickr-day.endRange,
+.flatpickr-day.selected.inRange,
+.flatpickr-day.startRange.inRange,
+.flatpickr-day.endRange.inRange,
+.flatpickr-day.selected:focus,
+.flatpickr-day.startRange:focus,
+.flatpickr-day.endRange:focus,
+.flatpickr-day.selected:hover,
+.flatpickr-day.startRange:hover,
+.flatpickr-day.endRange:hover,
+.flatpickr-day.selected.prevMonthDay,
+.flatpickr-day.startRange.prevMonthDay,
+.flatpickr-day.endRange.prevMonthDay,
+.flatpickr-day.selected.nextMonthDay,
+.flatpickr-day.startRange.nextMonthDay,
+.flatpickr-day.endRange.nextMonthDay {
+    background: var(--teal, #014653);
+    border-color: var(--teal, #014653);
+    color: #fff;
+    font-weight: 600;
+    box-shadow: none;
+}
+.flatpickr-day.selected.today:after,
+.flatpickr-day.startRange.today:after,
+.flatpickr-day.endRange.today:after {
+    background: #fff;
+}
+/* the connector shadow flatpickr draws between adjacent range days */
+.flatpickr-day.selected.startRange + .endRange:not(:nth-child(7n+1)),
+.flatpickr-day.startRange.startRange + .endRange:not(:nth-child(7n+1)),
+.flatpickr-day.endRange.startRange + .endRange:not(:nth-child(7n+1)) {
+    box-shadow: -10px 0 0 var(--teal, #014653);
+}
+
+/* in-range days — teal tint, not flatpickr's default grey */
+.flatpickr-day.inRange,
+.flatpickr-day.prevMonthDay.inRange,
+.flatpickr-day.nextMonthDay.inRange,
+.flatpickr-day.today.inRange,
+.flatpickr-day.prevMonthDay.today.inRange,
+.flatpickr-day.nextMonthDay.today.inRange {
+    background: var(--teal-3, #E6F0F1);
+    border-color: var(--teal-3, #E6F0F1);
+    color: var(--teal, #014653);
+    box-shadow: -5px 0 0 var(--teal-3, #E6F0F1), 5px 0 0 var(--teal-3, #E6F0F1);
+}
+.flatpickr-day.inRange:nth-child(7n+1) {
+    box-shadow: -2px 0 0 var(--teal-3, #E6F0F1), 5px 0 0 var(--teal-3, #E6F0F1);
+}
+
+/* time UI (enableTime) — flatpickr's own default here is already grey
+   (#e6e6e6/#eee), not the blue used for day selection, but it's re-themed
+   anyway so it reads as one teal system with the calendar above it. The one
+   real blue here is the browser's native text-selection color on the H/M
+   number inputs, which flatpickr never overrides. */
+.flatpickr-calendar.hasTime .flatpickr-time {
+    border-top: 1px solid var(--line, #E2EBEC);
+}
+.flatpickr-time input,
+.flatpickr-time .flatpickr-am-pm {
+    color: var(--ink, #14232A);
+}
+.flatpickr-time input::selection {
+    background: var(--teal, #014653);
+    color: #fff;
+}
+.flatpickr-time input:hover,
+.flatpickr-time input:focus,
+.flatpickr-time .flatpickr-am-pm:hover,
+.flatpickr-time .flatpickr-am-pm:focus {
+    background: var(--teal-soft, #F5F8F8);
+    color: var(--teal, #014653);
+}
+.flatpickr-time .numInputWrapper:hover {
+    background: var(--teal-soft, #F5F8F8);
+}
+.flatpickr-time .numInputWrapper span:hover,
+.flatpickr-time .numInputWrapper span:active {
+    background: var(--teal-3, #E6F0F1);
+}
+.flatpickr-time .numInputWrapper span.arrowUp:after {
+    border-bottom-color: var(--teal, #014653);
+}
+.flatpickr-time .numInputWrapper span.arrowDown:after {
+    border-top-color: var(--teal, #014653);
+}

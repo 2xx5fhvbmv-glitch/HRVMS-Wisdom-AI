@@ -38,7 +38,7 @@
                             <div class="card-body"> <!-- Add body to contain form -->
                                 <div class="row g-4">
                                     <div class="col-6">
-                                        <label for="form_name" class="form-label">Form Name :</labe>
+                                        <label for="form_name" class="form-label">Form Name :</label>
                                         <input type="text" name="form_name" id="form_name" placeholder="Enter Form Name" class="form-control" value="{{ $form->form_name }}" required/>
                                     </div>
 
@@ -49,9 +49,9 @@
                                 </div>
                             </div>
                             <div class="card-footer text-end"> <!-- Footer for Save Form button -->
-                                <button id="update-form" class="btn btn-themeBlue btn-sm">Update Form</button>
+                                <button id="update-form" class="btn lnd-btn-primary btn-sm">Update Form</button>
 
-                                <a href="{{ route('feedback-form.index') }}" class="btn btn-themeSkyblue btn-sm">Cancel</a>
+                                <a href="{{ route('feedback-form.index') }}" class="btn lnd-btn-neutral btn-sm">Cancel</a>
                             </div>
 
                         </div>
@@ -60,6 +60,7 @@
             </div>
         </div>
     </div>
+@include('resorts.Learning._learning_buttons_v2_styles')
 @endsection
 
 @section('import-css')

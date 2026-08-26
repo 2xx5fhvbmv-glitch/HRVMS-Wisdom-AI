@@ -60,7 +60,7 @@
                                 </div>
                             </div>
                             <div class="card-footer text-end">
-                                <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                                <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                             </div>
                         </form>
                     </div>
@@ -105,7 +105,7 @@
                                 </div>
                             </div>
                             <div class="card-footer text-end">
-                                <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                                <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                             </div>
                         </form>
                     </div>
@@ -124,7 +124,7 @@
                         <input type="hidden" value="1"  id="AppendGrievanceCatAndSubCatCount">
                         <div class="row align-items-end g-md-4 g-3 mb-md-4 mb-3 AppendGrievanceCatandSubCat">
                             <div class="col-sm-6">
-                                <label for="gri_cate" class="form-label">dsff  GRIEVANCE CATEGORY <span class="red-mark">*</span></label>
+                                <label for="gri_cate" class="form-label">GRIEVANCE CATEGORY <span class="red-mark">*</span></label>
                                 <select class="form-select select2t-none  Grievance_Cat_idMain"
                                     data-parsley-required="true"
                                     data-flag="Grievance_cat_subcat_part_one"
@@ -170,10 +170,10 @@
                             </div>
                         </div>
                         <div class="col-sm-6">
-                            <a href="javascript:void(0);" class="btn btn-themeSkyblue btn-sm AddAppendGrievanceCat blockAdd-btn">Add More</a>
+                            <a href="javascript:void(0);" class="btn eb-btn-accent btn-sm AddAppendGrievanceCat blockAdd-btn">Add More</a>
                         </div>
                         <div class="card-footer text-end mt-3">
-                            <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                            <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                         </div>
                     </form>
                     </div>
@@ -219,11 +219,11 @@
                                 </div>
                                 <div class="col">
                                     <input type="hidden" id="GrievanceDelegationRuleCount" value="1">
-                                    <a href="javascript:void(0)" class="btn btn-themeSkyblue btn-sm blockAdd-btn AddGrievanceDelegationRule">Add More</a>
+                                    <a href="javascript:void(0)" class="btn eb-btn-accent btn-sm blockAdd-btn AddGrievanceDelegationRule">Add More</a>
                                 </div>
                             </div>
                             <div class="mt-3 card-footer text-end">
-                                <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                                <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                             </div>
                         </form>
                     </div> --}}
@@ -258,7 +258,7 @@
                                 </div>
                             </div>
                             <div class="card-footer text-end">
-                                <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                                <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                             </div>
                         </form>
                     </div> --}}
@@ -326,7 +326,7 @@
                                 </div>
                             </div>
                             <div class="card-footer text-end">
-                                <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                                <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                             </div>
                         </form>
                         
@@ -399,7 +399,7 @@
                                 </div>
                             </div>
                             <div class="card-footer text-end">
-                                <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                                <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                             </div>
                         </form>
                     </div> -->
@@ -426,7 +426,7 @@
                                                 </select>
                                         </div>
                                         <div class="col-sm-6">
-                                            <a href="javascript:void(0)" class="btn btn-themeSkyblue GrievanceCreateTemplete_Templete btn-sm">Create Template</a>
+                                            <a href="javascript:void(0)" class="btn eb-btn-accent GrievanceCreateTemplete_Templete btn-sm">Create Template</a>
                                         </div>
                                      
                                     </div>
@@ -441,7 +441,7 @@
                                                 <thead>
                                                     <tr>
                                                         <th>Category Name</th>
-                                                        <th>Templete Name</th>
+                                                        <th>Template Name</th>
                                                         <th>Action</th>
                                                 </th>
                                                 </thead>
@@ -501,7 +501,7 @@
                                 </div>
                             </div>
                             <div class="card-footer text-end">
-                                <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                                <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                             </div>
                         </form>
                     </div>
@@ -558,14 +558,14 @@
                                     </div>
                                     <div class="col-sm-12">
                         
-                                        <a href="javascript:void(0);" class="btn btn-themeSkyblue btn-sm  AddMoreEscaltion blockAdd-btn">Add
+                                        <a href="javascript:void(0);" class="btn eb-btn-accent btn-sm  AddMoreEscaltion blockAdd-btn">Add
                                             More</a>
                                     </div>
                                 </div>
                             </div>
 
                             <div class="card-footer text-end mt-3">
-                                <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                                <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                             </div>
                         </form>
                     </div>
@@ -603,7 +603,7 @@
                                 </div>
                             </div>
                             <div class="card-footer text-end">
-                                <button type='submit' class="btn btn-themeBlue btn-sm">Submit</button>
+                                <button type='submit' class="btn eb-btn-primary btn-sm">Submit</button>
                             </div>
                         </form>
                     </div>
@@ -646,7 +646,7 @@
                                 </div>
                             </div>
                             <div class="card-footer text-end">
-                                <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                                <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                             </div>
                         </form>
                     </div>
@@ -690,7 +690,7 @@
                                 </div>
                             </div>
                             <div class="card-footer text-end">
-                                <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                                <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                             </div>
                         </form>
                     </div>
@@ -731,7 +731,7 @@
                                             <div id="error-disciplinary_cate_error_one" class="text-danger small"></div>
                                             </div>
                                         <div class="col-sm-4">
-                                            <label for="disciplinary_cate" class="form-label"> Offenses name <span class="red-mark">*</span></label>
+                                            <label for="disciplinary_cate" class="form-label"> Offenses Name <span class="red-mark">*</span></label>
                                             <input type="text"
                                                         name="OffensesName"
                                                         class="form-control"
@@ -744,7 +744,7 @@
                                         <div class="col-sm-4">
                                             <label for="disciplinary_cate" class="form-label"> Offenses Description</label>
                                             <textarea  name="offensesdescription"  data-parsley-nohtml
-                                                    data-parsley-nohtml-message="HTML tags are not allowed." placeholder="offenses description (optional)" class="form-control"></textarea>
+                                                    data-parsley-nohtml-message="HTML tags are not allowed." placeholder="Offenses Description (optional)" class="form-control"></textarea>
                                         </div>
                                     </div>
                                     {{-- Optional defaults — auto-fill Severity / Action when this offence
@@ -772,7 +772,7 @@
                                 </div>
                             </div>
                             <div class="card-footer text-end">
-                                <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                                <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                             </div>
                         </form>
                     </div>
@@ -810,7 +810,7 @@
                                 </div>
                             </div>
                             <div class="card-footer text-end">
-                                <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                                <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                             </div>
                         </form>
                     </div>
@@ -852,7 +852,7 @@
                                 </div>
                             </div>
                             <div class="card-footer text-end">
-                                <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                                <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                             </div>
                         </form>
                     </div>
@@ -880,7 +880,7 @@
                                     <input type="text" name="description" class="form-control" placeholder="Short description (optional)">
                                 </div>
                                 <div class="col-sm-2 text-end">
-                                    <button type="submit" class="btn btn-themeBlue btn-sm w-100">Add</button>
+                                    <button type="submit" class="btn eb-btn-primary btn-sm w-100">Add</button>
                                 </div>
                             </div>
                         </form>
@@ -981,15 +981,15 @@
 
                                         {{-- Buttons --}}
                                         <div class="col-12">
-                                            <a href="javascript:void(0)" class="btn btn-themeSkyblue btn-sm CodeofConductAdd_More me-md-2 me-1">Add More</a>
-                                            <a href="{{ route('GrievanceAndDisciplinery.config.CodeOfConduct')}}" class="btn btn-themeSkyblue btn-sm">Download Code Of Conduct</a>
+                                            <a href="javascript:void(0)" class="btn eb-btn-accent btn-sm CodeofConductAdd_More me-md-2 me-1">Add More</a>
+                                            <a href="{{ route('GrievanceAndDisciplinery.config.CodeOfConduct')}}" class="btn eb-btn-secondary btn-sm">Download Code Of Conduct</a>
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
                             <div class="card-footer text-end">
-                                <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                                <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                             </div>
                         </form>
                     </div>
@@ -1002,7 +1002,7 @@
                                 
                                 <div class="col-md-12">
                                     <label class="form-label"> </label>
-                                    <a href="javascript:void(0)"  class="btn btn-themeSkyblue btn-sm EmailFreshModal">Create Latter Template</a>
+                                    <a href="javascript:void(0)"  class="btn eb-btn-accent btn-sm EmailFreshModal">Create Letter Template</a>
                                 
                                 </div>
                                 <div class="col-md-12">
@@ -1020,7 +1020,7 @@
                             </div>
                         </div>
                         {{-- <div class="card-footer text-end">
-                            <a href="#" class="btn btn-themeBlue btn-sm">Submit</a>
+                            <a href="#" class="btn eb-btn-primary btn-sm">Submit</a>
                         </div> --}}
                     </div>
                     
@@ -1043,7 +1043,7 @@
                                     </select>
                                 </div>
                             </div>
-                                <div class="card-footer text-end"><button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                                <div class="card-footer text-end"><button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                             </div>
                         </form>
                     </div> -->
@@ -1096,14 +1096,14 @@
                                     </div>
                                      <div class="row mt-2">
                                         <div class="col-sm-12">
-                                            <a href="javascript:void(0)" class="btn btn-themeSkyblue btn-sm blockAdd-btn AddAssignCommittees">Add More</a>
+                                            <a href="javascript:void(0)" class="btn eb-btn-accent btn-sm blockAdd-btn AddAssignCommittees">Add More</a>
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
                             <div class="card-footer text-end mt-3">
-                                <button type="submit" class="btn btn-themeBlue btn-sm CommitteeSubmit" id="CommitteeSubmit">Submit</button>
+                                <button type="submit" class="btn eb-btn-primary btn-sm CommitteeSubmit" id="CommitteeSubmit">Submit</button>
                             </div>
                         </form>
                     </div>
@@ -1111,9 +1111,9 @@
                         
                         <div class="mb-md-4 mb-3">
                             <label class="form-label">HEARING AND INVESTIGATION TEMPLATES <span class="red-mark">*</span></label>
-                            <div><a href="javascript:void(0)" class="btn btn-themeBlue btn-sm HearingIvestigation" data-type="HearingPackage">Create Template</a></div>
+                            <div><a href="javascript:void(0)" class="btn eb-btn-primary btn-sm HearingIvestigation" data-type="HearingPackage">Create Template</a></div>
                         </div>
-                        <div class="card-footer text-end"><a href="#" class="btn btn-themeBlue btn-sm">Submit</a>
+                        <div class="card-footer text-end"><a href="#" class="btn eb-btn-primary btn-sm">Submit</a>
                         </div>
                     </div>
                     <div class="body">
@@ -1159,11 +1159,11 @@
                                
                             </div>
                             <div class="col-sm-12">
-                                <a href="javascript:void(0)" class="btn btn-themeSkyblue btn-sm DelegationRuleAddmore blockAdd-btn">Add More</a>
+                                <a href="javascript:void(0)" class="btn eb-btn-accent btn-sm DelegationRuleAddmore blockAdd-btn">Add More</a>
                             </div>
                             <input type="hidden" name="DelegationRuleCount" id='DelegationRuleCount' value="1">
                             <div class="card-footer text-end mt-3">
-                                <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                                <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                             </div>
                         </form>
                     </div> 
@@ -1234,7 +1234,7 @@
                        
                             </div>
                             <div class="card-footer text-end">
-                                <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                                <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                             </div>
                      
                         </form>
@@ -1269,7 +1269,7 @@
                                 </div>
                             </div>
                             <div class="card-footer text-end">
-                                    <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                                    <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                             </div>
                         </form>
                     </div> --}}
@@ -1285,7 +1285,7 @@
     <div class="modal-dialog modal-dialog-centered modal-xl">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="staticBackdropLabel">Letter Templete</h5>
+                <h5 class="modal-title" id="staticBackdropLabel">Letter Template</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form id="LatterTempleteSaveForm">
@@ -1293,12 +1293,12 @@
                     <div class="row mt-2">
                         <div class="col-12">
                             <div class="col-sm-6">
-                                <label for="set_rule" class="form-label">Latter Templete Name <span class="red-mark">*</span></label>
-                                <input type="text" class="form-control" id="Latter_Temp_name" placeholder="Latter Templete Name" name="Latter_Temp_name">
+                                <label for="set_rule" class="form-label">Letter Template Name <span class="red-mark">*</span></label>
+                                <input type="text" class="form-control" id="Latter_Temp_name" placeholder="Letter Template Name" name="Latter_Temp_name">
                             </div>
                         </div>
                         <div class="col-12 mt-3">
-                            <label for="set_rule" class="form-label">Templete Format <span class="red-mark">*</span></label>
+                            <label for="set_rule" class="form-label">Template Format <span class="red-mark">*</span></label>
                             <div id="Latter_Templete-builder"></div>
                         </div>
                         <input type="hidden" name="templeteFlag" id='templeteFlag'>
@@ -1306,8 +1306,8 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <a href="#" class="btn btn-primary save-Template LatterTempleteSave">Save changes</a>
+                    <button type="button" class="btn eb-btn-neutral" data-bs-dismiss="modal">Close</button>
+                    <a href="#" class="btn eb-btn-primary save-Template LatterTempleteSave">Save changes</a>
                 </div>
             </form>
         </div>
@@ -1317,7 +1317,7 @@
     <div class="modal-dialog modal-dialog-centered modal-xl">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="staticBackdropLabel">Hearing and Investingation Templete</h5>
+                <h5 class="modal-title" id="staticBackdropLabel">Hearing and Investigation Template</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form id="HearingTempleteSaveForm">
@@ -1325,12 +1325,12 @@
                     <div class="row mt-2">
                         <div class="col-12">
                             <div class="col-sm-6">
-                                <label for="set_rule" class="form-label"> Templete Name <span class="red-mark">*</span></label>
-                                <input type="text" class="form-control" id="Hearing_Temp_name" placeholder="Hearing Templete Name" name="Latter_Temp_name">
+                                <label for="set_rule" class="form-label"> Template Name <span class="red-mark">*</span></label>
+                                <input type="text" class="form-control" id="Hearing_Temp_name" placeholder="Hearing Template Name" name="Latter_Temp_name">
                             </div>
                         </div>
                         <div class="col-12 mt-3">
-                            <label for="set_rule" class="form-label">Templete Format <span class="red-mark">*</span></label>
+                            <label for="set_rule" class="form-label">Template Format <span class="red-mark">*</span></label>
                             <div id="Hearing_Templete-builder"></div>
                         </div>
                         <input type="hidden" name="templeteFlag" id='templeteFlag'>
@@ -1338,8 +1338,8 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <a href="#" class="btn btn-primary save-Template InvestingHearingTempleteSave">Save changes</a>
+                    <button type="button" class="btn eb-btn-neutral" data-bs-dismiss="modal">Close</button>
+                    <a href="#" class="btn eb-btn-primary save-Template InvestingHearingTempleteSave">Save changes</a>
                 </div>
             </form>
         </div>
@@ -1349,7 +1349,7 @@
     <div class="modal-dialog modal-dialog-centered modal-xl">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="staticBackdropLabel">Grievance  Templete Templete</h5>
+                <h5 class="modal-title" id="staticBackdropLabel">Grievance Template</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form id="GrievanceTempleteForm" data-parsley-validate>
@@ -1367,11 +1367,11 @@
                                     @endif
                                 </select>                            </div>
                             <div class="col-sm-6">
-                                <label for="set_rule" class="form-label"> Templete Name <span class="red-mark">*</span></label>
-                                <input type="text" class="form-control" id="Grievance_Temp_name" placeholder="Hearing Templete Name" name="Latter_Temp_name">
+                                <label for="set_rule" class="form-label"> Template Name <span class="red-mark">*</span></label>
+                                <input type="text" class="form-control" id="Grievance_Temp_name" placeholder="Hearing Template Name" name="Latter_Temp_name">
                             </div>
                         <div class="col-12 mt-3">
-                            <label for="set_rule" class="form-label">Templete Format <span class="red-mark">*</span></label>
+                            <label for="set_rule" class="form-label">Template Format <span class="red-mark">*</span></label>
                             <div id="Grievance_Hearing_Templete-builder"></div>
                         </div>
                         <input type="hidden" name="GrievanectempleteFlag" id='GrievanectempleteFlag'>
@@ -1379,8 +1379,8 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="submit" class="btn btn-primary ">Save changes</button>
+                    <button type="button" class="btn eb-btn-neutral" data-bs-dismiss="modal">Close</button>
+                    <button type="submit" class="btn eb-btn-primary ">Save changes</button>
                 </div>
             </form>
         </div>
@@ -1457,14 +1457,15 @@
                 </div>
 
                 <div class="modal-footer">
-                    <!-- <a href="#" class="btn btn-themeBlue">Preview</a> -->
-                    <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                    <button class="btn btn-themeBlue">Submit</button>
+                    <!-- <a href="#" class="btn eb-btn-primary">Preview</a> -->
+                    <a href="#" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Cancel</a>
+                    <button class="btn eb-btn-primary">Submit</button>
                 </div>
                 </form>
             </div>
         </div>
     </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -1743,7 +1744,7 @@
                 width: '100%'        
             });
             $("#offenses_1").select2({
-                placeholder: "Select Offens",
+                placeholder: "Select Offense",
                 allowClear: true,
                 width: '100%'        
             });
@@ -1805,7 +1806,7 @@
                 width: '100%'        
             });
             $("#high_priority").select2({
-                placeholder: "Select Heigh Priority",
+                placeholder: "Select High Priority",
                 allowClear: true,
                 width: '100%'        
             });
@@ -2024,7 +2025,7 @@
                 messages: {
                     SeverityName:
                     {
-                        required: "Please Enter severity Name.",
+                        required: "Please Enter Severity Name.",
                     },
                 },
                 submitHandler: function(form) {
@@ -2083,7 +2084,7 @@
                 messages: {
                     "KeyPersonnel[]":
                     {
-                        required: "Please select Key Personnel   .",
+                        required: "Please select Key Personnel.",
                     }
                 },
                 submitHandler: function(form) {
@@ -2481,7 +2482,7 @@
                     var Hearing_Temp_name = $('#Hearing_Temp_name').val();
                     if($.trim(Hearing_Temp_name) === "") 
                     {
-                        toastr.error('Please enter  Template Name.', "Error", {
+                        toastr.error('Please enter Template Name.', "Error", {
                             positionClass: 'toast-bottom-right'
                         });
                         return false;
@@ -2673,7 +2674,7 @@
                             </div>
                             <div class="col-sm-2 codeOfConduct_remove_${count}">
                                 <label for="committee" class="form-label"> </label>
-                                <button type="button" class="btn btn-sm btn-danger CodeOfCounductRemove" data-id="${count}"><i class="fa fa-trash"></i></button>
+                                <button type="button" class="btn eb-btn-critical btn-sm CodeOfCounductRemove" data-id="${count}"><i class="fa fa-trash"></i></button>
                             </div>`;
                         $(".CodeOfConductappend").append(string);
                 
@@ -2683,7 +2684,7 @@
                             width: '100%'        
                         });
                         $("#offenses_"+count).select2({
-                            placeholder: "Select Offens",
+                            placeholder: "Select Offense",
                             allowClear: true,
                             width: '100%'        
                         });
@@ -2766,7 +2767,7 @@
                         </div>
                         <div class="col-sm-2 commite_id_${assignCommitteeCount}" >
                             <label for="committee" class="form-label"> </label>
-                            <button type="button" class="btn btn-sm btn-danger remove_committe" data-id="${assignCommitteeCount}"><i class="fa fa-trash"></i></button>
+                            <button type="button" class="btn eb-btn-critical btn-sm remove_committe" data-id="${assignCommitteeCount}"><i class="fa fa-trash"></i></button>
                             </div>`;
                         $("#AppendCommittesAssignMember").append(string);
                         $("#assign_members_"+assignCommitteeCount).select2({
@@ -2806,7 +2807,7 @@
                             </div>
                             <div class="col-sm-2 delegation_id_${DelegationRuleCount}" >
                             <label for="committee" class="form-label"> </label>
-                                <button type="button" class="btn btn-sm btn-danger remove_DelegationRule" data-id="${DelegationRuleCount}"><i class="fa fa-trash"></i></button>
+                                <button type="button" class="btn eb-btn-critical btn-sm remove_DelegationRule" data-id="${DelegationRuleCount}"><i class="fa fa-trash"></i></button>
                             </div>`;
                         $("#AppendDelegationRule").append(string);
                         $("#DelegationRuleCategory_"+DelegationRuleCount).select2({
@@ -2930,17 +2931,17 @@
 
            //End of Disciplinery Part  Developer Functionality
             $("#Grievance_Cat_id").select2({
-                placeholder: "Select Greivance Category",
+                placeholder: "Select Grievance Category",
                 allowClear: true,
                 width: '100%'        
             });
             $(".Grievance_Cat_idMain").select2({
-                placeholder: "Select Greivance Category",
+                placeholder: "Select Grievance Category",
                 allowClear: true,
                 width: '100%'        
             });
             $("#GrievanceSubcategories_1").select2({
-                placeholder: `Select Grieveance Sub Category `,
+                placeholder: `Select Grievance Sub Category `,
                 allowClear: true,
                 width: '100%'        
             });
@@ -2971,7 +2972,7 @@
                         required: "Please enter the email template name.",
                     },
                     Action_id: {
-                        required: "Please Select Action .",
+                        required: "Please Select Action.",
                     },
 
                     
@@ -3330,7 +3331,7 @@
 
                             <!-- Remove Button -->
                             <div class="col-md-6 d-flex align-items-end">
-                                <button type="button" class="btn btn-danger btn-sm CatAndSubCatRemove" 
+                                <button type="button" class="btn eb-btn-critical btn-sm CatAndSubCatRemove" 
                                         data-id="${Grievance_CatCount}">
                                     <i class="fa fa-trash"></i> 
                                 </button>
@@ -3340,12 +3341,12 @@
                 $(".AppendGrievanceCatandSubCat").append(row);
                 $("#AppendGrievanceCatAndSubCatCount").val(Grievance_CatCount);
                 $("#Grievance_Cat_idMain_"+Grievance_CatCount).select2({
-                    placeholder: "Select Greivance Category",
+                    placeholder: "Select Grievance Category",
                     allowClear: true,
                     width: '100%'        
                 });
                 $("#GrievanceSubcategories_"+Grievance_CatCount).select2({
-                    placeholder: `Select Grieveance Sub Category `,
+                    placeholder: `Select Grievance Sub Category `,
                     allowClear: true,
                     width: '100%'        
                 });
@@ -3559,13 +3560,13 @@
                             </div>
                             <div class="col-sm-2 GrievanceDelegationRul_${count}">
                                     <label for="committee" class="form-label"> </label>
-                                    <button type="button" class="btn btn-sm btn-danger GrievanceDelegationRuleRemove" data-id="${count}" fdprocessedid="ehjvsv"><i class="fa fa-trash"></i></button>
+                                    <button type="button" class="btn eb-btn-critical btn-sm GrievanceDelegationRuleRemove" data-id="${count}" fdprocessedid="ehjvsv"><i class="fa fa-trash"></i></button>
                             </div>`;
                     
                     $(".AppendGrievanceDelegationRule").append(row);
                     $("#GrievanceDelegationRuleCount").val(count);
                     $("#Grievance_Cat_idMain_"+count).select2({
-                        placeholder: "Select Greivance Category",
+                        placeholder: "Select Grievance Category",
                         allowClear: true,
                         width: '100%'        
                     });
@@ -3828,14 +3829,12 @@
                     var $row = $button.closest("tr");
                     var main_id = $(this).data('id');
 
-                    Swal.fire({
+                    wisdomConfirm({
+                        role: 'destructive',
                         title: 'Sure want to delete?',
                         text: 'This cannot be undone',
-                        icon: 'warning',
-                        showCancelButton: true,
-                        confirmButtonText: 'Yes',
-                        cancelButtonText: 'No',
-                        confirmButtonColor: "#DD6B55"
+                        confirmText: 'Yes',
+                        cancelText: 'No'
                     }).then((result) => {
                         if (result.isConfirmed) {
                             $.ajax({
@@ -3903,13 +3902,13 @@
                                         </div>
                                     <div class="col-sm-2  Grivance_Escaltion_r_${count}">
                                     <label for="committee" class="form-label"> </label>
-                                        <button type="button" class="btn btn-sm btn-danger remove_grivance_escaltion" data-id="${count}" fdprocessedid="po9pcm"><i class="fa fa-trash"></i></button>
+                                        <button type="button" class="btn eb-btn-critical btn-sm remove_grivance_escaltion" data-id="${count}" fdprocessedid="po9pcm"><i class="fa fa-trash"></i></button>
                                     </div>`;
 
                     $(".AppendGrievanecEscalation").append(row);
                     $("#grivance_escaltion_count").val(count);
                     $("#Grievance_Invest_Cat_idMain_"+count).select2({
-                        placeholder: "Select Greivance Category",
+                        placeholder: "Select Grievance Category",
                         allowClear: true,
                         width: '100%'        
                     })
@@ -4295,7 +4294,7 @@
         $row.html(`
             <td><input type="text" class="form-control fu-edit-name" value="${$('<div>').text(name).html()}"></td>
             <td><input type="text" class="form-control fu-edit-desc" value="${$('<div>').text(desc).html()}"></td>
-            <td><a href="javascript:void(0)" class="btn btn-theme btn-sm followup-update-btn" data-id="${id}">Save</a></td>
+            <td><a href="javascript:void(0)" class="btn eb-btn-primary btn-sm followup-update-btn" data-id="${id}">Save</a></td>
         `);
     });
 
@@ -4324,10 +4323,11 @@
 
     $(document).on('click', '.followup-delete-btn', function () {
         var id = $(this).data('id');
-        Swal.fire({
+        wisdomConfirm({
+            role: 'destructive',
             title: 'Delete this follow-up action?',
-            icon: 'warning', showCancelButton: true,
-            confirmButtonText: 'Yes', cancelButtonText: 'No', confirmButtonColor: '#DD6B55'
+            confirmText: 'Yes',
+            cancelText: 'No'
         }).then((r) => {
             if (!r.isConfirmed) return;
             $.ajax({

@@ -146,7 +146,7 @@ class DashboardController extends Controller
                                     <i class="fas fa-location"></i>
                                 </a>
 
-                                <a data-toggle="tooltip" data-title="Archive" class="btn-lg-icon icon-bg-skyblue action-delete  mx-1 '.$delete_class.'" href="JavaScript:void(0);" data-url="'.$delete_url.'"><img src="' . asset("resorts_assets/images/archive.svg") . '" class="img-fluid"></a>
+                                <a data-toggle="tooltip" data-title="Archive" class="btn-tableIcon btnIcon-skyblue action-delete mx-1 '.$delete_class.'" href="JavaScript:void(0);" data-url="'.$delete_url.'"><i class="fa-solid fa-box-archive"></i></a>
                             </div>';
             })
             ->rawColumns(['sos_type','date','time','initiated_by','status','Action'])

@@ -87,7 +87,7 @@
                                         <tr>
                                             <td
                                                 style="font-weight: 500;padding: 0px 4px 16px 0;vertical-align: top;border-bottom: 1px solid #3030301A">
-                                                Manifest type:</td>
+                                                Manifest Type:</td>
                                             <td
                                                 style="padding: 0px 0 16px 4px;text-align: right;opacity: .6;vertical-align: top;border-bottom: 1px solid #3030301A">
                                                 {{ $ManifestListing->manifest_type }}</td>
@@ -103,7 +103,7 @@
                                         <tr>
                                             <td
                                                 style="font-weight: 500;padding: 16px 4px 16px 0;vertical-align: top;border-bottom: 1px solid #3030301A">
-                                                Transportation name</td>
+                                                Transportation Name</td>
                                             <td
                                                 style="padding: 16px 0 16px 4px;text-align: right;opacity: .6;vertical-align: top;border-bottom: 1px solid #3030301A">
                                                 {{ $ManifestListing->transportation_name }}</td>

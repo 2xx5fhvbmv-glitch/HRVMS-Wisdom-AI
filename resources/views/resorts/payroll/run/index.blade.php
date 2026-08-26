@@ -246,7 +246,7 @@
                                         </div>
                                     </div>
                                     <div class="col-auto ms-auto">
-                                        <a id="download-city-ledger-template" href="#" class="a-link">Download City ledger Template</a>
+                                        <a id="download-city-ledger-template" href="#" class="a-link">Download City Ledger Template</a>
                                     </div>
                                     <div class="col-auto">
                                         <div class="uploadFile-btn me-0">
@@ -1197,7 +1197,7 @@
                 });
 
                 if (AttendaceData.length === 0) {
-                    toastr.error("Something is wrong to fetch attendance data.", 'Error', {
+                    toastr.error("Something went wrong fetching attendance data.", 'Error', {
                         positionClass: 'toast-bottom-right'
                     });
                     return;
@@ -1374,7 +1374,7 @@
                 console.log('Deduction data count:', DeductionData.length, 'Sample:', DeductionData[0]);
 
                 if (DeductionData.length === 0) {
-                    toastr.error("Something is wrong.some data are missing", 'Error', {
+                    toastr.error("Something is wrong. Some data are missing", 'Error', {
                         positionClass: 'toast-bottom-right'
                     });
                     return;
@@ -1492,7 +1492,7 @@
                 });
 
                 if (reviewData.length === 0) {
-                    toastr.error("Something is wrong.some data are missing",'Error', {
+                    toastr.error("Something is wrong. Some data are missing",'Error', {
                         positionClass: 'toast-bottom-right'
                     });
                     return;

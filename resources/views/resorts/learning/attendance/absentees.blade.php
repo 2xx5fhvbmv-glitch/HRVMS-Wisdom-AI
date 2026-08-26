@@ -63,9 +63,10 @@
         $('#searchInput, #dateFilter').on('keyup change', function () {
             getAbsentees();
         });
-        $('#dateFilter').datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true
+        flatpickr('#dateFilter', {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
     })
     function getAbsentees() {

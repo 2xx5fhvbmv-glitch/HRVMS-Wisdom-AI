@@ -19,7 +19,7 @@
                     </div>
                 </div>
                 <div class="col-auto ms-auto">
-                    <a href="{{ route('Survey.create') }}" class="btn btn-theme @if(Common::checkRouteWisePermission('Survey.Surveylist',config('settings.resort_permissions.create')) == false) d-none @endif">Create Survey</a>
+                    <a href="{{ route('Survey.create') }}" class="btn eb-btn-accent @if(Common::checkRouteWisePermission('Survey.Surveylist',config('settings.resort_permissions.create')) == false) d-none @endif">Create Survey</a>
                 </div>
                 <!-- <div class="col-xxl-2 col-auto ms-auto">
                     <select class="form-select select2t-none" id="select-budgeted"
@@ -131,7 +131,6 @@
                                             class="fa-regular fa-eye"></i></a>
                                     <a href="javascript:void(0)" data-id="{{$id}}" class="SendNotification btn-tableIcon btnIcon-yellow"><i
                                             class="fa-regular fa-bell"></i></a>
-                                    {{-- <a href="#" class="btn-tableIcon btnIcon-blue"><i class="fa-regular fa-pen"></i></a> --}}
                                 </div>
                             </div>
                         </div>
@@ -176,10 +175,16 @@
                                 <div class="wai-row-body">
                                     <h6>{{ $surveyInsights[$sc['key']]['title'] ?? '' }}</h6>
                                     <p class="wai-row-text">{{ $surveyInsights[$sc['key']]['body'] ?? '' }}</p>
-                                    @if($hasRecommendation)
-                                        <p class="wai-row-recommendation"><strong>Recommendation:</strong> {{ $surveyInsights[$sc['key']]['recommendation'] }}</p>
-                                    @endif
-                                    <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#{{ $sc['modal'] }}" class="wai-row-link">View details &rarr;</a>
+                                    <div class="lnkrow">
+                                        @if($hasRecommendation)
+                                            <button type="button" class="lnk-rec"
+                                                data-title="{{ $surveyInsights[$sc['key']]['title'] ?? '' }}"
+                                                data-rec="{{ $surveyInsights[$sc['key']]['recommendation'] }}"
+                                                data-details="{{ $sc['modal'] }}">View recommendation &rarr;</button>
+                                            <span class="sep"></span>
+                                        @endif
+                                        <a href="#" class="lnk" data-details="{{ $sc['modal'] }}">View details &rarr;</a>
+                                    </div>
                                 </div>
                             </div>
                         @endforeach
@@ -347,7 +352,7 @@
                             <div class="leaveUser-block">
                                 <div>
                                     <h6>{{ $s->Surevey_title }}</h6>
-                                    <p>From :- {{ $s->Start_date }}  To :- {{ $s->End_date }}</p>
+                                    <p>From: {{ $s->Start_date }} To: {{ $s->End_date }}</p>
                                     <div>
                                         <a target="_blank" href="{{ $s->route }}" class="a-linkTheme">View Details</a>
                                     </div>
@@ -462,7 +467,7 @@
 
 
                 <div class="modal-header">
-                    <h5 class="modal-title" id="staticBackdropLabel">Pending  Participant  in survey</h5>
+                    <h5 class="modal-title" id="staticBackdropLabel">Pending Participants in Survey</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
@@ -474,12 +479,14 @@
 
                 </div>
                 <div class="modal-footer">
-                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
+                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Cancel</a>
                 </div>
         </div>
     </div>
 </div>
 @includeWhen(isset($surveyInsights), 'resorts.Survey.dashboard._insight_modals')
+@includeWhen(isset($surveyInsights), 'partials._wai_insight_modals')
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -525,7 +532,6 @@
     .wai-narrative .wai-row-body { flex: 1 1 auto; min-width: 0; }
     .wai-narrative .wai-row-body h6 { margin: 0 0 4px; font-size: 13.5px; font-weight: 700; color: #14232A; }
     .wai-narrative .wai-row-text { margin: 0 0 4px; font-size: 12.5px; color: #5D6F75; line-height: 1.5; }
-    .wai-narrative .wai-row-recommendation { margin: 0 0 4px; font-size: 12.5px; color: #0e8a9e; line-height: 1.5; }
     .wai-narrative .wai-row-link { display: inline-block; margin-top: 2px; font-size: 12px; font-weight: 600; color: #014653; }
 
     /* Truncate long department / survey names in the chart legend pills.

@@ -112,13 +112,13 @@
                                 </select>
                             </div>
                             <div class="col-md-4 col-sm-6 d-flex align-items-end">
-                                <a href="#" class="btn btn-themeSkyblue btn-sm" id="addMoreParticipants">+ Add Participant</a>
+                                <a href="#" class="btn eb-btn-accent btn-sm" id="addMoreParticipants">+ Add Participant</a>
                             </div>
                         </div>
                     </div>
 
                     <div class="mb-3">
-                        <a href="#" class="btn btn-themeSkyblue btn-sm" id="add-external-participants">Add External Participants</a>
+                        <a href="#" class="btn eb-btn-accent btn-sm" id="add-external-participants">Add External Participants</a>
                     </div>
 
                     <div class="row g-3 mb-3" id="external-participants"></div>
@@ -140,10 +140,10 @@
                             <label class="form-label">ATTACHMENTS</label>
                             <div class="uploadFile-block">
                                 <div class="uploadFile-btn mb-2">
-                                    <a href="#" class="btn btn-themeBlue btn-sm" onclick="event.preventDefault(); document.getElementById('uploadFile').click();">Upload Files</a>
+                                    <a href="#" class="btn eb-btn-accent btn-sm" onclick="event.preventDefault(); document.getElementById('uploadFile').click();">Upload Files</a>
                                     <input type="file" name="attachments[]" id="uploadFile" multiple style="display:none;">
                                 </div>
-                                <div class="uploadFile-text mb-2 text-muted small">Photos, Documents, Or Videos</div>
+                                <div class="uploadFile-text mb-2 text-muted small">Photos, Documents, or Videos</div>
                             </div>
                             <ul id="file-list" class="mt-2"></ul>
                         </div>
@@ -179,13 +179,14 @@
                     </div>
 
                     <div class="card-footer text-end">
-                        <button type="submit" class="btn btn-themeBlue">Submit</button>
+                        <button type="submit" class="btn eb-btn-primary">Submit</button>
                     </div>
                 </div>
             </form>
 
         </div>
     </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -205,13 +206,10 @@ $(document).ready(function () {
         successClass: 'is-valid'
     });
 
-    $('.datepicker').datepicker({
-        format: 'dd/mm/yyyy',
-        autoclose: true,
-        todayHighlight: true,
-        clearBtn: true,
-        container: 'body',
-        orientation: 'bottom auto'
+    flatpickr('.datepicker', {
+        dateFormat: 'd/m/Y',
+        allowInput: true,
+        appendTo: document.body
     });
 
     document.getElementById('uploadFile').addEventListener('change', function (e) {
@@ -265,7 +263,7 @@ $(document).ready(function () {
                     </select>
                 </div>
                 <div class="col-md-4 col-sm-6 d-flex align-items-end">
-                    <a href="#" class="btn btn-danger btn-sm removeParticipant">Remove</a>
+                    <a href="#" class="btn eb-btn-critical btn-sm removeParticipant">Remove</a>
                 </div>
             </div>`;
         $('#participants-div').append(row);
@@ -286,7 +284,7 @@ $(document).ready(function () {
                     <input type="text" class="form-control" name="ext_participants[]" placeholder="External Participant Name" />
                 </div>
                 <div class="col-md-4 col-sm-6 d-flex align-items-end">
-                    <a href="#" class="btn btn-danger btn-sm removeExternal">Remove</a>
+                    <a href="#" class="btn eb-btn-critical btn-sm removeExternal">Remove</a>
                 </div>
             </div>`;
         $('#external-participants').append(extRow);

@@ -129,11 +129,11 @@ class ConfigrationController extends Controller
 
                             return '
                             <div  class="d-flex align-items-center">
-                                <a href="javascript:void(0)" class="btn-lg-icon icon-bg-green me-1 edit-row-btn" data-cat-id="' . e($id) . '">
-                                    <img src="' . asset("resorts_assets/images/edit.svg") . '" alt="Edit" class="img-fluid">
+                                <a href="javascript:void(0)" class="btn-tableIcon btnIcon-yellow me-1 edit-row-btn" data-cat-id="' . e($id) . '">
+                                    <i class="fa-solid fa-pen-to-square"></i>
                                 </a>
-                                <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-row-btn" data-cat-id="' . e($id) . '">
-                                    <img src="' . asset("resorts_assets/images/trash-red.svg") . '" alt="Delete" class="img-fluid">
+                                <a href="javascript:void(0)" class="btn-tableIcon eb-icon-critical delete-row-btn" data-cat-id="' . e($id) . '">
+                                    <i class="fa-regular fa-trash-can"></i>
                                 </a>
                             </div>';
 
@@ -295,11 +295,11 @@ class ConfigrationController extends Controller
 
                             return '
                             <div  class="d-flex align-items-center">
-                                <a href="javascript:void(0)" class="btn-lg-icon icon-bg-green me-1 edit-row-btn" data-cat-id="' . e($id) . '">
-                                    <img src="' . asset("resorts_assets/images/edit.svg") . '" alt="Edit" class="img-fluid">
+                                <a href="javascript:void(0)" class="btn-tableIcon btnIcon-yellow me-1 edit-row-btn" data-cat-id="' . e($id) . '">
+                                    <i class="fa-solid fa-pen-to-square"></i>
                                 </a>
-                                <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-row-btn" data-cat-id="' . e($id) . '">
-                                    <img src="' . asset("resorts_assets/images/trash-red.svg") . '" alt="Delete" class="img-fluid">
+                                <a href="javascript:void(0)" class="btn-tableIcon eb-icon-critical delete-row-btn" data-cat-id="' . e($id) . '">
+                                    <i class="fa-regular fa-trash-can"></i>
                                 </a>
                             </div>';
 
@@ -432,7 +432,7 @@ class ConfigrationController extends Controller
                 ->addColumn('action', function ($row) {
                     $id = $row->id;
                     return '<div class="d-flex align-items-center">
-                                <a href="javascript:void(0)" class="btn-lg-icon icon-bg-green me-1 edit-accommodation-btn" data-id="' . $id . '"
+                                <a href="javascript:void(0)" class="btn-tableIcon btnIcon-yellow me-1 edit-accommodation-btn" data-id="' . $id . '"
                                     data-building="' . e($row->BuildingName) . '"
                                     data-floor="' . e($row->Floor) . '"
                                     data-room="' . e($row->RoomNo) . '"
@@ -443,10 +443,10 @@ class ConfigrationController extends Controller
                                     data-roomstatus="' . e($row->RoomStatus) . '"
                                     data-threshold="' . e($row->Occupancytheresold) . '"
                                     data-accommodationtype="' . e($row->Accommodation_type_id) . '">
-                                    <img src="' . asset("resorts_assets/images/edit.svg") . '" alt="Edit">
+                                    <i class="fa-solid fa-pen-to-square"></i>
                                 </a>
-                                <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-accommodation-btn" data-id="' . $id . '">
-                                    <img src="' . asset("resorts_assets/images/trash-red.svg") . '" alt="Delete">
+                                <a href="javascript:void(0)" class="btn-tableIcon eb-icon-critical delete-accommodation-btn" data-id="' . $id . '">
+                                    <i class="fa-regular fa-trash-can"></i>
                                 </a>
                             </div>';
                 })
@@ -814,11 +814,11 @@ class ConfigrationController extends Controller
 
                             return '
                             <div  class="d-flex align-items-center">
-                                <a href="javascript:void(0)" class="btn-lg-icon icon-bg-green me-1 edit-row-btn" data-cat-id="' . e($id) . '">
-                                    <img src="' . asset("resorts_assets/images/edit.svg") . '" alt="Edit" class="img-fluid">
+                                <a href="javascript:void(0)" class="btn-tableIcon btnIcon-yellow me-1 edit-row-btn" data-cat-id="' . e($id) . '">
+                                    <i class="fa-solid fa-pen-to-square"></i>
                                 </a>
-                                <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-row-btn" data-cat-id="' . e($id) . '">
-                                    <img src="' . asset("resorts_assets/images/trash-red.svg") . '" alt="Delete" class="img-fluid">
+                                <a href="javascript:void(0)" class="btn-tableIcon eb-icon-critical delete-row-btn" data-cat-id="' . e($id) . '">
+                                    <i class="fa-regular fa-trash-can"></i>
                                 </a>
                             </div>';
 
@@ -981,11 +981,11 @@ class ConfigrationController extends Controller
 
                             return '
                             <div  class="d-flex align-items-center">
-                                <a href="javascript:void(0)" class="btn-lg-icon icon-bg-green me-1 edit-row-btn" data-buildingId="'.e($row->building_id).'" data-cat-id="' . e($id) . '">
-                                    <img src="' . asset("resorts_assets/images/edit.svg") . '" alt="Edit" class="img-fluid">
+                                <a href="javascript:void(0)" class="btn-tableIcon btnIcon-yellow me-1 edit-row-btn" data-buildingId="'.e($row->building_id).'" data-cat-id="' . e($id) . '">
+                                    <i class="fa-solid fa-pen-to-square"></i>
                                 </a>
-                                <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-row-btn" data-cat-id="' . e($id) . '">
-                                    <img src="' . asset("resorts_assets/images/trash-red.svg") . '" alt="Delete" class="img-fluid">
+                                <a href="javascript:void(0)" class="btn-tableIcon eb-icon-critical delete-row-btn" data-cat-id="' . e($id) . '">
+                                    <i class="fa-regular fa-trash-can"></i>
                                 </a>
                             </div>';
 

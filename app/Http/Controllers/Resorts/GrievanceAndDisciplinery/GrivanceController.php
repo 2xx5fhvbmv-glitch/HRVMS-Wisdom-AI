@@ -144,16 +144,16 @@ class GrivanceController extends Controller
                     $string='';
                 if($row->SentToGM =="Yes" &&  $rankKey =="GM")
                 {
-                    $string='<a target="_blank" href="'. route('GrievanceAndDisciplinery.config.Investigationinfo',$id) .'" class="btn btn-success btn-lg-icon  me-1 edit-row-btn '.$edit_class.'" data-cat-id="' . e($id) . '">
+                    $string='<a target="_blank" href="'. route('GrievanceAndDisciplinery.config.Investigationinfo',$id) .'" class="btn-tableIcon btnIcon-blue me-1 edit-row-btn '.$edit_class.'" data-cat-id="' . e($id) . '">
                     <i class="fas fa-info"></i>
                     </a>';
                 }
                 elseif($row->SentToGM == "No")
                 {
-                    $string='<a target="_blank" title="View Report" href="'. route('GrievanceAndDisciplinery.config.Investigationinfo',$id) .'" class="btn btn-success btn-lg-icon  me-1 edit-row-btn '.$edit_class.'" data-cat-id="' . e($id) . '">
+                    $string='<a target="_blank" title="View Report" href="'. route('GrievanceAndDisciplinery.config.Investigationinfo',$id) .'" class="btn-tableIcon btnIcon-blue me-1 edit-row-btn '.$edit_class.'" data-cat-id="' . e($id) . '">
                     <i class="fas fa-info"></i>
                     </a>
-                    <a target="_blank" title="Investigation Workspace" href="'. route('GrievanceAndDisciplinery.config.Investigation',$id) .'" class="btn btn-success btn-lg-icon  me-1 edit-row-btn '.$delete_class.'" data-cat-id="' . e($id) . '">
+                    <a target="_blank" title="Investigation Workspace" href="'. route('GrievanceAndDisciplinery.config.Investigation',$id) .'" class="btn-tableIcon btnIcon-blue me-1 edit-row-btn '.$delete_class.'" data-cat-id="' . e($id) . '">
                     <i class="fas fa-balance-scale"></i>
                     </a>';
                 }
@@ -167,15 +167,15 @@ class GrivanceController extends Controller
                     $string.='<a target="_blank" href="javascript:Void(0)">GM Response : '.$row->Gm_Decision.'</a>';
                 }
                
-                 // <a href="javascript:void(0)" class="btn-lg-icon icon-bg-green me-1 edit-row-btn" data-cat-id="' . e($id) . '">
-                                //     <img src="' . asset("resorts_assets/images/edit.svg") . '" alt="Edit" class="img-fluid">
+                 // <a href="javascript:void(0)" class="btn-tableIcon btnIcon-yellow me-1 edit-row-btn" data-cat-id="' . e($id) . '">
+                                //     <i class="fa-solid fa-pen-to-square"></i>
                                 // </a>
                         return '
                             <div  class="d-flex align-items-center">
                                 '.$string.'
 
-                                <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-row-btn '.$delete_class.'" data-cat-id="' . e($id) . '">
-                                    <img src="' . asset("resorts_assets/images/trash-red.svg") . '" alt="Delete" class="img-fluid">
+                                <a href="javascript:void(0)" class="btn-tableIcon eb-icon-critical delete-row-btn '.$delete_class.'" data-cat-id="' . e($id) . '">
+                                    <i class="fa-regular fa-trash-can"></i>
                                 </a>
                             </div>';
             })

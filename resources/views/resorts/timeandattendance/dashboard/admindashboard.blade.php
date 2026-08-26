@@ -14,7 +14,7 @@
             <div class="row justify-content-between g-3">
                 <div class="col-auto">
                     <div class="page-title">
-                        <span>Time And Attandance</span>
+                        <span>Time And Attendance</span>
                         <h1>Dashboard</h1>
                     </div>
                 </div>
@@ -185,7 +185,7 @@
                                         <img src="{{ URL::asset('resorts_assets/images/user-2.svg')}}" alt="image">
                                     </div>
                                     <div>
-                                        <p>John Doe has been sortlisted for Manager position</p>
+                                        <p>John Doe has been shortlisted for Manager position</p>
                                         <a href="#sendRequest-modal" data-bs-toggle="modal" class="a-link">Send
                                             Interview Request</a>
                                     </div>
@@ -195,7 +195,7 @@
                                         <img src="{{ URL::asset('resorts_assets/images/user-2.svg')}}" alt="image">
                                     </div>
                                     <div>
-                                        <p>GM is Approved vacancy for Assistant Front Desk Manager</p>
+                                        <p>GM approved the vacancy for Assistant Front Desk Manager</p>
                                         <a href="#jobAD-modal" data-bs-toggle="modal" class="a-link">Create Job
                                             Advertisement</a>
                                     </div>
@@ -205,7 +205,7 @@
                                         <img src="{{ URL::asset('resorts_assets/images/user-2.svg')}}" alt="image">
                                     </div>
                                     <div>
-                                        <p>John Doe has been sortlisted for Manager position</p>
+                                        <p>John Doe has been shortlisted for Manager position</p>
                                         <a href="#" class="a-link">Send Interview Request</a>
                                     </div>
                                 </div>
@@ -489,7 +489,7 @@
                                     </div>
                                     <div>
                                         <h6>Christian Slatter (HOD - Management)</h6>
-                                        <p>Requested for Hire 1 Executive Chef</p>
+                                        <p>Requested to Hire 1 Executive Chef</p>
                                         <a href="#" class="a-link">Send Interview Request</a>
                                     </div>
                                     <div class="icon"><a href="#respondmodal" data-bs-toggle="modal"
@@ -502,7 +502,7 @@
                                     </div>
                                     <div>
                                         <h6>Christian Slatter (HOD - Management)</h6>
-                                        <p>Requested for Hire 1 Executive Chef</p>
+                                        <p>Requested to Hire 1 Executive Chef</p>
                                         <a href="#" class="a-link">Send Interview Request</a>
                                     </div>
                                     <div class="icon"><a href="#respondmodal" data-bs-toggle="modal"
@@ -515,7 +515,7 @@
                                     </div>
                                     <div>
                                         <h6>Christian Slatter (HOD - Management)</h6>
-                                        <p>Requested for Hire 1 Executive Chef</p>
+                                        <p>Requested to Hire 1 Executive Chef</p>
                                         <a href="#" class="a-link">Send Interview Request</a>
                                     </div>
                                     <div class="icon"><a href="#respondmodal" data-bs-toggle="modal"
@@ -528,7 +528,7 @@
                                     </div>
                                     <div>
                                         <h6>Christian Slatter (HOD - Management)</h6>
-                                        <p>Requested for Hire 1 Executive Chef</p>
+                                        <p>Requested to Hire 1 Executive Chef</p>
                                         <a href="#" class="a-link">Send Interview Request</a>
                                     </div>
                                     <div class="icon"><a href="#respondmodal" data-bs-toggle="modal"
@@ -707,7 +707,7 @@
                 <div class="sendRequestTime-main">
                     <div class="head">
                         <div>Your Clock</div>
-                        <div>Applicant’s O’clock</div>
+                        <div>Applicant’s Clock</div>
                     </div>
                     <div class="block">
                         <div>

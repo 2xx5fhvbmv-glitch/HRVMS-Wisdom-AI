@@ -163,7 +163,7 @@
                                 <div class="row g-3 align-items-center justify-content-between">
                                     <div class="col-auto">
                                         <div class="d-flex justify-content-start align-items-center">
-                                            <h3>Terms And conditions</h3>
+                                            <h3>Terms and Conditions</h3>
                                         </div>
                                     </div>
                                 </div>
@@ -703,8 +703,8 @@ $(document).ready(function()
 
         $("#ResortDivision").select2({placeholder: "Select Division"});
         $(".Department").select2({placeholder: "Select Department"});
-        $(".Section").select2({placeholder: "select Section"});
-        $(".Position").select2({placeholder: "select Position"});
+        $(".Section").select2({placeholder: "Select Section"});
+        $(".Position").select2({placeholder: "Select Position"});
 
         $(document).on('click', '.delete-row-btn', function (e) {
             e.preventDefault();
@@ -714,14 +714,12 @@ $(document).ready(function()
             // Get the division ID from the data attribute
             var main_id = $(this).data('center-id');
 
-            Swal.fire({
+            wisdomConfirm({
+                role: 'destructive',
                 title: 'Sure want to delete?',
                 text: 'This cannot be undone',
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonText: 'Yes',
-                cancelButtonText: 'No',
-                confirmButtonColor: "#DD6B55"
+                confirmText: 'Yes',
+                cancelText: 'No'
             }).then((result) => {
                 if (result.isConfirmed)
                 {
@@ -760,14 +758,12 @@ $(document).ready(function()
             var main_id = $(this).data('source-id');
 
 
-            Swal.fire({
+            wisdomConfirm({
+                role: 'destructive',
                 title: 'Sure want to delete?',
                 text: 'This cannot be undone',
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonText: 'Yes',
-                cancelButtonText: 'No',
-                confirmButtonColor: "#DD6B55"
+                confirmText: 'Yes',
+                cancelText: 'No'
             }).then((result) => {
                 if (result.isConfirmed)
                 {
@@ -1107,14 +1103,12 @@ $(document).ready(function()
         e.preventDefault();
         var main_id = $(this).data('provider-id');
 
-        Swal.fire({
+        wisdomConfirm({
+            role: 'destructive',
             title: 'Sure want to delete?',
             text: 'This cannot be undone',
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonText: 'Yes',
-            cancelButtonText: 'No',
-            confirmButtonColor: "#DD6B55"
+            confirmText: 'Yes',
+            cancelText: 'No'
         }).then((result) => {
             if (result.isConfirmed)
             {

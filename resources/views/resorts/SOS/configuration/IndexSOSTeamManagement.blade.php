@@ -37,7 +37,7 @@
                                 </div>
                             </div>
 
-                            <div class="col-auto ms-auto"><a href="{{route('sos.config.index')}}" class="btn  btn-themeSkyblue btn-sm">Add New</a>
+                            <div class="col-auto ms-auto"><a href="{{route('sos.config.index')}}" class="btn eb-btn-secondary btn-sm">Add New</a>
                             </div>
                         </div>
                     </div>
@@ -82,7 +82,7 @@
                         </div>
                         
                         <div class="col-12">
-                            <a href="javascript:void(0);" class="btn btn-themeSkyblue btn-sm AddAppendTeamMember blockAdd-btn">Add More</a>
+                            <a href="javascript:void(0);" class="btn eb-btn-accent btn-sm AddAppendTeamMember blockAdd-btn">Add More</a>
                         </div>
                         <div class="col-12">
                             <textarea class="form-control description" id="description" name="description" placeholder="Description" rows="3" 
@@ -98,13 +98,14 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                    <button type="submit" class="btn btn-themeBlue btn-sm" id="submit">Submit</button>
+                    <a href="#" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Cancel</a>
+                    <button type="submit" class="btn eb-btn-primary btn-sm" id="submit">Submit</button>
                 </div>
             </div>
         </form>
     </div>
 </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -114,8 +115,8 @@
 
 @php
     $viewIcon = '<i class="fa-regular fa-eye"></i>';
-    $editIcon = asset("resorts_assets/images/edit.svg");
-    $trashIcon = asset("resorts_assets/images/trash-red.svg");
+    $editIcon = '<i class="fa-solid fa-pen-to-square"></i>';
+    $trashIcon = '<i class="fa-regular fa-trash-can"></i>';
     $viewRoute = route('sos.team.detail', '__MEETING_ID__'); // placeholder
 @endphp
 
@@ -237,7 +238,7 @@
                             </div>
                             <div class="col-md-2 team-member-group">
                                 <label for="member_role" class="form-label fw-bold d-md-block d-none">&nbsp;</label>
-                                <button type="button" class="btn btn-danger btn-sm TeamMemberRemove mt-md-1" data-id="${index}">
+                                <button type="button" class="btn eb-btn-critical btn-sm TeamMemberRemove mt-md-1" data-id="${index}">
                                     <i class="fa fa-trash"></i> 
                                 </button>
                             </div>
@@ -296,7 +297,7 @@
 
                     <!-- Remove Button -->
                     <div class="col-md-6 d-flex align-items-end team-member-group">
-                        <button type="button" class="btn btn-danger btn-sm TeamMemberRemove" 
+                        <button type="button" class="btn eb-btn-critical btn-sm TeamMemberRemove" 
                                 data-id="${TeamMemberCount}">
                             <i class="fa fa-trash"></i> 
                         </button>
@@ -376,14 +377,12 @@
             var $row = $button.closest("tr");
             var main_id = $(this).data('id');
 
-            Swal.fire({
+            wisdomConfirm({
+                role: 'destructive',
                 title: 'Sure want to delete?',
                 text: 'This cannot be undone',
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonText: 'Yes',
-                cancelButtonText: 'No',
-                confirmButtonColor: "#DD6B55"
+                confirmText: 'Yes',
+                cancelText: 'No'
             }).then((result) => {
                 if (result.isConfirmed) {
                     $.ajax({
@@ -438,8 +437,8 @@
                             `);
 
             $row.find("td:last-child").html(`
-                <button class="btn btn-sm btn-success update-row-btn me-1" data-id="${Main_id}">Update</button>
-                <button class="btn btn-sm btn-secondary cancel-row-btn" data-id="${Main_id}">Cancel</button>
+                <button class="btn btn-sm eb-btn-positive update-row-btn me-1" data-id="${Main_id}">Update</button>
+                <button class="btn btn-sm eb-btn-neutral cancel-row-btn" data-id="${Main_id}">Cancel</button>
             `);
 
             $row.data('name', TeamName);
@@ -461,14 +460,14 @@
             var viewUrl = `{!! str_replace('__MEETING_ID__', '${Main_Id}', $viewRoute) !!}`;
 
             $row.find("td:last-child").html(`
-                <a href="${viewUrl}" title="View Team Detail" class="btn-tableIcon btnIcon-yellow me-1">
+                <a href="${viewUrl}" title="View Team Detail" class="btn-tableIcon btnIcon-teal me-1">
                     {!! $viewIcon !!}
                 </a>
-                <a href="javascript:void(0)" class="btn-lg-icon icon-bg-green me-1 edit-row-btn" data-id="${Main_Id}">
-                    <img src="{{ $editIcon }}" alt="Edit" class="img-fluid">
+                <a href="javascript:void(0)" class="btn-tableIcon btnIcon-yellow me-1 edit-row-btn" data-id="${Main_Id}">
+                    {!! $editIcon !!}
                 </a>
-                <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-row-btn" data-id="${Main_Id}">
-                    <img src="{{ $trashIcon }}" alt="Delete" class="img-fluid">
+                <a href="javascript:void(0)" class="btn-tableIcon eb-icon-critical delete-row-btn" data-id="${Main_Id}">
+                    {!! $trashIcon !!}
                 </a>
             `);
         });

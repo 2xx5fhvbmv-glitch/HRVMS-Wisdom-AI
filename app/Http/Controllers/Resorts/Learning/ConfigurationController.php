@@ -112,18 +112,17 @@ class ConfigurationController extends Controller
 
             return datatables()->of($categories)
                 ->addColumn('action', function ($row) {
-                    $editUrl = asset('resorts_assets/images/edit.svg');
-                    $deleteUrl = asset('resorts_assets/images/trash-red.svg');
+                    $id = htmlspecialchars($row->id, ENT_QUOTES, 'UTF-8');
 
                     return '
                         <div class="d-flex align-items-center">
-                            <a href="#" class="btn-lg-icon icon-bg-red edit-row-btn"
-                           data-category-id="'. htmlspecialchars($row->id, ENT_QUOTES, 'UTF-8') . '">
-                                <img src="' . $editUrl . '" alt="Edit" class="img-fluid" />
+                            <a href="#" class="btn-tableIcon btnIcon-yellow me-1 edit-row-btn" title="Edit"
+                           data-category-id="'. $id . '">
+                                <i class="fa-solid fa-pen-to-square"></i>
                             </a>
-                            <a href="#" class="btn-lg-icon icon-bg-red delete-row-btn"
-                           data-category-id="'. htmlspecialchars($row->id, ENT_QUOTES, 'UTF-8') . '">
-                                <img src="' . $deleteUrl . '" alt="Delete" class="img-fluid" />
+                            <a href="#" class="btn-tableIcon lnd-icon-critical delete-row-btn" title="Delete"
+                           data-category-id="'. $id . '">
+                                <i class="fa-regular fa-trash-can"></i>
                             </a>
                         </div>';
                 })

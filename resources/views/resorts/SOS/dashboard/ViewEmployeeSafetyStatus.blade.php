@@ -79,7 +79,7 @@
                                 <input type="text" name="mass_instruction" class="form-control" placeholder="Mass Instructions" data-parsley-required="true" data-parsley-error-message="Please Enter Mass Instruction" />
                             </div>
                             <div class="col-auto">
-                                <button type="submit" class="btn btn-themeBlue">Submit</button>
+                                <button type="submit" class="btn eb-btn-primary">Submit</button>
                             </div>
                         </div>
                     </div>
@@ -92,6 +92,7 @@
 
         </div>
     </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')

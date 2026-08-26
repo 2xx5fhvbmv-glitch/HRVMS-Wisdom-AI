@@ -212,7 +212,7 @@
                     <label class="form-label">Attachment</label>
                     <div class="uploadFile-block">
                         <div class="uploadFile-btn">
-                            <a href="#" class="btn btn-themeBlue btn-sm">Upload File</a>
+                            <a href="#" class="btn eb-btn-accent btn-sm">Upload File</a>
                             <input type="file" name="attachment[]" id="attachment"
                                 accept=".png,.jpg,.jpeg,.heic,.heif,image/heic,image/heif,.pdf" multiple>
                         </div>
@@ -226,7 +226,7 @@
                     <label class="form-label">Upload Signed Document</label>
                     <div class="uploadFile-block">
                         <div class="uploadFile-btn">
-                            <a href="#" class="btn btn-themeBlue btn-sm">Upload File</a>
+                            <a href="#" class="btn eb-btn-accent btn-sm">Upload File</a>
                             <input type="file" name="upload_signed_document" id="upload-signed-document"
                                 accept=".png,.jpg,.jpeg,.heic,.heif,image/heic,image/heif,.pdf">
                         </div>
@@ -264,7 +264,7 @@
 
     <!-- Submit -->
     <div class="card-footer text-end">
-        <button type="submit" class="btn btn-themeBlue ms-1 btn-sm Submitme">Submit</button>
+        <button type="submit" class="btn eb-btn-primary ms-1 btn-sm Submitme">Submit</button>
     </div>
 </form>
 
@@ -272,6 +272,7 @@
 
     </div>
 </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -325,10 +326,10 @@
         });
         
          
-        $('.Expiry_date').datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,      // Close the picker after selection
-            todayHighlight: true  // Highlight today's date
+        flatpickr('.Expiry_date', {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
         // Reverse-direction shortcut: when the user picks an Offence first,
         // auto-select its parent Category and lock it. The data-cat attribute

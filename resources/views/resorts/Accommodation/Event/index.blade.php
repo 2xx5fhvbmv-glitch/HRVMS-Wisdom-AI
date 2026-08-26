@@ -21,7 +21,7 @@
                 </div>
                 <div class="col-auto">
                     <div class="d-flex justify-content-end">
-                        <a href="#createTask-modal" data-bs-toggle="modal" class="btn btn-theme @if(App\Helpers\Common::checkRouteWisePermission('resort.accommodation.event',config('settings.resort_permissions.create')) == false) d-none @endif">Create Task</a>
+                        <a href="#createTask-modal" data-bs-toggle="modal" class="btn eb-btn-accent @if(App\Helpers\Common::checkRouteWisePermission('resort.accommodation.event',config('settings.resort_permissions.create')) == false) d-none @endif">Create Task</a>
                     </div>
                 </div>
             </div>
@@ -134,14 +134,15 @@
                 </div>
 
                 <div class="modal-footer">
-                    <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                    <button type="submit" class="btn btn-themeBlue">Submit</button>
+                    <a href="#" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Cancel</a>
+                    <button type="submit" class="btn eb-btn-primary">Submit</button>
                 </div>
             </form>
 
         </div>
     </div>
 </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -163,10 +164,10 @@
         $(".RoomNo").select2({
           placeholder:'Select RoomNo',
         });
-        $("#start_date").datepicker({
-                format: 'dd/mm/yyyy',
-                autoclose: true,      // Close the picker after selection
-                todayHighlight: true  // Highlight today's date
+        flatpickr('#start_date', {
+                dateFormat: 'd/m/Y',
+                allowInput: true,
+                appendTo: document.body
             });
 
 
@@ -196,22 +197,22 @@
             },
             messages: {
                 date: {
-                    required: "Please Select date.",
+                    required: "Please select date.",
                 },
                 building_id: {
-                    required: "Please Select Building.",
+                    required: "Please select building.",
                 },
                 start_time: {
-                    required: "Please Select Start Time.",
+                    required: "Please select start time.",
                 },
                 end_time: {
-                    required: "Please Select End Time.",
+                    required: "Please select end time.",
                 },
                 descriptionIssues: {
-                    required: "Please Enter description.",
+                    required: "Please enter description.",
                 },
                 priority: {
-                    required: "Please Select Priority.",
+                    required: "Please select priority.",
                 }
             },
             submitHandler: function(form) {

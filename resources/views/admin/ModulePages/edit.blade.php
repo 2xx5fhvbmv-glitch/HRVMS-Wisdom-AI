@@ -93,7 +93,7 @@
                     class="form-control"
                     placeholder="Route Type">
                     <option value="InsideOfPage" @if(isset($data->TypeOfPage) && $data->TypeOfPage =="InsideOfPage") selected @endif>Inside Of Page</option>
-                    <option value="InsideOfMenu" @if(isset($data->TypeOfPage) && $data->TypeOfPage =="InsideOfMenu") selected @endif>InsideOfMenu</option>
+                    <option value="InsideOfMenu" @if(isset($data->TypeOfPage) && $data->TypeOfPage =="InsideOfMenu") selected @endif>Inside Of Menu</option>
                 </select>
                   <div id="div-page_name"></div>
                 </div>
@@ -180,7 +180,7 @@
 <script>
   $(document).ready(function() {
     $("#Module_id").select2({
-        placeholder: 'Select an Module Name',
+        placeholder: 'Select a Module Name',
         allowClear: true
     });
 
@@ -210,7 +210,7 @@
                 required: "Please select a module."
             },
             'page_name': {
-                required: "The Page name field is required",
+                required: "The page name field is required",
                 maxlength: "Max length should be 255 characters",
             },
             'status': {

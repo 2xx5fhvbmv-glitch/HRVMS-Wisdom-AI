@@ -190,6 +190,7 @@
             </div>
         </div>
     </div>
+    @include('partials._checkinout_modal')
     @endsection
     @section('import-css')
     @include('resorts.timeandattendance._taa_buttons_v2_styles')
@@ -269,20 +270,20 @@
                     // Show modal
                     $('#updateOvertimeStatusModal').modal('show');
                 } else {
-                    Swal.fire(
-                        'Error!',
-                        response.message || 'Failed to load overtime entries.',
-                        'error'
-                    );
+                    wisdomAlert({
+                        type: 'error',
+                        title: 'Error!',
+                        text: response.message || 'Failed to load overtime entries.'
+                    });
                 }
             },
             error: function(xhr) {
                 button.prop('disabled', false).html('<i class="fa-solid fa-clock me-1"></i>Update');
-                Swal.fire(
-                    'Error!',
-                    'An error occurred while loading overtime entries.',
-                    'error'
-                );
+                wisdomAlert({
+                    type: 'error',
+                    title: 'Error!',
+                    text: 'An error occurred while loading overtime entries.'
+                });
                 console.error('Error:', xhr);
             }
         });
@@ -441,42 +442,25 @@
         });
     });
 
-    // Handle manual check-in/check-out actions (same as dashboard: modal with time input)
+    // Handle manual check-in/check-out actions — confirm dialog is the shared
+    // openCheckInOutModal (see partials._checkinout_modal); submit itself is
+    // unchanged (same ManualCheckInOut endpoint/payload as before).
     $(document).on("click", ".manual-check-action", function() {
         const rosterId = $(this).data('roster-id');
         const action = $(this).data('action');
         const employeeName = $(this).data('employee-name');
+        const shiftName = $(this).data('shift-name');
+        const employeeImage = $(this).data('employee-image');
         const date = $(this).data('date');
         const time = $(this).data('time');
-        const actionText = action === 'check_in' ? 'Check-In' : 'Check-Out';
-        const button = $(this);
-        const row = button.closest('tr');
 
-        Swal.fire({
-            title: `Confirm ${actionText}`,
-            html: `
-                <p>Are you sure you want to record ${actionText.toLowerCase()} for ${employeeName}?</p>
-                <label class="mt-2 d-block">Time</label>
-                <input type="text" id="manualTime" class="swal2-input" placeholder="e.g. 09:00 AM" required>
-            `,
-            icon: 'question',
-            showCancelButton: true,
-            confirmButtonColor: action === 'check_in' ? '#2E9E5B' : '#D98A00',
-            cancelButtonColor: '#6c757d',
-            confirmButtonText: `Yes, ${actionText}`,
-            cancelButtonText: 'Cancel',
-            didOpen: () => {
-                const timeInput = document.getElementById('manualTime');
-                if (timeInput && time) {
-                    timeInput.value = time;
-                }
-            },
-        }).then((result) => {
-            if (result.isConfirmed) {
-                const selectedTime = (document.getElementById('manualTime') && document.getElementById('manualTime').value) ? document.getElementById('manualTime').value : time;
-                // Disable button during request
-                button.prop('disabled', true).html('<i class="fa fa-spinner fa-spin me-1"></i>Processing...');
-
+        openCheckInOutModal({
+            action: action,
+            employeeName: employeeName,
+            shiftLabel: shiftName,
+            employeeImage: employeeImage,
+            time: time,
+            onConfirm: function (selectedTime, reset, close) {
                 $.ajax({
                     url: "{{ route('resort.timeandattendance.ManualCheckInOut') }}",
                     type: 'POST',
@@ -488,32 +472,32 @@
                         time: selectedTime
                     },
                     success: function(response) {
+                        reset();
                         if (response.success) {
-                            Swal.fire({
+                            close();
+                            wisdomAlert({
+                                type: 'success',
                                 title: 'Success!',
-                                text: response.message,
-                                icon: 'success',
-                                confirmButtonColor: '#2E9E5B'
+                                text: response.message
                             }).then(() => {
                                 // Reload the datatable
                                 datatablelist();
                             });
                         } else {
-                            Swal.fire(
-                                'Error!',
-                                response.message || 'An error occurred.',
-                                'error'
-                            );
-                            button.prop('disabled', false);
+                            wisdomAlert({
+                                type: 'error',
+                                title: 'Error!',
+                                text: response.message || 'An error occurred.'
+                            });
                         }
                     },
                     error: function(xhr) {
-                        Swal.fire(
-                            'Error!',
-                            'An error occurred while processing the request.',
-                            'error'
-                        );
-                        button.prop('disabled', false);
+                        reset();
+                        wisdomAlert({
+                            type: 'error',
+                            title: 'Error!',
+                            text: 'An error occurred while processing the request.'
+                        });
                         console.error('Error:', xhr);
                     }
                 });
@@ -559,14 +543,11 @@
     {
         const action = flag === 'approve' ? 'approved' : 'rejected'; // Determine action based on flag
 
-        Swal.fire({
+        wisdomConfirm({
+            role: flag === 'approve' ? 'positive' : 'destructive',
             title: `Are you sure you want to ${flag} this OT?`,
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonColor: flag === 'approve' ? '#28a745' : '#dc3545', // Green for approve, red for reject
-            cancelButtonColor: '#6c757d', // Gray for cancel
-            confirmButtonText: `Yes, ${flag} it!`,
-            cancelButtonText: 'No, cancel',
+            confirmText: `Yes, ${flag} it!`,
+            cancelText: 'No, cancel'
             }).then((result) => {
                 if (result.isConfirmed) {
                     // Perform the AJAX request
@@ -580,21 +561,21 @@
                     },
                     success: function(response) {
                         // Show success message
-                        Swal.fire(
-                            `${action.charAt(0).toUpperCase() + action.slice(1)}!`,
-                            `The OT has been successfully ${action}.`,
-                            'success'
-                        );
+                        wisdomAlert({
+                            type: 'success',
+                            title: `${action.charAt(0).toUpperCase() + action.slice(1)}!`,
+                            text: `The OT has been successfully ${action}.`
+                        });
                         datatablelist();
                         // Optional: Update the UI (e.g., remove the item or update status)
                     },
                     error: function(xhr, status, error) {
                         // Show error message
-                        Swal.fire(
-                            'Error!',
-                            'An error occurred while processing the request.',
-                            'error'
-                        );
+                        wisdomAlert({
+                            type: 'error',
+                            title: 'Error!',
+                            text: 'An error occurred while processing the request.'
+                        });
 
                         console.error(error);
                     }

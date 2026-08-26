@@ -327,7 +327,7 @@
         <div class="modal-dialog modal-dialog-centered modal-small">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="staticBackdropLabel">Select EMail Template</h5>
+                    <h5 class="modal-title" id="staticBackdropLabel">Select Email Template</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <form id='EmailTemplateForm'>
@@ -353,32 +353,7 @@
         </div>
     </div>
     @endif
-    <div class="modal fade" id="bdVisa-iframeModel-modal-lg" tabindex="-1" aria-labelledby="myLargeModalLabel"
-        aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-            <div class="modal-header">
-                    <h5 class="modal-title" id="staticBackdropLabel">Download File</h5>
-                
-                    <a href="" class="btn ta-btn-secondary btn-sm downloadLink" target="_blank"> Download</a>
-                
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                
-                    <div class="modal-body">
-                    
-                            <div class=" ratio ratio-21x9" id="ViewModeOfFiles">
-
-                            </div>
-                    
-                    </div>
-                    <div class="modal-footer">
-                        <a href="javascript:void(0)" id="document-dismiss" class="btn ta-btn-secondary ms-auto">Cancel</a>
-                    </div>
-    
-            </div>
-        </div>
-    </div>
+    @include('partials._file_view_modal', ['cancelId' => 'document-dismiss'])
 
     {{-- Rejection Confirmation Modal --}}
     <div class="modal fade" id="rejectCandidate-modal" tabindex="-1" aria-hidden="true">

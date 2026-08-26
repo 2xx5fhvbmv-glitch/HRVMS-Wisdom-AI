@@ -48,7 +48,7 @@
                                 </div>
                             </div>
                             <div class="card-footer text-end">
-                                <button type="submit" class="btn btn-themeBlue">Submit</button>
+                                <button type="submit" class="btn lnd-btn-primary">Submit</button>
                             </div>
                         </form>
                         <div class="row g-1 category-list">
@@ -91,12 +91,12 @@
                                     <div id="objectivesList">
                                         <div class="objective-row d-flex align-items-center gap-2 mb-2">
                                             <input type="text" name="objectives[]" class="form-control objective-input" placeholder="e.g. Understand company vision and values">
-                                            <button type="button" class="btn btn-sm btn-themeGray objective-remove" title="Remove" disabled>
+                                            <button type="button" class="btn btn-sm lnd-btn-neutral objective-remove" title="Remove" disabled>
                                                 <i class="fa-solid fa-xmark"></i>
                                             </button>
                                         </div>
                                     </div>
-                                    <button type="button" id="addObjectiveBtn" class="btn btn-themeSkyblue btn-sm mt-1">
+                                    <button type="button" id="addObjectiveBtn" class="btn lnd-btn-accent btn-sm mt-1">
                                         <i class="fa-solid fa-plus me-1"></i> Add More
                                     </button>
                                 </div>
@@ -231,7 +231,7 @@
                                 </div>
                                 <div class="col-xxl-6">
                                     <div class="uploadFile-btn me-0">
-                                        <a href="javascript:void(0)" class="btn btn-themeSkyblue btn-sm"
+                                        <a href="javascript:void(0)" class="btn lnd-btn-accent btn-sm"
                                             onclick="document.getElementById('trainer_image').click();">
                                             Upload Trainer Image
                                         </a>
@@ -243,7 +243,7 @@
                                 </div>
                                 <div class="col-xxl-6">
                                     <div class="uploadFile-btn me-0">
-                                        <a href="javascript:void(0)" class="btn btn-themeSkyblue btn-sm"
+                                        <a href="javascript:void(0)" class="btn lnd-btn-accent btn-sm"
                                             onclick="document.getElementById('learning_material').click();">
                                             Upload Relevant Learning Materials
                                         </a>
@@ -258,10 +258,10 @@
                                 </div>
                             </div>
                             <div class="card-footer text-end">
-                                <button type="submit" class="btn btn-themeBlue">Submit</button>
+                                <button type="submit" class="btn lnd-btn-primary">Submit</button>
                             </div>
                         </form>
-                    </div>                  
+                    </div>
                 </div>
                 <div class="col-lg-6 ">
                     <div class="card mb-30">
@@ -319,15 +319,15 @@
                                             </select>
                                         </div>
                                         <div class="col-12 text-end">
-                                            <button type="button" class="btn btn-danger btn-sm remove-btn" style="display:none;">Remove</button>
+                                            <button type="button" class="btn lnd-btn-critical btn-sm remove-btn" style="display:none;">Remove</button>
                                         </div>
                                     </div>
                                 </div>
                             </div>
 
                             <div class="card-footer text-end">
-                                <button type="button" class="btn btn-themeSkyblue btn-sm blockAdd-btn" id="add-more">Add More</button>
-                                <button type="submit" class="btn btn-themeBlue">Submit</button>
+                                <button type="button" class="btn lnd-btn-accent btn-sm blockAdd-btn" id="add-more">Add More</button>
+                                <button type="submit" class="btn lnd-btn-primary">Submit</button>
                             </div>
                         </form>
                     </div>
@@ -362,7 +362,7 @@
                                 </div>
                             </div>
                             <div class="card-footer text-end">
-                                <button type="submit" class="btn btn-themeBlue">Submit</button>
+                                <button type="submit" class="btn lnd-btn-primary">Submit</button>
                             </div>
                         </form>
                     </div>
@@ -374,7 +374,7 @@
                         </div>
                         <div class="row g-2 mb-md-4 mb-3">
                             <div class="col-12">
-                                <a href="{{route('feedback-form.create')}}" class="btn btn-themeSkyblue btn-sm">Create Feedback Form
+                                <a href="{{route('feedback-form.create')}}" class="btn lnd-btn-accent btn-sm">Create Feedback Form
                                     Template</a>
                             </div>
                         </div>
@@ -387,7 +387,7 @@
                         </div>
 
                         <div class="col-12 mb-3">
-                            <a href="{{route('evaluation-form.create')}}" class="btn btn-themeSkyblue btn-sm">Create Evaluation Form</a>
+                            <a href="{{route('evaluation-form.create')}}" class="btn lnd-btn-accent btn-sm">Create Evaluation Form</a>
                         </div>
                         {{-- "Set Rules for Automatic Reminders" — hidden per user request (2026-04-25).
                              Backing field still exists in the DB for when reminders are re-enabled.
@@ -446,7 +446,7 @@
                                 --}}
                             </div>
                             <div class="card-footer text-end">
-                                <button type="submit" class="btn btn-themeBlue">Submit</button>
+                                <button type="submit" class="btn lnd-btn-primary">Submit</button>
                             </div>
                         </form>
                     </div>
@@ -454,6 +454,7 @@
             </div>
         </div>
     </div>
+@include('resorts.Learning._learning_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -463,7 +464,11 @@
 <script type="text/javascript">
     $(document).ready(function () {
         $('.select2t-none').select2();
-        $('.datepicker').datepicker();
+        flatpickr('.datepicker', {
+            dateFormat: 'm/d/Y',
+            allowInput: true,
+            appendTo: document.body
+        });
         $('#learning-category').validate({
             rules: {
                 category: {
@@ -563,7 +568,7 @@
                     </td>
                 
                     <td class="py-1">
-                        <a href="#" class="btn btn-theme update-category-btn" data-category-id="${categoryId}">Submit</a>
+                        <a href="#" class="btn lnd-btn-primary update-category-btn" data-category-id="${categoryId}">Submit</a>
                     </td>
                 `;
 
@@ -593,11 +598,11 @@
                             <td class="text-nowrap">${updatedColor}</td>
                             <td class="text-nowrap">
                                 <div class="d-flex align-items-center">
-                                    <a href="#" class="btn-lg-icon icon-bg-green me-1 edit-row-btn" data-category-id="${categoryId}">
-                                        <img src="{{ asset('resorts_assets/images/edit.svg') }}" alt="" class="img-fluid" />
+                                    <a href="#" class="btn-tableIcon btnIcon-yellow me-1 edit-row-btn" title="Edit" data-category-id="${categoryId}">
+                                        <i class="fa-solid fa-pen-to-square"></i>
                                     </a>
-                                    <a href="#" class="btn-lg-icon icon-bg-red delete-row-btn" data-category-id="${categoryId}">
-                                        <img src="{{ asset('resorts_assets/images/trash-red.svg') }}" alt="" class="img-fluid" />
+                                    <a href="#" class="btn-tableIcon lnd-icon-critical delete-row-btn" title="Delete" data-category-id="${categoryId}">
+                                        <i class="fa-regular fa-trash-can"></i>
                                     </a>
                                 </div>
                             </td>
@@ -647,14 +652,12 @@
             // Get the division ID from the data attribute
             var main_id = $(this).data('category-id');
 
-            Swal.fire({
-                title: 'Sure want to delete?',
+            wisdomConfirm({
+                role: 'destructive',
+                title: 'Are you sure you want to delete?',
                 text: 'This cannot be undone',
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonText: 'Yes',
-                cancelButtonText: 'No',
-                confirmButtonColor: "#DD6B55"
+                confirmText: 'Yes',
+                cancelText: 'No'
             }).then((result) => {
                 if (result.isConfirmed)
                 {
@@ -1250,7 +1253,7 @@
                         </select>
                     </div>
                     <div class="col-12 text-end">
-                        <button type="button" class="btn btn-danger btn-sm remove-btn">Remove</button>
+                        <button type="button" class="btn lnd-btn-critical btn-sm remove-btn">Remove</button>
                     </div>
                 </div>`;
 

@@ -84,9 +84,9 @@
                                 <th>Start Date</th>
                                 <th>Expected Resolution Date</th>
                                 <th>Investigation Findings</th>
-                                <th>Follwup Actions</th>
+                                <th>Followup Actions</th>
                                 <th>Resolution Notes</th>
-                                <th>Commitee Member</th>
+                                <th>Committee Member</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -103,7 +103,7 @@
                                 @endforeach
                             @else
                                 <tr>
-                                    <td colspan="5">No Investigation found</td>
+                                    <td colspan="5">No investigation found</td>
                                 </tr>
                             @endif
                         </tbody>
@@ -256,7 +256,7 @@
                                     <input type="text" class="form-control datepicker" placeholder="Ministry Date" name="Ministry_notified_date" id="Ministry_notified_date" value="{{ $investigations[0]->Ministry_notified_date ?? '' }}" {{isset($investigations[0]) &&  $investigations[0]->Ministry_notified_date ? 'readonly' : '' }}>
                                 </div>
                                 <div class="col-md-3">
-                                    <input type="time" class="form-control" placeholder="Ministry  Time" name="Ministry_time" id="Ministry_time" value="{{ $investigations[0]->Ministry_time ??'' }}" {{isset($investigations[0]) &&  $investigations[0]->Ministry_time ? 'readonly' : '' }}>
+                                    <input type="time" class="form-control" placeholder="Ministry Time" name="Ministry_time" id="Ministry_time" value="{{ $investigations[0]->Ministry_time ??'' }}" {{isset($investigations[0]) &&  $investigations[0]->Ministry_time ? 'readonly' : '' }}>
                                 </div>
                             </div>
                         </div>
@@ -295,7 +295,7 @@
                             </select>
                         </div>
                         <div class="col-auto d-none" id="request-witness-statement">
-                            <a href="#" class="btn btn-themeSkyblue" id="btn-request-statement" data-incident-id="{{ $incident->id }}">
+                            <a href="#" class="btn eb-btn-accent" id="btn-request-statement" data-incident-id="{{ $incident->id }}">
                                 Request For Employee Statement
                             </a>                        
                         </div>
@@ -311,7 +311,7 @@
                                                     <div class="card-body">
                                                         <h6 class="card-title">{{ $statement->employee->resortAdmin->full_name ?? 'Unknown Employee' }}</h6>
                                                         <p class="card-text text-muted mb-1">
-                                                            Date : {{ \Carbon\Carbon::flexible($statement->created_at)->format('d M Y, h:i A') }}
+                                                            Date: {{ \Carbon\Carbon::flexible($statement->created_at)->format('d M Y, h:i A') }}
                                                         </p>
                                                         <p class="card-text">{{ $statement->statement ?? 'No statement provided.' }}</p>
 
@@ -379,7 +379,7 @@
                                                     <div class="card-body">
                                                         <h6 class="card-title">{{ $witness->employee->resortAdmin->full_name ?? 'Unknown Witness' }}</h6>
                                                         <p class="card-text text-muted mb-1">
-                                                            Date : {{ \Carbon\Carbon::flexible($witness->created_at)->format('d M Y, h:i A') }}
+                                                            Date: {{ \Carbon\Carbon::flexible($witness->created_at)->format('d M Y, h:i A') }}
                                                         </p>
                                                         <p class="card-text">{{ $witness->witness_statements ?? 'No statement provided.' }}</p>
                                                         @php
@@ -497,38 +497,14 @@
                         </div>
                     </div>
                     <div class="card-footer text-end">
-                        <button type="submit" class="btn btn-themeBlue">Submit</button>
+                        <button type="submit" class="btn eb-btn-primary">Submit</button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
-     <div class="modal fade" id="bdVisa-iframeModel-modal-lg" tabindex="-1" aria-labelledby="myLargeModalLabel"
-        aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-            <div class="modal-header">
-                    <h5 class="modal-title" id="staticBackdropLabel">Download File</h5>
-                
-                    <a href="" class="btn btn-smbtn-primary downloadLink" target="_blank"> Download</a>
-                
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                
-                    <div class="modal-body">
-                    
-                            <div class=" ratio ratio-21x9" id="ViewModeOfFiles">
-
-                            </div>
-                    
-                    </div>
-                    <div class="modal-footer">
-                        <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                    </div>
-    
-            </div>
-        </div>
-    </div>
+     @include('partials._file_view_modal')
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -540,9 +516,10 @@
         $('.select2t-none').select2();
         $('.datepicker').each(function () {
             if (!$(this).prop('readonly')) {
-                $(this).datepicker({
-                    format: 'dd/mm/yyyy',
-                    autoclose: true
+                flatpickr(this, {
+                    dateFormat: 'd/m/Y',
+                    allowInput: true,
+                    appendTo: document.body
                 });
             }
         });
@@ -551,7 +528,11 @@
         // or later. Other datepickers on this page (mndf_date, fire_date,
         // Ministry_notified_date) record past events, so the past-date
         // lock is applied per-field rather than globally on `.datepicker`.
-        $('#start_date, #expResoDate').datepicker('setStartDate', new Date());
+        $('#start_date, #expResoDate').each(function () {
+            if (this._flatpickr) {
+                this._flatpickr.set('minDate', new Date());
+            }
+        });
 
         const originalPriority = $('#original_priority').val();
 
@@ -559,14 +540,12 @@
             let newValue = $(this).val();
 
             if (originalPriority && newValue !== originalPriority) {
-                Swal.fire({
+                wisdomConfirm({
+                    role: 'confirm',
                     title: 'Are you sure?',
                     text: 'Priority level was already set by HR. Do you want to change it?',
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonText: 'Yes, change it',
-                    cancelButtonText: 'No, keep original',
-                    confirmButtonColor: "#DD6B55"
+                    confirmText: 'Yes, change it',
+                    cancelText: 'No, keep original'
                 }).then((result) => {
                     if (!result.isConfirmed) {
                         $('#priority_level').val(originalPriority); // Revert if not confirmed

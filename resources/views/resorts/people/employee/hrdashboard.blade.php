@@ -698,7 +698,7 @@
                             <h3>Repayment Tracking</h3>
                         </div>
                         <div class="leaveUser-bgBlock">
-                            <h6>Total Active Repayment In Porgress</h6>
+                            <h6>Total Active Repayment In Progress</h6>
                             <strong>{{$totalRepayment->where('recovery_status','In Progress')->count()}}</strong>
                         </div>
                         <div class="leaveUser-bgBlock">
@@ -1060,8 +1060,8 @@
                     </form>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" id="confirmRejectBtn" class="btn btn-danger">Reject</button>
+                    <button type="button" class="btn eb-btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" id="confirmRejectBtn" class="btn eb-btn-critical">Reject</button>
                 </div>
                 
             </div>
@@ -1069,6 +1069,7 @@
     </div>
     {{--END info Update And Reject Modal Code --}}
 
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')

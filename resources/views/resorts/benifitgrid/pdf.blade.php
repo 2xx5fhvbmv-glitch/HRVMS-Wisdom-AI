@@ -309,7 +309,7 @@
                                     </tr>
                                     <tr>
                                         <td style="border-bottom: 1px solid #E7E7E7;padding:6px 4px; width: 70%;">
-                                            Furnitures and Fixtures</td>
+                                            Furniture and Fixtures</td>
                                         <td
                                             style="border-bottom: 1px solid #E7E7E7;padding:6px 4px; width: 130px;text-align: right;font-weight: 500">
                                             {{$benefit_grid->furniture_and_fixtures}}
@@ -350,7 +350,7 @@
                                     </tr>
                                     <tr>
                                         <td style="border-bottom: 1px solid #E7E7E7;padding:6px 4px; width: 70%;">
-                                            Ramadan Eligibilty</td>
+                                            Ramadan Eligibility</td>
                                         <td
                                             style="border-bottom: 1px solid #E7E7E7;padding:6px 4px; width: 130px;text-align: right;font-weight: 500">
                                             {{$benefit_grid->ramadan_bonus_eligibility}}
@@ -365,7 +365,7 @@
                                     </tr>
                                     <tr>
                                         <td style="border-bottom: 1px solid #E7E7E7;padding:6px 4px; width: 70%;">
-                                            Alchoholic Beverages Discount(In %)</td>
+                                            Alcoholic Beverages Discount(In %)</td>
                                         <td
                                             style="border-bottom: 1px solid #E7E7E7;padding:6px 4px; width: 130px;text-align: right;font-weight: 500">
                                             {{$benefit_grid->alchoholic_beverages_discount}}
@@ -453,7 +453,7 @@
                                         </td>
                                     </tr>
                                     <tr>
-                                        <td style="border-bottom: 1px solid #E7E7E7;padding:6px 4px; width: 70%;">MALE Subsistence Allowance(In Dollars)</td>
+                                        <td style="border-bottom: 1px solid #E7E7E7;padding:6px 4px; width: 70%;">Male Subsistence Allowance(In Dollars)</td>
                                         <td
                                             style="border-bottom: 1px solid #E7E7E7;padding:6px 4px; width: 130px;text-align: right;font-weight: 500">
                                             {{$benefit_grid->male_subsistence_allowance}}

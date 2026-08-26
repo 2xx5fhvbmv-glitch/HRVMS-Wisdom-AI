@@ -81,7 +81,8 @@
 </div>
 <div class="modal-footer">
      <a href="javascript:void();" data-url="{{ route('people.info-update.status-change', ['id' => $emp_info->id, 'status' => 'approve']) }}" class="btn btn-themeBlue" id="update-info-btn">Update</a>
-     <a href="javascript:void();" class="btn btn-danger"  data-bs-toggle="modal" data-id="{{$emp_info->id}}" data-bs-target="#reqReject-modal" >Reject</a>
+     <a href="javascript:void();" class="btn eb-btn-critical"  data-bs-toggle="modal" data-id="{{$emp_info->id}}" data-bs-target="#reqReject-modal" >Reject</a>
 
      {{-- <a href="{{route('people.info-update.status-change',['id'=>$emp_info->id,'status'=>'reject'])}}" class="btn btn-themeDanger">Reject</a> --}}
  </div>
+@include('resorts._emotional_buttons_v2_styles')

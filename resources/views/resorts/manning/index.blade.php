@@ -20,6 +20,9 @@
                     </div>
                 </div>
                 <div class="col-auto">
+                    <a href="{{ route('resort.budget.config') }}" class="btn btn-sm wfp-btn-neutral">
+                        <i class="fa-solid fa-arrow-left"></i> Back to Configuration
+                    </a>
                 </div>
             </div>
         </div>
@@ -187,7 +190,7 @@
                 <form id="addDivisionForm"  data-parsley-validate>
                     @csrf
                     <div class="form-group mb-2">
-                        <lable class="division-select1" for="division-select1">Select Existing Division <span class="red-mark">*</span></lable>
+                        <label class="division-select1" for="division-select1">Select Existing Division <span class="red-mark">*</span></label>
                         <select id="division-select1" name="division_id" class="form-select select2-modal"
                             data-parsley-errors-container="#div-division_id1"
                             required data-parsley-required-message="Please select a division.">
@@ -202,7 +205,7 @@
                     <label class="mx-auto d-block text-center mb-2">OR</label>
 
                     <div class="form-group mb-20">
-                        <lable class="ExistingDivision" for="division-ExistingDivision">Select Existing Division <span class="red-mark">*</span></lable>
+                        <label class="ExistingDivision" for="new-division-name">Add New Division <span class="red-mark">*</span></label>
              
                         <input type="text" id="new-division-name" name="name" class="form-control" placeholder="Add Name of Division" required data-parsley-required-message="Add Name of Division">
                     </div>
@@ -1167,14 +1170,12 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
         e.preventDefault();
         // Get the division ID from the data attribute
         var divisionId = $(this).data('division-id');
-        Swal.fire({
+        wisdomConfirm({
+            role: 'destructive',
             title: 'Sure want to delete?',
             text: 'This cannot be undone',
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonText: 'Yes',
-            cancelButtonText: 'No',
-            confirmButtonColor: "#DD6B55"
+            confirmText: 'Yes',
+            cancelText: 'No'
         }).then((result) => {
         if (result.isConfirmed) {
                 $.ajax({
@@ -1428,14 +1429,12 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
         e.preventDefault();
         // Get the division ID from the data attribute
         var dept_id = $(this).data('dept-id');
-        Swal.fire({
+        wisdomConfirm({
+            role: 'destructive',
             title: 'Sure want to delete?',
             text: 'This cannot be undone',
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonText: 'Yes',
-            cancelButtonText: 'No',
-            confirmButtonColor: "#DD6B55"
+            confirmText: 'Yes',
+            cancelText: 'No'
         }).then((result) => {
             if (result.isConfirmed) {
                 $.ajax({
@@ -1713,14 +1712,12 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
         e.preventDefault();
         // Get the division ID from the data attribute
         var section_id = $(this).data('section-id');
-        Swal.fire({
+        wisdomConfirm({
+            role: 'destructive',
             title: 'Sure want to delete?',
             text: 'This cannot be undone',
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonText: 'Yes',
-            cancelButtonText: 'No',
-            confirmButtonColor: "#DD6B55"
+            confirmText: 'Yes',
+            cancelText: 'No'
         }).then((result) => {
             if (result.isConfirmed) {
                 $.ajax({
@@ -2027,14 +2024,12 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
         e.preventDefault();
         // Get the division ID from the data attribute
         var position_id = $(this).data('position-id');
-        Swal.fire({
+        wisdomConfirm({
+            role: 'destructive',
             title: 'Sure want to delete?',
             text: 'This cannot be undone',
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonText: 'Yes',
-            cancelButtonText: 'No',
-            confirmButtonColor: "#DD6B55"
+            confirmText: 'Yes',
+            cancelText: 'No'
         }).then((result) => {
             if (result.isConfirmed) {
                 $.ajax({

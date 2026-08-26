@@ -225,7 +225,7 @@ class XpactEmployeeController extends Controller
                 })
                 ->editColumn('action', function ($row) use ($edit_class)
                 {
-                    return '<a target="_blank" href="' . route('resort.visa.XpactEmpDetails', base64_encode($row->id)) . '" class="btn btn-themeSkyblue btn-sm ' . $edit_class . '">Edit</a>';
+                    return '<a target="_blank" href="' . route('resort.visa.XpactEmpDetails', base64_encode($row->id)) . '" class="btn eb-btn-secondary btn-sm ' . $edit_class . '">Edit</a>';
                 })
                 ->rawColumns(['Profile','EmployeeId','Nationality','position','department', 'JoiningDate','Insurance','WorkPermitDue','MedicalExpiry', 'SlotPaymentDue', 'status', 'action'])
                 ->make(true);

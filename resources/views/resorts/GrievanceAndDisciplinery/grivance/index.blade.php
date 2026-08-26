@@ -62,6 +62,7 @@
         </div>
     </div>
 </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -78,14 +79,11 @@
             {
                 var id = $(this).data('cat-id');
                 
-                Swal.fire({
+                wisdomConfirm({
+                    role: 'destructive',
                     title: 'Are you sure?',
                     text: "You won't be able to revert this!",
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonColor: '#3085d6',
-                    cancelButtonColor: '#d33',
-                    confirmButtonText: 'Yes, delete it!'
+                    confirmText: 'Yes, delete it!'
                 }).then((result) => {
                     if (result.isConfirmed) {
                         $.ajax({

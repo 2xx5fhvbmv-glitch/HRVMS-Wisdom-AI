@@ -14,7 +14,7 @@
             <div class="row justify-content-between g-3">
                 <div class="col-auto">
                     <div class="page-title">
-                        <span>payroll</span>
+                        <span>Payroll</span>
                         <h1>{{ $page_title }}</h1>
                     </div>
                 </div>
@@ -168,9 +168,9 @@
             },
             messages: {
                 name :{
-                    required: "Please Enter Full Name .",
+                    required: "Please enter full name.",
                     maxlength: "Name cannot be longer than 50 characters",
-                    minlength: "Name must be at least 1 characters long"
+                    minlength: "Name must be at least 1 character long"
                 },
                 email: {
                     required: "Please enter email address.",

@@ -27,13 +27,13 @@
                 </div>
                 <div class="row g-2 mb-md-4 mb-3">
                     <div class="col-auto">
-                        <a href="{{route('shopkeeper.products.download')}}" class="btn btn-themeSkyblue btn-sm">Download Template</a>
+                        <a href="{{route('shopkeeper.products.download')}}" class="btn eb-btn-secondary btn-sm">Download Template</a>
                     </div>
                     <form id="ImportProductsForm">
                         @csrf
                         <div class="col-auto">
                             <div class="uploadFile-btn me-0">
-                                <a href="javascript:void(0)" class="btn btn-themeBlue btn-sm"
+                                <a href="javascript:void(0)" class="btn eb-btn-primary btn-sm"
                                 onclick="document.getElementById('ImportProducts').click();">
                                     Upload File
                                 </a>
@@ -42,23 +42,16 @@
                                 style="opacity: 0; position: absolute; z-index: -1;"
                                 onchange="displayProductImportFileName()">
 
-                                <div id="productImportFile" style="margin-top: 10px; color: #333;"></div>
+                                <div id="productImportFile" style="margin-top: 10px; color: var(--ink);"></div>
                                                     <input type="hidden" name="products" id="productsData">
 
                             </div>
                         </div>
                         <div class="card-footer text-end">
-                            <button type="submit" id="submitButton" class="btn btn-themeBlue">Submit</button>
+                            <button type="submit" id="submitButton" class="btn eb-btn-primary">Submit</button>
                         </div>
                     </form>
                 </div>
-                <!-- <div id="previewContainer"></div>
-
-                <form id="finalSubmitForm">
-                    @csrf
-                    <input type="hidden" name="products" id="productsData">
-                    <button type="submit" class="btn btn-theme">Import All Products</button>
-                </form> -->
                 <hr>
                 <form id="productForm" data-parsley-validate>
                     <div>
@@ -80,16 +73,13 @@
                                             <option value="MVR">MVR</option>
                                         </select>
                                     </div>
-                                    <!-- <div class="col-auto d-flex align-items-center">
-                                        <a href="#" class="btn btn-danger btn-sm remove-prodConfig">Remove</a>
-                                    </div> -->
                                 </div>
                             </div>
                         </div>
-                        <a href="#" class="btn btn-themeSkyblue btn-sm mb-3 add-prodConfig">Add More</a>
+                        <a href="#" class="btn eb-btn-secondary btn-sm mb-3 add-prodConfig">Add More</a>
                     </div>
                     <div class="card-footer text-end">
-                        <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                        <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                     </div>
                 </form>
             </div>
@@ -100,7 +90,7 @@
 @section('import-css')
 <style>
     #ImportProducts-error{
-        color:red!important;
+        color:var(--error)!important;
     }
 </style>
 @endsection
@@ -245,7 +235,7 @@
                     </select>
                 </div>
                 <div class="col-auto d-flex align-items-center">
-                    <a href="#" class="btn btn-danger btn-sm remove-prodConfig">Remove</a>
+                    <a href="#" class="btn eb-btn-critical btn-sm remove-prodConfig">Remove</a>
                 </div></div>
             `;
 

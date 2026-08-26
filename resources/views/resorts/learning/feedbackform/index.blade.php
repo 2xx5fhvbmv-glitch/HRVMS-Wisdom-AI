@@ -49,6 +49,7 @@
 
         </div>
     </div>
+    @include('resorts.Learning._learning_buttons_v2_styles')
     @endsection
 
     @section('import-css')
@@ -89,14 +90,12 @@
             let url = "{{ route('feedback-form.delete', ':id') }}";
             url = url.replace(':id', id);
 
-            Swal.fire({
+            wisdomConfirm({
+                role: 'destructive',
                 title: 'Are you sure you want to delete?',
                 text: 'This action cannot be undone.',
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonText: 'Yes',
-                cancelButtonText: 'No',
-                confirmButtonColor: '#DD6B55',
+                confirmText: 'Yes',
+                cancelText: 'No'
             }).then((result) => {
                 if (result.isConfirmed) {
                     $.ajax({
