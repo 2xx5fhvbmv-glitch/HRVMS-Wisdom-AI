@@ -62,7 +62,7 @@
                                     <th>ID</th>
                                     <th>Name</th>
                                     <th>Position</th>
-                                    <th>Departmeent</th>
+                                    <th>Department</th>
                                 </tr>
                             </thead>
                             <tbody id="NatioanlityWiseEmployee-table">
@@ -72,12 +72,13 @@
                 </div>
 
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn eb-btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
           
         </div>
     </div>
 </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')

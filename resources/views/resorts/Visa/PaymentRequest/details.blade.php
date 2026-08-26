@@ -36,8 +36,8 @@
                             </div>
                             <div class="col-auto">
                                 <div class="d-flex justify-content-sm-end align-items-center">
-                                    <a href="javascript:void(0)" class="PrintPaymentRequest btn btn-themeNeon btn-xs me-3 ">Print</a>
-                                    <a href="{{route('resort.visa.DownloadPymentRequest',$id)}}"  class="btn btn-themeSkyblue btn-xs  me-3">Download</a>
+                                    <a href="javascript:void(0)" class="PrintPaymentRequest btn eb-btn-secondary btn-xs me-3 ">Print</a>
+                                    <a href="{{route('resort.visa.DownloadPymentRequest',$id)}}"  class="btn eb-btn-secondary btn-xs  me-3">Download</a>
                             
                                 </div>
                             </div>
@@ -60,7 +60,7 @@
                                     @if($PaymentRequestChild->FullyPaid ?? false)
                                         <span class="badge badge-themeSuccess me-3">Renewed</span>
                                     @else
-                                        <a target="_blank" href="{{route('resort.visa.PaymentRequestThrowRenewal',[$id,base64_encode($PaymentRequestChild->id)])}}"  class="btn btn-themeBlue btn-sm btn-xs me-3">Renewal</a>
+                                        <a target="_blank" href="{{route('resort.visa.PaymentRequestThrowRenewal',[$id,base64_encode($PaymentRequestChild->id)])}}"  class="btn eb-btn-accent btn-sm btn-xs me-3">Renewal</a>
                                     @endif
 
                                 </div>
@@ -143,6 +143,7 @@
         </div>
     </div>
   
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')

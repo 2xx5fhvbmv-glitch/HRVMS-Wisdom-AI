@@ -57,7 +57,7 @@
                                                     <h3>Insurance Renewal</h3>
                                                     <span>Current Policy Expires: {{$EmployeeInsurance->insurance_end_date ?? 'N/A'}}</span>
                                                 </div>
-                                                <div class="col-sm-auto col-12 order-sm-last order-1 text-end"><span    class="badge badge-themeWarning">Expires  in 30days</span>
+                                                <div class="col-sm-auto col-12 order-sm-last order-1 text-end"><span    class="badge badge-themeWarning">Expires in 30 days</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -69,7 +69,7 @@
                                                 </div>
                                                 <div class="renewal-innerbox">
                                                     <label>Insurance company name</label>
-                                                    <p> fdsdff {{ (isset($EmployeeInsurance->insurance_company)) ? $EmployeeInsurance->insurance_company : 'N/A'}}</p>
+                                                    <p>{{ (isset($EmployeeInsurance->insurance_company)) ? $EmployeeInsurance->insurance_company : 'N/A'}}</p>
                                                 </div>
                                             <div class="col-sm-6">
                                                     <div class="renewal-innerbox">
@@ -86,7 +86,7 @@
                                                 </div>
                                             </div>
                                             <div class="col-12">
-                                                <a href="javascript:void(0)" data-child="{{base64_encode($child->id)}}" data-emp_id="{{base64_encode($child->Employee_id)}}" data-flag="insurance" class="SendFile btn btn-themeBlue btn-sm">
+                                                <a href="javascript:void(0)" data-child="{{base64_encode($child->id)}}" data-emp_id="{{base64_encode($child->Employee_id)}}" data-flag="insurance" class="SendFile btn eb-btn-accent btn-sm">
                                                     Upload The New Insurance Policy
                                                 </a>
                                             </div>
@@ -129,7 +129,7 @@
                                                 </div>
                                             </div>
                                             <div class="col-12">
-                                                <a  href="javascript:void(0)"   data-child="{{base64_encode($child->id)}}" data-emp_id="{{base64_encode($child->Employee_id)}}" data-flag="work_permit_card_Test_Fee" class="SendFile btn btn-themeBlue btn-sm">
+                                                <a  href="javascript:void(0)"   data-child="{{base64_encode($child->id)}}" data-emp_id="{{base64_encode($child->Employee_id)}}" data-flag="work_permit_card_Test_Fee" class="SendFile btn eb-btn-accent btn-sm">
                                                     Upload The New Work Permit
                                                 </a>
                                             </div>
@@ -156,7 +156,7 @@
                                             <div class="col-xxl-6 col-xl-12 col-sm-6">
                                                 <div class="renewal-innerbox">
                                                     <label>Visa Number</label>
-                                                    <p>Policy Number:{{$VisaRenewal->Visa_Number ?? 'N/A'}}</p>
+                                                    <p>Policy Number: {{$VisaRenewal->Visa_Number ?? 'N/A'}}</p>
                                                 </div>
                                                 <div class="renewal-innerbox">
                                                     <label>WP No</label>
@@ -178,7 +178,7 @@
                                             </div>
 
                                             <div class="col-12">
-                                                <a href="javascript:void(0)" data-child="{{base64_encode($child->id)}}"  data-emp_id="{{base64_encode($child->Employee_id)}}" data-flag="visa"  class="SendFile btn btn-themeBlue btn-sm">
+                                                <a href="javascript:void(0)" data-child="{{base64_encode($child->id)}}"  data-emp_id="{{base64_encode($child->Employee_id)}}" data-flag="visa"  class="SendFile btn eb-btn-accent btn-sm">
                                                     Upload The New Visa Renewal
                                                 </a>
                                             </div>
@@ -335,7 +335,7 @@
                             <div class="bg-themeGrayLight mb-md-4 mb-3">
                                     <div class="uploadFileNew-block">
                                         <img src="{{URL::asset('resorts_assets/images/upload.svg')}}" alt="icon">
-                                        <h5>Upload  Documents</h5>
+                                        <h5>Upload Documents</h5>
                                         <p>Browse or Drag the file here</p>
                                         <input type="file" id="file"  name="file" accept="image/*,application/pdf">
                                     </div>
@@ -346,8 +346,8 @@
                     
                     </div>
                     <div class="modal-footer">
-                        <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                        <button type="submit" class="btn btn-themeBlue FileUploadButton" href="javascript:void(0)">Upload File</button>
+                        <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Cancel</a>
+                        <button type="submit" class="btn eb-btn-primary FileUploadButton" href="javascript:void(0)">Upload File</button>
                     </div>
                 </form>
             </div>
@@ -379,14 +379,15 @@
                     </div>
 
                     <div class="modal-footer">
-                        <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                        <button type="submit" class="btn btn-themeBlue FileUploadButton" href="javascript:void(0)">Submit</button>
+                        <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Cancel</a>
+                        <button type="submit" class="btn eb-btn-primary FileUploadButton" href="javascript:void(0)">Submit</button>
                     </div>
                 </form>
             </div>
         </div>
     </div>
   
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')

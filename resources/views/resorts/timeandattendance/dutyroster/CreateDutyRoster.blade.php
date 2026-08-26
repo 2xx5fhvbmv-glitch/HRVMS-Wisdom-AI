@@ -284,7 +284,7 @@
                                     </select>
                                 </div>
                                 <div class="col-xl-2 col-md-4 col-sm-4 col-6">
-                                    <input type="text"  class="form-control  datepicker" id="DutyRosterCreateDatePickerFilter" placeholder="Select Date">
+                                    <input type="text"  class="form-control " id="DutyRosterCreateDatePickerFilter" placeholder="Select Date">
 
                                 </div>
 
@@ -991,19 +991,13 @@
        below is wired to stay in sync with it via JS, so the existing
        change handler (leave lookup, hours recalc, occupied-dates fetch)
        fires exactly as it did before. ================================== */
+    /* Neutral/geometry tokens (--teal/--teal-2/--teal-3/--teal-soft/--lime/
+       --ink/--muted/--faint/--line/--line-2/--card) now come from the
+       shared :root palette (resorts/layouts/_design_tokens.blade.php).
+       --bg/--off/--leave stay local — page-specific/semantic, not part
+       of the shared set. */
     .drc-page {
-        --teal: #014653;
-        --teal-2: #035b6c;
-        --teal-3: #e6f0f1;
-        --teal-soft: #f1f7f7;
-        --lime: #e0ff02;
-        --ink: #14232a;
-        --muted: #5d6f75;
-        --faint: #93a4a9;
-        --line: #e2ebec;
-        --line-2: #eef4f4;
         --bg: #f2f6f6;
-        --card: #ffffff;
         --off: #e5573f;
         --leave: #d98a00;
         color: var(--ink);
@@ -2043,7 +2037,12 @@
             dateFormat: "h:i", // 12-hour format without AM/PM
             time_24hr: false,  // Ensures 12-hour format
             minuteIncrement: 1, // Allows 1-minute steps
-
+            // developer.min.css force-hides .flatpickr-am-pm below 424px; now that
+            // flatpickr's own popover always mounts on mobile (disableMobile:true,
+            // set globally), undo that here so AM/PM stays visible on phones too.
+            onReady: function (selectedDates, dateStr, instance) {
+                instance.amPM.style.setProperty('display', 'inline-block', 'important');
+            }
         });
         $('#Employee').select2({
             placeholder: "Select Employees", // Placeholder text
@@ -2093,10 +2092,10 @@
             scrollX: true,
             "iDisplayLength": 10,
         });
-        $('.datepicker').datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,      // Close the picker after selection
-            todayHighlight: true  // Highlight today's date
+        flatpickr('#DutyRosterCreateDatePickerFilter', {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
 
         // Dates that selected employee(s) already have duty roster - disable in calendar (per employee, not resort)
@@ -2391,6 +2390,12 @@
                     dateFormat: "h:i", // 12-hour format without AM/PM
                     time_24hr: false,  // Ensures 12-hour format
                     minuteIncrement: 1, // Allows 1-minute steps
+                    // developer.min.css force-hides .flatpickr-am-pm below 424px; now that
+                    // flatpickr's own popover always mounts on mobile (disableMobile:true,
+                    // set globally), undo that here so AM/PM stays visible on phones too.
+                    onReady: function (selectedDates, dateStr, instance) {
+                        instance.amPM.style.setProperty('display', 'inline-block', 'important');
+                    }
                 });
             }
             $("#ShiftOverTime").val(overtime);
@@ -2466,7 +2471,7 @@
                             }
                             else
                             {
-                                toastr.error(response.message,"error", { positionClass: 'toast-bottom-right'});
+                                toastr.error(response.message,"Error", { positionClass: 'toast-bottom-right'});
 
                             }
 

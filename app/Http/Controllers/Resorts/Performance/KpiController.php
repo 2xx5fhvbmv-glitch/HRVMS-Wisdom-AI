@@ -269,27 +269,27 @@ class KpiController extends Controller
                     $html = '';
                     // HOD (2) or XCOM (1) can respond if status=pending and no one has responded yet
                     if (in_array($rank, [1, 2]) && $row->status === 'pending') {
-                        $html .= '<a href="'.route('Performance.kpi.respond', $row->id).'" class="btn btn-theme btn-sm me-1">Respond</a>';
+                        $html .= '<a href="'.route('Performance.kpi.respond', $row->id).'" class="btn perf-btn-secondary btn-sm me-1">Respond</a>';
                     }
                     // HOD (2) or XCOM (1) can revise & resubmit after GM rejection
                     if (in_array($rank, [1, 2]) && $row->status === 'rejected') {
-                        $html .= '<a href="'.route('Performance.kpi.respond', $row->id).'" class="btn btn-themeSkyblue btn-sm me-1">Edit Response</a>';
+                        $html .= '<a href="'.route('Performance.kpi.respond', $row->id).'" class="btn perf-btn-secondary btn-sm me-1">Edit Response</a>';
                     }
                     // GM (8) can approve/reject if status=responded
                     if ($rank == 8 && $row->status === 'responded') {
-                        $html .= '<button class="btn btn-theme btn-sm me-1 gm-approve-btn" data-id="'.$row->id.'">Approve</button>';
-                        $html .= '<button class="btn btn-danger btn-sm gm-reject-btn" data-id="'.$row->id.'">Reject</button>';
+                        $html .= '<button class="btn perf-btn-positive btn-sm me-1 gm-approve-btn" data-id="'.$row->id.'">Approve</button>';
+                        $html .= '<button class="btn perf-btn-critical btn-sm gm-reject-btn" data-id="'.$row->id.'">Reject</button>';
                     }
                     // View for everyone on non-pending KPIs
                     if ($row->status !== 'pending') {
-                        $html .= ' <a href="'.route('Performance.kpi.view', $row->id).'" class="btn btn-themeBlue btn-sm">View</a>';
+                        $html .= ' <a href="'.route('Performance.kpi.view', $row->id).'" class="btn perf-btn-secondary btn-sm">View</a>';
                     }
                     // GM edit (only on pending KPIs) + delete (always)
                     if ($rank == 8) {
                         if ($row->status === 'pending') {
-                            $html .= ' <a href="'.route('Performance.kpi.edit', $row->id).'" class="btn btn-themeSkyblue btn-sm">Edit</a>';
+                            $html .= ' <a href="'.route('Performance.kpi.edit', $row->id).'" class="btn perf-btn-secondary btn-sm">Edit</a>';
                         }
-                        $html .= ' <button class="btn btn-danger btn-sm kpi-delete-btn" data-id="'.$row->id.'">Delete</button>';
+                        $html .= ' <button class="btn perf-btn-critical btn-sm kpi-delete-btn" data-id="'.$row->id.'">Delete</button>';
                     }
                     return $html ?: '-';
                 })

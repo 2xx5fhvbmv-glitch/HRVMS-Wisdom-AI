@@ -71,7 +71,7 @@
                         <a href="{{ route('leave.details', ['leave_id' => base64_encode($request->id)]) }}" class="btn btn-themeSkyblue btn-sm @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.view')) == false) d-none @endif">View</a>
                         @if($request->can_approve ?? false)
                             <button class="btn btn-themeBlue btn-sm approve-btn @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.edit')) == false) d-none @endif" data-leave-id="{{ $request->id }}">Approve</button>
-                            <button class="btn btn-danger btn-sm reject-btn @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.edit')) == false) d-none @endif" data-leave-id="{{ $request->id }}">Reject</button>
+                            <button class="btn eb-btn-critical btn-sm reject-btn @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.edit')) == false) d-none @endif" data-leave-id="{{ $request->id }}">Reject</button>
                         @endif
                     </div>
                 </div>
@@ -125,7 +125,7 @@
                         <a href="{{ route('leave.details', ['leave_id' => base64_encode($request->id)]) }}" class="btn btn-themeSkyblue btn-sm @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.view')) == false) d-none @endif">View</a>
                         @if($request->can_approve ?? false)
                             <button class="btn btn-themeBlue btn-sm approve-btn @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.edit')) == false) d-none @endif" data-leave-id="{{ $request->id }}">Approve</button>
-                            <button class="btn btn-danger btn-sm reject-btn @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.edit')) == false) d-none @endif" data-leave-id="{{ $request->id }}">Reject</button>
+                            <button class="btn eb-btn-critical btn-sm reject-btn @if(App\Helpers\Common::checkRouteWisePermission('leave.request',config('settings.resort_permissions.edit')) == false) d-none @endif" data-leave-id="{{ $request->id }}">Reject</button>
                         @endif
                     </div>
                 </div>
@@ -137,3 +137,4 @@
         <h5>No Request Found.</h5>
     </div>
 @endif
+@include('resorts._emotional_buttons_v2_styles')

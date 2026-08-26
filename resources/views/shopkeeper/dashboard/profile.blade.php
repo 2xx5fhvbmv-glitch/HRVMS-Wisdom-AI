@@ -49,7 +49,7 @@
                                 </label>
                                 <div class="uploadFile-block">
                                     <div class="uploadFile-btn">
-                                        <a href="#" class="btn btn-themeBlue btn-sm">Upload File</a>
+                                        <a href="#" class="btn eb-btn-primary btn-sm">Upload File</a>
                                         <input type="file" name="profile_photo" id="profile_photo" >
                                     </div>
                                     <div class="uploadFile-text">
@@ -74,18 +74,18 @@
                                 <div class="d-flex">
                                     <input type="password" id="password" name="password" class="form-control" value="{{ old('password')}}" />
                                     <div class="input-group-append">
-                                        <button class="btn btn-outline-secondary" type="button" id="togglePassword" fdprocessedid="4qeof">
+                                        <button class="btn eb-btn-ghost" type="button" id="togglePassword" fdprocessedid="4qeof">
                                             <i class="fa fa-eye-slash" aria-hidden="true"></i>
                                         </button>
                                     </div>
                                 </div>
                             </div>
                             <div class="col-md-4">
-                                <label for="emp-grade-select" class="form-label">Confirm passwords </label>
+                                <label for="emp-grade-select" class="form-label">Confirm Password </label>
                                 <div class="d-flex">
                                     <input type="password" id="confirmpassword" name="confirmpassword" class="form-control" value="{{ old('confirmpassword') }}"/>
                                     <div class="input-group-append">
-                                        <button class="btn btn-outline-secondary" type="button" id="toggleConfirmPassword" fdprocessedid="4qeof">
+                                        <button class="btn eb-btn-ghost" type="button" id="toggleConfirmPassword" fdprocessedid="4qeof">
                                             <i class="fa fa-eye-slash" aria-hidden="true"></i>
                                         </button>
                                     </div>
@@ -98,8 +98,8 @@
 
                 <div class="d-none d-xl-block" style="height: 126px;"></div>
                 <div class="card-footer text-end">
-                    <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
-                    <a class="btn btn-sm btn-themeGray me-2" href="{{url()->previous()}}"  class="btn btn-default resetForm">Back</a>
+                    <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
+                    <a class="btn eb-btn-secondary btn-sm me-2" href="{{url()->previous()}}">Back</a>
                 </div>
             </div>
         </form>
@@ -145,16 +145,16 @@ $(document).ready(function(){
                 },
                 messages: {
                     full_name: {
-                        required: "Please enter Your First Name.",
+                        required: "Please enter your First Name.",
                         lettersAndSpaces: "Full name can only contain letters and spaces.",
                     },
                     contact_no: {
-                        required: "Please enter Your Contact Number.",
-                        number: "Please enter a valid Contact number.",
+                        required: "Please enter your Contact Number.",
+                        number: "Please enter a valid contact number.",
                         maxlength: "Your phone number must be no more than 12 digits.",
                     },
                     email: {
-                        required: "Please enter Your Email.",
+                        required: "Please enter your Email.",
                         email: "Please enter a valid email address.",
                     },
                     password: {

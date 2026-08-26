@@ -20,7 +20,7 @@
                 </div>
                 <div class="col-auto">
                     <div class="d-flex justify-content-end">
-                        <a href="{{ route('Performance.Meeting.list') }}" class="btn btn-themeSkyblue">
+                        <a href="{{ route('Performance.Meeting.list') }}" class="btn perf-btn-secondary">
                             <i class="fa-solid fa-list me-1"></i> View All Meetings
                         </a>
                     </div>
@@ -106,7 +106,7 @@
                         </div>
                     </div>
 
-                    <div class="card-footer text-end"><button type="submit" class="btn btn-themeBlue btn-sm ScheduleMeeting @if(App\Helpers\Common::checkRouteWisePermission('Performance.Meeting.index',config('settings.resort_permissions.create')) == false) d-none @endif">Schedule Meeting</button>
+                    <div class="card-footer text-end"><button type="submit" class="btn perf-btn-primary btn-sm ScheduleMeeting @if(App\Helpers\Common::checkRouteWisePermission('Performance.Meeting.index',config('settings.resort_permissions.create')) == false) d-none @endif">Schedule Meeting</button>
                     </div>
                 </form>
             </div>
@@ -114,6 +114,7 @@
 
     </div>
 </div>
+@include('resorts.Performance._performance_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -123,10 +124,10 @@
 <script>
     $(document).ready(function () {
 
-    $("#date").datepicker({
-        date: 'dd/mm/yyyy',
-        autoclose: true,      // Close the picker after selection
-        todayHighlight: true  // Highlight today's date
+    flatpickr('#date', {
+        dateFormat: 'm/d/Y',
+        allowInput: true,
+        appendTo: document.body
     });
     const $employeeContainer = $('.employee-container');
     const $noResults = $('.no-results');
@@ -243,7 +244,7 @@
         },
         messages: {
             title: {
-                required: "Please Enter Meeting title",
+                required: "Please Enter Meeting Title",
             },
             date: {
                 required: "Please Enter Meeting Date",
@@ -256,13 +257,13 @@
                 // greaterThanStart: "End time must be greater than start time" // Custom message
             },
             location: {
-                required: "Please enter Location or Meeting Link",
+                required: "Please Enter Location or Meeting Link",
             },
             conference_link: {
-                required: "Please enter Meeting Link or Location",
+                required: "Please Enter Meeting Link or Location",
             },
             description: {
-                required: "Please Enter Meeting description",
+                required: "Please Enter Meeting Description",
             },
             "Emp_id[]": {
                 required: "Please Select Employee",

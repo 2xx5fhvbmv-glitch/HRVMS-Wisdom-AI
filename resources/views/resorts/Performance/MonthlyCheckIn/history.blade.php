@@ -13,7 +13,7 @@
                     </div>
                 </div>
                 <div class="col-auto">
-                    <a href="{{ route('Performance.CreateMonltyCheckIn') }}" class="btn btn-themeBlue btn-sm">
+                    <a href="{{ route('Performance.CreateMonltyCheckIn') }}" class="btn perf-btn-secondary btn-sm">
                         <i class="fa-solid fa-arrow-left"></i> Back
                     </a>
                 </div>
@@ -42,6 +42,7 @@
         </div>
     </div>
 </div>
+@include('resorts.Performance._performance_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')

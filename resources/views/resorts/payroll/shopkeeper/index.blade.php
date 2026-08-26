@@ -225,7 +225,7 @@
                 }
             },
             error: function(xhr) {
-                toastr.error("An error occurred while updating the division.", "Error", {
+                toastr.error("An error occurred while updating the shopkeeper.", "Error", {
                     positionClass: 'toast-bottom-right'
                 });
             }
@@ -237,15 +237,13 @@
     $(document).on('click', '#shopkeeper-table .delete-row-btn', function (e) {
         e.preventDefault();
 
-       Swal.fire({
-            title: 'Sure want to delete?',
-            text: 'This cannot be undone',
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonText: 'Yes',
-            cancelButtonText: 'No',
-            confirmButtonColor: "#DD6B55"
-            }).then((result) => {
+       wisdomConfirm({
+           role: 'destructive',
+           title: 'Sure want to delete?',
+           text: 'This cannot be undone',
+           confirmText: 'Yes',
+           cancelText: 'No'
+       }).then((result) => {
                 if (result.isConfirmed) {
                     // Perform the AJAX request
                 $.ajax({
@@ -254,21 +252,21 @@
                     dataType: "json",
                     success: function(response) {
                         // Show success message
-                        Swal.fire(
-                            `${action.charAt(0).toUpperCase() + action.slice(1)}!`,
-                            `The OT has been successfully ${action}.`,
-                            'success'
-                        );
+                        wisdomAlert({
+                            type: 'success',
+                            title: `${action.charAt(0).toUpperCase() + action.slice(1)}!`,
+                            text: `The OT has been successfully ${action}.`
+                        });
                         datatablelist();
                         // Optional: Update the UI (e.g., remove the item or update status)
                     },
                     error: function(xhr, status, error) {
                         // Show error message
-                        Swal.fire(
-                            'Error!',
-                            'An error occurred while processing the request.',
-                            'error'
-                        );
+                        wisdomAlert({
+                            type: 'error',
+                            title: 'Error!',
+                            text: 'An error occurred while processing the request.'
+                        });
 
                         console.error(error);
                     }
@@ -279,14 +277,12 @@
         });
         // Get the division ID from the data attribute
         var shopkeeperId = $(this).data('shopkeeper-id');
-        Swal.fire({
+        wisdomConfirm({
+            role: 'destructive',
             title: 'Sure want to delete?',
             text: 'This cannot be undone',
-            icon: 'warning',
-            showCancelButton: true,
-            confirmButtonText: 'Yes',
-            cancelButtonText: 'No',
-            confirmButtonColor: "#DD6B55"
+            confirmText: 'Yes',
+            cancelText: 'No'
         }).then((result) => {
             if (result.isConfirmed) {
                 $.ajax({

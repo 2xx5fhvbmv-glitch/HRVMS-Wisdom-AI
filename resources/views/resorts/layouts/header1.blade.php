@@ -200,9 +200,9 @@
                                                 <li><a class="dropdown-item" href="{{route('resort.accommodation.hoddashboard')}}">Dashboard</a></li>
 
 
-                                                <li><a class="dropdown-item" href="{{route('resort.accommodation.inventory')}}">inventory</a></li>
-                                                <li><a class="dropdown-item" href="{{route('resort.accommodation.InventoryManagement')}}">inventory Management</a></li>
-                                                <li><a class="dropdown-item" href="{{route('resort.accommodation.AssignAccommation')}}">Assign Accommation</a></li>
+                                                <li><a class="dropdown-item" href="{{route('resort.accommodation.inventory')}}">Inventory</a></li>
+                                                <li><a class="dropdown-item" href="{{route('resort.accommodation.InventoryManagement')}}">Inventory Management</a></li>
+                                                <li><a class="dropdown-item" href="{{route('resort.accommodation.AssignAccommation')}}">Assign Accommodation</a></li>
 
                                                 <li><a class="dropdown-item" href="{{route('resort.accommodation.AccommodationMaster')}}">Accommodation Master</a></li>
                                                 <li><a class="dropdown-item" href="{{route('resort.accommodation.AvailableAccommodation')}}">Available Accommodation</a></li>
@@ -281,7 +281,7 @@
                                             <ul class="nav flex-column">
                                                 <li><a class="dropdown-item" href="{{ route('GrievanceAndDisciplinery.Hrdashboard') }}">Dashboard</a></li>
                                                 <li><a class="dropdown-item" href="{{ route('GrievanceAndDisciplinery.config.index') }}">Configuration</a></li>
-                                                <li><a class="dropdown-item" href="{{ route('GrievanceAndDisciplinery.grivance.GrivanceIndex') }}">Grievane</a></li>
+                                                <li><a class="dropdown-item" href="{{ route('GrievanceAndDisciplinery.grivance.GrivanceIndex') }}">Grievance</a></li>
                                                 <li><a class="dropdown-item {{ Route::currentRouteName() == 'GrievanceAndDisciplinery.Disciplinary.DisciplinaryIndex' ? 'active' : '' }}" href="{{ route('GrievanceAndDisciplinery.Disciplinary.DisciplinaryIndex') }}">Disciplinary</a></li>
                                                 <li><a class="dropdown-item {{ in_array(Route::currentRouteName(), ['GrievanceAndDisciplinery.Appeals.Index','GrievanceAndDisciplinery.Appeals.Show']) ? 'active' : '' }}" href="{{ route('GrievanceAndDisciplinery.Appeals.Index') }}">Appeals</a></li>
                                             </ul>

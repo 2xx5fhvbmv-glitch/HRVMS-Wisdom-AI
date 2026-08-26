@@ -37,11 +37,11 @@
                             <div class="card-body"> <!-- Add body to contain form -->
                                 <div class="row g-4">
                                     <div class="col-6">
-                                        <label for="form_name" class="form-label">Form Name :</labe>
+                                        <label for="form_name" class="form-label">Form Name :</label>
                                         <input type="text" name="form_name" id="form_name" placeholder="Enter Form Name" class="form-control"/>
                                     </div>
                                     <!-- <div class="col-6">
-                                        <label for="training" class="form-label">Select Learning :</labe>
+                                        <label for="training" class="form-label">Select Learning :</label>
                                         <select name="training" id="training" class="select2t-none">
                                             <option value="">Select Learning</option>
                                             @if($trainings)
@@ -57,7 +57,7 @@
                                 </div>
                             </div>
                             <div class="card-footer text-end"> <!-- Footer for Save Form button -->
-                                <button id="save-form" class="btn btn-themeBlue btn-sm">Save Form</button>
+                                <button id="save-form" class="btn lnd-btn-primary btn-sm">Save Form</button>
                             </div>
                         </div>
                     </div>
@@ -65,6 +65,7 @@
             </div>
         </div>
     </div>
+@include('resorts.Learning._learning_buttons_v2_styles')
 @endsection
 
 @section('import-css')

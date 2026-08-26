@@ -34,6 +34,21 @@
 
     @include('resorts.layouts.js')
 
+    {{-- Laravel's validation error bag currently has no universal surfacing
+         anywhere in this layout (only inline @error() field messages, added
+         per-page) — this is additive, not a change to an existing trigger.
+         One place so every redirect-back-with-errors flow (Payroll and any
+         other validation) gets the sticky multi-line toast automatically. --}}
+    @if ($errors->any())
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            wisdomToast('error', 'Please fix the following', 'A few things need attention before you can continue:', {
+                list: @json($errors->all())
+            });
+        });
+    </script>
+    @endif
+
     @include('partials.global-loader')
 </body>
 </html>

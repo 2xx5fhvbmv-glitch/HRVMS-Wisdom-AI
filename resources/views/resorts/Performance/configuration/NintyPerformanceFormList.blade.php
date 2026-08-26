@@ -79,8 +79,8 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                    <button type="button" id="save-form" class="btn btn-themeBlue">Submit</button>
+                    <a href="#" data-bs-dismiss="modal" class="btn perf-btn-neutral ms-auto">Cancel</a>
+                    <button type="button" id="save-form" class="btn perf-btn-primary">Submit</button>
                 </div>
             </form>
 
@@ -98,11 +98,12 @@
                 <div id="form-render-view"></div>
             </div>
             <div class="modal-footer">
-                <a href="#" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Close</a>
+                <a href="#" data-bs-dismiss="modal" class="btn perf-btn-neutral ms-auto">Close</a>
             </div>
         </div>
     </div>
 </div>
+@include('resorts.Performance._performance_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -318,7 +319,7 @@
 
         if(!isNaN(formname))
         {
-            toastr.error('Please enter  form Name.', "Error", {
+            toastr.error('Please enter Form Name.', "Error", {
                     positionClass: 'toast-bottom-right'
                 });
 
@@ -369,14 +370,12 @@
             // Get the division ID from the data attribute
             var main_id = $(this).data('id');
 
-            Swal.fire({
-                title: 'Sure want to delete?',
+            wisdomConfirm({
+                role: 'destructive',
+                title: 'Are you sure you want to delete?',
                 text: 'This cannot be undone',
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonText: 'Yes',
-                cancelButtonText: 'No',
-                confirmButtonColor: "#DD6B55"
+                confirmText: 'Yes',
+                cancelText: 'No'
              }).then((result) => {
                 if (result.isConfirmed)
                 {

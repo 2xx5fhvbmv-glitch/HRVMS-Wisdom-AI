@@ -30,10 +30,7 @@
 
 
         <div class="card">
-           
-blade
-Copy
-Edit
+
 <form id="GrivanceSubmitForm" data-parsley-validate>
     @csrf
     <div class="card-title">
@@ -65,7 +62,7 @@ Edit
     </div>
 
     <div class="card-title">
-        <h3>Grievant information</h3>
+        <h3>Grievant Information</h3>
     </div>
     <div class="row g-xl-4 g-3 mb-md-4 mb-3">
         <div class="col-md-4 col-sm-6">
@@ -160,7 +157,7 @@ Edit
             <label class="form-label">ATTACHMENTS (OPTIONAL)</label>
             <div class="uploadFile-block">
                 <div class="uploadFile-btn">
-                    <a href="#" class="btn btn-themeBlue btn-sm">Upload File</a>
+                    <a href="#" class="btn eb-btn-accent btn-sm">Upload File</a>
                     <input type="file" id="uploadFile" name="Attachments[]" class="uploadFile-input" multiple
                         data-parsley-max-file-size="2"
                         data-parsley-fileextension="png,jpg,jpeg,gif,svg,webp,heic,heif,pdf">
@@ -187,7 +184,7 @@ Edit
     <div class="card-footer">
         <div class="row align-items-center g-3">
             <div class="col-auto ms-auto">
-                <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
             </div>
         </div>
     </div>
@@ -195,6 +192,7 @@ Edit
         </div>
     </div>
 </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -214,10 +212,10 @@ $(document).ready(function() {
             en: 'HTML tags and scripts are not allowed.'
         }
     });
-    $('.datepicker').datepicker({
-        format: 'dd/mm/yyyy',
-        autoclose: true,      // Close the picker after selection
-        todayHighlight: true  // Highlight today's date
+    flatpickr('.datepicker', {
+        dateFormat: 'd/m/Y',
+        allowInput: true,
+        appendTo: document.body
     });
     $('#Employee_id').select2({
         placeholder: 'Select Employee',
@@ -240,7 +238,7 @@ $(document).ready(function() {
         width: '100%'
     });
     $('#witness_id').select2({
-        placeholder: 'Select Wintness',
+        placeholder: 'Select Witness',
         minimumResultsForSearch: -1,
         width: '100%'
     });

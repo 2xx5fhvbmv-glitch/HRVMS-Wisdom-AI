@@ -14,10 +14,10 @@
                 </div>
                 <div class="col-auto ms-auto d-flex gap-2">
                     @if(\App\Helpers\Common::isHRHOD())
-                        <a href="{{ route('Performance.kpi.config') }}" class="btn btn-theme">KPI Config</a>
+                        <a href="{{ route('Performance.kpi.config') }}" class="btn perf-btn-secondary">KPI Config</a>
                     @endif
                     @if(($userRank ?? null) == 8)
-                        <a href="{{ route('Performance.kpi.create') }}" class="btn btn-theme">Create New KPI</a>
+                        <a href="{{ route('Performance.kpi.create') }}" class="btn perf-btn-accent">Create New KPI</a>
                     @endif
                 </div>
             </div>
@@ -81,13 +81,14 @@
                     <textarea name="remarks" class="form-control" rows="4" required placeholder="Reason for rejection"></textarea>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-themeGray btn-sm" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-danger btn-sm">Reject</button>
+                    <button type="button" class="btn perf-btn-neutral btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn perf-btn-critical btn-sm">Reject</button>
                 </div>
             </div>
         </form>
     </div>
 </div>
+@include('resorts.Performance._performance_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')
@@ -137,11 +138,10 @@ function datatablelist() {
 // GM Approve
 $(document).on('click', '.gm-approve-btn', function() {
     const id = $(this).data('id');
-    Swal.fire({
+    wisdomConfirm({
+        role: 'positive',
         title: 'Approve this KPI response?',
-        icon: 'question',
-        showCancelButton: true,
-        confirmButtonText: 'Yes, approve'
+        confirmText: 'Yes, approve'
     }).then((result) => {
         if (!result.isConfirmed) return;
         $.ajax({
@@ -164,13 +164,11 @@ $(document).on('click', '.gm-approve-btn', function() {
 // GM Delete
 $(document).on('click', '.kpi-delete-btn', function() {
     const id = $(this).data('id');
-    Swal.fire({
+    wisdomConfirm({
+        role: 'destructive',
         title: 'Delete this KPI?',
         text: 'This will permanently remove the KPI and all its actual entries.',
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#d33',
-        confirmButtonText: 'Yes, delete'
+        confirmText: 'Yes, delete'
     }).then((result) => {
         if (!result.isConfirmed) return;
         $.ajax({

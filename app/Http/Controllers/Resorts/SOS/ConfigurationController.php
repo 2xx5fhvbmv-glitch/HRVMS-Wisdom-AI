@@ -272,15 +272,15 @@ class ConfigurationController extends Controller
                     $permissionIds = is_array($row->permission) ? $row->permission : explode(',', $row->permission);
                     return '
                         <div  class="d-flex align-items-center">
-                            <a href="javascript:void(0)" class="btn-lg-icon icon-bg-green me-1 edit-row-btn" 
+                            <a href="javascript:void(0)" class="btn-tableIcon btnIcon-yellow me-1 edit-row-btn" 
                             data-role_name ="' . $row->name . '"  
                             data-id="' . e($id) . '"
                             data-assign_permission=\'' . json_encode($permissionIds) . '\'
                             >
-                                <img src="' . asset("resorts_assets/images/edit.svg") . '" alt="Edit" class="img-fluid">
+                                <i class="fa-solid fa-pen-to-square"></i>
                             </a>
-                            <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-row-btn" data-id="' . e($id) . '">
-                                <img src="' . asset("resorts_assets/images/trash-red.svg") . '" alt="Delete" class="img-fluid">
+                            <a href="javascript:void(0)" class="btn-tableIcon eb-icon-critical delete-row-btn" data-id="' . e($id) . '">
+                                <i class="fa-regular fa-trash-can"></i>
                             </a>
                         </div>';
                 })
@@ -433,19 +433,19 @@ class ConfigurationController extends Controller
                 $id = base64_encode($row->id);
                             return '
                             <div  class="d-flex align-items-center">
-                                <a href="' . route('sos.team.detail', e($id)) . '" title="View Team Detail" class="btn-tableIcon btnIcon-yellow me-1">
+                                <a href="' . route('sos.team.detail', e($id)) . '" title="View Team Detail" class="btn-tableIcon btnIcon-blue me-1">
                                     <i class="fa-regular fa-eye"></i>
                                 </a>
-                                <a href="#editTeam-modal" data-bs-toggle="modal" class="btn-lg-icon icon-bg-green me-1 edit-team-btn" 
+                                <a href="#editTeam-modal" data-bs-toggle="modal" class="btn-tableIcon btnIcon-yellow me-1 edit-team-btn"
                                 data-name ="'.$row->name.'"  
                                 data-id="' . e($id) . '"
                                 data-description="'.$row->description.'"
                                 data-teamMembers="'.$row->members.'"
                                 >
-                                    <img src="' . asset("resorts_assets/images/edit.svg") . '" alt="Edit" class="img-fluid">
+                                    <i class="fa-solid fa-pen-to-square"></i>
                                 </a>
-                                <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-row-btn" data-id="' . e($id) . '">
-                                    <img src="' . asset("resorts_assets/images/trash-red.svg") . '" alt="Delete" class="img-fluid">
+                                <a href="javascript:void(0)" class="btn-tableIcon eb-icon-critical delete-row-btn" data-id="' . e($id) . '">
+                                    <i class="fa-regular fa-trash-can"></i>
                                 </a>
                             </div>';
             })
@@ -593,15 +593,15 @@ class ConfigurationController extends Controller
                 $id = base64_encode($row->id);
                             return '
                             <div  class="d-flex align-items-center">
-                                <a href="javascript:void(0)" class="btn-lg-icon icon-bg-green me-1 edit-row-btn" 
+                                <a href="javascript:void(0)" class="btn-tableIcon btnIcon-yellow me-1 edit-row-btn" 
                                 data-member_id ="'.$row->emp_id.'"  
                                 data-role_id ="'.$row->role_id.'"  
                                 data-id="' . e($id) . '"
                                 >
-                                    <img src="' . asset("resorts_assets/images/edit.svg") . '" alt="Edit" class="img-fluid">
+                                    <i class="fa-solid fa-pen-to-square"></i>
                                 </a>
-                                <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-row-btn" data-id="' . e($id) . '">
-                                    <img src="' . asset("resorts_assets/images/trash-red.svg") . '" alt="Delete" class="img-fluid">
+                                <a href="javascript:void(0)" class="btn-tableIcon eb-icon-critical delete-row-btn" data-id="' . e($id) . '">
+                                    <i class="fa-regular fa-trash-can"></i>
                                 </a>
                             </div>';
             })
@@ -977,17 +977,17 @@ class ConfigurationController extends Controller
 
                     return '
                     <div  class="d-flex align-items-center">
-                        <a href="#editEmergencyType-modal" data-bs-toggle="modal" class="btn-lg-icon icon-bg-green me-1 edit-emergency-btn" 
+                        <a href="#editEmergencyType-modal" data-bs-toggle="modal" class="btn-tableIcon btnIcon-yellow me-1 edit-emergency-btn" 
                         data-name ="' . $row->name . '"  
                         data-id="' . e($id) . '"
                         data-description="' . $row->description . '"
                         data-assigned_default_team="' . htmlspecialchars(json_encode($row->assignedTeams->pluck('team_id')->toArray()), ENT_QUOTES, 'UTF-8') . '"
                         data-custom_fields="' . e(json_encode($custom_fields)) . '"
                         >
-                            <img src="' . asset("resorts_assets/images/edit.svg") . '" alt="Edit" class="img-fluid">
+                            <i class="fa-solid fa-pen-to-square"></i>
                         </a>
-                        <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-row-btn" data-id="' . e($id) . '">
-                            <img src="' . asset("resorts_assets/images/trash-red.svg") . '" alt="Delete" class="img-fluid">
+                        <a href="javascript:void(0)" class="btn-tableIcon eb-icon-critical delete-row-btn" data-id="' . e($id) . '">
+                            <i class="fa-regular fa-trash-can"></i>
                         </a>
                     </div>';
                 })

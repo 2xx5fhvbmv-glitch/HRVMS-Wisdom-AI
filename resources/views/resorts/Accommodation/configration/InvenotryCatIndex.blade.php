@@ -37,7 +37,7 @@
                                 </div>
                                 {{-- <div class="col-auto">
                                     <div class="d-flex justify-content-sm-end align-items-center">
-                                        <a href="{{route('resort.benifitgrid.create')}}" class="btn btn-sm btn-theme">
+                                        <a href="{{route('resort.benifitgrid.create')}}" class="btn btn-sm eb-btn-primary">
                                             <i class="fa-solid fa-plus me-2"></i>Add New
                                         </a>
                                     </div>
@@ -61,6 +61,7 @@
         </div>
     </div>
 </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -100,14 +101,12 @@
             var $row = $button.closest("tr");
             var main_id = $(this).data('cat-id');
 
-            Swal.fire({
+            wisdomConfirm({
+                role: 'destructive',
                 title: 'Sure want to delete?',
                 text: 'This cannot be undone',
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonText: 'Yes',
-                cancelButtonText: 'No',
-                confirmButtonColor: "#DD6B55"
+                confirmText: 'Yes',
+                cancelText: 'No'
             }).then((result) => {
                 if (result.isConfirmed) {
                     $.ajax({
@@ -153,7 +152,7 @@
                     </td>
 
                     <td class="py-1">
-                        <a href="javascript:void(0)" class="btn btn-theme update-row-btn_cat" data-cat-id="${CatId}">Submit</a>
+                        <a href="javascript:void(0)" class="btn eb-btn-primary update-row-btn_cat" data-cat-id="${CatId}">Submit</a>
                     </td>
                 `;
 
@@ -181,11 +180,11 @@
                             <td class="text-nowrap">${updatedName}</td>
                             <td class="text-nowrap">
                                 <div class="d-flex align-items-center">
-                                    <a href="#" class="btn-lg-icon icon-bg-green me-1 edit-row-btn" data-cat-id="${CatId}">
-                                        <img src="{{ asset('resorts_assets/images/edit.svg') }}" alt="" class="img-fluid" />
+                                    <a href="#" class="btn-tableIcon btnIcon-yellow me-1 edit-row-btn" title="Edit" data-cat-id="${CatId}">
+                                        <i class="fa-solid fa-pen-to-square"></i>
                                     </a>
-                                    <a href="#" class="btn-lg-icon icon-bg-red delete-row-btn" data-cat-id="${CatId}">
-                                        <img src="{{ asset('resorts_assets/images/trash-red.svg') }}" alt="" class="img-fluid" />
+                                    <a href="#" class="btn-tableIcon eb-icon-critical delete-row-btn" title="Delete" data-cat-id="${CatId}">
+                                        <i class="fa-regular fa-trash-can"></i>
                                     </a>
                                 </div>
                             </td>

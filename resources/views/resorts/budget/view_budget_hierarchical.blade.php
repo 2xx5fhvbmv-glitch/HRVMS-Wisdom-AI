@@ -71,33 +71,24 @@
        every .closest()/.find() relationship the total/badge functions
        rely on — completely intact. See wobbly-munching-lake.md for why.
        ================================================================== */
+    /* Neutral/geometry tokens (--teal/--teal-2/--teal-3/--teal-soft/--lime/
+       --ink/--muted/--faint/--line/--line-2/--card) now come from the
+       shared :root palette (resorts/layouts/_design_tokens.blade.php) —
+       this block previously redefined them on :root itself (not scoped
+       to a wrapper class), which would have silently overridden the
+       shared palette page-wide; removed rather than renamed. --wb-bg and
+       the semantic/category tokens below stay local. */
     :root {
-        --wb-teal: #014653;
-        --wb-teal-2: #035b6c;
-        --wb-teal-tint-1: #E6F0F1;
-        --wb-teal-tint-2: #F1F7F7;
-        --wb-lime: #E0FF02;
-        --wb-ink: #14232A;
-        --wb-muted: #5D6F75;
-        --wb-faint: #93A4A9;
-        --wb-line: #E2EBEC;
-        --wb-line-2: #EEF4F4;
         --wb-bg: #F2F6F6;
-        --wb-card: #FFFFFF;
         --wb-vacant: #D98A00;
         --wb-vacant-bg: #FFF6E5;
         --wb-increase: #1F9D6B;
         --wb-increase-bg: #EAF7F0;
-        --wb-group-allowances: #014653;
-        --wb-group-overtime: #D98A00;
-        --wb-group-travel: #8A5CF6;
-        --wb-group-insurance: #0EA5E9;
-        --wb-group-other: #5D6F75;
     }
 
     /* ---- Nav card (Phase 1) ---- */
     .wb-nav-card {
-        background: var(--wb-card);
+        background: var(--card);
         border-radius: 14px;
         box-shadow: 0 1px 3px rgba(1,70,83,0.08);
         padding: 16px 18px;
@@ -111,7 +102,7 @@
         margin-bottom: 12px;
     }
     .wb-detail-header-card {
-        background: var(--wb-card);
+        background: var(--card);
         border-radius: 14px;
         box-shadow: 0 1px 3px rgba(1,70,83,0.08);
         padding: 14px 18px;
@@ -121,9 +112,9 @@
         width: 32px;
         height: 32px;
         border-radius: 8px;
-        border: 1px solid var(--wb-line);
+        border: 1px solid var(--line);
         background: #fff;
-        color: var(--wb-muted);
+        color: var(--muted);
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -131,7 +122,7 @@
         flex-shrink: 0;
         transition: background .12s, color .12s;
     }
-    .wb-back-btn:hover:not(:disabled) { background: var(--wb-teal-tint-2); color: var(--wb-ink); }
+    .wb-back-btn:hover:not(:disabled) { background: var(--teal-soft); color: var(--ink); }
     .wb-back-btn:disabled { opacity: .35; cursor: not-allowed; }
     .wb-revise-budget-btn {
         flex-shrink: 0;
@@ -141,11 +132,11 @@
         font-size: 12px;
         font-weight: 700;
         color: #fff;
-        background: var(--wb-teal);
+        background: var(--teal);
         cursor: pointer;
     }
-    .wb-revise-budget-btn:hover { background: var(--wb-teal-2); }
-    .wb-revise-budget-btn:disabled { background: var(--wb-muted); opacity: .5; cursor: not-allowed; }
+    .wb-revise-budget-btn:hover { background: var(--teal-2); }
+    .wb-revise-budget-btn:disabled { background: var(--muted); opacity: .5; cursor: not-allowed; }
     .wb-breadcrumb {
         display: flex;
         align-items: center;
@@ -153,7 +144,7 @@
         flex-wrap: wrap;
         font-size: 12.5px;
         font-weight: 600;
-        color: var(--wb-muted);
+        color: var(--muted);
         flex: 1;
         min-width: 160px;
     }
@@ -161,16 +152,16 @@
         border: none;
         background: none;
         padding: 2px 4px;
-        color: var(--wb-muted);
+        color: var(--muted);
         font-weight: 600;
         font-size: 12.5px;
         cursor: pointer;
         border-radius: 6px;
     }
-    .wb-breadcrumb button:hover { background: var(--wb-teal-tint-1); color: var(--wb-teal); }
-    .wb-breadcrumb button.wb-crumb-current { color: var(--wb-teal); cursor: default; }
+    .wb-breadcrumb button:hover { background: var(--teal-3); color: var(--teal); }
+    .wb-breadcrumb button.wb-crumb-current { color: var(--teal); cursor: default; }
     .wb-breadcrumb button.wb-crumb-current:hover { background: none; }
-    .wb-breadcrumb .wb-crumb-sep { color: var(--wb-faint); }
+    .wb-breadcrumb .wb-crumb-sep { color: var(--faint); }
     /* Search input itself uses the shared .input-group / .form-control.search
        / .card-header classes (same as e.g. Talent Pool) — no page-specific
        input styling here. Only the results dropdown below is this page's
@@ -180,7 +171,7 @@
         top: calc(100% + 4px);
         left: 0; right: 0;
         background: #fff;
-        border: 1px solid var(--wb-line);
+        border: 1px solid var(--line);
         border-radius: 10px;
         box-shadow: 0 8px 24px rgba(1,70,83,0.14);
         max-height: 320px;
@@ -193,22 +184,22 @@
         gap: 8px;
         padding: 8px 12px;
         cursor: pointer;
-        border-bottom: 1px solid var(--wb-line-2);
+        border-bottom: 1px solid var(--line-2);
         font-size: 12.5px;
     }
     .wb-search-result-row:last-child { border-bottom: none; }
-    .wb-search-result-row:hover { background: var(--wb-teal-tint-2); }
+    .wb-search-result-row:hover { background: var(--teal-soft); }
     .wb-search-result-type {
         font-size: 9.5px;
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: .04em;
-        color: var(--wb-faint);
+        color: var(--faint);
         flex-shrink: 0;
         width: 46px;
     }
-    .wb-search-result-name { color: var(--wb-ink); font-weight: 600; }
-    .wb-search-result-sub { color: var(--wb-faint); font-size: 11px; }
+    .wb-search-result-name { color: var(--ink); font-weight: 600; }
+    .wb-search-result-sub { color: var(--faint); font-size: 11px; }
 
     /* ---- Drill-down list rows (Phase 1) ---- */
     .wb-level-list { display: flex; flex-direction: column; gap: 8px; }
@@ -216,37 +207,37 @@
         display: flex;
         align-items: center;
         gap: 12px;
-        border: 1px solid var(--wb-line);
+        border: 1px solid var(--line);
         border-radius: 10px;
         padding: 10px 14px;
         cursor: pointer;
         transition: background .12s, border-color .12s;
     }
-    .wb-group-row:hover { background: var(--wb-teal-tint-2); border-color: var(--wb-teal-tint-1); }
+    .wb-group-row:hover { background: var(--teal-soft); border-color: var(--teal-3); }
     .wb-group-row-main { flex: 1; min-width: 0; }
-    .wb-group-row-name { font-size: 13.5px; font-weight: 600; color: var(--wb-ink); }
+    .wb-group-row-name { font-size: 13.5px; font-weight: 600; color: var(--ink); }
     .wb-level-tag {
         display: inline-block;
         font-size: 9.5px;
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: .04em;
-        color: var(--wb-teal);
-        background: var(--wb-teal-tint-1);
+        color: var(--teal);
+        background: var(--teal-3);
         border-radius: 6px;
         padding: 2px 7px;
         margin-right: 8px;
         vertical-align: middle;
     }
-    .wb-group-row-meta { font-size: 11px; color: var(--wb-muted); margin-top: 3px; }
-    .wb-group-row-budget { font-size: 13px; font-weight: 700; color: var(--wb-teal); flex-shrink: 0; }
-    .wb-group-row-chevron { color: var(--wb-faint); flex-shrink: 0; }
+    .wb-group-row-meta { font-size: 11px; color: var(--muted); margin-top: 3px; }
+    .wb-group-row-budget { font-size: 13px; font-weight: 700; color: var(--teal); flex-shrink: 0; }
+    .wb-group-row-chevron { color: var(--faint); flex-shrink: 0; }
 
     /* ---- Leaf rows: employee / vacant (Phase 1) ---- */
     .wb-leaf-row { display: flex; align-items: center; gap: 12px; }
     .wb-leaf-avatar {
         width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
-        object-fit: cover; background: var(--wb-teal); color: #fff;
+        object-fit: cover; background: var(--teal); color: #fff;
         display: flex; align-items: center; justify-content: center;
         font-size: 13px; font-weight: 700;
     }
@@ -269,7 +260,7 @@
     }
 
     /* ---- Detail card (Phase 2) ---- */
-    .wb-detail-card-inner { background: var(--wb-card); }
+    .wb-detail-card-inner { background: var(--card); }
     .wb-annual-summary {
         display: flex;
         flex-wrap: wrap;
@@ -279,7 +270,7 @@
     .wb-annual-stat {
         flex: 1;
         min-width: 130px;
-        background: var(--wb-teal-tint-2);
+        background: var(--teal-soft);
         border-radius: 10px;
         padding: 10px 12px;
     }
@@ -288,11 +279,11 @@
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: .04em;
-        color: var(--wb-faint);
+        color: var(--faint);
         display: block;
         margin-bottom: 3px;
     }
-    .wb-annual-stat-value { font-size: 15px; font-weight: 800; color: var(--wb-teal); }
+    .wb-annual-stat-value { font-size: 15px; font-weight: 800; color: var(--teal); }
     .wb-annual-stat-delta.wb-delta-up { color: var(--wb-increase); }
     .wb-annual-stat-delta.wb-delta-down { color: #E5573F; }
 
@@ -302,25 +293,25 @@
         display: inline-flex;
         align-items: center;
         gap: 6px;
-        border: 1px solid var(--wb-line);
+        border: 1px solid var(--line);
         border-radius: 20px;
         padding: 5px 12px;
         font-size: 11.5px;
         font-weight: 600;
-        color: var(--wb-muted);
+        color: var(--muted);
         background: #fff;
         cursor: pointer;
         user-select: none;
     }
     .wb-group-chip .wb-group-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
     .wb-group-chip.wb-chip-active {
-        background: var(--wb-teal-tint-1);
-        border-color: var(--wb-teal-tint-1);
-        color: var(--wb-teal);
+        background: var(--teal-3);
+        border-color: var(--teal-3);
+        color: var(--teal);
     }
 
     /* ---- Table framing / sticky (Phase 3) ---- */
-    .wb-table-scroll { max-height: 65vh; overflow: auto; border-radius: 10px; border: 1px solid var(--wb-line-2); }
+    .wb-table-scroll { max-height: 65vh; overflow: auto; border-radius: 10px; border: 1px solid var(--line-2); }
     /* Fixed layout so every column's rendered width exactly matches its
        declared inline width — required for the .wb-col-* left offsets
        below (0/80/210/340/440) to line up the 5 sticky columns edge to
@@ -338,9 +329,9 @@
         position: sticky;
         top: 0;
         z-index: 3;
-        background: var(--wb-teal-tint-1) !important;
-        color: var(--wb-teal) !important;
-        border-bottom: 2px solid var(--wb-teal) !important;
+        background: var(--teal-3) !important;
+        color: var(--teal) !important;
+        border-bottom: 2px solid var(--teal) !important;
         white-space: normal !important;
         overflow-wrap: break-word;
         font-size: 12px !important;
@@ -360,7 +351,7 @@
     .wb-col-current { left: 80px; }
     .wb-col-proposed { left: 210px; }
     .wb-col-action { left: 340px; box-shadow: 2px 0 4px rgba(0,0,0,0.05); }
-    .wb-zero-dash { color: var(--wb-faint); font-weight: 400; }
+    .wb-zero-dash { color: var(--faint); font-weight: 400; }
 
     /* Column show/hide by cost group (Phase 5) — driven purely by a
        data-hidden-groups token list on the scroll wrapper; never touches
@@ -391,17 +382,17 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        border: 1px solid var(--wb-line);
+        border: 1px solid var(--line);
         background: #fff;
-        color: var(--wb-muted);
+        color: var(--muted);
     }
-    .budget-monthly-table .btn-edit-month-budget:hover { background: var(--wb-teal-tint-1); color: var(--wb-teal); border-color: var(--wb-teal-tint-1); transform: none; }
-    .budget-monthly-table .btn-copy-down:hover { background: var(--wb-teal-tint-1); color: var(--wb-teal); border-color: var(--wb-teal-tint-1); }
+    .budget-monthly-table .btn-edit-month-budget:hover { background: var(--teal-3); color: var(--teal); border-color: var(--teal-3); transform: none; }
+    .budget-monthly-table .btn-copy-down:hover { background: var(--teal-3); color: var(--teal); border-color: var(--teal-3); }
 
     /* ---- Revise Budget button (Phase 6, visual only) ---- */
     .revisebudgetmodal, a.revisebudgetmodal {
-        background: var(--wb-teal) !important;
-        border-color: var(--wb-teal) !important;
+        background: var(--teal) !important;
+        border-color: var(--teal) !important;
         color: #fff !important;
     }
 
@@ -1551,7 +1542,7 @@ $(document).ready(function() {
                     let html = `
                         <div class="wb-table-scroll" data-hidden-groups=" overtime travel insurance other ">
                             <table class="table table-bordered table-hover align-middle budget-monthly-table" style="font-size: 0.875rem;">
-                                <thead style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                                <thead style="background: var(--teal); color: white;">
                                     <tr>
                                         <th class="text-center wb-sticky-col wb-col-month" style="width: 80px; font-weight: 600;">Month</th>
                                         <th class="text-center wb-sticky-col wb-col-current" style="width: 130px; font-weight: 600;">Current Basic<br>Salary</th>
@@ -1580,7 +1571,7 @@ $(document).ready(function() {
                                 <td class="text-end wb-sticky-col wb-col-current" style="font-size: 0.813rem;">${formatAmountOrDash(rowSalary.current, 'USD')}</td>
                                 <td class="text-end wb-sticky-col wb-col-proposed" style="font-size: 0.813rem;">${formatAmountOrDash(rowSalary.proposed, 'USD')}</td>
                                 <td class="text-center wb-sticky-col wb-col-action">
-                                    <button class="btn btn-sm btn-outline-primary btn-edit-month-budget"
+                                    <button class="btn btn-sm eb-btn-secondary btn-edit-month-budget"
                                             data-month="${m}"
                                             data-month-name="${months[m-1]}"
                                             data-employee-id="${employeeId}"
@@ -1592,7 +1583,7 @@ $(document).ready(function() {
                                         <i class="fas fa-edit" style="font-size: 0.75rem;"></i>
                                     </button>
                                     ${m < 12 ? `
-                                    <button class="btn btn-sm btn-outline-success btn-copy-down"
+                                    <button class="btn btn-sm eb-btn-positive btn-copy-down"
                                             data-month="${m}"
                                             data-month-name="${months[m-1]}"
                                             data-employee-id="${employeeId}"
@@ -1764,7 +1755,7 @@ $(document).ready(function() {
                     let html = `
                         <div class="wb-table-scroll" data-hidden-groups=" overtime travel insurance other ">
                             <table class="table table-bordered table-hover align-middle budget-monthly-table" style="font-size: 0.875rem;">
-                                <thead style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;">
+                                <thead style="background: var(--teal); color: white;">
                                     <tr>
                                         <th class="text-center wb-sticky-col wb-col-month" style="width: 80px; font-weight: 600;">Month</th>
                                         <th class="text-center wb-sticky-col wb-col-current" style="width: 130px; font-weight: 600;">Current Basic<br>Salary</th>
@@ -1793,7 +1784,7 @@ $(document).ready(function() {
                                 <td class="text-end wb-sticky-col wb-col-current" style="font-size: 0.813rem;">${formatAmountOrDash(rowSalary.current, 'USD')}</td>
                                 <td class="text-end wb-sticky-col wb-col-proposed" style="font-size: 0.813rem;">${formatAmountOrDash(rowSalary.proposed, 'USD')}</td>
                                 <td class="text-center wb-sticky-col wb-col-action">
-                                    <button class="btn btn-sm btn-outline-warning btn-edit-month-budget"
+                                    <button class="btn btn-sm eb-btn-secondary btn-edit-month-budget"
                                             data-month="${m}"
                                             data-month-name="${months[m-1]}"
                                             data-vacant-index="${vacantIndex}"
@@ -1806,7 +1797,7 @@ $(document).ready(function() {
                                         <i class="fas fa-edit" style="font-size: 0.75rem;"></i>
                                     </button>
                                     ${m < 12 ? `
-                                    <button class="btn btn-sm btn-outline-success btn-copy-down"
+                                    <button class="btn btn-sm eb-btn-positive btn-copy-down"
                                             data-month="${m}"
                                             data-month-name="${months[m-1]}"
                                             data-vacant-index="${vacantIndex}"
@@ -2020,14 +2011,13 @@ $(document).ready(function() {
         const nextMonthName = monthsLabels[nextMonth - 1];
         const targetMonths = [nextMonth];
 
-        Swal.fire({
+        wisdomConfirm({
+            role: 'confirm',
             title: 'Copy values to next month?',
-            html: `Copy <strong>${monthName}</strong>'s salary and cost values to <strong>${nextMonthName}</strong>? Any existing entry in ${nextMonthName} will be overwritten.`,
-            icon: 'question',
-            showCancelButton: true,
-            confirmButtonText: 'Yes, copy',
-            cancelButtonText: 'Cancel',
-            reverseButtons: true
+            confirmText: 'Yes, copy',
+            extra: {
+                html: `Copy <strong>${monthName}</strong>'s salary and cost values to <strong>${nextMonthName}</strong>? Any existing entry in ${nextMonthName} will be overwritten.`
+            }
         }).then(function (result) {
             if (!result.isConfirmed) return;
             performCopyDown();
@@ -3357,11 +3347,11 @@ $(document).ready(function() {
         other: 'Other'
     };
     var WB_COST_GROUP_COLORS = {
-        allowances: 'var(--wb-teal)', // brand teal per explicit user decision (spec's own #2F6BFF conflicted with its "no blue" rule)
-        overtime: '#8A5CF6',
-        travel: '#E08A00',
-        insurance: '#1F9D6B',
-        other: 'var(--wb-muted)'
+        allowances: 'var(--teal)', // brand teal per explicit user decision (spec's own #2F6BFF conflicted with its "no blue" rule)
+        overtime: '#7D4B17', // muted copper — darkened from #B8722E for CVD lightness separation from travel
+        travel: '#C1666B', // dusty terracotta
+        insurance: '#7C5C9C', // muted plum — was #1F9D6B, collided with --positive/--wb-increase
+        other: 'var(--muted)'
     };
     var WB_COST_GROUP_KEYWORDS = {
         overtime: ['overtime', 'ovetime'],

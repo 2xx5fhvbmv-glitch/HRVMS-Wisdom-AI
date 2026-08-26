@@ -18,7 +18,7 @@
                             <h1>{{ $page_title }}</h1>
                         </div>
                     </div>
-                    <div class="col-auto ms-auto"><a href="javascript:void(0)" class="ClickToSubmit btn btn-theme">Download</a></div>
+                    <div class="col-auto ms-auto"><a href="javascript:void(0)" class="ClickToSubmit btn eb-btn-secondary">Download</a></div>
                 </div>
             </div>
 
@@ -99,7 +99,7 @@
                                 @endif
                             </div>
                             <div class="col-auto">
-                                <button type="submit" class="btn btn-themeBlue">Export Results</button>
+                                <button type="submit" class="btn eb-btn-primary">Export Results</button>
                             </div>
                         </form>
                     </div>
@@ -140,7 +140,8 @@
 
         </div>
     </div>
-    @endsection
+    @include('resorts._emotional_buttons_v2_styles')
+@endsection
 
     @section('import-css')
     @endsection
@@ -156,7 +157,7 @@
                 },
                 messages: {
                     respondent: {
-                        required: "Please Select Any respondent."
+                        required: "Please select a respondent."
                     }
                 },
                

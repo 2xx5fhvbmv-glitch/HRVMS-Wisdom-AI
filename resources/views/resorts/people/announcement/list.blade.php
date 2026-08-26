@@ -97,9 +97,10 @@
     $(document).ready(function(){
        getAnnouncement();
        $('.select2t-none').select2();
-       $('#dateFilter').datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true
+       flatpickr('#dateFilter', {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
 
        $('#toggleArchivedAnnouncements').change(function () {
@@ -113,14 +114,12 @@
         $(document).on('click', '.archive-announcement', function () {
             let announcementId = $(this).data('id');
 
-            Swal.fire({
+            wisdomConfirm({
+                role: 'destructive',
                 title: 'Are you sure you want to archive this announcement?',
                 text: 'This cannot be undone.',
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonText: 'Yes, archive it!',
-                cancelButtonText: 'Cancel',
-                confirmButtonColor: '#DD6B55'
+                confirmText: 'Yes, archive it!',
+                cancelText: 'Cancel'
             }).then((result) => {
                 if (result.isConfirmed) {
                     $.ajax({
@@ -155,14 +154,11 @@
         $(document).on('click', '.restore-announcement', function () {
             let announcementId = $(this).data('id');
 
-            Swal.fire({
+            wisdomConfirm({
+                role: 'positive',
                 title: 'Restore this announcement?',
-                text: 'It will be moved back to active list.',
-                icon: 'info',
-                showCancelButton: true,
-                confirmButtonText: 'Yes, Restore',
-                cancelButtonText: 'Cancel',
-                confirmButtonColor: '#28a745'
+                text: 'It will be moved back to the active list.',
+                confirmText: 'Yes, Restore'
             }).then((result) => {
                 if (result.isConfirmed) {
                     $.ajax({

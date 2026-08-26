@@ -74,7 +74,7 @@
                                         <div class="bg-themeGrayLight">
                                             <div class="d-flex align-items-center justify-content-between">
                                                 <div>
-                                                    <p class="mb-0  fw-500">On leave</p>
+                                                    <p class="mb-0  fw-500">On Leave</p>
                                                     <strong>{{$leave_employee_counts}}</strong>
                                                 </div>
                                                 <a href="#">
@@ -326,7 +326,7 @@
                                 <div class="border-bottom">
                                     <h6>Time & Attendance</h6>
                                     <div class="d-flex">
-                                        <p>Excessive Overtime hours</p>
+                                        <p>Excessive Overtime Hours</p>
                                         <span class="text-danger">48</span>
                                     </div>
                                     <div class="d-flex">
@@ -481,7 +481,7 @@
                                     <div class="form-group">
                                         <select class="form-select form-select-sm" aria-label="Default select example">
                                             <option selected="">Monthly</option>
-                                            <option value="1">Tommorrow</option>
+                                            <option value="1">Tomorrow</option>
 
                                         </select>
                                     </div>
@@ -960,7 +960,7 @@
                                                     <th>Position</th>
                                                     <th>Probation End Date</th>
                                                     <th>Onboarding Training</th>
-                                                    <th>Monthly Check-in Status,</th>
+                                                    <th>Monthly Check-in Status</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -989,7 +989,7 @@
                                                     </td>
                                                     <td>Manager</td>
                                                     <td>15 Feb 2022 (Due in 90 days)</td>
-                                                    <td><span class="badge badge-themeWarning">IN Progress</span></td>
+                                                    <td><span class="badge badge-themeWarning">In Progress</span></td>
                                                     <td><span class="badge badge-themeSuccess">Up to date</span></td>
                                                 </tr>
                                                 <tr>
@@ -1003,7 +1003,7 @@
                                                     </td>
                                                     <td>Manager</td>
                                                     <td>15 Feb 2022 (Due in 90 days)</td>
-                                                    <td><span class="badge badge-themeWarning">IN Progress</span></td>
+                                                    <td><span class="badge badge-themeWarning">In Progress</span></td>
                                                     <td><span class="badge badge-themeSuccess">Up to date</span></td>
                                                 </tr>
                                                 <tr>
@@ -1017,7 +1017,7 @@
                                                     </td>
                                                     <td>Manager</td>
                                                     <td>15 Feb 2022 (Due in 90 days)</td>
-                                                    <td><span class="badge badge-themeWarning">IN Progress</span></td>
+                                                    <td><span class="badge badge-themeWarning">In Progress</span></td>
                                                     <td><span class="badge badge-themeSuccess">Up to date</span></td>
                                                 </tr>
                                                 <tr>
@@ -1031,7 +1031,7 @@
                                                     </td>
                                                     <td>Manager</td>
                                                     <td>15 Feb 2022 (Due in 90 days)</td>
-                                                    <td><span class="badge badge-themeWarning">IN Progress</span></td>
+                                                    <td><span class="badge badge-themeWarning">In Progress</span></td>
                                                     <td><span class="badge badge-themeDangerNew">Missed</span></td>
                                                 </tr>
                                                 <tr>
@@ -1045,7 +1045,7 @@
                                                     </td>
                                                     <td>Manager</td>
                                                     <td>15 Feb 2022 (Due in 90 days)</td>
-                                                    <td><span class="badge badge-themeWarning">IN Progress</span></td>
+                                                    <td><span class="badge badge-themeWarning">In Progress</span></td>
                                                     <td><span class="badge badge-themeDangerNew">Missed</span></td>
                                                 </tr>
                                                 <tr>
@@ -1059,7 +1059,7 @@
                                                     </td>
                                                     <td>Manager</td>
                                                     <td>15 Feb 2022 (Due in 90 days)</td>
-                                                    <td><span class="badge badge-themeWarning">IN Progress</span></td>
+                                                    <td><span class="badge badge-themeWarning">In Progress</span></td>
                                                     <td><span class="badge badge-themeSuccess">Up to date</span></td>
                                                 </tr>
                                             </tbody>
@@ -1331,7 +1331,7 @@
                                 </div>
                                 <div>
                                     <h6>${department} (${rank})</h6>
-                                    <p>Requested for Hire ${NoOfVacnacy} ${position}</p>
+                                    <p>Requested to Hire ${NoOfVacnacy} ${position}</p>
                                 </div>
 
                     </div>`;
@@ -1486,10 +1486,10 @@
         // End of Reject Vacanciy form
         //  Approval
 
-        $('#link_Expiry_date').datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,
-            todayHighlight: true
+        flatpickr('#link_Expiry_date', {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
         $("#ApprovedResponseModel").on("click",function(){
             var ta_id= $(this).attr('data-ta_id');

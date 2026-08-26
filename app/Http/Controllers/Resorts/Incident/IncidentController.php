@@ -143,15 +143,15 @@ class IncidentController extends Controller
                     $actions = '';
                     if ($isGM) {
                         $actions .= '<button class="correct-btn '.$edit_class.'" data-id="' . $row->id . '"><i class="fa-solid fa-check"></i></button>';
-                        $actions .= '<button class="btn-tableIcon btnIcon-danger reject-btn '.$edit_class.'" data-id="' . $row->id . '"><i class="fa-solid fa-xmark"></i></button>';
+                        $actions .= '<button class="btn-tableIcon eb-icon-critical reject-btn '.$edit_class.'" data-id="' . $row->id . '"><i class="fa-solid fa-xmark"></i></button>';
                     }
                     if ($isHR) {
                         $actions .= '<a href="' . route('incident.view', base64_encode($row->id)) . '" class="btn-tableIcon btnIcon-skyblue" title="View"><i class="fa-regular fa-eye"></i></a>';
                     }
-                    $actions .= '<a href="' . route('incident.investigation', base64_encode($row->id)) . '" class="btn-tableIcon btnIcon-green '.$edit_class.'" title="Investigation"><i class="fa-solid fa-user-secret"></i></a>';
+                    $actions .= '<a href="' . route('incident.investigation', base64_encode($row->id)) . '" class="btn-tableIcon btnIcon-success '.$edit_class.'" title="Investigation"><i class="fa-solid fa-user-secret"></i></a>';
                     $actions .= '<a href="' . route('incident.meeting.create', base64_encode($row->id)) . '" class="btn-tableIcon btnIcon-yellow '.$edit_class.'" title="Meeting"><i class="fa-solid fa-calendar-plus"></i></a>';
                     if ($isHR) {
-                        $actions .= '<a href="#" class="btn-tableIcon btnIcon-danger delete-row-btn ' . $delete_class . '" title="Delete" data-id="' . e(base64_encode($row->id)) . '"><i class="fa-regular fa-trash-can"></i></a>';
+                        $actions .= '<a href="#" class="btn-tableIcon eb-icon-critical delete-row-btn ' . $delete_class . '" title="Delete" data-id="' . e(base64_encode($row->id)) . '"><i class="fa-regular fa-trash-can"></i></a>';
                     }
                     return $actions;
                 })
@@ -265,7 +265,7 @@ class IncidentController extends Controller
                     return '<a href="' . route('incident.view', base64_encode($row->id)) . '" class="btn-tableIcon btnIcon-skyblue">
                                 <i class="fa-regular fa-eye"></i>
                             </a>
-                            <a href="#" class="btn-tableIcon btnIcon-danger delete-row-btn ' . $delete_class . '" data-cat-id="' . e($row->id) . '">
+                            <a href="#" class="btn-tableIcon eb-icon-critical delete-row-btn ' . $delete_class . '" data-cat-id="' . e($row->id) . '">
                                 <i class="fa-regular fa-trash-can"></i>
                             </a>';
                 })

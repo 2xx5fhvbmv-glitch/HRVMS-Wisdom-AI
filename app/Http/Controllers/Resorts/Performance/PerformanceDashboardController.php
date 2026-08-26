@@ -525,7 +525,7 @@ class PerformanceDashboardController extends Controller
                 return '<span class="badge '.$cls.'" data-label="'.$st['label'].'">'.$st['label'].'</span>';
             })
             ->addColumn('action', function ($row) {
-                return '<a href="'.route('Performance.employees.details', base64_encode($row->id)).'" class="btn btn-theme btn-sm">View Details</a>';
+                return '<a href="'.route('Performance.employees.details', base64_encode($row->id)).'" class="btn perf-btn-primary btn-sm">View Details</a>';
             })
             ->rawColumns(['applicant', 'rating', 'appraisal_status', 'action'])
             ->make(true);

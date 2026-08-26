@@ -19,7 +19,7 @@
                     <tbody>
                         <tr>
                             <th>Type:</th>
-                            <td>Room In Building</td>
+                            <td>Room in Building</td>
                         </tr>
                         <tr>
                             <th>Location:</th>
@@ -58,6 +58,6 @@
     @endforeach
 @else
 <div class="col-md-12">
-    <p style="text-align: center"> No Recored Found..!</p>
+    <p style="text-align: center"> No Records Found..!</p>
 </div>
 @endif

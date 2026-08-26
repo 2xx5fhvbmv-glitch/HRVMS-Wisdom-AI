@@ -834,7 +834,7 @@ class PaymentRequestController extends Controller
                                         return $view;
                                     }
                                     return $view . '
-                                                        <a  href="javascript:void(0)" class="btn-tableIcon btnIcon-danger PaymentRequestRejected   btn-sm '.$edit_class.'" data-id="'.$encodedId.'"><i class="fa-solid fa-xmark"></i></a>';
+                                                        <a  href="javascript:void(0)" class="btn-tableIcon eb-icon-critical PaymentRequestRejected   btn-sm '.$edit_class.'" data-id="'.$encodedId.'"><i class="fa-solid fa-xmark"></i></a>';
                                 })
                                 ->rawColumns(['Status', 'Action']) 
                                 ->make(true);

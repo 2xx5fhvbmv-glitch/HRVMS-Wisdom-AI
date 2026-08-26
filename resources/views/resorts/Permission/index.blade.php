@@ -326,7 +326,7 @@ $(document).on('change', '#position', function() {
             },
             error: function(response) {
                 // $("#accordionExample").html(response.html);
-            toastr.error("Posistion Not Found ", { positionClass: 'toast-bottom-right' });
+            toastr.error("Position Not Found ", { positionClass: 'toast-bottom-right' });
             }
         });
 });

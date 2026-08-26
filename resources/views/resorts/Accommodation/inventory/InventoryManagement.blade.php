@@ -20,7 +20,7 @@
                     </div>
                 </div>
                 <div class="col-auto">
-                    <a href="{{ route('resort.accommodation.inventory') }}"  class="btn btn-theme  @if(App\Helpers\Common::checkRouteWisePermission('resort.accommodation.Inventory',config('settings.resort_permissions.create')) == false) d-none @endif">Add New
+                    <a href="{{ route('resort.accommodation.inventory') }}"  class="btn eb-btn-accent  @if(App\Helpers\Common::checkRouteWisePermission('resort.accommodation.Inventory',config('settings.resort_permissions.create')) == false) d-none @endif">Add New
                         Inventory</a>
                 </div>
             </div>
@@ -117,14 +117,15 @@
                     <input type="hidden" name="resort_id" id="assignResortId">
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-themeGray" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-themeBlue">Assign</button>
+                    <button type="button" class="btn eb-btn-neutral" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn eb-btn-primary">Assign</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
 
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -275,18 +276,18 @@ $(document).ready(function()
                         empOptions[emp.assign_id] = emp.name + ' (' + emp.emp_id + ') - ' + emp.bed_no;
                     });
 
-                    Swal.fire({
+                    wisdomConfirm({
+                        role: 'confirm',
                         title: "Select Employee to Unassign",
                         text: response.message,
-                        icon: "question",
-                        input: "select",
-                        inputOptions: empOptions,
-                        inputPlaceholder: "Select an employee",
-                        showCancelButton: true,
-                        confirmButtonText: "Unassign",
-                        confirmButtonColor: "#d33",
-                        inputValidator: function(value) {
-                            if (!value) return "Please select an employee";
+                        confirmText: "Unassign",
+                        extra: {
+                            input: "select",
+                            inputOptions: empOptions,
+                            inputPlaceholder: "Select an employee",
+                            inputValidator: function(value) {
+                                if (!value) return "Please select an employee";
+                            }
                         }
                     }).then(function(result) {
                         if (result.isConfirmed) {
@@ -301,10 +302,18 @@ $(document).ready(function()
                                 },
                                 success: function(res) {
                                     if (res.success) {
-                                        Swal.fire("Unassigned!", res.message, "success");
+                                        wisdomAlert({
+                                            type: 'success',
+                                            title: "Unassigned!",
+                                            text: res.message
+                                        });
                                         InventoryList();
                                     } else {
-                                        Swal.fire("Error!", res.message, "error");
+                                        wisdomAlert({
+                                            type: 'error',
+                                            title: "Error!",
+                                            text: res.message
+                                        });
                                     }
                                 }
                             });
@@ -312,10 +321,18 @@ $(document).ready(function()
                     });
                 } else if (response.success) {
                     // Single employee — already unassigned
-                    Swal.fire("Unassigned!", response.message, "success");
+                    wisdomAlert({
+                        type: 'success',
+                        title: "Unassigned!",
+                        text: response.message
+                    });
                     InventoryList();
                 } else {
-                    Swal.fire("Error!", response.message, "error");
+                    wisdomAlert({
+                        type: 'error',
+                        title: "Error!",
+                        text: response.message
+                    });
                 }
             },
             error: function (response) {
@@ -328,7 +345,11 @@ $(document).ready(function()
                 } else {
                     errs = errors ? errors.message : 'An error occurred';
                 }
-                        Swal.fire("Error", errs, "error");
+                        wisdomAlert({
+                            type: 'error',
+                            title: "Error",
+                            text: errs
+                        });
                 }
         });
     });

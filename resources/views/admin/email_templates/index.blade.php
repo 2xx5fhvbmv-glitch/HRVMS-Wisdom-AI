@@ -40,8 +40,8 @@
 									<thead>
 										<tr>
 											<th>Name</th>
-											<th>Created at</th>
-											<th>Updated at</th>
+											<th>Created At</th>
+											<th>Updated At</th>
 											<th>Action</th>
 										</tr>
 									</thead>

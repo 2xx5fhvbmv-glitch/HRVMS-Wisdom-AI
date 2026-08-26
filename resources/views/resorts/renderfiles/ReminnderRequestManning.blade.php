@@ -23,5 +23,5 @@
 </div>
 <div class="text-center">
     <a href="#sendRespond-modal" data-bs-toggle="modal" class="btn btn-sm btn-theme">Send
-        Respond</a>
+        Response</a>
 </div>

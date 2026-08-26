@@ -253,10 +253,10 @@
 @section('import-scripts')
 <script>
     $(document).ready(function () {
-        $('.datepicker').datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,
-            todayHighlight: true
+        flatpickr('.datepicker', {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
         const promotionApprovalUrl = @json(route('promotion.review.action', ['id' => '__ID__', 'action' => '__ACTION__']));
 

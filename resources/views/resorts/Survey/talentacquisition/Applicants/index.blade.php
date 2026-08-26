@@ -358,7 +358,7 @@
                     {
                         if(status == "Complete")
                         {
-                            toastr.error('Please Wait For the next Responsed .', { positionClass: 'toast-bottom-right', timeOut: 5000 });
+                            toastr.error('Please Wait For the next Response.', { positionClass: 'toast-bottom-right', timeOut: 5000 });
                             return false;
                         }
                         else if(status == "Selected")

@@ -20,7 +20,7 @@
                     </div>
                     @if($canCreate)
                     <div class="col-auto">
-                        <a href="javascript:void(0)" class="btn btn-theme" data-bs-toggle="modal" data-bs-target="#selectIncidentForMeetingModal">
+                        <a href="javascript:void(0)" class="btn eb-btn-accent" data-bs-toggle="modal" data-bs-target="#selectIncidentForMeetingModal">
                             <i class="fa-solid fa-plus me-1"></i> Create Meeting
                         </a>
                     </div>
@@ -86,40 +86,16 @@
                     @endif
                 </div>
                 <div class="modal-footer">
-                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray">Cancel</a>
-                    <a href="javascript:void(0)" id="proceedToCreateMeeting" class="btn btn-themeBlue {{ $incidents->isEmpty() ? 'disabled' : '' }}">Proceed</a>
+                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn eb-btn-neutral">Cancel</a>
+                    <a href="javascript:void(0)" id="proceedToCreateMeeting" class="btn eb-btn-primary {{ $incidents->isEmpty() ? 'disabled' : '' }}">Proceed</a>
                 </div>
             </div>
         </div>
     </div>
     @endif
 
-     <div class="modal fade" id="bdVisa-iframeModel-modal-lg" tabindex="-1" aria-labelledby="myLargeModalLabel"
-        aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-            <div class="modal-header">
-                    <h5 class="modal-title" id="staticBackdropLabel">Download File</h5>
-                
-                    <a href="" class="btn btn-smbtn-primary downloadLink" target="_blank"> Download</a>
-                
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                
-                    <div class="modal-body">
-                    
-                            <div class=" ratio ratio-21x9" id="ViewModeOfFiles">
-
-                            </div>
-                    
-                    </div>
-                    <div class="modal-footer">
-                        <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                    </div>
-    
-            </div>
-        </div>
-    </div>
+     @include('partials._file_view_modal')
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -129,11 +105,11 @@
 
 @php
     $viewIcon = '<i class="fa-regular fa-eye"></i>';
-    $editIcon = asset("resorts_assets/images/edit.svg");
-    $trashIcon = asset("resorts_assets/images/trash-red.svg");
-    $updateIcon = asset("resorts_assets/images/update.svg");
+    $editIcon = '<i class="fa-solid fa-pen-to-square"></i>';
+    $trashIcon = '<i class="fa-regular fa-trash-can"></i>';
+    $updateIcon = '<i class="fa-solid fa-check"></i>';
     $viewRouteTemplate = route('incident.meeting.detail', '__MEETING_ID__'); // placeholder
-    $cancelIcon = asset("resorts_assets/images/cancel.svg");
+    $cancelIcon = '<i class="fa-solid fa-xmark"></i>';
 @endphp
 
 <script>
@@ -157,9 +133,10 @@
             window.location.href = "{{ route('incident.meeting.create', ':id') }}".replace(':id', encodedId);
         });
 
-        $('#dateFilter').datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true
+        flatpickr('#dateFilter', {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
 
         getIncidentMeetings();
@@ -188,11 +165,11 @@
             $timeCell.html(`<input type="time" id="edit-meeting-time-${meetingId}" class="form-control" value="${originalTime}" />`);
 
             $row.find("td:last-child").html(`
-                <a href="javascript:void(0)" class="update-row-btn btn-lg-icon icon-bg-green me-1" data-meeting-id="${meetingId}">
-                    <img src="{{ $updateIcon }}" alt="Update" class="img-fluid" />
+                <a href="javascript:void(0)" title="Update" class="update-row-btn btn-tableIcon btnIcon-success me-1" data-meeting-id="${meetingId}">
+                    {!! $updateIcon !!}
                 </a>
-                <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red mx-1 cancel-row-btn" data-meeting-id="${meetingId}">
-                    <img src="{{ $cancelIcon }}" alt="Update" class="img-fluid" />
+                <a href="javascript:void(0)" title="Cancel" class="btn-tableIcon eb-icon-neutral mx-1 cancel-row-btn" data-meeting-id="${meetingId}">
+                    {!! $cancelIcon !!}
                 </a>
                
             `);
@@ -230,14 +207,14 @@
             const viewUrl = "{{ $viewRouteTemplate }}".replace('__MEETING_ID__', meetingId);
 
             $row.find("td:last-child").html(`
-                <a href="${viewUrl}" title="View Meeting Detail" class="btn-tableIcon btnIcon-yellow me-1">
+                <a href="${viewUrl}" title="View Meeting Detail" class="btn-tableIcon btnIcon-teal me-1">
                     {!! $viewIcon !!}
                 </a>
-                <a href="javascript:void(0)" class="btn-lg-icon icon-bg-green me-1 edit-row-btn" data-meeting-id="${meetingId}">
-                    <img src="{{ $editIcon }}" alt="Edit" class="img-fluid" />
+                <a href="javascript:void(0)" class="btn-tableIcon btnIcon-yellow me-1 edit-row-btn" data-meeting-id="${meetingId}">
+                    {!! $editIcon !!}
                 </a>
-                <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-row-btn" data-meeting-id="${meetingId}">
-                    <img src="{{ $trashIcon }}" alt="Delete" class="img-fluid" />
+                <a href="javascript:void(0)" class="btn-tableIcon eb-icon-critical delete-row-btn" data-meeting-id="${meetingId}">
+                    {!! $trashIcon !!}
                 </a>
             `);
         });
@@ -271,14 +248,14 @@
                     const viewUrl = "{{ $viewRouteTemplate }}".replace('__MEETING_ID__', meetingId);
 
                     $row.find("td:last-child").html(`
-                        <a href="${viewUrl}" title="View Meeting Detail" class="btn-tableIcon btnIcon-yellow me-1">
+                        <a href="${viewUrl}" title="View Meeting Detail" class="btn-tableIcon btnIcon-teal me-1">
                             {!! $viewIcon !!}
                         </a>
-                        <a href="javascript:void(0)" class="btn-lg-icon icon-bg-green me-1 edit-row-btn" data-meeting-id="${meetingId}">
-                            <img src="{{ $editIcon }}" alt="Edit" class="img-fluid" />
+                        <a href="javascript:void(0)" class="btn-tableIcon btnIcon-yellow me-1 edit-row-btn" data-meeting-id="${meetingId}">
+                            {!! $editIcon !!}
                         </a>
-                        <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-row-btn" data-meeting-id="${meetingId}">
-                            <img src="{{ $trashIcon }}" alt="Delete" class="img-fluid" />
+                        <a href="javascript:void(0)" class="btn-tableIcon eb-icon-critical delete-row-btn" data-meeting-id="${meetingId}">
+                            {!! $trashIcon !!}
                         </a>
                     `);
                 },
@@ -296,14 +273,12 @@
 
             const meetingId = $(this).data('meeting-id');
 
-            Swal.fire({
+            wisdomConfirm({
+                role: 'destructive',
                 title: 'Sure want to delete?',
                 text: 'This cannot be undone',
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonText: 'Yes',
-                cancelButtonText: 'No',
-                confirmButtonColor: "#DD6B55"
+                confirmText: 'Yes',
+                cancelText: 'No'
             }).then((result) => {
                 if (result.isConfirmed) {
                     $.ajax({

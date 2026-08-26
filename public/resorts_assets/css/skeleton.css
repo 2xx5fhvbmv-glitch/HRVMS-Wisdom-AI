@@ -15,7 +15,7 @@
     position: absolute;
     width: 100%;
     height: 315px;
-    background-color: var(--green);
+    background-color: var(--teal);
     border-radius: 0 0 50px 50px;
 
 }

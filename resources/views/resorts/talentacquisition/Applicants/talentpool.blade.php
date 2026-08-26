@@ -48,7 +48,7 @@
                         @endif
                         <div class="col-xl-2 col-md-3 col-sm-4 col-6">
                             <select class="form-select  Positions" name="Positions">
-                                <option selected disabled>Select Poitions</option>
+                                <option selected disabled>Select Positions</option>
                            </select>
                         </div>
                         {{-- <div class="col-xl-2 col-md-3 col-sm-4 col-6">
@@ -197,23 +197,7 @@
     </div>
 
     {{-- File Viewer Modal --}}
-    <div class="modal fade" id="bdVisa-iframeModel-modal-lg" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Download File</h5>
-                    <a href="" class="btn btn-sm btn-primary downloadLink" target="_blank">Download</a>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="ratio ratio-21x9" id="ViewModeOfFiles"></div>
-                </div>
-                <div class="modal-footer">
-                    <a href="javascript:void(0)" id="document-dismiss" class="btn ta-btn-secondary ms-auto">Cancel</a>
-                </div>
-            </div>
-        </div>
-    </div>
+    @include('partials._file_view_modal', ['cancelId' => 'document-dismiss'])
 
 @endsection
 
@@ -225,10 +209,11 @@
 <script>
     $(document).ready(function () {
 
-        $('#consent_expiry_date').datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,
-            startDate: 'today',
+        flatpickr('#consent_expiry_date', {
+            dateFormat: 'd/m/Y',
+            minDate: 'today',
+            allowInput: true,
+            appendTo: document.body
         });
 
         // Was firing a full grid-HTML AJAX reload on every keystroke — typing
@@ -355,7 +340,7 @@
                 messages :
                 {
                     Reason: {
-                        required: "Reason is not exitest.",
+                        required: "Reason does not exist.",
                     }
                     ,
                     applicant_status_id: {
@@ -405,14 +390,11 @@
             var location = $(this).attr('data-location');
 
             // SweetAlert confirmation dialog
-            Swal.fire({
+            wisdomConfirm({
+                role: 'destructive',
                 title: "Are you sure?",
                 text: "This action will permanently delete the applicant.",
-                icon: "warning",
-                showCancelButton: true,
-                confirmButtonColor: "#3085d6",
-                cancelButtonColor: "#d33",
-                confirmButtonText: "Yes, delete it!"
+                confirmText: "Yes, delete it!"
             }).then((result) => {
                 if (result.isConfirmed) {
                     // Proceed with AJAX request after confirmation
@@ -423,19 +405,19 @@
                         success: function(response) {
                             $('#respond-rejectModal').modal('hide');
                             if (response.success) {
-                                Swal.fire(
-                                    "Deleted!",
-                                    response.message,
-                                    "success"
-                                );
+                                wisdomAlert({
+                                    type: 'success',
+                                    title: "Deleted!",
+                                    text: response.message
+                                });
                                 $("#talentPool_" + location).remove();
                                 DatatableList(); DatatableGrid();
                             } else {
-                                Swal.fire(
-                                    "Error!",
-                                    response.message,
-                                    "error"
-                                );
+                                wisdomAlert({
+                                    type: 'error',
+                                    title: "Error!",
+                                    text: response.message
+                                });
                             }
                         },
                         error: function(response) {
@@ -445,7 +427,11 @@
                                 console.log(error);
                                 errs += error + '<br>';
                             });
-                            Swal.fire("Error!", errs, "error");
+                            wisdomAlert({
+                                type: 'error',
+                                title: "Error!",
+                                text: errs
+                            });
                         }
                     });
                 }
@@ -472,14 +458,11 @@
             var location = $(this).attr('data-location');
 
             // SweetAlert confirmation dialog
-            Swal.fire({
+            wisdomConfirm({
+                role: 'destructive',
                 title: "Are you sure?",
                 text: "This action will permanently delete the applicant.",
-                icon: "warning",
-                showCancelButton: true,
-                confirmButtonColor: "#3085d6",
-                cancelButtonColor: "#d33",
-                confirmButtonText: "Yes, delete it!"
+                confirmText: "Yes, delete it!"
             }).then((result) => {
                 if (result.isConfirmed) {
                     // Proceed with AJAX request after confirmation
@@ -490,19 +473,19 @@
                         success: function(response) {
                             $('#respond-rejectModal').modal('hide');
                             if (response.success) {
-                                Swal.fire(
-                                    "Deleted!",
-                                    response.message,
-                                    "success"
-                                );
+                                wisdomAlert({
+                                    type: 'success',
+                                    title: "Deleted!",
+                                    text: response.message
+                                });
                                 $("#talentPool_" + location).remove();
                                 DatatableList(); DatatableGrid();
                             } else {
-                                Swal.fire(
-                                    "Error!",
-                                    response.message,
-                                    "error"
-                                );
+                                wisdomAlert({
+                                    type: 'error',
+                                    title: "Error!",
+                                    text: response.message
+                                });
                             }
                         },
                         error: function(response) {
@@ -512,7 +495,11 @@
                                 console.log(error);
                                 errs += error + '<br>';
                             });
-                            Swal.fire("Error!", errs, "error");
+                            wisdomAlert({
+                                type: 'error',
+                                title: "Error!",
+                                text: errs
+                            });
                         }
                     });
                 }

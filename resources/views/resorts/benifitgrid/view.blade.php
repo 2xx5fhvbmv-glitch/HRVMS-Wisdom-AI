@@ -84,7 +84,7 @@
                                         <span>{{$benefit_grid->food_and_beverages_discount}}</span>
                                     </li>
                                     <li class="d-sm-flex align-items-center justify-content-between list-group-item">
-                                        <p class="mb-sm-0 mb-1 fw-500">Alchoholic Beverages Discount(In %)</p>
+                                        <p class="mb-sm-0 mb-1 fw-500">Alcoholic Beverages Discount(In %)</p>
                                         <span>{{$benefit_grid->alchoholic_beverages_discount}}</span>
                                     </li>
                                     <li class="d-sm-flex align-items-center justify-content-between list-group-item">
@@ -104,7 +104,7 @@
                                         <span>{{$benefit_grid->ticket_upon_termination}}</span>
                                     </li>
                                     <li class="d-sm-flex align-items-center justify-content-between list-group-item">
-                                        <p class="mb-sm-0 mb-1 fw-500">MALE Subsistence Allowance(In Dollars)</p>
+                                        <p class="mb-sm-0 mb-1 fw-500">Male Subsistence Allowance(In Dollars)</p>
                                         <span>{{$benefit_grid->male_subsistence_allowance}}</span>
                                     </li>
 
@@ -134,7 +134,7 @@
                                         <span>{{$benefit_grid->accommodation_status}}</span>
                                     </li>
                                     <li class="d-sm-flex align-items-center justify-content-between list-group-item">
-                                        <p class="mb-sm-0 mb-1 fw-500">Furnitures and Fixtures</p>
+                                        <p class="mb-sm-0 mb-1 fw-500">Furniture and Fixtures</p>
                                         <span>{{$benefit_grid->furniture_and_fixtures}}</span>
                                     </li>
                                     <li class="d-sm-flex align-items-center justify-content-between list-group-item">

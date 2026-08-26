@@ -102,14 +102,15 @@
                 </form>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="submit" id="confirmRejectBtn" class="btn btn-danger">Reject</button>
+                <button type="button" class="btn eb-btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" id="confirmRejectBtn" class="btn eb-btn-critical">Reject</button>
             </div>
             
         </div>
     </div>
 </div>
 
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -130,7 +131,7 @@
                 }
             },
             error: function() {
-                 toastr.error("something went wrong.","Error",{
+                 toastr.error("Something went wrong.","Error",{
                     positionClass: 'toast-bottom-right'
                 });
             }

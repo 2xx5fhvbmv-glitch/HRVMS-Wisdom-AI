@@ -332,9 +332,9 @@ class LearningController extends Controller
                 ->addColumn('action', function ($row) use ($isManager) {
                     if (!$isManager) return ''; // Hide actions for HR & HOD
 
-                    $approveBtn = '<button class="btn btn-themeBlue btn-sm" onclick="updateLearningRequestStatus(' . $row->id . ', \'Approved\')">Approve</button>';
-                    $onHoldBtn = '<button class="btn btn-sm btn-warning" onclick="updateLearningRequestStatus(' . $row->id . ', \'On Hold\')">On Hold</button>';
-                    $rejectBtn = '<button class="btn btn-danger btn-sm" onclick="rejectLearningRequest(' . $row->id . ')">Deny</button>';
+                    $approveBtn = '<button class="btn lnd-btn-positive btn-sm" onclick="updateLearningRequestStatus(' . $row->id . ', \'Approved\')">Approve</button>';
+                    $onHoldBtn = '<button class="btn lnd-btn-neutral btn-sm" onclick="updateLearningRequestStatus(' . $row->id . ', \'On Hold\')">On Hold</button>';
+                    $rejectBtn = '<button class="btn lnd-btn-critical btn-sm" onclick="rejectLearningRequest(' . $row->id . ')">Deny</button>';
 
                     return ($row->status == 'Pending' || $row->status == 'On Hold') ? $approveBtn . ' ' . $onHoldBtn . ' ' . $rejectBtn : '';
                 })

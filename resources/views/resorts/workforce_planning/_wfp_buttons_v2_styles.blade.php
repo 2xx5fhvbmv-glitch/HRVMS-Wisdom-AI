@@ -70,11 +70,11 @@
 
     /* Additive action — Import Occupancy. */
     .wfp-btn-positive {
-        background: #E4F3E9;
-        color: #2E9E5B;
+        background: var(--positive-bg);
+        color: var(--positive);
     }
     .wfp-btn-positive:hover {
-        background: #2E9E5B;
+        background: var(--positive);
         color: #fff;
         transform: translateY(-2px);
         box-shadow: 0 8px 18px -8px rgba(20,35,42,.25);
@@ -88,12 +88,12 @@
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        color: #2E9E5B;
-        background: rgba(46, 158, 91, .09);
+        color: var(--positive);
+        background: rgba(31, 157, 107, .09);
     }
     .wfp-icon-positive:hover {
         color: #fff;
-        background: #2E9E5B;
+        background: var(--positive);
         transform: translateY(-2px);
         box-shadow: 0 8px 18px -8px rgba(20,35,42,.25);
     }

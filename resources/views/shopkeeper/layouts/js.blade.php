@@ -20,7 +20,53 @@
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script src="{{ URL::asset('resorts_assets/additionalJs/swatalart.min.js') }}"></script>
 <script src="{{ URL::asset('resorts_assets/additionalJs/sweetalert2.js') }}"></script>
+@include('resorts.layouts._confirm')
 <script src="https://cdnjs.cloudflare.com/ajax/libs/toastr.js/latest/toastr.min.js"></script>
+<script>
+    // Toastr re-theme glue (see toastr-theme.css, shared with the resort-admin
+    // and admin portals). One place so every existing toastr call in the
+    // shopkeeper portal gets the new frosted look automatically.
+    var wtPendingSticky = false;
+    if (window.toastr) {
+        toastr.options.closeButton = true;
+        toastr.options.progressBar = false;
+        toastr.options.closeOnHover = false;
+        toastr.options.showMethod = 'show';
+        toastr.options.hideMethod = 'hide';
+        toastr.options.timeOut = toastr.options.timeOut || 4500;
+        toastr.options.extendedTimeOut = toastr.options.timeOut;
+        toastr.options.onShown = function () {
+            var $t = $(this);
+            if (wtPendingSticky) { wtPendingSticky = false; return; }
+            $t.append(
+                $('<span class="wt-prog"></span>')
+                    .css('animation-duration', toastr.options.timeOut + 'ms')
+                    .on('animationend', function () { toastr.clear($t); })
+            );
+        };
+    }
+    function wisdomToast(type, title, message, opts) {
+        if (!window.toastr) return;
+        opts = opts || {};
+        var sticky = !!opts.sticky || !!(opts.list && opts.list.length);
+        var esc = function (s) {
+            return String(s).replace(/[&<>"']/g, function (c) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+            });
+        };
+        var html = esc(message || '');
+        if (opts.list && opts.list.length) {
+            html += '<ul class="wt-errlist">' + opts.list.map(function (i) { return '<li>' + esc(i) + '</li>'; }).join('') + '</ul>';
+        }
+        wtPendingSticky = sticky;
+        var $toast = toastr[type](html, title, {
+            timeOut: sticky ? 0 : toastr.options.timeOut,
+            extendedTimeOut: sticky ? 0 : toastr.options.timeOut,
+            escapeHtml: false
+        });
+        return $toast;
+    }
+</script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery-validate/1.19.3/jquery.validate.min.js"></script>
 
 

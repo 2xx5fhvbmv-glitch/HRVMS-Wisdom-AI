@@ -13,7 +13,7 @@
                         </div>
                     </div>
                     <div class="col-auto">
-                        <a href="{{ route('learning.manager.dashboard') }}" class="btn btn-theme">Back to Dashboard</a>
+                        <a href="{{ route('learning.manager.dashboard') }}" class="btn lnd-btn-neutral">Back to Dashboard</a>
                     </div>
                 </div>
             </div>
@@ -52,7 +52,7 @@
                                     </td>
                                     <td>
                                         <a href="{{ route('learning.schedule') }}?program_id={{ $row->program_id }}&employee_id={{ $row->employee_id }}"
-                                           class="btn btn-theme btn-sm">Schedule</a>
+                                           class="btn lnd-btn-accent btn-sm">Schedule</a>
                                     </td>
                                 </tr>
                             @empty
@@ -77,4 +77,5 @@
             </div>
         </div>
     </div>
+@include('resorts.Learning._learning_buttons_v2_styles')
 @endsection

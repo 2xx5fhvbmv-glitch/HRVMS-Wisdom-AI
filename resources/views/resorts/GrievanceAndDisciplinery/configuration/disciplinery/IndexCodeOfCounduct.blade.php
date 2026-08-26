@@ -62,7 +62,7 @@
     <div class="modal-dialog modal-dialog-centered modal-xl">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="staticBackdropLabel">Code of Counduct</h5>
+                <h5 class="modal-title" id="staticBackdropLabel">Code of Conduct</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form id="CodeOdfConductform">
@@ -135,13 +135,14 @@
 
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="submit" class="btn btn-primary">Save changes</button>
+                    <button type="button" class="btn eb-btn-neutral" data-bs-dismiss="modal">Close</button>
+                    <button type="submit" class="btn eb-btn-primary">Save changes</button>
                 </div>
             </form>
         </div>
     </div>
 </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -180,14 +181,12 @@
             var $button = $(this);
      
             var main_id = $(this).attr('data-Self_id');
-            Swal.fire({
+            wisdomConfirm({
+                role: 'destructive',
                 title: 'Sure want to delete?',
                 text: 'This cannot be undone',
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonText: 'Yes',
-                cancelButtonText: 'No',
-                confirmButtonColor: "#DD6B55"
+                confirmText: 'Yes',
+                cancelText: 'No'
             }).then((result) => {
                 if (result.isConfirmed) {
                     $.ajax({

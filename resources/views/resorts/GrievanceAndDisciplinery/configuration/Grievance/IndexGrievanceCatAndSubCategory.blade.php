@@ -56,6 +56,7 @@
         </div>
     </div>
 </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -66,12 +67,12 @@
 <script>
 
             $(".Grievance_Cat_idMain").select2({
-                placeholder: "Select Greivance Category",
+                placeholder: "Select Grievance Category",
                 allowClear: true,
                 width: '100%'        
             });
             $(".GrievanceSubcategories").select2({
-                placeholder: `Select Grieveance Sub Category `,
+                placeholder: `Select Grievance Sub Category `,
                 allowClear: true,
                 width: '100%'        
             });
@@ -111,14 +112,12 @@
             var $row = $button.closest("tr");
             var main_id = $(this).data('cat-id');
 
-            Swal.fire({
+            wisdomConfirm({
+                role: 'destructive',
                 title: 'Sure want to delete?',
                 text: 'This cannot be undone',
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonText: 'Yes',
-                cancelButtonText: 'No',
-                confirmButtonColor: "#DD6B55"
+                confirmText: 'Yes',
+                cancelText: 'No'
             }).then((result) => {
                 if (result.isConfirmed) {
                     $.ajax({
@@ -200,7 +199,7 @@
                     </div>    
                 </td>
                 <td class="py-1">
-                    <a href="javascript:void(0)" class="btn btn-theme update-row-btn_cat" data-cat-id="${Main_id}">Submit</a>
+                    <a href="javascript:void(0)" class="btn eb-btn-primary update-row-btn_cat" data-cat-id="${Main_id}">Submit</a>
                 </td>
             `;
             $row.html(editRowHtml);
@@ -225,12 +224,12 @@
                 });
                 
             $("#Grievance_Cat_idMain_1").select2({
-                placeholder: "Select Greivance Category",
+                placeholder: "Select Grievance Category",
                 allowClear: true,
                 width: '100%'        
             });
             $("#GrievanceSubcategories_1").select2({
-                placeholder: `Select Grieveance Sub Category `,
+                placeholder: `Select Grievance Sub Category `,
                 allowClear: true,
                 width: '100%'        
             });
@@ -319,7 +318,7 @@
                 });
 
                 $row.find('select[name="Gri_Sub_cat_id"]').select2({
-                    placeholder: `Select Grieveance Sub Category `,
+                    placeholder: `Select Grievance Sub Category `,
                     allowClear: true,
                     width: '100%'        
                 });

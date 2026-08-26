@@ -9,7 +9,7 @@
         <div class="col-12">
           <div class="card">
             <div class="card-header">
-              <h1>Resort Modules Pages </h1>
+              <h1>Resort Module Pages </h1>
               <div>
                   <a href="{{route('admin.ModulePages.create')}}" class="btn btn-primary float-right"><i class="fas fa-plus"></i> Add</a>
 

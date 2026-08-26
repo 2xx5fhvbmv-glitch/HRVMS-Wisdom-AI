@@ -22,7 +22,7 @@
                     </div>
                 </div>
                 <div class="col-auto">
-                    <a href="{{ route('resort.report.index') }}" class="btn btn-sm btn-themeSkyblue">Back to Reports</a>
+                    <a href="{{ route('resort.report.index') }}" class="btn eb-btn-secondary">Back to Reports</a>
                 </div>
             </div>
         </div>
@@ -183,10 +183,10 @@
                             </div>
 
                             <div class="col-12 d-flex flex-wrap gap-2 align-items-center">
-                                <button type="submit" class="btn btn-sm btn-theme" id="plRunBtn">Run Report</button>
+                                <button type="submit" class="btn eb-btn-primary btn-sm" id="plRunBtn">Run Report</button>
 
                                 <div class="dropdown">
-                                    <button class="btn btn-sm btn-primary dropdown-toggle plActionBtn" disabled type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                    <button class="btn eb-btn-accent dropdown-toggle plActionBtn" disabled type="button" data-bs-toggle="dropdown" aria-expanded="false">
                                         <i class="fa fa-download"></i> Export
                                     </button>
                                     <ul class="dropdown-menu">
@@ -196,8 +196,8 @@
                                     </ul>
                                 </div>
 
-                                <button type="button" class="btn btn-sm btn-theme plActionBtn" id="plInsightsBtn" disabled>WAI Insights</button>
-                                <button type="button" class="btn btn-sm btn-themeSkyblue d-none" id="plBackToData">Back to Data</button>
+                                <button type="button" class="btn eb-btn-accent plActionBtn" id="plInsightsBtn" disabled>WAI Insights</button>
+                                <button type="button" class="btn eb-btn-secondary d-none" id="plBackToData">Back to Data</button>
                             </div>
                         </form>
 
@@ -211,6 +211,7 @@
         </div>
     </div>
 </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')

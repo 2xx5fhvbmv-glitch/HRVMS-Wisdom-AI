@@ -63,6 +63,7 @@
     </div>
 </div>
 
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -112,14 +113,12 @@ $(document).on('click', '.delete-row-btn', function (e) {
             var $row = $button.closest("tr");
             var main_id = $(this).attr('data-cat-id');
 
-            Swal.fire({
+            wisdomConfirm({
+                role: 'destructive',
                 title: 'Sure want to delete?',
                 text: 'This cannot be undone',
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonText: 'Yes',
-                cancelButtonText: 'No',
-                confirmButtonColor: "#DD6B55"
+                confirmText: 'Yes',
+                cancelText: 'No'
             }).then((result) => {
                 if (result.isConfirmed) {
                     $.ajax({
@@ -180,7 +179,7 @@ $(document).on('click', '.delete-row-btn', function (e) {
                         </div>
                     </td>
                     <td class="py-1">
-                        <a href="javascript:void(0)" class="btn btn-theme update-row-btn_cat" data-cat-id="${Main_id}">Submit</a>
+                        <a href="javascript:void(0)" class="btn eb-btn-primary update-row-btn_cat" data-cat-id="${Main_id}">Submit</a>
                     </td>
                 `;
 

@@ -61,6 +61,7 @@
         </div>
     </div>
 </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -70,8 +71,8 @@
 
 @php
     $viewIcon = '<i class="fa-regular fa-eye"></i>';
-    $editIcon = asset("resorts_assets/images/edit.svg");
-    $trashIcon = asset("resorts_assets/images/trash-red.svg");
+    $editIcon = '<i class="fa-solid fa-pen-to-square"></i>';
+    $trashIcon = '<i class="fa-regular fa-trash-can"></i>';
     $viewRoute = route('incident.meeting.detail', '__MEETING_ID__'); // placeholder
 @endphp
 
@@ -102,14 +103,12 @@
             var $row = $button.closest("tr");
             var main_id = $(this).data('id');
 
-            Swal.fire({
+            wisdomConfirm({
+                role: 'destructive',
                 title: 'Sure want to delete?',
                 text: 'This cannot be undone',
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonText: 'Yes',
-                cancelButtonText: 'No',
-                confirmButtonColor: "#DD6B55"
+                confirmText: 'Yes',
+                cancelText: 'No'
             }).then((result) => {
                 if (result.isConfirmed) {
                     $.ajax({
@@ -172,8 +171,8 @@
                                 </select>`);
 
             $row.find("td:last-child").html(`
-                <button class="btn btn-sm btn-success update-row-btn me-1" data-id="${Main_id}">Update</button>
-                <button class="btn btn-sm btn-secondary cancel-row-btn" data-id="${Main_id}">Cancel</button>
+                <button class="btn btn-sm eb-btn-positive update-row-btn me-1" data-id="${Main_id}">Update</button>
+                <button class="btn btn-sm eb-btn-neutral cancel-row-btn" data-id="${Main_id}">Cancel</button>
             `);
 
             $row.data('original-member', orgMember);
@@ -194,11 +193,11 @@
             $row.find("td:nth-child(2)").text(orgRole);
 
             $row.find("td:last-child").html(`
-                <a href="javascript:void(0)" class="btn-lg-icon icon-bg-green me-1 edit-row-btn" data-id="${Main_Id}">
-                    <img src="{{ $editIcon }}" alt="Edit" class="img-fluid">
+                <a href="javascript:void(0)" class="btn-tableIcon btnIcon-yellow me-1 edit-row-btn" data-id="${Main_Id}">
+                    {!! $editIcon !!}
                 </a>
-                <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-row-btn" data-id="${Main_Id}">
-                    <img src="{{ $trashIcon }}" alt="Delete" class="img-fluid">
+                <a href="javascript:void(0)" class="btn-tableIcon eb-icon-critical delete-row-btn" data-id="${Main_Id}">
+                    {!! $trashIcon !!}
                 </a>
             `);
         });
@@ -246,7 +245,7 @@
                         }
                         else
                         {
-                            errorMessage = "An error occurred while Create or Update."; // Default error message
+                            errorMessage = "An error occurred while creating or updating."; // Default error message
                         }
 
                         toastr.error(errorMessage, "Error", {

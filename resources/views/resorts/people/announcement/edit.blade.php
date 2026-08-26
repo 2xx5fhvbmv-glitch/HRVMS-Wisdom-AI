@@ -98,16 +98,17 @@
             </div>
             <div class="modal-body">
                 <label for="scheduled_date" class="form-label">Select Date</label>
-                <input type="text" id="scheduled_date" class="form-control datepicker" min="{{ date('Y-m-d') }}">
+                <input type="text" id="scheduled_date" class="form-control" min="{{ date('Y-m-d') }}">
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary btn-sm" onclick="confirmScheduled()">Confirm</button>
+                <button type="button" class="btn eb-btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn eb-btn-primary btn-sm" onclick="confirmScheduled()">Confirm</button>
             </div>
             </div>
         </div>
     </div>
 
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -119,7 +120,11 @@
 
     $(document).ready(function () {
         $('.select2t-none').select2();
-        $('.datepicker').datepicker();
+        flatpickr('#scheduled_date', {
+            dateFormat: 'm/d/Y',
+            allowInput: true,
+            appendTo: document.body
+        });
         form = $("#editAnnouncement").parsley();
         const selectedEmployeeId = $('#employee_name').val();
         if (selectedEmployeeId) {

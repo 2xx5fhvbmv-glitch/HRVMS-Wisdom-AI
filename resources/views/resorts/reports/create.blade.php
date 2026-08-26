@@ -28,7 +28,7 @@
                         <h3>Reports</h3>
                     </div>
                     <div class="col-auto">
-                        <a href="{{ route('resort.report.index')}}" class="btn btn-sm btn-theme "> Report List</a>
+                        <a href="{{ route('resort.report.index')}}" class="btn eb-btn-secondary"> Report List</a>
                     </div>
                 </div>  
             </div> 
@@ -132,15 +132,15 @@
                         You can add filters after selecting columns
                     </div>
                 </div>
-                <button type="button" class="btn btn-info mt-2" id="add-filter" style="display: none;">
+                <button type="button" class="btn eb-btn-secondary mt-2" id="add-filter" style="display: none;">
                     Add Filter
                 </button>
             </div>
 
             <!-- Submit -->
             <div class="col-md-12 form-group">
-                <button type="submit" class="btn btn-sm btn-theme">Save Report</button>
-                <a href="{{ route('resort.report.index') }}" class="btn btn-sm btn-danger">Cancel</a>
+                <button type="submit" class="btn eb-btn-primary">Save Report</button>
+                <a href="{{ route('resort.report.index') }}" class="btn eb-btn-neutral">Cancel</a>
             </div>
         </div>
     </form>
@@ -149,6 +149,7 @@
         </div>
     </div>
 </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -158,15 +159,15 @@
 <script>
      $(document).ready(function() {
 
-          $("#todate").datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,      // Close the picker after selection
-            todayHighlight: true  // Highlight today's date
+          flatpickr("#todate", {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
-         $("#formdate").datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,      // Close the picker after selection
-            todayHighlight: true  // Highlight today's date
+         flatpickr("#formdate", {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
      
         $('#report-create-form').parsley();
@@ -270,7 +271,7 @@
                                 <input type="text" name="filters[${filterCount}][value]" class="form-control" placeholder="Value" required>
                             </div>
                             <div class="col-md-2">
-                                <button type="button" class="btn btn-danger remove-filter">Remove</button>
+                                <button type="button" class="btn eb-btn-critical remove-filter">Remove</button>
                             </div>
                         </div>
                     </div>

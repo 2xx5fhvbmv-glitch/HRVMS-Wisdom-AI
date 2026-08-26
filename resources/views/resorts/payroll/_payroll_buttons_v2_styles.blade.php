@@ -71,11 +71,11 @@
     /* Affirming but not the finale — Approve (per approval step), Confirm
        payment consent, Mark selected as Paid, Update (save an edit). */
     .payroll-btn-positive {
-        background: #E4F3E9;
-        color: #2E9E5B;
+        background: var(--positive-bg);
+        color: var(--positive);
     }
     .payroll-btn-positive:hover {
-        background: #2E9E5B;
+        background: var(--positive);
         color: #fff;
         transform: translateY(-2px);
         box-shadow: 0 8px 18px -8px rgba(20,35,42,.25);

@@ -51,7 +51,7 @@
                                                 </div>
                                             </div>
                                             <div class="col-sm-2 d-flex align-items-end">
-                                                <a href="#" class="btn btn-danger btn-sm removeReason d-none">Remove</a>
+                                                <a href="#" class="btn eb-btn-critical btn-sm removeReason d-none">Remove</a>
                                             </div>
                                         </div>
 
@@ -211,7 +211,7 @@
                                                 </div>
                                             </div>
                                             <div class="col-sm-2 d-flex align-items-end">
-                                                <a href="#" class="btn btn-danger btn-sm removeIncrementType d-none">Remove</a>
+                                                <a href="#" class="btn eb-btn-critical btn-sm removeIncrementType d-none">Remove</a>
                                             </div>
                                         </div>
                                     </div>
@@ -264,7 +264,7 @@
                                                 </div>
                                             </div>
                                             <div class="col-xxl-2 col-lg-6 col-md-2 col-sm-2 d-flex align-items-end">
-                                                <a href="#" class="btn btn-danger btn-sm removeNotice d-none">Remove</a>
+                                                <a href="#" class="btn eb-btn-critical btn-sm removeNotice d-none">Remove</a>
                                             </div>
                                         </div>
                                     </div>
@@ -367,7 +367,7 @@
                                     <option value="fail">Probation Unsuccessful Letter</option>
                                     <option value="promotion">Promotion Letter</option>
                                     <option value="offer">Offer Letter</option>
-                                    <option value="experience">Experiance\Employment Letter</option>
+                                    <option value="experience">Experience\Employment Letter</option>
                                 </select>
                             </div>
                             <div id="div-type"></div>
@@ -462,6 +462,7 @@
             </div>
         </div>
     </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -486,7 +487,7 @@
                                 <input type="text" class="form-control" name="category_name[]" placeholder="Category Name">
                             </div>
                             <div class="col d-flex align-items-end">
-                                <a href="#" class="btn btn-danger btn-sm removeCategory">Remove</a>
+                                <a href="#" class="btn eb-btn-critical btn-sm removeCategory">Remove</a>
                             </div>
                         </div>
                     </div>
@@ -585,7 +586,7 @@
                 },
                 messages: {
                     type: {
-                        required: "Please Select Type .",
+                        required: "Please Select Type.",
                     },
                     MailSubject: {
                         required: "Please enter the email subject.",
@@ -1168,7 +1169,7 @@
                             valid = false;     
                             $btn.find('.increment-btn-loader').addClass('d-none');
                             $btn.find('.increment-btn-text').removeClass('d-none'); 
-                            toastr.error('Incriment Type field is required.', "Validation Error", {
+                            toastr.error('Increment Type field is required.', "Validation Error", {
                                 positionClass: 'toast-bottom-right'
                             });      
                         }
@@ -1197,7 +1198,7 @@
                         error: function (xhr) {
                             $btn.find('.increment-btn-loader').addClass('d-none');
                             $btn.find('.increment-btn-text').removeClass('d-none');
-                            toastr.error("Something went worng", "Error", {
+                            toastr.error("Something went wrong", "Error", {
                                 positionClass: 'toast-bottom-right'
                             });
                         }

@@ -10,7 +10,7 @@
         <div class="col-xxl-cust5 col-xl-3 col-lg-4 col-sm-6">
             <div class="empListPeopleEmp-block">
                 <div class="dropdown table-dropdown ">
-                    <button class="btn btn-secondary dropdown-toggle dotsV-link" type="button"
+                    <button class="btn eb-btn-ghost dropdown-toggle dotsV-link" type="button"
                         id="dropdownMenuButton1" data-bs-toggle="dropdown" aria-expanded="false">
                         <i class="fa-solid fa-ellipsis-vertical"></i>
                     </button>
@@ -41,19 +41,19 @@
                 <div class="block">
                     <table>
                         <tr><td>Department:</td><td>{{ $employee->department->name ?? '-' }}</td></tr>
-                        <tr><td>Status</td><td>
+                        <tr><td>Status:</td><td>
                             @if($employee->status == 'Active')
                                 <span class="badge badge-themeSuccess">{{ $employee->status }}</span>
                             @else
                                 <span class="badge badge-themeDanger">{{ $employee->status }}</span>
                             @endif
                         </td></tr>
-                        <tr><td>Employment Type</td><td>{{$employee->employment_type}}</td></tr>
+                        <tr><td>Employment Type:</td><td>{{$employee->employment_type}}</td></tr>
                         {{-- Email + phone surfaced on the card so HR can dial / mail
                              without clicking into the profile. Email truncates when
                              long; full address sits in the title attribute on hover. --}}
                         <tr>
-                            <td>Mobile</td>
+                            <td>Mobile:</td>
                             <td>
                                 @php $_mob = $employee->resortAdmin->personal_phone ?? null; @endphp
                                 @if($_mob)
@@ -64,7 +64,7 @@
                             </td>
                         </tr>
                         <tr>
-                            <td>Email</td>
+                            <td>Email:</td>
                             <td>
                                 @php $_em = $employee->resortAdmin->email ?? null; @endphp
                                 @if($_em)
@@ -87,3 +87,4 @@
         </div>
     @endforeach
 @endif
+@include('resorts._emotional_buttons_v2_styles')

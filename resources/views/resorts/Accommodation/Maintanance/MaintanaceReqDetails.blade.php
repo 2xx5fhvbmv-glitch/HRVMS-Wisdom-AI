@@ -52,7 +52,7 @@
                                     <td>{{ $MaintanaceRequest->Date }}</td>
                                 </tr>
                                 <tr>
-                                    <th>Priority :</th>
+                                    <th>Priority:</th>
                                     <td>
                                         {!! $MaintanaceRequest->Priority !!}
                                     </td>
@@ -225,7 +225,7 @@
                                                 }
                                             @endphp
                                         </p>
-                                        <span>Submited Request</span>
+                                        <span>Submitted Request</span>
 
                                     </li>
                                     <li class="{{ in_array('Open', $displayedStatuses) ? 'active' : '' }}">
@@ -282,12 +282,13 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
+                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Cancel</a>
                 </div>
                 </form>
             </div>
         </div>
     </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')

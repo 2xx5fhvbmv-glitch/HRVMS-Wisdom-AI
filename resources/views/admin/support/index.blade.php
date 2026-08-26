@@ -358,7 +358,7 @@
                 location.reload(); // Refresh page to show the new reply
             },
             error: function(xhr) {
-                toastr.success('An error occurred while sending the reply.', "Success", {
+                toastr.error('An error occurred while sending the reply.', "Error", {
                     positionClass: 'toast-bottom-right'
                 });
             }

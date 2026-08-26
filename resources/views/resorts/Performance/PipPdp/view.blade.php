@@ -13,7 +13,7 @@
                     </div>
                 </div>
                 <div class="col-auto">
-                    <a href="{{ route('Performance.' . $kind . '.index') }}" class="btn btn-themeBlue btn-sm">
+                    <a href="{{ route('Performance.' . $kind . '.index') }}" class="btn perf-btn-secondary btn-sm">
                         <i class="fa-solid fa-arrow-left"></i> Back
                     </a>
                 </div>
@@ -67,7 +67,7 @@
 
                         @if($canEdit)
                             <div class="text-end mt-3">
-                                <button type="submit" class="btn btn-themeBlue btn-sm">Submit Form</button>
+                                <button type="submit" class="btn perf-btn-primary btn-sm">Submit Form</button>
                             </div>
                         @endif
                     </form>
@@ -76,6 +76,7 @@
         </div>
     </div>
 </div>
+@include('resorts.Performance._performance_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -114,7 +115,7 @@
 
             var data = collectFormData();
             if (!validateRequired(data)) {
-                toastr.error('Please fill all required fields', 'Validation error', { positionClass: 'toast-bottom-right' });
+                toastr.error('Please fill all required fields', 'Validation Error', { positionClass: 'toast-bottom-right' });
                 return;
             }
 
@@ -152,7 +153,7 @@
                     if (payload.errors) {
                         var msg = '';
                         $.each(payload.errors, function(k, v) { msg += v + '<br>'; });
-                        toastr.error(msg, 'Validation error', { positionClass: 'toast-bottom-right' });
+                        toastr.error(msg, 'Validation Error', { positionClass: 'toast-bottom-right' });
                     } else {
                         toastr.error(payload.message || 'Failed to submit', 'Error', { positionClass: 'toast-bottom-right' });
                     }
@@ -217,7 +218,7 @@
                         if (value) {
                             var fileUrl = "{{ url('resort/performance/' . $kind . '/' . $plan->id . '/file') }}/" + encodeURIComponent(fieldName);
                             var name = String(value).split('/').pop().replace(/^\d+_/, '');
-                            html += '<a href="' + fileUrl + '" class="btn btn-themeLight btn-sm"><i class="fa-solid fa-file-arrow-down me-1"></i>' + name + '</a>';
+                            html += '<a href="' + fileUrl + '" class="btn perf-btn-secondary btn-sm"><i class="fa-solid fa-file-arrow-down me-1"></i>' + name + '</a>';
                         } else {
                             html += '<span class="text-muted">No file uploaded</span>';
                         }

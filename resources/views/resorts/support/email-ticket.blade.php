@@ -79,32 +79,8 @@
             </div>
         </div>
     </div>
-    <div class="modal fade" id="bdVisa-iframeModel-modal-lg" tabindex="-1" aria-labelledby="myLargeModalLabel"
-        aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-            <div class="modal-header">
-                    <h5 class="modal-title" id="staticBackdropLabel">Download File</h5>
-                
-                    <a href="" class="btn btn-smbtn-primary downloadLink" target="_blank"> Download</a>
-                
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                
-                    <div class="modal-body">
-                    
-                            <div class=" ratio ratio-21x9" id="ViewModeOfFiles">
-
-                            </div>
-                    
-                    </div>
-                    <div class="modal-footer">
-                        <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                    </div>
-    
-            </div>
-        </div>
-    </div>
+    @include('partials._file_view_modal')
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')

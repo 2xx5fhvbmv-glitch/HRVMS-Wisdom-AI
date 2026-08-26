@@ -99,7 +99,7 @@
                             <td
                                 style="color: #fff;font-size: 14px;font-weight: 400;    line-height: 21px;padding:3px 15px 15px  20px;text-align: right;">
                                 {{$ResortData->address1}},
-                                {{$ResortData->address2}},,
+                                {{$ResortData->address2}},
                                 {{$ResortData->state}},   {{$ResortData->city}},
                                 {{$ResortData->zip}},  {{$ResortData->country}}</td>
                         </tr>

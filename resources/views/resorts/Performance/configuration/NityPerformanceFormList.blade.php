@@ -31,7 +31,7 @@
                 <div class="col-lg-12">
                     <div class="card">
                         <div class="card-title">
-                            <h3>90 Peformance</h3>
+                            <h3>90 Performance</h3>
                             <div class="text-end">
                             </div>
                         </div>
@@ -186,7 +186,7 @@
 
         if(!isNaN(formname))
         {
-            toastr.error('Please enter  form Name.', "Error", {
+            toastr.error('Please enter Form Name.', "Error", {
                     positionClass: 'toast-bottom-right'
                 });
 
@@ -237,15 +237,13 @@
             // Get the division ID from the data attribute
             var main_id = $(this).data('id');
 
-            Swal.fire({
+            wisdomConfirm({
+                role: 'destructive',
                 title: 'Sure want to delete?',
                 text: 'This cannot be undone',
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonText: 'Yes',
-                cancelButtonText: 'No',
-                confirmButtonColor: "#DD6B55"
-             }).then((result) => {
+                confirmText: 'Yes',
+                cancelText: 'No'
+            }).then((result) => {
                 if (result.isConfirmed)
                 {
 

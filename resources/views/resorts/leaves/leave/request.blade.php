@@ -67,9 +67,9 @@
                         <div class="col-xl-2 col-md-3 col-sm-4 col-6">
                             <button class="btn leave-btn-neutral btn-sm" id="clearFilter">Clear Filter</button>
                         </div>
-                        <div class="col-auto ms-auto leave-tabnav">
-                            <a href="javascript:void(0);" class="btn-grid active"><img src="{{ URL::asset('resorts_assets/images/grid.svg')}}" alt="icon"></a>
-                            <a href="javascript:void(0);" class="btn-list "><img src="{{ URL::asset('resorts_assets/images/list.svg')}}" alt="icon"></a>
+                        <div class="col-auto ms-auto">
+                            <a href="javascript:void(0);" class="btn btn-grid active"><img src="{{ URL::asset('resorts_assets/images/grid.svg')}}" alt="icon"></a>
+                            <a href="javascript:void(0);" class="btn btn-list "><img src="{{ URL::asset('resorts_assets/images/list.svg')}}" alt="icon"></a>
                         </div>
                     </div>
                 </div>
@@ -550,7 +550,7 @@
                                         <img src="/resorts_assets/images/pdf1.svg" alt="icon">
                                     </a>`;
                         } else {
-                            return 'No attachements';  // Return an empty string if there's no attachment
+                            return 'No attachments';  // Return an empty string if there's no attachment
                         }
                     }
                 },

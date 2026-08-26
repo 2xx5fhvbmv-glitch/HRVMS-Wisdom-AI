@@ -472,10 +472,10 @@
                 "placeholder": "Select Position",
                 "allowClear": true
             });
-            $('.datepicker').datepicker({
-                format: 'dd/mm/yyyy',
-                autoclose: true,      // Close the picker after selection
-                todayHighlight: true  // Highlight today's date
+            flatpickr('.datepicker', {
+                dateFormat: 'd/m/Y',
+                allowInput: true,
+                appendTo: document.body
             });
             flatpickr(".overtime", {
                 enableTime: true,
@@ -483,6 +483,12 @@
                 dateFormat: "h:i", // 12-hour format without AM/PM
                 time_24hr: false,  // Ensures 12-hour format
                 minuteIncrement: 1, // Allows 1-minute steps
+                // developer.min.css force-hides .flatpickr-am-pm below 424px; now that
+                // flatpickr's own popover always mounts on mobile (disableMobile:true,
+                // set globally), undo that here so AM/PM stays visible on phones too.
+                onReady: function (selectedDates, dateStr, instance) {
+                    instance.amPM.style.setProperty('display', 'inline-block', 'important');
+                }
             });
 
             $('#OverTimeform').validate({

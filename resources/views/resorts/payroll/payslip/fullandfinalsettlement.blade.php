@@ -227,7 +227,7 @@
                                             placeholder="Pension" data-parsley-required="true" readonly>
                                     </div>
                                     <div class="col-xl-4 col-sm-6">
-                                        <label for="loan_payment" class="form-label">LOAN OR ADVANCE PAYMENT? (<span class="display-currency-label">{{ $displayCurrencyCode ?? 'MVR' }}</span>)<span class="red-mark">*</span></label>
+                                        <label for="loan_payment" class="form-label">LOAN OR ADVANCE PAYMENT (<span class="display-currency-label">{{ $displayCurrencyCode ?? 'MVR' }}</span>)<span class="red-mark">*</span></label>
                                         <input type="text" id="loan_payment" name="loan_payment" class="form-control money-field"
                                             placeholder="Enter Amount" data-parsley-required="true" readonly>
                                         {{-- Loan vs Salary Advance bucket breakdown — built
@@ -563,7 +563,7 @@
             '</td>' +
             '<td class="text-end">' +
                 (custom
-                    ? '<button type="button" class="btn btn-sm btn-link text-danger p-0 payable-leave-remove"' +
+                    ? '<button type="button" class="btn btn-sm eb-btn-critical text-danger p-0 payable-leave-remove"' +
                       ' title="Remove row"><i class="fa-solid fa-trash"></i></button>'
                     : '') +
             '</td>' +
@@ -943,7 +943,7 @@
             '<td class="text-end">' + formatMoney(mvrToDisplay(dailyRate)) + '</td>' +
             '<td class="text-end payable-leave-amount">' + formatMoney(0) + '</td>' +
             '<td class="text-end">' +
-                '<button type="button" class="btn btn-sm btn-link text-danger p-0 payable-leave-remove"' +
+                '<button type="button" class="btn btn-sm eb-btn-critical text-danger p-0 payable-leave-remove"' +
                 ' title="Remove row"><i class="fa-solid fa-trash"></i></button>' +
             '</td>' +
         '</tr>');
@@ -1438,7 +1438,7 @@
                             data-parsley-type="number" data-parsley-min="0" data-parsley-required-if="#deductionFor" data-parsley-trigger="change">
                     </div>
                     <div class="col-xl-3 col-sm">
-                         <input type="text" class="form-control amount-unit" name="amount_unit[]" placeholder="Amount Unit" redaonly>
+                         <input type="text" class="form-control amount-unit" name="amount_unit[]" placeholder="Amount Unit" readonly>
                      </div>
                     <div class="col-xl-3 col-auto align-self-end">
                         <a href="#" class="btn payroll-btn-secondary btn-sm remove-deduction">Remove</a>

@@ -162,7 +162,7 @@
                                                     <input type="color" name="themes[{{ $index }}][color]"
                                                         value="{{ $theme->color }}" style="top: 28% !important;">
                                                     <button type="button"
-                                                        class="btn btn-danger remove-theme-btn">Remove</button>
+                                                        class="btn eb-btn-critical remove-theme-btn">Remove</button>
                                                 </div>
                                             </div>
                                         @endforeach
@@ -175,7 +175,7 @@
                                                     value="On Time">
                                                 <input type="color" name="themes[0][color]" value="#63C67E" style="top: 28% !important;">
                                                 <button type="button"
-                                                    class="btn btn-danger remove-theme-btn">Remove</button>
+                                                    class="btn eb-btn-critical remove-theme-btn">Remove</button>
                                             </div>
                                         </div>
                                         <div class="col-sm-6 theme-row" data-theme-id="new">
@@ -185,7 +185,7 @@
                                                     value="Late">
                                                 <input type="color" name="themes[1][color]" value="#A264F7" style="top: 28% !important;">
                                                 <button type="button"
-                                                    class="btn btn-danger remove-theme-btn">Remove</button>
+                                                    class="btn eb-btn-critical remove-theme-btn">Remove</button>
                                             </div>
                                         </div>
                                     @endif
@@ -711,10 +711,10 @@
 
 
             $("#fileUploadForm").parsley();
-            $("#start_date , #end_date").datepicker({
-                format: 'dd/mm/yyyy',
-                autoclose: true,      // Close the picker after selection
-                todayHighlight: true  // Highlight today's date
+            flatpickr("#start_date , #end_date", {
+                dateFormat: 'd/m/Y',
+                allowInput: true,
+                appendTo: document.body
             });
             $("#ResortDivision").select2({
                 placeholder: "Select Division"
@@ -961,15 +961,12 @@
 
 
                 // Show SweetAlert2 confirmation
-                Swal.fire({
+                wisdomConfirm({
+                    role: 'destructive',
                     title: 'Are you sure?',
                     text: "You won't be able to revert this!",
-                    icon: 'warning',
-                    showCancelButton: true,
-                    confirmButtonColor: '#3085d6',
-                    cancelButtonColor: '#d33',
-                    confirmButtonText: 'Yes, remove it!',
-                    cancelButtonText: 'No, cancel!'
+                    confirmText: 'Yes, remove it!',
+                    cancelText: 'No, cancel!'
                 }).then((result) => {
                     if (result.isConfirmed) {
 
@@ -1424,10 +1421,10 @@
                 },
                 messages: {
                     latitude: {
-                        required: "Please Calculate and enter Resort Latitude.",
+                        required: "Please calculate and enter Resort Latitude.",
                     },
                     longitude: {
-                        required: "Please Calculate and enter Resort longitude..",
+                        required: "Please calculate and enter Resort Longitude.",
                     }
                 },
                 submitHandler: function(form) {
@@ -2256,7 +2253,7 @@
                     <div class="inputCustom-color">
                         <input type="text" name="themes[${index}][name]" placeholder="Label (e.g., Overtime)" class="form-control mb-2">
                         <input type="color" name="themes[${index}][color]" value="#000000" style="top: 28% !important;">
-                        <button type="button" class="btn btn-danger remove-theme-btn">Remove</button>
+                        <button type="button" class="btn eb-btn-critical remove-theme-btn">Remove</button>
                     </div>
                 </div>
             `;
@@ -2341,7 +2338,7 @@
                                 <div class="inputCustom-color">
                                     <input type="text" name="themes[${index}][name]" placeholder="Label" class="form-control mb-2" value="${theme.name}">
                                     <input type="color" name="themes[${index}][color]" value="${theme.color}" style="top: 28% !important;">
-                                    <button type="button" class="btn btn-danger remove-theme-btn">Remove</button>
+                                    <button type="button" class="btn eb-btn-critical remove-theme-btn">Remove</button>
                                 </div>
                             </div>
                         `;

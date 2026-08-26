@@ -111,10 +111,16 @@
                                     <div class="wai-row-body">
                                         <h6>{{ $visaInsights[$vc['key']]['title'] ?? '' }}</h6>
                                         <p class="wai-row-text">{{ $visaInsights[$vc['key']]['body'] ?? '' }}</p>
-                                        @if($hasRecommendation)
-                                            <p class="wai-row-recommendation"><strong>Recommendation:</strong> {{ $visaInsights[$vc['key']]['recommendation'] }}</p>
-                                        @endif
-                                        <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#{{ $vc['modal'] }}" class="wai-row-link">View details &rarr;</a>
+                                        <div class="lnkrow">
+                                            @if($hasRecommendation)
+                                                <button type="button" class="lnk-rec"
+                                                    data-title="{{ $visaInsights[$vc['key']]['title'] ?? '' }}"
+                                                    data-rec="{{ $visaInsights[$vc['key']]['recommendation'] }}"
+                                                    data-details="{{ $vc['modal'] }}">View recommendation &rarr;</button>
+                                                <span class="sep"></span>
+                                            @endif
+                                            <a href="#" class="lnk" data-details="{{ $vc['modal'] }}">View details &rarr;</a>
+                                        </div>
                                     </div>
                                 </div>
                             @endforeach
@@ -362,7 +368,7 @@
                                         <label for="attachments" class="form-label">ATTACHMENTS</label>
                                         <div class="uploadFile-block">
                                             <div class="uploadFile-btn">
-                                                <a href="javascript:void(0)" class="btn btn-themeBlue btn-sm">Upload Files</a>
+                                                <a href="javascript:void(0)" class="btn eb-btn-accent btn-sm">Upload Files</a>
                                                 <input type="file" name="transectionFile" id="uploadFile" name="attachment">
                                             </div>
                                             <div class="uploadFile-text"></div>
@@ -371,7 +377,7 @@
                                 </div>
 
                                 <div class="card-footer text-end mt-xl-4 mt-3">
-                                    <button type="submit" class="btn btn-themeBlue btn-sm">Transfer Amount</button>
+                                    <button type="submit" class="btn eb-btn-primary btn-sm">Transfer Amount</button>
                                 </div>
                             </form>
 
@@ -417,8 +423,8 @@
                                                         <div class="reconciliation-block">
                                                             <div>
                                                                 <div class="d-flex align-items-center">
-                                                                       <h6>{{$VisaWallet->Xpact_WalletName}}   <a href="javascript:void(0)" class="edit-visa-wallet"  data-amt="{{base64_encode($VisaWallet->Xpact_Amt)}}" data-name="{{base64_encode($VisaWallet->Xpact_WalletName)}}" data-id="{{ base64_encode($VisaWallet->id) }}" class="me-2">
-                                                                        <img src="{{URL::asset('resorts_assets/images/edit.svg')}}" alt="icon">
+                                                                       <h6>{{$VisaWallet->Xpact_WalletName}}   <a href="javascript:void(0)" class="btn-tableIcon btnIcon-yellow edit-visa-wallet me-2" title="Edit" data-amt="{{base64_encode($VisaWallet->Xpact_Amt)}}" data-name="{{base64_encode($VisaWallet->Xpact_WalletName)}}" data-id="{{ base64_encode($VisaWallet->id) }}">
+                                                                        <i class="fa-solid fa-pen-to-square"></i>
                                                                     </a> </h6>
                                                                 </div>
                                                             
@@ -553,8 +559,8 @@
                 </div>
 
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-                    <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                    <button type="button" class="btn eb-btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                 </div>
             </form>
         </div>
@@ -576,7 +582,7 @@
                                     <th>ID</th>
                                     <th>Name</th>
                                     <th>Position</th>
-                                    <th>Departmeent</th>
+                                    <th>Department</th>
                                 </tr>
                             </thead>
                             <tbody id="NatioanlityWiseEmployee-table">
@@ -586,13 +592,15 @@
                 </div>
 
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <button type="button" class="btn eb-btn-secondary" data-bs-dismiss="modal">Close</button>
                 </div>
           
         </div>
     </div>
 </div>
 @includeWhen(isset($visaInsights), 'resorts.Visa.dashboard._insight_modals')
+@includeWhen(isset($visaInsights), 'partials._wai_insight_modals')
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -638,7 +646,6 @@
     .wai-narrative .wai-row-body { flex: 1 1 auto; min-width: 0; }
     .wai-narrative .wai-row-body h6 { margin: 0 0 4px; font-size: 13.5px; font-weight: 700; color: #14232A; }
     .wai-narrative .wai-row-text { margin: 0 0 4px; font-size: 12.5px; color: #5D6F75; line-height: 1.5; }
-    .wai-narrative .wai-row-recommendation { margin: 0 0 4px; font-size: 12.5px; color: #0e8a9e; line-height: 1.5; }
     .wai-narrative .wai-row-link { display: inline-block; margin-top: 2px; font-size: 12px; font-weight: 600; color: #014653; }
 </style>
 @endsection
@@ -804,17 +811,15 @@ $(document).ready(function ()
         allowClear: true,
     });
 
-    $("#DepositeDate").datepicker({
-        format: 'dd-mm-yyyy',
-        autoclose: true, // Close after selecting a date
-        todayHighlight: true,
-        clearBtn: true,
+    flatpickr('#DepositeDate', {
+        dateFormat: 'd-m-Y',
+        allowInput: true,
+        appendTo: document.body
     });
-    $("#expiryDate").datepicker({
-        format: 'dd-mm-yyyy',
-        autoclose: true, // Close after selecting a date
-        todayHighlight: true,
-        clearBtn: true,
+    flatpickr('#expiryDate', {
+        dateFormat: 'd-m-Y',
+        allowInput: true,
+        appendTo: document.body
     });
     $("#expiryDate").on("change",function()
     {

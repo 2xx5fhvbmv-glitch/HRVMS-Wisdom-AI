@@ -93,8 +93,8 @@
                         <input type="hidden" name="count" id="count" value="1">
 
                         <div class="card-footer text-end">
-                            <a href="javascript:void(0)" class="btn btn-themeSkyblue btn-sm SaveAndAdd">Add Another</a>
-                            <button type="submit" href="#" class="btn btn-themeBlue ms-1 btn-sm">Submit</button>
+                            <a href="javascript:void(0)" class="btn eb-btn-accent btn-sm SaveAndAdd">Add Another</a>
+                            <button type="submit" href="#" class="btn eb-btn-primary ms-1 btn-sm">Submit</button>
                         </div>
                     </form>
 
@@ -144,7 +144,7 @@
                             </select>
                         </div> -->
                         <div class="col-auto">
-                            <button class="btn btn-themeBlue btn-sm" id="clearFilter">Clear Filter</button>
+                            <button class="btn eb-btn-neutral btn-sm" id="clearFilter">Clear Filter</button>
                         </div>
                     
 
@@ -208,6 +208,7 @@
 
 
 
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -254,11 +255,11 @@ $(document).ready(function()
             }
         });
     });
-    $(".datePurchase").datepicker({
-        format: 'dd/mm/yyyy',
-        autoclose: true,      // Close the picker after selection
-        todayHighlight: true, // Highlight today's date
-        endDate: new Date(),
+    flatpickr(".datePurchase", {
+        dateFormat: 'd/m/Y',
+        maxDate: 'today',
+        allowInput: true,
+        appendTo: document.body
     });
 
 
@@ -401,7 +402,7 @@ $(document).ready(function()
                             <input type="number" min="1" name="DefaultQtyPerUnit[]" class="form-control" id="DefaultQtyPerUnit_${counts}" placeholder="e.g. 2" value="1" required data-parsley-type="number" data-parsley-min="1" data-parsley-min-message="Must be at least 1.">
                         </div>
                         <div class="col-lg-4 col-sm-6">
-                                <button type="button" style="margin-top: 32px;" class="btn btn-sm btn-danger remove" data-id="${counts}">Remove</button>
+                                <button type="button" style="margin-top: 32px;" class="btn btn-sm eb-btn-critical remove" data-id="${counts}">Remove</button>
                         </div>
                     </div>
                 </div>`;
@@ -421,11 +422,11 @@ $(document).ready(function()
 
     })
     function datepickeraddmore(counts) {
-        $("#PurchageDate_"+counts).datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,      // Close the picker after selection
-            todayHighlight: true, // Highlight today's date
-            endDate: new Date(),
+        flatpickr("#PurchageDate_"+counts, {
+            dateFormat: 'd/m/Y',
+            maxDate: 'today',
+            allowInput: true,
+            appendTo: document.body
         });
 
         $("#Inv_Cat_id_"+counts).select2({
@@ -539,8 +540,8 @@ if ( $(".historical_inventory").is(':checked'))
                         </div>
                     </td>
                     <td class="py-1">
-                        <a href="#" class="btn btn-theme update-row-btn_agent" data-inventory-id="${invenotry_id}">Submit</a>
-                        <a href="#" class="btn btn-themeGray btn-sm cancel-edit-btn ms-1">Cancel</a>
+                        <a href="#" class="btn eb-btn-primary update-row-btn_agent" data-inventory-id="${invenotry_id}">Submit</a>
+                        <a href="#" class="btn eb-btn-neutral btn-sm cancel-edit-btn ms-1">Cancel</a>
                     </td>
                 `;
 

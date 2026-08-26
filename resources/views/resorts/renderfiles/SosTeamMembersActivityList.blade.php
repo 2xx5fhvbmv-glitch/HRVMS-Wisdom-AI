@@ -43,7 +43,7 @@
         @endforeach
     @else
         <div class="col-md-12">
-            <p class="text-center"><b>No records Found...</b></p>
+            <p class="text-center"><b>No Records Found...</b></p>
         </div>
     @endif
 </div>

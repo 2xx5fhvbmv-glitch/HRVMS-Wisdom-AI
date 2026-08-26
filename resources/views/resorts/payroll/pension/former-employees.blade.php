@@ -77,7 +77,7 @@
                             <th>Position</th>
                             <th>Basic Earned</th>
                             <th>Time</th>
-                            <th>Person Contribution</th>
+                            <th>Pension Contribution</th>
                             <th>Employee </th>
                             <th>Employer </th>
                         </tr>

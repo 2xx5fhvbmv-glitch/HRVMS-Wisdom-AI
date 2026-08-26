@@ -51,12 +51,10 @@ class EvaluationFormController extends Controller
             ->addColumn('action', function ($row) {
                 $view_url = route('evaluation-form.preview', $row->id);
                 $edit_url = route('evaluation-form.edit', $row->id);
-                $editimg = asset('resorts_assets/images/edit.svg');
-                $deleteimg = asset('resorts_assets/images/trash-red.svg');
 
-                return "<a href='$view_url' class='view-row-btn me-1' title='View'><i class='fa-solid fa-eye'></i></a>
-                        <a href='$edit_url' class='edit-row-btn'><img src='$editimg' alt='Edit'></a>
-                        <a href='#' class='delete-row-btn' data-id='$row->id'><img src='$deleteimg' alt='Delete'></a>";
+                return "<a href='$view_url' class='btn-tableIcon btnIcon-blue view-row-btn me-1' title='View'><i class='fa-solid fa-eye'></i></a>
+                        <a href='$edit_url' class='btn-tableIcon btnIcon-yellow edit-row-btn me-1' title='Edit'><i class='fa-solid fa-pen-to-square'></i></a>
+                        <a href='#' class='btn-tableIcon lnd-icon-critical delete-row-btn' title='Delete' data-id='$row->id'><i class='fa-regular fa-trash-can'></i></a>";
             })
             ->rawColumns(['form_name', 'action'])
             ->make(true);

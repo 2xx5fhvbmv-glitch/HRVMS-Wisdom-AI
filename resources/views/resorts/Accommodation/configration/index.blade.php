@@ -46,7 +46,7 @@
                             </div>
                         </div>
                         <div class="card-footer text-end mt-3">
-                            <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                            <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                         </div>
                     </form>
                 </div>
@@ -74,7 +74,7 @@
                             --}}
                         </div>
                         <div class="card-footer text-end mt-3">
-                            <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                            <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                         </div>
                     </form>
                 </div>
@@ -107,12 +107,12 @@
                             </div>
                             <div class="col-lg-4 col-md-4 col-sm-6">
                                 <label for="roomNo" class=" form-label">ROOM NO.</label>
-                                <input type="number" min="1" class="form-control" id="Room" name="Room" placeholder="1st floort">
+                                <input type="number" min="1" class="form-control" id="Room" name="Room" placeholder="1st floor">
                             </div>
                         </div>
 
                         <div class="card-footer text-end mt-3">
-                            <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                            <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                         </div>
                     </form>
                 </div>
@@ -131,18 +131,18 @@
                                 @csrf
                                 <div class="row g-2 align-items-center mb-3">
                                     <div class="col-auto">
-                                        <a href="{{ route('resort.accommodation.config.AccommodationTemplete') }}" class="btn btn-themeSkyblue btn-sm">Download Template</a>
+                                        <a href="{{ route('resort.accommodation.config.AccommodationTemplete') }}" class="btn eb-btn-secondary btn-sm">Download Template</a>
                                     </div>
                                     <div class="col-auto">
                                         <div class="uploadFile-block">
                                             <div class="uploadFile-btn me-0">
-                                                <a href="#" class="btn btn-themeBlue btn-sm">Upload File</a>
+                                                <a href="#" class="btn eb-btn-accent btn-sm">Upload File</a>
                                                 <input type="file" name="AvailableAccommodationFile" id="uploadFile" accept=".csv, .xls, .xlsx">
                                             </div>
                                         </div>
                                     </div>
                                     <div class="col-auto">
-                                        <button type="submit" class="btn btn-themeBlue btn-sm availableFormSubmit">Submit</button>
+                                        <button type="submit" class="btn eb-btn-primary btn-sm availableFormSubmit">Submit</button>
                                     </div>
                                 </div>
                             </form>
@@ -173,7 +173,7 @@
                                         <label for="floor" class="form-label">FLOOR</label>
                                         <select class="form-select select2t-none AvailableFloor" data-flag="A" id="AvailableFloor_1"
                                         data-id= "1" name="Floor[1]" placeholder=" Select Building" required   required 
-                                         data-parsley-trigger="keyup" data-parsley-required-message="Please Select Floor."
+                                         data-parsley-trigger="keyup" data-parsley-required-message="Please select floor."
                                              data-parsley-errors-container="#type_accom_error_2"
                                          >
 
@@ -186,7 +186,7 @@
                                         <label for="roomNo" class=" form-label">ROOM NO.</label>
                                         <select class="form-select select2t-none RoomNo" data-id= "1" id="RoomNo_1" name="RoomNo[1]" 
                                          required    data-parsley-type="digits" data-parsley-trigger="keyup" 
-                                         data-parsley-required-message="Please Select Floor."  data-parsley-errors-container="#type_accom_error_3">
+                                         data-parsley-required-message="Please select floor."  data-parsley-errors-container="#type_accom_error_3">
 
                                         </select>
                                         <div id="type_accom_error_3"></div>
@@ -291,10 +291,10 @@
 
                                 <input type="hidden" name="AvailableCount" id="AvailableCount"  value="1">
                                 <div class="mb-4">
-                                    <button type="button" class="btn btn-themeSkyblue btn-sm addMore-availabel">Add More</a>
+                                    <button type="button" class="btn eb-btn-accent btn-sm addMore-availabel">Add More</a>
                                 </div>
                                 <div class="card-footer text-end">
-                                    <button type="submit" class="btn btn-themeBlue btn-sm availableFormSubmit">Submit</button>
+                                    <button type="submit" class="btn eb-btn-primary btn-sm availableFormSubmit">Submit</button>
                                 </div>
                             </form>
                         </div>
@@ -368,10 +368,10 @@
                             </div>
                         </div>
                         <div class="mb-4">
-                            <button type="button" class="btn btn-themeSkyblue btn-sm addMore-Occupancy_threshod">Add More</button>
+                            <button type="button" class="btn eb-btn-accent btn-sm addMore-Occupancy_threshod">Add More</button>
                         </div>
                         <div class="card-footer text-end">
-                            <button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                            <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                         </div>
                     </div>
                 </form>
@@ -385,18 +385,18 @@
                     <form id="QuickAssignmentForm">
                         @csrf
                         <div class="row g-2 align-items-center mb-3">
-                            <div class="col-auto"><a href="{{route('resort.accommodation.config.QuickAssignmentTemplete')}}" class="btn btn-themeSkyblue btn-sm">Download
+                            <div class="col-auto"><a href="{{route('resort.accommodation.config.QuickAssignmentTemplete')}}" class="btn eb-btn-secondary btn-sm">Download
                                     Template</a></div>
                             <div class="col-auto">
                                 <div class="uploadFile-block">
                                     <div class="uploadFile-btn me-0">
-                                        <a href="#" class="btn btn-themeBlue btn-sm">Upload File</a>
+                                        <a href="#" class="btn eb-btn-accent btn-sm">Upload File</a>
                                         <input type="file"  name="QuickAssignmentFile"id="uploadFile1">
                                     </div>
                                 </div>
                             </div>
                         </div>
-                        <div class="card-footer text-end"><button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                        <div class="card-footer text-end"><button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                         </div>
                     </form>
                 </div>
@@ -404,7 +404,7 @@
             <div class="col-lg-6 ">
                 <div class="card">
                     <div class="card-title">
-                        <h3>Escalation day</h3>
+                        <h3>Escalation Day</h3>
                     </div>
                     <form id="EscalationDay">
                         <div class="mb-3">
@@ -412,7 +412,7 @@
                             value="{{ old('EscalationDay', isset($EscalationDay) ? $EscalationDay->EscalationDay : '') }}"
                             class="form-control" placeholder="Define Time Duration">
                         </div>
-                        <div class="card-footer text-end"><button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                        <div class="card-footer text-end"><button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                         </div>
                     </form>
                 </div>
@@ -430,7 +430,7 @@
                         <div class="mb-3">
                             <input type="text" class="form-control" name="CategoryName" placeholder="Category Name">
                         </div>
-                        <div class="card-footer text-end"><button type="submit" class="btn btn-themeBlue btn-sm">Submit</button>
+                        <div class="card-footer text-end"><button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                         </div>
                     </form>
                 </div>
@@ -444,6 +444,7 @@
 
 
 
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -745,7 +746,7 @@ $(document).ready(function()
                 required: "Please Enter Room Name.",
             },
             "ThresSoldLevel[]": {
-                required: "Please Enter ThreSold level.",
+                required: "Please Enter Threshold level.",
             },
         },
         submitHandler: function(form) {
@@ -1197,7 +1198,7 @@ $(document).ready(function()
         var row =`<div class="col-12 added-accommodation-row" id="accommodation_row_${AvailableCount}">
                         <hr class="my-3">
                         <div class="d-flex justify-content-end mb-2">
-                            <button type="button" class="btn btn-sm btn-outline-danger remove-accommodation-row" data-row="${AvailableCount}"><i class="fa-solid fa-times me-1"></i>Remove</button>
+                            <button type="button" class="btn btn-sm eb-btn-critical remove-accommodation-row" data-row="${AvailableCount}"><i class="fa-solid fa-times me-1"></i>Remove</button>
                         </div>
                         <div class="row g-xl-4 g-3">
                               <div class="col-lg-3 col-md-4 col-sm-6">
@@ -1225,7 +1226,7 @@ $(document).ready(function()
                                          data-flag="A" id="AvailableFloor_${AvailableCount}"data-id= "${AvailableCount}" 
                                          name="Floor[${AvailableCount}]" placeholder=" Select Building" required   required
                                           data-parsley-errors-container="#type_accom_f_error_{{$k}}"
-                                            data-parsley-trigger="keyup" data-parsley-required-message="Please Select Floor.">
+                                            data-parsley-trigger="keyup" data-parsley-required-message="Please select floor.">
 
                                         </select>
                                         <div id="type_accom_f_error_{{$k}}"></div>
@@ -1237,7 +1238,7 @@ $(document).ready(function()
                                          name="RoomNo[${AvailableCount}]"  required   
                                           data-parsley-type="digits" data-parsley-trigger="keyup"
                                         data-parsley-errors-container="#type_accom_r_error_{{$k}}"
-                                        data-parsley-required-message="Please Select Floor.">
+                                        data-parsley-required-message="Please select floor.">
 
                                         </select>
                                         <div id="type_accom_r_error_{{$k}}"></div>

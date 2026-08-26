@@ -190,8 +190,8 @@ class FileManageController extends Controller
                                             <h5>' . htmlspecialchars($f->Folder_Name, ENT_QUOTES, 'UTF-8') . '</h5>
                                         </div>
                                     
-                                        <a href="javascript:void(0)" class="btn-lg-icon icon-bg-green selFolLoc-edit" data-name="'.$f->Folder_Name.'" data-id="' . base64_encode($f->id) . '">
-                                            <img src="' . URL::asset('resorts_assets/images/edit.svg') . '" alt="" class="img-fluid" />
+                                        <a href="javascript:void(0)" class="btn-tableIcon btnIcon-yellow selFolLoc-edit" data-name="'.$f->Folder_Name.'" data-id="' . base64_encode($f->id) . '">
+                                            <i class="fa-solid fa-pen-to-square"></i>
                                         </a>
                                     </div>';
                     }
@@ -1628,8 +1628,8 @@ class FileManageController extends Controller
                                             <input type="text" class="form-control d-none" placeholder="New Folder |" />
                                             <h5>' . htmlspecialchars($f->Folder_Name, ENT_QUOTES, 'UTF-8') . '</h5>
                                         </div>
-                                        <a href="javascript:void(0)" class="btn-lg-icon icon-bg-green selFolLoc-edit" data-name="'.$f->Folder_Name.'" data-id="' . base64_encode($f->id) . '">
-                                            <img src="' . URL::asset('resorts_assets/images/edit.svg') . '" alt="" class="img-fluid" />
+                                        <a href="javascript:void(0)" class="btn-tableIcon btnIcon-yellow selFolLoc-edit" data-name="'.$f->Folder_Name.'" data-id="' . base64_encode($f->id) . '">
+                                            <i class="fa-solid fa-pen-to-square"></i>
                                         </a>
                                     </div>';
                     }

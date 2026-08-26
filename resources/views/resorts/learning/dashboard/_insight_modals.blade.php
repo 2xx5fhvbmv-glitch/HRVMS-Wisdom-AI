@@ -1,158 +1,148 @@
 {{-- Learning & Development AI-insight detail modals. Included by the Learning
-     HR dashboard; reads $learningInsights. Opened by the "View Details" links. --}}
+     HR dashboard; reads $learningInsights. Opened by the "View Details" links
+     via the vanilla-JS frosted-modal system in hrdashboard.blade.php (matches
+     modals_reference.html exactly). Table-only body — title/issue/recommendation
+     already live on the WAI Insights card and the Recommendation modal. --}}
 @php
     $compD = $learningInsights['completion']['details']   ?? [];
     $mandD = $learningInsights['mandatory']['details']    ?? [];
     $reqD  = $learningInsights['requests']['details']     ?? [];
     $probD = $learningInsights['probationary']['details'] ?? [];
+
+    $ldRateClass = fn($rate) => $rate == 0 ? 'zero' : ($rate == 100 ? 'full' : '');
+    $ldRowAttn = fn($rate) => $rate == 0 ? 'attn' : '';
 @endphp
 
 <!-- Training Completion Rate -->
-<div class="modal fade" id="learningInsightCompletionModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">{{ $learningInsights['completion']['title'] ?? 'Training Completion Rate' }}</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+<div class="wai-backdrop" id="learningInsightCompletionModal">
+    <div class="wai-modal wide" role="dialog" aria-modal="true">
+        <button class="m-x" aria-label="Close">&times;</button>
+        <div class="m-kicker"><span class="dot"></span>WAI Insight</div>
+        <div class="mt">{{ $learningInsights['completion']['title'] ?? 'Training Completion Rate' }}</div>
+        @if(!empty($compD['rows']))
+            <div class="m-tablewrap">
+                <div class="m-tcap">Completion by program &middot; threshold {{ $compD['threshold'] ?? 0 }}%</div>
+                <div class="m-tscroll">
+                    <table class="m-table">
+                        <thead><tr><th>Program</th><th>Participants</th><th>Met threshold</th><th>Rate</th></tr></thead>
+                        <tbody>
+                            @foreach($compD['rows'] as $row)
+                                <tr class="{{ $ldRowAttn($row['rate']) }}"><td>{{ $row['program'] }}</td><td>{{ $row['participants'] }}</td><td>{{ $row['completed'] }}</td><td class="rate {{ $ldRateClass($row['rate']) }}">{{ $row['rate'] }}%</td></tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
             </div>
-            <div class="modal-body">
-                <p class="text-muted">{{ $learningInsights['completion']['body'] ?? '' }}</p>
-                @if(!empty($learningInsights['completion']['recommendation']))<p style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $learningInsights['completion']['recommendation'] }}</p>@endif
-                @if(!empty($compD['rows']))
-                    <p class="mb-1">Completion by program (threshold {{ $compD['threshold'] ?? 0 }}%):</p>
-                    <div class="table-responsive">
-                        <table class="table table-sm table-striped align-middle">
-                            <thead><tr><th>Program</th><th class="text-end">Participants</th><th class="text-end">Met threshold</th><th class="text-end">Rate</th></tr></thead>
-                            <tbody>
-                                @foreach($compD['rows'] as $row)
-                                    <tr><td>{{ $row['program'] }}</td><td class="text-end">{{ $row['participants'] }}</td><td class="text-end">{{ $row['completed'] }}</td><td class="text-end">{{ $row['rate'] }}%</td></tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                @else
-                    <p class="mb-0">No training attendance recorded yet.</p>
-                @endif
-            </div>
-        </div>
+        @else
+            <p class="m-empty">No training attendance recorded yet.</p>
+        @endif
     </div>
 </div>
 
 <!-- Mandatory Training Compliance -->
-<div class="modal fade" id="learningInsightMandatoryModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">{{ $learningInsights['mandatory']['title'] ?? 'Mandatory Training Compliance' }}</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+<div class="wai-backdrop" id="learningInsightMandatoryModal">
+    <div class="wai-modal wide" role="dialog" aria-modal="true">
+        <button class="m-x" aria-label="Close">&times;</button>
+        <div class="m-kicker"><span class="dot"></span>WAI Insight</div>
+        <div class="mt">{{ $learningInsights['mandatory']['title'] ?? 'Mandatory Training Compliance' }}</div>
+        @if(!empty($mandD['rows']))
+            <div class="m-tablewrap">
+                <div class="m-tcap">{{ $mandD['completed'] ?? 0 }} of {{ $mandD['required'] ?? 0 }} required completions ({{ $mandD['pct'] ?? 0 }}%) &middot; {{ $mandD['outstanding'] ?? 0 }} outstanding</div>
+                <div class="m-tscroll">
+                    <table class="m-table">
+                        <thead><tr><th>Program</th><th>Required</th><th>Completed</th><th>Compliance</th></tr></thead>
+                        <tbody>
+                            @foreach($mandD['rows'] as $row)
+                                <tr class="{{ $ldRowAttn($row['pct']) }}"><td>{{ $row['program'] }}</td><td>{{ $row['required'] }}</td><td>{{ $row['completed'] }}</td><td class="rate {{ $ldRateClass($row['pct']) }}">{{ $row['pct'] }}%</td></tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
             </div>
-            <div class="modal-body">
-                <p class="text-muted">{{ $learningInsights['mandatory']['body'] ?? '' }}</p>
-                @if(!empty($learningInsights['mandatory']['recommendation']))<p style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $learningInsights['mandatory']['recommendation'] }}</p>@endif
-                @if(!empty($mandD['rows']))
-                    <p class="mb-1">Overall: {{ $mandD['completed'] ?? 0 }} of {{ $mandD['required'] ?? 0 }} required completions ({{ $mandD['pct'] ?? 0 }}%), {{ $mandD['outstanding'] ?? 0 }} outstanding.</p>
-                    <div class="table-responsive">
-                        <table class="table table-sm table-striped align-middle">
-                            <thead><tr><th>Program</th><th class="text-end">Required</th><th class="text-end">Completed</th><th class="text-end">Compliance</th></tr></thead>
-                            <tbody>
-                                @foreach($mandD['rows'] as $row)
-                                    <tr><td>{{ $row['program'] }}</td><td class="text-end">{{ $row['required'] }}</td><td class="text-end">{{ $row['completed'] }}</td><td class="text-end">{{ $row['pct'] }}%</td></tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                @else
-                    <p class="mb-0">No mandatory programs configured yet.</p>
-                @endif
-            </div>
-        </div>
+        @else
+            <p class="m-empty">No mandatory programs configured yet.</p>
+        @endif
     </div>
 </div>
 
 <!-- Learning Request Pipeline -->
-<div class="modal fade" id="learningInsightRequestsModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">{{ $learningInsights['requests']['title'] ?? 'Learning Request Pipeline' }}</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+<div class="wai-backdrop" id="learningInsightRequestsModal">
+    <div class="wai-modal wide" role="dialog" aria-modal="true">
+        <button class="m-x" aria-label="Close">&times;</button>
+        <div class="m-kicker"><span class="dot"></span>WAI Insight</div>
+        <div class="mt">{{ $learningInsights['requests']['title'] ?? 'Learning Request Pipeline' }}</div>
+        @if(!empty($reqD['counts']))
+            <div class="m-tablewrap">
+                <div class="m-tcap">Pipeline @if(isset($reqD['approval_rate']) && $reqD['approval_rate'] !== null)&middot; approval rate {{ $reqD['approval_rate'] }}%@endif</div>
+                <div class="m-tscroll">
+                    <table class="m-table">
+                        <thead><tr><th>Status</th><th>Count</th></tr></thead>
+                        <tbody>
+                            @foreach($reqD['counts'] as $st => $c)
+                                <tr><td>{{ $st }}</td><td>{{ $c }}</td></tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
             </div>
-            <div class="modal-body">
-                <p class="text-muted">{{ $learningInsights['requests']['body'] ?? '' }}</p>
-                @if(!empty($learningInsights['requests']['recommendation']))<p style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $learningInsights['requests']['recommendation'] }}</p>@endif
-                @if(!empty($reqD['counts']))
-                    <p class="mb-1 fw-bold">Pipeline @if(isset($reqD['approval_rate']) && $reqD['approval_rate'] !== null)(approval rate {{ $reqD['approval_rate'] }}%)@endif</p>
-                    <div class="table-responsive mb-3">
-                        <table class="table table-sm table-striped align-middle">
-                            <thead><tr><th>Status</th><th class="text-end">Count</th></tr></thead>
+            @if(!empty($reqD['categories']))
+                <div class="m-tablewrap">
+                    <div class="m-tcap">Top requested categories</div>
+                    <div class="m-tscroll">
+                        <table class="m-table">
+                            <thead><tr><th>Category</th><th>Requests</th></tr></thead>
                             <tbody>
-                                @foreach($reqD['counts'] as $st => $c)
-                                    <tr><td>{{ $st }}</td><td class="text-end">{{ $c }}</td></tr>
+                                @foreach($reqD['categories'] as $row)
+                                    <tr><td>{{ $row['category'] }}</td><td>{{ $row['count'] }}</td></tr>
                                 @endforeach
                             </tbody>
                         </table>
                     </div>
-                    @if(!empty($reqD['categories']))
-                        <p class="mb-1 fw-bold">Top requested categories</p>
-                        <div class="table-responsive mb-3">
-                            <table class="table table-sm table-striped align-middle">
-                                <thead><tr><th>Category</th><th class="text-end">Requests</th></tr></thead>
-                                <tbody>
-                                    @foreach($reqD['categories'] as $row)
-                                        <tr><td>{{ $row['category'] }}</td><td class="text-end">{{ $row['count'] }}</td></tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-                    @endif
-                    @if(!empty($reqD['denials']))
-                        <p class="mb-1 fw-bold">Top denial reasons</p>
-                        <div class="table-responsive">
-                            <table class="table table-sm table-striped align-middle">
-                                <thead><tr><th>Reason</th><th class="text-end">Count</th></tr></thead>
-                                <tbody>
-                                    @foreach($reqD['denials'] as $row)
-                                        <tr><td>{{ $row['reason'] }}</td><td class="text-end">{{ $row['count'] }}</td></tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-                    @endif
-                @else
-                    <p class="mb-0">No learning requests submitted yet.</p>
-                @endif
-            </div>
-        </div>
+                </div>
+            @endif
+            @if(!empty($reqD['denials']))
+                <div class="m-tablewrap">
+                    <div class="m-tcap">Top denial reasons</div>
+                    <div class="m-tscroll">
+                        <table class="m-table">
+                            <thead><tr><th>Reason</th><th>Count</th></tr></thead>
+                            <tbody>
+                                @foreach($reqD['denials'] as $row)
+                                    <tr><td>{{ $row['reason'] }}</td><td>{{ $row['count'] }}</td></tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            @endif
+        @else
+            <p class="m-empty">No learning requests submitted yet.</p>
+        @endif
     </div>
 </div>
 
 <!-- Probationary Training Progress -->
-<div class="modal fade" id="learningInsightProbationaryModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">{{ $learningInsights['probationary']['title'] ?? 'Probationary Training Progress' }}</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+<div class="wai-backdrop" id="learningInsightProbationaryModal">
+    <div class="wai-modal" role="dialog" aria-modal="true">
+        <button class="m-x" aria-label="Close">&times;</button>
+        <div class="m-kicker"><span class="dot"></span>WAI Insight</div>
+        <div class="mt">{{ $learningInsights['probationary']['title'] ?? 'Probationary Training Progress' }}</div>
+        @if(!empty($probD))
+            <div class="m-tablewrap">
+                <div class="m-tscroll">
+                    <table class="m-table">
+                        <tbody>
+                            <tr><td>Staff on probation</td><td>{{ $probD['employees'] ?? 0 }}</td></tr>
+                            <tr><td>Required programs</td><td>{{ $probD['programs'] ?? 0 }}</td></tr>
+                            <tr><td>Completed</td><td>{{ $probD['completed'] ?? 0 }} of {{ $probD['total'] ?? 0 }}</td></tr>
+                            <tr><td>Outstanding</td><td>{{ $probD['outstanding'] ?? 0 }}</td></tr>
+                            <tr class="{{ $ldRowAttn($probD['pct'] ?? 0) }}"><td>Completion</td><td class="rate {{ $ldRateClass($probD['pct'] ?? 0) }}">{{ $probD['pct'] ?? 0 }}%</td></tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
-            <div class="modal-body">
-                <p class="text-muted">{{ $learningInsights['probationary']['body'] ?? '' }}</p>
-                @if(!empty($learningInsights['probationary']['recommendation']))<p style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $learningInsights['probationary']['recommendation'] }}</p>@endif
-                @if(!empty($probD))
-                    <div class="table-responsive">
-                        <table class="table table-sm table-striped align-middle">
-                            <tbody>
-                                <tr><td>Staff on probation</td><td class="text-end">{{ $probD['employees'] ?? 0 }}</td></tr>
-                                <tr><td>Required programs</td><td class="text-end">{{ $probD['programs'] ?? 0 }}</td></tr>
-                                <tr><td>Completed</td><td class="text-end">{{ $probD['completed'] ?? 0 }} of {{ $probD['total'] ?? 0 }}</td></tr>
-                                <tr><td>Outstanding</td><td class="text-end">{{ $probD['outstanding'] ?? 0 }}</td></tr>
-                                <tr class="fw-bold"><td>Completion</td><td class="text-end">{{ $probD['pct'] ?? 0 }}%</td></tr>
-                            </tbody>
-                        </table>
-                    </div>
-                @else
-                    <p class="mb-0">No probationary programs or staff on probation yet.</p>
-                @endif
-            </div>
-        </div>
+        @else
+            <p class="m-empty">No probationary programs or staff on probation yet.</p>
+        @endif
     </div>
 </div>

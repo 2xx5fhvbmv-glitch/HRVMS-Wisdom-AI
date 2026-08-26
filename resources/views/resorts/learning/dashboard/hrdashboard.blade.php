@@ -7,6 +7,16 @@
 </div>
 @endif
 
+@php
+    // Tiny inline-SVG icon set — currentColor, no icon font dependency. Defined
+    // here (not in import-scripts) because Blade sections execute top-to-bottom
+    // as the file runs, and 'content' below needs these before 'import-scripts' runs.
+    $arrowIcon = '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>';
+    $clockIcon = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 8v5l3 2"/><circle cx="12" cy="12" r="9"/></svg>';
+    $checkIcon = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>';
+    $warnIcon  = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="8" x2="12" y2="13"/><circle cx="12" cy="16.5" r="1" fill="currentColor" stroke="none"/></svg>';
+@endphp
+
 @section('content')
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
@@ -21,406 +31,461 @@
                 </div>
             </div>
 
-            <div class="row g-3 g-xxl-4 card-heigth">
-                {{-- Compulsory % is a static placeholder; no destination route — drop the arrow --}}
-                <div class="col-lg-3 col-sm-6 ">
-                    <div class="card dashboard-boxcard timeAttend-boxcard">
-                        <div class="d-flex align-items-center justify-content-between">
-                            <div>
-                                <p class="mb-0  fw-500">Completed Compulsory Learning</p>
-                                <strong>70%</strong>
-                            </div>
-                        </div>
-                    </div>
+            {{-- Stat cards --}}
+            <div class="ld-grid ld-stats">
+                <div class="card ld-stat ld-stat-hero">
+                    <span class="ld-stat-badge">Compliance</span>
+                    <div class="ld-stat-label">Completed Compulsory Learning</div>
+                    <div class="ld-stat-val">70<span>%</span></div>
+                    <div class="ld-stat-track"><i style="width:70%"></i></div>
+                    <div class="ld-stat-sub">Mandatory compliance across all programs</div>
                 </div>
-                <div class="col-lg-3 col-sm-6 ">
-                    <div class="card dashboard-boxcard timeAttend-boxcard">
-                        <div class="d-flex align-items-center justify-content-between">
-                            <div>
-                                <p class="mb-0  fw-500">Scheduled Learning</p>
-                                <strong>{{$scheduled_trainings_count ?? 0}}</strong>
-                            </div>
-                            <a href="{{route('learning.schedule.index')}}?status=Scheduled">
-                                <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg')}}" alt="" class="img-fluid">
-                            </a>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-3 col-sm-6 ">
-                    <div class="card dashboard-boxcard timeAttend-boxcard">
-                        <div class="d-flex align-items-center justify-content-between">
-                            <div>
-                                <p class="mb-0  fw-500">Completed Learning Programs</p>
-                                <strong>{{$completed_trainings_count ?? 0}}</strong>
-                            </div>
-                            <a href="{{route('training.history')}}?status=Completed">
-                                <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg')}}" alt="" class="img-fluid">
-                            </a>
-                        </div>
-                    </div>
-                </div>
-                <div class="col-lg-3 col-sm-6 ">
-                    <div class="card dashboard-boxcard timeAttend-boxcard">
-                        <div class="d-flex align-items-center justify-content-between">
-                            <div>
-                                <p class="mb-0  fw-500">Pending Learning Programs</p>
-                                <strong>{{$pending_trainings_count ?? 0}}</strong>
-                            </div>
-                            <a href="{{route('learning.request.index')}}?status=Pending">
-                                <img src="{{ URL::asset('resorts_assets/images/arrow-right-circle.svg')}}" alt="" class="img-fluid">
-                            </a>
-                        </div>
-                    </div>
-                </div>
+                <a href="{{route('learning.schedule.index')}}?status=Scheduled" class="card ld-stat">
+                    <div class="ld-stat-label">Scheduled Learning<span class="ld-chev">{!! $arrowIcon !!}</span></div>
+                    <div class="ld-stat-val">{{$scheduled_trainings_count ?? 0}}</div>
+                    <div class="ld-stat-sub">Upcoming programs</div>
+                </a>
+                <a href="{{route('training.history')}}?status=Completed" class="card ld-stat">
+                    <div class="ld-stat-label">Completed Learning Programs<span class="ld-chev">{!! $arrowIcon !!}</span></div>
+                    <div class="ld-stat-val">{{$completed_trainings_count ?? 0}}</div>
+                    <div class="ld-stat-sub">Across all categories</div>
+                </a>
+                <a href="{{route('learning.request.index')}}?status=Pending" class="card ld-stat">
+                    <div class="ld-stat-label">Pending Learning Programs<span class="ld-chev">{!! $arrowIcon !!}</span></div>
+                    <div class="ld-stat-val">{{$pending_trainings_count ?? 0}}</div>
+                    <div class="ld-stat-sub">{{ ($pending_trainings_count ?? 0) > 0 ? 'Awaiting action' : 'Nothing awaiting action' }}</div>
+                </a>
+            </div>
 
-                {{-- Row 2: Pending Actions (col-4) + WAI Insights (col-5) + Calendar (col-3), side by side. --}}
-                <div class="col-xl-4 col-12 @if(Common::checkRouteWisePermission('learning.request.add',config('settings.resort_permissions.view')) == false) d-none @endif">
-                    <div class="card h-100" id="card-pendingActions">
-                        <div class="card-title">
-                            <div class="row justify-content-between align-items-center g-md-3 g-1">
-                                <div class="col">
-                                    <h3 class="text-nowrap">Pending Actions</h3>
-                                </div>
-                                <div class="col-auto">
-                                    <a href="{{route('learning.request.index')}}" class="a-link">View All</a>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="leaveUser-main">
-                            @if($pending_learning_request && count($pending_learning_request))
-                                @foreach($pending_learning_request->take(4) as $request)
-                                    <div class="leaveUser-block">
-                                        <div>
-                                            <h6>{{$request->learning->name}}</h6>
-                                            <p>{{ \Illuminate\Support\Str::words($request->learning->description, 30, '…') }}</p>
-                                            <div>
-                                                <a href="{{ route('learning.request.details', ['id' => $request->id]) }}" class="a-linkTheme">View Details</a>
-                                            </div>
-                                        </div>
-                                    </div>
-                                @endforeach
-                            @else
-                                <p class="text-muted small mb-0">No pending requests.</p>
-                            @endif
-                        </div>
+            {{-- Combined middle grid — 3 columns x 2 rows. Pending Actions / WAI
+                 Insights / Feedback / Onboarding auto-place into the 4 left+center
+                 cells in DOM order; Calendar is the only explicitly-positioned item
+                 (column 3, spanning both rows), so it naturally stretches to match
+                 the combined height of the other two columns — no JS, no height
+                 hack, just how CSS grid track-stretching works. --}}
+            <div class="ld-grid ld-combo">
+                <div class="card ld-card ld-pa-card @if(Common::checkRouteWisePermission('learning.request.add',config('settings.resort_permissions.view')) == false) d-none @endif" id="card-pendingActions">
+                    <div class="ld-card-head">
+                        <span class="ld-card-title">Pending Actions</span>
+                        <a href="{{route('learning.request.index')}}" class="ld-viewall">View all</a>
                     </div>
-                </div>
-
-                {{-- WAI Insights — AI-narrated L&D metrics, beside Pending Actions --}}
-                <div class="col-xl-5 col-md-6">
-                    <div class="card card-wiINsightLearning wai-narrative h-100" id="card-wiINsightLearning">
-                        @php $lMeta = $learningInsights['_meta'] ?? null; @endphp
-                        <div class="wai-head">
-                            <h2>WAI Insights</h2>
-                            @if($lMeta)
-                                <div class="wai-head-meta">
-                                    <span>Updated {{ $lMeta['generated_at']->diffForHumans() }}</span>
-                                    @if($lMeta['can_regenerate'])
-                                        <a href="?regenerate_insights=1">Regenerate</a>
-                                    @else
-                                        <span title="{{ $lMeta['next_available']->format('d M Y, H:i') }}">&middot; Regenerate {{ $lMeta['next_available']->diffForHumans() }}</span>
-                                    @endif
-                                </div>
-                            @endif
-                        </div>
-                        <div class="leaveUser-main wai-narrative-body">
-                            @foreach([['key'=>'completion','modal'=>'learningInsightCompletionModal'],['key'=>'mandatory','modal'=>'learningInsightMandatoryModal'],['key'=>'requests','modal'=>'learningInsightRequestsModal'],['key'=>'probationary','modal'=>'learningInsightProbationaryModal']] as $lc)
-                                @php $hasRecommendation = !empty($learningInsights[$lc['key']]['recommendation']); @endphp
-                                <div class="wai-row">
-                                    <div class="wai-row-icon {{ $hasRecommendation ? 'is-flagged' : 'is-ok' }}">
-                                        <i class="fa-solid {{ $hasRecommendation ? 'fa-triangle-exclamation' : 'fa-check' }}"></i>
-                                    </div>
-                                    <div class="wai-row-body">
-                                        <h6>{{ $learningInsights[$lc['key']]['title'] ?? '' }}</h6>
-                                        <p class="wai-row-text">{{ $learningInsights[$lc['key']]['body'] ?? '' }}</p>
-                                        @if($hasRecommendation)
-                                            <p class="wai-row-recommendation"><strong>Recommendation:</strong> {{ $learningInsights[$lc['key']]['recommendation'] }}</p>
-                                        @endif
-                                        <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#{{ $lc['modal'] }}" class="wai-row-link">View details &rarr;</a>
+                    @if($pending_learning_request && count($pending_learning_request))
+                        <div class="ld-pa-list">
+                            @foreach($pending_learning_request->take(4) as $request)
+                                <div class="ld-pa">
+                                    <div class="ld-pa-ic">{!! $clockIcon !!}</div>
+                                    <div class="ld-pa-body">
+                                        <div class="ld-pa-t">{{$request->learning->name}}</div>
+                                        <div class="ld-pa-d">{{ \Illuminate\Support\Str::words($request->learning->description, 24, '…') }}</div>
+                                        <a href="{{ route('learning.request.details', ['id' => $request->id]) }}" class="ld-lnk">View details &rarr;</a>
                                     </div>
                                 </div>
                             @endforeach
                         </div>
-                    </div>
+                    @else
+                        <div class="ld-empty">
+                            <div class="ld-empty-ring">{!! $checkIcon !!}</div>
+                            <div class="ld-empty-t">All caught up</div>
+                            <div class="ld-empty-s">No pending requests right now.</div>
+                        </div>
+                    @endif
                 </div>
 
-                <div class="col-xl-3 col-md-6 @if(Common::checkRouteWisePermission('learning.calendar.index',config('settings.resort_permissions.view')) == false) d-none @endif" id="right-ldDash">
-                    <div class="card calendar-card calendarLD-card h-100">
-                        <div class="ldDash-block">
-                            <div class="mb-4 overflow-hidden">
-                                <div id="calendar"></div>
-                            </div>
-                            <div class="card-title">
-                                <h3>Upcoming Learning Sessions</h3>
-                            </div>
-                            <div class="leaveUser-main" id="leaveUser-main">
-                                <!-- Dynamic content will be loaded here -->
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {{-- Row 3: three donut/score cards (Feedback · Onboarding Progress · Learning Attendance) --}}
-                <div class="col-xl-4 col-md-6">
-                    <div class="card card-feedbackEvaluation h-100" id="card-feedbackEvaluationHR">
-                        <div class="card-title">
-                            <h3>Feedback and Evaluation</h3>
-                        </div>
-                        <div class="progress-block">
-                            <div class="progress-container blue" data-progress="{{ $feedbackAvgScore ?? 0 }}" data-bs-toggle="tooltip"
-                                data-bs-placement="bottom" title="Average Trainer Performance Score">
-                                <svg class="progress-circle" viewBox="0 0 120 120">
-                                    <circle class="progress-background" cx="60" cy="60" r="54"></circle>
-                                    <circle class="progress" cx="60" cy="60" r="54"></circle>
-                                </svg>
-                            </div>
-                            <div class="text">
-                                <h5>{{ is_null($feedbackAvgScore) ? '—' : ($feedbackAvgScore . '%') }}</h5>
-                                <p>AVERAGE FEEDBACK SCORES</p>
-                            </div>
-                        </div>
-                        <div class="d-flex">
-                            <p>Over Time:</p>
-                            <p class="fw-500">Trainer Performance</p>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-xl-4 col-md-6">
-                    <div class="card card-feedbackEvaluation h-100">
-                        <div class="card-title">
-                            <h3>Onboarding Learning Progress</h3>
-                        </div>
-                        <div class="progress-block">
-                            <div class="progress-container blue" data-progress="{{ $onboardingProgress ?? 0 }}" data-bs-toggle="tooltip"
-                                data-bs-placement="bottom" title="New Hires Completing Compulsory Training">
-                                <svg class="progress-circle" viewBox="0 0 120 120">
-                                    <circle class="progress-background" cx="60" cy="60" r="54"></circle>
-                                    <circle class="progress" cx="60" cy="60" r="54"></circle>
-                                </svg>
-                            </div>
-                            <div class="text">
-                                <h5>{{ is_null($onboardingProgress) ? '—' : ($onboardingProgress . '%') }}</h5>
-                                <p>NEW HIRES COMPLETING THEIR COMPULSORY TRAINING</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-xl-4 col-md-12 @if(Common::checkRouteWisePermission('learning.programs.index',config('settings.resort_permissions.view')) == false) d-none @endif">
-                    <div class="card h-100">
-                        <div class="card-title">
-                            <h3>Learning Attendance</h3>
-                        </div>
-                        <p id="lateAttendanceText" class="small mb-2">Late Attendance: --%</p>
-
-                        <div class="trainingAttendance-chart mb-3">
-                            <canvas id="myDoughnutChart"></canvas>
-                        </div>
-                        @php
-                            $attBreakdown = $learningAttendance ?? [];
-                            $attLegend = [
-                                'Present' => 'bg-theme',
-                                'Late'    => 'bg-themeWarning',
-                                'Absent'  => 'bg-themeRed',
-                            ];
-                        @endphp
-                        <div class="row g-2 justify-content-center">
-                            @forelse($attLegend as $label => $cls)
-                                @if(($attBreakdown[$label] ?? 0) > 0)
-                                    <div class="col-auto">
-                                        <div class="doughnut-label" title="{{ $attBreakdown[$label] }} records">
-                                            <span class="{{ $cls }}"></span>{{ $label }} ({{ $attBreakdown[$label] }})
-                                        </div>
-                                    </div>
+                {{-- WAI Insights — gradient shell kept, row content restructured to title / issue / view-recommendation+view-details --}}
+                <div class="card ld-wai" id="card-wiINsightLearning">
+                    @php $lMeta = $learningInsights['_meta'] ?? null; @endphp
+                    <div class="ld-wai-head">
+                        <div class="ld-wai-h">WAI Insights</div>
+                        @if($lMeta)
+                            <div class="ld-wai-meta">
+                                <span>Updated {{ $lMeta['generated_at']->diffForHumans() }}</span>
+                                @if($lMeta['can_regenerate'])
+                                    <a href="?regenerate_insights=1">&middot; Regenerate</a>
+                                @else
+                                    <span title="{{ $lMeta['next_available']->format('d M Y, H:i') }}">&middot; Regenerate {{ $lMeta['next_available']->diffForHumans() }}</span>
                                 @endif
-                            @empty
-                            @endforelse
-                            @if(empty(array_filter($attBreakdown)))
-                                <div class="col-auto text-muted small">No attendance recorded yet.</div>
-                            @endif
-                        </div>
+                            </div>
+                        @endif
+                    </div>
+                    <div class="ld-wai-body">
+                        @foreach(['completion','mandatory','requests','probationary'] as $lcKey)
+                            @php $lc = ['key' => $lcKey, 'modal' => 'learningInsight' . ucfirst($lcKey) . 'Modal']; @endphp
+                            @php $hasRecommendation = !empty($learningInsights[$lc['key']]['recommendation']); @endphp
+                            <div class="ld-ins">
+                                <div class="ld-ins-ic {{ $hasRecommendation ? 'is-flagged' : 'is-ok' }}">
+                                    {!! $hasRecommendation ? $warnIcon : $checkIcon !!}
+                                </div>
+                                <div class="ld-ins-body">
+                                    <div class="ld-ins-tt">{{ $learningInsights[$lc['key']]['title'] ?? '' }}</div>
+                                    <div class="ld-ins-issue">{{ $learningInsights[$lc['key']]['body'] ?? '' }}</div>
+                                    <div class="lnkrow">
+                                        @if($hasRecommendation)
+                                            <button type="button" class="lnk-rec"
+                                                data-title="{{ $learningInsights[$lc['key']]['title'] ?? '' }}"
+                                                data-rec="{{ $learningInsights[$lc['key']]['recommendation'] }}"
+                                                data-details="{{ $lc['modal'] }}">View recommendation &rarr;</button>
+                                            <span class="sep"></span>
+                                        @endif
+                                        <a href="#" class="lnk" data-details="{{ $lc['modal'] }}">View details &rarr;</a>
+                                    </div>
+                                </div>
+                            </div>
+                        @endforeach
                     </div>
                 </div>
 
-                {{-- Row 4: Learning Hours bar chart (wide) + Learning Completion Rates (narrow) --}}
-                <div class="col-xl-8 @if(Common::checkRouteWisePermission('learning.programs.index',config('settings.resort_permissions.view')) == false) d-none @endif">
-                    <div class="card card-participation h-100">
-                        <div class="card-title mb-md-3">
-                            <h3>Learning Hours</h3>
-                        </div>
-                        @php
-                            $hasLearningHours = ($learningHoursByProg ?? collect())->count() > 0;
-                            $learningHoursHeight = max(220, (($learningHoursByProg ?? collect())->count()) * 36);
-                        @endphp
-                        @if($hasLearningHours)
-                            <div class="chart-flex-wrap" style="height: {{ $learningHoursHeight }}px;">
-                                <canvas id="myStackedBarChart"></canvas>
+                <div class="card ld-card ld-cal-card @if(Common::checkRouteWisePermission('learning.calendar.index',config('settings.resort_permissions.view')) == false) d-none @endif" id="right-ldDash">
+                    <div id="calendar"></div>
+                    <div class="ld-card-head ld-sessions-head">
+                        <span class="ld-card-title">Upcoming Learning Sessions</span>
+                        <a href="{{route('learning.schedule.index')}}" class="ld-viewall">View all &rarr;</a>
+                    </div>
+                    <div id="leaveUser-main" class="ld-sess-list">
+                        <p class="ld-loading-text">Loading sessions&hellip;</p>
+                    </div>
+                </div>
+
+                <div class="card ld-card" id="card-feedbackEvaluationHR">
+                    <div class="ld-card-head"><span class="ld-card-title">Feedback and Evaluation</span></div>
+                    <div class="ld-gauge-wrap">
+                        <div class="ld-gauge-canvas"><canvas id="gaugeFeedback"></canvas>
+                            <div class="ld-gauge-center">
+                                <div class="ld-gauge-big" style="color:var(--faint)">{{ is_null($feedbackAvgScore) ? '—' : ($feedbackAvgScore . '%') }}</div>
+                                <div class="ld-gauge-lbl">Average feedback scores</div>
                             </div>
+                        </div>
+                    </div>
+                    <div class="ld-gauge-foot"><span>Over time</span><span>Trainer performance</span></div>
+                </div>
+
+                <div class="card ld-card">
+                    <div class="ld-card-head"><span class="ld-card-title">Onboarding Learning Progress</span></div>
+                    <div class="ld-gauge-wrap">
+                        <div class="ld-gauge-canvas"><canvas id="gaugeOnboard"></canvas>
+                            <div class="ld-gauge-center">
+                                <div class="ld-gauge-big">{{ is_null($onboardingProgress) ? '—' : ($onboardingProgress . '%') }}</div>
+                                <div class="ld-gauge-lbl">New hires completing compulsory training</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="ld-gauge-foot"><span>Compulsory modules</span><span>{{ $onboardingProgress ?? 0 }}% complete</span></div>
+                </div>
+            </div>
+
+            {{-- Learning Hours + Completion Rates --}}
+            <div class="ld-grid ld-tworow">
+                <div class="card ld-card @if(Common::checkRouteWisePermission('learning.programs.index',config('settings.resort_permissions.view')) == false) d-none @endif">
+                    <div class="ld-card-head"><span class="ld-card-title">Learning Hours</span></div>
+                    @php $hasLearningHours = ($learningHoursByProg ?? collect())->count() > 0; @endphp
+                    @if($hasLearningHours)
+                        <div class="ld-chart-box"><canvas id="myStackedBarChart"></canvas></div>
+                    @else
+                        <p class="text-muted small mb-0">No training programs scheduled yet.</p>
+                    @endif
+                </div>
+
+                <div class="card ld-card @if(Common::checkRouteWisePermission('learning.request.add',config('settings.resort_permissions.view')) == false) d-none @endif">
+                    <div class="ld-card-head">
+                        <span class="ld-card-title">Learning Completion Rates</span>
+                        <a href="{{route('training.history')}}" class="ld-viewall">View all &rarr;</a>
+                    </div>
+                    @php
+                        // $completionData has one row per scheduled instance, so the same
+                        // program can repeat — group by name and average the rate, then cap
+                        // to the first 4 so the card stays a fixed, readable height.
+                        $completionByProgram = collect($completionData ?? [])
+                            ->groupBy('training_name')
+                            ->map(fn($rows) => [
+                                'training_name' => $rows->first()['training_name'],
+                                'completion_rate' => round($rows->avg('completion_rate')),
+                            ])
+                            ->values();
+                        $completionShown = $completionByProgram->take(4);
+                        $completionRestCount = max(0, $completionByProgram->count() - $completionShown->count());
+                    @endphp
+                    @if($completionShown->isNotEmpty())
+                        <div class="ld-track-list">
+                            @foreach($completionShown as $i => $data)
+                                <div class="ld-track">
+                                    <div class="ld-track-top">
+                                        <span class="ld-track-nm">{{ $data['training_name'] }}</span>
+                                        <span class="ld-track-val" style="color:var(--ld-ramp-{{ $i % 5 }})">{{ $data['completion_rate'] }}<small>%</small></span>
+                                    </div>
+                                    <div class="ld-pips">
+                                        @php $ldRampIdx = $i % 5; @endphp
+                                    @for($p = 0; $p < 10; $p++)
+                                            <i style="background:{{ $p < round($data['completion_rate'] / 10) ? "var(--ld-ramp-{$ldRampIdx})" : 'var(--line-2)' }}"></i>
+                                        @endfor
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                        @if($completionRestCount > 0)
+                            <div class="ld-others"><span>+ {{ $completionRestCount }} more programs</span><a href="{{route('training.history')}}" class="ld-viewall">View all &rarr;</a></div>
+                        @endif
+                    @else
+                        <p class="text-muted small mb-0">No completion data yet.</p>
+                    @endif
+                </div>
+            </div>
+
+            {{-- Learning History + Learning Attendance. History's own entry grid is
+                 capped to a fixed height with internal scroll (.ld-history) so it
+                 stays the same height as Attendance regardless of entry count —
+                 2 per row is always visible, more scroll under a thin scrollbar. --}}
+            <div class="ld-grid ld-histrow @if(Common::checkRouteWisePermission('learning.schedule',config('settings.resort_permissions.view')) == false) d-none @endif">
+                <div class="card ld-card" id="card-trainingHistory">
+                    <div class="ld-card-head">
+                        <span class="ld-card-title">Learning History</span>
+                        <a href="{{ route('training.history') }}" class="ld-viewall">View all</a>
+                    </div>
+                    <div class="ld-grid ld-history">
+                        @if($trainings->isEmpty())
+                            <p class="text-muted small mb-0">No training history available.</p>
                         @else
-                            <p class="text-muted small mb-0">No training programs scheduled yet.</p>
+                            @foreach ($trainings->take(5) as $training)
+                                @php
+                                    $totalTrainingDays = \Carbon\Carbon::parse($training->start_date)->diffInDays(\Carbon\Carbon::parse($training->end_date)) + 1;
+                                    $totalParticipants = $training->participants->count();
+                                    $totalExpectedAttendance = $totalTrainingDays * $totalParticipants;
+                                    $actualAttendance = $training->trainingAttendances->where('status', 'Present')->count();
+                                    $attendancePercentage = ($totalExpectedAttendance > 0)
+                                        ? round(($actualAttendance / $totalExpectedAttendance) * 100, 2)
+                                        : 0;
+                                @endphp
+                                <div class="ld-hist">
+                                    <div class="ld-hist-range">{{ date('d M Y', strtotime($training->start_date)) . ' – ' . date('d M Y', strtotime($training->end_date)) }}</div>
+                                    <div class="ld-hist-t">{{ $training->learningProgram->name ?? 'Learning Program' }}</div>
+                                    <div class="ld-hist-d">{{ \Illuminate\Support\Str::words($training->description, 22, '…') }}</div>
+                                    <div class="ld-hist-foot">
+                                        <span class="ld-hist-att">Attendance
+                                            @if($attendancePercentage == 100)
+                                                <b class="ok">{{ $attendancePercentage }}%</b>
+                                            @else
+                                                <span class="ld-status-pill {{ $attendancePercentage == 0 ? 'warn' : '' }}">{{ $attendancePercentage }}%</span>
+                                            @endif
+                                        </span>
+                                    </div>
+                                </div>
+                            @endforeach
                         @endif
                     </div>
                 </div>
 
-                <div class="col-xl-4 @if(Common::checkRouteWisePermission('learning.request.add',config('settings.resort_permissions.view')) == false) d-none @endif">
-                    <div class="card h-100">
-                        <div class="card-title mb-md-4">
-                            <h3>Learning Completion Rates</h3>
-                        </div>
-
-                        <div class="three-progressbar mb-md-4 mb-3">
-                            @if($completionData)
-                                @foreach($completionData as $data)
-                                    <div class="progress-container blue" data-progress="{{ $data['completion_rate'] }}" data-bs-toggle="tooltip"
-                                        data-bs-placement="bottom" title="{{ $data['training_name'] }} - {{ $data['completion_rate'] }}">
-                                        <svg class="progress-circle" viewBox="0 0 120 120">
-                                            <circle class="progress-background" cx="60" cy="60" r="54"></circle>
-                                            <circle class="progress" cx="60" cy="60" r="54"></circle>
-                                        </svg>
-                                    </div>
-                                @endforeach
-                            @endif
-                        </div>
-                        <div class="row g-2 justify-content-center doughnut-labelTop">
-                            @forelse ($completionData as $data)
-                                <div class="col-auto">
-                                    <div class="doughnut-label">
-                                        <span></span>
-                                        {{ $data['training_name'] }} <br>{{ $data['completion_rate'] }}
-                                    </div>
-                                </div>
-                            @empty
-                                <div class="col-12 text-muted small">No completion data yet.</div>
-                            @endforelse
-                        </div>
+                <div class="card ld-card @if(Common::checkRouteWisePermission('learning.programs.index',config('settings.resort_permissions.view')) == false) d-none @endif">
+                    <div class="ld-card-head">
+                        <span class="ld-card-title">Learning Attendance</span>
+                        <a href="{{route('training.history')}}" class="ld-viewall">View all &rarr;</a>
                     </div>
+                    <p id="lateAttendanceText" class="ld-late-text">Late attendance: &mdash;</p>
+                    <div class="ld-dial-list" id="attList"><p class="ld-loading-text">Loading&hellip;</p></div>
+                    <div class="ld-others" id="attOthersRow" style="display:none"><span>Others</span><b id="attOthers"></b></div>
                 </div>
-
-                {{-- Row 5: Learning History full width --}}
-                <div class="col-12 @if(Common::checkRouteWisePermission('learning.schedule',config('settings.resort_permissions.view')) == false) d-none @endif">
-                    <div class="card card-trainingHistory h-100" id="card-trainingHistory">
-                        <div class="card-title">
-                            <div class="row justify-content-between align-items-center g-md-3 g-1">
-                                <div class="col">
-                                    <h3 class="text-nowrap">Learning History</h3>
-                                </div>
-                                <div class="col-auto">
-                                    <a href="{{ route('training.history') }}" class="a-link">View All</a>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="leaveUser-main row g-3">
-                            @if($trainings->isEmpty())
-                                <div class="col-12"><p class="text-muted small mb-0">No training history available.</p></div>
-                            @else
-                                @foreach ($trainings->take(5) as $training)
-                                    @php
-                                        $totalTrainingDays = \Carbon\Carbon::parse($training->start_date)->diffInDays(\Carbon\Carbon::parse($training->end_date)) + 1;
-                                        $totalParticipants = $training->participants->count();
-                                        $totalExpectedAttendance = $totalTrainingDays * $totalParticipants;
-                                        $actualAttendance = $training->trainingAttendances->where('status', 'Present')->count();
-                                        $attendancePercentage = ($totalExpectedAttendance > 0)
-                                            ? round(($actualAttendance / $totalExpectedAttendance) * 100, 2)
-                                            : 0;
-                                    @endphp
-                                    <div class="col-xl-4 col-md-6">
-                                        <div class="leaveUser-block">
-                                            <div>
-                                                <div class="date"><i class="fa-regular fa-calendar"></i>
-                                                    {{ date('d M Y', strtotime($training->start_date)) . ' - ' . date('d M Y', strtotime($training->end_date)) }}
-                                                </div>
-                                                <h6>{{ $training->learningProgram->name ?? 'Learning Program' }}</h6>
-                                                <p>{{ \Illuminate\Support\Str::words($training->description, 25, '…') }}</p>
-                                                <span>Attendance: {{ $attendancePercentage }}%</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                @endforeach
-                            @endif
-                        </div>
-                    </div>
-                </div>
-
             </div>
+
         </div>
     </div>
+
+    @include('partials._wai_insight_modals')
+
 @includeWhen(isset($learningInsights), 'resorts.learning.dashboard._insight_modals')
 @endsection
 
 @section('import-css')
 <style>
-    /* WAI Insights — same gradient-header treatment as the other modules'
-       WAI Insights cards. Narrow column beside Pending Actions; the four
-       insights stack vertically and scroll inside the fixed-height card.
-       Narrative (title + body + optional recommendation), not pass/fail
-       counts, so no hero — icon is amber when a recommendation is present,
-       teal tick otherwise. */
-    .card-wiINsightLearning {
-        height: 450px !important;
-        max-height: 450px !important;
-        display: flex;
-        flex-direction: column;
-        padding: 0;
-        overflow: hidden;
-        border-radius: 16px;
-    }
-    .card-wiINsightLearning .leaveUser-main {
-        flex: 1 1 auto;
-        min-height: 0;
-        overflow-y: auto;
+    /* Category ramp — teal family + one muted positive/warning + neutral. No blue. */
+    :root {
+        --ld-ramp-0: var(--teal);
+        --ld-ramp-1: var(--teal-bright, #2EACB3);
+        --ld-ramp-2: var(--positive);
+        --ld-ramp-3: var(--warning);
+        --ld-ramp-4: var(--faint);
     }
 
-    .wai-narrative .wai-head { position: relative; overflow: hidden; padding: 17px 18px; flex-shrink: 0; }
-    .wai-narrative .wai-head::before {
-        content: ""; position: absolute; inset: 0; pointer-events: none;
-        background: linear-gradient(110deg, #014653 0%, #0e8a9e 40%, #7fa61e 70%, #e0ff02 100%);
-    }
-    .wai-narrative .wai-head::after {
-        content: ""; position: absolute; inset: 0; pointer-events: none;
-        background: linear-gradient(110deg, rgba(1,40,48,.35), transparent 55%);
-    }
-    .wai-narrative .wai-head h2 { position: relative; color: #fff; font-size: 15px; font-weight: 800; margin: 0; }
-    .wai-narrative .wai-head-meta { position: relative; margin-top: 4px; font-size: 11.5px; color: rgba(255,255,255,.75); display: flex; gap: 6px; }
-    .wai-narrative .wai-head-meta a { color: #fff; font-weight: 600; text-decoration: underline; }
+    /* Layout grids — CSS Grid throughout the body (stat cards down), matching
+       the reference exactly rather than Bootstrap's row/col system. */
+    .ld-grid { display: grid; gap: 16px; margin-bottom: 16px; }
+    .ld-stats { grid-template-columns: repeat(4, 1fr); }
+    .ld-stat { display: block; padding: 18px 20px; text-decoration: none; color: inherit; border-radius: 16px; }
+    .ld-stat-label { font-size: 12px; font-weight: 600; color: var(--muted); display: flex; align-items: center; justify-content: space-between; }
+    .ld-chev { width: 26px; height: 26px; border-radius: 50%; background: var(--line-2); display: grid; place-items: center; color: var(--muted); }
+    .ld-chev svg { width: 13px; height: 13px; }
+    .ld-stat-val { font-size: 34px; font-weight: 700; letter-spacing: -.5px; margin-top: 14px; line-height: 1; color: var(--ink); font-variant-numeric: tabular-nums; }
+    .ld-stat-val span { font-size: 20px; color: var(--muted); }
+    .ld-stat-sub { font-size: 11.5px; color: var(--faint); margin-top: 6px; }
+    .ld-stat-hero { position: relative; }
+    .ld-stat-badge { position: absolute; top: 16px; right: 18px; font-size: 10px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--teal); background: var(--teal-3); padding: 3px 8px; border-radius: 20px; }
+    .ld-stat-track { height: 5px; border-radius: 5px; background: var(--line-2); margin-top: 14px; overflow: hidden; }
+    .ld-stat-track > i { display: block; height: 100%; border-radius: 5px; background: linear-gradient(90deg, var(--teal), var(--lime)); }
 
-    .wai-narrative-body { padding: 16px; }
-    .wai-narrative .wai-row { display: flex; align-items: flex-start; gap: 12px; padding: 12px 2px; border-bottom: 1px solid #F2F6F6; }
-    .wai-narrative .wai-row:last-child { border-bottom: none; }
-    .wai-narrative .wai-row-icon { width: 32px; height: 32px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; margin-top: 2px; }
-    .wai-narrative .wai-row-icon.is-ok { background: #E9F7F0; color: #1F9D6B; }
-    .wai-narrative .wai-row-icon.is-flagged { background: #FBF0DC; color: #D98A00; }
-    .wai-narrative .wai-row-body { flex: 1 1 auto; min-width: 0; }
-    .wai-narrative .wai-row-body h6 { margin: 0 0 4px; font-size: 13.5px; font-weight: 700; color: #14232A; }
-    .wai-narrative .wai-row-text { margin: 0 0 4px; font-size: 12.5px; color: #5D6F75; line-height: 1.5; }
-    .wai-narrative .wai-row-recommendation { margin: 0 0 4px; font-size: 12.5px; color: #0e8a9e; line-height: 1.5; }
-    .wai-narrative .wai-row-link { display: inline-block; margin-top: 2px; font-size: 12px; font-weight: 600; color: #014653; }
-
-    /* Chart wrapper used by Learning Hours bar chart — fixed-height container so
-       the canvas fills it via responsive: true / maintainAspectRatio: false. */
-    .chart-flex-wrap {
-        position: relative;
-        height: 320px;
-        width: 100%;
-    }
-    .chart-flex-wrap canvas {
-        position: absolute !important;
-        inset: 0;
-        width: 100% !important;
-        height: 100% !important;
+    /* combined middle grid — Calendar is the only explicitly-placed item (col 3,
+       spanning both rows); Pending Actions/WAI/Feedback/Onboarding auto-place
+       into the remaining 4 cells in DOM order (row 1 fills left-to-right, then
+       row 2), so the calendar naturally stretches to their combined height. */
+    .ld-combo { grid-template-columns: 1fr 1.4fr 0.9fr; grid-template-rows: auto auto; align-items: stretch; }
+    .ld-combo .ld-cal-card { grid-column: 3; grid-row: 1 / span 2; }
+    .ld-tworow { grid-template-columns: 1.6fr 1fr; }
+    .ld-histrow { grid-template-columns: 1.7fr 1fr; align-items: start; }
+    @media (max-width: 1100px) {
+        .ld-stats { grid-template-columns: repeat(2, 1fr); }
+        .ld-combo { grid-template-columns: 1fr; grid-template-rows: none; }
+        .ld-combo > * { grid-column: auto !important; grid-row: auto !important; }
+        .ld-tworow, .ld-histrow { grid-template-columns: 1fr; }
     }
 
-    .fc-day.custom-dot::after {
-        content: '';
-        position: absolute;
-        left: 75%!important;
-        bottom: 10%;
-        transform: translateX(-50%);
-        width: 8px;
-        height: 8px;
-        background: #2EACB3;
-        border-radius: 50%;
-    }
+    .ld-card { padding: 20px 22px; }
+    .ld-card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+    .ld-card-title { font-size: 11.5px; font-weight: 600; letter-spacing: .8px; text-transform: uppercase; color: var(--muted); }
+    .ld-viewall { font-size: 12px; font-weight: 600; color: var(--teal); text-decoration: none; }
+    .ld-viewall:hover { text-decoration: underline; }
+    .ld-lnk { font-size: 12px; font-weight: 600; color: var(--teal); text-decoration: none; }
+    .ld-lnk:hover { text-decoration: underline; }
+
+    /* Pending Actions */
+    .ld-pa { display: flex; gap: 12px; padding: 16px 0; border-bottom: 1px solid var(--line); }
+    .ld-pa:last-child { border-bottom: none; }
+    .ld-pa-ic { flex: none; width: 30px; height: 30px; border-radius: 9px; background: var(--warning-bg); color: var(--warning); display: grid; place-items: center; }
+    .ld-pa-ic svg { width: 15px; height: 15px; }
+    .ld-pa-t { font-weight: 600; font-size: 13.5px; color: var(--ink); }
+    .ld-pa-d { font-size: 12.5px; color: var(--muted); line-height: 1.5; margin-top: 3px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .ld-pa-body .ld-lnk { display: inline-block; margin-top: 8px; }
+    .ld-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: var(--faint); padding: 40px 10px; }
+    .ld-empty-ring { width: 52px; height: 52px; border-radius: 50%; border: 2px dashed var(--line); display: grid; place-items: center; margin-bottom: 14px; color: var(--faint); }
+    .ld-empty-t { font-weight: 600; color: var(--muted); font-size: 13px; }
+    .ld-empty-s { font-size: 12px; margin-top: 4px; }
+    .ld-loading-text { color: var(--faint); font-size: 12.5px; padding: 8px 0; margin: 0; }
+
+    /* WAI Insights — gradient shell kept, rows restructured */
+    .ld-wai { padding: 0; overflow: hidden; height: 100%; display: flex; flex-direction: column; border-radius: 25px; }
+    .ld-wai-head { position: relative; overflow: hidden; padding: 20px 22px 17px; flex-shrink: 0; background: linear-gradient(110deg, var(--teal) 0%, #0e8a9e 40%, #7fa61e 70%, var(--lime) 100%); }
+    .ld-wai-h { position: relative; color: #fff; font-size: 11.5px; font-weight: 600; letter-spacing: .8px; text-transform: uppercase; display: flex; align-items: center; gap: 7px; margin-bottom: 4px; }
+    .ld-wai-meta { position: relative; font-size: 11.5px; color: rgba(255,255,255,.8); }
+    .ld-wai-meta a, .ld-wai-meta span { color: #fff; }
+    .ld-wai-body { padding: 6px 20px 18px; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
+    .ld-ins { display: flex; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--line-2); }
+    .ld-ins:last-child { border-bottom: none; }
+    .ld-ins-ic { flex: none; width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; margin-top: 2px; }
+    .ld-ins-ic svg { width: 14px; height: 14px; }
+    .ld-ins-ic.is-ok { background: var(--positive-bg); color: var(--positive); }
+    .ld-ins-ic.is-flagged { background: var(--warning-bg); color: var(--warning); }
+    .ld-ins-tt { font-weight: 600; font-size: 13px; color: var(--ink); }
+    .ld-ins-issue { font-size: 12.5px; color: var(--muted); margin-top: 3px; line-height: 1.5; }
+
+    /* Calendar (FullCalendar v3 reskin — plugin/AJAX logic untouched) + sessions
+       list. .ld-combo's grid-row:1/span 2 plus align-items:stretch (native CSS
+       Grid behavior, no JS/height hack needed) stretches this card to the full
+       combined height of the other two rows; the sessions list grows to fill
+       it via flex:1 below, so there's no empty gap at the bottom. */
+    .ld-cal-card { display: flex; flex-direction: column; }
+    .ld-sess-list { flex: 1; overflow-y: auto; }
+    .ld-cal-card .fc-toolbar { margin-bottom: 12px; }
+    .ld-cal-card .fc-toolbar h2 { font-size: 14px; font-weight: 600; color: var(--ink); }
+    .ld-cal-card .fc-day-header { font-weight: 500; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .3px; }
+    .ld-cal-card .fc-button { background: #fff; border: 1px solid var(--line); color: var(--muted); box-shadow: none; text-shadow: none; border-radius: 8px; }
+    .ld-cal-card .fc-button:hover { background: var(--line-2); }
+    .ld-cal-card .fc-state-active, .ld-cal-card .fc-button:active { background: var(--teal-3); }
+    .ld-cal-card .fc-basic-view .fc-day-top .fc-day-number { font-size: 12px; color: var(--ink); padding: 6px 0; }
+    /* today's own dark-teal pill (default.css) needs white text, not --ink —
+       same specificity as the rule above so it has to win explicitly */
+    .ld-cal-card .fc-today .fc-day-number { color: #fff !important; }
+    .ld-cal-card .fc-day-top { position: relative; }
+    .fc-day.custom-dot { position: relative; }
+    .fc-day.custom-dot::after { content: ''; position: absolute; left: 50%; bottom: 6px; transform: translateX(-50%); width: 5px; height: 5px; background: var(--teal-bright, #2EACB3); border-radius: 50%; }
+    .fc-today.custom-dot::after { background: var(--lime); }
+
+    .ld-sessions-head { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); margin-bottom: 4px; }
+    .ld-sess { display: flex; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--line); }
+    .ld-sess:last-child { border-bottom: none; }
+    .ld-sess-list .date-block { flex: none; width: 46px; text-align: center; background: var(--line-2); border-radius: 10px; padding: 6px 0; align-self: flex-start; font-size: 9.5px; font-weight: 600; letter-spacing: .5px; color: var(--faint); text-transform: uppercase; }
+    .ld-sess-list .date-block h5 { font-size: 18px; font-weight: 700; color: var(--teal); margin: 2px 0; }
+    /* Root cause of the recurring avatar-clipping bug: default.css has a bare,
+       unscoped `.leaveUser-block { display:flex; flex-wrap:wrap; gap:6px }`
+       rule (a leftover from some other feature reusing this class name). That
+       makes the title chip / description / time / avatars all flex items that
+       wrap onto shared lines instead of stacking — which is what put time and
+       the avatar row side-by-side on one line, stretched them to match each
+       other's height, and ultimately clipped the circles. Killing the flex
+       here restores plain block stacking. */
+    .ld-sess-list .leaveUser-block { display: block; }
+    .ld-sess-list .leaveUser-bgBlock { background: var(--line-2); border-radius: 8px; padding: 6px 10px; display: inline-block; margin-bottom: 4px; }
+    .ld-sess-list .leaveUser-bgBlock h6 { font-size: 13px; font-weight: 600; color: var(--ink); margin: 0; }
+    .ld-sess-list .leaveUser-block p { font-size: 12px; color: var(--muted); margin: 0 0 6px; line-height: 1.45; }
+    /* Time (icon glued to the text, never wraps) sits on its own line right
+       below the description; avatars get their own line below that — two
+       stacked left-aligned rows, not squeezed into one shared row. */
+    .ld-sess-list .time { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--faint); white-space: nowrap; margin-top: 8px; }
+    .ld-sess-list .user-ovImg { display: flex; margin-top: 8px; }
+    /* default.css's own generic .img-circle (47px, no ancestor scoping) and its
+       .leaveUser-block .img-circle variant tie this rule's specificity — forcing
+       the shape so this list's circle size wins regardless of load order.
+       24px = 20px + 20%. box-sizing:border-box because this app has no global
+       reset — with the default content-box, the 2px border would add on top
+       of the declared 24px, rendering a 28px box and clipping against
+       whatever assumed a 24px circle. */
+    .ld-sess-list .img-circle { box-sizing: border-box !important; width: 24px !important; height: 24px !important; min-width: 24px !important; border-radius: 50% !important; overflow: hidden !important; margin-left: -7px; border: 2px solid #fff; }
+    .ld-sess-list .img-circle:first-child { margin-left: 0; }
+    .ld-sess-list .img-circle img { width: 100% !important; height: 100% !important; object-fit: cover !important; }
+    .ld-sess-list .num { box-sizing: border-box; width: 24px; height: 24px; border-radius: 50%; background: var(--line-2); color: var(--muted); font-size: 10.5px; display: grid; place-items: center; margin-left: -7px; border: 2px solid #fff; }
+    .ld-view-all-row { padding-top: 10px; }
+
+    /* Gauges */
+    .ld-gauge-wrap { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 6px 0; }
+    .ld-gauge-canvas { position: relative; width: 160px; height: 160px; }
+    .ld-gauge-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .ld-gauge-big { font-size: 28px; font-weight: 700; letter-spacing: -.5px; color: var(--ink); font-variant-numeric: tabular-nums; }
+    .ld-gauge-lbl { font-size: 10.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; max-width: 120px; margin-top: 4px; line-height: 1.3; }
+    .ld-gauge-foot { display: flex; justify-content: space-between; width: 100%; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 11.5px; }
+    .ld-gauge-foot span:first-child { color: var(--faint); }
+    .ld-gauge-foot span:last-child { color: var(--ink); font-weight: 600; }
+
+    /* Learning Attendance — mini radial dials */
+    .ld-late-text { font-size: 11.5px; color: var(--muted); margin: -6px 0 12px; }
+    .ld-dial-list { display: flex; flex-direction: column; gap: 16px; }
+    .ld-dial-item { display: flex; align-items: center; gap: 14px; }
+    .ld-dial { position: relative; width: 52px; height: 52px; flex: none; }
+    .ld-dial-num { position: absolute; inset: 0; display: grid; place-items: center; font-size: 12.5px; font-weight: 400; font-variant-numeric: tabular-nums; }
+    .ld-dial-meta { flex: 1; min-width: 0; }
+    .ld-dial-nm { font-size: 13px; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ld-dial-s { font-size: 11.5px; color: var(--faint); margin-top: 2px; }
+    .ld-others { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); }
+    .ld-others b { color: var(--ink); }
+
+    /* Learning Hours */
+    .ld-chart-box { position: relative; height: 260px; }
+    .ld-chart-box canvas { max-height: 100%; }
+
+    /* Learning Completion Rates — segmented tracks */
+    .ld-track-list { display: flex; flex-direction: column; gap: 18px; }
+    .ld-track-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .ld-track-nm { font-size: 12.5px; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 10px; }
+    .ld-track-val { font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums; flex: none; }
+    .ld-track-val small { color: var(--faint); font-weight: 600; }
+    .ld-pips { display: flex; gap: 3px; }
+    .ld-pips i { flex: 1; height: 10px; border-radius: 3px; display: block; }
+
+    /* Learning History — capped to a fixed height with internal scroll, so its
+       height always matches Learning Attendance beside it regardless of how
+       many entries there are (2 per row visible, rest scroll under a thin bar). */
+    .ld-history { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; max-height: 300px; overflow-y: auto; padding-right: 6px; align-content: start; margin-bottom: 0; }
+    .ld-history::-webkit-scrollbar { width: 6px; }
+    .ld-history::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+    .ld-history::-webkit-scrollbar-track { background: transparent; }
+    @media (max-width: 1100px) { .ld-history { grid-template-columns: 1fr; } }
+    .ld-hist { border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; background: #fff; height: 100%; }
+    .ld-hist-range { font-size: 11px; font-weight: 600; color: var(--faint); letter-spacing: .3px; }
+    .ld-hist-t { font-weight: 600; font-size: 13.5px; color: var(--ink); }
+    .ld-hist-d { font-size: 12px; color: var(--muted); line-height: 1.45; flex: 1; }
+    /* No divider line above the attendance pill — the card's own border is enough. */
+    .ld-hist-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 2px; }
+    .ld-hist-att { font-size: 11.5px; color: var(--muted); }
+    .ld-hist-att b.ok { color: var(--positive); font-weight: 600; }
+    .ld-status-pill { font-size: 10px; font-weight: 700; letter-spacing: .4px; padding: 3px 9px; border-radius: 20px; background: var(--line-2); color: var(--muted); }
+    .ld-status-pill.warn { background: var(--warning-bg); color: var(--warning); }
+
+    /* WAI Insight trigger-link row + frosted modal chrome (including the
+       .m-empty "no data yet" state) now live in the shared
+       partials/_wai_insight_modals.blade.php, included below — reused by
+       every module's dashboard instead of copied per page. */
 </style>
 @endsection
 
@@ -428,137 +493,58 @@
     <script type="text/javascript">
         $(document).ready(function () {
             $('.data-Table').dataTable({
-                "searching": false,
-                "bLengthChange": false,
-                "bFilter": true,
-                "bInfo": false,
-                "bAutoWidth": false,
-                scrollX: true,
-                "iDisplayLength": 10,
+                "searching": false, "bLengthChange": false, "bFilter": true,
+                "bInfo": false, "bAutoWidth": false, scrollX: true, "iDisplayLength": 10,
             });
 
             fetchUpcomingSessions();
             fetchTrainingAttendance();
         });
 
+        // Recommendation/details modal open-close logic now lives in the
+        // shared partials/_wai_insight_modals.blade.php include below.
+
         $(function () {
-            var todayDate = moment().startOf('day');
-            var YM = todayDate.format('YYYY-MM');
-            var TODAY = todayDate.format('YYYY-MM-DD');
-
             var cal = $('#calendar').fullCalendar({
-                header: {
-                    left: 'prev',
-                    center: 'title',
-                    right: 'next'
-                },
+                header: { left: 'prev', center: 'title', right: 'next' },
                 editable: false,
-                eventLimit: 0, // No extra "more" link
-                // Disable nav links — clicking a date should only refresh the side
-                // panel via dayClick, not switch FullCalendar into a day view.
+                eventLimit: 0,
                 navLinks: false,
-                // Let the day grid grow to its natural height instead of FullCalendar's
-                // default 213px scroller, which forces an internal vertical scrollbar.
                 contentHeight: 'auto',
-
                 events: function(start, end, timezone, callback) {
                     $.ajax({
-                        url: "{{ route('get.learning.sessions') }}", // Adjusted for training sessions
+                        url: "{{ route('get.learning.sessions') }}",
                         type: "GET",
-                        data: {
-                            start_date: start.format('YYYY-MM-DD'),
-                            end_date: end.format('YYYY-MM-DD')
-                        },
+                        data: { start_date: start.format('YYYY-MM-DD'), end_date: end.format('YYYY-MM-DD') },
                         success: function(response) {
                             window._learningSessions = response.data || [];
-                            callback([]); // No events displayed, just dots
-                            // FullCalendar v3 may build day cells AFTER the events callback
-                            // resolves — defer one tick so the addClass lands on real cells.
+                            callback([]);
                             setTimeout(paintLearningDots, 0);
                         },
-                        error: function(xhr) {
-                            console.error("Error fetching training sessions", xhr);
-                        }
+                        error: function(xhr) { console.error("Error fetching training sessions", xhr); }
                     });
                 },
                 viewRender: function (view) {
-                    let startDate = view.start.format('YYYY-MM-DD');
-                    let endDate = view.end.format('YYYY-MM-DD');
-                    fetchUpcomingSessions(startDate, endDate); // Load sidebar when month changes
-                    // Re-apply dots once the new month's day cells exist.
+                    fetchUpcomingSessions();
                     setTimeout(paintLearningDots, 0);
                 },
                 dayClick: function(date, jsEvent, view) {
                     $.ajax({
                         url: "{{ route('get.learning.sessions') }}",
                         type: "GET",
-                        data: {
-                            start_date: date.format('YYYY-MM-DD'),
-                            end_date: date.format('YYYY-MM-DD')
-                        },
+                        data: { start_date: date.format('YYYY-MM-DD'), end_date: date.format('YYYY-MM-DD') },
                         success: function(response) {
-                            let trainingHtml = '';
-                            if (response.data.length > 0) {
-                                response.data.forEach(session => {
-                                    let sessionDate = new Date(session.session_date);
-                                    let day = sessionDate.getDate();
-                                    let month = sessionDate.toLocaleString('en-US', { month: 'short' }).toUpperCase();
-                                    let weekday = sessionDate.toLocaleString('en-US', { weekday: 'short' }).toUpperCase();
-                                    let bgColorClass = session.color || "success"; // Set color dynamically
-
-                                    // Generate Attendee Images
-                                    let attendeeHtml = "";
-                                    if (session.participants && session.participants.length > 0) {
-                                        session.participants.forEach((attendee, index) => {
-                                            if (index < 5) { // Show only first 5 images
-                                                attendeeHtml += `
-                                                    <div class="img-circle">
-                                                        <img src="${attendee.image}" alt="${attendee.name}">
-                                                    </div>
-                                                `;
-                                            }
-                                        });
-
-                                        // Add remaining count if more than 5 attendees
-                                        if (session.participants.length > 5) {
-                                            let remainingCount = session.participants.length - 5;
-                                            attendeeHtml += `<div class="num">+${remainingCount}</div>`;
-                                        }
-                                    }
-
-                                    trainingHtml += `
-                                        <div class="d-flex">
-                                            <div class="date-block bg">${month} <h5>${day}</h5> ${weekday}</div>
-                                            <div>
-                                                <div class="leaveUser-bgBlock ${bgColorClass}">
-                                                    <h6>${session.title}</h6>
-                                                </div>
-                                                <div class="leaveUser-block">
-                                                    <p>${session.description || "No description available"}</p>
-                                                    <div class="time"><i class="fa-regular fa-clock"></i> ${session.start_time} to ${session.end_time}</div>
-                                                    <div class="user-ovImg">${attendeeHtml}</div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    `;
-                                });
-                            } else {
-                                trainingHtml = `<p class="text-center">No training sessions on this date.</p>`;
-                            }
-
-                            $("#leaveUser-main").html(trainingHtml);
+                            // Day-click is a deliberate drill-in, so show every session
+                            // on that day (unlike the passive dashboard list below).
+                            $("#leaveUser-main").html(buildSessionsHtml(response.data || []));
                         },
-                        error: function(xhr) {
-                            console.error("Error fetching training sessions", xhr);
-                        }
+                        error: function(xhr) { console.error("Error fetching training sessions", xhr); }
                     });
                 }
             });
         });
 
         // Paint a marker dot on every day each cached training session covers.
-        // Called after the events: callback resolves AND on every viewRender, so
-        // the dots survive month-to-month navigation.
         function paintLearningDots() {
             $('.fc-day').removeClass('custom-dot');
             var sessions = window._learningSessions || [];
@@ -570,8 +556,6 @@
                 var endDate   = endStr ? moment(endStr) : startDate.clone();
                 if (!startDate.isValid()) return;
                 if (!endDate.isValid() || endDate.isBefore(startDate, 'day')) endDate = startDate.clone();
-
-                // moment 2.9.0 doesn't have isSameOrBefore — use !isAfter instead.
                 var cursor = startDate.clone();
                 while (!cursor.isAfter(endDate, 'day')) {
                     var dayCell = $('.fc-day[data-date="' + cursor.format('YYYY-MM-DD') + '"]');
@@ -581,416 +565,159 @@
             });
         }
 
+        // Shared card-style renderer for a list of session objects — used by both
+        // the passive dashboard load and the day-click drill-in. Both render every
+        // session passed in; the dashboard list scrolls internally (.ld-sess-list)
+        // instead of truncating, so nothing needs capping here.
+        function buildSessionsHtml(sessions) {
+            if (!sessions.length) return '<p class="text-muted small mb-0">No training sessions.</p>';
+            var html = '';
+            sessions.forEach(function (session) {
+                var d = new Date(session.session_date);
+                var day = d.getDate();
+                var month = d.toLocaleString('en-US', { month: 'short' }).toUpperCase();
+                var weekday = d.toLocaleString('en-US', { weekday: 'short' }).toUpperCase();
+                var attendeeHtml = '';
+                if (session.participants && session.participants.length) {
+                    session.participants.slice(0, 5).forEach(function (a) {
+                        attendeeHtml += '<div class="img-circle"><img src="' + a.image + '" alt="' + a.name + '"></div>';
+                    });
+                    if (session.participants.length > 5) {
+                        attendeeHtml += '<div class="num">+' + (session.participants.length - 5) + '</div>';
+                    }
+                }
+                html += '' +
+                    '<div class="ld-sess">' +
+                        '<div class="date-block">' + month + '<h5>' + day + '</h5>' + weekday + '</div>' +
+                        '<div class="leaveUser-block flex-fill">' +
+                            '<div class="leaveUser-bgBlock"><h6>' + session.title + '</h6></div>' +
+                            '<p>' + (session.description || 'No description available') + '</p>' +
+                            '<div class="time"><i class="fa-regular fa-clock"></i> ' + session.start_time + ' to ' + session.end_time + '</div>' +
+                            '<div class="user-ovImg">' + attendeeHtml + '</div>' +
+                        '</div>' +
+                    '</div>';
+            });
+            return html;
+        }
+
         function fetchUpcomingSessions() {
             $.ajax({
-                url: '{{ route("get.learning.sessions") }}', // Adjust the route accordingly
+                url: '{{ route("get.learning.sessions") }}',
                 type: 'GET',
                 data: {
-                    start_date: new Date().toISOString().split('T')[0], // Today
-                    end_date: new Date(new Date().setDate(new Date().getDate() + 30)).toISOString().split('T')[0] // Next 30 days
+                    start_date: new Date().toISOString().split('T')[0],
+                    end_date: new Date(new Date().setDate(new Date().getDate() + 30)).toISOString().split('T')[0]
                 },
                 success: function(response) {
-                    let sessionsHtml = '';
-                    if (response.data.length > 0) {
-                        response.data.forEach(session => {
-                                    let sessionDate = new Date(session.session_date);
-                                    let day = sessionDate.getDate();
-                                    let month = sessionDate.toLocaleString('en-US', { month: 'short' }).toUpperCase();
-                                    let weekday = sessionDate.toLocaleString('en-US', { weekday: 'short' }).toUpperCase();
-                                    let bgColorClass = session.color || "success"; // Set color dynamically
-
-                                    // Generate Attendee Images
-                                    let attendeeHtml = "";
-                                    if (session.participants && session.participants.length > 0) {
-                                        session.participants.forEach((attendee, index) => {
-                                            if (index < 5) { // Show only first 5 images
-                                                attendeeHtml += `
-                                                    <div class="img-circle">
-                                                        <img src="${attendee.image}" alt="${attendee.name}">
-                                                    </div>
-                                                `;
-                                            }
-                                        });
-
-                                        // Add remaining count if more than 5 attendees
-                                        if (session.participants.length > 5) {
-                                            let remainingCount = session.participants.length - 5;
-                                            attendeeHtml += `<div class="num">+${remainingCount}</div>`;
-                                        }
-                                    }
-
-                                    sessionsHtml += `
-                                        <div class="d-flex">
-                                            <div class="date-block bg">${month} <h5>${day}</h5> ${weekday}</div>
-                                            <div>
-                                                <div class="leaveUser-bgBlock ${bgColorClass}">
-                                                    <h6>${session.title}</h6>
-                                                </div>
-                                                <div class="leaveUser-block">
-                                                    <p>${session.description || "No description available"}</p>
-                                                    <div class="time"><i class="fa-regular fa-clock"></i> ${session.start_time} to ${session.end_time}</div>
-                                                    <div class="user-ovImg">${attendeeHtml}</div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    `;
-                                });
-                    } else {
-                        sessionsHtml = `<p class="text-center">No upcoming training sessions.</p>`;
-                    }
-
-                    $('#leaveUser-main').html(sessionsHtml);
+                    // Card height is capped with the list scrolling internally now
+                    // (see .ld-cal-card / .ld-sess-list), so render every upcoming
+                    // session instead of truncating to 2 — scrolling reveals the rest.
+                    $('#leaveUser-main').html(buildSessionsHtml(response.data || []));
                 },
-                error: function(error) {
-                    console.error('Error fetching training sessions:', error);
-                }
+                error: function(error) { console.error('Error fetching training sessions:', error); }
             });
         }
 
+        var LD_RAMP = ['#014653', '#2EACB3', '#4A7C64', '#A8823F', '#7C9DA3'];
 
         function fetchTrainingAttendance() {
             $.ajax({
-                url: "{{ route('learning.attendance.chart-data') }}", // Backend route
+                url: "{{ route('learning.attendance.chart-data') }}",
                 type: "GET",
                 success: function (response) {
-                    console.log(response);
                     if (response.success) {
-                        updateDoughnutChart(response.data);
-                        
-                        // ✅ Update Late Attendance Percentage
-                        $("#lateAttendanceText").text(`Late Attendance: ${response.data.late_percentage}%`);
+                        renderAttendanceDials(response.data);
+                        $("#lateAttendanceText").text('Late attendance: ' + response.data.late_percentage + '%');
                     } else {
-                        toastr.error(response.message, "Error", {
-                            positionClass: 'toast-bottom-right'
-                        });
+                        toastr.error(response.message, "Error", { positionClass: 'toast-bottom-right' });
                     }
                 },
                 error: function () {
-                    toastr.error("Failed to fetch attendance data.", "Error", {
-                        positionClass: 'toast-bottom-right'
-                    });
+                    toastr.error("Failed to fetch attendance data.", "Error", { positionClass: 'toast-bottom-right' });
                 }
             });
         }
 
-        function updateDoughnutChart(chartData) {
-            var ctz = document.getElementById('myDoughnutChart').getContext('2d');
-
-            // ✅ Check if the chart already exists and destroy it before creating a new one
-            if (window.myDoughnutChart instanceof Chart) {
-                window.myDoughnutChart.destroy();
+        var MAX_ATT_DIALS = 4;
+        function renderAttendanceDials(data) {
+            var labels = data.labels || [];
+            var values = data.values || [];
+            var el = document.getElementById('attList');
+            el.innerHTML = '';
+            if (!labels.length) {
+                el.innerHTML = '<p class="text-muted small mb-0">No attendance recorded yet.</p>';
+                document.getElementById('attOthersRow').style.display = 'none';
+                return;
             }
+            var recent = labels.slice(0, MAX_ATT_DIALS).map(function (l, i) { return { name: l, value: values[i] || 0 }; });
+            var rest = labels.slice(MAX_ATT_DIALS).map(function (l, i) { return values[i + MAX_ATT_DIALS] || 0; });
 
-            const doughnutLabelsInsideN = {
-                id: 'doughnutLabelsInsideN',
-                afterDraw: function (chart) {
-                    var ctx = chart.ctx;
-                   
-                    chart.data.datasets.forEach(function (dataset, i) {
-                        var meta = chart.getDatasetMeta(i);
-                        if (!meta.hidden) {
-                            meta.data.forEach(function (element, index) {
-                                var dataValue = dataset.data[index] + '%';
-                                var total = dataset.data.reduce((acc, val) => acc + val, 0);
-                                var percentage = ((dataValue / total) * 100).toFixed(0) + '%';
-                                var position = element.tooltipPosition();
-                                ctx.fillStyle = '#fff';
-                                ctx.font = 'bold 14px Poppins';
-                                ctx.textAlign = 'center';
-                                ctx.textBaseline = 'middle';
-                                ctx.fillText(dataValue, position.x, position.y); // Show percentage inside
-                            });
-                        }
-                    });
-                }
-            };
-
-            // Create new chart
-            window.myDoughnutChart = new Chart(ctz, {
-                type: 'doughnut',
-                data: {
-                    labels: chartData.labels,  // Dynamically assigned labels
-                    datasets: [{
-                        data: chartData.values,  // Dynamically assigned values
-                        backgroundColor: chartData.colors,  // Dynamically assigned colors
-                        borderWidth: 0
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    plugins: {
-                        legend: {
-                            display: false
-                        }
-                    },
-                    layout: {
-                        padding: {
-                            top: 10,
-                            bottom: 10,
-                            left: 0,
-                            right: 0
-                        }
-                    }
-                },
-                plugins: [doughnutLabelsInsideN]
-            });
-
-            // ✅ Update the legend after the chart is created
-            updateLegend(chartData.labels, chartData.colors);
-        }
-
-        function updateLegend(labels, colors) {
-            let legendContainer = $(".row.g-2.justify-content-center"); // Ensure this selector is correct
-            legendContainer.empty(); // Clear existing legend items
-
-            labels.forEach((label, index) => {
-                let legendItem = `
-                    <div class="col-auto">
-                        <div class="doughnut-label" style="display: flex; align-items: center;">
-                            <span style="background-color: ${colors[index]}; width: 12px; height: 12px; display: inline-block; margin-right: 5px;"></span>
-                            <span>${label}</span>
-                        </div>
-                    </div>`;
-                legendContainer.append(legendItem);
-            });
-        }
-
-        function updateLegend(labels, colors) {
-            let legendContainer = $(".row.g-2.justify-content-center");
-            legendContainer.empty();
-
-            labels.forEach((label, index) => {
-                let legendItem = `
-                    <div class="col-auto">
-                        <div class="doughnut-label">
-                            <span style="background-color: ${colors[index]}; width: 12px; height: 12px; display: inline-block;"></span> ${label}
-                        </div>
-                    </div>`;
-                legendContainer.append(legendItem);
-            });
-        }
-
-        // Generic function to equalize heights of two or more elements based on a reference element
-        function equalizeHeights(referenceId, targetIds) {
-            // Get the reference element
-            const reference = document.getElementById(referenceId);
-
-            // Check if the reference element exists
-            if (reference) {
-                // Get the height of the reference element
-                const referenceHeight = reference.offsetHeight;
-
-                // Loop through target element IDs and set their height
-                targetIds.forEach(targetId => {
-                    const target = document.getElementById(targetId);
-                    if (target) {
-                        target.style.height = referenceHeight + 'px';
-                    }
+            recent.forEach(function (r, i) {
+                var cid = 'attDial' + i;
+                var item = document.createElement('div');
+                item.className = 'ld-dial-item';
+                item.innerHTML = '<div class="ld-dial"><canvas id="' + cid + '"></canvas>' +
+                    '<div class="ld-dial-num" style="color:' + LD_RAMP[i % LD_RAMP.length] + '">' + Math.round(r.value) + '%</div></div>' +
+                    '<div class="ld-dial-meta"><div class="ld-dial-nm">' + r.name + '</div><div class="ld-dial-s">Attendance rate</div></div>';
+                el.appendChild(item);
+                new Chart(document.getElementById(cid), {
+                    type: 'doughnut',
+                    data: { datasets: [{ data: [r.value, Math.max(0, 100 - r.value)], backgroundColor: [LD_RAMP[i % LD_RAMP.length], '#EEF4F4'], borderWidth: 0 }] },
+                    options: { cutout: '74%', rotation: -90, circumference: 360, responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { enabled: false } } }
                 });
+            });
+
+            var othersRow = document.getElementById('attOthersRow');
+            if (rest.length) {
+                var avg = Math.round(rest.reduce(function (s, v) { return s + v; }, 0) / rest.length);
+                document.getElementById('attOthers').textContent = rest.length + ' programs · ' + avg + '%';
+                othersRow.style.display = 'flex';
+            } else {
+                othersRow.style.display = 'none';
             }
         }
 
-        // h-100 + Bootstrap rows now handle equal heights — equalizeHeights() is
-        // a no-op kept only so the function reference doesn't break anything else.
-        function adjustHeights() {}
-
-
-        // progress 
-        const radius = 54; // Circle radius
-        const circumference = 2 * Math.PI * radius; // The circumference of the circle
-        // Select all progress containers
-        const progressContainers = document.querySelectorAll('.progress-container');
-
-        progressContainers.forEach(container => {
-            const progressCircle = container.querySelector('.progress');
-            // const progressText = container.querySelector('.progress-text');
-            const progressValue = container.getAttribute('data-progress'); // Get the progress value from the container's data attribute
-            const offset = circumference - (progressValue / 100 * circumference); // Calculate the offset
-
-            // Set the initial stroke-dashoffset to the full circumference
-            progressCircle.style.strokeDashoffset = circumference;
-
-            // Use a small timeout to allow the browser to render the initial state before applying the offset (to trigger the animation)
-            setTimeout(() => {
-                // Apply the calculated offset to the progress bar with animation
-                progressCircle.style.strokeDashoffset = offset;
-
-                // Update the text inside the circle
-                // progressText.textContent = `${progressValue}%`;
-            }, 100); // A small delay to trigger the animation smoothly
-        });
-
-        document.addEventListener("DOMContentLoaded", function () {
-            const progressBars = document.querySelectorAll('.progress.progress-custom .progress-bar'); // Ensure parent has progress-custom class
-
-            progressBars.forEach((progressBar) => {
-                const valueNow = parseInt(progressBar.getAttribute('aria-valuenow'), 10);
-                const parentProgress = progressBar.closest('.progress'); // Get the parent .progress element
-
-                // Add specific classes to the parent based on aria-valuenow
-                if (valueNow === 100) {
-                    parentProgress.classList.add('value-100');
-                } else if (valueNow === 0) {
-                    parentProgress.classList.add('value-0');
-                }
+        function gauge(id, value, color) {
+            var canvas = document.getElementById(id);
+            if (!canvas) return;
+            new Chart(canvas, {
+                type: 'doughnut',
+                data: { datasets: [{ data: [value, Math.max(0, 100 - value)], backgroundColor: [color, '#EEF4F4'], borderWidth: 0 }] },
+                options: { cutout: '78%', rotation: -90, circumference: 360, responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { enabled: false } } }
             });
-
-            // (Duplicate fullCalendar() init removed — it re-initialised #calendar
-            //  without the events / dayClick handlers configured above and reverted
-            //  navLinks back to defaults, which is what produced the empty
-            //  "April 15, 2026 / Wednesday" day-view header on date click.)
-        });
+        }
+        gauge('gaugeFeedback', {{ $feedbackAvgScore ?? 0 }}, '#C7CDCF');
+        gauge('gaugeOnboard', {{ $onboardingProgress ?? 0 }}, '#014653');
     </script>
     <script type="module">
-        // Learning Hours — horizontal bar per program. Program name on the y-axis,
-        // hours on the x-axis. No duplicate legend below the chart.
-        var learningHoursPalette = ['#014653','#2EACB3','#FED049','#8DC9C9','#333333','#7AD45A','#FF4B4B','#F5738D','#53CAFF'];
+        // Learning Hours — horizontal bar per program, on-brand ramp (was blue/pink/yellow).
         var learningHoursRows = @json($learningHoursByProg ?? []);
         var learningHoursCanvas = document.getElementById('myStackedBarChart');
 
         if (learningHoursCanvas && learningHoursRows.length) {
-            var learningHoursLabels = learningHoursRows.map(function (r) { return r.name || 'Untitled'; });
-            var learningHoursData   = learningHoursRows.map(function (r) { return parseFloat(r.total_hours || 0); });
-            var learningHoursColors = learningHoursRows.map(function (_r, i) { return learningHoursPalette[i % learningHoursPalette.length]; });
-            var learningHoursMeta   = learningHoursRows.map(function (r) {
-                return { sessions: r.session_count || 0, hours: parseFloat(r.total_hours || 0) };
-            });
+            var labels = learningHoursRows.map(function (r) { return r.name || 'Untitled'; });
+            var values = learningHoursRows.map(function (r) { return parseFloat(r.total_hours || 0); });
+            var colors = learningHoursRows.map(function (_r, i) { return LD_RAMP[i % LD_RAMP.length]; });
+            var meta   = learningHoursRows.map(function (r) { return { sessions: r.session_count || 0 }; });
 
             new Chart(learningHoursCanvas.getContext('2d'), {
                 type: 'bar',
-                data: {
-                    labels: learningHoursLabels,
-                    datasets: [{
-                        label: 'Hours',
-                        data: learningHoursData,
-                        backgroundColor: learningHoursColors,
-                        borderColor: '#fff',
-                        borderWidth: 1,
-                        borderRadius: 6,
-                    }]
-                },
+                data: { labels: labels, datasets: [{ label: 'Hours', data: values, backgroundColor: colors, borderRadius: 6 }] },
                 options: {
-                    indexAxis: 'y',                 // horizontal bars: names on Y, hours on X
-                    responsive: true,
-                    maintainAspectRatio: false,
+                    indexAxis: 'y', responsive: true, maintainAspectRatio: false,
                     plugins: {
-                        legend: { display: false }, // single dataset, no need for a legend
-                        tooltip: {
-                            callbacks: {
-                                title: function (items) { return items[0].label; }, // full name on hover
-                                label: function (item)  {
-                                    var meta = learningHoursMeta[item.dataIndex] || {};
-                                    return ' ' + item.formattedValue + ' hrs · ' + (meta.sessions || 0) + ' sessions';
-                                }
-                            }
-                        }
+                        legend: { display: false },
+                        tooltip: { callbacks: {
+                            title: function (items) { return items[0].label; },
+                            label: function (item) { var m = meta[item.dataIndex] || {}; return ' ' + item.formattedValue + ' hrs · ' + (m.sessions || 0) + ' sessions'; }
+                        } }
                     },
                     scales: {
-                        x: {
-                            beginAtZero: true,
-                            grid: { color: '#f1f3f5' },
-                            ticks: { precision: 0 },
-                            title: { display: true, text: 'Hours' }
-                        },
-                        y: {
-                            grid: { display: false },
-                            ticks: {
-                                callback: function (value) {
-                                    var label = this.getLabelForValue(value);
-                                    return label && label.length > 18 ? label.slice(0, 18) + '…' : label;
-                                }
-                            }
-                        }
+                        x: { beginAtZero: true, grid: { color: '#EEF4F4' }, ticks: { precision: 0 }, title: { display: true, text: 'Hours' } },
+                        y: { grid: { display: false }, ticks: { callback: function (value) { var l = this.getLabelForValue(value); return l && l.length > 18 ? l.slice(0, 18) + '…' : l; } } }
                     }
                 }
             });
         }
-
-      
-
-        var cty = document.getElementById('onboardingChart').getContext('2d');
-        var onboardingChart = new Chart(cty, {
-            type: 'bar',
-            data: {
-                labels: ['Learning 1', 'Learning 2', 'Learning 3', 'Learning 4', 'Learning 5', 'Learning 6'],
-                datasets: [
-                    {
-                        label: 'Department  1',
-                        data: [8, 20, 25, 10, 10, 20, 10],
-                        backgroundColor: '#014653',
-                        borderColor: '#fff',
-                        borderWidth: 2,
-                        borderRadius: 10,
-                    },
-                    {
-                        label: 'Department  2',
-                        data: [5, 10, 4, 20, 2, 5, 10],
-                        backgroundColor: '#2EACB3',
-                        borderColor: '#fff',
-                        borderWidth: 2,
-                        borderRadius: 10,
-                    },
-                    {
-                        label: 'Department  3',
-                        data: [20, 5, 20, 40, 22, 5, 20],
-                        backgroundColor: '#FED049',
-                        borderColor: '#fff',
-                        borderWidth: 2,
-                        borderRadius: 10,
-                    },
-                    {
-                        label: 'Department  4',
-                        data: [5, 20, 15, 5, 5, 5, 10],
-                        backgroundColor: '#8DC9C9',
-                        borderColor: '#fff',
-                        borderWidth: 2,
-                        borderRadius: 10,
-                    },
-                    {
-                        label: 'Department  5',
-                        data: [5, 7, 4, 4, 2, 5, 5],
-                        backgroundColor: '#333333',
-                        borderColor: '#fff',
-                        borderWidth: 2,
-                        borderRadius: 10,
-                    }
-                ]
-            },
-            options: {
-                plugins: {
-                    legend: {
-                        display: false // Hide legend
-                    },
-                    layout: {
-                        padding: 0 // Remove padding
-                    },
-                    tooltip: {
-                        enabled: false // Disable tooltips
-                    }
-                },
-                hover: {
-                    mode: null // Disable hover effects
-                },
-                scales: {
-                    x: {
-                        stacked: true,
-                        grid: {
-                            display: false // Hide x-axis grid lines
-                        }
-                    },
-                    y: {
-                        stacked: true,
-                        beginAtZero: true,
-                        grid: {
-                            display: false // Hide y-axis grid lines
-                        },
-                        ticks: {
-                            stepSize: 20
-                        }
-                    }
-                }
-            }
-        });
-
     </script>
 @endsection

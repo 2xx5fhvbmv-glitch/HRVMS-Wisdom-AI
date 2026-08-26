@@ -205,7 +205,7 @@
 
       if (id.length > 0) {
         swal({
-          title: 'Sure want to archived selected data?',
+          title: 'Sure want to archive selected data?',
           text: 'This cannot be undone',
           type: 'warning',
           showCancelButton: true,

@@ -13,7 +13,7 @@
                     </div>
                 </div>
                 <div class="col-auto">
-                    <a href="{{ route('Performance.kpi.KpiList') }}" class="btn btn-themeGray btn-sm">
+                    <a href="{{ route('Performance.kpi.KpiList') }}" class="btn perf-btn-secondary btn-sm">
                         <i class="fa-solid fa-arrow-left"></i> Back
                     </a>
                 </div>
@@ -58,7 +58,7 @@
                                     <div class="small fw-bold" data-col="superb">{{ $k->superb !== null ? $k->superb : '-' }}</div>
                                 </td>
                                 <td>
-                                    <button class="btn btn-theme btn-sm edit-kpi-config-btn"
+                                    <button class="btn perf-btn-secondary btn-sm edit-kpi-config-btn"
                                             data-id="{{ $k->id }}"
                                             data-poor-range="{{ $k->poor_range }}"
                                             data-fair-range="{{ $k->fair_range }}"
@@ -95,7 +95,7 @@
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="form-label fw-bold" style="color:#9e9e9e;">POOR Range</label>
-                            <input type="text" name="poor_range" class="form-control" placeholder="e.g. Below than 85%">
+                            <input type="text" name="poor_range" class="form-control" placeholder="e.g. Below 85%">
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold" style="color:#9e9e9e;">POOR Points</label>
@@ -128,13 +128,14 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-themeGray btn-sm" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-theme btn-sm">Save</button>
+                    <button type="button" class="btn perf-btn-neutral btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn perf-btn-primary btn-sm">Save</button>
                 </div>
             </div>
         </form>
     </div>
 </div>
+@include('resorts.Performance._performance_buttons_v2_styles')
 @endsection
 
 @section('import-css')

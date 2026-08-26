@@ -73,7 +73,7 @@
                                 <th>Target Position</th>
                                 <th>Current Department</th>
                                 <th>Target Department</th>
-                                <th>Transfer date</th>
+                                <th>Transfer Date</th>
                                 <th>Reason</th>
                                 <th>Status</th>
                                 <th>Action</th>
@@ -96,10 +96,10 @@
     $(document).ready(function () {
         $('.select2t-none').select2();
 
-        $(".datepicker").datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,
-            todayHighlight: true
+        flatpickr(".datepicker", {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
 
         getTransferData();
@@ -118,12 +118,11 @@
             const action = $(this).data('action');
             const finalUrl = transferApprovalUrl.replace('__ID__', transferId).replace('__ACTION__', action);
 
-            Swal.fire({
+            wisdomConfirm({
+                role: 'confirm',
                 title: `Are you sure?`,
                 text: `You want to ${action} this transfer?`,
-                icon: 'warning',
-                showCancelButton: true,
-                confirmButtonText: `Yes, ${action} it!`,
+                confirmText: `Yes, ${action} it!`
             }).then((result) => {
                 if (result.isConfirmed) {
                     $.ajax({

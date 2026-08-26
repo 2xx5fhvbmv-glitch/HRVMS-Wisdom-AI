@@ -227,7 +227,7 @@ class GrievanceAppealController extends Controller
 
         // Notify each scheduled participant.
         $msg = 'You are scheduled for hearing #' . $hearing->sequence_no . ' of appeal ' . $appeal->appeal_no
-            . ' on ' . Carbon::parse($hearing->hearing_date)->format('d M Y') . '.';
+            . ' on ' . Common::formatDate($hearing->hearing_date) . '.';
         foreach ($hearing->participants ?? [] as $empId) {
             $this->fireBellNotification($empId, 'Hearing Scheduled', $msg, $appeal->id);
         }

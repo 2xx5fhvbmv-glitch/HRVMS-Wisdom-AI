@@ -74,7 +74,7 @@
                                         <div class="bg-themeGrayLight">
                                             <div class="d-flex align-items-center justify-content-between">
                                                 <div>
-                                                    <p class="mb-0  fw-500">On leave</p>
+                                                    <p class="mb-0  fw-500">On Leave</p>
                                                     <strong>{{$leave_employee_counts}}</strong>
                                                 </div>
                                                 <a href="#">
@@ -368,7 +368,7 @@
                                 <div class="border-bottom">
                                     <h6>Time & Attendance</h6>
                                     <div class="d-flex">
-                                        <p>Excessive Overtime hours</p>
+                                        <p>Excessive Overtime Hours</p>
                                         <span class="text-danger">48</span>
                                     </div>
                                     <div class="d-flex">
@@ -695,7 +695,7 @@
                                                             </tbody>
                                                         </table>
                                                     </div>
-                                                    <h6 class="mb-md-3 mb-2">Employees with highest number of Ots</h6>
+                                                    <h6 class="mb-md-3 mb-2">Employees with highest number of OTs</h6>
                                                     @foreach($rosterData as $roster)
                                                         
                                                         <div class="leaveUser-block">
@@ -723,7 +723,7 @@
                                                             <div class="col-auto">
                                                                 <div class="form-group">
                                                                     <select class="form-select" aria-label="Default select example" id="ResortPosition">
-                                                                        <option selected="">All Poistion</option>
+                                                                        <option selected="">All Positions</option>
                                                                         @if($resort_positions->isNotEmpty())
                                                                             @foreach($resort_positions as $position)
                                                                                 <option value="{{$position->id}}">{{$position->position_title}}</option>
@@ -745,7 +745,7 @@
                                                         <thead>
                                                             <tr>
                                                                 <th>Employee Name</th>
-                                                                <th>Poisition</th>
+                                                                <th>Position</th>
                                                                 <th>Shift</th>
                                                             </tr>
                                                         </thead>
@@ -981,7 +981,7 @@
                                                     <th>Position</th>
                                                     <th>Probation End Date</th>
                                                     <th>Onboarding Training</th>
-                                                    <th>Monthly Check-in Status,</th>
+                                                    <th>Monthly Check-in Status</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
@@ -1939,7 +1939,7 @@
                                     </div>
                                     <div>
                                         <h6>${department} (${rank})</h6>
-                                        <p>Requested for Hire ${NoOfVacnacy} ${position}</p>
+                                        <p>Requested to Hire ${NoOfVacnacy} ${position}</p>
                                     </div>
 
                         </div>`;
@@ -2094,10 +2094,10 @@
             // End of Reject Vacanciy form
             //  Approval
 
-            $('#link_Expiry_date').datepicker({
-                format: 'dd/mm/yyyy',
-                autoclose: true,
-                todayHighlight: true
+            flatpickr('#link_Expiry_date', {
+                dateFormat: 'd/m/Y',
+                allowInput: true,
+                appendTo: document.body
             });
             $("#ApprovedResponseModel").on("click",function(){
                 var ta_id= $(this).attr('data-ta_id');

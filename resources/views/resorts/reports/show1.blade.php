@@ -32,7 +32,7 @@
                         </h3>
                     </div>
                     <div class="col-auto">
-                        <a href="{{ route('reports.create') }}" class="btn btn-sm btn-theme">Create Report</a>
+                        <a href="{{ route('reports.create') }}" class="btn eb-btn-accent">Create Report</a>
                     </div>
                 </div>  
                 <hr>
@@ -71,7 +71,7 @@
                             </div>
 
                             <div class="col-xl-1">
-                                <button type="submit" class="btn btn-sm btn-theme SearchReport">Search</button>
+                                <button type="submit" class="btn eb-btn-primary SearchReport">Search</button>
                             </div>
                             <div class="col-xl-1 page-hedding">
                                 <div class="d-flex">
@@ -79,7 +79,7 @@
                                       
                                         <div class="dropdown">
                                         
-                                            <button class="btn btn-sm btn-primary dropdown-toggle" disabled type="button" id="exportDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                                            <button class="btn eb-btn-accent dropdown-toggle" disabled type="button" id="exportDropdown" data-bs-toggle="dropdown" aria-expanded="false">
                                                 <i class="fa fa-download"></i> Export Report
                                             </button>
                                             <ul class="dropdown-menu" aria-labelledby="exportDropdown">
@@ -102,7 +102,7 @@
                                         </div>                                    
                                     </div>
                                     <div class="d-flex align-items-center ms-2">
-                                        <button class="btn btn-sm btn-theme AIInSide" disabled type="button"aria-expanded="false">AI InSide</button>
+                                        <button class="btn eb-btn-accent AIInSide" disabled type="button"aria-expanded="false">AI InSide</button>
                                     </div>
                                 </div>
                             </div>
@@ -117,7 +117,7 @@
                     <table class="table  bordered">
                         <thead>
                             <tr>
-                                <th colspan="5">No Record Found..</th>
+                                <th colspan="5">No Record Found.</th>
                             </tr>
                         </thead>
                      
@@ -127,7 +127,7 @@
             <div class="card-footer">
                 <div class="row">
                     <div class="col">
-                        <a href="{{ route('resort.report.index') }}" class="btn btn-sm btn-danger">Back to Reports</a>
+                        <a href="{{ route('resort.report.index') }}" class="btn eb-btn-secondary">Back to Reports</a>
                     </div>  
                     <div class="col-auto">
                         <div class="dropdown">
@@ -141,6 +141,7 @@
         </div>
     </div>
 </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -164,15 +165,15 @@ $(document).ready(function() {
     $("#GetReportData").parsley();
    
         
-        $("#todate").datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,      // Close the picker after selection
-            todayHighlight: true  // Highlight today's date
+        flatpickr("#todate", {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
-         $("#formdate").datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,      // Close the picker after selection
-            todayHighlight: true  // Highlight today's date
+         flatpickr("#formdate", {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
      
 

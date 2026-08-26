@@ -110,7 +110,7 @@
                         @csrf
                         <button type="submit" class="btn-accept">Accept Contract</button>
                     </form>
-                    <button type="button" class="btn-outline-decline" id="showDeclineForm">Decline Contract</button>
+                    <button type="button" class="eb-btn-decline" id="showDeclineForm">Decline Contract</button>
                 </div>
 
                 <div class="decline-form" id="declineForm">
@@ -153,3 +153,4 @@
 </script>
 </body>
 </html>
+@include('resorts._emotional_buttons_v2_styles')

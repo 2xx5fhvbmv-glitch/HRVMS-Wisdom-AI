@@ -235,10 +235,10 @@ $(document).ready(function() {
             });
 
 
-        $('#link_Expiry_date').datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,
-            todayHighlight: true
+        flatpickr('#link_Expiry_date', {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
 
 
@@ -255,7 +255,8 @@ $(document).ready(function() {
 
 
     let formattedDate = parts[0] + "/" + parts[1] + "/" + parts[2];
-        $('#link_Expiry_date').datepicker('setDate',ExpiryDate);
+        var linkExpiryFp = document.getElementById('link_Expiry_date')._flatpickr;
+        if (linkExpiryFp) { linkExpiryFp.setDate(ExpiryDate, true, "d/m/Y"); }
     });
 
     // View Job Advertisement Modal

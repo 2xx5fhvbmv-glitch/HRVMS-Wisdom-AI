@@ -157,7 +157,7 @@
         });
         populateMonthYearDropdowns();
 
-        $('#employee-table').on('click', '.btn-themeSkyblueLight', function () {
+        $('#employee-table').on('click', 'a[href="#share-modal"]', function () {
             let employeeId = $(this).data('id'); // Get employee ID from the clicked button
         
             // Set employee ID in the modal
@@ -168,7 +168,7 @@
             $('#share-modal').find('#selectedEmployeeName').text(employeeName);
         });
 
-        $('#employee-table').on('click', '.btn-themeBlue', function () {
+        $('#employee-table').on('click', 'a[href="#view-modal"]', function () {
             let employeeId = $(this).data('id'); // Get employee ID from the clicked button
         
             // Set employee ID in the modal

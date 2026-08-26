@@ -278,10 +278,16 @@
                                 <div class="wai-row-body">
                                     <h6>{{ $accommodationInsights[$ac['key']]['title'] ?? '' }}</h6>
                                     <p class="wai-row-text">{{ $accommodationInsights[$ac['key']]['body'] ?? '' }}</p>
-                                    @if($hasRecommendation)
-                                        <p class="wai-row-recommendation"><strong>Recommendation:</strong> {{ $accommodationInsights[$ac['key']]['recommendation'] }}</p>
-                                    @endif
-                                    <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#{{ $ac['modal'] }}" class="wai-row-link">View details &rarr;</a>
+                                    <div class="lnkrow">
+                                        @if($hasRecommendation)
+                                            <button type="button" class="lnk-rec"
+                                                data-title="{{ $accommodationInsights[$ac['key']]['title'] ?? '' }}"
+                                                data-rec="{{ $accommodationInsights[$ac['key']]['recommendation'] }}"
+                                                data-details="{{ $ac['modal'] }}">View recommendation &rarr;</button>
+                                            <span class="sep"></span>
+                                        @endif
+                                        <a href="#" class="lnk" data-details="{{ $ac['modal'] }}">View details &rarr;</a>
+                                    </div>
                                 </div>
                             </div>
                         @endforeach
@@ -482,7 +488,7 @@
                     <div class=" card-title">
                         <div class="row justify-content-between align-items-center g-md-3 g-1">
                             <div class="col">
-                                <h3 class="text-nowrap">On Hold Requested </h3>
+                                <h3 class="text-nowrap">On Hold Requests</h3>
                             </div>
                             <div class="col-auto"><a href="{{ route('resort.accommodation.HoldMaintanaceRequest') }}" class="a-link">View All</a>
                             </div>
@@ -534,8 +540,8 @@
                     <input type="hidden" name="task_id" id="task_id">
                 </div>
                 <div class="modal-footer">
-                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                    <button type='submit' class="btn btn-themeBlue">Submit</button>
+                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Cancel</a>
+                    <button type='submit' class="btn eb-btn-primary">Submit</button>
                 </div>
             </form>
         </div>
@@ -568,8 +574,8 @@
                     <input type="hidden" name="task_id" id="task_id">
                 </div>
                 <div class="modal-footer">
-                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                    <button type='submit' class="btn btn-themeBlue">Submit</button>
+                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Cancel</a>
+                    <button type='submit' class="btn eb-btn-primary">Submit</button>
                 </div>
             </form>
         </div>
@@ -592,7 +598,7 @@
                     <input type="hidden" name="task_id" id="task_id">
                 </div>
                 <div class="modal-footer">
-                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
+                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Cancel</a>
                 </div>
             </form>
         </div>
@@ -647,13 +653,15 @@
                 </div>
             </div>
             <div class="modal-footer border-top">
-                <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray">Cancel</a>
-                <button type="button" class="btn btn-themeBlue" id="submitAssignBed">Submit</button>
+                <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn eb-btn-neutral">Cancel</a>
+                <button type="button" class="btn eb-btn-primary" id="submitAssignBed">Submit</button>
             </div>
         </div>
     </div>
 </div>
 @includeWhen(isset($accommodationInsights), 'resorts.Accommodation.dashboard._insight_modals')
+@includeWhen(isset($accommodationInsights), 'partials._wai_insight_modals')
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -699,7 +707,6 @@
     .wai-narrative .wai-row-body { flex: 1 1 auto; min-width: 0; }
     .wai-narrative .wai-row-body h6 { margin: 0 0 4px; font-size: 13.5px; font-weight: 700; color: #14232A; }
     .wai-narrative .wai-row-text { margin: 0 0 4px; font-size: 12.5px; color: #5D6F75; line-height: 1.5; }
-    .wai-narrative .wai-row-recommendation { margin: 0 0 4px; font-size: 12.5px; color: #0e8a9e; line-height: 1.5; }
     .wai-narrative .wai-row-link { display: inline-block; margin-top: 2px; font-size: 12px; font-weight: 600; color: #014653; }
 
     #selectBed-modal .table-sm th,
@@ -997,11 +1004,10 @@
                         let errs = errors?.errors ? Object.values(errors.errors).join('<br>') : "An unexpected error occurred.";
 
                         // Show error SweetAlert
-                        Swal.fire({
+                        wisdomAlert({
+                            type: 'error',
                             title: 'Error!',
-                            html: errs,
-                            icon: 'error',
-                            confirmButtonColor: '#d33'
+                            extra: { html: errs }
                         });
                     }
                 });
@@ -1048,19 +1054,18 @@
 
         var description = $(this).attr('data-description') || '';
 
-        Swal.fire({
+        wisdomConfirm({
+            role: 'confirm',
             title: 'Approve & Forward?',
-            html: `<div class="text-start">
-                        <p><strong>Description:</strong> ${description}</p>
-                        <p><strong>Item:</strong> ${EffectedAmenity}</p>
-                        <p><strong>Location:</strong> ${Location}</p>
-                        <p class="text-muted mt-2">This request will be approved and forwarded to the Engineering department.</p>
-                    </div>`,
-            icon: 'question',
-            showCancelButton: true,
-            confirmButtonText: 'Approve & Forward',
-            confirmButtonColor: '#014653',
-            cancelButtonText: 'Cancel'
+            confirmText: 'Approve & Forward',
+            extra: {
+                html: `<div class="text-start">
+                            <p><strong>Description:</strong> ${description}</p>
+                            <p><strong>Item:</strong> ${EffectedAmenity}</p>
+                            <p><strong>Location:</strong> ${Location}</p>
+                            <p class="text-muted mt-2">This request will be approved and forwarded to the Engineering department.</p>
+                        </div>`
+            }
         }).then(function(result) {
             if (result.isConfirmed) {
                 $.ajax({
@@ -1094,19 +1099,18 @@
         let msg = (flag === "On-Hold") ? 'Yes, put it on hold!' : 'Yes, close it!';
 
         // SweetAlert confirmation dialog with input field
-        Swal.fire({
+        wisdomConfirm({
+            role: 'confirm',
             title: 'Are you sure?',
             text: msg,
-            icon: 'warning',
-            input: 'textarea', // Input type for providing a reason
-            inputPlaceholder: 'Enter your reason here...',
-            showCancelButton: true,
-            confirmButtonColor: '#3085d6',
-            cancelButtonColor: '#d33',
-            confirmButtonText: msg,
-            inputValidator: (value) => {
-                if (!value) {
-                    return 'Reason is required!';
+            confirmText: msg,
+            extra: {
+                input: 'textarea', // Input type for providing a reason
+                inputPlaceholder: 'Enter your reason here...',
+                inputValidator: (value) => {
+                    if (!value) {
+                        return 'Reason is required!';
+                    }
                 }
             }
         }).then((result) => {
@@ -1126,19 +1130,17 @@
                     success: function(response) {
                         if (response.success) {
                             // Show success SweetAlert
-                            Swal.fire({
+                            wisdomAlert({
+                                type: 'success',
                                 title: 'Success!',
-                                text: response.message,
-                                icon: 'success',
-                                confirmButtonColor: '#3085d6'
+                                text: response.message
                             });
                             OnHoldTaskList(); // Refresh task list
                         } else {
-                            Swal.fire({
+                            wisdomAlert({
+                                type: 'error',
                                 title: 'Error!',
-                                text: response.message || "Something went wrong.",
-                                icon: 'error',
-                                confirmButtonColor: '#d33'
+                                text: response.message || "Something went wrong."
                             });
                         }
                     },
@@ -1147,11 +1149,10 @@
                         let errs = errors?.errors ? Object.values(errors.errors).join('<br>') : "An unexpected error occurred.";
 
                         // Show error SweetAlert
-                        Swal.fire({
+                        wisdomAlert({
+                            type: 'error',
                             title: 'Error!',
-                            html: errs,
-                            icon: 'error',
-                            confirmButtonColor: '#d33'
+                            extra: { html: errs }
                         });
                     }
                 });

@@ -391,7 +391,7 @@
                                                 </tr>
                                                 <!-- Hidden details for positions -->
                                                 <tr class="collapse" id="collapse-{{$pos->id}}">
-                                                    <td><span class="badge-headcount" id="head-count">2024 HEADCOUNT = 00 <br/> 2025 HEADCOUNT <br/> 2025 Filled COUNT <br/> 2025 vacant count </span></td>
+                                                    <td><span class="badge-headcount" id="head-count">2024 HEADCOUNT = 00 <br/> 2025 HEADCOUNT <br/> 2025 Filled COUNT <br/> 2025 Vacant COUNT </span></td>
                                                     <td id="january-{{$pos->id}}" data-month="January"></td>
                                                     <td id="february-{{$pos->id}}" data-month="February"></td>
                                                     <td id="march-{{$pos->id}}" data-month="March"></td>

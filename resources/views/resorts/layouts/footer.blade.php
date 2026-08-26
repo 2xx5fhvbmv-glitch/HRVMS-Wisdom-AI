@@ -2,7 +2,7 @@
 <footer>
     <div class="footer_wrap">
         <p class="m-0 text-light copy">©{{date('Y')}}  Wisdom AI Pvt Ltd | Every Data Shielded | Creativity Secured | All
-            innovations Protected. </p>
+            Innovations Protected. </p>
     </div>
 </footer>
 <div class="navigation-wrapper " >
@@ -58,9 +58,12 @@
 </div>
 
 <div class="notification-wrapper ">
-    <div class="notification-title d-flex justify-content-between">
-        <h5>Notifications</h5>
-        <a href="{{ route('resort.Mark.NotificationList')}}" class="text-underline btn-link-yellow">View All</a>
+    <div class="notification-title">
+        <div class="ntf-kicker">
+            <span class="ntf-kicker-l"><span class="ntf-dot"></span>Notifications</span>
+            <a href="{{ route('resort.Mark.NotificationList')}}" class="ntf-viewall">View all &rarr;</a>
+        </div>
+        <div class="ntf-heading">Recent activity</div>
     </div>
     <div class="notification-body">
         @php

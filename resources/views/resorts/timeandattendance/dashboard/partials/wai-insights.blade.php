@@ -57,13 +57,16 @@
 @endphp
 
 <style>
-    /* These tokens don't exist anywhere else in the app yet — scoped here
-       rather than added to :root so they can't collide with a future
-       global token system before one exists. */
+    /* Neutral/geometry tokens (--teal/--teal-2/--lime/--ink/--muted/
+       --faint/--line/--line-2) now come from the shared :root palette
+       (resorts/layouts/_design_tokens.blade.php). --teal-mid stays local
+       (used as a gradient stop, not a flat teal — see mapping guide).
+       --ok/--ok-bg folded into --positive/--positive-bg (same #1f9d6b/
+       #e9f7f0 value, now canonical). --warn/--err stay local for now
+       (out of scope for this pass). */
     .card-wiINsight {
-        --teal: #014653; --teal-2: #035b6c; --teal-mid: #0e8a9e; --lime: #e0ff02;
-        --ink: #14232a; --muted: #5d6f75; --faint: #9fadb2; --line: #eaf0f0; --line-2: #f2f6f6;
-        --ok: #1f9d6b; --ok-bg: #e9f7f0; --warn: #d98a00; --warn-bg: #fff6e5; --err: #e5573f; --err-bg: #fdeeeb;
+        --teal-mid: #0e8a9e;
+        --warn: #d98a00; --warn-bg: #fff6e5; --err: #e5573f; --err-bg: #fdeeeb;
     }
     .card-wiINsight { display: flex; flex-direction: column; padding: 0; overflow: hidden; border-radius: 16px; }
 
@@ -97,7 +100,7 @@
         border: 1px solid #d7ecdf;
     }
     .wai-hero-count { font-size: 28px; font-weight: 800; color: var(--err); line-height: 1; flex-shrink: 0; }
-    .wai-hero-icon { font-size: 22px; color: var(--ok); flex-shrink: 0; }
+    .wai-hero-icon { font-size: 22px; color: var(--positive); flex-shrink: 0; }
     .wai-hero-text { flex: 1 1 auto; min-width: 0; }
     .wai-hero-text p { margin: 0; font-size: 13.5px; color: var(--ink); line-height: 1.4; }
     .wai-hero-text small { color: var(--muted); font-size: 12px; }
@@ -112,7 +115,7 @@
         font-size: 14px; flex-shrink: 0;
         align-self: flex-start;
     }
-    .wai-row-icon.is-ok { background: var(--ok-bg); color: var(--ok); }
+    .wai-row-icon.is-ok { background: var(--positive-bg); color: var(--positive); }
     .wai-row-icon.is-flagged { background: var(--err-bg); color: var(--err); }
     .wai-row-body { flex: 1 1 auto; min-width: 0; }
     .wai-row-body h6 { margin: 0; font-size: 13.5px; font-weight: 600; color: var(--ink); }
@@ -141,9 +144,9 @@
                     @else
                         <p>{{ $waiHero['count'] }} employees over their {{ $waiHero['label'] }}.</p>
                     @endif
-                    <a href="javascript:void(0)" class="wai-hero-link wai-view-all"
+                    <a href="#" class="lnk wai-hero-link wai-view-all"
                        data-wai-key="{{ $waiHero['key'] }}" data-wai-title="{{ ucfirst($waiHero['label']) }}"
-                       data-bs-toggle="modal" data-bs-target="#waiInsightModal">Review &rarr;</a>
+                       data-details="waiInsightModal">Review &rarr;</a>
                 </div>
             </div>
         @else
@@ -171,9 +174,9 @@
                     @else
                         <div class="wai-row-status is-flagged">
                             {{ $check['count'] }} {{ $check['count'] == 1 ? 'employee' : 'employees' }} flagged
-                            <a href="javascript:void(0)" class="wai-view-all"
+                            <a href="#" class="lnk wai-view-all"
                                data-wai-key="{{ $check['key'] }}" data-wai-title="{{ ucfirst($check['label']) }}"
-                               data-bs-toggle="modal" data-bs-target="#waiInsightModal">View details &rarr;</a>
+                               data-details="waiInsightModal">View details &rarr;</a>
                         </div>
                     @endif
                 </div>
@@ -183,20 +186,28 @@
     </div>
 </div>
 
-{{-- WAI Insights details modal --}}
-<div class="modal fade" id="waiInsightModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="waiInsightModalTitle">WAI Insights</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <ul class="list-unstyled mb-0" id="waiInsightModalBody"></ul>
+{{-- WAI Insights details modal — shared frosted-modal chrome
+     (partials/_wai_insight_modals.blade.php), employee list stays JS-built
+     from the in-memory waiData below since it's a photo/name/detail list,
+     not a program-breakdown table. --}}
+<div class="wai-backdrop" id="waiInsightModal">
+    <div class="wai-modal" role="dialog" aria-modal="true">
+        <button class="m-x" aria-label="Close">&times;</button>
+        <div class="m-kicker"><span class="dot"></span>WAI Insight</div>
+        <div class="mt" id="waiInsightModalTitle">WAI Insights</div>
+        <div class="m-tablewrap">
+            <div class="m-tscroll">
+                <ul class="list-unstyled mb-0 p-3" id="waiInsightModalBody"></ul>
             </div>
         </div>
     </div>
 </div>
+
+{{-- Shared frosted-modal chrome/JS (.wai-backdrop/.wai-modal open-close,
+     Escape/outside-click) — this module has no recommendation modal
+     trigger, but reuses the same open-close mechanism for #waiInsightModal
+     above rather than a third bespoke JS implementation. --}}
+@include('partials._wai_insight_modals')
 
 <script>
     (function () {

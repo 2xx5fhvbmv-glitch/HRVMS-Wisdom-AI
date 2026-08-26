@@ -17,7 +17,7 @@
                             <h1>{{$shopkeeper->name}}</h1>
                         </div>
                     </div>
-                    <div class="col-auto ms-auto"><a href="{{route('shopkeeper.payment.add')}}" class="btn btn-theme">Add New Payment</a></div>
+                    <div class="col-auto ms-auto"><a href="{{route('shopkeeper.payment.add')}}" class="btn eb-btn-primary">Add New Payment</a></div>
                 </div>
             </div>
 
@@ -66,7 +66,7 @@
                         <div class=" card-title">
                             <div class="row justify-content-between align-items-center g-md-3 g-1">
                                 <div class="col">
-                                    <h3 class="text-nowrap">Transctions</h3>
+                                    <h3 class="text-nowrap">Transactions</h3>
                                 </div>
                                 <div class="col-auto">
                                     <div class="form-group">
@@ -90,7 +90,7 @@
                                     </div>
                                 </div>
                                 <div class="col-auto">
-                                    <a href="#" id="download-btn" class="btn btn-themeSkyblue btn-sm">Download</a>
+                                    <a href="#" id="download-btn" class="btn eb-btn-secondary btn-sm">Download</a>
                                 </div>
                             </div>
                         </div> <!-- data-Table  -->
@@ -143,8 +143,8 @@
             
             </div>
             <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button type="submit" class="btn btn-themeDanger">Apply Deduction</button>
+            <button type="button" class="btn eb-btn-secondary" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn eb-btn-critical">Apply Deduction</button>
             </div>
         </form>
         </div>

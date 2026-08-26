@@ -111,8 +111,8 @@
                     <input type="hidden" name="task_id" id="task_id">
                 </div>
                 <div class="modal-footer">
-                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
-                    <button type='submit' class="btn btn-themeBlue">Submit</button>
+                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Cancel</a>
+                    <button type='submit' class="btn eb-btn-primary">Submit</button>
                 </div>
             </form>
         </div>
@@ -135,12 +135,13 @@
                     <input type="hidden" name="task_id" id="task_id">
                 </div>
                 <div class="modal-footer">
-                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn btn-themeGray ms-auto">Cancel</a>
+                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Cancel</a>
                 </div>
             </form>
         </div>
     </div>
 </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
@@ -166,7 +167,7 @@
             },
             messages: {
                 HOD_id: {
-                    required: "Please Select HOD.",
+                    required: "Please select HOD.",
                 }
             },
             submitHandler: function(form) {
@@ -241,19 +242,18 @@
         let msg = (flag === "On-Hold") ? 'Yes, put it on hold!' : 'Yes, close it!';
 
         // SweetAlert confirmation dialog with input field
-        Swal.fire({
+        wisdomConfirm({
+            role: 'confirm',
             title: 'Are you sure?',
             text: msg,
-            icon: 'warning',
-            input: 'textarea', // Input type for providing a reason
-            inputPlaceholder: 'Enter your reason here...',
-            showCancelButton: true,
-            confirmButtonColor: '#3085d6',
-            cancelButtonColor: '#d33',
-            confirmButtonText: msg,
-            inputValidator: (value) => {
-                if (!value) {
-                    return 'Reason is required!';
+            confirmText: msg,
+            extra: {
+                input: 'textarea', // Input type for providing a reason
+                inputPlaceholder: 'Enter your reason here...',
+                inputValidator: (value) => {
+                    if (!value) {
+                        return 'Reason is required!';
+                    }
                 }
             }
         }).then((result) => {
@@ -273,19 +273,17 @@
                     success: function(response) {
                         if (response.success) {
                             // Show success SweetAlert
-                            Swal.fire({
+                            wisdomAlert({
+                                type: 'success',
                                 title: 'Success!',
-                                text: response.message,
-                                icon: 'success',
-                                confirmButtonColor: '#3085d6'
+                                text: response.message
                             });
                             PendingTaskList(); // Refresh task list
                         } else {
-                            Swal.fire({
+                            wisdomAlert({
+                                type: 'error',
                                 title: 'Error!',
-                                text: response.message || "Something went wrong.",
-                                icon: 'error',
-                                confirmButtonColor: '#d33'
+                                text: response.message || "Something went wrong."
                             });
                         }
                     },
@@ -294,11 +292,10 @@
                         let errs = errors?.errors ? Object.values(errors.errors).join('<br>') : "An unexpected error occurred.";
 
                         // Show error SweetAlert
-                        Swal.fire({
+                        wisdomAlert({
+                            type: 'error',
                             title: 'Error!',
-                            html: errs,
-                            icon: 'error',
-                            confirmButtonColor: '#d33'
+                            extra: { html: errs }
                         });
                     }
                 });

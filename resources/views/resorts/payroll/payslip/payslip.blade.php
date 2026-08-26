@@ -75,7 +75,7 @@
                                     <td>{{ $serviceCharge?->total_working_days ?? 0 }}</td>
                                 </tr>
                                 <tr>
-                                    <th>Salary period:</th>
+                                    <th>Salary Period:</th>
                                     <td>{{ \Carbon\Carbon::parse($payroll->start_date)->format('d M Y') }} to {{ \Carbon\Carbon::parse($payroll->end_date)->format('d M Y') }}</td>
                                 </tr>
                                 <tr>
@@ -139,7 +139,7 @@
                                         <td>{{ $review?->earnings_allowance ?? 0 }}</td>
                                     </tr>
                                     <tr>
-                                        <td>Service charge</td>
+                                        <td>Service Charge</td>
                                         <td>{{ $review?->service_charge ?? 0 }}</td>
                                     </tr>
                                     <tr>

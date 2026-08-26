@@ -1,5 +1,8 @@
 {{-- Incident AI-insight detail modals. Included by the Incident HR dashboard;
-     reads $incidentInsights. Opened by the "View Details" links. --}}
+     reads $incidentInsights. Opened by the "View Details" links via the
+     shared frosted-modal system (partials/_wai_insight_modals.blade.php).
+     Table-only body — title/issue/recommendation already live on the card
+     and the shared Recommendation modal. --}}
 @php
     $volD = $incidentInsights['volume']['details']   ?? [];
     $hotD = $incidentInsights['hotspots']['details'] ?? [];
@@ -7,127 +10,123 @@
 @endphp
 
 <!-- Incident Volume & Trend -->
-<div class="modal fade" id="incidentInsightVolumeModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">{{ $incidentInsights['volume']['title'] ?? 'Incident Volume & Trend' }}</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+<div class="wai-backdrop" id="incidentInsightVolumeModal">
+    <div class="wai-modal wide" role="dialog" aria-modal="true">
+        <button class="m-x" aria-label="Close">&times;</button>
+        <div class="m-kicker"><span class="dot"></span>WAI Insight</div>
+        <div class="mt">{{ $incidentInsights['volume']['title'] ?? 'Incident Volume & Trend' }}</div>
+        @if(!empty($volD))
+            <div class="m-tablewrap">
+                <div class="m-tcap">By priority</div>
+                <div class="m-tscroll"><table class="m-table"><tbody>
+                    @foreach(($volD['priority'] ?? []) as $p => $c)
+                        <tr><td>{{ $p }}</td><td>{{ $c }}</td></tr>
+                    @endforeach
+                </tbody></table></div>
             </div>
-            <div class="modal-body">
-                <p class="text-muted">{{ $incidentInsights['volume']['body'] ?? '' }}</p>
-                @if(!empty($incidentInsights['volume']['recommendation']))<p style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $incidentInsights['volume']['recommendation'] }}</p>@endif
-                @if(!empty($volD))
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <p class="mb-1 fw-bold">By priority</p>
-                            <table class="table table-sm table-striped align-middle">
-                                <tbody>@foreach(($volD['priority'] ?? []) as $p => $c)<tr><td>{{ $p }}</td><td class="text-end">{{ $c }}</td></tr>@endforeach</tbody>
-                            </table>
-                        </div>
-                        <div class="col-md-6">
-                            <p class="mb-1 fw-bold">By severity</p>
-                            <table class="table table-sm table-striped align-middle">
-                                <tbody>@foreach(($volD['severity'] ?? []) as $s => $c)<tr><td>{{ $s }}</td><td class="text-end">{{ $c }}</td></tr>@endforeach</tbody>
-                            </table>
-                        </div>
-                    </div>
-                    @if(!empty($volD['months']))
-                        <p class="mb-1 fw-bold">Monthly volume</p>
-                        <table class="table table-sm table-striped align-middle">
-                            <thead><tr><th>Month</th><th class="text-end">Incidents</th></tr></thead>
-                            <tbody>@foreach($volD['months'] as $row)<tr><td>{{ $row['month'] }}</td><td class="text-end">{{ $row['count'] }}</td></tr>@endforeach</tbody>
-                        </table>
-                    @endif
-                @endif
+            <div class="m-tablewrap">
+                <div class="m-tcap">By severity</div>
+                <div class="m-tscroll"><table class="m-table"><tbody>
+                    @foreach(($volD['severity'] ?? []) as $s => $c)
+                        <tr><td>{{ $s }}</td><td>{{ $c }}</td></tr>
+                    @endforeach
+                </tbody></table></div>
             </div>
-        </div>
+            @if(!empty($volD['months']))
+                <div class="m-tablewrap">
+                    <div class="m-tcap">Monthly volume</div>
+                    <div class="m-tscroll"><table class="m-table">
+                        <thead><tr><th>Month</th><th>Incidents</th></tr></thead>
+                        <tbody>
+                            @foreach($volD['months'] as $row)
+                                <tr><td>{{ $row['month'] }}</td><td>{{ $row['count'] }}</td></tr>
+                            @endforeach
+                        </tbody>
+                    </table></div>
+                </div>
+            @endif
+        @else
+            <p class="m-empty">No data.</p>
+        @endif
     </div>
 </div>
 
 <!-- Category & Severity Hotspots -->
-<div class="modal fade" id="incidentInsightHotspotsModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">{{ $incidentInsights['hotspots']['title'] ?? 'Category & Severity Hotspots' }}</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <p class="text-muted">{{ $incidentInsights['hotspots']['body'] ?? '' }}</p>
-                @if(!empty($incidentInsights['hotspots']['recommendation']))<p style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $incidentInsights['hotspots']['recommendation'] }}</p>@endif
-                <div class="row g-3">
-                    <div class="col-md-6">
-                        <p class="mb-1 fw-bold">Top categories</p>
-                        @if(!empty($hotD['categories']))
-                            <table class="table table-sm table-striped align-middle"><tbody>
-                                @foreach($hotD['categories'] as $row)<tr><td>{{ $row['category'] }}</td><td class="text-end">{{ $row['count'] }}</td></tr>@endforeach
-                            </tbody></table>
-                        @else<p class="text-muted small">No data.</p>@endif
-                    </div>
-                    <div class="col-md-6">
-                        <p class="mb-1 fw-bold">Top subcategories</p>
-                        @if(!empty($hotD['subcategories']))
-                            <table class="table table-sm table-striped align-middle"><tbody>
-                                @foreach($hotD['subcategories'] as $row)<tr><td>{{ $row['subcategory'] }}</td><td class="text-end">{{ $row['count'] }}</td></tr>@endforeach
-                            </tbody></table>
-                        @else<p class="text-muted small">No data.</p>@endif
-                    </div>
-                    <div class="col-md-6">
-                        <p class="mb-1 fw-bold">Severity</p>
-                        <table class="table table-sm table-striped align-middle"><tbody>
-                            @foreach(($hotD['severity'] ?? []) as $s => $c)<tr><td>{{ $s }}</td><td class="text-end">{{ $c }}</td></tr>@endforeach
-                        </tbody></table>
-                    </div>
-                    <div class="col-md-6">
-                        <p class="mb-1 fw-bold">Top locations</p>
-                        @if(!empty($hotD['locations']))
-                            <table class="table table-sm table-striped align-middle"><tbody>
-                                @foreach($hotD['locations'] as $row)<tr><td>{{ $row['location'] }}</td><td class="text-end">{{ $row['count'] }}</td></tr>@endforeach
-                            </tbody></table>
-                        @else<p class="text-muted small">No data.</p>@endif
-                    </div>
-                </div>
-            </div>
+<div class="wai-backdrop" id="incidentInsightHotspotsModal">
+    <div class="wai-modal wide" role="dialog" aria-modal="true">
+        <button class="m-x" aria-label="Close">&times;</button>
+        <div class="m-kicker"><span class="dot"></span>WAI Insight</div>
+        <div class="mt">{{ $incidentInsights['hotspots']['title'] ?? 'Category & Severity Hotspots' }}</div>
+        <div class="m-tablewrap">
+            <div class="m-tcap">Top categories</div>
+            <div class="m-tscroll"><table class="m-table"><tbody>
+                @forelse(($hotD['categories'] ?? []) as $row)
+                    <tr><td>{{ $row['category'] }}</td><td>{{ $row['count'] }}</td></tr>
+                @empty
+                    <tr><td colspan="2" class="m-empty">No data.</td></tr>
+                @endforelse
+            </tbody></table></div>
+        </div>
+        <div class="m-tablewrap">
+            <div class="m-tcap">Top subcategories</div>
+            <div class="m-tscroll"><table class="m-table"><tbody>
+                @forelse(($hotD['subcategories'] ?? []) as $row)
+                    <tr><td>{{ $row['subcategory'] }}</td><td>{{ $row['count'] }}</td></tr>
+                @empty
+                    <tr><td colspan="2" class="m-empty">No data.</td></tr>
+                @endforelse
+            </tbody></table></div>
+        </div>
+        <div class="m-tablewrap">
+            <div class="m-tcap">Severity</div>
+            <div class="m-tscroll"><table class="m-table"><tbody>
+                @foreach(($hotD['severity'] ?? []) as $s => $c)
+                    <tr><td>{{ $s }}</td><td>{{ $c }}</td></tr>
+                @endforeach
+            </tbody></table></div>
+        </div>
+        <div class="m-tablewrap">
+            <div class="m-tcap">Top locations</div>
+            <div class="m-tscroll"><table class="m-table"><tbody>
+                @forelse(($hotD['locations'] ?? []) as $row)
+                    <tr><td>{{ $row['location'] }}</td><td>{{ $row['count'] }}</td></tr>
+                @empty
+                    <tr><td colspan="2" class="m-empty">No data.</td></tr>
+                @endforelse
+            </tbody></table></div>
         </div>
     </div>
 </div>
 
 <!-- Outcomes & Preventive Actions -->
-<div class="modal fade" id="incidentInsightOutcomesModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title">{{ $incidentInsights['outcomes']['title'] ?? 'Outcomes & Preventive Actions' }}</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+<div class="wai-backdrop" id="incidentInsightOutcomesModal">
+    <div class="wai-modal wide" role="dialog" aria-modal="true">
+        <button class="m-x" aria-label="Close">&times;</button>
+        <div class="m-kicker"><span class="dot"></span>WAI Insight</div>
+        <div class="mt">{{ $incidentInsights['outcomes']['title'] ?? 'Outcomes & Preventive Actions' }}</div>
+        @if(!empty($outD))
+            <div class="m-tablewrap">
+                <div class="m-tcap">By outcome &middot; preventive measures on {{ $outD['preventive_recorded'] ?? 0 }} of {{ $outD['resolved'] ?? 0 }} resolved ({{ $outD['preventive_pct'] ?? 0 }}%); {{ $outD['preventive_missing'] ?? 0 }} missing</div>
+                <div class="m-tscroll"><table class="m-table"><tbody>
+                    @forelse(($outD['outcomes'] ?? []) as $row)
+                        <tr><td>{{ $row['outcome'] }}</td><td>{{ $row['count'] }}</td></tr>
+                    @empty
+                        <tr><td colspan="2" class="m-empty">No data.</td></tr>
+                    @endforelse
+                </tbody></table></div>
             </div>
-            <div class="modal-body">
-                <p class="text-muted">{{ $incidentInsights['outcomes']['body'] ?? '' }}</p>
-                @if(!empty($incidentInsights['outcomes']['recommendation']))<p style="color:#2EACB3;"><strong>Recommendation:</strong> {{ $incidentInsights['outcomes']['recommendation'] }}</p>@endif
-                @if(!empty($outD))
-                    <p class="mb-1">Preventive measures recorded on {{ $outD['preventive_recorded'] ?? 0 }} of {{ $outD['resolved'] ?? 0 }} resolved ({{ $outD['preventive_pct'] ?? 0 }}%); {{ $outD['preventive_missing'] ?? 0 }} missing.</p>
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <p class="mb-1 fw-bold">By outcome</p>
-                            @if(!empty($outD['outcomes']))
-                                <table class="table table-sm table-striped align-middle"><tbody>
-                                    @foreach($outD['outcomes'] as $row)<tr><td>{{ $row['outcome'] }}</td><td class="text-end">{{ $row['count'] }}</td></tr>@endforeach
-                                </tbody></table>
-                            @else<p class="text-muted small">No data.</p>@endif
-                        </div>
-                        <div class="col-md-6">
-                            <p class="mb-1 fw-bold">By action taken</p>
-                            @if(!empty($outD['actions']))
-                                <table class="table table-sm table-striped align-middle"><tbody>
-                                    @foreach($outD['actions'] as $row)<tr><td>{{ $row['action'] }}</td><td class="text-end">{{ $row['count'] }}</td></tr>@endforeach
-                                </tbody></table>
-                            @else<p class="text-muted small">No data.</p>@endif
-                        </div>
-                    </div>
-                @else
-                    <p class="mb-0">No resolved incidents yet to analyse.</p>
-                @endif
+            <div class="m-tablewrap">
+                <div class="m-tcap">By action taken</div>
+                <div class="m-tscroll"><table class="m-table"><tbody>
+                    @forelse(($outD['actions'] ?? []) as $row)
+                        <tr><td>{{ $row['action'] }}</td><td>{{ $row['count'] }}</td></tr>
+                    @empty
+                        <tr><td colspan="2" class="m-empty">No data.</td></tr>
+                    @endforelse
+                </tbody></table></div>
             </div>
-        </div>
+        @else
+            <p class="m-empty">No resolved incidents yet to analyse.</p>
+        @endif
     </div>
 </div>

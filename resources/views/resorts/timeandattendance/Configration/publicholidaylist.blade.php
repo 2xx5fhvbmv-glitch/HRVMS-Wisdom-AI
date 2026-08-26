@@ -277,15 +277,12 @@ $(document).on("click", ".delete-row-btn", function () {
     let id = $(this).data('id'); // Get the id of the row to be deleted
 
     // Confirm with SweetAlert
-    Swal.fire({
+    wisdomConfirm({
+        role: 'destructive',
         title: 'Are you sure?',
         text: "You won't be able to revert this!",
-        icon: 'warning',
-        showCancelButton: true,
-        confirmButtonColor: '#3085d6',
-        cancelButtonColor: '#d33',
-        confirmButtonText: 'Yes, remove it!',
-        cancelButtonText: 'No, cancel!'
+        confirmText: 'Yes, remove it!',
+        cancelText: 'No, cancel!'
     }).then((result) => {
         if (result.isConfirmed) {
             // Make the AJAX request to delete the holiday

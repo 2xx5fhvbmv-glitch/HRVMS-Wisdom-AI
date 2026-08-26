@@ -140,7 +140,7 @@ $(document).ready(function() {
                     '</div>' +
                     '<div>' +
                         '<h6>' + department + ' (' + rank + ')</h6>' +
-                        '<p><strong>' + createdBy + ' (' + creatorRank + ')</strong> Requested for Hire ' + NoOfVacnacy + ' ' + position + '</p>' +
+                        '<p><strong>' + createdBy + ' (' + creatorRank + ')</strong> Requested to Hire ' + NoOfVacnacy + ' ' + position + '</p>' +
                     '</div>' +
                  '</div>';
         $(".respond-main").html(hm);
