@@ -7854,14 +7854,23 @@ class Common
             return null;
         }
 
-        $decoded = json_decode($value, true);
-        if (is_array($decoded) && !empty($decoded['Child_id'])) {
-            $aws = self::GetAWSFile($decoded['Child_id'], $resortId);
-            return $aws['success'] ? $aws['NewURLshow'] : null;
-        }
+        // GetAWSFile() throws a raw \Exception on corrupted/undecryptable
+        // stored data — with 5+ call sites across the app (dashboard cards,
+        // list views), one bad attachment on one request among many would
+        // otherwise 500 the entire response instead of just that one image.
+        try {
+            $decoded = json_decode($value, true);
+            if (is_array($decoded) && !empty($decoded['Child_id'])) {
+                $aws = self::GetAWSFile($decoded['Child_id'], $resortId);
+                return $aws['success'] ? $aws['NewURLshow'] : null;
+            }
 
-        $path_path = config('settings.MaintanceRequest') . '/' . $resortId;
-        return StorageHelper::temporaryUrl($path_path . '/' . $value);
+            $path_path = config('settings.MaintanceRequest') . '/' . $resortId;
+            return StorageHelper::temporaryUrl($path_path . '/' . $value);
+        } catch (\Throwable $e) {
+            \Log::warning('resolveMaintenanceAttachmentUrl failed: ' . $e->getMessage());
+            return null;
+        }
     }
 
     /**
