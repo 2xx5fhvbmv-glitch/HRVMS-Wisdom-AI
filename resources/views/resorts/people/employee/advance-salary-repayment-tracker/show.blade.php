@@ -276,7 +276,7 @@
                 <form action="{{route('people.advance-salary-repayment-tracker.addNotes')}}" id="addNoteForm" method="POST">
                      @csrf
                      <input type="hidden" name="schedule_id" value="">
-                    <textarea id="remark" class="form-control" name="remark" rows="3" placeholder="write your Remark" required></textarea>
+                    <textarea id="remark" class="form-control" name="remark" rows="3" placeholder="Write your remark" required></textarea>
                 </form>
             </div>
             <div class="modal-footer">

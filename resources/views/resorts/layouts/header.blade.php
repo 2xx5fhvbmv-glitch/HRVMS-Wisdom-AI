@@ -46,6 +46,13 @@
         box-sizing: content-box;
     }
 
+    /* developer.min.css's base rule renders this span as a red circle
+       unconditionally — it never hid itself when there was nothing unread,
+       so the dot stayed visible at 0 just as much as at 5. */
+    .notification-nav span:empty {
+        display: none;
+    }
+
     /* Global search results dropdown (resources/views/resorts/search/index.blade.php)
        — redesigned into a grouped, internally-scrollable results list with
        a fixed header/footer. Some rules need !important to beat
@@ -295,7 +302,7 @@
                                         </li>
                                         
                                         <li class="nav-item nav-icon notification-nav">
-                                            <span>@if(Auth::guard('resort-admin')->user()->type != "super" && Auth::guard('resort-admin')->check()) {{ App\Helpers\Common::getNotificationCount(Auth::guard('resort-admin')->user()->resort_id,Auth::guard('resort-admin')->user()->GetEmployee->id) }} @endif</span>
+                                            <span>@if(Auth::guard('resort-admin')->user()->type != "super" && Auth::guard('resort-admin')->check()){{ App\Helpers\Common::getNotificationCount(Auth::guard('resort-admin')->user()->resort_id,Auth::guard('resort-admin')->user()->GetEmployee->id) }}@endif</span>
                                             <a href="javascript:void(0);" class="notification-btn">
                                                 <img src="{{ URL::asset('resorts_assets/images/bell.svg')}}" alt="" class="img-fluid" />
                                             </a>

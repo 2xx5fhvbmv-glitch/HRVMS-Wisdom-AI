@@ -280,7 +280,7 @@ class PromotionController extends Controller
             $msg = "📢 New Promotion Request Submitted\n👤 Employee: " . $promotion->employee->resortAdmin->full_name .
             "\n🏢 From: " . optional($promotion->currentPosition)->position_title .
             "\n➡️ To: " . optional($promotion->newPosition)->position_title .
-            "\n📅 Effective Date: " . Carbon::parse($promotion->effective_date)->format('d M Y') .
+            "\n📅 Effective Date: " . Common::formatDate($promotion->effective_date) .
             "\n📝 Status: Pending Approval";
 
             // Notify every pool member so e.g. Finance HOD sees the request

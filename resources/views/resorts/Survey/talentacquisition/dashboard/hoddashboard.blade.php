@@ -396,7 +396,7 @@
                         @else
                             <div class="upInterviews-block">
                                 <div style="text-align: left;" >
-                                    No Recore Found
+                                    No Record Found
                                 </div>
                             </div>
                         @endif

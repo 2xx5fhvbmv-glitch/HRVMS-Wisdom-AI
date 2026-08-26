@@ -154,9 +154,10 @@
     $(document).ready(function () {
         $('.select2t-none').select2();
         $('.select2t-modal').select2();
-        $('#dateFilter').datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true
+        flatpickr('#dateFilter', {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
         loadSupportlist();
         $('#searchInput, #dateFilter, #statusFilter').on('keyup change', function () {

@@ -131,7 +131,7 @@
                         </thead>
                         <tbody id="TableBody">
                            <tr>
-                              <td colspan="6" class="text-center"> No Record Found..</td>
+                              <td colspan="6" class="text-center"> No Record Found.</td>
                            </tr>
                         </tbody>
                      </table>
@@ -365,33 +365,7 @@
 </div> <!-- Closing first modal properly -->
 
 <!-- Second Modal (Separate from the First One) -->
-<div class="modal fade" id="bd-iframeModel-modal-lg" tabindex="-1" aria-labelledby="myLargeModalLabel"
-    aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-        <div class="modal-header">
-                <h5 class="modal-title" id="staticBackdropLabel">Download File</h5>
-               
-                <a href="" class="btn eb-btn-secondary downloadLink" target="_blank"> Download</a>
-               
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            
-                <div class="modal-body">
-                 
-                        <div class=" ratio ratio-21x9" id="ViewModeOfFiles">
-
-                        </div>
-                   
-                </div>
-                <div class="modal-footer">
-                    <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Cancel</a>
-                    <button type="submit" class="btn eb-btn-primary">Submit</button>
-                </div>
-   
-        </div>
-    </div>
-</div>
+@include('partials._file_view_modal', ['modalId' => 'bd-iframeModel-modal-lg'])
 <div class="overlayFileModule" id="overlay" onclick="hideImage()">
     <span class="closeFileModule" onclick="hideImage()">&times;</span>
     <img id="largeImage" src="" alt="Large View">

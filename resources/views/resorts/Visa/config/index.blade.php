@@ -228,7 +228,7 @@
                                             <input type="text"  name="WalletName" id="WalletName"   data-parsley-required="true" data-parsley-required-message="Wallet Name is required" class="form-control" placeholder="Deposit Wallet">
                                         </div>
                                          <div class="col-sm-6">
-                                            <label for="txt" class="form-label">WALLET NAME <span class="red-mark">*</span></label>
+                                            <label for="txt" class="form-label">WALLET AMOUNT <span class="red-mark">*</span></label>
                                             <input type="number"  min="1" name="Amt" id="Amt"   data-parsley-required="true" data-parsley-required-message="Wallet Amount is required" class="form-control" placeholder="Amount">
                                         </div>
                                     </div>
@@ -470,7 +470,7 @@
         <div class="modal-dialog modal-dialog-centered modal-small modal-CropImage">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="staticBackdropLabel">Upload Diposit Rate  </h5>
+                    <h5 class="modal-title" id="staticBackdropLabel">Upload Deposit Rate  </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <form id="NationalityExportForm"  data-parsley-validate enctype="multipart/form-data" >

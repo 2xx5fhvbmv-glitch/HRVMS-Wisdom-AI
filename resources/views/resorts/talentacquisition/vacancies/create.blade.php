@@ -46,7 +46,7 @@
                             </div>
                             <div class="col-sm-6 ">
                                 <label for="txt-required-starting-date" class="form-label">REQUIRED STARTING DATE</label>
-                                <input type="text" class="form-control datepicker" name="required_starting_date" id="txt-required-starting-date" placeholder="REQUIRED STARTING DATE">
+                                <input type="text" class="form-control" name="required_starting_date" id="txt-required-starting-date" placeholder="REQUIRED STARTING DATE">
                             </div>
                         </div>
 
@@ -406,10 +406,10 @@
     <script type="text/javascript">
         // new DataTable('#example');
         $(document).ready(function () {
-            $('.datepicker').datepicker({
-                format: 'dd/mm/yyyy',
-                autoclose: true,      // Close the picker after selection
-                todayHighlight: true  // Highlight today's date
+            flatpickr('#txt-required-starting-date', {
+                dateFormat: 'd/m/Y',
+                allowInput: true,
+                appendTo: document.body
             });
 
             $('#service_provider').on('change', function() {
@@ -554,7 +554,7 @@
                     "department": { required: "Department field is required." },
                     "required_starting_date": { required: "Required Starting date is required." },
                     "position": { required: "Position field is required." },
-                    "reporting_to": { required: "Required To field is required." },
+                    "reporting_to": { required: "Reporting To field is required." },
                     "rank": { required: "Rank field is required." },
                     "division": { required: "Division field is required." },
                     "section": { required: "Section field is required." },

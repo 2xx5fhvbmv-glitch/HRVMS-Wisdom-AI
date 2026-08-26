@@ -43,5 +43,5 @@
 </div>
 <div class="modal-footer">
      <botton class="btn btn-themeBlue submit-employee-increment">Update</botton>
-    <button type="button" class="btn btn-themeDanger" data-bs-dismiss="modal" aria-label="Close">Cancal</button>
+    <button type="button" class="btn btn-themeDanger" data-bs-dismiss="modal" aria-label="Close">Cancel</button>
  </div>

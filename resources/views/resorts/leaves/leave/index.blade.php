@@ -713,13 +713,15 @@
                     // No window constraint — employees can pick any date for
                     // their flight. Sequence (arrival ≥ departure) is still
                     // enforced below in the on-change handler.
-                    $(`#${datepickerId} .transport-departure-date`).datepicker({
-                        format: 'dd/mm/yyyy',
-                        autoclose: true,
+                    flatpickr(`#${datepickerId} .transport-departure-date`, {
+                        dateFormat: 'd/m/Y',
+                        allowInput: true,
+                        appendTo: document.body
                     });
-                    $(`#${datepickerId} .transport-arrival-date`).datepicker({
-                        format: 'dd/mm/yyyy',
-                        autoclose: true,
+                    flatpickr(`#${datepickerId} .transport-arrival-date`, {
+                        dateFormat: 'd/m/Y',
+                        allowInput: true,
+                        appendTo: document.body
                     });
             } else {
                 $(`#main-${transportId}`).remove(); // Remove if unchecked
@@ -880,9 +882,10 @@
         const maxDate = parseDate(toDateStr);
 
         // No window constraint — employees can pick any flight date.
-        $('#depDate, #arrDate').datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,
+        flatpickr('#depDate, #arrDate', {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
     } else {
         $options.addClass('d-none');

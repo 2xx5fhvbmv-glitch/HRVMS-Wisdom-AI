@@ -67,7 +67,7 @@
                         <table class="table table-collapseNew" id="employeeListTable">
                             <thead>
                                 <tr>
-                                    <th>Id</th>
+                                    <th>ID</th>
                                     <th>Employee Name</th>
                                     <th>Position</th>
                                     <th>Department</th>

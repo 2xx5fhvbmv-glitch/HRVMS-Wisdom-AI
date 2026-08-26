@@ -293,7 +293,8 @@ class IncidentMeetingController extends Controller
                     }
                     $notifiedParticipantIds[] = $participant_id;
 
-                    $msg = "Meeting Scheduled: {$request->meeting_subject}\n📅 {$request->meeting_date}\n⏰ {$request->meeting_time}\n📍 {$request->location}";
+                    $msg = "Meeting Scheduled: {$request->meeting_subject}\n📅 " . Common::formatDate($request->meeting_date)
+                        . "\n⏰ " . Common::formatDisplayTime($request->meeting_time) . "\n📍 {$request->location}";
                     event(new ResortNotificationEvent(Common::nofitication(
                         $this->resort->resort_id,
                         10,
@@ -443,7 +444,8 @@ class IncidentMeetingController extends Controller
             // dd($meeting->participant);
             foreach ($meeting->participant as $participant) {
                 // dd($participant->participant_id);
-                $msg = "Meeting Rescheduled: {$meeting->meeting_subject}\n📅 {$meeting->meeting_date}\n⏰ {$meeting->meeting_time}\n📍 {$meeting->location}";
+                $msg = "Meeting Rescheduled: {$meeting->meeting_subject}\n📅 " . Common::formatDate($meeting->meeting_date)
+                    . "\n⏰ " . Common::formatDisplayTime($meeting->meeting_time) . "\n📍 {$meeting->location}";
     
                 event(new ResortNotificationEvent(Common::nofitication(
                     $this->resort->resort_id,

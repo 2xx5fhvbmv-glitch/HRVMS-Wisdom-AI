@@ -69,7 +69,7 @@
                             <div class="bg-themeGrayLight mb-md-4 mb-3">
                                     <div class="uploadFileNew-block">
                                         <img src="{{URL::asset('resorts_assets/images/upload.svg')}}" alt="icon">
-                                        <h5>Upload  Documents</h5>
+                                        <h5>Upload Documents</h5>
                                         <p>Browse or Drag the file here</p>
                                         <input type="file" id="file"  name="file" accept="image/*,application/pdf">
                                     </div>
@@ -236,7 +236,7 @@ $(document).ready(function ()
                                         <div class="card-title">
                                             <div class="row g-2 ">
                                                 <div class="col order-sm-1 order-last">
-                                                    <h3> Medical  Insurance - Internationl  Renewal</h3>
+                                                    <h3>Medical Insurance - International Renewal</h3>
                                                 </div>
                                                 <div class="col-sm-auto col-12 order-sm-last order-1 text-end">
                                                 
@@ -246,7 +246,7 @@ $(document).ready(function ()
                                         </div>
                                         <div class="card-body">
                                             <div class="row gx-2">
-                                                No  Record Found
+                                                No Record Found
                                             </div>
                                         </div>
                                     </div>
@@ -312,7 +312,7 @@ $(document).ready(function ()
                                         </div>
                                         <div class="card-body">
                                             <div class="row gx-2">
-                                                No  Record Found
+                                                No Record Found
                                             </div>
                                         </div>
                                     </div>
@@ -326,7 +326,7 @@ $(document).ready(function ()
                                     <div class="row g-2 ">
                                         <div class="col order-sm-1 order-last">
                                             <h3>Visa Renewal</h3>
-                                            <span>Current Policy Expires:${VisaRenewal.end_date}</span>
+                                            <span>Current Policy Expires: ${VisaRenewal.end_date}</span>
                                         </div>
                                         <div class="col-auto col-sm-auto col-12 order-sm-last order-1 text-end"><span
                                                 class="badge badge-themeWarning">${VisaRenewal.VisaRenewalTime}</span>
@@ -385,7 +385,7 @@ $(document).ready(function ()
                                         </div>
                                         <div class="card-body">
                                             <div class="row gx-2">
-                                                No  Record Found
+                                                No Record Found
                                             </div>
                                         </div>
                                     </div>
@@ -438,7 +438,7 @@ $(document).ready(function ()
                                         </div>
                                         <div class="card-body">
                                             <div class="row gx-2">
-                                                No  Record Found
+                                                No Record Found
                                             </div>
                                         </div>
                                     </div>
@@ -492,7 +492,7 @@ $(document).ready(function ()
                                         </div>
                                         <div class="card-body">
                                             <div class="row gx-2">
-                                                No  Record Found
+                                                No Record Found
                                             </div>
                                         </div>
                                     </div>

@@ -90,15 +90,15 @@
                             <td>{{ $a->Application_date  }}</td>
                         </tr>
                         <tr>
-                            <th>Passport No.</th>
+                            <th>Passport No.:</th>
                             <td>{{ $a->passport_no  }}</td>
                         </tr>
                         <tr>
-                            <th>Current Employment Status :</th>
+                            <th>Current Employment Status:</th>
                             <td>{{ ($a->employment_status  =="Available") ?"Not Employed" :"Employed"}}</td>
                         </tr>
                         <tr>
-                            <th>Current position:</th>
+                            <th>Current Position:</th>
                             <td>{{ $a->job_title  }}</td>
                         </tr>
                     </table>

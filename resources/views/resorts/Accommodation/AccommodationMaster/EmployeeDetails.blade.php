@@ -214,7 +214,7 @@
                         </div>
                         <hr class="mt-2">
                         <div class="col-md-12 mt-1">
-                            <label >AVAILABLE ACCOMODATION</label>
+                            <label >AVAILABLE ACCOMMODATION</label>
                             <div class="table-responsive">
                                 <table class="table table-accommodation" id="table-accommodation">
                                     <thead>
@@ -343,7 +343,7 @@
                 },
                 messages: {
                     InventoryModule: {
-                        required: "Please Select Invenotory Items.",
+                        required: "Please select inventory items.",
                     }
                 },
                 submitHandler: function(form) {
@@ -391,7 +391,7 @@
                 },
                 messages: {
                     assignId: {
-                        required: "Please Select Bed.",
+                        required: "Please select a bed.",
                     }
                 },
                 submitHandler: function(form) 

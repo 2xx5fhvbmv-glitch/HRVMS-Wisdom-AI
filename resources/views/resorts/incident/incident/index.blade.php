@@ -118,9 +118,10 @@
 @section('import-scripts')
 <script>
     $(document).ready(function () {
-        $('#dateFilter').datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true
+        flatpickr('#dateFilter', {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
         getIncidents();
 
@@ -170,7 +171,7 @@
                 }
             }).then((result) => {
                 if (result.isConfirmed) {
-                    toastr.success('Incident ' + (isApprove ? 'approved' : 'rejected') + ' successfully', "Error", {
+                    toastr.success('Incident ' + (isApprove ? 'approved' : 'rejected') + ' successfully', "Success", {
                         positionClass: 'toast-bottom-right'
                     });
                     $('#table-incidentListing').DataTable().ajax.reload();
@@ -209,7 +210,7 @@
                             }
                         },
                         error: function (xhr) {
-                            toastr.error('Server error. Please try again.', " Error", "Error", {
+                            toastr.error('Server error. Please try again.', "Error", "Error", {
                                 positionClass: 'toast-bottom-right'
                             });
                         }

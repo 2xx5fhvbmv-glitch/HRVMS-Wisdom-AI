@@ -102,7 +102,7 @@
                             <td>{{ $a->passport_no  }}</td>
                         </tr>
                         <tr>
-                            <th>Current Employment Status :</th>
+                            <th>Current Employment Status:</th>
                             <td>{{ ($a->employment_status  =="Available") ?"Not Employed" :"Employed"}}</td>
                         </tr>
                         <tr>

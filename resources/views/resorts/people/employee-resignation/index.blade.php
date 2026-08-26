@@ -117,8 +117,8 @@
                             <input type="time" class="form-control" id="meetingTime" name="meetingTime" required>
                         </div>
                         <div class="mb-3">
-                            <label for="meetingVenue" class="form-label">Meeting venue <span class="req_span">*</span></label>
-                            <input type="text" class="form-control" id="meetingVenue" name="meetingVenue" placeholder="Enter Meeting Venue('ex: Google Meet,Zoom,Vertual')" required> 
+                            <label for="meetingVenue" class="form-label">Meeting Venue <span class="req_span">*</span></label>
+                            <input type="text" class="form-control" id="meetingVenue" name="meetingVenue" placeholder="Enter Meeting Venue (ex: Google Meet, Zoom, Virtual)" required>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -142,10 +142,11 @@
     $(document).ready(function(){
         getExitClearanceData();
         $('.select2t-none').select2();
-        $('.datepicker').datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,
-            startDate: new Date() // Restrict to upcoming dates only
+        flatpickr('.datepicker', {
+            dateFormat: 'd/m/Y',
+            minDate: 'today', // Restrict to upcoming dates only
+            allowInput: true,
+            appendTo: document.body
         });
 
         // Date filter removed — `#datapicker` no longer exists.

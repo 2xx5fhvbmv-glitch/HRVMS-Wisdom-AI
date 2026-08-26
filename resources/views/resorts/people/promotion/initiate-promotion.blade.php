@@ -114,7 +114,7 @@
                                         <a 
                                         class="a-link view-benifit-grid" 
                                         id="view-benifit-grid">
-                                            View Benifit Grid
+                                            View Benefit Grid
                                         </a>
                                     </td>
                                 </tr>
@@ -321,12 +321,11 @@
 
         let form1 = $("#initiate-promotion").parsley(); // Initialize Parsley
 
-        $('.datepicker').datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,
-            todayHighlight: true,
-            startDate: new Date() // Disables all past dates
-
+        flatpickr('.datepicker', {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body,
+            minDate: "today" // Disables all past dates
         });
 
         $('.select2t-none').select2();

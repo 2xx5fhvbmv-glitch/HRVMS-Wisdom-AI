@@ -189,10 +189,10 @@
             },
             messages: {
                 assignId: {
-                    required: "Please Select Bed.",
+                    required: "Please select a bed.",
                 },
                 emp_id: {
-                    required: "Please Select Employee.",
+                    required: "Please select an employee.",
                 }
             },
             errorPlacement: function (error, element) {

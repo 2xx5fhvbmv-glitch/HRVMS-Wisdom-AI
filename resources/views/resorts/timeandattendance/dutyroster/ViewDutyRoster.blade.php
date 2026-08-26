@@ -1843,7 +1843,12 @@
             dateFormat: "h:i", // 12-hour format without AM/PM
             time_24hr: false,  // Ensures 12-hour format
             minuteIncrement: 1, // Allows 1-minute steps
-
+            // developer.min.css force-hides .flatpickr-am-pm below 424px; now that
+            // flatpickr's own popover always mounts on mobile (disableMobile:true,
+            // set globally), undo that here so AM/PM stays visible on phones too.
+            onReady: function (selectedDates, dateStr, instance) {
+                instance.amPM.style.setProperty('display', 'inline-block', 'important');
+            }
         });
 
         $('#Shiftpopup').select2({
@@ -2005,11 +2010,11 @@
                         $("#editGeofenceZone-modal").modal('hide');
                         setTimeout(function() { window.location.reload(); }, 1500);
                     } else {
-                        toastr.error(response.message, "error", { positionClass: 'toast-bottom-right' });
+                        toastr.error(response.message, "Error", { positionClass: 'toast-bottom-right' });
                     }
                 },
                 error: function() {
-                    toastr.error("Something went wrong", "error", { positionClass: 'toast-bottom-right' });
+                    toastr.error("Something went wrong", "Error", { positionClass: 'toast-bottom-right' });
                 }
             });
         });
@@ -2070,7 +2075,7 @@
                             }
                             else
                             {
-                                toastr.error(response.message,"error", { positionClass: 'toast-bottom-right'});
+                                toastr.error(response.message,"Error", { positionClass: 'toast-bottom-right'});
 
                             }
 

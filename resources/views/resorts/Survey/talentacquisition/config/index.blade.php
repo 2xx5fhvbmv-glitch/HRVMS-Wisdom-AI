@@ -166,7 +166,7 @@
                                 <div class="row g-3 align-items-center justify-content-between">
                                     <div class="col-auto">
                                         <div class="d-flex justify-content-start align-items-center">
-                                            <h3>Terms And conditions</h3>
+                                            <h3>Terms and Conditions</h3>
                                         </div>
                                     </div>
                                 </div>
@@ -849,7 +849,7 @@ $(document).ready(function() {
                 },
                 messages: {
                     Jobadvimg: {
-                        required: "Please Upload Job Advertisment Image.",
+                        required: "Please Upload Job Advertisement Image.",
                         extension: "Please upload a valid image format (JFIF, JPG, JPEG, PNG, GIF, SVG, WEBP, HEIC, HEIF)",
                         accept: "Please upload a valid image file",
                         fileSize: "The file size must not exceed 2MB."
@@ -1000,10 +1000,10 @@ $(document).ready(function() {
                 },
                 messages: {
                     source_name :{
-                        required: "Please Enter Hiring Source name .",
+                        required: "Please Enter Hiring Source Name.",
                     },
                     color :{
-                        required: "Please Select Colour name .",
+                        required: "Please Select Colour Name.",
                     }
                 },
             submitHandler: function(form) {

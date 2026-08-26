@@ -49,7 +49,7 @@
                                 <div class="col-xl-7 col-lg-9 col-12">
                                     <div class="row g-1 mb-2 justify-content-between align-items-center">
                                         <div class="col-auto">
-                                            <label for="uploadCon" class="form-label">UPLOAD PAST YEAR's CONSOLIDATED BUDGET</label>
+                                            <label for="uploadCon" class="form-label">UPLOAD PAST YEAR'S CONSOLIDATED BUDGET</label>
                                         </div>
                                         <div class="col-auto">
                                             <a href="{{ route('resort.budget.GetConsolidateFile') }}" class="btn wfp-btn-secondary btn-small consolidatedBudget">Download Template</a>                                        </div>

@@ -405,7 +405,7 @@
                                         <div class="card-title mb-0">
                                             <div class="row g-md-2 g-1 align-items-center">
                                                 <div class="col">
-                                                    <h3 class="text-nowrap">Addtional Information</h3>
+                                                    <h3 class="text-nowrap">Additional Information</h3>
                                                 </div>
                                                 <div class="col-auto">
                                                     <a href="#" class="btn-lg-icon icon-bg-blue edit-addition-info">
@@ -1516,9 +1516,10 @@
 @section('import-scripts')
 <script>
     $(document).ready(function(){
-        $('.datepicker').datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true
+        flatpickr('.datepicker', {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
         $(document).on('click','.add-to-team-btn',function(){
             let empId = $(this).data('emp-id');
@@ -1651,16 +1652,18 @@
 
             setTimeout(function() {
                 if(!$('#termination-date-row').hasClass('d-none')) {
-                    $('#termination-date-row .datepicker').datepicker({
-                        format: 'dd/mm/yyyy',
-                        autoclose: true
+                    flatpickr('#termination-date-row .datepicker', {
+                        dateFormat: 'd/m/Y',
+                        allowInput: true,
+                        appendTo: document.body
                     });
                 }
 
                 if(!$('#probation-end-date-row').hasClass('d-none')) {
-                    $('#probation-end-date-row .datepicker').datepicker({
-                        format: 'dd/mm/yyyy',
-                        autoclose: true
+                    flatpickr('#probation-end-date-row .datepicker', {
+                        dateFormat: 'd/m/Y',
+                        allowInput: true,
+                        appendTo: document.body
                     });
                 }
             }, 100);
@@ -1744,10 +1747,10 @@
             $('#btn-expiry-save').removeClass('d-none');
             
             // Initialize Datepickers
-            $('.datepicker').datepicker({
-                format: 'dd/mm/yyyy',
-                autoclose: true,
-                todayHighlight: true
+            flatpickr('.datepicker', {
+                dateFormat: 'd/m/Y',
+                allowInput: true,
+                appendTo: document.body
             });
         });
 
@@ -1900,9 +1903,10 @@
                             positionClass: 'toast-bottom-right'
                         });
                         location.reload(); // Reload to show updated data
-                        $('.datepicker').datepicker({
-                            format: 'dd/mm/yyyy',
-                            autoclose: true
+                        flatpickr('.datepicker', {
+                            dateFormat: 'd/m/Y',
+                            allowInput: true,
+                            appendTo: document.body
                         });
                     } else {
                         toastr.error('Failed to update information.', "Error", {
@@ -2077,9 +2081,10 @@
                             positionClass: 'toast-bottom-right'
                         });
                         location.reload(); // Reload to show updated data
-                        $('.datepicker').datepicker({
-                            format: 'dd/mm/yyyy',
-                            autoclose: true
+                        flatpickr('.datepicker', {
+                            dateFormat: 'd/m/Y',
+                            allowInput: true,
+                            appendTo: document.body
                         });
                     } else {
                         toastr.error('Failed to update information.', "Error", {
@@ -2618,7 +2623,7 @@
                                 </td>
                             </tr>
                             <tr>
-                                <th>Reference Name</th>
+                                <th>Reference Name:</th>
                                <td>
                                     <input type="text" name="reference_name" class="form-control edit-mode">
                                 </td>

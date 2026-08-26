@@ -302,7 +302,7 @@
                             <div class="leaveUser-block">
                                 <div>
                                     <h6>{{ $s->Surevey_title }}</h6>
-                                    <p>From :- {{ $s->Start_date }}  To :- {{ $s->End_date }}</p>
+                                    <p>From: {{ $s->Start_date }} To: {{ $s->End_date }}</p>
                                     <div>
                                         <a target="_blank" href="{{ $s->route }}" class="a-linkTheme">View Details</a>
                                     </div>
@@ -390,7 +390,7 @@
 
 
                 <div class="modal-header">
-                    <h5 class="modal-title" id="staticBackdropLabel">Pending  Participant  in survey</h5>
+                    <h5 class="modal-title" id="staticBackdropLabel">Pending Participants in Survey</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">

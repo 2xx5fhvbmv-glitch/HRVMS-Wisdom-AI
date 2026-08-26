@@ -131,7 +131,7 @@
                 }
             },
             error: function() {
-                 toastr.error("something went wrong.","Error",{
+                 toastr.error("Something went wrong.","Error",{
                     positionClass: 'toast-bottom-right'
                 });
             }

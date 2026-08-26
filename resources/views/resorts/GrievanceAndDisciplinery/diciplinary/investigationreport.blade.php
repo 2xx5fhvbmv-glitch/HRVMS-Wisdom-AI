@@ -85,7 +85,7 @@
                                     </td>
                                 </tr>
                                 <tr>
-                                    <th>Attachements:</th>
+                                    <th>Attachments:</th>
                                     <td>
                                         @if(isset($Disciplinary_parent->Attachements) && !empty($Disciplinary_parent->Attachements))
                                             @foreach(explode(",", $Disciplinary_parent->Attachements) as $g)
@@ -309,7 +309,7 @@
                                         aria-label="Default select example">
                                         <option value="">Select Outcome</option>
                                         @if($Disciplinary_parent->SendtoHr != "Yes") 
-                                            <option value="DeliverToHr">Resolved  Send To Hr</option>
+                                            <option value="DeliverToHr">Resolved — Send To HR</option>
                                             <option value="Unresolved"  {{ ($Disciplinary_parent->outcome_type == "Unresolved")  ?'selected':'' }}>Unresolved</option>
 
                                         @else
@@ -408,10 +408,10 @@ $(document).ready(function() {
         output.appendChild(li);
     }
 });
-    $('.datepicker').datepicker({
-        format: 'dd/mm/yyyy',
-        autoclose: true,      // Close the picker after selection
-        todayHighlight: true  // Highlight today's date
+    flatpickr('.datepicker', {
+        dateFormat: 'd/m/Y',
+        allowInput: true,
+        appendTo: document.body
     });
     $('#Employee_id').select2({
         placeholder: 'Select Employee',
@@ -429,7 +429,7 @@ $(document).ready(function() {
         width: '100%'
     });
     $('#witness_id').select2({
-        placeholder: 'Select Wintness',
+        placeholder: 'Select Witness',
         minimumResultsForSearch: -1,
         width: '100%'
     });
@@ -444,7 +444,7 @@ $(document).ready(function() {
         width: '100%'
     });
     $('#follow_up_action').select2({
-        placeholder: 'Select follow Up Action',
+        placeholder: 'Select Follow-Up Action',
         minimumResultsForSearch: -1,
         width: '100%'
     });

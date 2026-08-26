@@ -144,9 +144,9 @@
                     @else
                         <p>{{ $waiHero['count'] }} employees over their {{ $waiHero['label'] }}.</p>
                     @endif
-                    <a href="javascript:void(0)" class="wai-hero-link wai-view-all"
+                    <a href="#" class="lnk wai-hero-link wai-view-all"
                        data-wai-key="{{ $waiHero['key'] }}" data-wai-title="{{ ucfirst($waiHero['label']) }}"
-                       data-bs-toggle="modal" data-bs-target="#waiInsightModal">Review &rarr;</a>
+                       data-details="waiInsightModal">Review &rarr;</a>
                 </div>
             </div>
         @else
@@ -174,9 +174,9 @@
                     @else
                         <div class="wai-row-status is-flagged">
                             {{ $check['count'] }} {{ $check['count'] == 1 ? 'employee' : 'employees' }} flagged
-                            <a href="javascript:void(0)" class="wai-view-all"
+                            <a href="#" class="lnk wai-view-all"
                                data-wai-key="{{ $check['key'] }}" data-wai-title="{{ ucfirst($check['label']) }}"
-                               data-bs-toggle="modal" data-bs-target="#waiInsightModal">View details &rarr;</a>
+                               data-details="waiInsightModal">View details &rarr;</a>
                         </div>
                     @endif
                 </div>
@@ -186,20 +186,28 @@
     </div>
 </div>
 
-{{-- WAI Insights details modal --}}
-<div class="modal fade" id="waiInsightModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title" id="waiInsightModalTitle">WAI Insights</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-                <ul class="list-unstyled mb-0" id="waiInsightModalBody"></ul>
+{{-- WAI Insights details modal — shared frosted-modal chrome
+     (partials/_wai_insight_modals.blade.php), employee list stays JS-built
+     from the in-memory waiData below since it's a photo/name/detail list,
+     not a program-breakdown table. --}}
+<div class="wai-backdrop" id="waiInsightModal">
+    <div class="wai-modal" role="dialog" aria-modal="true">
+        <button class="m-x" aria-label="Close">&times;</button>
+        <div class="m-kicker"><span class="dot"></span>WAI Insight</div>
+        <div class="mt" id="waiInsightModalTitle">WAI Insights</div>
+        <div class="m-tablewrap">
+            <div class="m-tscroll">
+                <ul class="list-unstyled mb-0 p-3" id="waiInsightModalBody"></ul>
             </div>
         </div>
     </div>
 </div>
+
+{{-- Shared frosted-modal chrome/JS (.wai-backdrop/.wai-modal open-close,
+     Escape/outside-click) — this module has no recommendation modal
+     trigger, but reuses the same open-close mechanism for #waiInsightModal
+     above rather than a third bespoke JS implementation. --}}
+@include('partials._wai_insight_modals')
 
 <script>
     (function () {

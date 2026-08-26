@@ -170,7 +170,7 @@
                                     <label for="transporation_name" class="form-label">TRANSPORTATION NAME <span class="red-mark">*</span></label>
                                     <input type="text" class="form-control" id="transporation_name"
                                         placeholder="Transportation Name" required name="transporation_name"
-                                        data-parsley-required-message="Please enter transporation name">
+                                        data-parsley-required-message="Please enter transportation name">
                                 </div>
                                 <div class="col-lg-4 col-sm-6">
                                     <label for="captain_number" class="form-label">Captain Number <span class="red-mark">*</span></label>
@@ -213,7 +213,7 @@
                             </div>
                             <div class="row g-md-3 g-2 mb-md-4 mb-3">
                                 <div class="col-lg-4 col-sm-6">
-                                    <label for="medical_center_name" class="form-label">Medical center Name <span class="red-mark">*</span></label>
+                                    <label for="medical_center_name" class="form-label">Medical Center Name <span class="red-mark">*</span></label>
                                     <input type="text" class="form-control" id="medical_center_name" placeholder="Medical Center Name" required name="medical_center_name" data-parsley-required-message="Please enter medical center name">
                                 </div>
                                 <div class="col-lg-4 col-sm-6">
@@ -861,11 +861,11 @@
             startDate: new Date() // Only restrict to today by default
         });
 
-        $('#meeting_date').datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,
-            todayHighlight: true,
-            startDate: new Date() // Only restrict to today by default
+        flatpickr('#meeting_date', {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body,
+            minDate: "today" // Only restrict to today by default
         });
     }
 

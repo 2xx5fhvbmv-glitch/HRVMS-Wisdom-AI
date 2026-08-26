@@ -195,12 +195,12 @@ $(document).ready(function(){
     $('#MonthlyCheckinForm').parsley();
 
     $("#select_training").select2({
-        placeholder:"select Tranining"
+        placeholder:"Select Training"
     });
-    $("#date_discussion").datepicker({
-        format: 'dd/mm/yyyy',
-        autoclose: true,
-        todayHighlight: true
+    flatpickr('#date_discussion', {
+        dateFormat: 'd/m/Y',
+        allowInput: true,
+        appendTo: document.body
     });
 })
 $(document).on("click",".Employee",function(){

@@ -143,7 +143,7 @@
                                     <a href="#" class="btn eb-btn-accent btn-sm" onclick="event.preventDefault(); document.getElementById('uploadFile').click();">Upload Files</a>
                                     <input type="file" name="attachments[]" id="uploadFile" multiple style="display:none;">
                                 </div>
-                                <div class="uploadFile-text mb-2 text-muted small">Photos, Documents, Or Videos</div>
+                                <div class="uploadFile-text mb-2 text-muted small">Photos, Documents, or Videos</div>
                             </div>
                             <ul id="file-list" class="mt-2"></ul>
                         </div>
@@ -206,13 +206,10 @@ $(document).ready(function () {
         successClass: 'is-valid'
     });
 
-    $('.datepicker').datepicker({
-        format: 'dd/mm/yyyy',
-        autoclose: true,
-        todayHighlight: true,
-        clearBtn: true,
-        container: 'body',
-        orientation: 'bottom auto'
+    flatpickr('.datepicker', {
+        dateFormat: 'd/m/Y',
+        allowInput: true,
+        appendTo: document.body
     });
 
     document.getElementById('uploadFile').addEventListener('change', function (e) {

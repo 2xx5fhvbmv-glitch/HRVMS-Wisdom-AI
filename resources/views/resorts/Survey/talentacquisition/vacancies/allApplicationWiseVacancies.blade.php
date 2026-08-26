@@ -58,7 +58,7 @@
                             </div>
                             <div class="col-xl-2 col-md-3 col-sm-4 col-6">
                                 <select class="form-select  Positions" name="Positions">
-                                     <option selected disabled>Select Poitions</option>
+                                     <option selected disabled>Select Positions</option>
                                 </select>
                             </div>
                             <div class="col-auto ms-auto">
@@ -188,10 +188,10 @@ $(document).ready(function() {
             });
 
 
-        $('#link_Expiry_date').datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,
-            todayHighlight: true
+        var link_Expiry_date_fp = flatpickr('#link_Expiry_date', {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
 
 
@@ -207,7 +207,7 @@ $(document).ready(function() {
 
 
     let formattedDate = parts[0] + "/" + parts[1] + "/" + parts[2];
-        $('#link_Expiry_date').datepicker('setDate',ExpiryDate);
+        link_Expiry_date_fp.setDate(ExpiryDate, true);
     });
 
         $('#jobAD-form').validate({

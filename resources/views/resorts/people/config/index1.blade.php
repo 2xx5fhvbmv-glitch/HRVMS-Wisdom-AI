@@ -347,7 +347,7 @@
                                     <option value="failed">Probation Unsuccessful Letter</option>
                                     <option value="promotion">Promotion Letter</option>
                                     <option value="offer">Offer Letter</option>
-                                    <option value="experiance">Experiance\Employment Letter</option>
+                                    <option value="experiance">Experience\Employment Letter</option>
                                 </select>
                             </div>
                             <div id="div-type"></div>
@@ -509,7 +509,7 @@
                 },
                 messages: {
                     type: {
-                        required: "Please Select Type .",
+                        required: "Please Select Type.",
                     },
                     MailSubject: {
                         required: "Please enter the email subject.",

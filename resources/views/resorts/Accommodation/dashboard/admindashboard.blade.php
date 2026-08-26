@@ -373,7 +373,7 @@
             <div class="col-xl-6">
                 <div class="card card-wiINsight card-accomWiINsight">
                     <div class="card-title">
-                        <h3>WI Insight's</h3>
+                        <h3>WI Insights</h3>
                     </div>
                     <div class="leaveUser-main">
                         <div class="leaveUser-block">
@@ -413,7 +413,7 @@
                     <div class=" card-title">
                         <div class="row justify-content-between align-items-center g-md-3 g-1">
                             <div class="col">
-                                <h3 class="text-nowrap">On Hold Requested </h3>
+                                <h3 class="text-nowrap">On Hold Requests</h3>
                             </div>
                             <div class="col-auto"><a href="{{ route('resort.accommodation.HoldMaintanaceRequest') }}" class="a-link">View All</a>
                             </div>

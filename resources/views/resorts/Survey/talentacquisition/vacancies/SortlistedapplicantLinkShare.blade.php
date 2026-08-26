@@ -414,7 +414,7 @@ $(document).on("click", ".Timezone_checkBox", function() {
             },
             messages: {
                 SlotBook: {
-                    required: "Please select a valid time slot  .",
+                    required: "Please select a valid time slot.",
                 }
             },
             errorPlacement: function(error, element) {

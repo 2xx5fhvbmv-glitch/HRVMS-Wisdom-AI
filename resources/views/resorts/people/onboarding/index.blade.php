@@ -145,8 +145,8 @@
                                 <div class="col-lg-4 col-sm-6">
                                     <label for="resort_transportaion" class="form-label">RESORT TRANSPORTATION <span class="red-mark">*</span></label>
                                     <select class="form-select select2t-none" id="resort_transportaion_id"
-                                        placeholder="Resort Transportation" required name="resort_transportaion_id" data-parsley-required-message="Please Select resort transportation" data-parsley-errors-container="#resort_transportation-error" >
-                                        <option value="">Select Resort Transporation</option>
+                                        placeholder="Resort Transportation" required name="resort_transportaion_id" data-parsley-required-message="Please select resort transportation" data-parsley-errors-container="#resort_transportation-error" >
+                                        <option value="">Select Resort Transportation</option>
                                         @if($transportations)
                                             @foreach($transportations as $key => $value)
                                                 {{-- data-option carries the transportation NAME so the
@@ -311,7 +311,7 @@
                                      centre is the same partner each time. Test
                                      date/time stay blank (per appointment). --}}
                                 <div class="col-lg-4 col-sm-6">
-                                    <label for="medical_center_name" class="form-label">Medical center Name <span class="red-mark">*</span></label>
+                                    <label for="medical_center_name" class="form-label">Medical Center Name <span class="red-mark">*</span></label>
                                     <input type="text" class="form-control" id="medical_center_name" placeholder="Medical Center Name" required name="medical_center_name" data-parsley-required-message="Please enter medical center name" data-parsley-script-tag="true"
                                         data-parsley-html="true" value="{{ optional($lastItinerary)->medical_center_name }}">
                                 </div>
@@ -328,7 +328,7 @@
                                 <div class="col-lg-4 col-sm-6">
                                     <label for="medical_date" class="form-label">Medical Test Date <span class="red-mark">*</span></label>
                                     <input type="text" class="form-control datepicker" id="medical_date" name="medical_date"
-                                        placeholder="Medical Test Date" required data-parsley-required-message="Please enter medical type">
+                                        placeholder="Medical Test Date" required data-parsley-required-message="Please enter medical test date">
                                 </div>
                                 <div class="col-lg-4 col-sm-6">
                                     <label for="medical_time" class="form-label">Medical Test Time <span class="red-mark">*</span></label>

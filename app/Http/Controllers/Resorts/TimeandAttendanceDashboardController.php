@@ -435,7 +435,8 @@ class TimeandAttendanceDashboardController extends Controller
                                                     ->where("t1.resort_id",$this->resort->resort_id)
                                                     ->count();
         $totalLeaveEmployee = $totalLeaveEmployee ?? 0;
-        return view('resorts.timeandattendance.dashboard.hrdashboard',compact('page_title','ResortPosition','ResortDepartment','EmployeesCount','totalPresentEmployee','totalAbsantEmployee','totalLeaveEmployee'));
+        $attendanceDataTodoList = $this->Tododata();
+        return view('resorts.timeandattendance.dashboard.hrdashboard',compact('page_title','ResortPosition','ResortDepartment','EmployeesCount','totalPresentEmployee','totalAbsantEmployee','totalLeaveEmployee','attendanceDataTodoList'));
     }
 
 
@@ -2120,6 +2121,7 @@ class TimeandAttendanceDashboardController extends Controller
                     $icon = $row->action_type == 'check_in' ? 'fa-sign-in-alt' : 'fa-sign-out-alt';
                     $shiftDate = $row->shift_date ?? $row->date ?? date('Y-m-d');
                     $dataTime = $row->action_type == 'check_in' ? $row->StartTime : ($row->ExpectedEndTime ?? $row->EndTime ?? '');
+                    $shiftLabel = trim(($row->ShiftName ?? '') . ' · ' . ($row->StartTime ?? '') . ' - ' . ($row->ExpectedEndTime ?? $row->EndTime ?? ''), ' ·');
 
                     return '<button type="button"
                                 class="btn btn-sm ' . $buttonClass . ' manual-check-action"
@@ -2127,7 +2129,9 @@ class TimeandAttendanceDashboardController extends Controller
                                 data-action="' . $row->action_type . '"
                                 data-date="' . htmlspecialchars($shiftDate) . '"
                                 data-time="' . htmlspecialchars($dataTime) . '"
-                                data-employee-name="' . htmlspecialchars($row->EmployeeName) . '">
+                                data-employee-name="' . htmlspecialchars($row->EmployeeName) . '"
+                                data-shift-name="' . htmlspecialchars($shiftLabel) . '"
+                                data-employee-image="' . htmlspecialchars($row->profileImg ?? '') . '">
                                 <i class="fa-solid ' . $icon . ' me-1"></i>' . $buttonText . '
                             </button>';
                 }

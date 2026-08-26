@@ -345,7 +345,7 @@
                                 </div>
                                 <div class="col-lg-4 col-sm-6">
                                     <label for="passport_expiry_date" class="form-label">
-                                        Passport expiry date
+                                        Passport Expiry Date
                                         <span class="req_span passport-expiry-required-marker d-none">*</span>
                                     </label>
                                     <input type="text" class="form-control datepicker" id="passport_expiry_date"

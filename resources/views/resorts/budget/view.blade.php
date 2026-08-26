@@ -76,7 +76,7 @@
                                 <tr>
                                     <th></th>
                                     <th class="text-nowrap">Positions</th>
-                                    <th class="text-nowrap">No. of position</th>
+                                    <th class="text-nowrap">No. Of Positions</th>
                                     <th class="text-nowrap">Employee Name</th>
                                     <th class="text-nowrap w-120">Rank</th>
                                     <th class="text-nowrap">Nation</th>

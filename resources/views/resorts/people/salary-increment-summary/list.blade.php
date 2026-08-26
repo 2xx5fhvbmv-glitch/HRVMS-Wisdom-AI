@@ -64,7 +64,7 @@
                                       <th>Effective Date</th>
                                       <th>Remarks</th>
                                       <th>Status</th>
-                                      <th>Last Activty</th>
+                                      <th>Last Activity</th>
                                  </tr>
                             </thead>
                             <tbody>
@@ -91,7 +91,7 @@
                       <div class="row g-md-4 g-2 mt-2 align-items-end">
                             <div class="col-md-6">
                                  <div class="bg-themeGrayLight d-flex">
-                                      <h6>Payroll Cost Increase(Monthly)</h6><strong class="monthly-payroll-increase">{{ Common::GetResortCurrencySymbol() }} 0</strong>
+                                      <h6>Payroll Cost Increase (Monthly)</h6><strong class="monthly-payroll-increase">{{ Common::GetResortCurrencySymbol() }} 0</strong>
                                  </div>
                             </div>
                             <div class="col-md-6">
@@ -140,7 +140,7 @@
             <div class="modal-body">
                 <form action="{{route('people.salary-increment.request-change')}}" id="requestChange">
                     @csrf
-                    <textarea id="requestChange" class="form-control" name="request_change" rows="3" placeholder="write your Comment (required)" required></textarea>
+                    <textarea id="requestChange" class="form-control" name="request_change" rows="3" placeholder="Write your comment (required)" required></textarea>
                 </form>
             </div>
             <div class="modal-footer">
@@ -163,7 +163,7 @@
                     @csrf
                     <input type="text" class="form-control datepicker" id="holdDate" name="hold_date" placeholder="Hold Date" />
 
-                    <textarea id="requestChange" class="form-control mt-2" name="request_hold" rows="3" placeholder="write your Comment (required)" required></textarea>
+                    <textarea id="requestChange" class="form-control mt-2" name="request_hold" rows="3" placeholder="Write your comment (required)" required></textarea>
                 </form>
             </div>
             <div class="modal-footer">

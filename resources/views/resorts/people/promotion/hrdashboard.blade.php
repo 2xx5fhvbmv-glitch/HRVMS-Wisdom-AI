@@ -211,10 +211,10 @@
 
     $(document).ready(function(){
         $('.select2t-none').select2();
-        $(".datepicker").datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,
-            todayHighlight: true
+        flatpickr(".datepicker", {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
         getPromotionTable();
         window.positions = @json($positions);

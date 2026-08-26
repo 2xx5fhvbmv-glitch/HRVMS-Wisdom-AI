@@ -62,7 +62,7 @@
                                     <th>ID</th>
                                     <th>Name</th>
                                     <th>Position</th>
-                                    <th>Departmeent</th>
+                                    <th>Department</th>
                                 </tr>
                             </thead>
                             <tbody id="NatioanlityWiseEmployee-table">

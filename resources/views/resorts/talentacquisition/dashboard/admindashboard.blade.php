@@ -786,7 +786,7 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
                                 </div>
                                 <div>
                                     <h6>${department} (${rank})</h6>
-                                    <p>Requested for Hire ${NoOfVacnacy} ${position}</p>
+                                    <p>Requested to Hire ${NoOfVacnacy} ${position}</p>
                                 </div>
 
                     </div>`;
@@ -962,10 +962,10 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         // End of Reject Vacanciy form
         //  Approval
 
-        $('#link_Expiry_date').datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,
-            todayHighlight: true
+        flatpickr('#link_Expiry_date', {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
         $("#ApprovedResponseModel").on("click",function(){
             var ta_id= $(this).attr('data-ta_id');
@@ -1042,7 +1042,8 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
             if (expiryDate) {
                 var parts = expiryDate.split("-");
                 var formattedDate = parts[2] + "/" + parts[1] + "/" + parts[0];
-                $("#link_Expiry_date").datepicker("setDate", formattedDate);
+                var linkExpiryFp = document.getElementById("link_Expiry_date")._flatpickr;
+                if (linkExpiryFp) { linkExpiryFp.setDate(formattedDate, true, "d/m/Y"); }
             }
 
             $(".link_Job").val(applicantLink).addClass("link_Job_");

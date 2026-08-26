@@ -159,15 +159,15 @@
 <script>
      $(document).ready(function() {
 
-          $("#todate").datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,      // Close the picker after selection
-            todayHighlight: true  // Highlight today's date
+          flatpickr("#todate", {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
-         $("#formdate").datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,      // Close the picker after selection
-            todayHighlight: true  // Highlight today's date
+         flatpickr("#formdate", {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
      
         $('#report-create-form').parsley();

@@ -157,7 +157,7 @@
                 },
                 messages: {
                     respondent: {
-                        required: "Please Select Any respondent."
+                        required: "Please select a respondent."
                     }
                 },
                

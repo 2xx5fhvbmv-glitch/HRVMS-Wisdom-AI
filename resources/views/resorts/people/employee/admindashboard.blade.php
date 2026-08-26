@@ -752,7 +752,7 @@
                             <h3>Repayment Tracking</h3>
                         </div>
                         <div class="leaveUser-bgBlock">
-                            <h6>Total Active Repayment In Porgress</h6>
+                            <h6>Total Active Repayment In Progress</h6>
                             <strong>{{$totalRepayment->where('recovery_status','In Progress')->count()}}</strong>
                         </div>
                         <div class="leaveUser-bgBlock">

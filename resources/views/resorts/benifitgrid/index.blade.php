@@ -20,6 +20,9 @@
                     </div>
                 </div>
                 <div class="col-auto">
+                    <a href="{{ route('resort.budget.config') }}" class="btn btn-sm wfp-btn-neutral">
+                        <i class="fa-solid fa-arrow-left"></i> Back to Configuration
+                    </a>
                 </div>
             </div>
         </div>

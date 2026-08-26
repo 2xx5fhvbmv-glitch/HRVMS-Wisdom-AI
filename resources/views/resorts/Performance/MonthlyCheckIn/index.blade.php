@@ -74,10 +74,10 @@
 <script>
 $(document).ready(function () {
 
-    $("#date_discussion").datepicker({
-        format: 'dd/mm/yyyy',
-        autoclose: true,
-        todayHighlight: true
+    flatpickr('#date_discussion', {
+        dateFormat: 'd/m/Y',
+        allowInput: true,
+        appendTo: document.body
     });
     tablemonthlyCheck();
 });

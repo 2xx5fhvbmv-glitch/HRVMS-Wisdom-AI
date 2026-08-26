@@ -123,7 +123,7 @@
 					<li class="nav-item">
 						<a href="{{route('admin.ewt_brackets.index')}}" class="nav-link @if(in_array(Route::currentRouteName(), array('admin.ewt_brackets.index','admin.ewt_brackets.create', 'admin.ewt_brackets.edit'))) active @endif">
 							<i class="fa fa-bell nav-icon"></i>
-							<p>Ewt Tax Bracket</p>
+							<p>EWT Tax Bracket</p>
 						</a>
 					</li>
 				@endif

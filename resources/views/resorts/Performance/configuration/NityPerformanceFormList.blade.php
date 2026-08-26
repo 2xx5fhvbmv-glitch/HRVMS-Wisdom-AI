@@ -31,7 +31,7 @@
                 <div class="col-lg-12">
                     <div class="card">
                         <div class="card-title">
-                            <h3>90 Peformance</h3>
+                            <h3>90 Performance</h3>
                             <div class="text-end">
                             </div>
                         </div>
@@ -186,7 +186,7 @@
 
         if(!isNaN(formname))
         {
-            toastr.error('Please enter  form Name.', "Error", {
+            toastr.error('Please enter Form Name.', "Error", {
                     positionClass: 'toast-bottom-right'
                 });
 

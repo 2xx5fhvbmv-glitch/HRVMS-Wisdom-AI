@@ -7,7 +7,7 @@
             </div>
             <div>
                 <h6>{{ $vacancy->Department }} ({{ $vacancy->rank_name }})  </h6>
-                <p>Requested for Hire 1 {{ $vacancy->Position ?? 'Position' }}</p>
+                <p>Requested to Hire 1 {{ $vacancy->Position ?? 'Position' }}</p>
                 {{-- <a href="#" class="a-link">Send Interview Request</a> --}}
             </div>
             <div class="icon">

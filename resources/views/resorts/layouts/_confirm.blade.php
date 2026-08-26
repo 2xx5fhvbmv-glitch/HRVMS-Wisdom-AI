@@ -7,7 +7,7 @@
     .wisdom-swal-icon {
         width: 60px !important;
         height: 60px !important;
-        margin: 0 auto 16px !important;
+        margin: 28px auto 16px !important;
         border: 0 !important;
         border-radius: 50% !important;
         background: #E6F0F1 !important;
@@ -35,6 +35,14 @@
         gap: 10px !important;
         width: 100% !important;
         margin: 18px 0 0 !important;
+        padding: 0 28px !important;
+    }
+    /* wisdomAlert has a single OK button (no cancel) — flex-end from the
+       shared class above would strand it in the bottom-right corner, so
+       center it instead. wisdomConfirm keeps flex-end (its two buttons,
+       reversed, read correctly right-aligned). */
+    .wisdom-swal-actions.wisdom-swal-actions-center {
+        justify-content: center !important;
     }
     .wisdom-swal-confirm,
     .wisdom-swal-cancel {
@@ -168,7 +176,7 @@
                 icon: ('wisdom-swal-icon ' + t.iconClass).trim(),
                 title: 'wisdom-swal-title',
                 htmlContainer: 'wisdom-swal-text',
-                actions: 'wisdom-swal-actions',
+                actions: 'wisdom-swal-actions wisdom-swal-actions-center',
                 confirmButton: ('wisdom-swal-confirm ' + t.confirmClass).trim()
             }
         };

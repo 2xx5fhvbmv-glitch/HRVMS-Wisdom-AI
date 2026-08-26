@@ -100,7 +100,7 @@
 			},
 			messages: {
 				'name': {
-					required: "The name  is required"
+					required: "The name is required"
 				},
 				'subject': {
 					required: "The subject is required"

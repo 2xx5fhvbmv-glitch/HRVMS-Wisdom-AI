@@ -124,10 +124,10 @@
 <script>
     $(document).ready(function () {
 
-    $("#date").datepicker({
-        date: 'dd/mm/yyyy',
-        autoclose: true,      // Close the picker after selection
-        todayHighlight: true  // Highlight today's date
+    flatpickr('#date', {
+        dateFormat: 'm/d/Y',
+        allowInput: true,
+        appendTo: document.body
     });
     const $employeeContainer = $('.employee-container');
     const $noResults = $('.no-results');
@@ -244,7 +244,7 @@
         },
         messages: {
             title: {
-                required: "Please Enter Meeting title",
+                required: "Please Enter Meeting Title",
             },
             date: {
                 required: "Please Enter Meeting Date",
@@ -257,13 +257,13 @@
                 // greaterThanStart: "End time must be greater than start time" // Custom message
             },
             location: {
-                required: "Please enter Location or Meeting Link",
+                required: "Please Enter Location or Meeting Link",
             },
             conference_link: {
-                required: "Please enter Meeting Link or Location",
+                required: "Please Enter Meeting Link or Location",
             },
             description: {
-                required: "Please Enter Meeting description",
+                required: "Please Enter Meeting Description",
             },
             "Emp_id[]": {
                 required: "Please Select Employee",

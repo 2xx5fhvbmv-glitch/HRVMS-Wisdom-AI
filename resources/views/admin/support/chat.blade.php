@@ -121,29 +121,7 @@
       </div>
     </div>
   </section>
-<div class="modal fade" id="bdVisa-iframeModel-modal-lg" tabindex="-1" aria-labelledby="myLargeModalLabel"
-      aria-hidden="true">
-  <div class="modal-dialog modal-lg">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h5 class="modal-title mb-0" id="staticBackdropLabel">Download File</h5>
-        <div class="d-flex align-items-center">
-            <a href="#" class="btn btn-sm btn-primary downloadLink" target="_blank" style="margin-right: 35px;">Download</a>
-            <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                <span aria-hidden="true">&times;</span>
-            </button>
-        </div>
-      </div>
-      <div class="modal-body">
-        <div class=" ratio ratio-21x9" id="ViewModeOfFiles">
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-      </div>
-    </div>
-  </div>
-</div>
+@include('partials._file_view_modal')
 </div>
 @endsection
 

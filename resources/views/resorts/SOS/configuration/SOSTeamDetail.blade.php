@@ -245,7 +245,7 @@
                         }
                         else
                         {
-                            errorMessage = "An error occurred while Create or Update."; // Default error message
+                            errorMessage = "An error occurred while creating or updating."; // Default error message
                         }
 
                         toastr.error(errorMessage, "Error", {

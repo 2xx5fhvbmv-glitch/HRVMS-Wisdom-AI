@@ -93,7 +93,7 @@
             },
             messages: {
                 HOD_id: {
-                    required: "Please Select HOD.",
+                    required: "Please select HOD.",
                 }
             },
             submitHandler: function(form) {

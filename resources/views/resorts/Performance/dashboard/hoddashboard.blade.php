@@ -111,7 +111,7 @@
             <div class="col-xl-3 col-lg-6 col-md-6">
                 <div class="card">
                     <div class="card-title d-flex justify-content-between">
-                        <h3>AI Insight's</h3>
+                        <h3>AI Insights</h3>
                     </div>
                 </div>
             </div>
@@ -209,12 +209,12 @@
                     <div class="row g-2 ">
                         <div class="col-auto">
                             <div class="doughnut-label">
-                                <span class="bg-theme"></span>Preplannned OT
+                                <span class="bg-theme"></span>Preplanned OT
                             </div>
                         </div>
                         <div class="col-auto">
                             <div class="doughnut-label">
-                                <span class="bg-themeLightBlue"></span>Preplannned OT
+                                <span class="bg-themeLightBlue"></span>Preplanned OT
                             </div>
                         </div>
                         <div class="col-auto">
@@ -236,7 +236,7 @@
                             <div class="col-auto">
                                 <div class="form-group">
                                     <select class="form-select" aria-label="Default select example" id="ResortPosition">
-                                        <option selected="">All Poistion</option>
+                                        <option selected="">All Positions</option>
                                         @if($ResortPosition->isNotEmpty())
                                             @foreach($ResortPosition as $position)
                                                 <option value="{{$position->id}}">{{$position->position_title}}</option>
@@ -259,7 +259,7 @@
                         <thead>
                             <tr>
                                 <th>Employee Name</th>
-                                <th>Poisition</th>
+                                <th>Position</th>
                                 <th>Shift</th>
                                 <th>Action</th>
                             </tr>
@@ -569,7 +569,7 @@
 
     $(document).ready(function () {
         $('#ResortPosition').select2({
-            placeholder: "Select a Poitions", // Placeholder text
+            placeholder: "Select a Position", // Placeholder text
             allowClear: true // Adds a clear (X) button to reset the dropdown
         });
 
@@ -583,10 +583,10 @@
 
             DutyRosterList();
         });
-        $('.datepicker').datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,      // Close the picker after selection
-            todayHighlight: true  // Highlight today's date
+        flatpickr('.datepicker', {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
 
     });

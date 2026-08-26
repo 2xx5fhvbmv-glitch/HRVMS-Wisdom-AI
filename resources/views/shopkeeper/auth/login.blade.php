@@ -17,6 +17,7 @@
     <link href="{{ URL::asset('resorts_assets/css/default.css')}}" rel=stylesheet>
     <link href="{{ URL::asset('resorts_assets/css/media.css')}}" rel=stylesheet>
     <link rel="stylesheet" href="{{ URL::asset('admin_assets/plugins/toastr/toastr.min.css') }}">
+    <link rel="stylesheet" href="{{ URL::asset('resorts_assets/css/toastr-theme.css') }}">
 
 
 
@@ -110,7 +111,7 @@
                               <div class="form-check">
                                   <input class="form-check-input" type="checkbox" name="remember_token" value="" id="remember" checked>
                                   <label class="form-check-label" for="flexCheckDefault">
-                                      Remind me
+                                      Remember me
                                   </label>
                               </div>
                           </div>
@@ -122,7 +123,7 @@
                     </form>
                 </div>
                 <div class="footer">© 2024 Wisdom AI Pvt Ltd | Every Data Shielded | Creativity Secured | All
-                    innovations Protected.</div>
+                    Innovations Protected.</div>
             </div>
         </div>
     </div>
@@ -134,6 +135,50 @@
     <script src="{{ URL::asset('resorts_assets/js/bootstrap.bundle.min.js') }}"></script>
     <script src="{{ URL::asset('resorts_assets/js/slick.min.js') }}"></script>
     <script src="{{ URL::asset('admin_assets/plugins/toastr/toastr.min.js') }}"></script>
+    <script>
+        // Toastr re-theme glue (see toastr-theme.css) — standalone page, kept
+        // in sync with shopkeeper/layouts/js.blade.php.
+        var wtPendingSticky = false;
+        if (window.toastr) {
+            toastr.options.closeButton = true;
+            toastr.options.progressBar = false;
+            toastr.options.closeOnHover = false;
+            toastr.options.showMethod = 'show';
+            toastr.options.hideMethod = 'hide';
+            toastr.options.timeOut = toastr.options.timeOut || 4500;
+            toastr.options.extendedTimeOut = toastr.options.timeOut;
+            toastr.options.onShown = function () {
+                var $t = $(this);
+                if (wtPendingSticky) { wtPendingSticky = false; return; }
+                $t.append(
+                    $('<span class="wt-prog"></span>')
+                        .css('animation-duration', toastr.options.timeOut + 'ms')
+                        .on('animationend', function () { toastr.clear($t); })
+                );
+            };
+        }
+        function wisdomToast(type, title, message, opts) {
+            if (!window.toastr) return;
+            opts = opts || {};
+            var sticky = !!opts.sticky || !!(opts.list && opts.list.length);
+            var esc = function (s) {
+                return String(s).replace(/[&<>"']/g, function (c) {
+                    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+                });
+            };
+            var html = esc(message || '');
+            if (opts.list && opts.list.length) {
+                html += '<ul class="wt-errlist">' + opts.list.map(function (i) { return '<li>' + esc(i) + '</li>'; }).join('') + '</ul>';
+            }
+            wtPendingSticky = sticky;
+            var $toast = toastr[type](html, title, {
+                timeOut: sticky ? 0 : toastr.options.timeOut,
+                extendedTimeOut: sticky ? 0 : toastr.options.timeOut,
+                escapeHtml: false
+            });
+            return $toast;
+        }
+    </script>
     <script src="{{ URL::asset('admin_assets/plugins/holdon/holdon.min.js') }}"></script>
     <script src="{{ URL::asset('assets/js/jquery.validate.min.js') }}"></script>
     <script type="text/javascript">
@@ -161,7 +206,7 @@
             messages: {
               'email': {
                 required: "The email is required",
-                email: "Enter valid email",
+                email: "Enter a valid email",
               },
               'password': {
                 required: "The password is required",
@@ -221,7 +266,7 @@
                     }
                     $( "#er-message" ).html('<span> '+data.message+'</span>');
                   } else {
-                    $( "#er-message" ).html('<span><i class="fa fa-exclamation-triangle"></i> something went wrong please try again</span>');
+                    $( "#er-message" ).html('<span><i class="fa fa-exclamation-triangle"></i> Something went wrong. Please try again.</span>');
                   }
                 }
               });

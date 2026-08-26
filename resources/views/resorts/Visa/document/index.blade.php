@@ -58,7 +58,7 @@
                                                     class="form-control" 
                                                     accept=".pdf" 
                                                     data-parsley-fileextension="pdf"
-                                                    data-parsley-fileextension-message="Only PDF files are  allowed."
+                                                    data-parsley-fileextension-message="Only PDF files are allowed."
                                                     data-parsley-trigger="change"
                                                 >
                                             </div>
@@ -1164,39 +1164,39 @@
 
         // setProgressBar(current);
 
-        $("#date_birth").datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,
-            todayHighlight: true
+        flatpickr('#date_birth', {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
-        
-        $("#db_dob").datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,
-            todayHighlight: true
+
+        flatpickr('#db_dob', {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
-        
-        $("#Passport_expiry_date").datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,
-            todayHighlight: true
+
+        flatpickr('#Passport_expiry_date', {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
-        $("#step2_passport_expiry_date").datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,
-            todayHighlight: true
+        flatpickr('#step2_passport_expiry_date', {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
-        $("#Passport_issueDate").datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,
-            todayHighlight: true
+        flatpickr('#Passport_issueDate', {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
-        
-        
-        $("#joining_date").datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,
-            todayHighlight: true
+
+
+        flatpickr('#joining_date', {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
         $('#department').select2({
             width: '100%',

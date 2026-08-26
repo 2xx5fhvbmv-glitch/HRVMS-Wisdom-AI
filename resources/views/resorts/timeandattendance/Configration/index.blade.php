@@ -711,10 +711,10 @@
 
 
             $("#fileUploadForm").parsley();
-            $("#start_date , #end_date").datepicker({
-                format: 'dd/mm/yyyy',
-                autoclose: true,      // Close the picker after selection
-                todayHighlight: true  // Highlight today's date
+            flatpickr("#start_date , #end_date", {
+                dateFormat: 'd/m/Y',
+                allowInput: true,
+                appendTo: document.body
             });
             $("#ResortDivision").select2({
                 placeholder: "Select Division"
@@ -1421,10 +1421,10 @@
                 },
                 messages: {
                     latitude: {
-                        required: "Please Calculate and enter Resort Latitude.",
+                        required: "Please calculate and enter Resort Latitude.",
                     },
                     longitude: {
-                        required: "Please Calculate and enter Resort longitude..",
+                        required: "Please calculate and enter Resort Longitude.",
                     }
                 },
                 submitHandler: function(form) {

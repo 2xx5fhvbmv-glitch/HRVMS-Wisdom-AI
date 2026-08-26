@@ -20,7 +20,7 @@
                     </div>
                     <div class="col-auto">
                         <div class="d-flex justify-content-end">
-                            <a href="Javascritp:void(0)" class="btn ta-btn-accent EmailFreshModal">Add Email Template</a>
+                            <a href="javascript:void(0)" class="btn ta-btn-accent EmailFreshModal">Add Email Template</a>
                         </div>
                     </div>
                 </div>

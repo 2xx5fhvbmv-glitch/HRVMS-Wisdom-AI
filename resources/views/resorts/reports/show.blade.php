@@ -126,7 +126,7 @@
                     <table class="table  bordered">
                         <thead>
                             <tr>
-                                <th colspan="5">No Record Found..</th>
+                                <th colspan="5">No Record Found.</th>
                             </tr>
                         </thead>
                      
@@ -198,15 +198,15 @@ $(document).ready(function() {
     $("#GetReportData").parsley();
    
         
-        $("#todate").datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,      // Close the picker after selection
-            todayHighlight: true  // Highlight today's date
+        flatpickr("#todate", {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
-         $("#formdate").datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,      // Close the picker after selection
-            todayHighlight: true  // Highlight today's date
+         flatpickr("#formdate", {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
      
 

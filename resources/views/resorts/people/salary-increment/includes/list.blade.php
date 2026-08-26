@@ -97,7 +97,7 @@
                                         <th>Increment Type</th>
                                         <th>Effective Date</th>
                                         <th>Remark</th>
-                                        <th>Last Activty</th>
+                                        <th>Last Activity</th>
                                         <th>Action</th>
                                    </tr>
                               </thead>
@@ -198,10 +198,10 @@
      
      $(document).ready(function () {
 
-           $(".datepicker").datepicker({
-               format: 'dd/mm/yyyy', 
-               autoclose: true,   
-               todayHighlight: true  
+           flatpickr(".datepicker", {
+               dateFormat: 'd/m/Y',
+               allowInput: true,
+               appendTo: document.body
           });
 
           $(document).on('click', '.open-ajax-modal', function(e) {
@@ -216,7 +216,7 @@
                          }
                     },
                     error: function() {
-                         toastr.success(response.message, "Error", {
+                         toastr.error("An error occurred while loading the form.", "Error", {
                               positionClass: 'toast-bottom-right'
                          });
                     }

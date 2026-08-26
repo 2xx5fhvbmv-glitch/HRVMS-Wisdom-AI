@@ -133,7 +133,7 @@
             var formData = collectFormData('manager-form-render');
 
             if (!validateRequired('manager-form-render', formData)) {
-                toastr.error('Please fill all required fields', 'Validation error', { positionClass: 'toast-bottom-right' });
+                toastr.error('Please fill all required fields', 'Validation Error', { positionClass: 'toast-bottom-right' });
                 return;
             }
 
@@ -154,7 +154,7 @@
                     if (payload.errors) {
                         var msg = '';
                         $.each(payload.errors, function(field, err) { msg += err + '<br>'; });
-                        toastr.error(msg, 'Validation error', { positionClass: 'toast-bottom-right' });
+                        toastr.error(msg, 'Validation Error', { positionClass: 'toast-bottom-right' });
                     } else {
                         toastr.error(payload.message || 'Failed to submit review', 'Error', { positionClass: 'toast-bottom-right' });
                     }

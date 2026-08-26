@@ -115,7 +115,7 @@
 					<div class="small-box bg-warning">
 						<div class="inner">
 							<h3>{{$resortsCount}}</h3>
-							<p>Resorts Count</p>
+							<p>Resort Count</p>
 						</div>
 						<div class="icon">
 							<i class="ion ion-stats-bars"></i>

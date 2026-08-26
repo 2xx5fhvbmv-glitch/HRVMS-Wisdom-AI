@@ -117,10 +117,10 @@
             width: '100%'
         });
 
-        $('.datepicker').datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,      // Close the picker after selection
-            todayHighlight: true  // Highlight today's date
+        flatpickr('.datepicker', {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
 
         // flatpickr("#dateFilter", {

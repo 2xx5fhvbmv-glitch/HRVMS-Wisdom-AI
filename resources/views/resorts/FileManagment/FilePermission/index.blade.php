@@ -241,7 +241,7 @@ $(document).ready(function() {
                 },
                 "Permission[]": 
                 {
-                    required: "Please Select a position.",
+                    required: "Please select a position.",
                 }
         },
         submitHandler: function(form) {

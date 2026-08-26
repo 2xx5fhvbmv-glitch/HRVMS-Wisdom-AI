@@ -26,7 +26,7 @@
             <div class="col-lg-3">
                 <div class="card">
                     <div class="card-title">
-                        <h3>Filles</h3>
+                        <h3>Files</h3>
                     </div>
                     <div class="row g-3 align-items-center">
                         <div class="col-lg-12 col-sm-6">
@@ -103,7 +103,7 @@
                                 <table class="table-lableNew table-docExpiring  w-100">
                                     <tr>
                                         <th>Document Type</th>
-                                        <th>No. Of Document</th>
+                                        <th>No. Of Documents</th>
                                         <th>Employee Name</th>
                                         <th>Expiry Date</th>
                                         <th>Days Left</th>
@@ -363,7 +363,7 @@
                     <div class=" card-title">
                         <div class="row justify-content-between align-items-center g-1">
                             <div class="col">
-                            <h3>File version history</h3>
+                            <h3>File Version History</h3>
                             </div>
                             <div class="col-auto">
                                 <a href="{{route('FileManage.FileVersionList')}}" class="a-link">View All</a>
@@ -437,7 +437,7 @@
     <div class="modal-dialog modal-dialog-centered modal-lg modal-uploadFile">
         <form class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title" id="selectFolderLocation-modal">Upload Document sdfds</h5>
+                <h5 class="modal-title" id="selectFolderLocation-modal">Upload Document</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
          
@@ -508,7 +508,7 @@
         <div class="modal-dialog modal-dialog-centered modal-small modal-CropImage">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="staticBackdropLabel">Interview Details </h5>
+                    <h5 class="modal-title" id="staticBackdropLabel">Crop Image</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
@@ -953,7 +953,7 @@ document.getElementById('file').addEventListener('change', function (e) {
 
             // Check for reserved names
             if (reservedNames.includes(FolderName.toUpperCase())) {
-                toastr.error("This folder name is not allowed in Software!");
+                toastr.error("This folder name is not allowed in the software!");
                 return false;
             }
 

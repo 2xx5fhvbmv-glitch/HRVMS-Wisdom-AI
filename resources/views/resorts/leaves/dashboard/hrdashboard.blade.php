@@ -312,10 +312,16 @@
                                         <div class="wai-row-body">
                                             <h6>{{ $leaveInsights[$lc['key']]['title'] ?? $lc['default'] }}</h6>
                                             <p class="wai-row-text">{{ $leaveInsights[$lc['key']]['body'] ?? '' }}</p>
-                                            @if($hasRecommendation)
-                                                <p class="wai-row-recommendation"><strong>Recommendation:</strong> {{ $leaveInsights[$lc['key']]['recommendation'] }}</p>
-                                            @endif
-                                            <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#{{ $lc['modal'] }}" class="wai-row-link">View details &rarr;</a>
+                                            <div class="lnkrow">
+                                                @if($hasRecommendation)
+                                                    <button type="button" class="lnk-rec"
+                                                        data-title="{{ $leaveInsights[$lc['key']]['title'] ?? $lc['default'] }}"
+                                                        data-rec="{{ $leaveInsights[$lc['key']]['recommendation'] }}"
+                                                        data-details="{{ $lc['modal'] }}">View recommendation &rarr;</button>
+                                                    <span class="sep"></span>
+                                                @endif
+                                                <a href="#" class="lnk" data-details="{{ $lc['modal'] }}">View details &rarr;</a>
+                                            </div>
                                         </div>
                                     </div>
                                 @endforeach
@@ -327,6 +333,7 @@
 </div>
 
 @include('resorts.leaves.dashboard._insight_modals')
+@includeWhen(isset($leaveInsights), 'partials._wai_insight_modals')
 
 <!-- Modal HTML -->
 <div id="rejectionModal" class="modal fade" tabindex="-1" role="dialog">
@@ -384,7 +391,6 @@
     .wai-narrative .wai-row-body { flex: 1 1 auto; min-width: 0; }
     .wai-narrative .wai-row-body h6 { margin: 0 0 4px; font-size: 13.5px; font-weight: 700; color: #14232A; }
     .wai-narrative .wai-row-text { margin: 0 0 4px; font-size: 12.5px; color: #5D6F75; line-height: 1.5; }
-    .wai-narrative .wai-row-recommendation { margin: 0 0 4px; font-size: 12.5px; color: #0e8a9e; line-height: 1.5; }
     .wai-narrative .wai-row-link { display: inline-block; margin-top: 2px; font-size: 12px; font-weight: 600; color: #014653; }
 </style>
 @endsection
@@ -572,7 +578,7 @@
                                     <img src="/resorts_assets/images/pdf1.svg" alt="icon">
                                 </a>`;
                     } else {
-                        return 'No attachements'; // Return an empty string if there's no attachment
+                        return 'No attachments'; // Return an empty string if there's no attachment
                     }
                 }
             },

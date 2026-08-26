@@ -566,7 +566,7 @@
                                     <div class="row g-2 mb-md-4 mb-3">
                                         <div class="col-12">
                                             <input type="text" class="form-control" id="action_taken" name="action_taken[]" 
-                                            placeholder="Action taken" required 
+                                            placeholder="Action Taken" required
                                             data-parsley-required-message="Action taken is required" 
                                             data-parsley-maxlength="255" >
                                         </div>
@@ -627,8 +627,8 @@
                 <div class="row g-2 mb-md-4 mb-3 dynamic-field">
                     <div class="col-12">
                         <input type="text" class="form-control" id="subcategory_name"           name="subcategory_name[]" 
-                        placeholder="SubCategory" required 
-                        data-parsley-required-message="SubCategory is required" 
+                        placeholder="Sub-category" required
+                        data-parsley-required-message="Sub-category is required"
                         data-parsley-maxlength="255" >
                     </div>
                     <div class="col-12">

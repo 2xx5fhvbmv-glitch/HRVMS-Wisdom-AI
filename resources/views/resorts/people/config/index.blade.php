@@ -384,7 +384,7 @@
                                     <option value="fail">Probation Unsuccessful Letter</option>
                                     <option value="promotion">Promotion Letter</option>
                                     <option value="offer">Offer Letter</option>
-                                    <option value="experience">Experiance\Employment Letter</option>
+                                    <option value="experience">Experience\Employment Letter</option>
                                 </select>
                             </div>
                             <div id="div-type"></div>
@@ -603,7 +603,7 @@
                 },
                 messages: {
                     type: {
-                        required: "Please Select Type .",
+                        required: "Please Select Type.",
                     },
                     MailSubject: {
                         required: "Please enter the email subject.",
@@ -1186,7 +1186,7 @@
                             valid = false;     
                             $btn.find('.increment-btn-loader').addClass('d-none');
                             $btn.find('.increment-btn-text').removeClass('d-none'); 
-                            toastr.error('Incriment Type field is required.', "Validation Error", {
+                            toastr.error('Increment Type field is required.', "Validation Error", {
                                 positionClass: 'toast-bottom-right'
                             });      
                         }
@@ -1215,7 +1215,7 @@
                         error: function (xhr) {
                             $btn.find('.increment-btn-loader').addClass('d-none');
                             $btn.find('.increment-btn-text').removeClass('d-none');
-                            toastr.error("Something went worng", "Error", {
+                            toastr.error("Something went wrong", "Error", {
                                 positionClass: 'toast-bottom-right'
                             });
                         }

@@ -1690,11 +1690,11 @@
                                                                 </div>
                                                                 <div>
 
-                                                                    <p>{{ $t->rank_name }} Is Approved Vacancy For {{ $t->Position ?? '' }} </p>
+                                                                    <p>{{ $t->rank_name }} approved the vacancy for {{ $t->Position ?? '' }} </p>
                                                                     @if($t->LinkShareOrNot =="No")
                                                                         <a  href="{{route('resort.ta.add.Questionnaire')}}"
                                                                         target="_blank"
-                                                                        class="a-link">Before You Create  Job Advertisement You must be add Questioners</a>
+                                                                        class="a-link">Before you create a job advertisement, you must first add a questionnaire</a>
 
 
                                                                     @else
@@ -1713,7 +1713,7 @@
                                                                         <img src="{{ $t->profileImg}}" alt="image">
                                                                     </div>
                                                                     <div>
-                                                                        <p>{{ ucfirst($t->first_name).'  '.ucfirst($t->last_name) }} Is Shortlisted for {{ $t->Position ?? '' }} </p>
+                                                                        <p>{{ ucfirst($t->first_name).'  '.ucfirst($t->last_name) }} is shortlisted for {{ $t->Position ?? '' }} </p>
                                                                         <a
                                                                         href="javascript:void(0)"
                                                                         data-Resort_id="{{$t->Resort_id}}"
@@ -1772,7 +1772,7 @@
                                                                 </div>
                                                                 <div>
                                                                     <h6>{{ $vacancy->Department }} ({{ $vacancy->rank_name }})  </h6>
-                                                                    <p>Requested for Hire {{ $vacancy->NoOfVacnacy }} {{ $vacancy->Position ?? 'Position' }}</p>
+                                                                    <p>Requested to Hire {{ $vacancy->NoOfVacnacy }} {{ $vacancy->Position ?? 'Position' }}</p>
                                                                     {{-- <a href="#" class="a-link">Send Interview Request  {{ $vacancy->ta_id }}</a> --}}
                                                                 </div>
                                                                 <div class="icon">
@@ -2424,7 +2424,7 @@
                                                     <strong>{{$pending_resignation}}</strong>
                                                 </div>
                                                 <div class="leaveUser-bgBlock">
-                                                    <h6>Withdrw Resignation</h6>
+                                                    <h6>Withdraw Resignation</h6>
                                                     <strong>{{$withdraw_resignation}}</strong>
                                                 </div>
                                             </div>
@@ -3483,7 +3483,7 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
                                 </div>
                                 <div>
                                     <h6>${department} (${rank})</h6>
-                                    <p>Requested for Hire ${NoOfVacnacy} ${position}</p>
+                                    <p>Requested to Hire ${NoOfVacnacy} ${position}</p>
                                 </div>
 
                     </div>`;
@@ -3638,10 +3638,10 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         // End of Reject Vacanciy form
         //  Approval
 
-        $('#link_Expiry_date').datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,
-            todayHighlight: true
+        flatpickr('#link_Expiry_date', {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
         $("#ApprovedResponseModel").on("click",function(){
             var ta_id= $(this).attr('data-ta_id');

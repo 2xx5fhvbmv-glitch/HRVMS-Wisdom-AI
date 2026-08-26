@@ -348,10 +348,13 @@
 
 @section('import-scripts')
     <script type="text/javascript">
-        const incidentDetailBaseUrl = "{{ route('incident.view', ['id' => 'INCIDENT_ID']) }}";
         const meetingDetailBaseUrl  = "{{ route('incident.meeting.detail', ['id' => 'MEETING_ID']) }}";
         let incidentChart;
+    </script>
 
+    @include('resorts.incident.dashboard._incident_list_widget')
+
+    <script type="text/javascript">
         $(document).ready(function () {
            getIncidentChart();
            loadIncidentTodoList();
@@ -456,42 +459,6 @@
                 },
                 error: function (xhr, status, error) {
                     console.error('Error loading chart data:', error);
-                }
-            });
-        }
-
-        function loadIncidentTodoList() {
-            $.ajax({
-                url: '{{ route("incident.todoList") }}',
-                method: 'GET',
-                success: function (data) {
-                    let html = '';
-
-                    if (data.length === 0) {
-                        html = `<div class="text-center py-3">No incidents found.</div>`;
-                    } else {
-                        data.forEach(incident => {
-                            html += `
-                            <div class="leaveUser-block">
-                                <div>
-                                    <div class="d-flex justify-content-between">
-                                        <h6>${incident.title}</h6>
-                                        <span class="badge badge-themeNew1 border-0">${incident.time_ago}</span>
-                                    </div>
-                                    <p>${incident.description}</p>
-                                    <div>
-                                        <a href="${incidentDetailBaseUrl.replace('INCIDENT_ID', btoa(incident.id))}" class="a-linkTheme">View Details</a>
-                                    </div>
-                                </div>
-                            </div>`;
-                        });
-                    }
-
-                    $('#incidentTodoList').html(html);
-                },
-                error: function (err) {
-                    console.error('Failed to load incident to-do list:', err);
-                    $('#incidentTodoList').html(`<div class="text-danger py-3 text-center">Error loading data.</div>`);
                 }
             });
         }

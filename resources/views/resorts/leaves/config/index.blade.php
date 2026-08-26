@@ -326,7 +326,7 @@
 
                                     @if(count($LeaveCategories ?? []) >= 1)
                                         <div class="col-sm-6">
-                                            <label for="combine_with_other" class="form-label">IS THIS LEAVE COMBINES WITH ANOTHER?</label>
+                                            <label for="combine_with_other" class="form-label">IS THIS LEAVE COMBINED WITH ANOTHER?</label>
                                             <select class="form-select select2t-none" name="combine_with_other" id="combine_with_other" aria-label="Default select example">
                                                 <option value="0">No</option>
                                                 <option value="1">Yes</option>
@@ -463,7 +463,7 @@
 
                         @if(!empty($LeaveCategories) && count($LeaveCategories) >= 1)
                             <div class="col-sm-6">
-                                <label for="edit_combine_with_other" class="form-label">IS THIS LEAVE COMBINES WITH
+                                <label for="edit_combine_with_other" class="form-label">IS THIS LEAVE COMBINED WITH
                                     ANOTHER?</label>
                                 <select class="form-select select2t-none" name="combine_with_other" id="edit_combine_with_other" aria-label="Default select example">
                                     <option value="0">No</option>
@@ -550,11 +550,10 @@
         $(".Section").select2({ placeholder: "Select Section" });
 
         // Leave export: datepicker for Start Date and End Date (dd-mm-yyyy for server)
-        $("#leave_start_date, #leave_end_date").datepicker({
-            format: 'dd-mm-yyyy',
-            autoclose: true,
-            todayHighlight: true,
-            orientation: 'bottom auto'
+        flatpickr('#leave_start_date, #leave_end_date', {
+            dateFormat: 'd-m-Y',
+            allowInput: true,
+            appendTo: document.body
         });
 
         // Leave export: ensure end date is not before start date

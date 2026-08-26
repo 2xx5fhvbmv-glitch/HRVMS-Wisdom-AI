@@ -1,5 +1,5 @@
 @extends('resorts.layouts.app')
-@section('page_tab_title' ,"People RelationDashboard")
+@section('page_tab_title' ,"People Relation Dashboard")
 
 @if ($message = Session::get('success'))
     <div class="alert alert-success">
@@ -337,7 +337,7 @@
                     <div class=" card-title">
                         <div class="row justify-content-between align-items-center g-md-3 g-1">
                             <div class="col">
-                                <h3 class="text-nowrap">Offense Nearing To Expiry</h3>
+                                <h3 class="text-nowrap">Offense Nearing Expiry</h3>
                             </div>
                             <div class="col-auto">
                                 <a href="#" class="a-link">View All</a>

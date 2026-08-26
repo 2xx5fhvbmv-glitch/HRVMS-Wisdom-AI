@@ -52,7 +52,7 @@
 
                                 <div class="col-xl-2 col-md-3 col-sm-4 col-6">
                                     <select id="priorityFilter" class="form-select select2t-none">
-                                        <option value="">All Priority</option>
+                                        <option value="">All Priorities</option>
                                         <option value="Low">Low</option>
                                         <option value="Medium">Medium</option>
                                         <option value="High">High</option>

@@ -35,7 +35,7 @@
                                         <td>{{$request_detail->learning->name}}</td>
                                     </tr>
                                     <tr>
-                                        <th>Reason</th>
+                                        <th>Reason:</th>
                                         <td>{{$request_detail->reason}}
                                         </td>
                                     </tr>

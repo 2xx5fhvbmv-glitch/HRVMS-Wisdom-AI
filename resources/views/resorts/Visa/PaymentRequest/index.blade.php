@@ -109,7 +109,7 @@ $("#PaymentRequestRejectedForm").parsley();
                 data: $(this).serialize(),
                 success: function(response) {
                     if (response.status == 'success') {
-                        toastr.success(response.msg, "success", {
+                        toastr.success(response.msg, "Success", {
                             positionClass: 'toast-bottom-right'
                         });
                         $('#PaymentRequestRejected-modal').modal('hide');

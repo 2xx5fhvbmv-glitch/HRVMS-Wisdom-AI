@@ -20,6 +20,9 @@
                     </div>
                 </div>
                 <div class="col-auto">
+                    <a href="{{ route('resort.budget.config') }}" class="btn btn-sm wfp-btn-neutral">
+                        <i class="fa-solid fa-arrow-left"></i> Back to Configuration
+                    </a>
                 </div>
             </div>
         </div>
@@ -69,7 +72,7 @@
                                     <th class="text-nowrap">Amount</th>
                                     <th class="text-nowrap">Amount Unit</th>
                                     <th class="text-nowrap">Type</th>
-                                    <th class="text-nowrap">Frequnecy</th>
+                                    <th class="text-nowrap">Frequency</th>
                                     <th class="text-nowrap">Details</th>
                                     <th class="text-nowrap">Status</th>
                                     <th class="text-nowrap">Is Payroll Allowance</th>
@@ -128,7 +131,7 @@
                         <input type="text" id="particulars" name="particulars" class="form-control"
                                 placeholder="Add Particulars"
                                 required
-                                data-parsley-required-message="Please enter a particulars."
+                                data-parsley-required-message="Please enter particulars."
 
                                 data-parsley-pattern="^[a-zA-Z0-9\s\-_/\.]+$"
                                 data-parsley-pattern-message="Only letters, numbers, spaces, hyphens (-), underscores (_), periods (.), and slashes (/) are allowed.">
@@ -202,7 +205,7 @@
                             <label  class="form-label " for="cost-select">Select Details<span class="req_span">*</span></label>
                             <select id="details-select" name="details"
                                data-parsley-errors-container="#div-details"
-                               required data-parsley-required-message="Please select a details."
+                               required data-parsley-required-message="Please select details."
                              class="form-select select2t-none" required>
                                 <option value="">Select Details</option>
                                 <option value="Xpat Only">For Xpat Only</option>

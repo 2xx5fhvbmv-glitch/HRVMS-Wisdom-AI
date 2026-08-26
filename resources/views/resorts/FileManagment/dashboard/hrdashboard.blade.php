@@ -99,7 +99,7 @@
                             <div class=" card-title">
                                 <div class="row justify-content-between align-items-center g-1">
                                     <div class="col">
-                                    <h3>File version history</h3>
+                                    <h3>File Version History</h3>
                                     </div>
                                     <div class="col-auto">
                                         <a href="{{route('FileManage.FileVersionList')}}" class="a-link">View All</a>
@@ -732,7 +732,7 @@ document.getElementById('file').addEventListener('change', function (e) {
                 $(".text-themeYellow").text("Uploaded").removeClass("text-themeYellow").addClass("text-success");
                 $("#uploadDocument-modal").modal('hide');
 
-                toastr.success("File uploaded successfuly", "Success", {
+                toastr.success("File uploaded successfully", "Success", {
                        positionClass: "toast-bottom-right",
                    });
          
@@ -819,7 +819,7 @@ document.getElementById('file').addEventListener('change', function (e) {
             // Check for reserved names
             if (reservedNames.includes(FolderName.toUpperCase())) {
 
-                toastr.error("This folder name is not allowed in Software!", "Error",
+                toastr.error("This folder name is not allowed in the software!", "Error",
                         {
                             positionClass: 'toast-bottom-right'
                         });

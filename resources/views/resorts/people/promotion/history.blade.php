@@ -54,7 +54,7 @@
                                 <th>Current Salary</th>
                                 <th>Old JD</th>
                                 <th>New JD</th>
-                                <th>Old Benifit Grid</th>
+                                <th>Old Benefit Grid</th>
                                 <th>New Benefit Grid</th>
                             </tr>
                         </thead>
@@ -79,10 +79,10 @@
 @section('import-scripts')
 <script>
     $(document).ready(function () {
-        $('.datepicker').datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,
-            todayHighlight: true
+        flatpickr('.datepicker', {
+            dateFormat: 'd/m/Y',
+            allowInput: true,
+            appendTo: document.body
         });
         $('.select2t-none').select2();
         getPromotionHistory();

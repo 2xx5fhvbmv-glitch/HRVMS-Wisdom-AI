@@ -163,7 +163,7 @@
                                 <div class="row g-3 align-items-center justify-content-between">
                                     <div class="col-auto">
                                         <div class="d-flex justify-content-start align-items-center">
-                                            <h3>Terms And conditions</h3>
+                                            <h3>Terms and Conditions</h3>
                                         </div>
                                     </div>
                                 </div>
@@ -703,8 +703,8 @@ $(document).ready(function()
 
         $("#ResortDivision").select2({placeholder: "Select Division"});
         $(".Department").select2({placeholder: "Select Department"});
-        $(".Section").select2({placeholder: "select Section"});
-        $(".Position").select2({placeholder: "select Position"});
+        $(".Section").select2({placeholder: "Select Section"});
+        $(".Position").select2({placeholder: "Select Position"});
 
         $(document).on('click', '.delete-row-btn', function (e) {
             e.preventDefault();

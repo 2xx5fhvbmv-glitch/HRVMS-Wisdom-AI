@@ -184,9 +184,10 @@
     });
 
     // Optional: use a datepicker
-    $('#dateFilter').datepicker({
-        format: 'yyyy-mm-dd',
-        autoclose: true
+    flatpickr('#dateFilter', {
+        dateFormat: 'Y-m-d',
+        allowInput: true,
+        appendTo: document.body
     });
 });
 

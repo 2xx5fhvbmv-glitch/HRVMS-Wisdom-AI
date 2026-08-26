@@ -30,10 +30,7 @@
 
 
         <div class="card">
-           
-blade
-Copy
-Edit
+
 <form id="GrivanceSubmitForm" data-parsley-validate>
     @csrf
     <div class="card-title">
@@ -65,7 +62,7 @@ Edit
     </div>
 
     <div class="card-title">
-        <h3>Grievant information</h3>
+        <h3>Grievant Information</h3>
     </div>
     <div class="row g-xl-4 g-3 mb-md-4 mb-3">
         <div class="col-md-4 col-sm-6">
@@ -215,10 +212,10 @@ $(document).ready(function() {
             en: 'HTML tags and scripts are not allowed.'
         }
     });
-    $('.datepicker').datepicker({
-        format: 'dd/mm/yyyy',
-        autoclose: true,      // Close the picker after selection
-        todayHighlight: true  // Highlight today's date
+    flatpickr('.datepicker', {
+        dateFormat: 'd/m/Y',
+        allowInput: true,
+        appendTo: document.body
     });
     $('#Employee_id').select2({
         placeholder: 'Select Employee',
@@ -241,7 +238,7 @@ $(document).ready(function() {
         width: '100%'
     });
     $('#witness_id').select2({
-        placeholder: 'Select Wintness',
+        placeholder: 'Select Witness',
         minimumResultsForSearch: -1,
         width: '100%'
     });

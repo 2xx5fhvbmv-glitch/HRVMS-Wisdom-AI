@@ -319,7 +319,7 @@
 
         if(!isNaN(formname))
         {
-            toastr.error('Please enter  form Name.', "Error", {
+            toastr.error('Please enter Form Name.', "Error", {
                     positionClass: 'toast-bottom-right'
                 });
 

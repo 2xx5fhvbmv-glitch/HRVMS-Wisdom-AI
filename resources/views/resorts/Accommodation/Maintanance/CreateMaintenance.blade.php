@@ -103,7 +103,7 @@
                     <select class="form-select select2t-none buildingAvailable" name="building_id" id="building_1"
                         required
                            data-parsley-trigger="submit"
-                        data-parsley-required-message="Please select Building."
+                        data-parsley-required-message="Please select building."
                         data-parsley-errors-container="#Building">
                         <option></option>
                         @if($Building->isNotEmpty())
@@ -120,7 +120,7 @@
                     <select class="form-select select2t-none AvailableFloor" id="AvailableFloor_1" data-id="1"
                         name="FloorNo" required
                         data-parsley-trigger="submit"
-                        data-parsley-required-message="Please Select Floor."
+                        data-parsley-required-message="Please select floor."
                         data-parsley-errors-container="#AvailableFloor">
                     </select>
                     <div id="AvailableFloor"></div>
@@ -131,7 +131,7 @@
                     <select class="form-select select2t-none RoomNo" data-id="1" id="RoomNo_1"
                         name="RoomNo" required
                         data-parsley-trigger="submit"
-                        data-parsley-required-message="Please Select Room."
+                        data-parsley-required-message="Please select room."
                         data-parsley-errors-container="#RoomNo">
                     </select>
                     <div id="RoomNo"></div>

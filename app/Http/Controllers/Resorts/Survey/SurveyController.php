@@ -315,7 +315,7 @@ class SurveyController extends Controller
             // — **bold** syntax was showing up as literal asterisks on the
             // notification list instead of being rendered.
             $notificationMessage = "Survey request for '{$survey->Surevey_title}' has been submitted for feedback. "
-                . "Dates: {$startDate} to {$endDate}. "
+                . "Dates: " . Common::formatDate($startDate) . " to " . Common::formatDate($endDate) . ". "
                 . "Please participate in the survey. If you have already participated, kindly ignore this message.";
             foreach ($Emp_id as $e) {
                 $employeeId = (int) base64_decode($e);
@@ -512,7 +512,7 @@ class SurveyController extends Controller
 
                 $notificationTitle = ' Survey Request';
                 $notificationMessage = "Survey request for '{$survey->Surevey_title}' has been submitted for feedback. "
-                    . "Dates: {$startDate} to {$endDate}. "
+                    . "Dates: " . Common::formatDate($startDate) . " to " . Common::formatDate($endDate) . ". "
                     . "Please participate in the survey. If you have already participated, kindly ignore this message.";
         
                 $moduleName = "Survey";
@@ -1060,7 +1060,7 @@ class SurveyController extends Controller
             }
             $notificationTitle = ' Survey Request';
             $notificationMessage = "Survey request for '{$ParentSurvey->Surevey_title}' has been submitted for feedback. "
-                . "Dates: {$ParentSurvey->Start_date} to {$ParentSurvey->End_date}. "
+                . "Dates: " . Common::formatDate($ParentSurvey->Start_date) . " to " . Common::formatDate($ParentSurvey->End_date) . ". "
                 . "Please participate in the survey. If you have already participated, kindly ignore this message.";
             
             $moduleName = "Survey";

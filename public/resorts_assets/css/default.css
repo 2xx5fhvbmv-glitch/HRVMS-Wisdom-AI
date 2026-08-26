@@ -509,7 +509,7 @@ header .nav-item:hover .nav-link {
 }
 
 input.form-control::placeholder {
-    color: #222222;
+    color: var(--faint, #93A4A9);
 }
 
 textarea.form-control {
@@ -1563,18 +1563,58 @@ strong {
 }
 
 .notification-title {
-    padding: 30px 24px 24px;
+    padding: 22px 22px 4px;
 }
 
-.notification-title h5 {
-    color: var(--white);
-    font-size: 16px;
-    font-weight: 500;
-    line-height: 1;
+.ntf-kicker {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.ntf-kicker-l {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 10.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .9px;
+    color: var(--muted);
+}
+
+.ntf-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--teal);
+    flex: none;
+}
+
+.ntf-viewall {
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--teal);
+    text-decoration: none;
+}
+
+.ntf-viewall:hover {
+    text-decoration: underline;
+}
+
+.ntf-heading {
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: -.3px;
+    color: var(--ink);
+    margin-top: 8px;
 }
 
 .notification-wrapper {
-    background-color: #303030;
+    background: rgba(255, 255, 255, .82);
+    backdrop-filter: blur(28px) saturate(160%);
+    -webkit-backdrop-filter: blur(28px) saturate(160%);
+    border-left: 1px solid rgba(255, 255, 255, .7);
     border-radius: 25px 0 0 25px;
     position: fixed;
     top: 0;
@@ -1585,56 +1625,236 @@ strong {
     right: -110%;
     left: auto;
     overflow: hidden;
-    box-shadow: 0px 4px 4px rgba(0, 0, 0, 0.25);
+    box-shadow: -24px 0 70px rgba(1, 70, 83, .16), 0 2px 8px rgba(1, 70, 83, .06);
     width: 385px;
-    color: var(--white);
+    color: var(--ink);
 }
 
 .notification-box {
-    padding: 18px 20px;
+    padding: 15px 22px;
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
-    border-bottom: 1px solid hsla(0, 0%, 100%, 0.16);
+    gap: 10px;
+    border-bottom: 1px solid var(--line-2);
+    transition: opacity .15s;
+}
+
+.notification-box:hover {
+    opacity: .66;
 }
 
 .notification-box.active {
-    background-color: hsla(0, 0%, 0%, 0.18);
+    background: transparent;
 }
 
-
-/* .notification-box:not(:last-of-type) {
-    border-bottom: 1px solid hsla(0, 0%, 100%, 0.16);
-} */
-
 .notification-box>a {
-    color: var(--white);
+    color: var(--ink);
 }
 
 .notification-box h5 {
-    font-size: 12px;
-    font-weight: normal;
-    margin-bottom: 5px;
-    line-height: 1;
+    font-size: 13.5px;
+    font-weight: 600;
+    margin-bottom: 3px;
+    line-height: 1.3;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
 
 .notification-box p {
-    font-size: 13px;
+    font-size: 12.5px;
     margin-bottom: 3px;
-    color: #CCCCCC;
-    line-height: 1.2;
+    color: var(--muted);
+    line-height: 1.4;
 }
 
 .notification-box span {
-    font-size: 10px;
-    color: #A5A5A5;
+    font-size: 11px;
+    color: var(--faint);
     line-height: 1;
+}
+
+.notification-critical h5 {
+    color: var(--error);
+}
+
+.ntf-sos-tag {
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: .6px;
+    color: var(--error);
+    text-transform: uppercase;
+}
+
+/* .profile-dropdown is reused for the unrelated user-menu dropdown
+   elsewhere, so the gap is scoped to notification rows only — Bootstrap's
+   d-flex on its own sets no spacing, which is why the avatar and text
+   were sitting flush together. */
+.notification-box .profile-dropdown {
+    gap: 12px;
+}
+
+/* avatar — person photo, initials fallback, Wisdom AI mark, or SOS tile.
+   No overflow:hidden here: the unread-dot badge (::after below) sits
+   partly outside this box on purpose, and a clipping parent was cutting
+   it down to a crescent. Each variant is circular via its own
+   border-radius instead (the img clips itself; the tint/mark/sos
+   variants use this element's own background, nothing to clip). */
+.notification-box .ntf-av {
+    flex: none;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    position: relative;
+    margin-top: 1px;
+}
+
+.notification-box .ntf-av img {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
+    display: block;
+}
+
+.notification-box .ntf-av-person {
+    display: grid;
+    place-items: center;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--teal);
+    background: var(--teal-3);
+}
+
+.notification-box .ntf-av-wisdom {
+    background: var(--teal);
+    display: grid;
+    place-items: center;
+}
+
+.notification-box .ntf-av-wisdom .ntf-mk {
+    width: 14px;
+    height: 14px;
+    border-radius: 4px;
+    background: var(--lime);
+}
+
+.notification-box .ntf-av-sos {
+    background: var(--error);
+    color: #fff;
+    display: grid;
+    place-items: center;
+}
+
+.notification-box.active .ntf-av::after {
+    content: "";
+    position: absolute;
+    top: -1px;
+    right: -1px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--teal);
+    border: 2px solid #fff;
+}
+
+.notification-critical .ntf-av::after {
+    background: var(--error);
+}
+
+.notification-box .MarkNotification {
+    opacity: 0;
+    transition: opacity .15s;
+}
+
+.notification-box:hover .MarkNotification {
+    opacity: 1;
+}
+
+/* Notifications empty state — sunset-over-water scene. Pure inline SVG +
+   transform/opacity-only animations (GPU-friendly), no images/JS. */
+.notification-box.ntf-empty {
+    flex: 1;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 40px 26px 46px;
+    border-bottom: none;
+}
+
+.notification-box.ntf-empty:hover {
+    opacity: 1;
+}
+
+.ntf-scene {
+    width: 84px;
+    height: 84px;
+    border-radius: 50%;
+    overflow: hidden;
+    box-shadow: 0 6px 20px rgba(1, 70, 83, .14);
+    position: relative;
+}
+
+.ntf-scene svg {
+    display: block;
+}
+
+.ntf-sun {
+    transform-origin: center;
+    animation: ntfSun 5s ease-in-out infinite;
+}
+
+@keyframes ntfSun {
+    0%, 100% { opacity: .92; }
+    50% { opacity: 1; }
+}
+
+.ntf-wave {
+    will-change: transform;
+}
+
+.ntf-w1 {
+    animation: ntfWave 7s linear infinite;
+}
+
+.ntf-w2 {
+    animation: ntfWave 11s linear infinite;
+}
+
+@keyframes ntfWave {
+    from { transform: translateX(0); }
+    to { transform: translateX(-80px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ntf-sun, .ntf-w1, .ntf-w2 {
+        animation: none;
+    }
+}
+
+.ntf-empty-title {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--ink);
+    margin-top: 20px;
+}
+
+.ntf-empty-sub {
+    font-size: 12.5px;
+    color: var(--muted);
+    margin-top: 6px;
+    line-height: 1.55;
+    max-width: 230px;
 }
 
 .notification-body {
     overflow-y: auto;
     overflow-x: hidden;
     height: calc(100vh - 78px);
+    display: flex;
+    flex-direction: column;
 }
 
 .budget-box {
@@ -1774,7 +1994,7 @@ table.dataTable thead>tr>td.dt-ordering-desc span.dt-column-order:after {
     background-color: #f1f1f1;
     border-radius: 4px;
     cursor: pointer;
-    color: #007bff;
+    color: var(--teal);
 }
 
 div.dt-container .dt-paging .dt-paging-button {
@@ -1785,7 +2005,7 @@ div.dt-container .dt-paging .dt-paging-button {
 /* Custom styles for active and disabled pagination buttons */
 
 .pagination .paginate_button.current {
-    background-color: #007bff;
+    background-color: var(--teal);
     color: var(--white) !important;
 }
 
@@ -2146,7 +2366,16 @@ table.dataTable td table thead {
 
 /* select2 css start */
 .select2-container--default .select2-selection--single .select2-selection__placeholder {
-    color: #222;
+    color: var(--faint, #93A4A9);
+}
+
+/* Selects whose "placeholder" is really an empty-value first <option>
+   (e.g. "Select Learning") rather than select2's own placeholder config —
+   see the .select2t-none handling in resorts/layouts/js.blade.php, which
+   toggles this class based on the live <select> value. Matches the same
+   lighter color as a real select2 placeholder above. */
+.select2-container--default .select2-selection--single .select2-selection__rendered.s2-empty-opt {
+    color: var(--faint, #93A4A9);
 }
 
 .select2-container--default .select2-selection--single .select2-selection__rendered {
@@ -3455,6 +3684,31 @@ border-color: #ddd; */
 
 .fc-other-month {
     opacity: .35;
+}
+
+/* Unified today-date marker + centered day numbers, app-wide, for every
+   standard FullCalendar instance. Excludes .calendar-event, a separate
+   compact right-aligned skin used elsewhere that keeps its own look.
+   :not(.calendar-event) sits on the .fc root, matching how .calendar-event
+   is applied there (see ".fc.calendar-event th" above). */
+.fc:not(.calendar-event) .fc-basic-view .fc-day-top .fc-day-number {
+    float: none;
+    display: block;
+    text-align: center;
+}
+.fc:not(.calendar-event) .fc-today {
+    background: transparent;
+}
+.fc:not(.calendar-event) .fc-today .fc-day-number {
+    background: var(--teal, #014653);
+    color: #fff;
+    font-weight: 600;
+    border-radius: 8px;
+    width: 26px;
+    height: 26px;
+    line-height: 26px;
+    margin: 0 auto;
+    padding: 0;
 }
 
 .recHR-main .card {
@@ -10189,6 +10443,19 @@ ol.listingNo-wrapper li:last-child {
     margin-right: 5px;
 }
 
+/* .leaveUser-block>div:nth-child(3) (elsewhere in this file) is a
+   positional rule meant for a right-aligned action-link column on other
+   cards — it also happens to match .time here whenever the attendee-names
+   line renders (making .time the 3rd child), stacking the clock icon above
+   the text instead of beside it. Needs 3 class-selectors to outrank that
+   rule's specificity (2 classes + 1 pseudo-class). */
+.calendarLD-card .leaveUser-block .time,
+.calendarIncident-card .leaveUser-block .time {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-end;
+}
 
 .calendarLD-card .leaveUser-block .user-ovImg,
 .calendarIncident-card .leaveUser-block .user-ovImg {
@@ -10204,6 +10471,15 @@ ol.listingNo-wrapper li:last-child {
     height: 24px;
     min-width: 24px;
     font-size: 9px;
+}
+
+/* Base .img-circle>img is object-fit:contain (default.css, shared by 30+
+   other components) — fine for already-square sources, but it letterboxes
+   a non-square photo instead of filling the circle, leaving visible gaps
+   that read as "cut off". Scoped to this card only, not the shared rule. */
+.calendarLD-card .leaveUser-block .user-ovImg .img-circle>img,
+.calendarIncident-card .leaveUser-block .user-ovImg .img-circle>img {
+    object-fit: cover;
 }
 
 .calendarLD-card .upcoming,

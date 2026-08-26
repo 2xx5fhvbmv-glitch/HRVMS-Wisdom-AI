@@ -57,7 +57,7 @@
                                                     <h3>Insurance Renewal</h3>
                                                     <span>Current Policy Expires: {{$EmployeeInsurance->insurance_end_date ?? 'N/A'}}</span>
                                                 </div>
-                                                <div class="col-sm-auto col-12 order-sm-last order-1 text-end"><span    class="badge badge-themeWarning">Expires  in 30days</span>
+                                                <div class="col-sm-auto col-12 order-sm-last order-1 text-end"><span    class="badge badge-themeWarning">Expires in 30 days</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -69,7 +69,7 @@
                                                 </div>
                                                 <div class="renewal-innerbox">
                                                     <label>Insurance company name</label>
-                                                    <p> fdsdff {{ (isset($EmployeeInsurance->insurance_company)) ? $EmployeeInsurance->insurance_company : 'N/A'}}</p>
+                                                    <p>{{ (isset($EmployeeInsurance->insurance_company)) ? $EmployeeInsurance->insurance_company : 'N/A'}}</p>
                                                 </div>
                                             <div class="col-sm-6">
                                                     <div class="renewal-innerbox">
@@ -156,7 +156,7 @@
                                             <div class="col-xxl-6 col-xl-12 col-sm-6">
                                                 <div class="renewal-innerbox">
                                                     <label>Visa Number</label>
-                                                    <p>Policy Number:{{$VisaRenewal->Visa_Number ?? 'N/A'}}</p>
+                                                    <p>Policy Number: {{$VisaRenewal->Visa_Number ?? 'N/A'}}</p>
                                                 </div>
                                                 <div class="renewal-innerbox">
                                                     <label>WP No</label>
@@ -335,7 +335,7 @@
                             <div class="bg-themeGrayLight mb-md-4 mb-3">
                                     <div class="uploadFileNew-block">
                                         <img src="{{URL::asset('resorts_assets/images/upload.svg')}}" alt="icon">
-                                        <h5>Upload  Documents</h5>
+                                        <h5>Upload Documents</h5>
                                         <p>Browse or Drag the file here</p>
                                         <input type="file" id="file"  name="file" accept="image/*,application/pdf">
                                     </div>

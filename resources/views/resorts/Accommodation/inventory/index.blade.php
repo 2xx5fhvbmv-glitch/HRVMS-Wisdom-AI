@@ -255,11 +255,11 @@ $(document).ready(function()
             }
         });
     });
-    $(".datePurchase").datepicker({
-        format: 'dd/mm/yyyy',
-        autoclose: true,      // Close the picker after selection
-        todayHighlight: true, // Highlight today's date
-        endDate: new Date(),
+    flatpickr(".datePurchase", {
+        dateFormat: 'd/m/Y',
+        maxDate: 'today',
+        allowInput: true,
+        appendTo: document.body
     });
 
 
@@ -422,11 +422,11 @@ $(document).ready(function()
 
     })
     function datepickeraddmore(counts) {
-        $("#PurchageDate_"+counts).datepicker({
-            format: 'dd/mm/yyyy',
-            autoclose: true,      // Close the picker after selection
-            todayHighlight: true, // Highlight today's date
-            endDate: new Date(),
+        flatpickr("#PurchageDate_"+counts, {
+            dateFormat: 'd/m/Y',
+            maxDate: 'today',
+            allowInput: true,
+            appendTo: document.body
         });
 
         $("#Inv_Cat_id_"+counts).select2({

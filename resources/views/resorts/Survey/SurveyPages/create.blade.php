@@ -32,7 +32,7 @@
                     <fieldset data-parsley-group="block-0">
                         <div class="surveyTitle-block bg-themeGrayLight mb-3 mb-md-4">
                             <label for="survey_title" class="form-label">Survey Title</label>
-                            <input type="text" class="form-control" id="survey_title"  name="survey_title" data-parsley-required-message="Please Enter Survey Title"
+                            <input type="text" class="form-control" id="survey_title"  name="survey_title" data-parsley-required-message="Please enter survey title"
                             required data-parsley-group="block-0" required  placeholder="Survey Title">
                         </div>
                         <div class=" mb-md-4 mb-3">
@@ -246,7 +246,7 @@
                             </div>
                             
                             <div class="col-sm-6">
-                                <label for="endDate" class="form-label">End Date</label>
+                                <label for="endDate" class="form-label">END DATE</label>
                                 <input type="text" class="form-control " id="endDate" name="endDate" 
                                     placeholder="End Date" data-parsley-required="true"
                                     data-parsley-required-message="Please select an end date"
@@ -349,7 +349,7 @@
 
     $(document).ready(function ()
     {
-        $('.datepicker').datepicker({});
+        flatpickr('.datepicker', { dateFormat: 'm/d/Y', allowInput: true, appendTo: document.body });
 
         $('#endDate').attr('data-parsley-date-after', 'startDate_step_3');
         var current_fs, next_fs, previous_fs; //fieldsets
@@ -357,15 +357,15 @@
         var current = 1;
         var steps = $("fieldset").length;
         var form = $('#msform');
-        $('#startDate_step_3').datepicker({
-                format: 'dd/mm/yyyy',
-                autoclose: true,      // Close the picker after selection
-                todayHighlight: true  // Highlight today's date
+        flatpickr('#startDate_step_3', {
+                dateFormat: 'd/m/Y',
+                allowInput: true,
+                appendTo: document.body
         });
-        $('#endDate').datepicker({
-                format: 'dd/mm/yyyy',
-                autoclose: true,      // Close the picker after selection
-                todayHighlight: true  // Highlight today's date
+        flatpickr('#endDate', {
+                dateFormat: 'd/m/Y',
+                allowInput: true,
+                appendTo: document.body
         });
             var $form = $("#msform");
             $form.parsley({
@@ -434,7 +434,7 @@
             });
         var isEveryone = $("input[name='selectParticipants']:checked").val() === 'Everyone';
         if (currentGroup == "block-1" && !isEveryone && selectedEmployees.length === 0) {
-            toastr.error("Please Apply the Filter before You proceed to the next step and select at least one employee before proceeding.", "Error",
+            toastr.error("Please apply the filter before you proceed to the next step and select at least one employee before proceeding.", "Error",
             { positionClass: 'toast-bottom-right' });
             return false;
         }  

@@ -464,7 +464,11 @@
 <script type="text/javascript">
     $(document).ready(function () {
         $('.select2t-none').select2();
-        $('.datepicker').datepicker();
+        flatpickr('.datepicker', {
+            dateFormat: 'm/d/Y',
+            allowInput: true,
+            appendTo: document.body
+        });
         $('#learning-category').validate({
             rules: {
                 category: {

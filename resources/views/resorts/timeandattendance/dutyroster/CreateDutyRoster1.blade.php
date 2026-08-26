@@ -151,7 +151,7 @@
                                     </select>
                                 </div>
                                 <div class="col-xl-2 col-md-4 col-sm-4 col-6">
-                                    <input type="text" class="form-control datepicker" id="txt-bod"
+                                    <input type="text" class="form-control " id="txt-bod"
                                         placeholder="Select Duration">
                                 </div>
                                 <div class="col-auto ms-auto">
@@ -460,13 +460,19 @@
     // date range picker
     $(document).ready(function ()
     {
+        // developer.min.css force-hides .flatpickr-am-pm below 424px; now that
+        // flatpickr's own popover always mounts on mobile (disableMobile:true,
+        // set globally), undo that here so AM/PM stays visible on phones too.
+        var cdr1AmPmOnReady = function (selectedDates, dateStr, instance) {
+            instance.amPM.style.setProperty('display', 'inline-block', 'important');
+        };
         flatpickr(".overtime", {
             enableTime: true,
             noCalendar: true,
             dateFormat: "h:i", // 12-hour format without AM/PM
             time_24hr: false,  // Ensures 12-hour format
             minuteIncrement: 1, // Allows 1-minute steps
-
+            onReady: cdr1AmPmOnReady
         });
         var shiftOverTimePicker =  flatpickr(".shiftdate", {
             enableTime: true,
@@ -474,7 +480,7 @@
             dateFormat: "h:i", // 12-hour format without AM/PM
             time_24hr: false,  // Ensures 12-hour format
             minuteIncrement: 1, // Allows 1-minute steps
-
+            onReady: cdr1AmPmOnReady
         });
         $('#Employee').select2({
             placeholder: "Select an Employee", // Placeholder text
@@ -506,7 +512,11 @@
             scrollX: true,
             "iDisplayLength": 10,
         });
-        $('.datepicker').datepicker({});
+        flatpickr('#txt-bod', {
+            dateFormat: 'm/d/Y',
+            allowInput: true,
+            appendTo: document.body
+        });
         $("#hiddenInput").daterangepicker({
             autoApply: true,
             startDate: moment(),
@@ -670,6 +680,7 @@
                     dateFormat: "h:i", // 12-hour format without AM/PM
                     time_24hr: false,  // Ensures 12-hour format
                     minuteIncrement: 1, // Allows 1-minute steps
+                    onReady: cdr1AmPmOnReady
                 });
             }
             $("#ShiftOverTime").val(overtime);
@@ -745,7 +756,7 @@
                             }
                             else
                             {
-                                toastr.error(response.message,"error", { positionClass: 'toast-bottom-right'});
+                                toastr.error(response.message,"Error", { positionClass: 'toast-bottom-right'});
 
                             }
 
@@ -770,7 +781,7 @@
         let makeshiftdate = $("#MakeShift").val();
         if(makeshiftdate=="")
         {
-            toastr.error("Please Select Calander", "Error", {
+            toastr.error("Please Select Calendar", "Error", {
                 positionClass: 'toast-bottom-right'
             });
             return false;

@@ -278,10 +278,16 @@
                                 <div class="wai-row-body">
                                     <h6>{{ $accommodationInsights[$ac['key']]['title'] ?? '' }}</h6>
                                     <p class="wai-row-text">{{ $accommodationInsights[$ac['key']]['body'] ?? '' }}</p>
-                                    @if($hasRecommendation)
-                                        <p class="wai-row-recommendation"><strong>Recommendation:</strong> {{ $accommodationInsights[$ac['key']]['recommendation'] }}</p>
-                                    @endif
-                                    <a href="javascript:void(0)" data-bs-toggle="modal" data-bs-target="#{{ $ac['modal'] }}" class="wai-row-link">View details &rarr;</a>
+                                    <div class="lnkrow">
+                                        @if($hasRecommendation)
+                                            <button type="button" class="lnk-rec"
+                                                data-title="{{ $accommodationInsights[$ac['key']]['title'] ?? '' }}"
+                                                data-rec="{{ $accommodationInsights[$ac['key']]['recommendation'] }}"
+                                                data-details="{{ $ac['modal'] }}">View recommendation &rarr;</button>
+                                            <span class="sep"></span>
+                                        @endif
+                                        <a href="#" class="lnk" data-details="{{ $ac['modal'] }}">View details &rarr;</a>
+                                    </div>
                                 </div>
                             </div>
                         @endforeach
@@ -482,7 +488,7 @@
                     <div class=" card-title">
                         <div class="row justify-content-between align-items-center g-md-3 g-1">
                             <div class="col">
-                                <h3 class="text-nowrap">On Hold Requested </h3>
+                                <h3 class="text-nowrap">On Hold Requests</h3>
                             </div>
                             <div class="col-auto"><a href="{{ route('resort.accommodation.HoldMaintanaceRequest') }}" class="a-link">View All</a>
                             </div>
@@ -654,6 +660,7 @@
     </div>
 </div>
 @includeWhen(isset($accommodationInsights), 'resorts.Accommodation.dashboard._insight_modals')
+@includeWhen(isset($accommodationInsights), 'partials._wai_insight_modals')
 @include('resorts._emotional_buttons_v2_styles')
 @endsection
 
@@ -700,7 +707,6 @@
     .wai-narrative .wai-row-body { flex: 1 1 auto; min-width: 0; }
     .wai-narrative .wai-row-body h6 { margin: 0 0 4px; font-size: 13.5px; font-weight: 700; color: #14232A; }
     .wai-narrative .wai-row-text { margin: 0 0 4px; font-size: 12.5px; color: #5D6F75; line-height: 1.5; }
-    .wai-narrative .wai-row-recommendation { margin: 0 0 4px; font-size: 12.5px; color: #0e8a9e; line-height: 1.5; }
     .wai-narrative .wai-row-link { display: inline-block; margin-top: 2px; font-size: 12px; font-weight: 600; color: #014653; }
 
     #selectBed-modal .table-sm th,

@@ -52,7 +52,7 @@
                                     <td>{{ $MaintanaceRequest->Date }}</td>
                                 </tr>
                                 <tr>
-                                    <th>Priority :</th>
+                                    <th>Priority:</th>
                                     <td>
                                         {!! $MaintanaceRequest->Priority !!}
                                     </td>
@@ -225,7 +225,7 @@
                                                 }
                                             @endphp
                                         </p>
-                                        <span>Submited Request</span>
+                                        <span>Submitted Request</span>
 
                                     </li>
                                     <li class="{{ in_array('Open', $displayedStatuses) ? 'active' : '' }}">

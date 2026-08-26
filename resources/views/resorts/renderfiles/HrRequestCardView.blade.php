@@ -3,12 +3,12 @@
 </div>
 <div class="bg-green send-m-display d-flex align-items-center justify-content-between mt-1">
     <div class="">
-        <h5 class="fs-18 fw-500">send</h5>
+        <h5 class="fs-18 fw-500">Sent</h5>
         <strong class="ReponseDepartmentCount">{{$ManningPendingRequestCount}}</strong>
     </div>
     <img src="{{ URL::asset('resorts_assets/images/send.svg')}}" class="img-fluid" alt="" />
 </div>
-<p class="mt-4 mb-2 fw-600 PendingResponsesCount" >Pending responses - {{ $HODpendingResponse }}</p>
+<p class="mt-4 mb-2 fw-600 PendingResponsesCount" >Pending Responses - {{ $HODpendingResponse }}</p>
 <div class="send-reminder-box bg-grey">
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb">
@@ -29,7 +29,7 @@
 
             <li class="breadcrumb-item">
                 <a href="#"
-                        class="text-theme fw-600 text-underline">No Pending Request found </a>
+                        class="text-theme fw-600 text-underline">No Pending Request Found </a>
                     </li>
 
             @endif

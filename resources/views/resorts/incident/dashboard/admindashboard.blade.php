@@ -650,8 +650,8 @@
                                 <div>
                                     <h6>${item.incident_name}</h6>
                                     <p>${item.investigation_findings ?? 'No findings yet.'}</p>
-                                    <p>${item.outcome_type ?? 'No Outcome type yet.'}</p>
-                                    <p>${item.action_taken ?? 'No Action taken yet.'}</p>
+                                    <p>${item.outcome_type ?? 'No outcome type yet.'}</p>
+                                    <p>${item.action_taken ?? 'No action taken yet.'}</p>
 
                                 </div>
                             </div>

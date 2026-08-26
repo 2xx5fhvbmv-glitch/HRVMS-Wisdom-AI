@@ -97,7 +97,7 @@
             </div>
             <div class="modal-body">
                 <label for="scheduled_date" class="form-label">Select Date <span class="req_span">*</span></label>
-                <input type="text" id="scheduled_date" class="form-control datepicker" min="{{ date('Y-m-d') }}">
+                <input type="text" id="scheduled_date" class="form-control" min="{{ date('Y-m-d') }}">
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn eb-btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
@@ -118,7 +118,11 @@
 
     $(document).ready(function () {
         $('.select2t-none').select2();
-        $('.datepicker').datepicker();
+        flatpickr('#scheduled_date', {
+            dateFormat: 'm/d/Y',
+            allowInput: true,
+            appendTo: document.body
+        });
         form = $("#addAnnouncement").parsley();
     });
 
