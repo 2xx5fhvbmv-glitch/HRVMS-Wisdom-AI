@@ -66,6 +66,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form id="CodeOdfConductform">
+    @csrf
                 <div class="modal-body">
                     <div class="row">
                         <div class="col-sm-6">

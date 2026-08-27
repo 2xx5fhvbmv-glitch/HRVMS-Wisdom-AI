@@ -61,6 +61,7 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <form id="VisaFileUpload"enctype="multipart/form-data">
+    @csrf
                     <div class="modal-body ">
 
                         <div class="row">

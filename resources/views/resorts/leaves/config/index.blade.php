@@ -232,6 +232,7 @@
                         </div>
 
                         <form id="leave-category-form" name="leave-category-form">
+    @csrf
                             <div class="leaveAdd-block bg-themeGrayLight mt-3 d-none">
                                 <div class="row g-xxl-4 g-3 align-items-end">
                                     <div class="col-sm-6">

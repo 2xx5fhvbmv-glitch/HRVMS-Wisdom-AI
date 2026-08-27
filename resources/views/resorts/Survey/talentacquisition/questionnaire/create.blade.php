@@ -21,6 +21,7 @@
                 </div>
             </div>
             <form id="StoreQuestionnaire">
+    @csrf
                 <div class="card">
                     <div class="card-title">
                         <h3>Add Questionnaire For Interview</h3>

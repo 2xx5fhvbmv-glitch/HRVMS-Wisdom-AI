@@ -25,6 +25,7 @@
         <div class="card">
             <div class="mb-4 @if(Common::checkRouteWisePermission('resort.accommodation.Inventory',config('settings.resort_permissions.create')) == false)d-none @endif">
                     <form id="InventoryForm" data-parsley-validate>
+    @csrf
                         <div class="AddInventoryItem">
                             <div class="row gx-4 g-3 mb-3">
                                 <div class="col-lg-4 col-sm-6">

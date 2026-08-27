@@ -419,6 +419,7 @@
                                title="Minimum attendance % required for an employee to be counted as having completed a training. Used on the HR Learning Dashboard to compute per-program completion rates. Example: setting 35 means anyone who attended 35% or more of a training's sessions counts as having completed it."></i>
                         </div>
                         <form id="attendance_parameters">
+    @csrf
                             <div class="row align-items-center g-2 mb-md-4 mb-3">
                                 <div class="col-xxl-6">
                                     <label class="form-label small text-muted mb-1">Minimum Attendance %</label>

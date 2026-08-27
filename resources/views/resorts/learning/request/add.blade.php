@@ -26,6 +26,7 @@
 
             <div>
                 <form id="learning-request-form">
+    @csrf
                     <div class="card">
                         <div class="row g-md-4 g-3 mb-md-4 mb-3">
                             <div class="col-xl-4 col-lg-5 ">

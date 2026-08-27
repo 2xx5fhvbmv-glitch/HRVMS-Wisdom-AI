@@ -30,6 +30,7 @@
                         </div>
 
                         <form id="shopkeeperForm">
+    @csrf
                             <div class="earnings-main">
                                 <div class="earnings-block mb-md-4 mb-3">
                                     <div class="row align-items-end g-md-4 g-2 earnings-row">

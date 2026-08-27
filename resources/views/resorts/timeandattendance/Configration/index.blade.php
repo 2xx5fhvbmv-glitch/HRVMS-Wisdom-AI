@@ -308,6 +308,7 @@
                                         <div class="uploadFile-block">
                                             <div class="uploadFile-btn me-0">
                                                 <form id="fileUploadForm" enctype="multipart/form-data" parsley-validate>
+    @csrf
 
                                                     <a href="#" class="btn taa-btn-primary btn-sm"
                                                         onclick="document.getElementById('fileUpload').click();">
