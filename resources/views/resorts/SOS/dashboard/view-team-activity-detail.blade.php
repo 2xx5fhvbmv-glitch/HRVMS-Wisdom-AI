@@ -110,7 +110,7 @@
                                     @endif
 
                                 </ul>
-                                <span>{{ \Carbon\Carbon::flexible($teamMember->updated_at)->diffForHumans() }}</span>
+                                <span>{{ $teamMember->updated_at ? \Carbon\Carbon::flexible($teamMember->updated_at)->diffForHumans() : '-' }}</span>
                             </div>
                         </div>
                         @endforeach

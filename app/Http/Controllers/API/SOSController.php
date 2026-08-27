@@ -308,6 +308,14 @@ class SOSController extends Controller
                         'team_id'                       =>  $teamId,
                         'emp_id'                        =>  $member->admin_id,
                         'status'                        =>  'Unacknowledged',
+                        // ::insert() is a raw bulk query, not ::create() — it
+                        // never auto-populates Eloquent timestamps, unlike
+                        // $teamHistoryInsertData above which sets them
+                        // explicitly. Every row inserted here previously got
+                        // a permanent NULL updated_at, crashing any view
+                        // calling ->diffForHumans() on it.
+                        'created_at'                    =>  now(),
+                        'updated_at'                    =>  now(),
                     ];
                 }
             }
