@@ -23,6 +23,7 @@
 
             <div>
                 <form id="training-schedule">
+                    @csrf
                     <div class="card">
                         <div class="row g-md-4 g-3 mb-md-4 mb-3">
                             <div class="col-xl-8 col-lg-7 ">
