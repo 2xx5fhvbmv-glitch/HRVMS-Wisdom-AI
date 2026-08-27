@@ -339,6 +339,7 @@
                             <h3>Appeal </h3>
                         </div>
                         <form id="GrievanceAppealForm" >
+    @csrf
                             <div class="row align-items-center  g-1 mb-md-4 mb-3">
                                 <div class="col-auto">
                                     <h6>Enable Appeals</h6>
@@ -1062,6 +1063,7 @@
 
                        
                         <form id="DisciplinaryCommittees">
+    @csrf
                             <div class="disciplinaryComm-main">
                                 <input type="hidden" name="discplineryCommitteeCount" id="discplineryCommitteeCount" value="1">
                                 <div class="disciplinaryComm-block ">
@@ -1128,6 +1130,7 @@
 
                         </div>
                         <form id="DisciplinaryDeleationRule">
+    @csrf
                             <div class="disciplinaryDelegRules-main">
                                 <div class="disciplinaryDelegRules-block">
                                     <div class="row align-items-end gx-md-4 g-3 mb-md-4 mb-3 AppendDelegationRule" id="AppendDelegationRule">

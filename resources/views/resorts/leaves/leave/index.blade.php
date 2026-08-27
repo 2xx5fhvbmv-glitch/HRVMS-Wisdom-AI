@@ -25,6 +25,7 @@
                 <div class="row g-4">
                     <div class="col-xxl-9 col-lg-8 ">
                         <form id="leave-apply" name="leave-apply" method="post" enctype="multipart/form-data">
+    @csrf
                             @if(!empty($canApplyForOthers) && $canApplyForOthers)
                             <div class="card mb-3">
                                 <div class="row align-items-end g-md-4 g-3">

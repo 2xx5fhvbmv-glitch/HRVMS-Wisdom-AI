@@ -486,6 +486,39 @@ class FileManageController extends Controller
                     );
                 }
 
+                // Neither block above notifies the employee a document was
+                // actually shared TO — HR uploading into Ahmed Hassan's
+                // categorized folder only notified HR + the HR uploader.
+                // Walk UnderON up to the root categorized folder (its
+                // Folder_Name is the owning employee's Emp_id) and notify
+                // that employee too, unless they're the one who uploaded it.
+                $rootFolder = $File_structure;
+                while ($rootFolder && (int) $rootFolder->UnderON !== 0) {
+                    $rootFolder = FilemangementSystem::where('resort_id', $this->resort->resort_id)
+                        ->where('id', $rootFolder->UnderON)
+                        ->first();
+                }
+                if ($rootFolder && $rootFolder->Folder_Type === 'categorized') {
+                    $targetEmployee = Employee::where('resort_id', $this->resort->resort_id)
+                        ->where('Emp_id', $rootFolder->Folder_Name)
+                        ->first();
+                    if ($targetEmployee && $targetEmployee->id != $uploaderEmpId) {
+                        Common::sendMobileNotification(
+                            $this->resort->resort_id,
+                            2,
+                            null,
+                            null,
+                            'New Document Shared',
+                            ($this->resort->GetEmployee->resortAdmin->full_name ?? $this->resort->full_name ?? 'HR') . ' shared a new document with you.',
+                            'File Management',
+                            [$targetEmployee->id],
+                            $fileRecord->id,
+                            false,
+                            'file-management-upload',
+                        );
+                    }
+                }
+
                 return response()->json(['success' => true, 'message' => 'File Uploaded successfully'], 200);
 
         }

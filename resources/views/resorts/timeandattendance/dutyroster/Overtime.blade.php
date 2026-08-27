@@ -24,6 +24,7 @@
             <div>
                 <div class="card ">
                     <form id="OverTimeform" class="@if(Common::checkRouteWisePermission('resort.timeandattendance.OverTime',config('settings.resort_permissions.create')) == false) d-none @endif">
+    @csrf
                         <div class="row g-2 mb-3 align-items-end flex-nowrap overflow-auto">
                             <div class="col col-xl-2 col-lg-2 col-md-3 col-sm-4">
                                 <label for="select-emp" class="form-label">SELECT EMPLOYEE</label>

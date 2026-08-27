@@ -85,6 +85,7 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <form id="raiseTicketForm" enctype="multipart/form-data">
+    @csrf
                     <div class="modal-body pb-md-4">
                         <div class="row g-md-4 g-3">
                             {{-- Support Preference hidden per request — keep markup commented

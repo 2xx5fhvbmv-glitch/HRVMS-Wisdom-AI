@@ -23,6 +23,7 @@
             <div>
                 <div class="card">
                     <form id="final-settlement-form" method="POST" data-parsley-validate>
+    @csrf
                         <div class="row g-md-4 g-3 mb-md-4 mb-3">
                             <div class="col-xl-4 col-md-6">
                                 <label for="select_emp" class="form-label">SELECT EMPLOYEE OR EMPLOYEE ID<span class="red-mark">*</span></label>

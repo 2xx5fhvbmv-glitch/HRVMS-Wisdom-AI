@@ -23,6 +23,7 @@
             </div>
             <div class="card">
                 <form id="msform" class="peopleEmpCreation-form" enctype="multipart/form-data">
+    @csrf
                     <!-- progressbar -->
                     <div class="progressbar-wrapper">
                         <ul id="progressbar" class="progressbar-tab d-flex justify-content-between align-items-center ">
