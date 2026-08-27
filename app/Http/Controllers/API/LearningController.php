@@ -611,6 +611,53 @@ class LearningController extends Controller
 
             $dashboardArr['assign_trainig_prog_comp_percen']    =   $completedPercentage;
             $dashboardArr['assign_trainig_programs']            =   $events;
+
+            // completed_training_count above was already correct — the
+            // employee L&D screens ("Past Training Programs",
+            // "Pending Feedback & Evaluation") need the actual items, not
+            // just a count. Neither array existed at all before this.
+            $completedSessions                      =   $sessions->filter(function ($session) use ($today) {
+                                                            return $session->end_date < $today;
+                                                        })->values();
+
+            $dashboardArr['completed_trainings']    =   $completedSessions->map(function ($session) {
+                                                            return [
+                                                                'id'            =>  $session->id,
+                                                                'title'         =>  $session->learningProgram->name ?? null,
+                                                                'session_date'  =>  $session->start_date,
+                                                                'end_date'      =>  $session->end_date,
+                                                                'start_time'    =>  date('h:i A', strtotime($session->start_time)),
+                                                                'end_time'      =>  date('h:i A', strtotime($session->end_time)),
+                                                                'description'   =>  $session->learningProgram->description ?? null,
+                                                                'status'        =>  $session->status,
+                                                            ];
+                                                        })->values();
+
+            // Feedback forms are resort-wide (training_feedback_form has no
+            // per-training link — see feedbackformListing()), a response is
+            // keyed to (form_id, training_id, participant_id). "Pending" =
+            // a completed training this employee attended that has no
+            // response row yet, using whichever form the resort has
+            // configured to submit against.
+            $feedbackFormId                         =   TrainingFeedbackForm::where('resort_id', $this->resort_id)->value('id');
+            $pendingFeedbackForms                   =   collect();
+            if ($feedbackFormId && $completedSessions->isNotEmpty()) {
+                $respondedTrainingIds               =   TrainingFeedbackResponse::where('participant_id', $employeeId)
+                                                            ->whereIn('training_id', $completedSessions->pluck('id'))
+                                                            ->pluck('training_id')->unique();
+                $pendingFeedbackForms               =   $completedSessions->reject(function ($session) use ($respondedTrainingIds) {
+                                                            return $respondedTrainingIds->contains($session->id);
+                                                        })->map(function ($session) use ($feedbackFormId) {
+                                                            return [
+                                                                'training_schedule_id' =>  $session->id,
+                                                                'feedback_form_id'     =>  $feedbackFormId,
+                                                                'title'                =>  $session->learningProgram->name ?? null,
+                                                                'session_date'         =>  $session->start_date,
+                                                            ];
+                                                        })->values();
+            }
+            $dashboardArr['pending_feedback_forms'] =   $pendingFeedbackForms;
+
             return response()->json(['success' => true, 'message' => 'Employee dashboard data fetched Successfully', 'emp_dashboard_data' => $dashboardArr], 200);
 
         } catch (\Exception $e) {
