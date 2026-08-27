@@ -65,7 +65,7 @@
             </div>
         </div>
     </div>
-@include('resorts.Learning._learning_buttons_v2_styles')
+@include('resorts.learning._learning_buttons_v2_styles')
 @endsection
 
 @section('import-css')
