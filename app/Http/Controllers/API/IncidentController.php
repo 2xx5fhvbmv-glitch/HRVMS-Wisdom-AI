@@ -813,7 +813,7 @@ class IncidentController extends Controller
                         ->where('employee_id', $emp_id)
                         ->orderByDesc('id')
                         ->first();
-                    return $this->formatMyStatementRow($incident, 'involved_employee', $statement->statement ?? null, $statement ? $statement->status === 'submitted' : false);
+                    return $this->formatMyStatementRow($incident, 'involved_employee', $statement->statement ?? null, $statement ? $statement->status === 'submitted' : false, $statement->document_path ?? null);
                 });
 
             $witnessIncidentIds = IncidentsWitness::where('witness_id', $emp_id)->pluck('incident_id');
@@ -824,7 +824,7 @@ class IncidentController extends Controller
                 ->map(function ($incident) use ($emp_id) {
                     $witness = IncidentsWitness::where('incident_id', $incident->id)->where('witness_id', $emp_id)->first();
                     $stmt = $witness->witness_statements ?? null;
-                    return $this->formatMyStatementRow($incident, 'witness', $stmt, !empty($stmt));
+                    return $this->formatMyStatementRow($incident, 'witness', $stmt, !empty($stmt), $witness->witness_statement_file ?? null);
                 });
 
             // ->map() on an Eloquent query result keeps the Eloquent
@@ -856,8 +856,21 @@ class IncidentController extends Controller
         }
     }
 
-    private function formatMyStatementRow($incident, $role, $statementText, $submitted)
+    private function formatMyStatementRow($incident, $role, $statementText, $submitted, $documentPathJson = null)
     {
+        // document_path / witness_statement_file are stored as a JSON array
+        // of StorageHelper-relative paths (see provideStatement()) — never
+        // read back here before, so the mobile statement history had
+        // nowhere to show what was attached even though the file itself
+        // was saved correctly.
+        $paths = json_decode($documentPathJson ?? '', true) ?: [];
+        $attachments = collect($paths)->filter()->map(function ($path) {
+            return [
+                'file_name' => basename($path),
+                'url'       => \App\Helpers\StorageHelper::temporaryUrl($path),
+            ];
+        })->values();
+
         return [
             'id'            => $incident->id,
             'incident_id'   => $incident->incident_id,
@@ -867,6 +880,7 @@ class IncidentController extends Controller
             'your_role'     => $role,
             'status'        => $submitted ? 'submitted' : 'pending',
             'statement'     => $statementText,
+            'attachments'   => $attachments,
         ];
     }
 

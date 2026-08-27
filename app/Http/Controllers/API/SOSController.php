@@ -676,6 +676,18 @@ class SOSController extends Controller
                 $sosData->sos_history_employee          =   $sosHistoryEmployees;
             }
 
+            // date/time/emergency_description already come through via
+            // sos_history.* above — but nothing here ever resolved WHO
+            // raised it, so the Security Manager's detail screen had no
+            // name or photo to show for the initiating employee.
+            $initiator                                  =   Employee::join('resort_admins as ra', 'ra.id', '=', 'employees.Admin_Parent_id')
+                                                                ->where('employees.id', $sosData->emp_initiated_by)
+                                                                ->select('ra.id as admin_id', 'ra.first_name', 'ra.last_name', 'employees.Emp_id')
+                                                                ->first();
+            $sosData->initiator_name                    =   $initiator ? trim($initiator->first_name . ' ' . $initiator->last_name) : null;
+            $sosData->initiator_emp_id                  =   $initiator->Emp_id ?? null;
+            $sosData->initiator_photo                   =   $initiator ? Common::getResortUserPicture($initiator->admin_id) : null;
+
             $teamMemberStats                            =   SosTeamMemberActivity::where('sos_history_id', $sosId)
                                                                 ->selectRaw("
                                                                     COUNT(*) as total,
@@ -1425,7 +1437,8 @@ class SOSController extends Controller
         // sos_history_id was never checked against the resort before
         // insert — a message could be attached to another resort's SOS
         // event log.
-        if (!SOSHistoryModel::where('id', $request->sos_history_id)->where('resort_id', $this->resort_id)->exists()) {
+        $sosHistory                                      =   SOSHistoryModel::where('id', $request->sos_history_id)->where('resort_id', $this->resort_id)->first();
+        if (!$sosHistory) {
             return response()->json(['success' => false, 'message' => 'SOS event not found.'], 404);
         }
 
@@ -1436,6 +1449,18 @@ class SOSController extends Controller
                 'sender_id'                               =>  $this->user->id,
                 'message'                                 =>  $request->message,
             ]);
+
+            // The chat log only ever updated if the employee's app happened
+            // to poll it — nothing told them a new instruction arrived, so
+            // it never showed "in real time". Push it immediately, same as
+            // every other SOS status change.
+            $recipient                                   =   Employee::where('resort_id', $this->resort_id)
+                                                                ->where('id', $sosHistory->emp_initiated_by)
+                                                                ->first(['id', 'device_token']);
+            if ($recipient && $recipient->id != ($this->user->GetEmployee->id ?? null)) {
+                Common::sendPushNotificationForMobile([$recipient->device_token], 'Security Instructions', $request->message, 'SOS', 'Active', 'siren_sound', 'custom_sound_channel', NULL);
+                Common::sendMobileNotification($this->resort_id, 2, null, null, 'Security Instructions', $request->message, 'SOS', [$recipient->id], $sosHistory->id, false, 'sos-chat-message');
+            }
 
             return response()->json([
                 'success'                               =>  true,

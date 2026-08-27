@@ -359,6 +359,14 @@ use Illuminate\Support\Facades\Route;
 			Route::get('ld-manager/mark-attendance/participants/{training_schedule_id}', [App\Http\Controllers\API\LearningController::class, 'ldManagerMarkAttendanceParticipants']);
 			Route::post('ld-manager/mark-attendance', [App\Http\Controllers\API\LearningController::class, 'ldManagerMarkAttendanceStore']);
 			Route::get('learning/manager-request-list', [App\Http\Controllers\API\LearningController::class, 'managerRequestList']);
+
+			// participant-feedback-from-list / feedback-from-res-view already exist
+			// above under check.rank:EXCOM only — an L&D Manager who isn't also
+			// EXCOM rank got a 403 "Insufficient rank" from the L&D Manager
+			// Feedback Form screen, which has no EXCOM requirement of its own.
+			// Same controller methods, reachable via the ld.manager gate too.
+			Route::post('ld-manager/participant-feedback-from-list', [App\Http\Controllers\API\LearningController::class, 'participantFeedbackFromList']);
+			Route::get('ld-manager/feedback-from-res-view/{form_res_id}', [App\Http\Controllers\API\LearningController::class, 'feedbackFormResView']);
 		});
 
 		// HR onboarding dashboard — self-gated on HR department inside the controller.
