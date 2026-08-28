@@ -76,12 +76,9 @@ the employee has no document uploaded for that category yet.
   file" action) — `null` if no file was ever uploaded for this category (as
   in the example above) or if resolution failed.
 - **QR code**: neither endpoint returns a QR value — there's no
-  `qr_code`/similar field on `VisaEmployeeExpiryData`. If the Figma design's
-  "Scan QR Code" element is meant to encode something (e.g. a verification
-  link, or the extracted Work Permit Number), that needs a decision on what
-  it should contain before I can add it — same convention question as the
-  Third-Party Shop QR ticket. Let me know what it should encode and I'll
-  wire it up.
+  `qr_code`/similar field on `VisaEmployeeExpiryData`. Not implemented yet;
+  build the screen without it for now, we'll add the field once what it
+  should encode is decided.
 
 Verified against real resort 26 data — an employee with an actual uploaded
 Work Permit Entry Pass document and its real AI-extracted field.

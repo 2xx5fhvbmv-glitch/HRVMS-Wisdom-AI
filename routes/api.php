@@ -485,6 +485,7 @@ use Illuminate\Support\Facades\Route;
 
 		//SOS — general employee-facing (any authenticated employee)
 		Route::get('sos/emergency-types', [App\Http\Controllers\API\SOSController::class, 'getEmergencyTypes']);
+		Route::get('sos/emergency-contacts', [App\Http\Controllers\API\SOSController::class, 'getEmergencyContacts']);
 		Route::post('sos/sos-store', [App\Http\Controllers\API\SOSController::class, 'SOSStore']);
 		Route::get('sos/sos-team-listing', [App\Http\Controllers\API\SOSController::class, 'SOSTeamListing']);
 		Route::post('sos/sos-safe-status', [App\Http\Controllers\API\SOSController::class, 'SOSSafeStatus']);

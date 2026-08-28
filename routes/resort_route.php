@@ -1954,6 +1954,9 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
     Route::delete('sos/emergency-type/destroy/{id}', 'SOS\ConfigurationController@SOSEmergencyTypesDestory')->name('sos.config.SOSEmergencyTypesDestory');
     Route::post('sos/emergency-type/update/{id}', 'SOS\ConfigurationController@updateEmergencyTypes')->name('sos.emergencyType.update');
 
+    // SOS Emergency Contact Numbers (Police/Fire/MNDF, used by the mobile Receive SOS screen's Call buttons)
+    Route::post('sos/emergency-contacts/store', 'SOS\ConfigurationController@EmergencyContactsStore')->name('sos.config.EmergencyContactsStore');
+
     // SOS Dashboard
     Route::get('sos/dashboard', 'SOS\DashboardController@index')->name('sos.dashboard.index');
     Route::delete('sos/destroy/{id}', 'SOS\DashboardController@destroy')->name('sos.emergency.destroy');
