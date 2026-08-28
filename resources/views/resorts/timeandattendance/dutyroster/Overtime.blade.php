@@ -224,6 +224,23 @@
         color: #999;
     }
 
+    .attendance-ot-actions {
+        margin-top: 2px;
+        line-height: 1;
+    }
+
+    .attendance-ot-actions a {
+        display: inline-block;
+        padding: 0 3px;
+        font-size: 11px;
+        color: inherit;
+        opacity: 0.85;
+    }
+
+    .attendance-ot-actions a:hover {
+        opacity: 1;
+    }
+
     /* Tooltip Styles */
     .overtime-tooltip {
         position: fixed;

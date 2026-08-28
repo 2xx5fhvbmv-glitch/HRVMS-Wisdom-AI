@@ -135,7 +135,7 @@
                                 }
                             @endphp
 
-                            <td class="overtime-cell {{ $isPublicHoliday ? 'public-holiday-cell' : '' }} @if($overtimeCount > 0) has-overtime {{ $statusColor }} @endif"
+                            <td class="overtime-cell {{ $isPublicHoliday ? 'public-holiday-cell' : '' }} @if($overtimeCount > 0) has-overtime {{ $statusColor }} @endif @if($pendingAttendance) has-overtime status-pending @endif"
                                 data-date="{{ $date }}"
                                 data-emp-id="{{ $r->emp_id }}"
                                 style="cursor: pointer;"
@@ -157,12 +157,16 @@
                                 @if($pendingAttendance)
                                     {{-- Attendance-recorded OT with no OTStatus yet —
                                          this is the exact thing Run Payroll's "OT
-                                         entries with missing OT status" check
-                                         blocks on. --}}
-                                    <div class="mt-1">
-                                        <span class="badge badge-themeWarning" title="Attendance OT: {{ $pendingAttendance->OverTime }}, awaiting approval">{{ $pendingAttendance->OverTime }}</span>
-                                        <a href="javascript:void(0);" class="attendance-ot-approve" data-attdance-id="{{ $pendingAttendance->id }}" title="Approve"><i class="fa-solid fa-check text-success"></i></a>
-                                        <a href="javascript:void(0);" class="attendance-ot-reject" data-attdance-id="{{ $pendingAttendance->id }}" title="Reject"><i class="fa-solid fa-xmark text-danger"></i></a>
+                                         entries with missing OT status" check blocks
+                                         on. Cell background already matches the
+                                         pending/approved/rejected convention used for
+                                         EmployeeOvertime cells above (status-pending
+                                         class on the <td>) — keep the inner content
+                                         the same plain-text style, not a separate pill. --}}
+                                    <span class="overtime-total" title="Attendance OT, awaiting approval">{{ $pendingAttendance->OverTime }}</span>
+                                    <div class="attendance-ot-actions">
+                                        <a href="javascript:void(0);" class="attendance-ot-approve" data-attdance-id="{{ $pendingAttendance->id }}" title="Approve"><i class="fa-solid fa-check"></i></a>
+                                        <a href="javascript:void(0);" class="attendance-ot-reject" data-attdance-id="{{ $pendingAttendance->id }}" title="Reject"><i class="fa-solid fa-xmark"></i></a>
                                     </div>
                                 @endif
                             </td>
