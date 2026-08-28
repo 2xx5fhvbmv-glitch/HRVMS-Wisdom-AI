@@ -175,12 +175,29 @@ class JobAdvertisementController extends Controller
                             ['ContentType' => $request->file('Jobadvimg')->getMimeType()]
                         );
 
-                        JobAdvertisement::updateOrCreate([
+                        // A vacancy-specific poster is one slot per vacancy —
+                        // re-uploading replaces it. But the general/default
+                        // template (vacancy_id null) is meant to be a real
+                        // library ("View All Templates" lists every row for
+                        // the resort with its own delete button) — using
+                        // updateOrCreate for that case too collapsed every
+                        // upload into the same single row, so a second
+                        // template silently overwrote the first instead of
+                        // being added alongside it.
+                        if ($vacancy_id) {
+                            JobAdvertisement::updateOrCreate([
+                                    "Resort_id" => $resort_id,
+                                    "vacancy_id" => $vacancy_id,
+                            ],[
+                                "Jobadvimg" => $fileName,
+                            ]);
+                        } else {
+                            JobAdvertisement::create([
                                 "Resort_id" => $resort_id,
-                                "vacancy_id" => $vacancy_id,
-                        ],[
-                            "Jobadvimg" => $fileName,
-                        ]);
+                                "vacancy_id" => null,
+                                "Jobadvimg" => $fileName,
+                            ]);
+                        }
                         DB::commit();
                         return response()->json(['success' => true, 'message' => 'Job Advertisement Uploaded successfully.']);
                     }
