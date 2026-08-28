@@ -16,7 +16,7 @@ class ResortPosition extends Model
     use HasFactory,HasSlug;
     protected $table = 'resort_positions';
     protected $fillable = [
-        'resort_id','dept_id','section_id','position_title','code','short_title','is_reserved','status','Rank','slug'
+        'resort_id','dept_id','section_id','position_title','code','short_title','is_reserved','status','Rank','slug','benefit_grid_level'
     ];
 
     public static function boot(){

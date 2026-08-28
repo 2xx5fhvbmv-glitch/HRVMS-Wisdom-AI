@@ -5038,7 +5038,14 @@ class Common
      * getEmpGrade() alone is still correct for position-only lookups where
      * no specific employee exists yet.
      */
-    public static function resolveEmpGrade($resortId, $rank, $benefitGridLevel = null)
+    // Precedence: employee's own override > position's own grade > rank
+    // default. $positionId is optional and backward-compatible — omitted
+    // (the overwhelming majority of existing call sites), this behaves
+    // exactly as before (employee override, else rank default). Only
+    // callers that pass it get the new per-position layer, so two
+    // positions sharing one rank (e.g. Finance Director and Finance
+    // Manager, both rank HOD) can sit on different grades.
+    public static function resolveEmpGrade($resortId, $rank, $benefitGridLevel = null, $positionId = null)
     {
         if (!empty($benefitGridLevel)) {
             $stillValid = \App\Models\ResortBenefitGradeLevel::where('id', $benefitGridLevel)
@@ -5047,6 +5054,21 @@ class Common
                 ->exists();
             if ($stillValid) {
                 return $benefitGridLevel;
+            }
+        }
+
+        if (!empty($positionId)) {
+            $positionGrade = \App\Models\ResortPosition::where('id', $positionId)
+                ->where('resort_id', $resortId)
+                ->value('benefit_grid_level');
+            if (!empty($positionGrade)) {
+                $stillValid = \App\Models\ResortBenefitGradeLevel::where('id', $positionGrade)
+                    ->where('resort_id', $resortId)
+                    ->where('status', 'active')
+                    ->exists();
+                if ($stillValid) {
+                    return $positionGrade;
+                }
             }
         }
 
