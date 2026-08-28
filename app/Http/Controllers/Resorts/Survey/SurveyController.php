@@ -1327,6 +1327,52 @@ class SurveyController extends Controller
                                             return $i;
                                         });
 
+        // Per-respondent expandable breakdown (every question + their
+        // answer) — the page previously only offered a respondent picker
+        // feeding the Export form, with no way to see anyone's actual
+        // responses without downloading the file. Same masking rule as
+        // SurveyReultExport()'s export: identity shown only when the
+        // privacy type allows it for this viewer.
+        $fetchAllQA = ParentSurvey::join('survey_questions as t1', 't1.Parent_survey_id', '=', 'parent_surveys.id')
+            ->join('survey_employees as t2', 't2.Parent_survey_id', '=', 'parent_surveys.id')
+            ->join('employees as t3', 't3.id', '=', 't2.Emp_id')
+            ->join('resort_admins as t4', 't4.id', '=', 't3.Admin_Parent_id')
+            ->where('parent_surveys.id', $id)
+            ->where('t2.emp_status', 'yes')
+            ->select('t1.id as question_id', 't1.Question_Text', 't2.id as Emp_id', 't4.first_name', 't4.last_name')
+            ->orderBy('t2.id')
+            ->get();
+
+        $respondentAnswers = [];
+        $maskedLabelByEmpTaId = [];
+        $maskedSeq = 0;
+        foreach ($fetchAllQA as $q) {
+            if (!isset($respondentAnswers[$q->Emp_id])) {
+                if ($showRespondentIdentity) {
+                    $name = trim($q->first_name . ' ' . $q->last_name);
+                } else {
+                    if (!isset($maskedLabelByEmpTaId[$q->Emp_id])) {
+                        $maskedSeq++;
+                        $label = $privacy === 'Anonymous' ? 'Anonymous Respondent' : 'Confidential Respondent';
+                        $maskedLabelByEmpTaId[$q->Emp_id] = $label . ' #' . $maskedSeq;
+                    }
+                    $name = $maskedLabelByEmpTaId[$q->Emp_id];
+                }
+                $respondentAnswers[$q->Emp_id] = ['name' => $name, 'answers' => []];
+            }
+
+            $surveyResult = SurveyResult::where('Parent_survey_id', $id)
+                ->where('Survey_emp_ta_id', $q->Emp_id)
+                ->where('Question_id', $q->question_id)
+                ->first();
+
+            $respondentAnswers[$q->Emp_id]['answers'][] = [
+                'question' => $q->Question_Text,
+                'answer' => $surveyResult->Emp_Ans ?? '',
+            ];
+        }
+        $respondentAnswers = array_values($respondentAnswers);
+
         // Average score per Rating-type question, for the bar chart —
         // real questions use a numeric scale (e.g. 0-10), not the 5-point
         // Likert buckets the old disabled mockup assumed.
@@ -1363,7 +1409,7 @@ class SurveyController extends Controller
 
         $page_title = "Survey Results";
         $id = base64_encode($id);
-        return  view('resorts.Survey.SurveyPages.Result',compact('id','page_title','ResponedEmp','responseRate','formattedTime','TotalResponed','ParentSurvey','showRespondentIdentity','privacy','ratingChartLabels','ratingChartData','optionChartQuestion','optionChartLabels','optionChartData'));
+        return  view('resorts.Survey.SurveyPages.Result',compact('id','page_title','ResponedEmp','responseRate','formattedTime','TotalResponed','ParentSurvey','showRespondentIdentity','privacy','ratingChartLabels','ratingChartData','optionChartQuestion','optionChartLabels','optionChartData','respondentAnswers'));
 
     }
 
