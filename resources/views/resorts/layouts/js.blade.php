@@ -767,8 +767,8 @@
         // selection, not select2's lighter placeholder text. A
         // templateSelection callback here would fix that, but most pages
         // also call $('.select2t-none').select2() a second time with no
-        // options in their own @section('import-scripts') (which runs
-        // after this file, per js.blade.php's own @yield('import-scripts')
+        // options in their own @@section('import-scripts') (which runs
+        // after this file, per js.blade.php's own @@yield('import-scripts')
         // placement) — that reinit silently drops any callback set here.
         // Driving it off the live <select> value instead, via delegated
         // events, survives being reinitialized any number of times.
@@ -780,7 +780,7 @@
             s2SyncEmptyState($(this));
         });
         // setTimeout(0), not $(window).on('load'): most pages reinit
-        // .select2t-none a second time in their own @section('import-
+        // .select2t-none a second time in their own @@section('import-
         // scripts'), which runs later in the same document.ready pass —
         // window 'load' fires too unpredictably late (after images/etc)
         // to be the right signal here. setTimeout(0) just needs to run
