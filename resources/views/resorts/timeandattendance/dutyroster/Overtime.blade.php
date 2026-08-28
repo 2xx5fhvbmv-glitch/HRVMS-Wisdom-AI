@@ -47,7 +47,14 @@
                                         7 => 'July', 8 => 'August', 9 => 'September',
                                         10 => 'October', 11 => 'November', 12 => 'December'
                                     ] as $key => $monthName)
-                                        <option value="{{ $key }}">{{ $monthName }}</option>
+                                        {{-- Was never pre-selected from the current request at
+                                             all — navigating directly to a pagination link (which
+                                             now correctly carries month/year/overtime_type, see
+                                             withQueryString() fix) still showed the underlying
+                                             data correctly filtered, but the dropdowns themselves
+                                             looked reset, making it look like the filter "didn't
+                                             stick" even though it had. --}}
+                                        <option value="{{ $key }}" @if((int) request('month') === $key) selected @endif>{{ $monthName }}</option>
                                     @endforeach
                                 </select>
                             </div>
@@ -56,15 +63,15 @@
                                 <select class="form-select year" name="year" id="year">
                                     <option value="">Select Year</option>
                                     @for ($y = now()->year; $y >= now()->year - 5; $y--)
-                                        <option value="{{ $y }}">{{ $y }}</option>
+                                        <option value="{{ $y }}" @if((int) request('year') === $y) selected @endif>{{ $y }}</option>
                                     @endfor
                                 </select>
                             </div>
                             <div class="col col-xl-2 col-lg-2 col-md-2 col-sm-3">
                                 <label for="overtime_type" class="form-label">OVERTIME TYPE</label>
                                 <select class="form-select overtime_type" name="overtime_type" id="overtime_type">
-                                    <option value="actual">Actual Overtime</option>
-                                    <option value="preplanned">Pre-Planned Overtime</option>
+                                    <option value="actual" @if(request('overtime_type', 'actual') === 'actual') selected @endif>Actual Overtime</option>
+                                    <option value="preplanned" @if(request('overtime_type') === 'preplanned') selected @endif>Pre-Planned Overtime</option>
                                 </select>
                             </div>
                             <!-- <div class="col col-xl-2 col-lg-2 col-md-2 col-sm-3">
