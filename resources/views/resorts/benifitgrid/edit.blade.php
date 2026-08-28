@@ -339,8 +339,14 @@
                                     class="form-select select2t-none"
                                     @if(isset($isViewMode) && $isViewMode) disabled @endif>
                                 <option value="" disabled selected>Select Service Charge</option>
-                                <option value="0" @if($benefit_grid->service_charge == "0") selected @endif>Eligible</option>
-                                <option value="1" @if($benefit_grid->service_charge == "1") selected @endif>Not Eligible</option>
+                                {{-- Labels were inverted vs. every consumer (EmployeeController,
+                                     PayrollController, pdf.blade.php), which all correctly treat
+                                     service_charge == 1 as eligible. Fixed the labels to match what's
+                                     actually stored/consumed — values are unchanged, so existing rows
+                                     now display their TRUE current effective eligibility instead of
+                                     the label lying about it. --}}
+                                <option value="1" @if($benefit_grid->service_charge == "1") selected @endif>Eligible</option>
+                                <option value="0" @if($benefit_grid->service_charge == "0") selected @endif>Not Eligible</option>
                             </select>
 
                             <div id="service-charge-error" class="text-danger mt-1"></div>
