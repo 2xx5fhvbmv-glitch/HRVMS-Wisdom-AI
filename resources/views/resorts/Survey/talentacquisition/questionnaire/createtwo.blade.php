@@ -286,6 +286,7 @@
                             type: "post",
                             data: {
                                 division_id: $(this).val(),
+                                "_token": "{{ csrf_token() }}"
                             },
                             success: function(data) {
 
@@ -324,7 +325,8 @@
                         url: "{{ route('resort.get.position') }}",
                         type: "post",
                         data: {
-                            deptId: deptId
+                            deptId: deptId,
+                            "_token": "{{ csrf_token() }}"
                         },
                         success: function(data) {
                             // Clear the dropdown and add a placeholder option

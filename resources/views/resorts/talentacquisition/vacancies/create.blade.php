@@ -468,7 +468,8 @@
                         method: 'POST',
                         data: {
                             position_id: positionId,
-                            requested_vacancy: 1
+                            requested_vacancy: 1,
+                            "_token": "{{ csrf_token() }}"
                         },
                         success: function(response) {
                             if (response.budgeted_salary > 0) {
@@ -675,7 +676,8 @@
                     method: 'POST',
                     data: {
                         position_id: positionId,
-                        requested_vacancy: requestedVacancy
+                        requested_vacancy: requestedVacancy,
+                        "_token": "{{ csrf_token() }}"
                     },
                     success: function(response) {
                         const selectBox = $('#vacancy_status');

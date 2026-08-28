@@ -228,7 +228,7 @@
             $.ajax({
                 url: "{{ route('resort.ta.PositionSections') }}",
                 type: "POST",
-                data: { deptId: deptId },
+                data: { deptId: deptId, "_token": "{{ csrf_token() }}" },
                 success: function (response) {
                     $(".Position").html('<option value="">Select Position</option>'); // Reset Position dropdown
 

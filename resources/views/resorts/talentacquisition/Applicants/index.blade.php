@@ -1844,7 +1844,8 @@
                 data: {
                     id: fileId,
                     flag: fileFlag,
-                    index: fileIndex
+                    index: fileIndex,
+                    "_token": "{{ csrf_token() }}"
                 },
                 success: function(response) {
                     if (response.success) 
@@ -1900,7 +1901,7 @@
             $.ajax({
                 url: "{{ route('resort.ta.DownloadAllFiles') }}",
                 type: "POST",
-                data: { id: fileId },
+                data: { id: fileId, "_token": "{{ csrf_token() }}" },
                 success: function(response) {
                     btn.prop('disabled', false).text('Download All');
                     if (response.success) {
@@ -2055,7 +2056,8 @@
                 data:
                 {
                     id :$("#vacancy-id").val(),
-                    searchTerm : $('.search').val()
+                    searchTerm : $('.search').val(),
+                    "_token": "{{ csrf_token() }}"
                 },
                 success: function(response)
                 {

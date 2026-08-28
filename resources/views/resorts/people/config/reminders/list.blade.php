@@ -174,7 +174,8 @@
             data: {
                 Main_id: Main_id,
                 task: task,
-                days: days
+                days: days,
+                "_token": "{{ csrf_token() }}"
             },
             success: function(response) {
                 if (response.success == true) { 

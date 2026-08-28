@@ -811,7 +811,8 @@
                 url: "{{ route('incident.meeting-reminder.store') }}",
                 type: "POST",
                 data: {
-                    reminder: reminderValue
+                    reminder: reminderValue,
+                    "_token": "{{ csrf_token() }}"
                 },
                 success: function (response) {
                     toastr.success(response.message, "Success", {

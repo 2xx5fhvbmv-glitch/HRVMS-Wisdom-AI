@@ -273,6 +273,7 @@
                 FormName: formname,
                 form_structure: formStructure,
                 Form_id:$("#Form_id").val(),
+                "_token": "{{ csrf_token() }}",
             },
             success: function (response)
             {

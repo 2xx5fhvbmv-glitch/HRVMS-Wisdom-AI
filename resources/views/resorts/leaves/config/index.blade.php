@@ -580,7 +580,7 @@
             $.ajax({
                 url: "{{ route('resort.get.ResortDivision') }}",
                 type: "POST",
-                data: { division_id: divisionId },
+                data: { division_id: divisionId, "_token": "{{ csrf_token() }}" },
                 success: function (data) {
                     $(".Department").html('<option value="">Select Department</option>'); // Reset Department dropdown
 
@@ -608,7 +608,7 @@
             $.ajax({
                 url: "{{ route('resort.ta.PositionSections') }}",
                 type: "POST",
-                data: { deptId: deptId },
+                data: { deptId: deptId, "_token": "{{ csrf_token() }}" },
                 success: function (response) {
                     $(".Position").html('<option value="">Select Position</option>'); // Reset Position dropdown
                     $(".Section").html('<option value="">Select Section</option>'); // Reset Section dropdown
