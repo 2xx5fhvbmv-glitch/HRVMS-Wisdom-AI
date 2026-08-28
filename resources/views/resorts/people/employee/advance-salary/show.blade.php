@@ -367,14 +367,18 @@
                                         <div class="col-auto "><a href="javascript:void(0);" class="btn  btn-themeSkyblue btn-sm saveReSchedule"> Repayment Schedule Submit</a></div>
                                    </div>
                               </div>
-                         @elseif($advance_salary->status == 'In-Progress' && $advance_salary->hr_status == 'Approved' && $isFinance == true && $recovery_schedule->count() > 0 && $advance_salary->finance_status == 'Pending')
+                         @elseif($advance_salary->status == 'In-Progress' && $advance_salary->hr_status == 'Approved' && $isFinance == true && $advance_salary->finance_status == 'Pending')
+                              {{-- Repayment schedule creation is HR's own
+                                   separate task, not a precondition for
+                                   Finance/GM approval — Finance/GM should be
+                                   able to act as soon as HR approves. --}}
                               <div class="card-footer">
                                    <div class="row  g-2 justify-content-end">
                                         <div class="col-auto"><a href="javascript:void(0);" class="btn  btn-themeBlue btn-sm actionBtn" data-status='Approved' data-action_by='finance'>Approve</a></div>
                                         <div class="col-auto"><a href="javascript:void(0);" class="btn  btn-themeDanger btn-sm actionBtn" data-status='Rejected' data-action_by='finance'>Reject</a></div>
                                    </div>
                               </div>
-                         @elseif($advance_salary->status == 'In-Progress' && $advance_salary->hr_status == 'Approved' && $isGM == true && $recovery_schedule->count() > 0 && $advance_salary->finance_status == 'Approved' && $advance_salary->gm_status == 'Pending')
+                         @elseif($advance_salary->status == 'In-Progress' && $advance_salary->hr_status == 'Approved' && $isGM == true && $advance_salary->finance_status == 'Approved' && $advance_salary->gm_status == 'Pending')
                               <div class="card-footer">
                                    <div class="row  g-2 justify-content-end">
                                         <div class="col-auto"><a href="javascript:void(0);" class="btn  btn-themeBlue btn-sm actionBtn" data-status='Approved' data-action_by='gm'>Approve</a></div>
@@ -383,19 +387,15 @@
                               </div>
                          @elseif($advance_salary->status == 'In-Progress')
                               {{-- Finance/GM's Approve/Reject only appear once
-                                   the stage ahead of them is actually done —
-                                   Finance also needs HR to have finalized the
-                                   repayment schedule, not just approved the
-                                   request. With no message here, a Finance/GM
-                                   viewer saw a blank footer with no way to
-                                   tell whether that's a bug or just not their
+                                   the stage ahead of them is actually done.
+                                   With no message here, a Finance/GM viewer
+                                   saw a blank footer with no way to tell
+                                   whether that's a bug or just not their
                                    turn yet. --}}
                               <div class="card-footer">
                                    <div class="text-muted small">
                                         @if($advance_salary->hr_status == 'Pending')
                                              Waiting for HR review.
-                                        @elseif($advance_salary->hr_status == 'Approved' && $recovery_schedule->count() <= 0)
-                                             HR has approved this request — waiting for HR to finalize the repayment schedule before Finance can review.
                                         @elseif($advance_salary->finance_status == 'Pending')
                                              Waiting for Finance review.
                                         @elseif($advance_salary->finance_status == 'Approved' && $advance_salary->gm_status == 'Pending')
