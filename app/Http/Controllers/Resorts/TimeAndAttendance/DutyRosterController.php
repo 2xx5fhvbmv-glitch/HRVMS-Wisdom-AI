@@ -9,6 +9,7 @@ use Carbon\Carbon;
 use App\Helpers\Common;
 use App\Models\Employee;
 use App\Models\DutyRoster;
+use App\Models\ResortBenifitGrid;
 use Illuminate\Http\Request;
 use App\Models\EmployeeLeave;
 use App\Models\LeaveCategory;
@@ -338,10 +339,6 @@ class DutyRosterController extends Controller
         }
 
         $Shift = $request->Shift;   //ShiftId
-        $employeeOvertimeRaw = $request->employeeOvertime ?? '{}';
-        $employeeOvertime = json_decode($employeeOvertimeRaw, true) ?? []; // Overtime data with days
-
-
         $TotalHours = $request->TotalHours; // Shift total hours
         // $request->resort_id was fully client-controlled and never
         // cross-checked — any resort-admin could tag a new duty roster row
@@ -397,47 +394,80 @@ class DutyRosterController extends Controller
                 ], 422);
             }
 
-            // Overtime is only applicable for SUP (5) and LINE WORKERS (6)
-            $overtimeEligibleRanks = [
-                array_search('SUP', config('settings.Position_Rank', [])),
-                array_search('LINE WORKERS', config('settings.Position_Rank', [])),
-            ];
-            $overtimeEligibleRanks = array_filter($overtimeEligibleRanks, function ($v) { return $v !== false; });
+            // Was: trust the client-posted employeeOvertime map (manual
+            // per-employee OT entry) and gate it on a hardcoded SUP/LINE
+            // WORKERS rank whitelist. OT is now computed entirely from the
+            // Benefit Grid: expected daily hours = working_hrs_per_week /
+            // (7 - day_off_per_week); any shift hours beyond that are OT,
+            // only for employees whose grid has overtime = 'yes'. A shift
+            // shorter than the grid's expected daily hours is rejected
+            // outright rather than silently accepted.
+            $toDecimalHours = function ($hhmm) {
+                [$h, $m] = array_pad(explode(':', (string) $hhmm), 2, 0);
+                return ((int) $h) + ((int) $m) / 60;
+            };
+            $toHHMM = function ($decimalHours) {
+                $decimalHours = max(0, $decimalHours);
+                $h = (int) floor($decimalHours);
+                $m = (int) round(($decimalHours - $h) * 60);
+                if ($m === 60) { $h++; $m = 0; }
+                return sprintf('%02d:%02d', $h, $m);
+            };
+            $shiftHours = $toDecimalHours($TotalHours);
 
+            $mismatchedHoursEmployees = [];
             $ineligibleOvertimeEmployees = [];
-            foreach ($employeeOvertime as $empIdKey => $overtimeData) {
-                $overtimeHours = $overtimeData['overtime'] ?? '00:00';
-                $overtimeDays = $overtimeData['days'] ?? [];
-                $hoursByDate = $overtimeData['hoursByDate'] ?? [];
-                $hasOvertime = ($overtimeHours !== '00:00' && $overtimeHours !== '') || !empty($overtimeDays);
-                if (! $hasOvertime && ! empty($hoursByDate)) {
-                    foreach ($hoursByDate as $v) {
-                        if ($v !== '00:00' && $v !== '' && $v !== null) {
-                            $hasOvertime = true;
-                            break;
-                        }
+            $autoOvertimeByEmployee = [];
+
+            $rosterEmployees = Employee::join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
+                ->where('employees.resort_id', $resort_id)
+                ->whereIn('employees.id', $Employees)
+                ->get(['employees.id', 'employees.rank', 'employees.benefit_grid_level', 't1.first_name', 't1.last_name']);
+
+            foreach ($rosterEmployees as $emp) {
+                $empGrade = Common::resolveEmpGrade($resort_id, $emp->rank, $emp->benefit_grid_level);
+                $grid = $empGrade
+                    ? ResortBenifitGrid::where('resort_id', $resort_id)
+                        ->where('emp_grade', $empGrade)
+                        ->where('status', 'Active')
+                        ->first(['overtime', 'working_hrs_per_week', 'day_off_per_week'])
+                    : null;
+
+                if (!$grid || empty($grid->working_hrs_per_week) || $grid->day_off_per_week === null || (int) $grid->day_off_per_week >= 7) {
+                    // No usable grid policy to check against — leave this
+                    // employee's hours as entered, same as before this fix.
+                    continue;
+                }
+
+                $workingDaysPerWeek = 7 - (int) $grid->day_off_per_week;
+                $dailyTargetHours = $grid->working_hrs_per_week / $workingDaysPerWeek;
+                $empName = trim(($emp->first_name ?? '') . ' ' . ($emp->last_name ?? ''));
+
+                if ($shiftHours < $dailyTargetHours - 0.01) {
+                    $mismatchedHoursEmployees[] = $empName . ' (expects ' . round($dailyTargetHours, 2) . 'h/day)';
+                    continue;
+                }
+
+                $excess = $shiftHours - $dailyTargetHours;
+                if ($excess > 0.01) {
+                    if ($grid->overtime !== 'yes') {
+                        $ineligibleOvertimeEmployees[] = $empName;
+                        continue;
                     }
+                    $autoOvertimeByEmployee[$emp->id] = $toHHMM($excess);
                 }
-                if (!$hasOvertime) {
-                    continue;
-                }
-                $empId = is_numeric($empIdKey) ? (int) $empIdKey : (int) $empIdKey;
-                $emp = Employee::join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
-                    ->where('employees.id', $empId)
-                    ->where('employees.resort_id', $resort_id)
-                    ->first(['employees.id', 'employees.rank', 't1.first_name', 't1.last_name']);
-                if (!$emp) {
-                    continue;
-                }
-                $rank = $emp->rank;
-                if (!in_array((int) $rank, $overtimeEligibleRanks, true)) {
-                    $ineligibleOvertimeEmployees[] = trim(($emp->first_name ?? '') . ' ' . ($emp->last_name ?? ''));
-                }
+            }
+
+            if (!empty($mismatchedHoursEmployees)) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Shift hours do not meet the Benefit Grid\'s expected daily hours for: ' . implode(', ', $mismatchedHoursEmployees) . '.',
+                ], 422);
             }
             if (!empty($ineligibleOvertimeEmployees)) {
                 return response()->json([
                     'status' => 'error',
-                    'message' => 'Overtime is applicable only for Line Workers and Supervisor roles. The selected employee(s) are not eligible.',
+                    'message' => 'Overtime is not applicable for the selected employee(s) per their Benefit Grid: ' . implode(', ', $ineligibleOvertimeEmployees) . '.',
                 ], 422);
             }
 
@@ -484,17 +514,12 @@ class DutyRosterController extends Controller
                 ]);
                 if(isset($DutyRoster))
                 {
-                    // Get overtime for this employee - support hoursByDate (per-date OT) or legacy overtime + days
-                    $employeeOvertimeHours = '00:00';
-                    $employeeOvertimeDays = [];
-                    $employeeOvertimeHoursByDate = [];
-
-                    $empOt = $employeeOvertime[$Employee] ?? $employeeOvertime[(string) $Employee] ?? $employeeOvertime[(int) $Employee] ?? null;
-                    if ($empOt) {
-                        $employeeOvertimeHours = $empOt['overtime'] ?? '00:00';
-                        $employeeOvertimeDays = $empOt['days'] ?? [];
-                        $employeeOvertimeHoursByDate = $empOt['hoursByDate'] ?? [];
-                    }
+                    // OT is now computed entirely from the Benefit Grid
+                    // (see $autoOvertimeByEmployee above) — same value for
+                    // every non-DayOff date of this employee's shift, since
+                    // it's the excess over their grid's expected daily
+                    // hours, not a manually-chosen per-date amount.
+                    $employeeOvertimeHours = $autoOvertimeByEmployee[$Employee] ?? '00:00';
 
                     if ($DefaultShiftTime == "All")
                     {
@@ -527,15 +552,7 @@ class DutyRosterController extends Controller
                             $isDayOff = in_array($currentDateFormatted, $dayOffDatesArray);
                             $status = $isDayOff ? "DayOff" : '';
 
-                            // Overtime per date: use hoursByDate if set, else legacy (single overtime + days)
-                            if ($isDayOff) {
-                                $overtimeForThisDay = '00:00';
-                            } elseif (! empty($employeeOvertimeHoursByDate) && isset($employeeOvertimeHoursByDate[$currentDateFormatted])) {
-                                $overtimeForThisDay = $employeeOvertimeHoursByDate[$currentDateFormatted] ?? '00:00';
-                            } else {
-                                $hasOvertime = in_array($currentDateFormatted, $employeeOvertimeDays);
-                                $overtimeForThisDay = $hasOvertime ? $employeeOvertimeHours : '00:00';
-                            }
+                            $overtimeForThisDay = $isDayOff ? '00:00' : $employeeOvertimeHours;
 
                             // Create roster entry only if there's no leave
                             $DutyRosterEntry = new DutyRosterEntry;
@@ -567,12 +584,7 @@ class DutyRosterController extends Controller
 
                         // Skip creating roster entry if employee has approved leave on this date
                         if (!$leave) {
-                            $singleDateOvertime = '00:00';
-                            if (! empty($employeeOvertimeHoursByDate) && isset($employeeOvertimeHoursByDate[$singleDate])) {
-                                $singleDateOvertime = $employeeOvertimeHoursByDate[$singleDate];
-                            } elseif (isset($employeeOvertimeDays[0]) && in_array($singleDate, $employeeOvertimeDays)) {
-                                $singleDateOvertime = $employeeOvertimeHours;
-                            }
+                            $singleDateOvertime = $employeeOvertimeHours;
                             DutyRosterEntry::create([
                                 "roster_id" => $DutyRoster->id,
                                 "Shift_id" => $DutyRoster->Shift_id,
@@ -588,16 +600,8 @@ class DutyRosterController extends Controller
                         }
                     }
 
-                    // Check compliance for overtime (any OT from single value or hoursByDate)
+                    // Check compliance for overtime
                     $hasAnyOvertime = ($employeeOvertimeHours !== '00:00' && $employeeOvertimeHours !== '');
-                    if (! $hasAnyOvertime && ! empty($employeeOvertimeHoursByDate)) {
-                        foreach ($employeeOvertimeHoursByDate as $otVal) {
-                            if ($otVal !== '00:00' && $otVal !== '' && $otVal !== null) {
-                                $hasAnyOvertime = true;
-                                break;
-                            }
-                        }
-                    }
                     $CheckEmployees = Employee::with(['resortAdmin','position','department','EmployeeAttandance'])->where('id',$Employee)->where('resort_id', $this->resort->resort_id)->first();
 
                     if($CheckEmployees)
