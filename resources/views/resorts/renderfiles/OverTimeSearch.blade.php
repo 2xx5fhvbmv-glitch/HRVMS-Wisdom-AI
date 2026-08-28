@@ -47,6 +47,27 @@
                                 ->orderBy('date', 'asc')
                                 ->orderBy('start_time', 'asc')
                                 ->get();
+
+                            // Separate, unrelated OT source: attendance-recorded
+                            // overtime (parent_attendaces.OverTime/OTStatus) —
+                            // this is what Run Payroll's "OT entries with missing
+                            // OT status" check actually validates, and there was
+                            // no working UI anywhere in the app to approve/reject
+                            // it (the closest thing, a "confirmations()" JS
+                            // function on the HR dashboard, was never wired to
+                            // any button). Same trivial-zero exclusions as the
+                            // payroll check so a row only shows up here if it's
+                            // the exact thing blocking payroll.
+                            $pendingAttendanceOt = \App\Models\ParentAttendace::where('Emp_id', $r->emp_id)
+                                ->where('resort_id', $resort_id)
+                                ->whereBetween('date', [$startOfMonth->format('Y-m-d'), $endOfMonth->format('Y-m-d')])
+                                ->whereNotNull('OverTime')
+                                ->whereNotIn('OverTime', ['', '-', '0:00', '00:00', '0:0', '0', '00:00:00'])
+                                ->where(function ($q) {
+                                    $q->whereNull('OTStatus')->orWhere('OTStatus', '');
+                                })
+                                ->get()
+                                ->keyBy(fn($a) => \Carbon\Carbon::parse($a->date)->format('Y-m-d'));
                             
                             // Group overtime by date
                             $overtimeByDate = $overtimeData->groupBy(function($item) {
@@ -82,6 +103,7 @@
                                 $isPublicHoliday = isset($publicHolidays) && in_array($date, $publicHolidays);
                                 $dayOvertimes = $overtimeByDate->get($date, collect());
                                 $overtimeCount = $dayOvertimes->count();
+                                $pendingAttendance = $pendingAttendanceOt->get($date);
                                 
                                 // Calculate total overtime for the day
                                 $dayTotalMinutes = 0;
@@ -131,6 +153,17 @@
                                     <span class="overtime-total">{{ $dayTotalTime }}</span>
                                 @else
                                     <span class="no-overtime">-</span>
+                                @endif
+                                @if($pendingAttendance)
+                                    {{-- Attendance-recorded OT with no OTStatus yet —
+                                         this is the exact thing Run Payroll's "OT
+                                         entries with missing OT status" check
+                                         blocks on. --}}
+                                    <div class="mt-1">
+                                        <span class="badge badge-themeWarning" title="Attendance OT: {{ $pendingAttendance->OverTime }}, awaiting approval">{{ $pendingAttendance->OverTime }}</span>
+                                        <a href="javascript:void(0);" class="attendance-ot-approve" data-attdance-id="{{ $pendingAttendance->id }}" title="Approve"><i class="fa-solid fa-check text-success"></i></a>
+                                        <a href="javascript:void(0);" class="attendance-ot-reject" data-attdance-id="{{ $pendingAttendance->id }}" title="Reject"><i class="fa-solid fa-xmark text-danger"></i></a>
+                                    </div>
                                 @endif
                             </td>
                         @endforeach
