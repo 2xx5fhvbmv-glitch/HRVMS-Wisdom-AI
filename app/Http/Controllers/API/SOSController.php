@@ -19,6 +19,7 @@ use App\Models\Employee;
 use App\Models\ChildSOSHistoryStatus;
 use App\Models\SOSRolesAndPermission;
 use App\Models\SOSChildEmergencyType;
+use App\Models\ResortSiteSettings;
 use Illuminate\Support\Facades\Http;
 use App\Helpers\Common;
 use GuzzleHttp\Client;
@@ -70,6 +71,33 @@ class SOSController extends Controller
         }
     }
     
+    public function getEmergencyContacts()
+    {
+        if (!Auth::guard('api')->check()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        try {
+            $siteSettings = ResortSiteSettings::where('resort_id', $this->resort_id)->first();
+
+            return response()->json([
+                'success' => true,
+                'message' => "Emergency contact numbers retrieved successfully.",
+                'data' => [
+                    'police' => $siteSettings->emergency_police_number ?? null,
+                    'fire' => $siteSettings->emergency_fire_number ?? null,
+                    'mndf' => $siteSettings->emergency_mndf_number ?? null,
+                ],
+            ], 200);
+
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
     public function SOSStore(Request $request)
     {
         if (!Auth::guard('api')->check()) {
