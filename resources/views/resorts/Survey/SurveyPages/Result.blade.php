@@ -103,6 +103,32 @@
                             </div>
                         </form>
                     </div>
+                    @if(!empty($respondentAnswers))
+                    <div class="bg-white mb-3">
+                        <p class="fw-600 mb-2">Responses</p>
+                        <div class="accordion" id="respondentAnswersAccordion">
+                            @foreach($respondentAnswers as $idx => $respondent)
+                                <div class="accordion-item">
+                                    <h2 class="accordion-header">
+                                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#respondentAnswer{{ $idx }}">
+                                            {{ $respondent['name'] }}
+                                        </button>
+                                    </h2>
+                                    <div id="respondentAnswer{{ $idx }}" class="accordion-collapse collapse" data-bs-parent="#respondentAnswersAccordion">
+                                        <div class="accordion-body">
+                                            @foreach($respondent['answers'] as $qa)
+                                                <div class="mb-2">
+                                                    <div class="fw-600">{{ $qa['question'] }}</div>
+                                                    <div class="text-muted">{{ $qa['answer'] !== '' ? $qa['answer'] : 'No answer' }}</div>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                    @endif
                     @if(!empty($ratingChartLabels) || !empty($optionChartLabels))
                     <div class="bg-white">
                         <div class="row g-md-4 g-3 align-items-center">
