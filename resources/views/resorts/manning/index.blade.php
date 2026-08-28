@@ -448,12 +448,13 @@
                              position should sit on a different grade than its
                              rank's default (e.g. Finance Director and Finance
                              Manager both rank HOD, but different grades).
-                             Leave unset to just use the rank's default grade. --}}
+                             Leave unset to just use the rank's default grade.
+                             Options are narrowed to only the grades mapped to
+                             the selected rank (see #new-position-rank change
+                             handler) — picking a rank first is required for
+                             this to show anything beyond the default option. --}}
                         <select class="form-select select2-modal" name="benefit_grid_level" id="new-position-grid-level">
                             <option value="">Use rank's default grade</option>
-                            @foreach ($allGrades as $grade)
-                                <option value="{{ $grade->id }}">{{ $grade->name }}</option>
-                            @endforeach
                         </select>
                     </div>
                     <div class="form-group mb-3">
@@ -900,10 +901,25 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
     $('#new-position-rank').on('change', function() {
         let rank = $(this).val();
         let hint = $('#new-position-rank-grade-hint');
-        if (!rank) { hint.text(''); return; }
+        let gradeSelect = $('#new-position-grid-level');
+        if (!rank) {
+            hint.text('');
+            gradeSelect.html('<option value="">Use rank\'s default grade</option>');
+            return;
+        }
         $.get("{{ route('manning.rank-grade-mapping') }}", { rank: rank }, function(response) {
             let grades = response.grades || [];
             hint.text(grades.length ? 'Employee Grade(s) currently using this rank: ' + grades.join(', ') : 'No Employee Grade currently uses this rank yet.');
+
+            // Employee Grade options narrow to only the grades actually
+            // mapped to the selected rank — picking a grade unrelated to
+            // this rank made no sense and just invited mistakes.
+            let gradeOptions = response.gradeOptions || [];
+            let optionsHtml = '<option value="">Use rank\'s default grade</option>';
+            gradeOptions.forEach(function(grade) {
+                optionsHtml += `<option value="${grade.id}">${grade.name}</option>`;
+            });
+            gradeSelect.html(optionsHtml);
         });
     });
 

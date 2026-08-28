@@ -51,14 +51,12 @@ class ManningController extends Controller
         $positions = Position::where('status', 'active')->get();
         $resort_sections = ResortSection::where('status', 'active')->where('resort_id',$resort_id)->get();
         $resort_positions = ResortPosition::where('status', 'active')->where('resort_id',$resort_id)->get();
-        $allGrades = \App\Models\ResortBenefitGradeLevel::where('resort_id', $resort_id)->where('status', 'active')->get(['id', 'name']);
 
         return view('resorts.manning.index')->with(
             compact(
             'page_title',
             'divisions','departments','sections','positions',
-            'resort_divisions','resort_departments','resort_sections','resort_positions',
-            'allGrades'
+            'resort_divisions','resort_departments','resort_sections','resort_positions'
             )
         );
     }
@@ -80,11 +78,18 @@ class ManningController extends Controller
             ->where('rank', (int) $rank)
             ->pluck('grade_level_id');
 
-        $gradeNames = \App\Models\ResortBenefitGradeLevel::where('resort_id', $resort_id)
+        $grades = \App\Models\ResortBenefitGradeLevel::where('resort_id', $resort_id)
+            ->where('status', 'active')
             ->whereIn('id', $gradeLevelIds)
-            ->pluck('name');
+            ->get(['id', 'name']);
 
-        return response()->json(['grades' => $gradeNames->values()]);
+        // 'grades' kept as plain names for the existing read-only hint text;
+        // 'gradeOptions' adds ids so the Employee Grade select can be
+        // filtered to only the grades actually mapped to this rank.
+        return response()->json([
+            'grades' => $grades->pluck('name')->values(),
+            'gradeOptions' => $grades->values(),
+        ]);
     }
 
     public function getDropdownData()
