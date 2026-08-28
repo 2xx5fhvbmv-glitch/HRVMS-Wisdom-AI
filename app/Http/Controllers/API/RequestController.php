@@ -170,7 +170,7 @@ class RequestController extends Controller
         // resolution pattern as every other benefit-grid lookup (employee's
         // own benefit_grid_level wins, else rank-based default).
         if (in_array($request->request_type, ['Salary Advance', 'Loan Request'])) {
-            $empGrade                                   =   Common::resolveEmpGrade($this->resort_id, $employee->rank, $employee->benefit_grid_level);
+            $empGrade                                   =   Common::resolveEmpGrade($this->resort_id, $employee->rank, $employee->benefit_grid_level, $employee->Position_id);
             $benefitGrid                                =   $empGrade
                                                                 ? \App\Models\ResortBenifitGrid::where('resort_id', $this->resort_id)
                                                                     ->where('emp_grade', $empGrade)

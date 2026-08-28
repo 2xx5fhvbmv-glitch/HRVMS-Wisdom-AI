@@ -442,6 +442,20 @@
                         </select>
                         <small class="text-muted" id="new-position-rank-grade-hint"></small>
                     </div>
+                    <div class="form-group mb-20">
+                        <label class="position-rank-label">Employee Grade (optional)</label>
+                        {{-- Optional override: only needed when this specific
+                             position should sit on a different grade than its
+                             rank's default (e.g. Finance Director and Finance
+                             Manager both rank HOD, but different grades).
+                             Leave unset to just use the rank's default grade. --}}
+                        <select class="form-select select2-modal" name="benefit_grid_level" id="new-position-grid-level">
+                            <option value="">Use rank's default grade</option>
+                            @foreach ($allGrades as $grade)
+                                <option value="{{ $grade->id }}">{{ $grade->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
                     <div class="form-group mb-3">
                         <label class="position-status-label">Select Status <span class="red-mark">*</span></label>
                         <select class="form-select select2-modal" name="status" required data-parsley-required-message="Please select a status.">
@@ -733,7 +747,8 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
     window.resortDivisions = @json($resort_divisions);
     window.resortDepartments = @json($resort_departments);
     window.resortSections = @json($resort_sections);
-    window.Position_Rank = @json(config('settings.eligibilty'));
+    {{-- Was config('settings.eligibilty') — stale, missing HR/Finance/MD/SO/EDHOD/CLINIC_STAFF. Same fix as the create form. --}}
+    window.Position_Rank = @json(config('settings.Position_Rank'));
 
     // Function to reload all 4 DataTables
     function reloadAllTables() {

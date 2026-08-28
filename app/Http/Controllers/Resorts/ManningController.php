@@ -51,12 +51,14 @@ class ManningController extends Controller
         $positions = Position::where('status', 'active')->get();
         $resort_sections = ResortSection::where('status', 'active')->where('resort_id',$resort_id)->get();
         $resort_positions = ResortPosition::where('status', 'active')->where('resort_id',$resort_id)->get();
+        $allGrades = \App\Models\ResortBenefitGradeLevel::where('resort_id', $resort_id)->where('status', 'active')->get(['id', 'name']);
 
         return view('resorts.manning.index')->with(
             compact(
             'page_title',
             'divisions','departments','sections','positions',
-            'resort_divisions','resort_departments','resort_sections','resort_positions'
+            'resort_divisions','resort_departments','resort_sections','resort_positions',
+            'allGrades'
             )
         );
     }
@@ -96,7 +98,12 @@ class ManningController extends Controller
         $sections = Section::where('status', 'active')->get(['id', 'name']);
         $positions = Position::where('status', 'active')->get(['id', 'position_title']);
         $resort_sections = ResortSection::where('status', 'active')->where('resort_id', $resort_id)->get(['id', 'name']);
-        $eligibility = config('settings.eligibilty');
+        // Was config('settings.eligibilty') — a stale, incomplete copy of
+        // Position_Rank missing HR, Finance, MD, SO, EDHOD, and
+        // CLINIC_STAFF. Same fix already applied to the Add Position
+        // create form; this feeds the inline-edit row's Rank dropdown,
+        // which had the identical gap.
+        $eligibility = config('settings.Position_Rank');
 
         return response()->json([
             'divisions' => $divisions,
@@ -886,6 +893,11 @@ class ManningController extends Controller
             $position->short_title = $request->filled('short_title') ? $request->short_title : '';
             $position->status = $request->status;
             $position->Rank = $request->Rank;
+            // Optional per-position grade override — lets two positions
+            // sharing the same rank sit on different Benefit Grids. Left
+            // unset, the position falls back to its rank's default grade
+            // exactly as before.
+            $position->benefit_grid_level = $request->filled('benefit_grid_level') ? $request->benefit_grid_level : null;
             $position->save();
             // Return success message
             return response()->json(['success' => true, 'message' => 'Position added successfully.']);
@@ -973,6 +985,10 @@ class ManningController extends Controller
                 // short_title not edited from UI; keep existing value
                 $position->status = $request->input('status');
                 $position->Rank = $request->input('Rank');
+                // benefit_grid_level intentionally left untouched here — the
+                // inline-edit row doesn't have a Grade field yet, so there's
+                // nothing in $request to read; touching it would silently
+                // wipe out an override set via the create form.
                 $update = $position->save();
                 // Get the updated division name
                 $divisionName = ResortDivision::find($request->input('division'))->name;

@@ -422,10 +422,10 @@ class DutyRosterController extends Controller
             $rosterEmployees = Employee::join('resort_admins as t1', 't1.id', '=', 'employees.Admin_Parent_id')
                 ->where('employees.resort_id', $resort_id)
                 ->whereIn('employees.id', $Employees)
-                ->get(['employees.id', 'employees.rank', 'employees.benefit_grid_level', 't1.first_name', 't1.last_name']);
+                ->get(['employees.id', 'employees.rank', 'employees.benefit_grid_level', 'employees.Position_id', 't1.first_name', 't1.last_name']);
 
             foreach ($rosterEmployees as $emp) {
-                $empGrade = Common::resolveEmpGrade($resort_id, $emp->rank, $emp->benefit_grid_level);
+                $empGrade = Common::resolveEmpGrade($resort_id, $emp->rank, $emp->benefit_grid_level, $emp->Position_id);
                 $grid = $empGrade
                     ? ResortBenifitGrid::where('resort_id', $resort_id)
                         ->where('emp_grade', $empGrade)

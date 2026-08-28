@@ -725,7 +725,7 @@ class PayrollController extends Controller
             // active grade for this resort (resolveEmpGrade() guards against
             // stale/poisoned values); otherwise falls back to the rank-based
             // default grade mapping.
-            $empGrade = Common::resolveEmpGrade($resortId, $employee->rank, $employee->benefit_grid_level);
+            $empGrade = Common::resolveEmpGrade($resortId, $employee->rank, $employee->benefit_grid_level, $employee->Position_id);
             $grid = ResortBenifitGrid::where('resort_id', $resortId)
                 ->where('emp_grade', $empGrade)
                 ->where('service_charge', 1)
