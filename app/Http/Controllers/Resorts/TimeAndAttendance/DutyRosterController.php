@@ -1262,7 +1262,13 @@ class DutyRosterController extends Controller
                                     // Non-HR/EXCOM users only see their own department
                                     $Rosterdata=$Rosterdata->where('employees.Dept_id', $Dept_id);
                                 }
-                                $Rosterdata=$Rosterdata->paginate(10);
+                                // withQueryString() — pagination links previously
+                                // dropped every filter param (month/year/
+                                // overtime_type/search/Poitions) except page
+                                // itself, so clicking "page 2" silently reset the
+                                // whole view to today's defaults instead of
+                                // staying on whatever period/filter was selected.
+                                $Rosterdata=$Rosterdata->paginate(10)->withQueryString();
 
         $year = now()->year;
         $month = now()->month;
@@ -1392,7 +1398,12 @@ class DutyRosterController extends Controller
             $Rosterdata1->where('employees.id', $searchTerm);
         }
 
-        $Rosterdata = $Rosterdata1->paginate(10);
+        // withQueryString() — pagination links previously dropped every
+        // filter param (month/year/overtime_type/search/Poitions) except
+        // page itself, so clicking "page 2" silently reset to today's
+        // defaults instead of staying on whatever period/filter was
+        // selected — this is the AJAX-filtered path's pagination links.
+        $Rosterdata = $Rosterdata1->paginate(10)->withQueryString();
 
         // Build monthwise headers for the cutoff period
         $monthwiseheaders = [];
