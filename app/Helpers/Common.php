@@ -5054,6 +5054,32 @@ class Common
     }
 
     /**
+     * The Benefit Grid's Salary Paid In is the authoritative source for
+     * which currency an employee's basic_salary is actually paid/displayed
+     * in — not a value copied onto employees.basic_salary_currency at one
+     * point in time (which only ever synced once, at grid-assignment time,
+     * and only when basic_salary was previously unset, so it could go
+     * stale the moment the grid changed or was assigned after a salary
+     * already existed). Always resolves the employee's CURRENT grid live,
+     * so a grid edit takes effect everywhere immediately with nothing to
+     * keep in sync. Falls back to 'USD' if no active grid resolves.
+     */
+    public static function resolveEmpSalaryCurrency($resortId, $rank, $benefitGridLevel = null)
+    {
+        $empGrade = self::resolveEmpGrade($resortId, $rank, $benefitGridLevel);
+        if (!$empGrade) {
+            return 'USD';
+        }
+
+        $salaryPaidIn = \App\Models\ResortBenifitGrid::where('resort_id', $resortId)
+            ->where('emp_grade', $empGrade)
+            ->where('status', 'Active')
+            ->value('salary_paid_in');
+
+        return $salaryPaidIn ?: 'USD';
+    }
+
+    /**
      * Builds the standardized multi-step approval payload for a single
      * Leave request, for mobile's timeline UI. Pure read-side — does not
      * change how approve/reject is enforced (that stays in
