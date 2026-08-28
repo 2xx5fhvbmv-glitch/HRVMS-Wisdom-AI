@@ -178,7 +178,8 @@
                         url: "{{ route('resort.get.position') }}",
                         type: "post",
                         data: {
-                            deptId: deptId
+                            deptId: deptId,
+                            "_token": "{{ csrf_token() }}"
                         },
                         success: function(data) {
                             if(data.success == true)
@@ -488,7 +489,8 @@
                                 searchTerm : $('.search').val(),
                                 ResortDepartment: $("#ResortDepartment").val(),
                                 searchTerm: $('.search').val(),
-                                Positions : $('.Positions ').val()
+                                Positions : $('.Positions ').val(),
+                                "_token": "{{ csrf_token() }}"
                             },
                             success: function(response)
                             {

@@ -872,7 +872,7 @@
             $.ajax({
                 url: "{{ route('send.email.to.travel.partner') }}", // Backend route
                 method: "POST",
-                data:{leaveId : leaveId},
+                data:{leaveId : leaveId, "_token": "{{ csrf_token() }}"},
                 success: function (response) {
                     toastr.success(response.message, "Success", {
                         positionClass: 'toast-bottom-right',

@@ -108,7 +108,7 @@
             $.ajax({
                 url: "{{ route('resort.ta.DownloadFile') }}",
                 type: "POST",
-                data: { id: fileId, flag: fileFlag },
+                data: { id: fileId, flag: fileFlag, "_token": "{{ csrf_token() }}" },
                 success: function(response) {
                     if (response.success) {
                         $("#ViewModeOfFiles").html('<div class="text-center"><p>Loading...</p></div>');

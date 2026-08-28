@@ -153,7 +153,8 @@ $(document).ready(function() {
                         url: "{{ route('resort.get.position') }}",
                         type: "post",
                         data: {
-                            deptId: deptId
+                            deptId: deptId,
+                            "_token": "{{ csrf_token() }}"
                         },
                         success: function(data) {
                             if(data.success == true)

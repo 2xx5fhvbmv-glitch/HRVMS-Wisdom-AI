@@ -922,7 +922,7 @@
             $.ajax({
                 url: '{{ route("get.applicantinfo.draft") }}',
                 method: 'POST',
-                data: { step: step },
+                data: { step: step, "_token": "{{ csrf_token() }}" },
                 success: function (response) {
                     if (response.success) {
                         // Populate the previous fieldset with retrieved data

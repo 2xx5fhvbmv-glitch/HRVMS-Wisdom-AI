@@ -798,6 +798,7 @@ $(document).ready(function()
                 type: "post",
                 data: {
                     division_id: $(this).val(),
+                    "_token": "{{ csrf_token() }}"
                 },
                 success: function(data) {
 
@@ -829,7 +830,8 @@ $(document).ready(function()
                 url: "{{ route('resort.ta.PositionSections') }}",
                 type: "post",
                 data: {
-                    deptId: deptId
+                    deptId: deptId,
+                    "_token": "{{ csrf_token() }}"
                 },
                 success: function(d) {
                     // Clear the dropdown and add a placeholder option

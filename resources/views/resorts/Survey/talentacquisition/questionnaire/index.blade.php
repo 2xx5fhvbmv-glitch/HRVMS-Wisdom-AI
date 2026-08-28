@@ -132,7 +132,7 @@ $(document).on('click', '.delete-row-btn', function (e) {
             $.ajax({
                 type: "post",
                 url: "{{ route('resort.ta.destroyQuestions') }}",
-                data: {"childId": position_id,"ParentId":ParentId},
+                data: {"childId": position_id,"ParentId":ParentId,"_token": "{{ csrf_token() }}"},
                 dataType: "json",
             }).done(function(result) {
                 if (result.success == true) {

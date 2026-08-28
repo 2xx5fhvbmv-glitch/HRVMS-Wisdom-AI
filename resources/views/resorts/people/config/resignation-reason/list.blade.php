@@ -177,7 +177,8 @@
             data: {
                 Main_id: Main_id,
                 reason: reason,
-                status: Status
+                status: Status,
+                "_token": "{{ csrf_token() }}"
             },
             success: function(response) {
                 if (response.success == true) { // Ensure response contains a success key

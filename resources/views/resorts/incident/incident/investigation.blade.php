@@ -662,7 +662,8 @@
                 url: '{{ route("incident.request-statement") }}',
                 method: 'POST',
                 data: {
-                    incident_id: incidentId
+                    incident_id: incidentId,
+                    "_token": "{{ csrf_token() }}"
                 },
                 headers: {
                     'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
@@ -686,6 +687,7 @@
                     data: {
                         incident_id: incidentId,
                         approval: $('#inlineCheckbox1').is(':checked') ? 1 : 0,
+                        "_token": "{{ csrf_token() }}"
                     },
                     headers: {
                         'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')

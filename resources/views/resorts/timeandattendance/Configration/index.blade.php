@@ -850,6 +850,7 @@
                     type: "post",
                     data: {
                         division_id: $(this).val(),
+                        "_token": "{{ csrf_token() }}",
                     },
                     success: function(data) {
 
@@ -884,7 +885,8 @@
                     url: "{{ route('resort.ta.PositionSections') }}",
                     type: "post",
                     data: {
-                        deptId: deptId
+                        deptId: deptId,
+                        "_token": "{{ csrf_token() }}"
                     },
                     success: function(d) {
                         // Clear the dropdown and add a placeholder option
@@ -977,7 +979,8 @@
                                 url: "{{ route('resort.timeandattendance.removeShift') }}",
                                 type: "POST",
                                 data: {
-                                    id: id
+                                    id: id,
+                                    "_token": "{{ csrf_token() }}"
                                 }, // Pass the id in the data
                                 success: function(response) {
                                     $('#respond-HoldModel').modal('hide');

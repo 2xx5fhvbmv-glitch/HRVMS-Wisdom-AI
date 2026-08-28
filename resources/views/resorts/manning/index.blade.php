@@ -1644,7 +1644,8 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
                 name: updatedName,
                 division:updatedDivision,
                 department:updatedDepartment,
-                status: updatedStatus
+                status: updatedStatus,
+                "_token": "{{ csrf_token() }}"
             },
             success: function(response) {
                 if(response.success == true) {

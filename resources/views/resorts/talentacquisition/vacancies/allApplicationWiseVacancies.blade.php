@@ -194,7 +194,7 @@ $(document).ready(function() {
         $.ajax({
             url: "{{ route('resort.get.position') }}",
             type: "post",
-            data: { deptId: deptId },
+            data: { deptId: deptId, "_token": "{{ csrf_token() }}" },
             success: function(data) {
                 if(data.success == true) {
                     $.each(data.data, function(key, value) {

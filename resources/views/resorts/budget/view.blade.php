@@ -602,6 +602,7 @@
                         ProposedBasicsalary: ProposedBasicsalary,
                         month_data: month_data,
                         grand_total:grand_total,
+                        "_token": "{{ csrf_token() }}"
                     },
                     success: function (response) {
 
