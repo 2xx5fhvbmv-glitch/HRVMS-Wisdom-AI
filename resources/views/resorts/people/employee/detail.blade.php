@@ -3924,7 +3924,7 @@
         // round-trip through every layer untouched.
         //
         // Toastr itself is loaded in resorts/layouts/js.blade.php BEFORE
-        // @yield('import-scripts') runs, so by the time this $(function)
+        // @@yield('import-scripts') runs, so by the time this $(function)
         // fires it's already defined. The guard is just defensive.
         $(function () {
             try {
