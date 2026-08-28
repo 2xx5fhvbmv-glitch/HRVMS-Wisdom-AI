@@ -213,6 +213,28 @@
                                 </ul>
                             </div>
                         </div>
+
+                        @if(!empty($positionsByRank) && $positionsByRank->isNotEmpty())
+                        <div class="row g-lg-5 g-3 mb-3">
+                            <div class="col-12">
+                                <p class="fw-500 mb-2">Positions Covered by This Grade</p>
+                                <div class="row g-3">
+                                    @foreach($positionsByRank as $rankName => $positions)
+                                    <div class="col-lg-4 col-md-6">
+                                        <div class="bg-themeGrayLight rounded p-3 h-100">
+                                            <p class="fw-600 mb-2">{{ $rankName }}</p>
+                                            <ul class="list-unstyled mb-0">
+                                                @foreach($positions as $position)
+                                                <li>{{ $position->position_title }} <span class="text-muted">({{ $position->employees_count }} employee{{ $position->employees_count == 1 ? '' : 's' }})</span></li>
+                                                @endforeach
+                                            </ul>
+                                        </div>
+                                    </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        </div>
+                        @endif
                     </div>
                 </div>
 

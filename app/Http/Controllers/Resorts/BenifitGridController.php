@@ -687,8 +687,24 @@ class BenifitGridController extends Controller
             $selected_sports =  explode(',', $benefit_grid->sports_and_entertainment_facilities);
             $LeaveCategories = LeaveCategory::where('resort_id',$resort_id)->get();
 
+            // Direct Position -> Grade breakdown: which real positions this
+            // grade actually covers, via the rank(s) it's mapped to. The
+            // view page previously showed nothing at all connecting this
+            // grade back to ranks/positions — only the create/edit form's
+            // rank checkboxes had a position-count hint.
+            $mappedRanks = ResortBenefitGradeLevelRank::where('resort_id', $resort_id)
+                ->where('grade_level_id', $benefit_grid->emp_grade)
+                ->pluck('rank');
+            $rankConfig = config('settings.Position_Rank');
+            $positionsByRank = ResortPosition::where('resort_id', $resort_id)
+                ->where('status', 'active')
+                ->whereIn('Rank', $mappedRanks)
+                ->withCount('employees')
+                ->get()
+                ->groupBy(fn($p) => $rankConfig[(int) $p->Rank] ?? ('Rank ' . $p->Rank));
+
             return view('resorts.benifitgrid.view')->with(compact(
-                'page_title', 'resort_id', 'sports', 'benefit_grid','benefitGridChildren', 'isViewMode','selected_linen_array','selected_laundry','selected_sports','LeaveCategories'
+                'page_title', 'resort_id', 'sports', 'benefit_grid','benefitGridChildren', 'isViewMode','selected_linen_array','selected_laundry','selected_sports','LeaveCategories','positionsByRank'
             ));
         } catch (\Exception $e) {
             \Log::emergency("File: " . $e->getFile());
