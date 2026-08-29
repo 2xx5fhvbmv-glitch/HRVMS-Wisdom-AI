@@ -300,7 +300,7 @@
                                                                                                                             </div>
                                                                                                                         </div>
                                                                                                                     </div>
-                                                                                                                @elseif($shiftData)
+                                                                                                                @elseif($shiftData && $shiftData->Status !== null)
                                                                                                                     @if($shiftData->Status == 'DayOff')
                                                                                                                         {{-- Day Off: show on whole column, no shift, but
                                                                                                                              expose edit so HR can change it back to a
@@ -694,7 +694,7 @@
                                                                                                     </div>
                                                                                                 </div>
                                                                                             </div>
-                                                                                        @elseif($shiftData)
+                                                                                        @elseif($shiftData && $shiftData->Status !== null)
                                                                                             @if($shiftData->Status == 'DayOff')
                                                                                                 {{-- Day Off: show on whole column, no shift --}}
                                                                                                 <div class="createDuty-tableBlock dayoff-cell">

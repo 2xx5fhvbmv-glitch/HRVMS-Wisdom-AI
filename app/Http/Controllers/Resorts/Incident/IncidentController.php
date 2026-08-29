@@ -421,12 +421,12 @@ class IncidentController extends Controller
         if (!Common::canViewIncidentInvestigation($incident)) {
             abort(403, 'Only HR and committee members assigned to this incident can view the investigation.');
         }
-        $investigations = IncidentsInvestigation::with(['addedBy.employee','followupAction'])->where('incident_id',$id)->orderBy('created_at','desc')->get();
+        $investigations = IncidentsInvestigation::with(['addedBy.employee.resortAdmin','followupAction'])->where('incident_id',$id)->orderBy('created_at','desc')->get();
         // dd($investigations);
-        $incident_committee = IncidentCommittee::where('resort_id',$resort_id)->get();  
-        $incident_witness_statements = IncidentsWitness::with('employee')->where('incident_id',$id)->get();
+        $incident_committee = IncidentCommittee::where('resort_id',$resort_id)->get();
+        $incident_witness_statements = IncidentsWitness::with('employee.resortAdmin')->where('incident_id',$id)->get();
         // dd($incident_witness_statements);
-        $incident_employee_statements = IncidentsEmployeeStatements::with('employee')->where('incident_id',$id)->get();
+        $incident_employee_statements = IncidentsEmployeeStatements::with('employee.resortAdmin')->where('incident_id',$id)->get();
         
         // dd($incident_employee_statements);
         $followup_actions = IncidentFollowupActions::where('resort_id',$resort_id)->get(); 
