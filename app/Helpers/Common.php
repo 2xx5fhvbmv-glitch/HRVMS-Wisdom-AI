@@ -2808,17 +2808,34 @@ class Common
 
 					// Generate other links
 					// Was building a URL straight from $vacancy->Jobadvimg (often
-					// empty — most vacancies have no per-vacancy override) and
-					// separately pulling EVERY JobAdvertisement row for the whole
-					// resort with no vacancy_id scoping at all, so the carousel
-					// mixed in every other position's poster and the fallback
-					// image 404'd — matches resolveVacancyPosterImage's own
-					// per-vacancy-then-resort-default logic (see VacancyController's
-					// grid view for the same pattern), just duplicated and broken
-					// here.
-					$poster = self::resolveVacancyPosterImage($resort_id, $vacancy->V_id);
-					$vacancy->JobAdvertisement = $poster;
-					$vacancy->allJobAdImages = [$poster];
+					// empty — most vacancies have no per-vacancy override), which
+					// 404'd whenever there was no override. Separately,
+					// allJobAdImages pulled EVERY JobAdvertisement row for the
+					// whole resort with no vacancy_id scoping at all, so the
+					// carousel mixed in every OTHER position's poster too —
+					// fixed by scoping to this vacancy's own poster(s) plus the
+					// resort-wide defaults (vacancy_id IS NULL) a resort can
+					// upload more than one of, which is the actual multi-poster
+					// picker this carousel is for.
+					$posterRows = JobAdvertisement::where('Resort_id', $resort_id)
+						->where(function($q) use ($vacancy) {
+							$q->where('vacancy_id', $vacancy->V_id)->orWhereNull('vacancy_id');
+						})
+						->get();
+					$posterUrls = $posterRows->map(function($ad) use ($resort_id) {
+						return self::GetJobAdvertisementImage($resort_id, $ad->Jobadvimg ?? null);
+					})->values()->toArray();
+					// Raw filenames in the same order as allJobAdImages — the modal's
+					// "pick a poster and submit" flow needs the actual filename to
+					// save, not the resolved (and for Wasabi, presigned/expiring) URL.
+					$posterFiles = $posterRows->pluck('Jobadvimg')->values()->toArray();
+					if (empty($posterUrls)) {
+						$posterUrls = [self::GetJobAdvertisementImage($resort_id, null)];
+						$posterFiles = [null];
+					}
+					$vacancy->JobAdvertisement = $posterUrls[0];
+					$vacancy->allJobAdImages = $posterUrls;
+					$vacancy->allJobAdImageFiles = $posterFiles;
 					$vacancy->profileImg = URL::asset($vacancy->passport_photo);
 					$vacancy->ApplicationStatus = $vacancy->ApplicationStatus == null ? " " : $vacancy->ApplicationStatus;
 					$vacancy->As_ApprovedBy = $vacancy->As_ApprovedBy == null ? 25 : $vacancy->As_ApprovedBy;
