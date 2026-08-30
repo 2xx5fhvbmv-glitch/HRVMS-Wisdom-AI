@@ -84,6 +84,14 @@ class LearningController extends Controller
             // HR sees their own department's employees (excluding self).
             $employees_query->where('Dept_id', $emp->Dept_id);
             $employees_query->where('employees.id', '!=', $emp->id);
+        } elseif (in_array((int) ($emp->rank ?? 0), [1, 2], true) && optional($emp)->Dept_id) {
+            // EXCOM (1) / HOD (2) heading any OTHER department (Finance,
+            // Engineering, etc.) own their whole department too — only the
+            // HR-department case above was handled, so every other
+            // EXCOM/HOD fell through to the reporting_to-only branch below
+            // and saw just their direct peers instead of their department.
+            $employees_query->where('Dept_id', $emp->Dept_id);
+            $employees_query->where('employees.id', '!=', $emp->id);
         } else {
             // Everyone else (regular Manager rank, etc.) sees their reporting tree.
             $scopedDeptIds = Common::getScopedDepartmentIds();
