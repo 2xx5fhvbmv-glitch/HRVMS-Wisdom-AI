@@ -285,6 +285,27 @@ class JobAdvertisementController extends Controller
                     "Resort_id"=> $this->resort->resort_id,
                     "ta_child_id" =>  $request->ta_child_id,
                 ]);
+
+                // Persist whichever poster the user picked in the carousel as
+                // this vacancy's own override — otherwise the selection has no
+                // effect and the vacancy just keeps showing the resort default.
+                // ta_child_id -> t_anotification_children.id -> Parent_ta_id ->
+                // t_anotification_parents.id -> V_id (vacancies.id), same chain
+                // Common::GmApprovedVacancy() itself joins through.
+                if ($request->filled('selected_jobadvimg')) {
+                    $vacancyId = DB::table('t_anotification_children as t3')
+                        ->join('t_anotification_parents as t2', 't2.id', '=', 't3.Parent_ta_id')
+                        ->where('t3.id', $request->ta_child_id)
+                        ->value('t2.V_id');
+
+                    if ($vacancyId) {
+                        DB::table('vacancies')
+                            ->where('id', $vacancyId)
+                            ->where('resort_id', $this->resort->resort_id)
+                            ->update(['Jobadvimg' => $request->selected_jobadvimg]);
+                    }
+                }
+
                 DB::commit();
 
                 // Return rendered views to refresh dashboard sections
