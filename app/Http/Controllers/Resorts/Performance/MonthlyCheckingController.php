@@ -435,12 +435,18 @@ class MonthlyCheckingController extends Controller
         if($request->ajax())
         {
             $id = base64_decode($request->Parent_id);
+            // Was missing the same department scoping as GetMonthlyCheckInDetails()
+            // (the other endpoint serving this same details page/record) — a
+            // Finance EXCOM (or any HOD/EXCOM) could view another department's
+            // check-in by id with no access check at all.
+            $scopedIds = Common::getPerformanceScopedEmpIds();
             $monthlyDetails = MonthlyCheckingModel::join("employees as t1", "t1.id", "=", "monthly_checking_models.emp_id")
                                                     ->join("resort_admins as t2", "t2.id", "=", "t1.Admin_Parent_id")
                                                     ->join("resort_positions as t3", "t3.id", "=", "t1.Position_id")
                                                     ->leftjoin("learning_programs as t4", "t4.id", "=", "monthly_checking_models.tranining_id")
                                                     ->where("t1.resort_id", $this->resort->resort_id)
                                                     ->where("monthly_checking_models.id", $id)
+                                                    ->when(is_array($scopedIds), fn($q) => $q->whereIn('monthly_checking_models.emp_id', $scopedIds))
                                                     ->orderBy("id","desc")
                                                     ->get(['t1.id as emp_orignal_id','t4.name as traniningname','t2.first_name','t2.last_name','t3.position_title as PositionName','monthly_checking_models.*'])
                                                     ->map(function($ak)
@@ -601,10 +607,16 @@ class MonthlyCheckingController extends Controller
      */
     public function approvedList(Request $request)
     {
+        // Was missing the department scoping every sibling method in this
+        // controller applies (index(), GetMonthlyCheckInDetails()) — any
+        // HOD/EXCOM from any department could see every other department's
+        // approved check-ins here, regardless of rank/dept.
+        $scopedIds = Common::getPerformanceScopedEmpIds();
         $rows = MonthlyCheckingModel::with('employee.resortAdmin', 'employee.position')
             ->where('resort_id', $this->resort->resort_id)
             ->where('approval_status', 'approved')
             ->whereNull('finalized_at')
+            ->when(is_array($scopedIds), fn($q) => $q->whereIn('emp_id', $scopedIds))
             ->orderByDesc('approved_at')
             ->limit(30)
             ->get()
@@ -749,6 +761,13 @@ class MonthlyCheckingController extends Controller
         $checkin = MonthlyCheckingModel::where('resort_id', $this->resort->resort_id)->find($id);
         if (!$checkin) {
             return response()->json(['success' => false, 'message' => 'Check-in not found'], 404);
+        }
+        // Same department-scoping gap as approvedList()/MonltyCheckInDetailsPageList()
+        // — this is the HR/HOD-facing finalize action, not employee self-service, so
+        // it needs the access check, not an emp_id-equals-self check.
+        $scopedIds = Common::getPerformanceScopedEmpIds();
+        if (is_array($scopedIds) && !in_array($checkin->emp_id, $scopedIds, true)) {
+            return response()->json(['success' => false, 'message' => 'You are not authorized to finalize this check-in.'], 403);
         }
         if ($checkin->approval_status !== 'approved') {
             return response()->json(['success' => false, 'message' => 'Check-in must be approved before it can be finalized.'], 422);

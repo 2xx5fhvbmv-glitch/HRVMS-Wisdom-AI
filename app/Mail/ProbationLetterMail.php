@@ -47,9 +47,18 @@ class ProbationLetterMail extends Mailable
      */
     public function build()
     {
-        $subject = $this->type === 'success'
-            ? 'Probation Confirmation Letter'
-            : 'Probation Unsuccessful Letter';
+        // 'experience' is a real caller (EmployeeController::sendEmploymentVerificationLetter)
+        // that never went through failProbation()/sendProbationLetter() — it's not a probation
+        // outcome at all, so it must not fall into the success/fail binary below. Matches
+        // EmployementCertificateMail's existing subject wording for the same letter type used
+        // by the offboarding flow (ExitClearanceController::employementCertificate).
+        if ($this->type === 'experience') {
+            $subject = 'Experience Certificate';
+        } else {
+            $subject = $this->type === 'success'
+                ? 'Probation Confirmation Letter'
+                : 'Probation Unsuccessful Letter';
+        }
 
         $mail = $this->subject($subject)
                     ->view('emails.commonEmail')
