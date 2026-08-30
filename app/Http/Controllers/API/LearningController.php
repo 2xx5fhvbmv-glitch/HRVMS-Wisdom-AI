@@ -19,6 +19,8 @@ use App\Models\TrainingAttendance;
 use App\Models\TrainingFeedbackForm;
 use App\Models\TrainingParticipant;
 use App\Models\TrainingFeedbackResponse;
+use App\Models\EvaluationForm;
+use App\Models\EvaluationFormResponse;
 use App\Models\EmployeeItineraries;
 use App\Models\LearningMaterials;
 use App\Helpers\Common;
@@ -834,7 +836,175 @@ class LearningController extends Controller
                 'message'                           =>  'Feedback data retrieved successfully',
                 'feedback_form_res_view'            =>  $trainingFeedbackResponse
             ], 200);
-        
+
+
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    /**
+     * Structural mirror of feedbackformListing()/feedbackStore()/
+     * participantFeedbackFromList()/feedbackFormResView() for evaluation
+     * forms — same shapes, same conventions, see those methods' comments
+     * for the reasoning behind them.
+     */
+    public function evaluationformListing()
+    {
+        if (!$this->user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        try {
+            $form = EvaluationForm::where('resort_id', $this->resort_id)->get();
+
+            return response()->json(['success' => true, 'message' => 'Evaluation form data fetched Successfully', 'evaluation_form_listing' => $form], 200);
+
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    public function evaluationStore(Request $request)
+    {
+        if (!$this->user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'evaluation_form_id'                        => 'required',
+            'training_schedule_id'                      => 'required',
+            'responses'                                  => 'required',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
+        }
+
+        DB::beginTransaction();
+        try {
+                $evaluationFormId                       =   $request->evaluation_form_id;
+                $trainingScheduleId                     =   $request->training_schedule_id;
+                $participant_id                         =   $this->user->GetEmployee->id;
+                $responses                              =   $request->responses;
+
+                $existing                               =   EvaluationFormResponse::where('form_id', $evaluationFormId)
+                                                                ->where('training_id', $trainingScheduleId)
+                                                                ->where('participant_id', $participant_id)
+                                                                ->first();
+                if ($existing) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Evaluation has already been submitted for this participant.'
+                    ], 200);
+                }
+
+                EvaluationFormResponse::create([
+                    'form_id'                           => $evaluationFormId,
+                    'training_id'                       => $trainingScheduleId,
+                    'participant_id'                    => $participant_id,
+                    'responses'                         => $responses,
+                ]);
+
+                DB::commit();
+            return response()->json(['success' => true, 'message' => 'Evaluation data stored successfully'], 200);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    public function participantEvaluationFromList(Request $request)
+    {
+        if (!$this->user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'training_schedule_id'      => 'required',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
+        }
+
+        try {
+                $trainingScheduleId                     =   $request->training_schedule_id;
+
+                $evaluationResponse                     =   EvaluationFormResponse::join('employees as e','e.id','evaluation_form_responses.participant_id')
+                                                                ->join('resort_admins as t1', "t1.id", "=", "e.Admin_Parent_id")
+                                                                ->join('resort_positions as t2', "t2.id", "=", "e.Position_id")
+                                                                ->when($trainingScheduleId, function ($query, $trainingScheduleId) {
+                                                                    return $query->where('evaluation_form_responses.training_id', $trainingScheduleId);
+                                                                })
+                                                                ->select(
+                                                                   'evaluation_form_responses.*',
+                                                                    't1.id as Parentid',
+                                                                    't1.first_name',
+                                                                    't1.last_name',
+                                                                    't1.profile_picture',
+                                                                    'e.id as emp_id',
+                                                                    't2.position_title',
+                                                                )->get()
+                                                                ->map(function ($item) {
+                                                                    $item->profile_picture = Common::getResortUserPicture($item->Parentid);
+                                                                    return $item;
+                                                                });
+
+                if ($evaluationResponse->isEmpty()) {
+                    return response()->json([
+                        'success'                       => true,
+                        'message'                       => 'No evaluation records found',
+                        'evaluation_listing'            => []
+                    ]);
+                }
+
+                return response()->json([
+                    'success'                           =>  true,
+                    'message'                           =>  'Evaluation data retrieved successfully',
+                    'evaluation_listing'                =>  $evaluationResponse
+                ], 200);
+
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    public function evaluationFormResView($formResId)
+    {
+        if (!$this->user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        try {
+            $evaluationResponse                         =   EvaluationFormResponse::join('evaluation_form as ef','ef.id','evaluation_form_responses.form_id')
+                                                                ->when($formResId, function ($query, $formResId) {
+                                                                    return $query->where('evaluation_form_responses.id', $formResId);
+                                                                })
+                                                                ->select(
+                                                                    'evaluation_form_responses.*',
+                                                                   'ef.form_name',
+                                                                   'ef.form_structure',
+                                                                )->first();
+
+            return response()->json([
+                'success'                           =>  true,
+                'message'                           =>  'Evaluation data retrieved successfully',
+                'evaluation_form_res_view'          =>  $evaluationResponse
+            ], 200);
 
         } catch (\Exception $e) {
             \Log::emergency("File: " . $e->getFile());

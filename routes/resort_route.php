@@ -1236,6 +1236,11 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
     Route::post('learning/employees/get-dept-wise','Learning\TrainingScheduleController@getEmployeesDeptwise')->name('get.employees.deptwise');
     Route::get('learning/program/{id}/detail','Learning\TrainingScheduleController@getProgramDetail')->name('learning.program.detail');
     Route::post('learning/schedule/inline-update','Learning\TrainingScheduleController@inlineUpdate')->name('learning.schedule.update');
+    Route::post('learning/schedule/assign-feedback-form','Learning\TrainingScheduleController@feedbackformAssignParticipant')->name('learning.schedule.assignFeedbackForm');
+    Route::post('learning/schedule/assign-evaluation-form','Learning\TrainingScheduleController@evaluationformAssignParticipant')->name('learning.schedule.assignEvaluationForm');
+    Route::get('learning/schedule/{id}/feedback-responses','Learning\TrainingScheduleController@feedbackResponses')->name('learning.schedule.feedbackResponses');
+    Route::get('learning/schedule/{id}/evaluation-responses','Learning\TrainingScheduleController@evaluationResponses')->name('learning.schedule.evaluationResponses');
+    Route::get('learning/forms/list','Learning\TrainingScheduleController@getAssignableForms')->name('learning.forms.list');
 
     Route::get('learning/schedule/attendance', 'Learning\AttendanceController@index')->name('learning.schedule.attendance');
     Route::get('learning/schedule/attendance/list', 'Learning\AttendanceController@list')->name('learning.schedule.attendance.list');

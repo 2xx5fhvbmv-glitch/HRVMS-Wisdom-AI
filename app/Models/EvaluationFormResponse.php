@@ -13,12 +13,19 @@ class EvaluationFormResponse extends Model
     use HasFactory;
     protected $table="evaluation_form_responses";
     public  $fillable = ['form_id','training_id','participant_id','responses','created_by'];
+    protected $casts = ['responses' => 'array'];
 
     public static function boot()
     {
         parent::boot();
+        // Was resort-admin-only — fataled on null when an employee submits
+        // this via the mobile app (api guard), which is the actual/only
+        // real caller of this model (nothing wrote to this table before).
         self::creating(function ($model) {
-            $model->created_by = Auth::guard('resort-admin')->user()->id;
+            $user = Auth::guard('api')->user() ?? Auth::guard('resort-admin')->user();
+            if ($user) {
+                $model->created_by = $user->id;
+            }
         });
     }
 
@@ -49,7 +56,7 @@ class EvaluationFormResponse extends Model
     
     public function form()
     {
-        return $this->belongsTo(TrainingFeedbackForm::class, 'form_id');
+        return $this->belongsTo(EvaluationForm::class, 'form_id');
     }
 
     public function training()

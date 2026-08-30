@@ -337,6 +337,8 @@ use Illuminate\Support\Facades\Route;
 			Route::post('learning/mark-attendance', [App\Http\Controllers\API\LearningController::class, 'markAttendance']);
 			Route::post('learning/participant-feedback-from-list', [App\Http\Controllers\API\LearningController::class, 'participantFeedbackFromList']);
 			Route::get('learning/feedback-from-res-view/{form_res_id}', [App\Http\Controllers\API\LearningController::class, 'feedbackFormResView']);
+			Route::post('learning/participant-evaluation-from-list', [App\Http\Controllers\API\LearningController::class, 'participantEvaluationFromList']);
+			Route::get('learning/evaluation-from-res-view/{form_res_id}', [App\Http\Controllers\API\LearningController::class, 'evaluationFormResView']);
 
 		});
 
@@ -350,6 +352,8 @@ use Illuminate\Support\Facades\Route;
 		Route::get('learning/emp-lt-dashboard', [App\Http\Controllers\API\LearningController::class, 'employeeLearningDashbaord']);
 		Route::get('learning/feedback-from-list', [App\Http\Controllers\API\LearningController::class, 'feedbackformListing']);
 		Route::post('learning/feedback-data-store', [App\Http\Controllers\API\LearningController::class, 'feedbackStore']);
+		Route::get('learning/evaluation-from-list', [App\Http\Controllers\API\LearningController::class, 'evaluationformListing']);
+		Route::post('learning/evaluation-data-store', [App\Http\Controllers\API\LearningController::class, 'evaluationStore']);
 
 		//L&D Manager module + HR onboarding dashboard (position/department gated, not rank)
 		Route::middleware(['ld.manager'])->group(function () {
@@ -367,6 +371,8 @@ use Illuminate\Support\Facades\Route;
 			// Same controller methods, reachable via the ld.manager gate too.
 			Route::post('ld-manager/participant-feedback-from-list', [App\Http\Controllers\API\LearningController::class, 'participantFeedbackFromList']);
 			Route::get('ld-manager/feedback-from-res-view/{form_res_id}', [App\Http\Controllers\API\LearningController::class, 'feedbackFormResView']);
+			Route::post('ld-manager/participant-evaluation-from-list', [App\Http\Controllers\API\LearningController::class, 'participantEvaluationFromList']);
+			Route::get('ld-manager/evaluation-from-res-view/{form_res_id}', [App\Http\Controllers\API\LearningController::class, 'evaluationFormResView']);
 		});
 
 		// HR onboarding dashboard — self-gated on HR department inside the controller.
