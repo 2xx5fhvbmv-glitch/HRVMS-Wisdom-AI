@@ -1900,6 +1900,21 @@ class TimeandAttendanceDashboardController extends Controller
     if ($dutyRosters->isEmpty()) {
         return $todoList;
     }
+
+    // Pending OT created via the auto-OT flow lands in employee_overtimes,
+    // not parent_attendaces.OverTime (that column is a separate, older
+    // mechanism written only by the "missing checkout" correction flow) —
+    // without this, a shift that produced real overtime here never surfaces
+    // an "overtime_pending" card at all. Batched once up front rather than
+    // per-iteration to avoid turning the loop below into an N+1.
+    $pendingOvertimeKeys = EmployeeOvertime::where('resort_id', $this->resort->resort_id)
+        ->where('status', 'pending')
+        ->whereIn('Emp_id', $dutyRosters->pluck('employee_id')->unique())
+        ->whereIn('date', $dutyRosters->pluck('date')->unique())
+        ->get(['Emp_id', 'date'])
+        ->map(fn($o) => $o->Emp_id . '|' . Carbon::parse($o->date)->format('Y-m-d'))
+        ->flip();
+
     /**
      * STEP 3: Process each roster
      */
@@ -1989,7 +2004,9 @@ class TimeandAttendanceDashboardController extends Controller
             $isApproved = in_array($otStatus, ['Approved', 'approved'], true);
             $isRejected = in_array($otStatus, ['Rejected', 'rejected'], true);
 
-            if ($hasOT && !$isApproved && !$isRejected) {
+            $hasPendingOvertimeEntry = $pendingOvertimeKeys->has($roster->employee_id . '|' . $rosterDate->format('Y-m-d'));
+
+            if (($hasOT && !$isApproved && !$isRejected) || $hasPendingOvertimeEntry) {
                 $actionType = 'overtime_pending';
                 $message    = 'Pending OT Approval';
             }
@@ -2269,6 +2286,33 @@ class TimeandAttendanceDashboardController extends Controller
                         'InTime_out' => $attendance->CheckingTime,
                         'OutTime_out' => $EndTime,
                     ]);
+                }
+
+                // Auto-overtime — this manual (web-portal) checkout previously
+                // never computed OT at all, unlike the mobile app's own
+                // checkout (API\TimeAndAttendanceController::manualCheckOut),
+                // which already does exactly this and writes to
+                // employee_overtimes. Mirroring it here so a shift confirmed
+                // via the HR Dashboard To-Do List produces OT the same way.
+                $breakData = BreakAttendaces::where('Parent_attd_id', $attendance->id)->get();
+                $overtimeEntries = Common::calculateOvertimeEntries(
+                    $attendance->CheckingTime,
+                    $EndTime,
+                    $shiftSettings->StartTime,
+                    $shiftSettings->EndTime,
+                    $today,
+                    $breakData->toArray()
+                );
+                if (!empty($overtimeEntries)) {
+                    Common::createOvertimeEntries(
+                        $this->resort->resort_id,
+                        $dutyRoster->Emp_id,
+                        $dutyRoster->Shift_id,
+                        $rosterId,
+                        $attendance->id,
+                        $today,
+                        $overtimeEntries
+                    );
                 }
 
                 DB::commit();
