@@ -15,6 +15,7 @@ Figma screen sets.
 | `Training-calendar` | `POST learning/employee-training-calendar` |
 | `Training-details-employee` | `GET learning/training-details/{schedule_id}` |
 | `Feedback Form Screen` (submit) | `GET learning/feedback-from-list` (form to render) + `POST learning/feedback-data-store` (submit) |
+| `Evaluation Form Screen` (submit) | `GET learning/evaluation-from-list` (form to render) + `POST learning/evaluation-data-store` (submit) |
 
 **L&D Manager** — gated by role/position (`check.rank:EXCOM` for the two
 `manager-*` endpoints below; `ld.manager` — L&D position title or L&D
@@ -27,6 +28,7 @@ full in `docs/mobile-hr-ld-onboarding-manager.md`):
 | `Training-details` (Trainer, Participants, Present/Absent) | `GET learning/training-details/{schedule_id}` — same endpoint as the employee screen |
 | `l&d-manager-mark-attendance` | `GET ld-manager/mark-attendance/trainings` → `GET ld-manager/mark-attendance/participants/{id}` → `POST ld-manager/mark-attendance` — see `docs/mobile-hr-ld-onboarding-manager.md` |
 | `feedback-form` (manager reviewing everyone's responses for a session) | `POST learning/participant-feedback-from-list` |
+| `evaluation-form` (manager reviewing everyone's responses for a session) | `POST learning/participant-evaluation-from-list` |
 | L&D Request screen (**new — see below**) | `GET learning/manager-request-list` |
 
 **Two different "manager calendar" endpoints exist — don't conflate them:**
@@ -37,11 +39,9 @@ onboarding cohort, built for the onboarding module's L&D Manager dashboard
 — different data, different screen, same-sounding name. Use
 `manager-training-calendar` for this Figma set.
 
-**"Evaluation" button** on the manager `Training-details` screen has no
-backing endpoint anywhere in this controller — flagging, not guessing at
-what it should do. If it's meant to be a separate scoring/assessment step
-distinct from the feedback form, that needs a real spec before it can be
-built.
+Evaluation forms are now built — own form/response tables (`evaluation_form`
+/ `evaluation_form_responses`), same shape as feedback. See "Evaluation
+forms" section below.
 
 ## L&D Request screen — already built
 
@@ -193,6 +193,79 @@ Absent," only from `mark-attendance`'s own POST body.
 - `GET learning/feedback-from-res-view/{form_res_id}` — a specific submitted response, joined with its form's `form_name`/`form_structure` for re-rendering read-only.
 - `GET learning/feedback-form-res-view` is HR/supervisor-facing (list of all responses for a training via `participant-feedback-from-list`), not employee self-service — included here for completeness since it lives in the same controller.
 
+## Evaluation forms (post-training)
+
+Structural mirror of feedback forms above — separate form/response tables
+(`evaluation_form` / `evaluation_form_responses`), same request/response
+shapes, just `evaluation_form_id` in place of `feedback_form_id`:
+
+- `GET learning/evaluation-from-list` — every evaluation form template configured at the resort (`form_structure` is the form's JSON schema for rendering, same shape as feedback's — see "Dynamic form fields" below).
+- `POST learning/evaluation-data-store` — employee submits their response once per training:
+  ```json
+  {"evaluation_form_id": 2, "training_schedule_id": 45, "responses": {"date-123": "2026-08-30", "select-456": "option-3"}}
+  ```
+  Submitting twice for the same form+training+employee returns `success:false`
+  with "Evaluation has already been submitted for this participant," not a
+  duplicate row or an error.
+- `GET learning/evaluation-from-res-view/{form_res_id}` — a specific submitted response, joined with its form's `form_name`/`form_structure` for re-rendering read-only.
+- `POST learning/participant-evaluation-from-list` — HR/manager-facing, body `{"training_schedule_id": 45}`, every participant's submitted evaluation-form response for that session (same joined shape as `participant-feedback-from-list` below).
+
+## How a form gets assigned to an employee (web-side, for context)
+
+Neither form type is visible to an employee until HR explicitly assigns it
+to that employee for a specific training session (web portal, Learning >
+Schedule list > "Assign Form" button on a session that's Ongoing or
+Completed). Assignment sets `training_participants.train_feedback_form_id`
+or `train_evaluation_form_id` and fires a push notification via
+`Common::sendMobileNotification`:
+
+| Form type | `page_id` sent to the app | Notification title/message |
+|---|---|---|
+| Feedback | `training-feedback-form-assigned` | "Learing Feedback Form" / "Recive feedbackform notification" |
+| Evaluation | `training-evaluation-form-assigned` | "Learning Evaluation Form" / "You have a new evaluation form to complete." |
+
+Both carry `module: "Learning"`. Use `page_id` to route the push tap straight
+to the right form-submit screen (`learning/feedback-from-list` or
+`learning/evaluation-from-list`, filtered to the relevant
+`training_schedule_id`) rather than the wording, which may change. A form is
+assigned at most once per participant per session — re-tapping "Assign Form"
+for someone who already has one assigned is a no-op server-side (no duplicate
+notification).
+
+## Dynamic form fields (`form_structure`)
+
+Both `feedback-from-list`/`feedback-from-res-view` and their evaluation
+equivalents return `form_structure` as the form's field schema — built with
+a drag-and-drop form builder (`formbuilder.online`), so treat every field
+type below as something that could appear in any order, and don't assume
+this is the exhaustive list of types HR could configure. It's a JSON array
+of field-definition objects, e.g.:
+```json
+[
+  {"type":"date","required":false,"label":"Date Field","name":"date-1776965511286-0","subtype":"date"},
+  {"type":"select","required":false,"label":"Overall, how would you rate this training program?","name":"select-1776965642027-0","multiple":false,
+   "values":[{"label":"Poor","value":"option-1"},{"label":"Okay","value":"option-2"},{"label":"Good","value":"option-3"}]}
+]
+```
+Render one input per array element based on `type` (a `select`/`radio`/
+`checkbox` field carries its options in `values[]`, `{label, value}` each —
+render the `label`, submit the `value`). `name` is the field's stable key.
+
+**The submit payload's `responses` object is keyed by `name`, valued by
+whatever the user picked** — for the example above:
+```json
+{"date-1776965511286-0": "2026-08-30", "select-1776965642027-0": "option-3"}
+```
+Submit the raw `value` (e.g. `"option-3"`), not the display `label` — the
+server stores exactly what it's given and the response-view/HR-review
+screens re-resolve `value` → `label` themselves against the form's
+`form_structure`.
+
+**Parse `form_structure` defensively** — at least one real form row has it
+double-JSON-encoded (a JSON string containing an escaped JSON string,
+instead of a plain array). If decoding it once yields a string rather than
+an array/object, decode it again before rendering.
+
 ## Manager/HOD-facing (same controller, not employee self-service)
 
 ### POST `learning/manager-training-calendar`
@@ -252,3 +325,24 @@ submitted feedback-form response for that session — backs the manager
 ```
 Empty array (not an error) if nobody's submitted feedback for that session
 yet.
+
+### POST `learning/participant-evaluation-from-list`
+
+Same gate/body/shape as `participant-feedback-from-list` above, evaluation
+form's equivalent:
+```json
+{
+  "success": true,
+  "message": "Evaluation data retrieved successfully",
+  "evaluation_listing": [
+    {
+      "id": 4, "training_id": 45, "participant_id": 88, "evaluation_form_id": 2,
+      "responses": { "date-123": "2026-08-30", "select-456": "option-3" },
+      "emp_id": 88, "first_name": "John", "last_name": "Doe",
+      "position_title": "Sheaf", "profile_picture": "https://..."
+    }
+  ]
+}
+```
+Empty array (not an error) if nobody's submitted an evaluation for that
+session yet.
