@@ -36,9 +36,31 @@
             </div>
         </div>
     </div>
+@include('resorts._emotional_buttons_v2_styles')
 @endsection
 
 @section('import-css')
+<style>
+/* Sidebar empty state only — calendar chrome/config untouched. Reuses the
+   .upcoming/.leaveUser-* styling already in default.css as-is (no font-size
+   changes there); this block only adds the new empty-state illustration,
+   scoped to #calsidebar so nothing leaks elsewhere. Same lightweight
+   transform/opacity-only float + prefers-reduced-motion pattern already
+   used by the Notifications empty state (default.css .ntf-empty*). */
+/* #calsidebar's own height is set by equalizeHeights() (unchanged JS) to
+   match the calendar's height — flex-column here just stacks children the
+   same way block layout already did (no visual change for the populated
+   meeting-list case), and lets .cal-empty use flex:1 to fill and center
+   within whatever's left below the header. */
+#calsidebar{display:flex;flex-direction:column}
+#calsidebar .cal-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:10px}
+#calsidebar .cal-empty-scene{width:84px;height:84px;margin:0 auto;border-radius:50%;background:radial-gradient(circle,var(--teal-3) 0%,rgba(230,240,241,0) 72%);display:grid;place-items:center;animation:calEmptyFloat 6s ease-in-out infinite;will-change:transform}
+@keyframes calEmptyFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+@media (prefers-reduced-motion:reduce){#calsidebar .cal-empty-scene{animation:none}}
+#calsidebar .cal-empty-title{font-size:15px;font-weight:600;color:var(--ink);margin-top:18px}
+#calsidebar .cal-empty-sub{font-size:12.5px;color:var(--muted);margin-top:6px;line-height:1.55}
+#calsidebar .cal-empty-btn{margin-top:18px}
+</style>
 @endsection
 
 @section('import-scripts') 
@@ -92,7 +114,30 @@ $(document).ready(function () {
                 end: endDate
             },
             success: function (meetings) {
-                let sidebarHTML = '<div class="upcoming">Scheduled Meetings</div>';
+                const monthLabel = moment(startDate).format('MMMM YYYY');
+                let sidebarHTML = `<div class="upcoming">${monthLabel} <span class="text-muted">&middot; ${meetings.length}</span></div>`;
+
+                if (!meetings.length) {
+                    sidebarHTML += `
+                        <div class="cal-empty">
+                            <div class="cal-empty-scene">
+                                <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#014653" stroke-width="1.6">
+                                    <rect x="3" y="5" width="18" height="16" rx="3"/>
+                                    <path d="M3 9h18M8 3v4M16 3v4"/>
+                                    <circle cx="8" cy="14" r="1.1" fill="#014653" stroke="none"/>
+                                    <circle cx="12" cy="14" r="1.1" fill="#014653" stroke="none"/>
+                                    <circle cx="16" cy="14" r="1.1" fill="#014653" stroke="none"/>
+                                </svg>
+                            </div>
+                            <div class="cal-empty-title">Nothing on the calendar yet</div>
+                            <div class="cal-empty-sub">Meetings you schedule for incident reviews will appear here.</div>
+                            <a href="{{ route('incident.meeting') }}" class="btn eb-btn-primary btn-sm cal-empty-btn">Schedule a meeting</a>
+                        </div>
+                    `;
+                    $('#calsidebar').html(sidebarHTML);
+                    equalizeHeights();
+                    return;
+                }
 
                 meetings.forEach(meeting => {
                     const dateObj = new Date(meeting.date);
