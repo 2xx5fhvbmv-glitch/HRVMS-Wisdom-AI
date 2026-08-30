@@ -1290,9 +1290,22 @@ class EmployeeController extends Controller
             ]);
         }
 
-        // Sort by most-recent created_at and keep top 3 across all sources
+        // Sort by most-recent created_at and keep top 3 across all sources.
+        // `when` comes from 6 different tables' created_at/updated_at — a
+        // historical row with a malformed value (seen in prod as literal
+        // "14/08/2026 15:24", a d/m/Y string in a column Carbon expects
+        // Y-m-d in) must not 500 the whole page; treat it as oldest instead.
         $recentActivities = $recentActivities
-            ->sortByDesc(fn($a) => $a->when ? Carbon::parse($a->when)->timestamp : 0)
+            ->sortByDesc(function ($a) {
+                if (!$a->when) {
+                    return 0;
+                }
+                try {
+                    return Carbon::parse($a->when)->timestamp;
+                } catch (\Throwable $e) {
+                    return 0;
+                }
+            })
             ->take(3)
             ->values();
 
