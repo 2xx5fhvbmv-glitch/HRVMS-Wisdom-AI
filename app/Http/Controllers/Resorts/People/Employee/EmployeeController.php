@@ -35,6 +35,12 @@ use App\Models\EmployeeManningAndBudgeting;
 use App\Models\EmployeeManningAndBudgetingConfig;
 use App\Models\ResortTransportation;
 use App\Models\EmployeeTravelQuota;
+use App\Models\ProbationLetterTemplate;
+use App\Models\PayrollAdvance;
+use App\Models\Resort;
+use App\Mail\ProbationLetterMail;
+use Illuminate\Support\Facades\Mail;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Auth;
 use App\Models\ResortSiteSettings;
 use Hash;
@@ -1316,7 +1322,148 @@ class EmployeeController extends Controller
             ->get()
             ->keyBy('transportation');
 
-        return view('resorts.people.employee.detail',compact('page_title','conversionRate','teams','roles','resort_id','resort_divisions','employee','departments','positions','remianing_leaves','nationality','benefitGrids','sections','costs','emp_benigit_grid','resort_allowances','airports','recentActivities','xpatExpiries','transportationOptions','travelQuotas','travelUsage'));
+        // Surfaces the mobile-submitted request (if any) on the button below
+        // so HR has context on what they're fulfilling — the button itself
+        // works either way, HR can also issue this letter proactively.
+        $pendingEmploymentVerificationRequest = PayrollAdvance::where('resort_id', $resort_id)
+            ->where('employee_id', $employee->id)
+            ->where('request_type', 'Employment Verification Letter')
+            ->where('hr_status', 'Pending')
+            ->latest('id')
+            ->first();
+
+        return view('resorts.people.employee.detail',compact('page_title','conversionRate','teams','roles','resort_id','resort_divisions','employee','departments','positions','remianing_leaves','nationality','benefitGrids','sections','costs','emp_benigit_grid','resort_allowances','airports','recentActivities','xpatExpiries','transportationOptions','travelQuotas','travelUsage','pendingEmploymentVerificationRequest'));
+    }
+
+    /**
+     * HR-triggered "Generate & Send Employment Verification Letter" for an
+     * ACTIVE employee, from their own details page. Deliberately NOT built on
+     * top of ProbationController::sendProbationLetter() — that method has
+     * probation-only side effects (flips employee->status to 'Offboarding',
+     * creates an exit-clearance record) that would corrupt an active
+     * employee's record if invoked with type=experience. Also not built on
+     * ExitClearanceController::employementCertificate() — that requires an
+     * EmployeeResignation row active employees don't have. Mirrors the
+     * placeholder/PDF/email shape of both, adapted for an active employee
+     * (duration of service = joining date -> today, not -> last working day).
+     */
+    public function sendEmploymentVerificationLetter(Request $request, $id)
+    {
+        $resort_id = $this->resort->resort_id;
+        $employee = Employee::with(['resortAdmin','position','department'])
+            ->where('resort_id', $resort_id)
+            ->where('id', $id)
+            ->first();
+        if (!$employee) {
+            return response()->json(['success' => false, 'message' => 'Employee not found.'], 404);
+        }
+
+        $template = ProbationLetterTemplate::where('resort_id', $resort_id)
+            ->where('type', 'experience')
+            ->first();
+        if (!$template) {
+            return response()->json(['success' => false, 'message' => 'Experience/Employment Letter template not found for this resort. Please create one in People > Configuration.'], 404);
+        }
+
+        $resort = Resort::findOrFail($resort_id);
+
+        $duration = '—';
+        if ($employee->joining_date) {
+            $jd = Carbon::parse($employee->joining_date);
+            $now = Carbon::now();
+            if ($now->greaterThanOrEqualTo($jd)) {
+                $diff = $jd->diff($now);
+                $parts = [];
+                if ($diff->y > 0) $parts[] = $diff->y . ' year' . ($diff->y === 1 ? '' : 's');
+                if ($diff->m > 0) $parts[] = $diff->m . ' month' . ($diff->m === 1 ? '' : 's');
+                if (empty($parts)) $parts[] = max(1, $diff->d) . ' day' . ($diff->d === 1 ? '' : 's');
+                $duration = implode(' ', $parts);
+            }
+        }
+
+        $joiningDate = $employee->joining_date ? Carbon::parse($employee->joining_date)->format('d M Y') : '—';
+        $issueDate = now()->format('d M Y');
+
+        $placeholders = [
+            '{{date}}'                => $joiningDate,
+            '{{issue_date}}'          => $issueDate,
+            '{{resort_name}}'         => (string) $resort->resort_name,
+            '{{employee_name}}'       => (string) optional($employee->resortAdmin)->full_name,
+            '{{employee_code}}'       => (string) $employee->Emp_id,
+            '{{Emp_id}}'              => (string) $employee->Emp_id,
+            '{{position_title}}'      => (string) optional($employee->position)->position_title,
+            '{{position}}'            => (string) optional($employee->position)->position_title,
+            '{{Department_title}}'    => (string) optional($employee->department)->name,
+            '{{department_name}}'     => (string) optional($employee->department)->name,
+            '{{employment_type}}'     => (string) ($employee->employment_type ?? ''),
+            '{{joining_date}}'        => $joiningDate,
+            '{{last_working_day}}'    => '—',
+            '{{date_of_separation}}'  => '—',
+            '{{duration_of_service}}' => $duration,
+        ];
+
+        // Same stand-in text the seeded experience template ships with (no
+        // {{token}} for it, just raw text) — see ExitClearanceController's
+        // employementCertificate() for precedent.
+        $letterContent = str_replace('[As per employment records]', $duration, $template->content);
+        $letterContent = strtr($letterContent, $placeholders);
+
+        $defaultEmailBody = '<p>Dear {{employee_name}},</p>'
+            . '<p>Please find your ' . e($template->subject ?? 'Employment Verification Letter') . ' attached.</p>'
+            . '<p>Regards,<br>{{resort_name}} HR</p>';
+        $emailBodyTemplate = !empty($template->email_body) ? $template->email_body : $defaultEmailBody;
+        $emailBody = strtr($emailBodyTemplate, $placeholders);
+
+        $letterhead = Common::getLetterheadData($resort_id);
+        $pdf = Pdf::loadView('resorts.people.probation.probation_letter_pdf', [
+            'letterContent'  => $letterContent,
+            'letterhead'     => $letterhead,
+            'resort'         => $resort,
+            'resortLogo'     => Common::GetResortLogo($resort_id),
+            'signatureImage' => $letterhead['signatureImage'] ?? null,
+            'signatoryName'  => ($letterhead['signatoryName'] ?? null) ?: 'Human Resources Department',
+            'signatoryTitle' => ($letterhead['signatoryTitle'] ?? null)
+                ?: 'For and on behalf of ' . ($resort->resort_name ?? 'the Management'),
+        ])->setPaper('a4', 'portrait');
+        $pdf->getDomPDF()->getOptions()->set('isRemoteEnabled', true);
+
+        $fileName = 'employment-verification_' . $employee->id . '_' . time() . '.pdf';
+        $pdfPath = storage_path('app/' . $fileName);
+        $pdf->save($pdfPath);
+
+        if (!file_exists($pdfPath)) {
+            \Log::error("Employment verification letter PDF not found at $pdfPath");
+            return response()->json(['success' => false, 'message' => 'Letter PDF could not be generated.'], 500);
+        }
+
+        Mail::to($employee->resortAdmin->email)->send(new ProbationLetterMail($employee, $pdfPath, 'experience', $resort, $fileName, $emailBody));
+
+        $pendingRequest = PayrollAdvance::where('resort_id', $resort_id)
+            ->where('employee_id', $employee->id)
+            ->where('request_type', 'Employment Verification Letter')
+            ->where('hr_status', 'Pending')
+            ->latest('id')
+            ->first();
+        if ($pendingRequest) {
+            $pendingRequest->hr_status = 'Approved';
+            $pendingRequest->save();
+        }
+
+        Common::sendMobileNotification(
+            $resort_id,
+            2,
+            null,
+            null,
+            'Employment Verification Letter',
+            'Your Employment Verification Letter has been sent to your email.',
+            'Request',
+            [$employee->id],
+            $pendingRequest->id ?? null,
+            false,
+            'employment-verification-ready'
+        );
+
+        return response()->json(['success' => true, 'message' => 'Employment Verification Letter sent to ' . $employee->resortAdmin->email . ' successfully.']);
     }
 
     /**

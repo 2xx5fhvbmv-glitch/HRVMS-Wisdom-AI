@@ -1748,6 +1748,7 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
        Route::post('/people/employees/activate', 'People\Employee\EmployeeController@activate')->name('people.employees.activate');
       Route::post('/people/employees/bulk-delete', 'People\Employee\EmployeeController@bulkDelete')->name('employee.bulk.delete');
       Route::post('/people/employees/send-credentials', 'People\Employee\EmployeeController@sendCredentials')->name('people.employee.send-credentials');
+      Route::post('/people/employees/{id}/send-employment-verification-letter', 'People\Employee\EmployeeController@sendEmploymentVerificationLetter')->name('people.employees.sendEmploymentVerificationLetter');
 
 
 

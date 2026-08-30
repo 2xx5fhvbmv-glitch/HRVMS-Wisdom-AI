@@ -725,6 +725,20 @@
                                                 </div>
                                             </div>
                                         </div>
+                                        <div class="row g-xxl-4 g-md-3 g-2 mb-3">
+                                            <div class="col-12">
+                                                @if($pendingEmploymentVerificationRequest)
+                                                    <p class="small text-muted mb-2">
+                                                        Employee requested an Employment Verification Letter on
+                                                        {{ \Carbon\Carbon::parse($pendingEmploymentVerificationRequest->created_at)->format('d M Y') }}.
+                                                    </p>
+                                                @endif
+                                                <button type="button" class="btn btn-themeBlue btn-sm" id="btn-send-employment-verification-letter"
+                                                        data-employee-id="{{ $employee->id }}">
+                                                    Generate &amp; Send Employment Verification Letter
+                                                </button>
+                                            </div>
+                                        </div>
                                         <div class="row g-xxl-4 g-md-3 g-2">
                                             <div class="col-lg-6">
                                                 <div class="table-responsive">
@@ -2098,6 +2112,52 @@
                 complete: function () {
                     $btn.prop('disabled', false).text('Send Credentials');
                 }
+            });
+        });
+
+        $(document).on('click', '#btn-send-employment-verification-letter', function(e) {
+            e.preventDefault();
+            let $btn = $(this);
+            let employeeId = $btn.data('employee-id');
+
+            wisdomConfirm({
+                title: 'Generate & Send Employment Verification Letter?',
+                text: 'This will email the letter to the employee and notify them in the app.',
+                confirmText: 'Yes, Send',
+                cancelText: 'Cancel'
+            }).then((result) => {
+                if (!result.isConfirmed) return;
+
+                let url = "{{ route('people.employees.sendEmploymentVerificationLetter', ':id') }}".replace(':id', employeeId);
+
+                $.ajax({
+                    url: url,
+                    type: 'POST',
+                    data: { _token: "{{ csrf_token() }}" },
+                    beforeSend: function () {
+                        $btn.prop('disabled', true).text('Sending...');
+                    },
+                    success: function (response) {
+                        if (response.success) {
+                            toastr.success(response.message, "Success", {
+                                positionClass: 'toast-bottom-right'
+                            });
+                        } else {
+                            toastr.error(response.message || 'Something went wrong.', "Error", {
+                                positionClass: 'toast-bottom-right'
+                            });
+                        }
+                    },
+                    error: function (xhr) {
+                        let error = xhr.responseJSON?.message || 'Request failed.';
+                        toastr.error(error, "Error", {
+                            positionClass: 'toast-bottom-right'
+                        });
+                    },
+                    complete: function () {
+                        $btn.prop('disabled', false).text('Generate & Send Employment Verification Letter');
+                    }
+                });
             });
         });
 
