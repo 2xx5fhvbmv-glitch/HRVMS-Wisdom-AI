@@ -7,6 +7,25 @@
 </div>
 @endif
 
+@php
+// probation_end_date / termination_date / document expiry_date below have no
+// strtotime() guard (unlike joining_date above them, which does) — a
+// malformed historical value like "14/08/2026 15:24" (d/m/Y, Carbon expects
+// Y-m-d) crashes the whole page with a 500 instead of just showing "-".
+if (!function_exists('safeParseDate')) {
+    function safeParseDate($value, $format = 'd M Y') {
+        if (empty($value)) {
+            return null;
+        }
+        try {
+            return \Carbon\Carbon::parse($value)->format($format);
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+}
+@endphp
+
 @section('content')
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
@@ -730,7 +749,7 @@
                                                 @if($pendingEmploymentVerificationRequest)
                                                     <p class="small text-muted mb-2">
                                                         Employee requested an Employment Verification Letter on
-                                                        {{ \Carbon\Carbon::parse($pendingEmploymentVerificationRequest->created_at)->format('d M Y') }}.
+                                                        {{ safeParseDate($pendingEmploymentVerificationRequest->created_at) ?: $pendingEmploymentVerificationRequest->created_at }}.
                                                     </p>
                                                 @endif
                                                 <button type="button" class="btn btn-themeBlue btn-sm" id="btn-send-employment-verification-letter"
@@ -987,8 +1006,8 @@
                                                             <tr id="probation-end-date-row" class="{{ $employee->employment_type == 'Probationary' ? '' : 'd-none' }}">
                                                                 <th>Probation Exp Date:</th>
                                                                 <td>
-                                                                    <span class="view-mode">{{ $employee->probation_end_date ? \Carbon\Carbon::parse($employee->probation_end_date)->format('d M Y') : "-" }}</span>
-                                                                    <input type="text" name="probation_end_date" class="form-control edit-mode d-none datepicker" value="{{ $employee->probation_end_date ? \Carbon\Carbon::parse($employee->probation_end_date)->format('d/m/Y') : '' }}">
+                                                                    <span class="view-mode">{{ safeParseDate($employee->probation_end_date) ?: "-" }}</span>
+                                                                    <input type="text" name="probation_end_date" class="form-control edit-mode d-none datepicker" value="{{ safeParseDate($employee->probation_end_date, 'd/m/Y') }}">
                                                                 </td>
                                                             </tr>
                                                             <tr>
@@ -1001,8 +1020,8 @@
                                                             <tr id="termination-date-row" class="{{ $employee->status != 'Terminated' ? 'd-none' : '' }}">
                                                                 <th>Termination Date:</th>
                                                                 <td>
-                                                                    <span class="view-mode">{{ $employee->termination_date ? \Carbon\Carbon::parse($employee->termination_date)->format('d M Y') : "-" }}</span>
-                                                                    <input type="text" name="termination_date" class="form-control edit-mode d-none datepicker" value="{{ $employee->termination_date ? \Carbon\Carbon::parse($employee->termination_date)->format('d/m/Y') : '' }}">
+                                                                    <span class="view-mode">{{ safeParseDate($employee->termination_date) ?: "-" }}</span>
+                                                                    <input type="text" name="termination_date" class="form-control edit-mode d-none datepicker" value="{{ safeParseDate($employee->termination_date, 'd/m/Y') }}">
                                                                 </td>
                                                             </tr>
                                                             <tr>
@@ -1666,8 +1685,8 @@
                                                                         <input type="text" name="document_titles[]" class="form-control edit-mode d-none" value="{{ $doc->document_title }}">
                                                                     </th>
                                                                     <td>
-                                                                        <span class="view-mode">{{ $doc->expiry_date ? \Carbon\Carbon::parse($doc->expiry_date)->format('d M Y') : '-' }}</span>
-                                                                        <input type="text" name="expiry_dates[]" class="form-control edit-mode d-none datepicker" value="{{ $doc->expiry_date ? \Carbon\Carbon::parse($doc->expiry_date)->format('d/m/Y') : '' }}">
+                                                                        <span class="view-mode">{{ safeParseDate($doc->expiry_date) ?: '-' }}</span>
+                                                                        <input type="text" name="expiry_dates[]" class="form-control edit-mode d-none datepicker" value="{{ safeParseDate($doc->expiry_date, 'd/m/Y') }}">
                                                                         {{-- Document is stored on Wasabi/S3 under
                                                                              `document_path` (NOT `document_file` —
                                                                              that column doesn't exist; the link
