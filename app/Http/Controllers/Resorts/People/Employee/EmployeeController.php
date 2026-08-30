@@ -1398,6 +1398,16 @@ class EmployeeController extends Controller
         $issueDate = now()->format('d M Y');
 
         $placeholders = [
+            // The seeded experience template literally uses {{date}} for BOTH
+            // "Date of Joining:" and "Issued Date:" (same token, twice) — no
+            // {{joining_date}} token appears in the content at all, so no
+            // code-side mapping can make those two lines show different
+            // values. Matches ExitClearanceController::employementCertificate's
+            // own documented trade-off: {{date}} = joining date (the one that
+            // actually matters for an employment-verification letter); HR can
+            // fix "Issued Date" by editing the template in People >
+            // Configuration to use {{issue_date}} there instead, which this
+            // code already maps correctly.
             '{{date}}'                => $joiningDate,
             '{{issue_date}}'          => $issueDate,
             '{{resort_name}}'         => (string) $resort->resort_name,
