@@ -15,6 +15,8 @@ use Illuminate\Support\Facades\File;
 use App\Models\Employee;
 use App\Models\IncidentsMeeting;
 use App\Models\IncidentsEmployeeStatements;
+use App\Models\IncidentCommitteeMember;
+use App\Events\ResortNotificationEvent;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
@@ -912,7 +914,7 @@ class IncidentController extends Controller
 
             $incident           =       Incidents::where("resort_id", $this->resort_id)
                                                     ->where('id',$data['incident_id'])
-                                                    ->select(['id','incident_name','incident_date','involved_employees','incident_id'])
+                                                    ->select(['id','incident_name','incident_date','involved_employees','incident_id','assigned_to'])
                                                     ->first();
 
             $witness            =       IncidentsWitness::join('incidents as i','i.id','=','incidents_witness.incident_id')
@@ -977,7 +979,51 @@ class IncidentController extends Controller
                 'incident_date' => date('d M Y', strtotime($incident->incident_date)),  
             ];
 
-            $incidentData['incident']                       =   $formattedIncident;           
+            $incidentData['incident']                       =   $formattedIncident;
+
+            // Notify the committee members assigned to this incident that a
+            // statement has come in — mirrors the notify-on-request flow in
+            // Resorts\Incident\IncidentController::requestStatement(), just
+            // the other direction (submission instead of request). Nothing
+            // told them a mobile-submitted statement had arrived before this.
+            $assignedCommitteeIds = json_decode($incident->assigned_to ?? '[]', true) ?: [];
+            if (!empty($assignedCommitteeIds)) {
+                $committeeMembers = IncidentCommitteeMember::whereIn('commitee_id', $assignedCommitteeIds)
+                    ->get()
+                    ->unique('member_id')
+                    ->values();
+
+                $submitterName = trim(($employee->resortAdmin->first_name ?? '') . ' ' . ($employee->resortAdmin->last_name ?? ''));
+                $title = 'Incident Statement Submitted';
+                $msg = ($submitterName ?: 'An employee') . ' submitted a statement for incident #' . $incident->incident_id . '.';
+                $ModuleName = "Incident";
+
+                foreach ($committeeMembers as $member) {
+                    event(new ResortNotificationEvent(Common::nofitication(
+                        $this->resort_id,
+                        10,
+                        $title,
+                        $msg,
+                        0,
+                        $member->member_id,
+                        $ModuleName
+                    )));
+
+                    Common::sendMobileNotification(
+                        $this->resort_id,
+                        2,
+                        '',
+                        '',
+                        $title,
+                        $msg,
+                        $ModuleName,
+                        [$member->member_id],
+                        $incident->id,
+                        true,
+                        'incident-notification'
+                    );
+                }
+            }
 
             $response['status']                             =   true;
             $response['message']                            =   'Your statement for incident #'. $incident->incident_id .' has been successfully submitted';

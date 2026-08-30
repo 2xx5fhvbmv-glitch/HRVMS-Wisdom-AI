@@ -2807,12 +2807,18 @@ class Common
 					$vacancy->applicationUrlshow = substr($applicant_link_base, 0, 30) . '...';
 
 					// Generate other links
-					$vacancy->JobAdvertisement = URL::asset(config('settings.Resort_JobAdvertisement') . '/' . Auth::guard('resort-admin')->user()->resort->resort_id . "/" . $vacancy->Jobadvimg);
-					// All job advertisement images for this resort
-					$allJobAds = JobAdvertisement::where('Resort_id', $resort_id)->get();
-					$vacancy->allJobAdImages = $allJobAds->map(function($ad) use ($resort_id) {
-						return URL::asset(config('settings.Resort_JobAdvertisement') . '/' . $resort_id . '/' . $ad->Jobadvimg);
-					})->values()->toArray();
+					// Was building a URL straight from $vacancy->Jobadvimg (often
+					// empty — most vacancies have no per-vacancy override) and
+					// separately pulling EVERY JobAdvertisement row for the whole
+					// resort with no vacancy_id scoping at all, so the carousel
+					// mixed in every other position's poster and the fallback
+					// image 404'd — matches resolveVacancyPosterImage's own
+					// per-vacancy-then-resort-default logic (see VacancyController's
+					// grid view for the same pattern), just duplicated and broken
+					// here.
+					$poster = self::resolveVacancyPosterImage($resort_id, $vacancy->V_id);
+					$vacancy->JobAdvertisement = $poster;
+					$vacancy->allJobAdImages = [$poster];
 					$vacancy->profileImg = URL::asset($vacancy->passport_photo);
 					$vacancy->ApplicationStatus = $vacancy->ApplicationStatus == null ? " " : $vacancy->ApplicationStatus;
 					$vacancy->As_ApprovedBy = $vacancy->As_ApprovedBy == null ? 25 : $vacancy->As_ApprovedBy;

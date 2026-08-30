@@ -15,7 +15,7 @@
             <div class="row justify-content-between g-3">
                 <div class="col-auto">
                     <div class="page-title">
-                        <span>People Relation</span>
+                        <span> Grievance And Disciplinery</span>
                         <h1>{{ $page_title }}</h1>
                     </div>
                 </div>
