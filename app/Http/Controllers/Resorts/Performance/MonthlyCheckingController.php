@@ -121,7 +121,14 @@ class MonthlyCheckingController extends Controller
                 ->where("learning_id", $ak->tranining_id)
                 ->where("resort_id", $this->resort->resort_id)
                 ->whereHas('employees', function($q) use ($ak) {
-                    $q->where('id', $ak->emp_orignal_id);
+                    // Was 'id' — the pivot row's own auto-increment PK on
+                    // learning_requests_employees, not the employee's id, so
+                    // this matched almost at random (or nothing) instead of
+                    // this employee's actual training request. That's why the
+                    // list page showed a different status ("Pending") than
+                    // the details page ("In Progress") for the same check-in
+                    // — details already used the correct 'employee_id' column.
+                    $q->where('employee_id', $ak->emp_orignal_id);
                 })
                 ->latest('id')
                 ->first();
@@ -311,7 +318,11 @@ class MonthlyCheckingController extends Controller
             'emp_id' => 'required',
             'start_time' => 'required',
             'end_time' => 'required',
-            'comment' => 'required|max:500',
+            // Was max:500 — comment is a TEXT column (65k+ capacity) and every
+            // sibling field here (Area_of_Discussion, Area_of_Improvement,
+            // Time_Line) has no length cap at all; a real monthly-review
+            // comment easily runs longer than 500 chars.
+            'comment' => 'required',
             'learning_manager_id' => 'required_with:tranining_id',
         ], [
             'learning_manager_id.required_with' => 'Please select a Learning Manager when a training is chosen.',
@@ -720,7 +731,9 @@ class MonthlyCheckingController extends Controller
             'Area_of_Discussion'  => 'required',
             'Area_of_Improvement' => 'required',
             'Time_Line'           => 'required',
-            'comment'             => 'required|max:500',
+            // Was max:500 — same arbitrary cap as MonltyCheckInStore(), same
+            // TEXT column, same fix.
+            'comment'             => 'required',
             'learning_manager_id' => 'required_with:tranining_id',
         ], [
             'learning_manager_id.required_with' => 'Please select a Learning Manager when a training is chosen.',
