@@ -739,6 +739,8 @@ class LearningController extends Controller
                     'responses'                         => $responses,
                 ]);
 
+                $this->notifyFormSubmitted($resort_id, $participant_id, $trainingScheduleId, $feedbackFormId, 'feedback');
+
                 DB::commit();
             return response()->json(['success' => true, 'message' => 'Feedback data stored successfully'], 200);
 
@@ -912,6 +914,8 @@ class LearningController extends Controller
                     'responses'                         => $responses,
                 ]);
 
+                $this->notifyFormSubmitted($this->resort_id, $participant_id, $trainingScheduleId, $evaluationFormId, 'evaluation');
+
                 DB::commit();
             return response()->json(['success' => true, 'message' => 'Evaluation data stored successfully'], 200);
 
@@ -1012,6 +1016,45 @@ class LearningController extends Controller
             \Log::error($e->getMessage());
             return response()->json(['success' => false, 'message' => 'Server error'], 500);
         }
+    }
+
+    /**
+     * Alerts HR (Common::getResortHrEmployeeIds) and L&D Manager
+     * (Common::getResortLdManagerEmployeeIds) whenever an employee submits a
+     * feedback or evaluation form, so review isn't missed. Excludes the
+     * submitter themself in case they happen to also be HR/L&D.
+     */
+    private function notifyFormSubmitted($resortId, $submitterEmployeeId, $trainingScheduleId, $formId, string $formType)
+    {
+        $notifyIds = array_values(array_diff(
+            array_unique(array_merge(
+                Common::getResortHrEmployeeIds($resortId),
+                Common::getResortLdManagerEmployeeIds($resortId)
+            )),
+            [(int) $submitterEmployeeId]
+        ));
+
+        if (empty($notifyIds)) {
+            return;
+        }
+
+        $submitterName = optional($this->user)->full_name ?? 'An employee';
+        $trainingName  = optional(optional(TrainingSchedule::with('learningProgram')->find($trainingScheduleId))->learningProgram)->name;
+        $label         = $formType === 'evaluation' ? 'Evaluation' : 'Feedback';
+
+        Common::sendMobileNotification(
+            $resortId,
+            2,
+            $formId,
+            $trainingScheduleId,
+            "{$label} Form Submitted",
+            "{$submitterName} submitted {$label}" . ($trainingName ? " for {$trainingName}" : '') . '.',
+            'Learning',
+            $notifyIds,
+            null,
+            false,
+            "training-{$formType}-form-submitted"
+        );
     }
 
     /**
