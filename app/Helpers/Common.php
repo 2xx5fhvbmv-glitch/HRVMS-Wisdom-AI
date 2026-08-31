@@ -4488,6 +4488,39 @@ class Common
     }
 
     /**
+     * Returns the employee IDs in a resort that should receive L&D Manager
+     * notifications: anyone whose position title matches a known L&D Manager
+     * title, plus everyone in the L&D department. Mirrors getResortHrEmployeeIds()
+     * and EnsureLDManagerAccess's own access check — used to fan out
+     * feedback/evaluation submission alerts to L&D leadership.
+     */
+    public static function getResortLdManagerEmployeeIds($resortId)
+    {
+        $ldDeptIds = \App\Models\ResortDepartment::where('resort_id', $resortId)
+            ->pluck('id')
+            ->filter(fn($id) => self::isLDDepartment($id))
+            ->all();
+
+        $ldManagerTitles = ['Training Director', 'L&D Manager', 'Learning & Development Head'];
+
+        return \App\Models\Employee::where('resort_id', $resortId)
+            ->where(function ($q) use ($ldDeptIds, $ldManagerTitles) {
+                $q->whereHas('position', function ($qq) use ($ldManagerTitles) {
+                    $qq->whereIn('position_title', $ldManagerTitles);
+                });
+                if (!empty($ldDeptIds)) {
+                    $q->orWhereIn('Dept_id', $ldDeptIds);
+                }
+            })
+            ->where(function ($q) {
+                $q->whereNull('status')->orWhere('status', 'Active')->orWhere('status', 'Probationary');
+            })
+            ->pluck('id')
+            ->map(fn($v) => (int) $v)
+            ->all();
+    }
+
+    /**
      * Active employees in the resort's Finance / Accounting department(s).
      * Used to notify Finance of visa payment requests (they handle the actual
      * payments). Department matching reuses the same aliases as
@@ -5075,7 +5108,30 @@ class Common
                 ->where('resort_id', $resortId)
                 ->where('status', 'active')
                 ->exists();
-            if ($stillValid) {
+
+            // Guards against the 2026_04_22_030000_backfill_employee_benefit_grid_level
+            // artifact: that one-time migration wrote the employee's raw
+            // rank NUMBER straight into benefit_grid_level for any employee
+            // who had it empty, before this grade-level system existed. No
+            // UI flow lets a human pick a grade level by typing a bare rank
+            // number (it's always chosen by name), so a value that still
+            // exactly equals the employee's own rank — while the resort has
+            // since mapped that SAME rank to a genuinely different grade
+            // level via Benefit Grade Levels > Map Ranks — can only be that
+            // stale backfill artifact, silently overriding the intended
+            // rank default (this broke OT eligibility for a batch of
+            // rank-6 employees whose value coincidentally still matched a
+            // real, active "GM" grade after the resort remapped rank 6 to
+            // "LINE WORKERS"). Treat it as untrustworthy and fall through
+            // to the rank/position default instead of trusting it forever.
+            $looksLikeStaleRankBackfill = $stillValid
+                && (string) $benefitGridLevel === (string) (int) $rank
+                && \App\Models\ResortBenefitGradeLevelRank::where('resort_id', $resortId)
+                    ->where('rank', (int) $rank)
+                    ->where('grade_level_id', '!=', $benefitGridLevel)
+                    ->exists();
+
+            if ($stillValid && !$looksLikeStaleRankBackfill) {
                 return $benefitGridLevel;
             }
         }

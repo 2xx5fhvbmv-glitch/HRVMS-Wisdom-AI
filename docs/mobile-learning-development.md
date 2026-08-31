@@ -232,6 +232,19 @@ assigned at most once per participant per session — re-tapping "Assign Form"
 for someone who already has one assigned is a no-op server-side (no duplicate
 notification).
 
+The reverse direction also notifies: when an employee submits `feedback-data-store`
+or `evaluation-data-store`, HR and the L&D Manager get a push too —
+
+| Event | `page_id` sent to the app | Notification title/message |
+|---|---|---|
+| Feedback submitted | `training-feedback-form-submitted` | "Feedback Form Submitted" / "{Employee Name} submitted Feedback for {Training Name}." |
+| Evaluation submitted | `training-evaluation-form-submitted` | "Evaluation Form Submitted" / "{Employee Name} submitted Evaluation for {Training Name}." |
+
+Recipients: everyone HR (`Common::getResortHrEmployeeIds`) plus the L&D
+Manager (`Common::getResortLdManagerEmployeeIds`) — minus the submitter
+themself, in case they're also HR/L&D (e.g. the L&D Manager filling out
+their own post-training feedback doesn't get pinged about it).
+
 ## Dynamic form fields (`form_structure`)
 
 Both `feedback-from-list`/`feedback-from-res-view` and their evaluation

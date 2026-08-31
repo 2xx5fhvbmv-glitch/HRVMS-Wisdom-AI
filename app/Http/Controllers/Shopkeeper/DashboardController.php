@@ -16,7 +16,6 @@ use App\Helpers\Common;
 use App\Models\Shopkeeper;
 use App\Models\Payment;
 use App\Models\PayrollConfig;
-use App\Models\Payroll;
 
 class DashboardController extends Controller
 {
@@ -58,15 +57,13 @@ class DashboardController extends Controller
                 }
             } else {
                 // No explicit filter yet — default to the resort's current
-                // payroll period instead of showing every purchase ever
-                // made, so the table lands on something meaningful before
-                // the user picks a month/year themselves.
-                $currentPayroll = Payroll::where('resort_id', $this->shopkeeper->resort_id)
-                    ->orderBy('start_date', 'desc')
-                    ->first();
-                if ($currentPayroll) {
-                    $tableData->whereBetween('purchased_date', [$currentPayroll->start_date, $currentPayroll->end_date]);
-                }
+                // cutoff-based payroll period, not the last already-run
+                // Payroll batch (that row only exists after HR runs payroll,
+                // so an in-progress period with no batch yet fell through to
+                // showing every purchase ever made).
+                $cutoffDay = PayrollConfig::where('resort_id', $this->shopkeeper->resort_id)->value('cutoff_day') ?? 1;
+                $cutoffPeriod = Common::getCurrentCutoffPeriod($cutoffDay);
+                $tableData->whereBetween('purchased_date', [$cutoffPeriod['start'], $cutoffPeriod['end']]);
             }
             
             // updated_at bumps on every status change (Consented, Rejected,
