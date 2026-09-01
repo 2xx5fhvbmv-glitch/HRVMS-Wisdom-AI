@@ -877,6 +877,27 @@ class ClinicController extends Controller
                     $appointment->save();
                 }
             }
+
+            // Was never sent — treatmentAdd() had no notification call at
+            // all, so the patient found out about a submitted treatment
+            // only by opening the app. appointmentStatusUpdate() (a
+            // separate endpoint) still fires its own "Appointment Approved"
+            // notification when the doctor approves the appointment; this
+            // one is specifically for the treatment being submitted.
+            Common::sendMobileNotification(
+                $this->user->resort_id,
+                2,
+                null,
+                null,
+                'Treatment Submitted',
+                'Your doctor has submitted a treatment for your appointment.',
+                'Clinic',
+                [$request->employee_id],
+                $treatmentData->id,
+                false,
+                'clinic-treatment-submitted'
+            );
+
             DB::commit();
             return response()->json([
                 'success'                           => true,
