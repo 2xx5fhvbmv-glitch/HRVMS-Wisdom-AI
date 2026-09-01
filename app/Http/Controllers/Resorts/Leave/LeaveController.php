@@ -191,7 +191,11 @@ class LeaveController extends Controller
                             ) as total_leave_days")
             )
             ->join('leave_categories as lc', 'lc.id', '=', 'resort_benefit_grid_child.leave_cat_id')
-            ->where('resort_benefit_grid_child.rank', $benefit_grid_emp_grade)
+            // resort_benefit_grid_child.rank stores the employee RANK the row
+            // was saved under, not the grid's emp_grade — filtering by
+            // $benefit_grid_emp_grade matched only by coincidence, same bug
+            // as API/LeaveController::leaveCategory.
+            ->where('resort_benefit_grid_child.rank', $rank)
             ->when($benefit_grid_id, function($query) use ($benefit_grid_id) {
                 return $query->where('resort_benefit_grid_child.benefit_grid_id', $benefit_grid_id);
             })
@@ -259,7 +263,7 @@ class LeaveController extends Controller
                             ) as total_leave_days")
             )
             ->join('leave_categories as lc', 'lc.id', '=', 'resort_benefit_grid_child.leave_cat_id')
-            ->where('resort_benefit_grid_child.rank', $benefit_grid->emp_grade)
+            ->where('resort_benefit_grid_child.rank', $rank)
             ->where('resort_benefit_grid_child.benefit_grid_id', $benefit_grid->id)
             ->whereRaw('FIND_IN_SET(?, lc.eligibility)', [$rank])
             ->where('resort_benefit_grid_child.allocated_days', '>', 0)
