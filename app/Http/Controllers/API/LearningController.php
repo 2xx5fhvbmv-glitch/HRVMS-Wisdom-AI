@@ -580,6 +580,7 @@ class LearningController extends Controller
 
                 $sessionData =  [
                     'id'                            =>  $session['learningProgram']['id'],
+                    'training_schedule_id'          =>  $session->id,
                     'title'                         =>  $session->learningProgram->name,
                     'session_date'                  =>  $session->start_date,
                     'start_time'                    =>  date('h:i A', strtotime($session->start_time)),
@@ -590,7 +591,17 @@ class LearningController extends Controller
 
                 $events[]                           =   $sessionData;
             }
-            
+
+            // Programs this employee already has an actual scheduled session
+            // for (rendered above with real venue/trainer/dates via $sessions).
+            // A learning request has no persisted link to the schedule it
+            // eventually becomes — matched only by training_id == learning_id
+            // — so once scheduled it must be skipped below, otherwise it
+            // renders twice: once correctly, once as a stale stub with no
+            // training_schedule_id, hardcoded 9-5 times, and the request's
+            // own approval status instead of "Scheduled".
+            $scheduledProgramIds                    =   $sessions->pluck('training_id')->filter()->unique();
+
             $learningRequests                       =   LearningRequest::join("learning_requests_employees as lre", "learning_requests.id", "=", 'lre.learning_request_id')
                                                             ->where('lre.employee_id', $employeeId)
                                                             ->where('learning_requests.resort_id', $this->resort_id)
@@ -598,8 +609,13 @@ class LearningController extends Controller
 
             // Process Learning Requests
             foreach ($learningRequests as $request) {
+                if ($scheduledProgramIds->contains($request->learning_id)) {
+                    continue;
+                }
+
                 $requestData                        =   [
                     'id'                            =>  $request->learning->id,
+                    'training_schedule_id'          =>  null,
                     'title'                         =>  "Learning Request: " . $request->learning->name,
                     'session_date'                  =>  $request->start_date,
                     'start_time'                    =>  '09:00 AM', // Adjust if necessary
