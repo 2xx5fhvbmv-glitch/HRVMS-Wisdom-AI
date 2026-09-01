@@ -786,7 +786,12 @@ class EmployeeController extends Controller
                 'lc.id as leave_cat_id'
                         )
                         ->join('leave_categories as lc', 'lc.id', '=', 'resort_benefit_grid_child.leave_cat_id')
-                        ->where('resort_benefit_grid_child.rank', $benefit_grid->emp_grade)
+                        // resort_benefit_grid_child.rank stores the employee RANK the
+                        // row was saved under, not the grid's emp_grade; benefit_grid_id
+                        // scopes to the one grid resolveEmpGrade picked (multiple grids
+                        // can share a rank).
+                        ->where('resort_benefit_grid_child.rank', $rank)
+                        ->where('resort_benefit_grid_child.benefit_grid_id', $benefit_grid->id ?? null)
                         ->where('lc.resort_id', $this->resort->resort_id)
                         ->whereRaw('FIND_IN_SET(?, lc.eligibility)', [$rank])
                         ->where('resort_benefit_grid_child.allocated_days', '>', 0)
@@ -1302,7 +1307,12 @@ class EmployeeController extends Controller
                     'lc.id as leave_cat_id'
                 )
                     ->join('leave_categories as lc', 'lc.id', '=', 'resort_benefit_grid_child.leave_cat_id')
-                    ->where('resort_benefit_grid_child.rank', $benefit_grid->emp_grade)
+                    // resort_benefit_grid_child.rank stores the employee RANK the
+                    // row was saved under, not the grid's emp_grade; benefit_grid_id
+                    // scopes to the one grid resolveEmpGrade picked (multiple grids
+                    // can share a rank).
+                    ->where('resort_benefit_grid_child.rank', $rank)
+                    ->where('resort_benefit_grid_child.benefit_grid_id', $benefit_grid->id ?? null)
                     ->where('lc.resort_id', $this->resort->resort_id)
                     ->whereRaw('FIND_IN_SET(?, lc.eligibility)', [$rank])
                         ->where('resort_benefit_grid_child.allocated_days', '>', 0)
@@ -1880,7 +1890,12 @@ class EmployeeController extends Controller
                 'lc.id as leave_cat_id'
                         )
                         ->join('leave_categories as lc', 'lc.id', '=', 'resort_benefit_grid_child.leave_cat_id')
-                        ->where('resort_benefit_grid_child.rank', $benefit_grid->emp_grade)
+                        // resort_benefit_grid_child.rank stores the employee RANK the
+                        // row was saved under, not the grid's emp_grade; benefit_grid_id
+                        // scopes to the one grid resolveEmpGrade picked (multiple grids
+                        // can share a rank).
+                        ->where('resort_benefit_grid_child.rank', $rank)
+                        ->where('resort_benefit_grid_child.benefit_grid_id', $benefit_grid->id ?? null)
                         ->where('lc.resort_id', $this->resort->resort_id)
                         ->whereRaw('FIND_IN_SET(?, lc.eligibility)', [$rank])
                         ->where('resort_benefit_grid_child.allocated_days', '>', 0)
