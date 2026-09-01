@@ -34,27 +34,31 @@ class DisciplinaryController extends Controller
         try
         { 
             $employee_id                                        =   $this->user->GetEmployee->id;
-            $start                                              =   now()->startOfMonth();
-            $end                                                =   now()->endOfMonth();
-            
+
+            // Was hard-restricted to the current calendar month via
+            // whereBetween('Expiry_date', [start,end]) — Expiry_date is the
+            // form's "Action Valid Until" field, unrelated to when the case
+            // was raised, and often '0000-00-00' (unset). The web portal's
+            // own disciplinary listing (Resorts/GrievanceAndDisciplinery/
+            // DisciplinaryController) has no such restriction — every real
+            // case outside the current month (i.e. almost always) was
+            // invisible on mobile while showing correctly on web.
             $activeDisciplinaryCount                            =   disciplinarySubmit::with(['offence'])
                                                                         ->where('resort_id',$this->resort_id) //show all and history of all the committe members
                                                                         ->where('Employee_id',$employee_id)
-                                                                        ->whereBetween('Expiry_date', [$start, $end])       
                                                                         ->where('status', 'In_Review')
                                                                         ->count();
 
             $pastDisciplinaryCount                              =   disciplinarySubmit::with(['offence'])
                                                                         ->where('resort_id',$this->resort_id) //show all and history of all the committe members
                                                                         ->where('Employee_id',$employee_id)
-                                                                        ->whereBetween('Expiry_date', [$start, $end])       
                                                                         ->where('status', 'resolved')
                                                                         ->count();
-                                                                        
+
             $DisciplinarySubmissionModel                        =   disciplinarySubmit::with(['offence'])
                                                                         ->where('resort_id', $this->resort_id) //show all and history of all the committe members
-                                                                        ->whereBetween('Expiry_date', [$start, $end])       
                                                                         ->where('Employee_id',$employee_id)
+                                                                        ->orderByDesc('id')
                                                                         ->get();
 
             $response['status']                                 =   true;
