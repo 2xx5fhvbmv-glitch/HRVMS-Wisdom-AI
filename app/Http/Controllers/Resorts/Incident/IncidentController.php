@@ -301,7 +301,7 @@ class IncidentController extends Controller
         // a non-HR user must not be able to load an out-of-scope incident
         // by guessing/typing the URL.
         $incident = Common::scopeIncidentsForViewer(Incidents::query())
-            ->with(['reporter.resortAdmin','reporter.position','witness.employee'])
+            ->with(['reporter.resortAdmin','reporter.position','witness.employee.resortAdmin'])
             ->where('id', $id)
             ->first();
         if (!$incident) {

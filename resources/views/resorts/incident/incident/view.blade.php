@@ -84,7 +84,7 @@
                             <tr>
                                 <th>ATTACHMENTS:</th>
                                 <td>  
-                                     @if($incident->attachments && count($incident->attachements) > 0)
+                                     @if($incident->attachements && count(json_decode($incident->attachements, true) ?? []) > 0)
                                         <div class="attachments">
                                             @foreach(json_decode($incident->attachements, true) as $attachment)
 
@@ -106,8 +106,13 @@
                                     <div class="user-ovImg">
                                         @if($incident->witness)
                                             @foreach($incident->witness as $witness)
-                                                <div class="img-circle">
-                                                    <img src="{{Common::getResortUserPicture($witness->employee->Admin_Parent_id)}}" alt="image">
+                                                <div class="d-flex align-items-center mb-2">
+                                                    <div class="img-circle userImg-block me-2">
+                                                        <img src="{{Common::getResortUserPicture($witness->employee->Admin_Parent_id)}}" alt="image">
+                                                    </div>
+                                                    <div>
+                                                        <h5 class="fw-600">{{$witness->employee->resortAdmin->full_name}}<span class="badge badge-themeNew">#{{$witness->employee->Emp_id}}</span></h5>
+                                                    </div>
                                                 </div>
                                             @endforeach
                                         @endif
