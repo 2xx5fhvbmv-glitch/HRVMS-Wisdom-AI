@@ -9405,35 +9405,21 @@ class Common
 
             $basePath = $main_folder . '/public/talent_acquisition/' . base64_encode($vacancy_id);
 
-            $driver = config('filesystems.default', 'local');
-            $uploadedToS3 = false;
-
-            if ($driver === 's3') {
-                try {
-                    $s3 = StorageHelper::disk();
-
-                    $folderExists = $s3->exists($basePath . '/.gitkeep');
-                    if (!$folderExists) {
-                        $s3->put($basePath . '/.gitkeep', '');
-                    }
-
-                    $filePath = $basePath . '/' . $newFileName;
-                    $s3->put($filePath, file_get_contents($uploadedFile->getRealPath()));
-                    $uploadedToS3 = true;
-                } catch (\Exception $e) {
-                    \Log::warning('S3 upload failed, falling back to local storage: ' . $e->getMessage());
-                }
-            }
-
-            if (!$uploadedToS3) {
-                $localPath = 'talent_acquisition/' . base64_encode($vacancy_id);
-                $fullDir = public_path($localPath);
-                if (!file_exists($fullDir)) {
-                    mkdir($fullDir, 0755, true);
-                }
-                $uploadedFile->move($fullDir, $newFileName);
-                $filePath = $localPath . '/' . $newFileName;
-            }
+            // Was: picked the disk off config('filesystems.default')
+            // (FILESYSTEM_DRIVER) with a raw public_path()/move() local
+            // fallback whenever that wasn't exactly 's3' — a DIFFERENT env
+            // var than Common::GetApplicantAWSFile() (the download/render
+            // side) uses to pick a disk (settings.storage_driver /
+            // STORAGE_DRIVER). Once the two env vars diverged in prod
+            // (FILESYSTEM_DRIVER=local, STORAGE_DRIVER=wasabi), every
+            // upload silently landed on local disk while every download
+            // looked on Wasabi — "File Not Found!" and the applicant photo
+            // placeholder, and dead after any redeploy/restart wipes that
+            // local file. StorageHelper::disk() resolves from the SAME
+            // config as the download side, so upload and download always
+            // agree on where the file actually lives.
+            $filePath = $basePath . '/' . $newFileName;
+            StorageHelper::disk()->put($filePath, file_get_contents($uploadedFile->getRealPath()));
 
             $data['status'] = true;
             $data['path'] = $filePath;

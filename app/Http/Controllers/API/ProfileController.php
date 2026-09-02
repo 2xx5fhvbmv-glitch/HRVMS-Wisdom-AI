@@ -37,6 +37,56 @@ class ProfileController extends Controller
             $this->resort_id = $this->user->resort_id;
         }
   }
+    /**
+     * Sends a real FCM push to every device token registered against the
+     * authenticated employee and returns the raw per-device result (FCM
+     * credentials missing/invalid, no device token registered, or the
+     * actual FCM send result per device) — a single call to confirm push
+     * notifications are working end to end, not just that the DB insert
+     * (Common::nofitication) succeeded.
+     */
+    public function testPushNotification(Request $request)
+    {
+        if (!$this->user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $employee = $this->user->GetEmployee;
+        if (!$employee) {
+            return response()->json(['success' => false, 'message' => 'No employee record linked to this account.'], 200);
+        }
+
+        $tokens = Common::decodeDeviceTokens($employee->device_token);
+        if (empty($tokens)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'No device token registered for this account — log in on the app first so it registers one, then retry.',
+            ], 200);
+        }
+
+        $results = Common::sendPushNotificationForMobile(
+            $tokens,
+            'Test Push Notification',
+            'If you can see this, push notifications are working.',
+            'Test',
+            null,
+            null,
+            null,
+            null
+        );
+
+        $anySucceeded = collect($results)->contains(fn ($r) => ($r['status'] ?? false) === true);
+
+        return response()->json([
+            'success' => $anySucceeded,
+            'message' => $anySucceeded
+                ? 'Push sent — check the device for the test notification.'
+                : 'Push send failed — see results for the reason (FCM credentials, invalid/stale token, etc).',
+            'device_count' => count($tokens),
+            'results' => $results,
+        ]);
+    }
+
   public function getProfile(Request $request)
   {
     if (!Auth::guard('api')->check()) {
