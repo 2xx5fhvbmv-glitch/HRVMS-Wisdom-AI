@@ -882,7 +882,14 @@ class DashboardController extends Controller
                     'category' => optional($item->categoryName)->category_name ?? 'Uncategorized',
                     'scheduled_time' => $datetime->format('g:i A'), // e.g., "2:00 PM"
                     'day_label' => $datetime->isToday() ? 'Today' : ($datetime->isTomorrow() ? 'Tomorrow' : $datetime->format('d M Y')),
-                    'time_ago' => $datetime->diffForHumans(), // now accurate
+                    // Was diffForHumans() on incident_date+incident_time (when the
+                    // incident OCCURRED) while the list itself is ordered by
+                    // created_at desc (when it was SUBMITTED) — an old incident
+                    // reported just now sorted to the top but still showed "1
+                    // month ago", reading as a stale/wrong timestamp. getRawOriginal
+                    // bypasses the model's getCreatedAtAttribute (which returns an
+                    // already-formatted display string, not a raw datetime).
+                    'time_ago' => Carbon::parse($item->getRawOriginal('created_at'))->diffForHumans(),
                 ];
             });
     
