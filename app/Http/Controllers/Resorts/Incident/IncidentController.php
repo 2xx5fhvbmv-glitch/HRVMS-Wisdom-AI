@@ -492,8 +492,19 @@ class IncidentController extends Controller
         ]);
 
         $incident_details = Incidents::where('resort_id', $this->resort->resort_id)->findOrFail($request->incident_id);
-        $incident_details->priority = $request->priority;
-        $incident_details->severity = $request->severity;
+
+        // Priority/Severity are only editable on the FIRST investigation
+        // submission — an existing IncidentsInvestigation row means they've
+        // already been classified, so keep whatever was saved then and
+        // ignore any value posted now (the select is disabled client-side
+        // for this same reason, but that alone doesn't stop a bypassed
+        // request from reaching here).
+        $alreadyClassified = IncidentsInvestigation::where('incident_id', $incident_details->id)->exists();
+        if (!$alreadyClassified) {
+            $incident_details->priority = $request->priority;
+            $incident_details->severity = $request->severity;
+        }
+
         $incident_details->status = $request->status;
         $incident_details->outcome_type =  $request->outcomeType;
         $incident_details->preventive_measures =  $request->pre_mea;
