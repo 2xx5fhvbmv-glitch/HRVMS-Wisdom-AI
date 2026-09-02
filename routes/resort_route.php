@@ -343,6 +343,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::post('/get/occupancy-data', ['App\Http\Controllers\Resorts\OccupancyController', 'getOccupancyData'])->name('occupancy.getData');
 
     // Notifications
+    Route::get('test-push-notification', 'ResortAllNotificationController@testPushNotification')->name('resort.testPushNotification');
     Route::post('workforce-planning/requestmanning', 'ResortAllNotificationController@ManningNotification')->name('resort.manning.notification');
     Route::post('workforce-planning/reminder/request-manning', 'ResortAllNotificationController@ReminderRequestManning')->name('resort.reminder.manning.notification');
     Route::post('workforce-planning/send-to-finance', 'ResortAllNotificationController@SendToFinance')->name('resort.SendToFinance.manning.notification');
