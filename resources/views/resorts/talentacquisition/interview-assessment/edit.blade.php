@@ -114,26 +114,27 @@
 
             // Per-field "Responder Roles" attribute — same set used on Create.
             // Lets HR edit which roles can fill each existing field.
+            //
+            // formBuilder looks up custom attrs by `type + '-' + subtype`
+            // (e.g. "header-h1") whenever a field has a subtype set — a
+            // per-type key like "header" only ever matches a header BEFORE
+            // its H1/H2/H3 level is chosen, so picking a level made this
+            // section vanish. The '*' key applies to every field
+            // regardless of subtype, sidestepping that lookup entirely.
             const RESPONDER_ROLE_OPTIONS = {
                 'GM': 'GM', 'EXCOM': 'EXCOM', 'HOD': 'HOD', 'HR': 'HR',
                 'MGR': 'MGR', 'SUP': 'SUP', 'LINE WORKERS': 'LINE WORKERS',
                 'Finance': 'Finance', 'Self': 'Self (the candidate)'
             };
-            const FIELD_TYPES = [
-                'text','textarea','password','email','phone','url','number','date','time','hidden',
-                'select','checkbox','radio','checkbox-group','radio-group','file','autocomplete',
-                'header','paragraph','button','starRating','ratingTable'
-            ];
-            const typeUserAttrs = {};
-            FIELD_TYPES.forEach(function (t) {
-                typeUserAttrs[t] = {
+            const typeUserAttrs = {
+                '*': {
                     responder_roles: {
                         label: 'Responder Roles (who fills)',
                         multiple: true,
                         options: RESPONDER_ROLE_OPTIONS
                     }
-                };
-            });
+                }
+            };
 
             // Initialize FormBuilder with the role-tagging attribute.
             const formBuilder = $('#form-builder').formBuilder({
