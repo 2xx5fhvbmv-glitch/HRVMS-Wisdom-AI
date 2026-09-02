@@ -308,7 +308,7 @@ class RenewalController extends Controller
         }
         $file = $request->file('file');
         $doc_type = $request->flag;
-        $url = env('AI_extract_work_details_URL').$doc_type;
+        $url = config('services.ai_extract.url').$doc_type;
 
 
         if($doc_type=="insurance")
@@ -341,7 +341,7 @@ class RenewalController extends Controller
         };
 
 
-            $url = env('AI_extract_work_details_URL').$doc_type;
+            $url = config('services.ai_extract.url').$doc_type;
 
             $ResortBudgetCost = Common::VisaRenewalCost($this->resort->resort_id);
             $curl = curl_init();
@@ -1537,7 +1537,7 @@ class RenewalController extends Controller
         $flag=$request->flag;
         $file = $request->file('file');
         
-            $url = env('AI_extract_work_details_URL').$flag; 
+            $url = config('services.ai_extract.url').$flag;
             $curl = curl_init();
             $postFields = [
                 'file' => new \CURLFile($file->getRealPath(), $file->getMimeType(), $file->getClientOriginalName()),
@@ -1649,7 +1649,7 @@ class RenewalController extends Controller
         $file = $request->file('file');
         if($file)
         {
-            $url = env('AI_URL').'extract_education_exp_details?doc_type=cv'; 
+            $url = config('services.ai_extract.base_url').'extract_education_exp_details?doc_type=cv';
             $curl = curl_init();
             $postFields = [
                 'file' => new \CURLFile($file->getRealPath(), $file->getMimeType(), $file->getClientOriginalName()),
@@ -1702,7 +1702,7 @@ class RenewalController extends Controller
         $file = $request->file('file');
         if($file)
         {
-            $url = env('AI_URL').'extract_education_exp_details?doc_type=education';
+            $url = config('services.ai_extract.base_url').'extract_education_exp_details?doc_type=education';
             $curl = curl_init();
             $postFields = [
                 'file' => new \CURLFile($file->getRealPath(), $file->getMimeType(), $file->getClientOriginalName()),
@@ -1759,7 +1759,7 @@ class RenewalController extends Controller
 
         if($file)
         {
-            $url = env('AI_URL').'extract_education_exp_details?doc_type=experience'; 
+            $url = config('services.ai_extract.base_url').'extract_education_exp_details?doc_type=experience';
             $curl = curl_init();
             $postFields = [
                 'file' => new \CURLFile($file->getRealPath(), $file->getMimeType(), $file->getClientOriginalName()),

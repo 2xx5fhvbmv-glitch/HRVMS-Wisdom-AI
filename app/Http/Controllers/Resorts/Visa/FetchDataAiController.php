@@ -179,10 +179,10 @@ class FetchDataAiController extends Controller
      *  AI_extract_work_details_URL (just stripping its path/query). */
     private function aiBaseUrl(): string
     {
-        $u = (string) env('AI_extract_work_details_URL');
+        $u = (string) config('services.ai_extract.url');
         $base = preg_replace('#extract_work_details.*$#', '', $u);
         if (!$base) {
-            $base = rtrim((string) env('AI_URL', 'http://localhost:8001/'), '/') . '/';
+            $base = rtrim((string) config('services.ai_extract.base_url'), '/') . '/';
         }
         return rtrim($base, '/') . '/';
     }

@@ -68,4 +68,21 @@ return [
         // (replaces the external PaddleOCR service). Must accept PDF/image input.
         'vision_model' => env('OPENROUTER_VISION_MODEL', 'google/gemini-2.5-flash'),
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | AI work-details extraction (Visa document upload)
+    |--------------------------------------------------------------------------
+    | Same env()-outside-config bug as 'fcm' above — RenewalController,
+    | XpactEmployeeController and FetchDataAiController all called
+    | env('AI_extract_work_details_URL') directly, which returns null once
+    | config:cache runs in prod. The concatenated URL then collapsed to just
+    | the doc-type suffix (e.g. "passport"), and curl tried to resolve that
+    | bare string as a hostname — "Could not resolve host: passport" in prod,
+    | while working fine locally where config is never cached.
+    */
+    'ai_extract' => [
+        'url' => env('AI_extract_work_details_URL'),
+        'base_url' => env('AI_URL', 'http://localhost:8001/'),
+    ],
 ];

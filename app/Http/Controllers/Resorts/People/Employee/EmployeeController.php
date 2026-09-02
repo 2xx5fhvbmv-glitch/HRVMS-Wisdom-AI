@@ -2545,7 +2545,7 @@ class EmployeeController extends Controller
             return response()->json(['success' => false, 'message' => 'The document failed to upload.'], 400);
         }
         $flag = $request->doc_type;
-        $url = env('AI_URL').'extract_education_exp_details?doc_type='.$flag;
+        $url = config('services.ai_extract.base_url').'extract_education_exp_details?doc_type='.$flag;
         if($flag)
         {
             $curl = curl_init();
