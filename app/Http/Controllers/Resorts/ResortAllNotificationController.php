@@ -24,6 +24,23 @@ class ResortAllNotificationController extends Controller
         $this->type = config('settings.Notifications');
     }
 
+    /**
+     * Web-portal counterpart of API\ProfileController::testPushNotification
+     * — same underlying Common::sendTestPushToResort(), just reachable from
+     * a browser session (auth:resort-admin) instead of a Passport bearer
+     * token, so HR/admin can trigger a real test push without needing to
+     * mint an API token first.
+     */
+    public function testPushNotification(Request $request)
+    {
+        $resort = Auth::guard('resort-admin')->user();
+        if (!$resort) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        return response()->json(Common::sendTestPushToResort($resort->resort_id));
+    }
+
     public function ManningNotification(Request $request)
     {
         $resort = Auth::guard('resort-admin')->user();

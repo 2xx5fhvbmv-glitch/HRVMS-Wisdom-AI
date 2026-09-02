@@ -9026,6 +9026,67 @@ class Common
         ], 200);
     }
 
+    /**
+     * Sends a real FCM test push to every device token registered against
+     * every active employee at $resortId and returns a single normalized
+     * result shape. Shared by the mobile test-push API endpoint
+     * (ProfileController::testPushNotification) and the web-side one
+     * (ResortAllNotificationController), so both call sites agree on what
+     * "success" means and neither has to know that
+     * sendPushNotificationForMobile() returns a plain array on one failure
+     * path (FCM auth token unavailable) but a full JsonResponse object on
+     * its normal path — that inconsistency is normalized here, once.
+     */
+    public static function sendTestPushToResort($resortId): array
+    {
+        $tokens = \App\Models\Employee::where('resort_id', $resortId)
+            ->where(function ($q) {
+                $q->whereNull('status')->orWhere('status', 'Active')->orWhere('status', 'Probationary');
+            })
+            ->whereNotNull('device_token')
+            ->pluck('device_token')
+            ->flatMap(fn ($raw) => self::decodeDeviceTokens($raw))
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($tokens)) {
+            return [
+                'success' => false,
+                'message' => 'No device tokens registered for this resort — at least one employee needs to have logged into the app first.',
+                'device_count' => 0,
+                'success_count' => 0,
+                'results' => [],
+            ];
+        }
+
+        $raw = self::sendPushNotificationForMobile(
+            $tokens,
+            'Test Push Notification',
+            'If you can see this, push notifications are working.',
+            'Test',
+            null,
+            null,
+            null,
+            null
+        );
+
+        $results = $raw instanceof \Illuminate\Http\JsonResponse
+            ? ($raw->getData(true)['response'] ?? [])
+            : (array) $raw;
+
+        $successCount = collect($results)->filter(fn ($r) => ($r['status'] ?? false) === true)->count();
+
+        return [
+            'success' => $successCount > 0,
+            'message' => $successCount > 0
+                ? "Push sent to {$successCount}/" . count($tokens) . ' device(s) — check those devices for the test notification.'
+                : 'Push send failed for every device — see results for the reason (FCM credentials, invalid/stale tokens, etc).',
+            'device_count' => count($tokens),
+            'success_count' => $successCount,
+            'results' => $results,
+        ];
+    }
 
     /**
      * Department head resolution — rank 2 (HOD) first, falls back to rank 1
