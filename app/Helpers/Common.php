@@ -8991,6 +8991,25 @@ class Common
             if ($http_code !== 200) {
                 $errorMsg = isset($response_arr['error']['message']) ? $response_arr['error']['message'] : $response;
                 \Log::error('FCM Error: ' . $errorMsg);
+
+                // FCM confirming NotRegistered/InvalidRegistration means this
+                // token is permanently dead (app uninstalled/reinstalled,
+                // logged out) — every future push to whichever employee owns
+                // it, from ANY module, would keep silently failing forever
+                // otherwise. Prune it now. Wrapped defensively so a lookup
+                // failure here never breaks sending to the other tokens in
+                // this same batch.
+                if (in_array($errorMsg, ['NotRegistered', 'InvalidRegistration'], true)) {
+                    try {
+                        \App\Models\Employee::where('device_token', $deviceToken)
+                            ->orWhereJsonContains('device_token', $deviceToken)
+                            ->get()
+                            ->each(fn ($emp) => self::removeDeviceToken($emp, $deviceToken));
+                    } catch (\Throwable $e) {
+                        \Log::warning('Failed to prune dead FCM token: ' . $e->getMessage());
+                    }
+                }
+
                 $responses[] = [
                     'deviceToken' => $deviceToken,
                     'status' => false,
