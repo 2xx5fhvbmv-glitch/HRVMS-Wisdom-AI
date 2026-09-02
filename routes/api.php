@@ -52,6 +52,7 @@ use Illuminate\Support\Facades\Route;
 		Route::post('resort/profile-img-update', [App\Http\Controllers\API\ProfileController::class, 'changeProfileImage']);
 		Route::get('profile/visa-category', [App\Http\Controllers\API\ProfileController::class, 'getVisaCategory']);
 		Route::get('profile/visa-data/{visa_category}', [App\Http\Controllers\API\ProfileController::class, 'getVisaData']);
+		Route::get('resort/test-push-notification', [App\Http\Controllers\API\ProfileController::class, 'testPushNotification']);
 
 		//Employees Document
 		Route::post('resort/employees-docs', [App\Http\Controllers\API\EmployeeDocumentController::class, 'employeeDocument']);
