@@ -947,7 +947,7 @@ class XpactEmployeeController extends Controller
         if($aws['status'] == true)
         {
             $file_child_id  = $aws['Chil_file_id'];
-            $url = env('AI_extract_work_details_URL').$flag; 
+            $url = config('services.ai_extract.url').$flag;
                 $curl = curl_init();
                 $postFields = [
                     'file' => new \CURLFile($file->getRealPath(), $file->getMimeType(), $file->getClientOriginalName()),
