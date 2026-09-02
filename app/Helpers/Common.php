@@ -9060,6 +9060,28 @@ class Common
             ];
         }
 
+        // FCMTokenPushNotification() (the real send path) returns null for
+        // ALL THREE of these causes indistinguishably and only logs which
+        // one to storage/logs/laravel.log — not much use to whoever's
+        // sitting at this test endpoint without server/log access. Check
+        // the same three things here, up front, so the response itself
+        // says which one it is.
+        $missingCreds = array_filter([
+            'FCM_PROJECT_ID' => empty(config('services.fcm.project_id')),
+            'FCM_SERVICE_ACCOUNT_EMAIL' => empty(config('services.fcm.service_account_email')),
+            'FCM_PRIVATE_KEY' => empty(config('services.fcm.private_key')),
+        ]);
+        if (!empty($missingCreds)) {
+            return [
+                'success' => false,
+                'message' => 'FCM credentials missing from config/env: ' . implode(', ', array_keys($missingCreds))
+                    . '. Set these in the server .env, then (if config is cached) run `php artisan config:clear`.',
+                'device_count' => count($tokens),
+                'success_count' => 0,
+                'results' => [],
+            ];
+        }
+
         $raw = self::sendPushNotificationForMobile(
             $tokens,
             'Test Push Notification',
@@ -9074,6 +9096,27 @@ class Common
         $results = $raw instanceof \Illuminate\Http\JsonResponse
             ? ($raw->getData(true)['response'] ?? [])
             : (array) $raw;
+
+        // All three credentials are present but the send still failed with
+        // "FCM auth token unavailable" — narrow it down further: either the
+        // private key is malformed (openssl_sign() failed) or Google
+        // rejected the resulting JWT/OAuth request. Neither is checkable
+        // without actually attempting the signed request, which
+        // FCMTokenPushNotification() already just did (inside
+        // sendPushNotificationForMobile() above) — point at the log line
+        // it wrote instead of guessing further here.
+        $authUnavailable = collect($results)->contains(fn ($r) => ($r['message'] ?? '') === 'FCM auth token unavailable, see log for cause');
+        if ($authUnavailable) {
+            return [
+                'success' => false,
+                'message' => 'FCM credentials are present in config, but requesting an FCM auth token still failed — check storage/logs/laravel.log '
+                    . 'on this server for "FCM JWT signing failed" (malformed FCM_PRIVATE_KEY) or "FCM OAuth token request failed" (Google rejected the request — '
+                    . 'check the logged response for the exact reason, e.g. wrong project_id/service_account_email or a revoked key).',
+                'device_count' => count($tokens),
+                'success_count' => 0,
+                'results' => $results,
+            ];
+        }
 
         $successCount = collect($results)->filter(fn ($r) => ($r['status'] ?? false) === true)->count();
 
