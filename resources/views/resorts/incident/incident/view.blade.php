@@ -34,6 +34,7 @@
                                 <ul class="userDetailList-wrapper">
                                     <li><span>DATE:</span>{{date('d M Y', strtotime($incident->incident_date))}}</li>
                                     <li><span>TIME:</span>{{date('h:i A', strtotime($incident->incident_time))}}</li>
+                                    <li><span>SUBMITTED:</span>{{$incident->created_at}}</li>
                                 </ul>
                             </div>
                         </div>

@@ -403,6 +403,56 @@ class IncidentController extends Controller
     
             DB::commit();
 
+            // Nothing told HR or the reporter's own manager a new incident had
+            // come in — mirrors the notify pattern already used for statement
+            // submissions further down this controller (provideStatement()).
+            // Wrapped in its own try/catch and kept OUTSIDE the DB transaction
+            // logic above: the incident is already committed at this point, so
+            // a notification failure must never turn into a 500 that makes the
+            // app think the whole submission failed.
+            try {
+                $notifyIds = array_values(array_unique(array_filter(array_merge(
+                    Common::getResortHrEmployeeIds($this->resort_id),
+                    [$employee->reporting_to]
+                ))));
+                $notifyIds = array_diff($notifyIds, [$emp_id]);
+
+                if (!empty($notifyIds)) {
+                    $submitterName = trim(($employee->resortAdmin->first_name ?? '') . ' ' . ($employee->resortAdmin->last_name ?? ''));
+                    $title = 'New Incident Reported';
+                    $msg = ($submitterName ?: 'An employee') . ' reported incident "' . $incident->incident_name . '" (#' . $incident->incident_id . ').';
+                    $ModuleName = "Incident";
+
+                    foreach ($notifyIds as $notifyId) {
+                        event(new ResortNotificationEvent(Common::nofitication(
+                            $this->resort_id,
+                            10,
+                            $title,
+                            $msg,
+                            0,
+                            $notifyId,
+                            $ModuleName
+                        )));
+
+                        Common::sendMobileNotification(
+                            $this->resort_id,
+                            2,
+                            '',
+                            '',
+                            $title,
+                            $msg,
+                            $ModuleName,
+                            [$notifyId],
+                            $incident->id,
+                            true,
+                            'incident-notification'
+                        );
+                    }
+                }
+            } catch (\Exception $e) {
+                \Log::error('AddIncident notification failed: ' . $e->getMessage());
+            }
+
             return response()->json([
                 'message' => 'Incident created successfully',
                 'data' => $incident,
