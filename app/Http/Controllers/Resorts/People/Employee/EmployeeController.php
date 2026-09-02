@@ -2732,30 +2732,13 @@ class EmployeeController extends Controller
 
     public function getReportingPerson(Request $request){
 
-        $Dept_id = $request->department_id;
-        $targetRanks = [
-            array_search('HOD', config('settings.Position_Rank')),
-            array_search('MGR', config('settings.Position_Rank')),
-            array_search('GM', config('settings.Position_Rank')),
-            array_search('SUP', config('settings.Position_Rank')),
-            array_search('EXCOM', config('settings.Position_Rank'))
-        ];
+        $reportingEmployees = Common::getValidReportingManagers(
+            $this->resort->resort_id,
+            $request->rank,
+            $request->department_id,
+            $request->employee_id
+        );
 
-        // Get all employees with reporting ranks (all HODs regardless of department, plus other ranks)
-        $reportingEmployees = DB::table('employees')
-            ->join('resort_admins', 'employees.Admin_Parent_id', '=', 'resort_admins.id')
-            ->where('employees.resort_id', $this->resort->resort_id)
-            ->where('employees.status', '!=', 'Inactive')
-            ->whereIn('employees.rank', $targetRanks)
-            ->select(
-                'employees.*',
-                'resort_admins.first_name as first_name',
-                'resort_admins.last_name as last_name',
-                'resort_admins.email as admin_email'
-            )
-            ->orderBy('employees.rank', 'asc')
-            ->orderBy('resort_admins.first_name', 'asc')
-            ->get();
         return response()->json(['success' => true, 'data' => $reportingEmployees]);
 
     }

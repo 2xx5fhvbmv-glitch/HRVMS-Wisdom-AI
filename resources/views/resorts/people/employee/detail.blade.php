@@ -2047,7 +2047,9 @@ if (!function_exists('safeParseDate')) {
             url: '{{ route("people.getReportingPerson") }}',
             method: 'GET',
             data: {
-                department_id: currentDeptId || ''
+                department_id: currentDeptId || '',
+                rank: {!! json_encode((string) $employee->rank) !!},
+                employee_id: {!! json_encode($employee->id) !!}
             },
             success: function(response) {
                 if (response.success && response.data && response.data.length > 0) {

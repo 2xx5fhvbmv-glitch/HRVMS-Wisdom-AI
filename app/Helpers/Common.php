@@ -7808,6 +7808,17 @@ class Common
         $tempPdfPath = null;
         $fullImagePath = null;
 
+        // A file rejected by php.ini's upload_max_filesize (silently,
+        // before Laravel/Symfony even see it) or otherwise invalid leaves
+        // an UploadedFile whose temp path is empty/unreadable —
+        // file_get_contents() on that resolves to the CWD and blows up
+        // with a confusing "Is a directory" error instead of a clean one.
+        // This is the shared upload path for every module's attachments,
+        // so guard it here once rather than per caller.
+        if (!$file || !$file->isValid()) {
+            return ['status' => false, 'msg' => 'Invalid or missing file upload — it may exceed the server\'s upload size limit.'];
+        }
+
         try {
             // Backfill folder row + placeholder for employees who pre-date the file-management feature.
             $File_structure = FilemangementSystem::firstOrCreate(
@@ -9034,6 +9045,65 @@ class Common
             return $emp;
         }
         return Employee::where('resort_id',$resort_id)->where('Dept_id',$department_id)->where("rank",1)->where('status','Active')->first();
+    }
+
+    /**
+     * Valid "Reporting Manager" candidates for the Reporting Person dropdown
+     * (Employee create + Employment Data edit + Visa document wizard).
+     * Scopes by rank per the hierarchy: GM has none, EXCOM reports only to
+     * GM (resort-wide, no dept filter — same pattern as the GM lookup in
+     * Leave approval), HOD reports to GM or their own dept's EXCOM, everyone
+     * else reports to HOD/EXCOM/MGR/SUP within their own department.
+     */
+    public static function getValidReportingManagers($resort_id, $employeeRank, $deptId, $excludeEmployeeId = null)
+    {
+        $rank = (string) $employeeRank;
+
+        if ($rank === '8') {
+            return collect();
+        }
+
+        if ($rank === '1') {
+            $targetRanks = ['8'];
+            $scopeToDept = false;
+        } elseif ($rank === '2') {
+            $targetRanks = ['8', '1'];
+            $scopeToDept = 'excom_only';
+        } else {
+            $targetRanks = ['2', '1', '4', '5'];
+            $scopeToDept = true;
+        }
+
+        $query = DB::table('employees')
+            ->join('resort_admins', 'employees.Admin_Parent_id', '=', 'resort_admins.id')
+            ->where('employees.resort_id', $resort_id)
+            ->where('employees.status', '!=', 'Inactive')
+            ->whereIn('employees.rank', $targetRanks);
+
+        if ($scopeToDept === true) {
+            $query->where('employees.Dept_id', $deptId);
+        } elseif ($scopeToDept === 'excom_only') {
+            $query->where(function ($q) use ($deptId) {
+                $q->where('employees.rank', '8')
+                  ->orWhere(function ($q2) use ($deptId) {
+                      $q2->where('employees.rank', '1')->where('employees.Dept_id', $deptId);
+                  });
+            });
+        }
+
+        if ($excludeEmployeeId) {
+            $query->where('employees.id', '!=', $excludeEmployeeId);
+        }
+
+        return $query->select(
+                'employees.*',
+                'resort_admins.first_name as first_name',
+                'resort_admins.last_name as last_name',
+                'resort_admins.email as admin_email'
+            )
+            ->orderBy('employees.rank', 'asc')
+            ->orderBy('resort_admins.first_name', 'asc')
+            ->get();
     }
 
     /**

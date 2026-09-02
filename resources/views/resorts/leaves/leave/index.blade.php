@@ -33,7 +33,7 @@
                                         <label for="applyForEmployee" class="form-label">APPLYING LEAVE FOR</label>
                                         <select class="form-select" id="applyForEmployee">
                                             @foreach($applicableEmployees as $emp)
-                                                <option value="{{ $emp->id }}" @selected((int) $selectedEmployeeId === (int) $emp->id)>{{ ucfirst($emp->first_name . ' ' . $emp->last_name) }} ({{ $emp->Emp_id }})</option>
+                                                <option value="{{ $emp->id }}" {{ (int) $selectedEmployeeId === (int) $emp->id ? 'selected' : '' }}>{{ ucfirst($emp->first_name . ' ' . $emp->last_name) }} ({{ $emp->Emp_id }})</option>
                                             @endforeach
                                         </select>
                                         <small class="text-muted">Leave categories, balances, and approvals below reflect whoever is selected here.</small>

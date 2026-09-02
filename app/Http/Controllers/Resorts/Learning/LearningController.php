@@ -262,7 +262,8 @@ class LearningController extends Controller
                 // Creator (resort_admin who submitted the request) — second join below.
                 DB::raw("CONCAT(creator.first_name, ' ', creator.last_name) as requested_by"),
 
-                DB::raw("GROUP_CONCAT(CONCAT(resort_admins.first_name, ' ', resort_admins.last_name) SEPARATOR ', ') as employee_names")
+                DB::raw("GROUP_CONCAT(CONCAT(resort_admins.first_name, ' ', resort_admins.last_name) SEPARATOR ', ') as employee_names"),
+                DB::raw("GROUP_CONCAT(DISTINCT learning_requests_employees.employee_id SEPARATOR ',') as employee_ids")
             )
             ->leftJoin('learning_programs', 'learning_requests.learning_id', '=', 'learning_programs.id')
             ->leftJoin('learning_requests_employees', 'learning_requests.id', '=', 'learning_requests_employees.learning_request_id')
@@ -340,11 +341,27 @@ class LearningController extends Controller
                 ->addColumn('action', function ($row) use ($isManager) {
                     if (!$isManager) return ''; // Hide actions for HR & HOD
 
-                    $approveBtn = '<button class="btn lnd-btn-positive btn-sm" onclick="updateLearningRequestStatus(' . $row->id . ', \'Approved\')">Approve</button>';
-                    $onHoldBtn = '<button class="btn lnd-btn-neutral btn-sm" onclick="updateLearningRequestStatus(' . $row->id . ', \'On Hold\')">On Hold</button>';
-                    $rejectBtn = '<button class="btn lnd-btn-critical btn-sm" onclick="rejectLearningRequest(' . $row->id . ')">Deny</button>';
+                    if ($row->status == 'Pending' || $row->status == 'On Hold') {
+                        $approveBtn = '<button class="btn lnd-btn-positive btn-sm" onclick="updateLearningRequestStatus(' . $row->id . ', \'Approved\')">Approve</button>';
+                        $onHoldBtn = '<button class="btn lnd-btn-neutral btn-sm" onclick="updateLearningRequestStatus(' . $row->id . ', \'On Hold\')">On Hold</button>';
+                        $rejectBtn = '<button class="btn lnd-btn-critical btn-sm" onclick="rejectLearningRequest(' . $row->id . ')">Deny</button>';
+                        return $approveBtn . ' ' . $onHoldBtn . ' ' . $rejectBtn;
+                    }
 
-                    return ($row->status == 'Pending' || $row->status == 'On Hold') ? $approveBtn . ' ' . $onHoldBtn . ' ' . $rejectBtn : '';
+                    if ($row->status == 'Approved') {
+                        // Lands the L&D Manager on the schedule-creation page with
+                        // this request's program and suggested employee(s)
+                        // pre-selected (see preselectFromQuery() in
+                        // schedule/index.blade.php) — employee_ids is a
+                        // comma-separated GROUP_CONCAT from learning_requests_employees.
+                        $scheduleUrl = route('learning.schedule', [
+                            'program_id' => $row->learning_id,
+                            'employee_id' => $row->employee_ids,
+                        ]);
+                        return '<a href="' . e($scheduleUrl) . '" class="btn lnd-btn-positive btn-sm">Schedule Program</a>';
+                    }
+
+                    return '';
                 })
                 ->rawColumns(['status', 'action'])
                 ->make(true);

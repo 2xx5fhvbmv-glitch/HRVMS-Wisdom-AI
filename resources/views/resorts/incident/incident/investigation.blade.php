@@ -117,23 +117,29 @@
 
                             <label for="priority_level" class="form-label">PRIORITY LEVEL</label>
                             <select class="form-select select2t-none" id="priority_level" name="priority"
-                                aria-label="Default select example">
+                                aria-label="Default select example" {{ isset($investigations[0]) ? 'disabled' : '' }}>
                                 <option value="">Select Priority </option>
                                 <option value="Low" {{ $incident->priority == "Low" ? 'selected' : '' }}>Low</option>
                                 <option value="Medium" {{ $incident->priority == "Medium" ? 'selected' : '' }}>Medium</option>
                                 <option value="High" {{ $incident->priority == "High" ? 'selected' : '' }}>High</option>
                             </select>
+                            @if(isset($investigations[0]))
+                                <small class="text-muted">Priority is locked once the incident has been classified.</small>
+                            @endif
                         </div>
                         <div class="col-sm-6">
                             <label for="incident_severity" class="form-label">INCIDENT SEVERITY</label>
-                            <select class="form-select select2t-none" name="severity" id="severity" aria-label="Default select example">
+                            <select class="form-select select2t-none" name="severity" id="severity" aria-label="Default select example" {{ isset($investigations[0]) ? 'disabled' : '' }}>
                                 <option value="">Select Severity </option>
                                 @if($severities)
-                                    @foreach($severities as $severity)   
+                                    @foreach($severities as $severity)
                                         <option value="{{$severity}}" {{ $incident->severity == $severity ? 'selected' : '' }}>{{$severity}}</option>
-                                    @endforeach                                
+                                    @endforeach
                                 @endif
                             </select>
+                            @if(isset($investigations[0]))
+                                <small class="text-muted">Severity is locked once the incident has been classified.</small>
+                            @endif
                         </div>
                     </div>
                     <div class="card-title mb-md-4">

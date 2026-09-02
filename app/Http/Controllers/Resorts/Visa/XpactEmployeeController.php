@@ -890,6 +890,25 @@ class XpactEmployeeController extends Controller
     }
     public function EmployeeWiseVisaDocumentUpload(Request $request)
     {
+        // Was: no validation at all before handing the file to
+        // AWSEmployeeFileUpload() — a file rejected by php.ini's
+        // upload_max_filesize (silently, before Laravel even sees it) or
+        // otherwise invalid left $request->file('DocumentFile') with an
+        // empty/unreadable temp path, and file_get_contents() on that blew
+        // up with a confusing "Is a directory" error instead of a clean
+        // message. Matches the UI's own "Accepted formats: PDF, JPG, JPEG,
+        // PNG. Maximum size: 5MB" copy (XpatEmployeeDetails.blade.php).
+        $validator = \Illuminate\Support\Facades\Validator::make($request->all(), [
+            'DocumentFile' => 'required|file|mimes:pdf,jpg,jpeg,png,heic,heif|max:5120',
+        ]);
+        if ($validator->fails()) {
+            // 200 + status:false, not a 4xx — this endpoint's own JS only
+            // reads the specific message on the success: callback; a 4xx
+            // hits its generic error: handler and shows a useless
+            // "An error occurred" toast instead of telling the user why.
+            return response()->json(['status' => false, 'message' => $validator->errors()->first()], 200);
+        }
+
         $DocumentType = $request->DocumentType;
         $employee_id  = base64_decode($request->emp_id);
         $flag ='';

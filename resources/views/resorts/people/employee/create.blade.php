@@ -1685,6 +1685,9 @@
                         success: function (res) {
                             if (!res) return;
                             $('#position_rank').val(res.position_rank || '');
+                            if (typeof window.getReportingPerson === 'function') {
+                                window.getReportingPerson(deptId, res.position_rank);
+                            }
                             let opts = res.options || [];
                             if (opts.length === 1) {
                                 // Single, unambiguous grade for this rank —
@@ -3107,12 +3110,13 @@
                 });
             }
 
-            function getReportingPerson(departmentId) {
+            window.getReportingPerson = function(departmentId, rank) {
                 $.ajax({
                     url: '{{ route('people.getReportingPerson') }}',
                     type: 'GET',
                     data: {
-                        department_id: departmentId
+                        department_id: departmentId,
+                        rank: rank || ''
                     },
                     success: function(res) {
                         let html = '<option></option>';
@@ -3131,7 +3135,7 @@
                         $('#reporting_person').html(html).trigger('change');
                     }
                 });
-            }
+            };
         });
 
         $(document).ready(function() {
@@ -3222,6 +3226,7 @@
                             html += `<option value="${o.emp_grade}"${sel}>${o.name}</option>`;
                         });
                         $('#position_rank').val(res.position_rank);
+                        getReportingPerson($('#department').val(), res.position_rank);
 
                         // Multiple grades can now share this rank — only
                         // auto-fill the entitlement switches when there's a
