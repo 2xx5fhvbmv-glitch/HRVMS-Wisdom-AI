@@ -503,7 +503,17 @@ class ClinicController extends Controller
                                                                 ->whereNotIn('clinic_appointment.status', ['Cancel', 'Rejected','Medical Certificate'])
                                                                 ->where('clinic_appointment.resort_id', $this->resort_id)
                                                                  ->limit(2)
-                                                                ->get(['clinic_appointment.*', 'ra.first_name', 'ra.last_name', 'rp.position_title as position']);
+                                                                ->get(['clinic_appointment.*', 'ra.id as admin_parent_id', 'ra.first_name', 'ra.last_name', 'rp.position_title as position']);
+
+            // Never resolved a photo at all for this list (separate from the
+            // temp-clinic-doctor guard fix — that fix only helps callers
+            // that already invoke getResortUserPicture(), and this query
+            // never did), so "Recently Approved" always had no photo field
+            // whatsoever, not even a default-image fallback.
+            $appointmentData                            =   $appointmentData->map(function ($appointment) {
+                                                                $appointment->profile_picture = Common::getResortUserPicture($appointment->admin_parent_id);
+                                                                return $appointment;
+                                                            });
 
             $today                                      =   Carbon::today();
             $startOfWeek                                =   Carbon::now()->startOfWeek();
