@@ -71,15 +71,21 @@ class LeaveController extends Controller
             'trans_departure_date'      => 'required_with:transportation|array',
             'trans_departure_date.*'    => 'required_with:transportation.*|date_format:Y-m-d',
 
-            // Additional fields for transportation and destination
-            'dept_date'                 => 'required_with_all:destination,transportation|date_format:Y-m-d',
-            'dept_time'                 => 'required_with_all:destination,transportation|date_format:H:i',
-            'dept_transportation'       => 'required_with_all:destination,transportation|integer',
-            'arrival_date'              => 'required_with_all:destination,transportation|date_format:Y-m-d',
-            'arrival_time'              => 'required_with_all:destination,transportation|date_format:H:i',
-            'arrival_transportation'    => 'required_with_all:destination,transportation|integer',
-            'dept_reason'               => 'required_with_all:destination,transportation',
-            'arrival_reason'            => 'required_with_all:destination,transportation',
+            // Additional fields for transportation and destination — was
+            // required_with_all:destination,transportation, blocking
+            // submission (e.g. a single Maternity Leave with a destination
+            // picked but exact departure/arrival times not yet known) even
+            // though nothing downstream requires these to be set. Made
+            // optional per request; still validated (date/time format,
+            // integer id) whenever a value is actually provided.
+            'dept_date'                 => 'nullable|date_format:Y-m-d',
+            'dept_time'                 => 'nullable|date_format:H:i',
+            'dept_transportation'       => 'nullable|integer',
+            'arrival_date'              => 'nullable|date_format:Y-m-d',
+            'arrival_time'              => 'nullable|date_format:H:i',
+            'arrival_transportation'    => 'nullable|integer',
+            'dept_reason'               => 'nullable',
+            'arrival_reason'            => 'nullable',
         ]);
 
         if ($validator->fails()) {
@@ -2118,13 +2124,13 @@ class LeaveController extends Controller
             'trans_departure_date.*'                    => 'required_with:transportation.*|date_format:Y-m-d',
 
             // Additional fields for transportation and destination
-            'dept_date'                                 => 'required_with_all:destination,transportation|date_format:Y-m-d',
-            'dept_time'                                 => 'required_with_all:destination,transportation|date_format:H:i',
-            'dept_transportation'                       => 'required_with_all:destination,transportation|integer',
-            'arrival_date'                              => 'required_with_all:destination,transportation|date_format:Y-m-d',
-            'arrival_time'                              => 'required_with_all:destination,transportation|date_format:H:i',
-            'arrival_transportation'                    => 'required_with_all:destination,transportation|integer',
-            'dept_reason'                               => 'required_with_all:destination,transportation',
+            'dept_date'                                 => 'nullable|date_format:Y-m-d',
+            'dept_time'                                 => 'nullable|date_format:H:i',
+            'dept_transportation'                       => 'nullable|integer',
+            'arrival_date'                              => 'nullable|date_format:Y-m-d',
+            'arrival_time'                              => 'nullable|date_format:H:i',
+            'arrival_transportation'                    => 'nullable|integer',
+            'dept_reason'                               => 'nullable',
 
         ]);
 
