@@ -7986,16 +7986,27 @@ class Common
             $encryptedData = StorageHelper::disk()->get($ChildFiles->File_Path);
 
             if (empty($encryptedData) || strlen($encryptedData) < 16) {
-                throw new \Exception('Invalid or corrupted encrypted data');
+                \Log::error("GetAWSFile: invalid/corrupted encrypted data for child_file_management id {$id}, resort {$resort_id}, path {$ChildFiles->File_Path}");
+                return ['success' => false, 'NewURLshow' => null, 'mimeType' => null];
             }
 
             $iv = substr($encryptedData, 0, 16);
             $cipherText = substr($encryptedData, 16);
+            // Flush any stale queued OpenSSL error (e.g. left behind by an
+            // unrelated PEM/JWT operation earlier in the same FPM worker)
+            // so a real failure below reports its own actual error, not
+            // noise from something else entirely.
+            while (openssl_error_string() !== false);
             $decryptedData = openssl_decrypt($cipherText, 'aes-256-cbc', $key, OPENSSL_RAW_DATA, $iv);
 
             if ($decryptedData === false) {
-                $error = openssl_error_string();
-                throw new \Exception("Decryption failed: {$error}");
+                // A single corrupted/undecryptable attachment used to throw
+                // here uncaught, 500-ing the entire page that was showing
+                // it (e.g. clinic appointment-details) instead of just
+                // that one file. Log and skip it like the other failure
+                // paths in this method already do.
+                \Log::error("GetAWSFile: decryption failed for child_file_management id {$id}, resort {$resort_id}, path {$ChildFiles->File_Path}: " . openssl_error_string());
+                return ['success' => false, 'NewURLshow' => null, 'mimeType' => null];
             }
 
             $decryptedFileName = str_replace('.enc', '', basename($ChildFiles->File_Path));
