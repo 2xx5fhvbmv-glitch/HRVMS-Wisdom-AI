@@ -234,6 +234,41 @@ class LearningController extends Controller
                 'trainer_profile'                   =>  optional($trainerData)->profile,
             ];
 
+            // Current employee's own feedback/evaluation form state for this
+            // session — drives the app's button (Feedback Form/Evaluation
+            // Form when pending vs. View Feedback Form/View Evaluation Form
+            // once submitted). training_participants.train_*_form_id is set
+            // when the L&D Manager assigns a form; the response tables key
+            // off participant_id = employees.id (not training_participants.id
+            // despite the relation name), matching feedbackStore()/
+            // evaluationStore()'s own lookup.
+            $myEmployeeId = optional($this->user->GetEmployee)->id;
+            $myParticipant = $sessions->participants->firstWhere('employee_id', $myEmployeeId);
+
+            $feedbackResponse = null;
+            $evaluationResponse = null;
+            if ($myEmployeeId) {
+                $feedbackResponse = TrainingFeedbackResponse::where('training_id', $sessions->id)
+                    ->where('participant_id', $myEmployeeId)
+                    ->first();
+                $evaluationResponse = EvaluationFormResponse::where('training_id', $sessions->id)
+                    ->where('participant_id', $myEmployeeId)
+                    ->first();
+            }
+
+            $data['feedback_form'] = [
+                'assigned'      => (bool) optional($myParticipant)->train_feedback_form_id,
+                'form_id'       => optional($myParticipant)->train_feedback_form_id,
+                'submitted'     => (bool) $feedbackResponse,
+                'form_res_id'   => optional($feedbackResponse)->id,
+            ];
+            $data['evaluation_form'] = [
+                'assigned'      => (bool) optional($myParticipant)->train_evaluation_form_id,
+                'form_id'       => optional($myParticipant)->train_evaluation_form_id,
+                'submitted'     => (bool) $evaluationResponse,
+                'form_res_id'   => optional($evaluationResponse)->id,
+            ];
+
             $data['participants'] = [];
             foreach ($sessions->participants as $participant) {
 
