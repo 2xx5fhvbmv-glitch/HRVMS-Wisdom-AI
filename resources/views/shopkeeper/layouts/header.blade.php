@@ -90,12 +90,6 @@
                                                 <img src="{{ URL::asset('resorts_assets/images/user.svg')}}" alt="" class="img-fluid"></span>Profile
                                             </a>
                                         </li>
-                                        {{-- Dark/Teal theme picker — disabled 2026-08-30, not production-ready.
-                                             See resources/views/resorts/layouts/app.blade.php for the full
-                                             explanation; one of 6 switches, all must be uncommented together.
-                                        @include('partials._theme_picker')
-                                        --}}
-
                                         <li>
                                             <a class="dropdown-item" href="{{route('shopkeeper.logout')}}"><span class="img-box">
                                                 <img src="{{ URL::asset('resorts_assets/images/log-out.svg')}}" alt="" class="img-fluid"></span>Logout

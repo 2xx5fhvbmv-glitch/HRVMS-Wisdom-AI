@@ -4,10 +4,6 @@
 <script src="{{ URL::asset('resorts_assets/js/dataTables.min.js')}}"></script>
 <script src="{{ URL::asset('resorts_assets/js/dataTables.bootstrap5.js')}}"></script>
 <script src="{{ URL::asset('resorts_assets/js/chart.js')}}"></script>
-<!-- Dark/Teal theme system — disabled 2026-08-30, not production-ready.
-     See resources/views/resorts/layouts/app.blade.php for the full
-     explanation; one of 6 switches, all must be uncommented together. -->
-<!-- <script src="{{ URL::asset('resorts_assets/js/chart-theme.js')}}"></script> -->
 <script src="{{ URL::asset('resorts_assets/js/bootstrap-datepicker.min.js')}}"></script>
 <script src="{{ URL::asset('resorts_assets/js/select2.min.js')}}"></script>
 <script src="{{ URL::asset('resorts_assets/js/moment.min.js')}}"></script>
