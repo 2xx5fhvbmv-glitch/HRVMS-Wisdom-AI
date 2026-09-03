@@ -187,4 +187,73 @@ class DisciplinaryController extends Controller
             return response()->json(['error' => 'Failed to fetch disciplinary dashboard'], 500);
         }
     }
+
+    /**
+     * POST disciplinary/appeal-submit — mirrors AcknowledgmentSubmit()
+     * exactly (same table, same ownership/resort checks, same HR
+     * notification pattern). The mobile app already calls this route
+     * (employeeDisciplinaryDetailsScreen's Appeal action); it just never
+     * existed server-side, hence the raw 404.
+     */
+    public function AppealSubmit(Request $request)
+    {
+        if (!$this->user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'disciplinary_id'                                   => 'required',
+            'Appeal_description'                                => 'required',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
+        }
+
+        try
+        {
+            $employee_id                                        =   $this->user->GetEmployee->id;
+            $DisciplinaryModel                                  =   disciplinarySubmit::where('id', $request->disciplinary_id)
+                                                                        ->where('resort_id', $this->resort_id)
+                                                                        ->where('Employee_id', $employee_id)
+                                                                        ->first();
+
+            if (!$DisciplinaryModel) {
+                return response()->json([
+                    'success'                                   =>  false,
+                    'message'                                   =>  'Disciplinary record not found'
+                ], 200);
+            }
+            $DisciplinaryModel->Appeal_description              =   $request->Appeal_description;
+            $DisciplinaryModel->save();
+
+            // Send mobile notification to HR employee
+            $hrEmployee = Common::FindResortHR($this->user);
+            if ($hrEmployee) {
+                Common::sendMobileNotification(
+                    $this->resort_id,
+                    2,
+                    null,
+                    null,
+                    'Employee Disciplinary Appeal',
+                    'A disciplinary appeal has been submitted by ' . $this->user->first_name . ' ' . $this->user->last_name . '.',
+                    'Employee Disciplinary',
+                    [$hrEmployee->id],
+                    $DisciplinaryModel->id,
+                    false,
+                    'disciplinary-appeal',
+                );
+            }
+            $response['status']                                 =   true;
+            $response['message']                                =   'Appeal Submitted Successfully';
+
+            return response()->json($response);
+
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::emergency("Message: " . $e->getMessage());
+            return response()->json(['error' => 'Failed to submit appeal'], 500);
+        }
+    }
 }
