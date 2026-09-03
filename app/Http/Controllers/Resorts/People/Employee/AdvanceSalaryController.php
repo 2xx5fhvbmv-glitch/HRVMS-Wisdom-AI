@@ -70,10 +70,20 @@ class AdvanceSalaryController extends Controller
             // undefined for roles outside HR/Finance/GM/master (e.g. a Finance
             // HOD/XCOM whose RANK maps to "HOD"/"EXCOM", not "Finance"), which
             // previously threw and surfaced as a DataTables "Ajax error".
+            // Sort by id, not created_at — the query below is materialized
+            // with ->get() before reaching datatables()->of(), so the
+            // frontend's requested sort re-orders the resulting Collection
+            // in PHP using each row's created_at ATTRIBUTE, which goes
+            // through PayrollAdvance::getCreatedAtAttribute() and returns a
+            // pre-formatted display string (d/m/Y H:i) — sorted lexically,
+            // not chronologically, so a newer record could land below an
+            // older one whenever their day-of-month digits don't happen to
+            // agree with real date order. id is monotonic with real
+            // creation order and has no accessor to trip over.
             $payroll_data_query = PayrollAdvance::where('resort_id', $resort_id)
                 ->with(['employee.resortAdmin', 'employee.position', 'employee.department'])
                 ->whereHas('employee.resortAdmin')
-                ->orderBy('created_at', 'DESC');
+                ->orderBy('id', 'DESC');
 
             // Stage filters: Finance sees HR-approved; GM sees Finance-approved.
             // HR / master / other authorised roles see the full resort list.
@@ -205,8 +215,31 @@ class AdvanceSalaryController extends Controller
         $guarantors = PayrollAdvanceGuarantor::where('payroll_advance_id',$id)->get();
         $recovery_schedule = PayrollRecoverySchedule::where('payroll_advance_id',$id)->get();
 
-        $request_attachment  =   config('settings.RequestAttachments');
-        $attechment_path     =   $request_attachment . '/' . $advance_salary->employee->resort_id.'/'.$advance_salary->employee->Emp_id;
+        // attachments is JSON ([{Filename,Child_id}, ...], one row can hold
+        // several files) written by the AWS/Wasabi upload flow
+        // (RequestController::RequestStore) — the blade used to treat the
+        // raw column value as if it were a plain filename (building a
+        // local-path URL and printing the JSON itself as the link text),
+        // never resolving the real Wasabi file at all. Same resolution the
+        // mobile API's resolveAttachments() already does correctly.
+        $resolvedAttachments = $advance_salary->PayrollAdvanceAttachment->flatMap(function ($row) {
+            $decoded = json_decode((string) $row->attachments, true);
+            return is_array($decoded) ? $decoded : [];
+        })->map(function ($file) use ($resort_id) {
+            $childId = $file['Child_id'] ?? null;
+            $url = null;
+            if ($childId) {
+                try {
+                    $aws = Common::GetAWSFile($childId, $resort_id);
+                    if (!empty($aws['success'])) {
+                        $url = $aws['NewURLshow'] ?? null;
+                    }
+                } catch (\Throwable $e) {
+                    // leave url null for attachments that fail to resolve
+                }
+            }
+            return ['filename' => $file['Filename'] ?? 'Attachment', 'url' => $url];
+        })->values();
 
         $total_interest = 0;
         $actual_amount = 0;
@@ -228,7 +261,7 @@ class AdvanceSalaryController extends Controller
             $availableMonths[] = $currentMonth->copy()->addMonths($i)->format('F Y');
         }
 
-        return view('resorts.people.employee.advance-salary.show',compact('page_title','advance_salary','guarantors','recovery_schedule','total_interest','actual_amount','total_recovery','attechment_path','isHR','isFinance','isGM','availableMonths'));
+        return view('resorts.people.employee.advance-salary.show',compact('page_title','advance_salary','guarantors','recovery_schedule','total_interest','actual_amount','total_recovery','resolvedAttachments','isHR','isFinance','isGM','availableMonths'));
     }
     
     public function paymentReschedule(Request $request){
@@ -251,7 +284,21 @@ class AdvanceSalaryController extends Controller
         $remaining_balance = $amount;
         $month_year_array = [];
 
-        if ($monthly_installment > $employee->basic_salary) {
+        // The requested amount is in whatever currency the employee picked
+        // (payroll_advance.currency), but basic_salary is in the
+        // employee's own basic_salary_currency — these were compared as
+        // raw numbers with no conversion, so a 2000 MVR loan (667/month
+        // over 3 months) failed against a $600 USD salary just because
+        // 667 > 600 numerically, even though $600 USD is actually ~9,252
+        // MVR at the resort's own rate — nowhere close to too high.
+        // Normalize both to MVR via the same DollertoMVR rate used
+        // everywhere else in this app before comparing.
+        $rate = Common::getUsdToMvrRate();
+        $toMvr = fn ($value, $currency) => strtoupper($currency ?: 'USD') === 'USD' ? $value * $rate : $value;
+        $monthlyInstallmentMvr = $toMvr($monthly_installment, $payroll_advance_data->currency);
+        $basicSalaryMvr = $toMvr($employee->basic_salary, $employee->basic_salary_currency);
+
+        if ($monthlyInstallmentMvr > $basicSalaryMvr) {
             return response()->json([
                 'success' => false,
                 'status' => 'error',

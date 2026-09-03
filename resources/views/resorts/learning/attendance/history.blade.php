@@ -137,7 +137,7 @@
         </div>
     </div>
 
-@include('resorts.Learning._learning_buttons_v2_styles')
+@include('resorts.learning._learning_buttons_v2_styles')
 @include('resorts._dropdown_styles')
 @include('resorts._dropdown_script')
 @endsection

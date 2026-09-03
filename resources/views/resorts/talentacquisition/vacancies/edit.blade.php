@@ -614,7 +614,8 @@
                     method: 'POST',
                     data: {
                         position_id: positionId,
-                        requested_vacancy: requestedVacancy
+                        requested_vacancy: requestedVacancy,
+                        "_token": "{{ csrf_token() }}"
                     },
                     success: function(response) {
                         const selectBox = $('#vacancy_status');

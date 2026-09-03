@@ -48,7 +48,11 @@ class ConfigController extends Controller
         {
             $page_title = 'Configuration';
             $TicketAgent = TicketAgent::where('resort_id', $this->resort->resort_id)->orderBy('id', 'desc')->pluck('agents_email');
-            $configset = JobAdvertisement::where('resort_id', $this->resort->resort_id)->first();
+            // No orderBy meant "Current Template" showed whichever row the
+            // DB happened to return first (effectively the oldest) once
+            // more than one template exists for a resort — should show the
+            // most recently uploaded one.
+            $configset = JobAdvertisement::where('resort_id', $this->resort->resort_id)->orderBy('id', 'desc')->first();
             $resort_divisions = ResortDivision::where('status', 'active')->where('resort_id',$this->resort->resort_id)->get();
             $termsAndCondition = TermsAndCondition::where('Resort_id', Auth::guard('resort-admin')->user()->resort_id)->first();
 

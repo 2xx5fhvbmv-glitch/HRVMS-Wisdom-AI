@@ -14,6 +14,7 @@ class ResortSiteSettings extends Model
     protected $table='resort_site_settings';
     protected $fillable = [
         'Footer','resort_id', 'currency','FinalApproval', 'header_img','footer_img','signature_img','MVRtoDoller','DollertoMVR','MVR_img','Doller_img',
+        'emergency_police_number','emergency_fire_number','emergency_mndf_number',
     ];
 
     public static function boot(){

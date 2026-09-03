@@ -321,7 +321,7 @@
                                         @if(isset($configset) && !empty($configset->Jobadvimg))
                                         <div class="mb-2 text-center" id="currentTemplate">
                                             <p class="mb-1 text-muted"><small>Current Template:</small></p>
-                                            <img src="{{ URL::asset(config('settings.Resort_JobAdvertisement').'/'.$configset->Resort_id.'/'.$configset->Jobadvimg) }}" alt="Job Ad Template" class="img-fluid rounded" style="max-height: 200px;">
+                                            <img src="{{ App\Helpers\Common::GetJobAdvertisementImage($configset->Resort_id, $configset->Jobadvimg) }}" alt="Job Ad Template" class="img-fluid rounded" style="max-height: 200px;">
                                         </div>
                                         @endif
                                         <div class="card-footer text-end">
@@ -863,6 +863,7 @@ $(document).ready(function()
                 type: "post",
                 data: {
                     division_id: $(this).val(),
+                    "_token": "{{ csrf_token() }}"
                 },
                 success: function(data) {
 
@@ -896,7 +897,8 @@ $(document).ready(function()
                 url: "{{ route('resort.ta.PositionSections') }}",
                 type: "post",
                 data: {
-                    deptId: deptId
+                    deptId: deptId,
+                    "_token": "{{ csrf_token() }}"
                 },
                 success: function(d) {
                     // Clear the dropdown and add a placeholder option

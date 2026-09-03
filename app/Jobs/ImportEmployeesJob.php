@@ -12,6 +12,7 @@ use App\Models\ImportHistory;
 use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\File;
+use App\Helpers\Common;
 
 class ImportEmployeesJob implements ShouldQueue
 {
@@ -33,6 +34,13 @@ class ImportEmployeesJob implements ShouldQueue
         // resort-admin guard, so authenticate it here rather than refactor
         // each of those helpers.
         Auth::guard('resort-admin')->loginUsingId($this->actingAdminId);
+
+        // Same reasoning for outbound mail: ApplyResortSmtpConfig only runs
+        // as HTTP middleware, so the welcome-credentials email sent for
+        // each imported row would otherwise fall back to the app-wide
+        // mail config instead of this resort's own configured sender
+        // (Settings > Email Config) — apply it explicitly here.
+        Common::applyResortSmtpConfig($this->resortId);
 
         $history = ImportHistory::find($this->historyId);
         if (!$history) {

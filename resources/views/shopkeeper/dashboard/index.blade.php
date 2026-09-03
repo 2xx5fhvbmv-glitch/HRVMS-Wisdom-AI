@@ -74,7 +74,7 @@
                                             <option value="">Select Month</option>
                                             @php $months = ['01'=>'January','02'=>'February','03'=>'March','04'=>'April','05'=>'May','06'=>'June','07'=>'July','08'=>'August','09'=>'September','10'=>'October','11'=>'November','12'=>'December']; @endphp
                                             @foreach ($months as $value => $label)
-                                                <option value="{{ $value }}" @selected($value === date('m'))>{{ $label }}</option>
+                                                <option value="{{ $value }}">{{ $label }}</option>
                                             @endforeach
                                         </select>
                                     </div>
@@ -84,7 +84,7 @@
                                         <select class="form-select" id="year-filter">
                                             <option value="">Select Year</option>
                                             @for ($i = date('Y'); $i >= date('Y') - 5; $i--)
-                                                <option value="{{ $i }}" @selected($i == date('Y'))>{{ $i }}</option>
+                                                <option value="{{ $i }}">{{ $i }}</option>
                                             @endfor
                                         </select>
                                     </div>

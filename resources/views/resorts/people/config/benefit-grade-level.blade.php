@@ -124,7 +124,7 @@
         $.ajax({
             url: '{{ route("resort.benefitgradelevel.store") }}',
             type: 'POST',
-            data: { name: $('#grade-name-input').val() },
+            data: { name: $('#grade-name-input').val(), "_token": "{{ csrf_token() }}" },
             success: function (response) {
                 if (response.success) {
                     toastr.success(response.message, 'Success', { positionClass: 'toast-bottom-right' });
@@ -231,7 +231,7 @@
         $.ajax({
             url: "{{ route('resort.benefitgradelevel.updateRanks', '') }}/" + currentGradeId,
             type: 'POST',
-            data: { ranks: ranks },
+            data: { ranks: ranks, "_token": "{{ csrf_token() }}" },
             success: function (response) {
                 if (response.success) {
                     toastr.success(response.message, 'Success', { positionClass: 'toast-bottom-right' });

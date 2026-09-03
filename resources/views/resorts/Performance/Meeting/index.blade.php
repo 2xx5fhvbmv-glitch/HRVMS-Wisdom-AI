@@ -37,6 +37,7 @@
         <div>
             <div class="card">
                 <form id="ScheduleMeetingForm">
+    @csrf
                     <div class="row g-md-4 g-3 mb-md-4 mb-3">
                         <div class="col-xl-8 col-lg-7 ">
                             <div class="row g-md-4 g-3">

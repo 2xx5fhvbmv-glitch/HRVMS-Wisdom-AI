@@ -135,17 +135,32 @@ class JobAdvertisementController extends Controller
                 if ($request->hasFile('Jobadvimg'))
                 {
 
-                    $path_profile_image = config('settings.Resort_JobAdvertisement').'/'. Auth::guard('resort-admin')->user()->resort->resort_id;
-
-
+                    // Was Auth::...->user()->resort->resort_id — the
+                    // resort's STRING slug (e.g. "87fca1b014"), not the
+                    // numeric id. The DB row's Resort_id (used by the list
+                    // and delete methods, and by every GetJobAdvertisementImage()
+                    // caller) is the numeric $resort_id computed above —
+                    // so every fresh upload was written to
+                    // .../JobAdvertisement/87fca1b014/... while every read
+                    // looked in .../JobAdvertisement/26/..., a guaranteed
+                    // NoSuchKey on every single upload. Reuse the same
+                    // numeric $resort_id the DB save already uses below.
+                    $path_profile_image = config('settings.Resort_JobAdvertisement').'/'.$resort_id;
 
                     // A vacancy-specific poster and the resort-wide default
                     // share this same flat folder with no per-vacancy
                     // namespacing — two different vacancies uploading a
                     // same-named file would otherwise silently overwrite
                     // each other's file on disk even though they're
-                    // different job_advertisements rows.
-                    $fileName  = ($vacancy_id ?? 'default') . '_' . $request->file('Jobadvimg')->getClientOriginalName();
+                    // different job_advertisements rows. Also sanitize the
+                    // filename to a safe ASCII key — a macOS screenshot's
+                    // default name embeds a narrow no-break space
+                    // (U+202F), not a regular space, which is safest not to
+                    // trust as a raw storage key.
+                    $originalName = $request->file('Jobadvimg')->getClientOriginalName();
+                    $extension    = strtolower($request->file('Jobadvimg')->getClientOriginalExtension());
+                    $safeBaseName = preg_replace('/[^A-Za-z0-9_-]+/', '_', pathinfo($originalName, PATHINFO_FILENAME));
+                    $fileName     = ($vacancy_id ?? 'default') . '_' . $safeBaseName . '.' . $extension;
 
                         // Common::uploadFile() only moves the file to local
                         // disk — on live (STORAGE_DRIVER=wasabi) that left
@@ -160,12 +175,29 @@ class JobAdvertisementController extends Controller
                             ['ContentType' => $request->file('Jobadvimg')->getMimeType()]
                         );
 
-                        JobAdvertisement::updateOrCreate([
+                        // A vacancy-specific poster is one slot per vacancy —
+                        // re-uploading replaces it. But the general/default
+                        // template (vacancy_id null) is meant to be a real
+                        // library ("View All Templates" lists every row for
+                        // the resort with its own delete button) — using
+                        // updateOrCreate for that case too collapsed every
+                        // upload into the same single row, so a second
+                        // template silently overwrote the first instead of
+                        // being added alongside it.
+                        if ($vacancy_id) {
+                            JobAdvertisement::updateOrCreate([
+                                    "Resort_id" => $resort_id,
+                                    "vacancy_id" => $vacancy_id,
+                            ],[
+                                "Jobadvimg" => $fileName,
+                            ]);
+                        } else {
+                            JobAdvertisement::create([
                                 "Resort_id" => $resort_id,
-                                "vacancy_id" => $vacancy_id,
-                        ],[
-                            "Jobadvimg" => $fileName,
-                        ]);
+                                "vacancy_id" => null,
+                                "Jobadvimg" => $fileName,
+                            ]);
+                        }
                         DB::commit();
                         return response()->json(['success' => true, 'message' => 'Job Advertisement Uploaded successfully.']);
                     }
@@ -253,6 +285,27 @@ class JobAdvertisementController extends Controller
                     "Resort_id"=> $this->resort->resort_id,
                     "ta_child_id" =>  $request->ta_child_id,
                 ]);
+
+                // Persist whichever poster the user picked in the carousel as
+                // this vacancy's own override — otherwise the selection has no
+                // effect and the vacancy just keeps showing the resort default.
+                // ta_child_id -> t_anotification_children.id -> Parent_ta_id ->
+                // t_anotification_parents.id -> V_id (vacancies.id), same chain
+                // Common::GmApprovedVacancy() itself joins through.
+                if ($request->filled('selected_jobadvimg')) {
+                    $vacancyId = DB::table('t_anotification_children as t3')
+                        ->join('t_anotification_parents as t2', 't2.id', '=', 't3.Parent_ta_id')
+                        ->where('t3.id', $request->ta_child_id)
+                        ->value('t2.V_id');
+
+                    if ($vacancyId) {
+                        DB::table('vacancies')
+                            ->where('id', $vacancyId)
+                            ->where('resort_id', $this->resort->resort_id)
+                            ->update(['Jobadvimg' => $request->selected_jobadvimg]);
+                    }
+                }
+
                 DB::commit();
 
                 // Return rendered views to refresh dashboard sections

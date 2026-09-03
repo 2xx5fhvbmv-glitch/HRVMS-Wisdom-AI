@@ -53,11 +53,14 @@
                             data-parsley-required-message="Please select at least one rank"
                             @if(isset($isViewMode) && $isViewMode) disabled @endif>
                                 @foreach($rankConfig ?? [] as $rankValue => $rankLabel)
-                                    <option value="{{ $rankValue }}" @if(in_array($rankValue, $currentGradeRanks ?? [])) selected @endif>{{ $rankLabel }}</option>
+                                    @php $rankUsage = ($rankPositionSummary ?? collect())->get((int) $rankValue); @endphp
+                                    <option value="{{ $rankValue }}"
+                                        @if(in_array($rankValue, $currentGradeRanks ?? [])) selected @endif
+                                        @if($rankUsage) title="{{ $rankUsage['names'] }}" @endif>{{ $rankLabel }}@if($rankUsage) ({{ $rankUsage['count'] }} position{{ $rankUsage['count'] == 1 ? '' : 's' }})@endif</option>
                                 @endforeach
                             </select>
                             <div id="div-ranks"></div>
-                            <small class="text-muted">A rank can only belong to one grade at a time — selecting it here moves it off whatever grade currently holds it.</small>
+                            <small class="text-muted">A rank can belong to more than one grade. When it does, an employee's own assigned grade (if set) wins; otherwise the oldest grade this rank was assigned to applies by default.</small>
                         </div>
                     </div>
                     <div class="col-sm-6">
@@ -157,7 +160,7 @@
                                                 name="LeaveCat[{{$leave->id}}][{{$leave->eligibility}}][]" 
                                                 class="form-control" value="{{ $allocatedDays }}"
                                                 @if(isset($isViewMode) && $isViewMode) disabled @endif
-                                                max="{{$leave->number_of_days}}" required/>
+                                                required/>
                                         </div>
                                         <div class="col-lg-6 form-group mb-2">
                                             <label class="form-label" for="eligible_emp_type_{{$key}}">Eligible Employee Type</label>
@@ -342,8 +345,14 @@
                                     class="form-select select2t-none"
                                     @if(isset($isViewMode) && $isViewMode) disabled @endif>
                                 <option value="" disabled selected>Select Service Charge</option>
-                                <option value="0" @if($benefit_grid->service_charge == "0") selected @endif>Eligible</option>
-                                <option value="1" @if($benefit_grid->service_charge == "1") selected @endif>Not Eligible</option>
+                                {{-- Labels were inverted vs. every consumer (EmployeeController,
+                                     PayrollController, pdf.blade.php), which all correctly treat
+                                     service_charge == 1 as eligible. Fixed the labels to match what's
+                                     actually stored/consumed — values are unchanged, so existing rows
+                                     now display their TRUE current effective eligibility instead of
+                                     the label lying about it. --}}
+                                <option value="1" @if($benefit_grid->service_charge == "1") selected @endif>Eligible</option>
+                                <option value="0" @if($benefit_grid->service_charge == "0") selected @endif>Not Eligible</option>
                             </select>
 
                             <div id="service-charge-error" class="text-danger mt-1"></div>
@@ -481,7 +490,10 @@
                             <select id="loan-and-salary-advanced-select" name="loan_and_salary_advanced" class="form-select select2t-none" @if(isset($isViewMode) && $isViewMode) disabled @endif>
                                 <option value="">Staff Loan & salary advance</option>
                                 <option value="yes" @if($benefit_grid->loan_and_salary_advanced == "yes") selected @endif>Yes</option>
-                                <option value="no" @if($benefit_grid->loan_and_salary_advanced == "no") selected @endif>No</option>
+                                {{-- Column is enum('yes','n/a') — "no" isn't a valid member, so
+                                     selecting it silently coerced to '' on save (same bug shape
+                                     as the Overtime field, which already uses n/a correctly). --}}
+                                <option value="n/a" @if($benefit_grid->loan_and_salary_advanced == "n/a") selected @endif>No</option>
                             </select>
                         </div>
                     </div>
@@ -910,7 +922,6 @@
                                                         name="LeaveCat[${leave.id}][${leave.eligibility}][]"
                                                         class="form-control"
                                                         value="${leave.number_of_days}"
-                                                        max="${leave.number_of_days}"
                                                         ${response.isViewMode ? 'disabled' : ''} />
                                                 </div>
                                                 <div class="col-lg-6 form-group mb-2">

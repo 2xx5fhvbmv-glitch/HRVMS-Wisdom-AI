@@ -108,6 +108,7 @@ $(document).ready(function() {
             type: "post",
             data: {
                 division_id: $(this).val(),
+                "_token": "{{ csrf_token() }}",
             },
             success: function(data) {
                 // Clear the dropdown and add a placeholder option
@@ -143,7 +144,8 @@ $(document).ready(function() {
                 url: "{{ route('resort.get.position') }}",
                 type: "post",
                 data: {
-                    deptId: deptId
+                    deptId: deptId,
+                    "_token": "{{ csrf_token() }}"
                 },
                 success: function(data) {
                     // Clear the dropdown and add a placeholder option
@@ -308,6 +310,7 @@ $(document).on('change', '#position', function() {
             data: {
                 deptId: Departid,
                 position_id:position,
+                "_token": "{{ csrf_token() }}",
             },
             success: function(data) {
 

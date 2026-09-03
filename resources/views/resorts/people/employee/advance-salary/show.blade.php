@@ -147,49 +147,57 @@
                             </div>
                         </div>
                     </div>
-                              @php
-                                  $attachmentFiles = $advance_salary->PayrollAdvanceAttachment;
-                              @endphp
-
-                    <div class="col-12 @if($attachmentFiles->count() <= 0) d-none @endif" >
+                    <div class="col-12 @if($resolvedAttachments->count() <= 0) d-none @endif" >
                         <div class="bg-themeGrayLight h-100">
                             <div class="card-title mb-md-3">
                                 <h3>Attachments</h3>
                             </div>
 
                             <div class="row g-1">
-                              
-                              @if($attachmentFiles->count() > 0)
-                                   @foreach($attachmentFiles as $attachmentFile)
+
+                              @if($resolvedAttachments->count() > 0)
+                                   @foreach($resolvedAttachments as $attachmentFile)
                                         <div class="col-auto">
                                               <div class="attachPdf-block">
                                                     @php
-                                                          $fileExtension = pathinfo($attachmentFile->attachments, PATHINFO_EXTENSION);
-                                                          $iconPath = asset('assets/icons/default-icon.svg'); // Default icon path
+                                                          // public/assets/icons/*.svg never existed in this app at
+                                                          // all (confirmed — no such directory), so every one of
+                                                          // these icons was always broken regardless of the
+                                                          // attachment-resolution bug above. Font Awesome is
+                                                          // already loaded and used everywhere else in this app.
+                                                          $fileExtension = pathinfo($attachmentFile['filename'], PATHINFO_EXTENSION);
+                                                          $iconClass = 'fa-file'; // Default icon
                                                           switch (strtolower($fileExtension)) {
                                                                   case 'pdf':
-                                                                         $iconPath = asset('assets/icons/file-pdf.svg');
+                                                                         $iconClass = 'fa-file-pdf';
                                                                          break;
                                                                   case 'doc':
                                                                   case 'docx':
-                                                                         $iconPath = asset('assets/icons/file-word.svg');
+                                                                         $iconClass = 'fa-file-word';
                                                                          break;
                                                                   case 'xls':
                                                                   case 'xlsx':
-                                                                         $iconPath = asset('assets/icons/file-excel.svg');
+                                                                         $iconClass = 'fa-file-excel';
                                                                          break;
                                                                   case 'jpg':
                                                                   case 'jpeg':
                                                                   case 'png':
-                                                                         $iconPath = asset('assets/icons/file-image.svg');
+                                                                         $iconClass = 'fa-file-image';
                                                                        break;
                                                                  // Add more cases for other file types as needed
                                                           }
                                                     @endphp
-                                                    <a href="{{ url($attechment_path.'/' . $attachmentFile->attachments) }}" target="_blank">
-                                                          <img src="{{ $iconPath }}" alt="icon">
-                                                          {{ $attachmentFile->attachments }}
+                                                    @if($attachmentFile['url'])
+                                                    <a href="{{ $attachmentFile['url'] }}" target="_blank">
+                                                          <i class="fa-solid {{ $iconClass }} me-1"></i>
+                                                          {{ $attachmentFile['filename'] }}
                                                     </a>
+                                                    @else
+                                                    <span class="text-muted">
+                                                          <i class="fa-solid {{ $iconClass }} me-1"></i>
+                                                          {{ $attachmentFile['filename'] }} (unavailable)
+                                                    </span>
+                                                    @endif
                                               </div>
                                         </div>
                                    @endforeach
@@ -417,18 +425,40 @@
                                         <div class="col-auto "><a href="javascript:void(0);" class="btn  btn-themeSkyblue btn-sm saveReSchedule"> Repayment Schedule Submit</a></div>
                                    </div>
                               </div>
-                         @elseif($advance_salary->status == 'In-Progress' && $advance_salary->hr_status == 'Approved' && $isFinance == true && $recovery_schedule->count() > 0 && $advance_salary->finance_status == 'Pending')
+                         @elseif($advance_salary->status == 'In-Progress' && $advance_salary->hr_status == 'Approved' && $isFinance == true && $advance_salary->finance_status == 'Pending')
+                              {{-- Repayment schedule creation is HR's own
+                                   separate task, not a precondition for
+                                   Finance/GM approval — Finance/GM should be
+                                   able to act as soon as HR approves. --}}
                               <div class="card-footer">
                                    <div class="row  g-2 justify-content-end">
                                         <div class="col-auto"><a href="javascript:void(0);" class="btn  btn-themeBlue btn-sm actionBtn" data-status='Approved' data-action_by='finance'>Approve</a></div>
                                         <div class="col-auto"><a href="javascript:void(0);" class="btn  btn-themeDanger btn-sm actionBtn" data-status='Rejected' data-action_by='finance'>Reject</a></div>
                                    </div>
                               </div>
-                         @elseif($advance_salary->status == 'In-Progress' && $advance_salary->hr_status == 'Approved' && $isGM == true && $recovery_schedule->count() > 0 && $advance_salary->finance_status == 'Approved' && $advance_salary->gm_status == 'Pending')
+                         @elseif($advance_salary->status == 'In-Progress' && $advance_salary->hr_status == 'Approved' && $isGM == true && $advance_salary->finance_status == 'Approved' && $advance_salary->gm_status == 'Pending')
                               <div class="card-footer">
                                    <div class="row  g-2 justify-content-end">
                                         <div class="col-auto"><a href="javascript:void(0);" class="btn  btn-themeBlue btn-sm actionBtn" data-status='Approved' data-action_by='gm'>Approve</a></div>
                                         <div class="col-auto"><a href="javascript:void(0);" class="btn  btn-themeDanger btn-sm actionBtn" data-status='Rejected' data-action_by='gm'>Reject</a></div>
+                                   </div>
+                              </div>
+                         @elseif($advance_salary->status == 'In-Progress')
+                              {{-- Finance/GM's Approve/Reject only appear once
+                                   the stage ahead of them is actually done.
+                                   With no message here, a Finance/GM viewer
+                                   saw a blank footer with no way to tell
+                                   whether that's a bug or just not their
+                                   turn yet. --}}
+                              <div class="card-footer">
+                                   <div class="text-muted small">
+                                        @if($advance_salary->hr_status == 'Pending')
+                                             Waiting for HR review.
+                                        @elseif($advance_salary->finance_status == 'Pending')
+                                             Waiting for Finance review.
+                                        @elseif($advance_salary->finance_status == 'Approved' && $advance_salary->gm_status == 'Pending')
+                                             Waiting for GM review.
+                                        @endif
                                    </div>
                               </div>
                          @endif
@@ -549,6 +579,18 @@ $(document).ready(function () {
                }
           });
      });
+});
+
+// User picks which month an installment falls in (e.g. take September,
+// skip October) instead of the schedule always being consecutive months
+// from today — keep the paired interest-input's data-month/name in sync
+// so the recalculation + final save reflect the chosen month.
+$(document).on('change', '.repay-month-select', function () {
+     let newMonth = $(this).val();
+     let interestInput = $(this).closest('tr').find('.interest-input');
+     interestInput.attr('data-month', newMonth);
+     interestInput.attr('name', newMonth + '-interest');
+     interestInput.trigger('keyup');
 });
 
 $(document).on('keyup', '.interest-input', function () {

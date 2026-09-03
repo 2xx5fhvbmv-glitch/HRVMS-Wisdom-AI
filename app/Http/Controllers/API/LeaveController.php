@@ -861,7 +861,14 @@ class LeaveController extends Controller
                                                                                 ) as total_leave_days")
                                                             )
                                                             ->join('leave_categories as lc', 'lc.id', '=', 'resort_benefit_grid_child.leave_cat_id')
-                                                            ->where('resort_benefit_grid_child.rank', $benefit_grid->emp_grade)
+                                                            // resort_benefit_grid_child.rank stores the employee RANK
+                                                            // the grid's row was saved under (BenifitGridController's
+                                                            // rankArray loop), not the grid's own emp_grade — filtering
+                                                            // by $benefit_grid->emp_grade matched only by coincidence
+                                                            // when a grid's emp_grade equaled its mapped rank, and
+                                                            // returned zero rows (surfaced to mobile as "Leave Category
+                                                            // is not found") for every other grid.
+                                                            ->where('resort_benefit_grid_child.rank', $rank)
                                                             ->where('resort_benefit_grid_child.benefit_grid_id', $benefit_grid->id)
                                                             ->where('lc.resort_id', $resort_id)
                                                             // lc.eligibility is a comma-separated list of rank ids the
@@ -4071,6 +4078,17 @@ class LeaveController extends Controller
                 return response()->json([
                     'status'                            => false,
                     'message'                           =>  'Leave request not found.',
+                ], 200);
+            }
+
+            // Already finalized (e.g. a retried/duplicate submit after an earlier
+            // successful approve) — no pending stage is left, so $lastStatus below
+            // would be null and crash on ->approver_rank. Same guard the web
+            // portal's handleLeaveAction already has.
+            if (in_array($leave->status, ['Approved', 'Rejected'])) {
+                return response()->json([
+                    'status'                            => false,
+                    'message'                           => 'This leave request is already ' . $leave->status . '.',
                 ], 200);
             }
 

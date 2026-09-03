@@ -138,7 +138,7 @@
                                 <div class="r"><span class="l">Employee ID</span><span class="v">{{ $incident->reporter->Emp_id ?? '-' }}</span></div>
                                 <div class="r"><span class="l">Department</span><span class="v">{{ $incident->reporter->department->name ?? 'N/A' }}</span></div>
                                 <div class="r"><span class="l">Section</span><span class="v">{{ $incident->reporter->section->name ?? 'N/A' }}</span></div>
-                                <div class="r"><span class="l">Reported</span><span class="v">{{ \Carbon\Carbon::parse($incident->created_at)->format('d M Y') }}</span></div>
+                                <div class="r"><span class="l">Reported</span><span class="v">{{ \Carbon\Carbon::parse($incident->getRawOriginal('created_at'))->format('d M Y') }}</span></div>
                             </div>
                         </div>
                     </div>
@@ -157,14 +157,14 @@
                             <div>
                                 <label for="priority_level" class="iv-fl">Priority level</label>
                                 <div class="iv-selwrap">
-                                    <select class="form-select dd-native-select" id="priority_level" name="priority" aria-label="Priority level">
+                                    <select class="form-select dd-native-select" id="priority_level" name="priority" aria-label="Priority level" {{ isset($investigations[0]) ? 'disabled' : '' }}>
                                         <option value="">Select Priority</option>
                                         <option value="Low" {{ $incident->priority == "Low" ? 'selected' : '' }}>Low</option>
                                         <option value="Medium" {{ $incident->priority == "Medium" ? 'selected' : '' }}>Medium</option>
                                         <option value="High" {{ $incident->priority == "High" ? 'selected' : '' }}>High</option>
                                     </select>
                                     <div class="dd" data-target="#priority_level">
-                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false" {{ isset($investigations[0]) ? 'disabled' : '' }}>
                                             <span class="dd-lbl">{{ in_array($incident->priority, ['Low','Medium','High']) ? $incident->priority : 'Select Priority' }}</span>
                                             <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
                                         </button>
@@ -178,11 +178,14 @@
                                         </div>
                                     </div>
                                 </div>
+                                @if(isset($investigations[0]))
+                                    <small class="text-muted">Priority is locked once the incident has been classified.</small>
+                                @endif
                             </div>
                             <div>
                                 <label for="severity" class="iv-fl">Incident severity</label>
                                 <div class="iv-selwrap">
-                                    <select class="form-select dd-native-select" name="severity" id="severity" aria-label="Incident severity">
+                                    <select class="form-select dd-native-select" name="severity" id="severity" aria-label="Incident severity" {{ isset($investigations[0]) ? 'disabled' : '' }}>
                                         <option value="">Select Severity</option>
                                         @if($severities)
                                             @foreach($severities as $severity)
@@ -191,7 +194,7 @@
                                         @endif
                                     </select>
                                     <div class="dd" data-target="#severity">
-                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false" {{ isset($investigations[0]) ? 'disabled' : '' }}>
                                             <span class="dd-lbl">{{ $incident->severity ?: 'Select Severity' }}</span>
                                             <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
                                         </button>
@@ -207,6 +210,9 @@
                                         </div>
                                     </div>
                                 </div>
+                                @if(isset($investigations[0]))
+                                    <small class="text-muted">Severity is locked once the incident has been classified.</small>
+                                @endif
                             </div>
                         </div>
                     </div>
@@ -1024,7 +1030,8 @@ textarea.iv-inp{max-width:820px}
                 url: '{{ route("incident.request-statement") }}',
                 method: 'POST',
                 data: {
-                    incident_id: incidentId
+                    incident_id: incidentId,
+                    "_token": "{{ csrf_token() }}"
                 },
                 headers: {
                     'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
@@ -1048,6 +1055,7 @@ textarea.iv-inp{max-width:820px}
                     data: {
                         incident_id: incidentId,
                         approval: $('#inlineCheckbox1').is(':checked') ? 1 : 0,
+                        "_token": "{{ csrf_token() }}"
                     },
                     headers: {
                         'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')

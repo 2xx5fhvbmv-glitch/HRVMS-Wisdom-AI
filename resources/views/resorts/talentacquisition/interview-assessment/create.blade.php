@@ -115,23 +115,24 @@
                 'Finance': 'Finance',
                 'Self': 'Self (the candidate)'
             };
-            // Every field type formbuilder.online supports (incl. the
-            // 'button' the user noticed was missing the picker).
-            const FIELD_TYPES = [
-                'text','textarea','password','email','phone','url','number','date','time','hidden',
-                'select','checkbox','radio','checkbox-group','radio-group','file','autocomplete',
-                'header','paragraph','button','starRating','ratingTable'
-            ];
-            const typeUserAttrs = {};
-            FIELD_TYPES.forEach(function (t) {
-                typeUserAttrs[t] = {
+            // formBuilder looks up custom attrs by `type + '-' + subtype`
+            // (e.g. "header-h1") whenever a field has a subtype set — a
+            // per-type key like "header" (added for every field type,
+            // incl. the 'button' the user once noticed was missing the
+            // picker) only ever matches a header BEFORE its H1/H2/H3 level
+            // is chosen, so picking a level made this section vanish. The
+            // '*' key applies to every field regardless of subtype,
+            // sidestepping that lookup entirely — covers every type
+            // (including button) in one entry instead of enumerating them.
+            const typeUserAttrs = {
+                '*': {
                     responder_roles: {
                         label: 'Responder Roles (who fills)',
                         multiple: true,
                         options: RESPONDER_ROLE_OPTIONS
                     }
-                };
-            });
+                }
+            };
 
             const options = {
                 disableFields: ['autocomplete', 'button'],

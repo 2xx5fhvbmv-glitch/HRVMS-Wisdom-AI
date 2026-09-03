@@ -7,6 +7,25 @@
 </div>
 @endif
 
+@php
+// probation_end_date / termination_date / document expiry_date below have no
+// strtotime() guard (unlike joining_date above them, which does) — a
+// malformed historical value like "14/08/2026 15:24" (d/m/Y, Carbon expects
+// Y-m-d) crashes the whole page with a 500 instead of just showing "-".
+if (!function_exists('safeParseDate')) {
+    function safeParseDate($value, $format = 'd M Y') {
+        if (empty($value)) {
+            return null;
+        }
+        try {
+            return \Carbon\Carbon::parse($value)->format($format);
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+}
+@endphp
+
 @section('content')
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
@@ -845,6 +864,20 @@
                                                 </div>
                                             </div>
                                         </div>
+                                        <div class="row g-xxl-4 g-md-3 g-2 mb-3">
+                                            <div class="col-12">
+                                                @if($pendingEmploymentVerificationRequest)
+                                                    <p class="small text-muted mb-2">
+                                                        Employee requested an Employment Verification Letter on
+                                                        {{ safeParseDate($pendingEmploymentVerificationRequest->created_at) ?: $pendingEmploymentVerificationRequest->created_at }}.
+                                                    </p>
+                                                @endif
+                                                <button type="button" class="btn btn-themeBlue btn-sm" id="btn-send-employment-verification-letter"
+                                                        data-employee-id="{{ $employee->id }}">
+                                                    Generate &amp; Send Employment Verification Letter
+                                                </button>
+                                            </div>
+                                        </div>
                                         <div class="row g-xxl-4 g-md-3 g-2">
                                             <div class="col-lg-6">
                                                 <div class="table-responsive">
@@ -1196,8 +1229,8 @@
                                                             <tr id="probation-end-date-row" class="{{ $employee->employment_type == 'Probationary' ? '' : 'd-none' }}">
                                                                 <th>Probation Exp Date:</th>
                                                                 <td>
-                                                                    <span class="view-mode">{{ $employee->probation_end_date ? \Carbon\Carbon::parse($employee->probation_end_date)->format('d M Y') : "-" }}</span>
-                                                                    <input type="text" name="probation_end_date" class="form-control edit-mode d-none datepicker" value="{{ $employee->probation_end_date ? \Carbon\Carbon::parse($employee->probation_end_date)->format('d/m/Y') : '' }}">
+                                                                    <span class="view-mode">{{ safeParseDate($employee->probation_end_date) ?: "-" }}</span>
+                                                                    <input type="text" name="probation_end_date" class="form-control edit-mode d-none datepicker" value="{{ safeParseDate($employee->probation_end_date, 'd/m/Y') }}">
                                                                 </td>
                                                             </tr>
                                                             <tr>
@@ -1210,8 +1243,8 @@
                                                             <tr id="termination-date-row" class="{{ $employee->status != 'Terminated' ? 'd-none' : '' }}">
                                                                 <th>Termination Date:</th>
                                                                 <td>
-                                                                    <span class="view-mode">{{ $employee->termination_date ? \Carbon\Carbon::parse($employee->termination_date)->format('d M Y') : "-" }}</span>
-                                                                    <input type="text" name="termination_date" class="form-control edit-mode d-none datepicker" value="{{ $employee->termination_date ? \Carbon\Carbon::parse($employee->termination_date)->format('d/m/Y') : '' }}">
+                                                                    <span class="view-mode">{{ safeParseDate($employee->termination_date) ?: "-" }}</span>
+                                                                    <input type="text" name="termination_date" class="form-control edit-mode d-none datepicker" value="{{ safeParseDate($employee->termination_date, 'd/m/Y') }}">
                                                                 </td>
                                                             </tr>
                                                             <tr>
@@ -1971,8 +2004,8 @@
                                                                         <input type="text" name="document_titles[]" class="form-control edit-mode d-none" value="{{ $doc->document_title }}">
                                                                     </th>
                                                                     <td>
-                                                                        <span class="view-mode">{{ $doc->expiry_date ? \Carbon\Carbon::parse($doc->expiry_date)->format('d M Y') : '-' }}</span>
-                                                                        <input type="text" name="expiry_dates[]" class="form-control edit-mode d-none datepicker" value="{{ $doc->expiry_date ? \Carbon\Carbon::parse($doc->expiry_date)->format('d/m/Y') : '' }}">
+                                                                        <span class="view-mode">{{ safeParseDate($doc->expiry_date) ?: '-' }}</span>
+                                                                        <input type="text" name="expiry_dates[]" class="form-control edit-mode d-none datepicker" value="{{ safeParseDate($doc->expiry_date, 'd/m/Y') }}">
                                                                         {{-- Document is stored on Wasabi/S3 under
                                                                              `document_path` (NOT `document_file` —
                                                                              that column doesn't exist; the link
@@ -2381,7 +2414,9 @@
             url: '{{ route("people.getReportingPerson") }}',
             method: 'GET',
             data: {
-                department_id: currentDeptId || ''
+                department_id: currentDeptId || '',
+                rank: {!! json_encode((string) $employee->rank) !!},
+                employee_id: {!! json_encode($employee->id) !!}
             },
             success: function(response) {
                 if (response.success && response.data && response.data.length > 0) {
@@ -2468,6 +2503,52 @@
                 complete: function () {
                     $btn.prop('disabled', false).text('Send Credentials');
                 }
+            });
+        });
+
+        $(document).on('click', '#btn-send-employment-verification-letter', function(e) {
+            e.preventDefault();
+            let $btn = $(this);
+            let employeeId = $btn.data('employee-id');
+
+            wisdomConfirm({
+                title: 'Generate & Send Employment Verification Letter?',
+                text: 'This will email the letter to the employee and notify them in the app.',
+                confirmText: 'Yes, Send',
+                cancelText: 'Cancel'
+            }).then((result) => {
+                if (!result.isConfirmed) return;
+
+                let url = "{{ route('people.employees.sendEmploymentVerificationLetter', ':id') }}".replace(':id', employeeId);
+
+                $.ajax({
+                    url: url,
+                    type: 'POST',
+                    data: { _token: "{{ csrf_token() }}" },
+                    beforeSend: function () {
+                        $btn.prop('disabled', true).text('Sending...');
+                    },
+                    success: function (response) {
+                        if (response.success) {
+                            toastr.success(response.message, "Success", {
+                                positionClass: 'toast-bottom-right'
+                            });
+                        } else {
+                            toastr.error(response.message || 'Something went wrong.', "Error", {
+                                positionClass: 'toast-bottom-right'
+                            });
+                        }
+                    },
+                    error: function (xhr) {
+                        let error = xhr.responseJSON?.message || 'Request failed.';
+                        toastr.error(error, "Error", {
+                            positionClass: 'toast-bottom-right'
+                        });
+                    },
+                    complete: function () {
+                        $btn.prop('disabled', false).text('Generate & Send Employment Verification Letter');
+                    }
+                });
             });
         });
 
@@ -4384,7 +4465,7 @@
         // round-trip through every layer untouched.
         //
         // Toastr itself is loaded in resorts/layouts/js.blade.php BEFORE
-        // @yield('import-scripts') runs, so by the time this $(function)
+        // @@yield('import-scripts') runs, so by the time this $(function)
         // fires it's already defined. The guard is just defensive.
         $(function () {
             try {

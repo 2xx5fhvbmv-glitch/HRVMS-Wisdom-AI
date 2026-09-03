@@ -191,7 +191,11 @@ class LeaveController extends Controller
                             ) as total_leave_days")
             )
             ->join('leave_categories as lc', 'lc.id', '=', 'resort_benefit_grid_child.leave_cat_id')
-            ->where('resort_benefit_grid_child.rank', $benefit_grid_emp_grade)
+            // resort_benefit_grid_child.rank stores the employee RANK the row
+            // was saved under, not the grid's emp_grade — filtering by
+            // $benefit_grid_emp_grade matched only by coincidence, same bug
+            // as API/LeaveController::leaveCategory.
+            ->where('resort_benefit_grid_child.rank', $rank)
             ->when($benefit_grid_id, function($query) use ($benefit_grid_id) {
                 return $query->where('resort_benefit_grid_child.benefit_grid_id', $benefit_grid_id);
             })
@@ -259,7 +263,7 @@ class LeaveController extends Controller
                             ) as total_leave_days")
             )
             ->join('leave_categories as lc', 'lc.id', '=', 'resort_benefit_grid_child.leave_cat_id')
-            ->where('resort_benefit_grid_child.rank', $benefit_grid->emp_grade)
+            ->where('resort_benefit_grid_child.rank', $rank)
             ->where('resort_benefit_grid_child.benefit_grid_id', $benefit_grid->id)
             ->whereRaw('FIND_IN_SET(?, lc.eligibility)', [$rank])
             ->where('resort_benefit_grid_child.allocated_days', '>', 0)
@@ -1078,7 +1082,18 @@ class LeaveController extends Controller
         // dd($leaveDetail);
 
         if ($leaveDetail) {
+            // This must stay scoped to the SAME employee's OTHER row from this
+            // same combined-category submission. `flag` alone isn't a unique
+            // per-submission key — it's the leave category's static
+            // combine-partner config, so the same value repeats across every
+            // combined request for that category pairing. Without emp_id/
+            // resort_id scoping this could (and did) match a completely
+            // unrelated employee's leave row, showing their to_date/total_days
+            // here instead — a cross-tenant data leak, not just a display bug.
             $combinedLeave = EmployeeLeave::where('flag',$leaveDetail->leave_category_id)
+                ->where('employees_leaves.emp_id', $leaveDetail->emp_id)
+                ->where('employees_leaves.resort_id', $resort_id)
+                ->where('employees_leaves.id', '!=', $leaveDetail->id)
                 ->join('leave_categories as lc','lc.id','=','employees_leaves.leave_category_id')
                 ->first();
             // dd($combinedLeave);
@@ -1301,13 +1316,19 @@ class LeaveController extends Controller
                 $approverIdToLabel[(int) $empId] = ($k !== null && is_array($rank) && array_key_exists($k, $rank)) ? $rank[$k] : 'designated approver';
             }
         }
-        $leaveUsage = $leaveUsage->map(function($usage) use ($rank, $approverIdToLabel) {
+        $leaveUsage = $leaveUsage->map(function($usage) use ($rank, $approverIdToLabel, $empID) {
             $fromDate = $usage->from_date ?? null;
             $toDate = $usage->to_date ?? null;
             $usage->from_date = $fromDate ? Carbon::parse($fromDate)->format('d M') : '—';
             $usage->to_date = $toDate ? Carbon::parse($toDate)->format('d M') : '—';
 
+            // Scoped to the same employee/resort — see LeaveController::details()
+            // for why an unscoped `flag` match can pull in an unrelated
+            // employee's leave row.
             $combinedLeave = EmployeeLeave::where('flag', $usage->id)
+                ->where('employees_leaves.emp_id', $empID)
+                ->where('employees_leaves.resort_id', $this->resort->resort_id)
+                ->where('employees_leaves.id', '!=', $usage->id)
                 ->join('leave_categories as lc', 'lc.id', '=', 'employees_leaves.leave_category_id')
                 ->first();
 

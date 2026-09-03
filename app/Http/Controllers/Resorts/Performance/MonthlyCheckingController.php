@@ -121,7 +121,14 @@ class MonthlyCheckingController extends Controller
                 ->where("learning_id", $ak->tranining_id)
                 ->where("resort_id", $this->resort->resort_id)
                 ->whereHas('employees', function($q) use ($ak) {
-                    $q->where('id', $ak->emp_orignal_id);
+                    // Was 'id' — the pivot row's own auto-increment PK on
+                    // learning_requests_employees, not the employee's id, so
+                    // this matched almost at random (or nothing) instead of
+                    // this employee's actual training request. That's why the
+                    // list page showed a different status ("Pending") than
+                    // the details page ("In Progress") for the same check-in
+                    // — details already used the correct 'employee_id' column.
+                    $q->where('employee_id', $ak->emp_orignal_id);
                 })
                 ->latest('id')
                 ->first();
@@ -311,7 +318,11 @@ class MonthlyCheckingController extends Controller
             'emp_id' => 'required',
             'start_time' => 'required',
             'end_time' => 'required',
-            'comment' => 'required|max:500',
+            // Was max:500 — comment is a TEXT column (65k+ capacity) and every
+            // sibling field here (Area_of_Discussion, Area_of_Improvement,
+            // Time_Line) has no length cap at all; a real monthly-review
+            // comment easily runs longer than 500 chars.
+            'comment' => 'required',
             'learning_manager_id' => 'required_with:tranining_id',
         ], [
             'learning_manager_id.required_with' => 'Please select a Learning Manager when a training is chosen.',
@@ -424,12 +435,18 @@ class MonthlyCheckingController extends Controller
         if($request->ajax())
         {
             $id = base64_decode($request->Parent_id);
+            // Was missing the same department scoping as GetMonthlyCheckInDetails()
+            // (the other endpoint serving this same details page/record) — a
+            // Finance EXCOM (or any HOD/EXCOM) could view another department's
+            // check-in by id with no access check at all.
+            $scopedIds = Common::getPerformanceScopedEmpIds();
             $monthlyDetails = MonthlyCheckingModel::join("employees as t1", "t1.id", "=", "monthly_checking_models.emp_id")
                                                     ->join("resort_admins as t2", "t2.id", "=", "t1.Admin_Parent_id")
                                                     ->join("resort_positions as t3", "t3.id", "=", "t1.Position_id")
                                                     ->leftjoin("learning_programs as t4", "t4.id", "=", "monthly_checking_models.tranining_id")
                                                     ->where("t1.resort_id", $this->resort->resort_id)
                                                     ->where("monthly_checking_models.id", $id)
+                                                    ->when(is_array($scopedIds), fn($q) => $q->whereIn('monthly_checking_models.emp_id', $scopedIds))
                                                     ->orderBy("id","desc")
                                                     ->get(['t1.id as emp_orignal_id','t4.name as traniningname','t2.first_name','t2.last_name','t3.position_title as PositionName','monthly_checking_models.*'])
                                                     ->map(function($ak)
@@ -590,10 +607,16 @@ class MonthlyCheckingController extends Controller
      */
     public function approvedList(Request $request)
     {
+        // Was missing the department scoping every sibling method in this
+        // controller applies (index(), GetMonthlyCheckInDetails()) — any
+        // HOD/EXCOM from any department could see every other department's
+        // approved check-ins here, regardless of rank/dept.
+        $scopedIds = Common::getPerformanceScopedEmpIds();
         $rows = MonthlyCheckingModel::with('employee.resortAdmin', 'employee.position')
             ->where('resort_id', $this->resort->resort_id)
             ->where('approval_status', 'approved')
             ->whereNull('finalized_at')
+            ->when(is_array($scopedIds), fn($q) => $q->whereIn('emp_id', $scopedIds))
             ->orderByDesc('approved_at')
             ->limit(30)
             ->get()
@@ -643,12 +666,18 @@ class MonthlyCheckingController extends Controller
         $msg        = ($this->resort->full_name ?? 'Employee').' has approved the monthly check-in scheduled on '.date('d M Y', strtotime($checkin->date_discussion)).'.';
         $ModuleName = 'Performance';
 
-        event(new ResortNotificationEvent(
-            Common::nofitication($this->resort->resort_id, 10, $title, $msg, $checkin->id, $checkin->created_by, $ModuleName)
-        ));
-        Common::sendMobileNotification(
-            $this->resort->resort_id, 2, null, null, $title, $msg, $ModuleName, [$checkin->created_by], $checkin->id, true, 'monthly-checkin-approved'
-        );
+        // created_by is a resort_admins.id, not an employees.id — resolve
+        // the real employee via Admin_Parent_id, same as the mobile
+        // API's MonthlyCheckInController::employeeApproveRequest().
+        $creatorEmployee = Employee::where('Admin_Parent_id', $checkin->created_by)->first();
+        if ($creatorEmployee) {
+            event(new ResortNotificationEvent(
+                Common::nofitication($this->resort->resort_id, 10, $title, $msg, $checkin->id, $creatorEmployee->id, $ModuleName)
+            ));
+            Common::sendMobileNotification(
+                $this->resort->resort_id, 2, null, null, $title, $msg, $ModuleName, [$creatorEmployee->id], $checkin->id, true, 'monthly-checkin-approved'
+            );
+        }
 
         return response()->json(['success' => true, 'message' => 'Check-in approved']);
     }
@@ -690,12 +719,17 @@ class MonthlyCheckingController extends Controller
         $msg        = ($this->resort->full_name ?? 'Employee').' has rejected the monthly check-in. Reason: '.$request->reason;
         $ModuleName = 'Performance';
 
-        event(new ResortNotificationEvent(
-            Common::nofitication($this->resort->resort_id, 10, $title, $msg, $checkin->id, $checkin->created_by, $ModuleName)
-        ));
-        Common::sendMobileNotification(
-            $this->resort->resort_id, 2, null, null, $title, $msg, $ModuleName, [$checkin->created_by], $checkin->id, true, 'monthly-checkin-rejected'
-        );
+        // created_by is a resort_admins.id, not an employees.id — see the
+        // same fix in employeeApprove() above.
+        $creatorEmployee = Employee::where('Admin_Parent_id', $checkin->created_by)->first();
+        if ($creatorEmployee) {
+            event(new ResortNotificationEvent(
+                Common::nofitication($this->resort->resort_id, 10, $title, $msg, $checkin->id, $creatorEmployee->id, $ModuleName)
+            ));
+            Common::sendMobileNotification(
+                $this->resort->resort_id, 2, null, null, $title, $msg, $ModuleName, [$creatorEmployee->id], $checkin->id, true, 'monthly-checkin-rejected'
+            );
+        }
 
         return response()->json(['success' => true, 'message' => 'Check-in rejected']);
     }
@@ -709,7 +743,9 @@ class MonthlyCheckingController extends Controller
             'Area_of_Discussion'  => 'required',
             'Area_of_Improvement' => 'required',
             'Time_Line'           => 'required',
-            'comment'             => 'required|max:500',
+            // Was max:500 — same arbitrary cap as MonltyCheckInStore(), same
+            // TEXT column, same fix.
+            'comment'             => 'required',
             'learning_manager_id' => 'required_with:tranining_id',
         ], [
             'learning_manager_id.required_with' => 'Please select a Learning Manager when a training is chosen.',
@@ -725,6 +761,13 @@ class MonthlyCheckingController extends Controller
         $checkin = MonthlyCheckingModel::where('resort_id', $this->resort->resort_id)->find($id);
         if (!$checkin) {
             return response()->json(['success' => false, 'message' => 'Check-in not found'], 404);
+        }
+        // Same department-scoping gap as approvedList()/MonltyCheckInDetailsPageList()
+        // — this is the HR/HOD-facing finalize action, not employee self-service, so
+        // it needs the access check, not an emp_id-equals-self check.
+        $scopedIds = Common::getPerformanceScopedEmpIds();
+        if (is_array($scopedIds) && !in_array($checkin->emp_id, $scopedIds, true)) {
+            return response()->json(['success' => false, 'message' => 'You are not authorized to finalize this check-in.'], 403);
         }
         if ($checkin->approval_status !== 'approved') {
             return response()->json(['success' => false, 'message' => 'Check-in must be approved before it can be finalized.'], 422);

@@ -192,6 +192,23 @@ class Logincontroller extends Controller
         }
 
         try {
+            // A TemporaryClinicDoctor calls this same route right after
+            // login (every account does), but this route sat inside the
+            // outer auth:api-only group and this method only ever checked
+            // Auth::guard('api') — so a doctor's own valid token got a 401
+            // here immediately post-login, which the app surfaces as a
+            // forced logout even though the login itself succeeded. A
+            // doctor has no Employee row at all (see EnsureClinicManagerAccess),
+            // so there's nowhere to persist a device token for one yet —
+            // acknowledge and no-op rather than crash or 401, until doctor
+            // push support is actually built.
+            if (Auth::guard('temp-clinic-doctor')->check()) {
+                return response()->json([
+                    'success'                       =>  true,
+                    'message'                       =>  'Device token registration not yet supported for this account type.',
+                ], 200);
+            }
+
             // Was looking the employee up by a client-supplied emp_id in the
             // request body instead of the authenticated user this Bearer
             // token actually belongs to (this route already sits behind

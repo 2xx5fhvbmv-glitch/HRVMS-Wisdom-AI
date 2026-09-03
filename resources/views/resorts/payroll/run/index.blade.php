@@ -3974,14 +3974,21 @@
         {
             $('#payroll-employees').DataTable().destroy();
         }
+        // Was a mix of legacy DataTables 1.9 Hungarian-notation options
+        // (bLengthChange/bFilter/bInfo/bAutoWidth/iDisplayLength) alongside
+        // the modern "searching" property — bFilter:true directly
+        // contradicted searching:false, and if the loaded DataTables asset
+        // is v2.x, every legacy property here is silently ignored entirely
+        // (removed in DT2, not just deprecated), which meant pageLength
+        // never actually applied and every row from the server rendered
+        // on one page. Normalized to the modern property names only.
         let table = $('#payroll-employees').DataTable({
-            "searching": false,
-            "bLengthChange": false,
-            "bFilter": true,
-            "bInfo": true,
-            "bAutoWidth": false,
+            searching: false,
+            lengthChange: false,
+            info: true,
+            autoWidth: false,
             "scrollX": true,
-            "iDisplayLength":10,
+            pageLength: 10,
             processing: true,
             serverSide: true,
             ajax: {

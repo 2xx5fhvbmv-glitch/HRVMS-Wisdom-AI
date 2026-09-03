@@ -170,8 +170,12 @@
                                 <div class="detail-item rounded-2 p-3 h-100">
                                     <div class="detail-label">Task delegation</div>
                                     <div class="detail-value d-inline-flex align-items-center gap-2">
-                                        <img src="{{ $leaveDetail->task_delegation_profile_picture ? $leaveDetail->task_delegation_profile_picture : URL::asset('resorts_assets/images/user-2.svg') }}" alt="" class="rounded-circle" style="width:28px;height:28px;object-fit:cover;">
-                                        <span>{{ $leaveDetail->task_delegation_first_name ?? '—' }} {{ $leaveDetail->task_delegation_last_name ?? '' }}</span>
+                                        @if($leaveDetail->task_delegation_first_name)
+                                            <img src="{{ $leaveDetail->task_delegation_profile_picture ?: URL::asset('resorts_assets/images/user-2.svg') }}" alt="" class="rounded-circle" style="width:28px;height:28px;object-fit:cover;">
+                                            <span>{{ $leaveDetail->task_delegation_first_name }} {{ $leaveDetail->task_delegation_last_name ?? '' }}</span>
+                                        @else
+                                            <span>—</span>
+                                        @endif
                                     </div>
                                 </div>
                             </div>
@@ -897,7 +901,7 @@
             $.ajax({
                 url: "{{ route('send.email.to.travel.partner') }}", // Backend route
                 method: "POST",
-                data:{leaveId : leaveId},
+                data:{leaveId : leaveId, "_token": "{{ csrf_token() }}"},
                 success: function (response) {
                     toastr.success(response.message, "Success", {
                         positionClass: 'toast-bottom-right',

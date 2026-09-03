@@ -1157,7 +1157,8 @@
                 data:
                 {
                     id :$("#vacancy-id").val(),
-                    searchTerm : $('.search').val()
+                    searchTerm : $('.search').val(),
+                    "_token": "{{ csrf_token() }}"
                 },
                 success: function(response)
                 {

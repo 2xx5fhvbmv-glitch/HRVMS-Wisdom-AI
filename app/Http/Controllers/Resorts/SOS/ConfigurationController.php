@@ -19,6 +19,7 @@ use App\Models\SOSTeamManagementModel;
 use App\Models\SOSTeamMemeberModel;
 use App\Models\SOSEmergencyTypesModel;
 use App\Models\SOSChildEmergencyType;
+use App\Models\ResortSiteSettings;
 use Google\Service\CloudControlsPartnerService\Console;
 use Illuminate\Support\Facades\Validator;
 
@@ -46,9 +47,43 @@ class ConfigurationController extends Controller
                             ->get();
         $Roles = SOSRolesAndPermission::where("resort_id",$this->resort->resort_id)->get();
         $allTeams = SOSTeamManagementModel::where("resort_id",$this->resort->resort_id)->get();
+        $siteSettings = ResortSiteSettings::where("resort_id",$this->resort->resort_id)->first();
 
-        return view('resorts.SOS.configuration.index', compact('page_title', 'Roles', 'getMembers', 'allTeams'));
+        return view('resorts.SOS.configuration.index', compact('page_title', 'Roles', 'getMembers', 'allTeams', 'siteSettings'));
     }
+
+    public function EmergencyContactsStore(Request $request)
+    {
+        $resort_id = $this->resort->resort_id;
+
+        $validator = Validator::make($request->all(), [
+            'emergency_police_number' => ['nullable', 'string', 'max:20'],
+            'emergency_fire_number' => ['nullable', 'string', 'max:20'],
+            'emergency_mndf_number' => ['nullable', 'string', 'max:20'],
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        ResortSiteSettings::updateOrCreate(
+            ['resort_id' => $resort_id],
+            [
+                'emergency_police_number' => $request->emergency_police_number,
+                'emergency_fire_number' => $request->emergency_fire_number,
+                'emergency_mndf_number' => $request->emergency_mndf_number,
+            ]
+        );
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Emergency contact numbers updated successfully',
+        ], 200);
+    }
+
     public function SOSRolesAndPermissionStore(Request $request)
     {
         $resort_id = $this->resort->resort_id;

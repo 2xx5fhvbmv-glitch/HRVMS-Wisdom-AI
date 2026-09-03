@@ -12,6 +12,7 @@ use Validator;
 use Illuminate\Validation\Rule;
 use DB;
 use App\Helpers\Common;
+use App\Helpers\StorageHelper;
 use Illuminate\Support\Str;
 class JobDescriptionController extends Controller
 {
@@ -110,13 +111,13 @@ class JobDescriptionController extends Controller
                     $deleteUrl = asset('resorts_assets/images/trash-red.svg');
                     $redirectToMe = route('resort.ta.jobdescription.download', $row->slug);
                     return '
-                            <a href="javscript:void(0)" class="btn-tableIcon btnIcon-orange viewJobDesc " data-id="' . htmlspecialchars($row->id, ENT_QUOTES, 'UTF-8').'"><i class="fa-regular fa-eye"></i></a>
+                            <a href="javascript:void(0)" class="btn-tableIcon btnIcon-orange viewJobDesc " data-id="' . htmlspecialchars($row->id, ENT_QUOTES, 'UTF-8').'"><i class="fa-regular fa-eye"></i></a>
                             <a target="_blank" href="'.$redirectToMe.'" class="btn-tableIcon btnIcon-skyblue"><i class="fa-regular fa-download"></i></a>
-                            <a href="javscript:void(0)" class="btn-lg-icon icon-bg-green me-1 edit-row-btn '.$edit_class.'"
+                            <a href="javascript:void(0)" class="btn-lg-icon icon-bg-green me-1 edit-row-btn '.$edit_class.'"
                             data-id="' . htmlspecialchars($row->id, ENT_QUOTES, 'UTF-8') . '">
                                 <img src="' . $editUrl . '" alt="Edit" class="img-fluid" />
                             </a>
-                            <a href="javscript:void(0)" class="btn-lg-icon icon-bg-red delete-row-btn '.$delete_class.'"
+                            <a href="javascript:void(0)" class="btn-lg-icon icon-bg-red delete-row-btn '.$delete_class.'"
                            data-id="'. htmlspecialchars($row->id, ENT_QUOTES, 'UTF-8') . '" >
                                 <img src="' . $deleteUrl . '" alt="Delete" class="img-fluid" />
                             </a>
@@ -259,17 +260,22 @@ class JobDescriptionController extends Controller
             $pdf->setPaper('a4', 'portrait');
             $filename = 'JobDescription_' . $slug . '.pdf';
 
-            // Save PDF to storage
-            $storagePath = config('settings.jd_path');
-            $dynamic_path = $storagePath.'/'.$filename;
-            
-            $absolute_path = public_path($dynamic_path);
-            // Create directory if it doesn't exist
+            // CURLFile below needs a real local path to upload from, so this still needs a
+            // local scratch copy — storage/app is always writable regardless of the public/
+            // directory's permissions on this deploy (which is what was 500ing). The durable
+            // copy for record-keeping goes to Wasabi via StorageHelper, disk-agnostic.
+            $absolute_path = storage_path('app/tmp/' . $filename);
             if (!file_exists(dirname($absolute_path))) {
                 mkdir(dirname($absolute_path), 0755, true);
             }
 
             $pdf->save($absolute_path);
+            // jd_path carries a "public/" prefix (meaningful for the old public_path() local
+            // write, not for a Wasabi bucket key) — strip it to match the relative-path
+            // convention every other StorageHelper::put() caller uses (e.g. PayrollController's
+            // 'uploads/payslip', no "public/").
+            $wasabiPath = preg_replace('#^public/#', '', config('settings.jd_path')) . '/' . $filename;
+            StorageHelper::put($wasabiPath, $pdf->output());
 
             // Run the AI job-description compliance check on the generated PDF
             // and persist the result. The /check_compliance endpoint returns a

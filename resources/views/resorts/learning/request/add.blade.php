@@ -32,6 +32,7 @@
 
             <div>
                 <form id="learning-request-form">
+    @csrf
                     <div class="card">
                         <div class="row g-md-4 g-3 mb-md-4 mb-3">
                             <div class="col-xl-4 col-lg-5 ">
@@ -149,7 +150,7 @@
 
         </div>
     </div>
-@include('resorts.Learning._learning_buttons_v2_styles')
+@include('resorts.learning._learning_buttons_v2_styles')
 @include('resorts._dropdown_styles')
 @include('resorts._dropdown_script')
 @endsection

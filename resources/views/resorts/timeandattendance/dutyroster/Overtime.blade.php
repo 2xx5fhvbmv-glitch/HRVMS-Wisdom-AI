@@ -30,6 +30,7 @@
             <div>
                 <div class="card ">
                     <form id="OverTimeform" class="@if(Common::checkRouteWisePermission('resort.timeandattendance.OverTime',config('settings.resort_permissions.create')) == false) d-none @endif">
+    @csrf
                         <div class="row g-2 mb-3 align-items-end flex-nowrap overflow-auto">
                             <div class="col col-xl-2 col-lg-2 col-md-3 col-sm-4">
                                 <label for="select-emp" class="form-label">SELECT EMPLOYEE</label>
@@ -72,20 +73,27 @@
                                 <select class="form-select month dd-native-select" name="month" id="month">
                                     <option value="">Select Month</option>
                                     @foreach ($monthsList as $key => $monthName)
-                                        <option value="{{ $key }}">{{ $monthName }}</option>
+                                        {{-- Was never pre-selected from the current request at
+                                             all — navigating directly to a pagination link (which
+                                             now correctly carries month/year/overtime_type, see
+                                             withQueryString() fix) still showed the underlying
+                                             data correctly filtered, but the dropdowns themselves
+                                             looked reset, making it look like the filter "didn't
+                                             stick" even though it had. --}}
+                                        <option value="{{ $key }}" @if((int) request('month') === $key) selected @endif>{{ $monthName }}</option>
                                     @endforeach
                                 </select>
                                 <div class="dd" data-target="#month">
                                     <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
-                                        <span class="dd-lbl">Select Month</span>
+                                        <span class="dd-lbl">{{ $monthsList[(int) request('month')] ?? 'Select Month' }}</span>
                                         <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
                                     </button>
                                     <div class="dd-panel" role="listbox" aria-label="Month">
                                         <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a month…"></div>
                                         <div class="dd-scroll">
-                                            <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Month</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            <div class="dd-item{{ !request('month') ? ' active' : '' }}" role="option" data-value=""><span class="dd-nm">Select Month</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
                                             @foreach ($monthsList as $key => $monthName)
-                                            <div class="dd-item" role="option" data-value="{{ $key }}"><span class="dd-nm">{{ $monthName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            <div class="dd-item{{ (int) request('month') === $key ? ' active' : '' }}" role="option" data-value="{{ $key }}"><span class="dd-nm">{{ $monthName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
                                             @endforeach
                                         </div>
                                     </div>
@@ -96,7 +104,7 @@
                                 <select class="form-select year dd-native-select" name="year" id="year">
                                     <option value="">Select Year</option>
                                     @for ($y = now()->year; $y >= now()->year - 5; $y--)
-                                        <option value="{{ $y }}">{{ $y }}</option>
+                                        <option value="{{ $y }}" @if((int) request('year') === $y) selected @endif>{{ $y }}</option>
                                     @endfor
                                 </select>
                                 <div class="dd" data-target="#year">
@@ -117,18 +125,18 @@
                             <div class="col col-xl-2 col-lg-2 col-md-2 col-sm-3">
                                 <label for="overtime_type" class="form-label">OVERTIME TYPE</label>
                                 <select class="form-select overtime_type dd-native-select" name="overtime_type" id="overtime_type">
-                                    <option value="actual">Actual Overtime</option>
-                                    <option value="preplanned">Pre-Planned Overtime</option>
+                                    <option value="actual" @if(request('overtime_type', 'actual') === 'actual') selected @endif>Actual Overtime</option>
+                                    <option value="preplanned" @if(request('overtime_type') === 'preplanned') selected @endif>Pre-Planned Overtime</option>
                                 </select>
                                 <div class="dd" data-target="#overtime_type">
                                     <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
-                                        <span class="dd-lbl">Actual Overtime</span>
+                                        <span class="dd-lbl">{{ request('overtime_type') === 'preplanned' ? 'Pre-Planned Overtime' : 'Actual Overtime' }}</span>
                                         <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
                                     </button>
                                     <div class="dd-panel" role="listbox" aria-label="Overtime type">
                                         <div class="dd-scroll">
-                                            <div class="dd-item active" role="option" data-value="actual"><span class="dd-nm">Actual Overtime</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
-                                            <div class="dd-item" role="option" data-value="preplanned"><span class="dd-nm">Pre-Planned Overtime</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            <div class="dd-item{{ request('overtime_type') !== 'preplanned' ? ' active' : '' }}" role="option" data-value="actual"><span class="dd-nm">Actual Overtime</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            <div class="dd-item{{ request('overtime_type') === 'preplanned' ? ' active' : '' }}" role="option" data-value="preplanned"><span class="dd-nm">Pre-Planned Overtime</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
                                         </div>
                                     </div>
                                 </div>
@@ -179,157 +187,20 @@
                             </div>
                         </div>
                         <div class="appendData">
-                            <div class="monthly-main">
-                                <div class="table-responsive mb-4">
-                                    <table id="" class="table table-bordered table-overtimemonthly mb-1">
-                                        <thead>
-                                            <tr>
-                                                <th>Employee Name</th>
-                                                @if(!empty($monthwiseheaders))
-                                                    @foreach ($monthwiseheaders as $h)
-                                                        @php
-                                                            $currentDate = isset($h['date']) ? $h['date'] : date('Y-m-d', strtotime($h['day']));
-                                                            $isPublicHoliday = isset($publicHolidays) && in_array($currentDate, $publicHolidays);
-                                                        @endphp
-                                                        <th class="{{ $isPublicHoliday ? 'public-holiday-header' : '' }}">{{ $h['day'] }} <span>{{ $h['dayname'] }}</span> <span style="font-size:9px; opacity:0.7; display:block;">{{ $h['month'] ?? '' }}</span></th>
-                                                    @endforeach
-                                                @endif
-                                                <th>Regular OT</th>
-                                                <th>Friday OT</th>
-                                                <th>Holiday OT</th>
-                                                <th>Total OT</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            @if($Rosterdata->isNotEmpty())
-                                            @foreach ($Rosterdata as $r)
-                                                <tr>
-                                                    <td>
-                                                        <div class="createDuty-user">
-                                                            <div class="img-circle">
-                                                                <img src="{{ Common::getResortUserPicture($r->Parentid) }}" alt="user">
-                                                            </div>
-                                                            <div>
-                                                                <p>
-                                                                    <span class="fw-600">{{ ucfirst($r->first_name . ' ' . $r->last_name) }}</span>
-                                                                    <span class="badge badge-white">{{ $r->Emp_id }}</span>
-                                                                </p>
-                                                                <span>{{ ucfirst($r->position_title) }}</span>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-
-                                                    @php
-                                                        // Fetch overtime data from employee_overtimes table
-                                                        $overtimeData = \App\Models\EmployeeOvertime::with('shift')
-                                                            ->where('Emp_id', $r->emp_id)
-                                                            ->where('resort_id', $resort_id)
-                                                            ->whereBetween('date', [$startOfMonth->format('Y-m-d'), $endOfMonth->format('Y-m-d')])
-                                                            ->orderBy('date', 'asc')
-                                                            ->orderBy('start_time', 'asc')
-                                                            ->get();
-
-                                                        // Group overtime by date
-                                                        $overtimeByDate = $overtimeData->groupBy(function($item) {
-                                                            return $item->date->format('Y-m-d');
-                                                        });
-
-                                                        $totalMonthWiseHours = 0;
-                                                        $fridayOtMonthly = 0;
-                                                        $holidayOtMonthly = 0;
-                                                        $regularOtMonthly = 0;
-
-                                                        foreach($overtimeData as $ot) {
-                                                            $isFriday = $ot->date->isFriday();
-                                                            $isHoliday = isset($publicHolidays) && in_array($ot->date->format('Y-m-d'), $publicHolidays);
-                                                            list($hours, $minutes) = explode(':', $ot->total_time ?? '0:0');
-                                                            $totalOtHours = (int)$hours + ((int)$minutes / 60);
-
-                                                            if ($isFriday) {
-                                                                $fridayOtMonthly += $totalOtHours;
-                                                            } elseif ($isHoliday) {
-                                                                $holidayOtMonthly += $totalOtHours;
-                                                            } else {
-                                                                $regularOtMonthly += $totalOtHours;
-                                                            }
-                                                            $totalMonthWiseHours += $totalOtHours;
-                                                        }
-                                                    @endphp
-
-                                                    <!-- Loop through each monthwise header for the status per day -->
-                                                    @foreach ($monthwiseheaders as $h)
-                                                        @php
-                                                            $date = isset($h['date']) ? $h['date'] : ($startOfMonth->format('Y-m') . '-' . str_pad($h['day'], 2, '0', STR_PAD_LEFT));
-                                                            $isPublicHoliday = isset($publicHolidays) && in_array($date, $publicHolidays);
-                                                            $dayOvertimes = $overtimeByDate->get($date, collect());
-                                                            $overtimeCount = $dayOvertimes->count();
-
-                                                            // Calculate total overtime for the day
-                                                            $dayTotalMinutes = 0;
-                                                            $hasPending = false;
-                                                            $hasRejected = false;
-                                                            $hasApproved = false;
-
-                                                            foreach($dayOvertimes as $ot) {
-                                                                list($hours, $minutes) = explode(':', $ot->total_time ?? '0:0');
-                                                                $dayTotalMinutes += (int)$hours * 60 + (int)$minutes;
-
-                                                                if($ot->status == 'pending') $hasPending = true;
-                                                                if($ot->status == 'rejected') $hasRejected = true;
-                                                                if($ot->status == 'approved') $hasApproved = true;
-                                                            }
-
-                                                            $dayTotalHours = floor($dayTotalMinutes / 60);
-                                                            $dayTotalMins = $dayTotalMinutes % 60;
-                                                            $dayTotalTime = sprintf('%02d:%02d', $dayTotalHours, $dayTotalMins);
-
-                                                            // Determine status color priority: pending > rejected > approved
-                                                            $statusColor = '';
-                                                            if($hasPending) {
-                                                                $statusColor = 'status-pending';
-                                                            } elseif($hasRejected) {
-                                                                $statusColor = 'status-rejected';
-                                                            } elseif($hasApproved) {
-                                                                $statusColor = 'status-approved';
-                                                                    }
-                                                                @endphp
-
-                                                        <td class="overtime-cell {{ $isPublicHoliday ? 'public-holiday-cell' : '' }} @if($overtimeCount > 0) has-overtime {{ $statusColor }} @endif"
-                                                            data-date="{{ $date }}"
-                                                            data-emp-id="{{ $r->emp_id }}"
-                                                            data-tooltip="{{ htmlspecialchars(json_encode($dayOvertimes->map(function($ot) {
-                                                                return [
-                                                                    'id' => $ot->id,
-                                                                    'start_time' => $ot->start_time,
-                                                                    'end_time' => $ot->end_time,
-                                                                    'total_time' => $ot->total_time,
-                                                                    'status' => $ot->status,
-                                                                    'shift' => $ot->shift->ShiftName ?? ''
-                                                                ];
-                                                            })->toArray())) }}">
-                                                            @if($overtimeCount > 0)
-                                                                <span class="overtime-total">{{ $dayTotalTime }}</span>
-                                                                @else
-                                                                <span class="no-overtime">-</span>
-                                                            @endif
-                                                        </td>
-                                                    @endforeach
-                                                    <td>{{ sprintf('%02d:%02d', floor($regularOtMonthly), round(($regularOtMonthly - floor($regularOtMonthly)) * 60)) }}</td>
-                                                    <td>{{ sprintf('%02d:%02d', floor($fridayOtMonthly), round(($fridayOtMonthly - floor($fridayOtMonthly)) * 60)) }}</td>
-                                                    <td>{{ sprintf('%02d:%02d', floor($holidayOtMonthly), round(($holidayOtMonthly - floor($holidayOtMonthly)) * 60)) }}</td>
-                                                    <td>{{ sprintf('%02d:%02d', floor($totalMonthWiseHours), round(($totalMonthWiseHours - floor($totalMonthWiseHours)) * 60)) }}
-                                                    </td>
-                                                </tr>
-                                            @endforeach
-                                        @endif
-
-                                        </tbody>
-                                    </table>
-                                </div>
-                                <div class="pagination-custom">
-                                    {!! $Rosterdata->links('pagination::bootstrap-4') !!}
-                                  </div>
-                            </div>
+                            {{-- Was a full second copy of resorts.renderfiles.OverTimeSearch's
+                                 exact table/query logic, duplicated between this initial
+                                 page load and the AJAX-filtered reload — the classic
+                                 "fix one, miss the other" trap. Now a single shared
+                                 partial so both paths (and the new attendance-OT
+                                 approve/reject UI added to it) always stay in sync. --}}
+                            @include('resorts.renderfiles.OverTimeSearch', [
+                                'Rosterdata' => $Rosterdata,
+                                'monthwiseheaders' => $monthwiseheaders,
+                                'resort_id' => $resort_id,
+                                'startOfMonth' => $startOfMonth,
+                                'endOfMonth' => $endOfMonth,
+                                'publicHolidays' => $publicHolidays,
+                            ])
                         </div>
 
                     </div>
@@ -426,6 +297,23 @@
 
     .no-overtime {
         color: #999;
+    }
+
+    .attendance-ot-actions {
+        margin-top: 2px;
+        line-height: 1;
+    }
+
+    .attendance-ot-actions a {
+        display: inline-block;
+        padding: 0 3px;
+        font-size: 11px;
+        color: inherit;
+        opacity: 0.85;
+    }
+
+    .attendance-ot-actions a:hover {
+        opacity: 1;
     }
 
     /* Tooltip Styles */
@@ -941,6 +829,32 @@
                         console.error('Error parsing overtime data:', e);
                     }
                 }
+            });
+
+            // Approve/reject for attendance-recorded OT with no OTStatus yet
+            // (parent_attendaces.OverTime/OTStatus) — the exact thing Run
+            // Payroll's "OT entries with missing OT status" check blocks
+            // on. There was previously no working UI for this anywhere.
+            $('.attendance-ot-approve, .attendance-ot-reject').off('click').on('click', function(event) {
+                event.stopPropagation(); // don't also trigger the cell's own click (opens the unrelated OT modal)
+                var attdanceId = $(this).data('attdance-id');
+                var action = $(this).hasClass('attendance-ot-approve') ? 'approve' : 'reject';
+                $.ajax({
+                    url: "{{ route('resort.timeandattendance.OTStatusUpdate') }}",
+                    type: "POST",
+                    data: { _token: "{{ csrf_token() }}", action: action, AttdanceId: attdanceId },
+                    success: function(response) {
+                        if (response.success) {
+                            toastr.success(response.message, "Success", { positionClass: 'toast-bottom-right' });
+                            updateFilterWiseTable();
+                        } else {
+                            toastr.error(response.message || 'Failed to update OT status.', "Error", { positionClass: 'toast-bottom-right' });
+                        }
+                    },
+                    error: function() {
+                        toastr.error('Failed to update OT status.', "Error", { positionClass: 'toast-bottom-right' });
+                    }
+                });
             });
         }
 

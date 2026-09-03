@@ -42,13 +42,20 @@ class RequestController extends Controller
 
             $employee_id                                =   $this->user->GetEmployee->id;
 
-            // Fetch all in one query for efficiency
+            // Letter-type requests (Employment Verification Letter, etc.)
+            // never get a payroll_advance_guarantor row — only Salary
+            // Advance/Loan Request do (see RequestStore's required_if).
+            // An INNER JOIN against that table dropped every letter-type
+            // request from this list entirely; a request with more than
+            // one guarantor would also have fanned out into duplicate
+            // rows here. Fetch guarantors separately instead, same
+            // pattern as the attachments fetch right below, so a request
+            // shows up regardless of whether/how many guarantors it has.
             $requests                                   =   PayrollAdvance::join('employees', 'payroll_advance.employee_id', '=', 'employees.id')
-                                                                ->join('payroll_advance_guarantor as pag', 'payroll_advance.id', '=', 'pag.payroll_advance_id')
                                                                 ->where('payroll_advance.employee_id', $employee_id)
                                                                 ->where('payroll_advance.resort_id', $this->resort_id)
                                                                 ->orderBy('payroll_advance.created_at', 'desc')
-                                                                ->get(['payroll_advance.*','employees.Emp_id', 'pag.status as guarantor_status', 'pag.guarantor_id']);
+                                                                ->get(['payroll_advance.*','employees.Emp_id']);
 
             // The upload endpoint's response includes payroll_advance_attachment,
             // but this dashboard/listing never surfaced it at all — a file
@@ -57,9 +64,19 @@ class RequestController extends Controller
                                                                 ->get()
                                                                 ->groupBy('payroll_advance_id');
 
-            $requests                                   =   $requests->map(function ($req) use ($attachmentsByAdvanceId) {
+            $guarantorsByAdvanceId                       =   PayrollAdvanceGuarantor::whereIn('payroll_advance_id', $requests->pluck('id'))
+                                                                ->get()
+                                                                ->groupBy('payroll_advance_id');
+
+            $requests                                   =   $requests->map(function ($req) use ($attachmentsByAdvanceId, $guarantorsByAdvanceId) {
                 $rows                                   =   $attachmentsByAdvanceId->get($req->id, collect());
                 $req->attachments                       =   $this->resolveAttachments($rows);
+                // Kept as a single scalar pair (not an array) to match the
+                // existing response shape every client already reads —
+                // first guarantor only when a request has more than one.
+                $guarantor                               =   $guarantorsByAdvanceId->get($req->id, collect())->first();
+                $req->guarantor_status                   =   $guarantor->status ?? null;
+                $req->guarantor_id                       =   $guarantor->guarantor_id ?? null;
                 return $req;
             });
 
@@ -130,14 +147,49 @@ class RequestController extends Controller
             'priority'                                  =>  'required',
             'request_date'                              =>  'required',
             'purpose'                                   =>  'required',
+            // No size limit existed at all — a file large enough to hit
+            // nginx's client_max_body_size never reaches this validator, it
+            // 413s at the web server before Laravel sees the request. This
+            // rule can only catch files under that ceiling; it exists so
+            // those get a clean, actionable error instead of accidentally
+            // being allowed through unbounded. Matches the 20MB precedent
+            // already used for general file uploads (FileManagementController).
+            'Attachments.*'                             =>  'file|max:20480',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
         }
 
+        $employee                                       =  $this->user->GetEmployee;
+        $employee_id                                    =  $employee->id;
+
+        // Benefit Grid's "Staff Loan & salary advance" flag was saved and
+        // displayed everywhere but never actually gated a request — an
+        // employee whose grid says n/a could still submit one. Same grade
+        // resolution pattern as every other benefit-grid lookup (employee's
+        // own benefit_grid_level wins, else rank-based default).
+        if (in_array($request->request_type, ['Salary Advance', 'Loan Request'])) {
+            $empGrade                                   =   Common::resolveEmpGrade($this->resort_id, $employee->rank, $employee->benefit_grid_level, $employee->Position_id);
+            $benefitGrid                                =   $empGrade
+                                                                ? \App\Models\ResortBenifitGrid::where('resort_id', $this->resort_id)
+                                                                    ->where('emp_grade', $empGrade)
+                                                                    ->where('status', 'Active')
+                                                                    ->first()
+                                                                : null;
+            // Only block on an explicit 'n/a' — some existing grids have an
+            // empty value from a form bug (the "No" option used to submit
+            // an invalid "no" for this yes/n/a enum column, silently
+            // coerced to '' on save, now fixed separately). Treating that
+            // pre-existing blank as ineligible would lock out employees
+            // whose grid was never a deliberate "not eligible" in the
+            // first place.
+            if ($benefitGrid && $benefitGrid->loan_and_salary_advanced === 'n/a') {
+                return response()->json(['success' => false, 'message' => 'You are not eligible for Staff Loan / Salary Advance requests under your current benefit grid.'], 403);
+            }
+        }
+
         DB::beginTransaction();
-        $employee_id                                    =  $this->user->GetEmployee->id;
         try {
             $PayrollAdvance                             =   PayrollAdvance::create([
                 'resort_id'                             =>  $this->resort_id,

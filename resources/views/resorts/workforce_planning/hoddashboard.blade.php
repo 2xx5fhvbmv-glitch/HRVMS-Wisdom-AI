@@ -713,7 +713,8 @@
                 type: 'POST',
                 data: {
                     position_id: positionId,
-                    count: currentValue // Use the updated count
+                    count: currentValue, // Use the updated count
+                    "_token": "{{ csrf_token() }}",
                 },
                 success: function(response) {
                     let monthCell = document.querySelector(`#${monthName}-${positionId}`);
@@ -803,7 +804,8 @@
                             type: 'POST',
                             data: {
                                 position_id: positionId,
-                                count: targetInput.value
+                                count: targetInput.value,
+                                "_token": "{{ csrf_token() }}",
                             },
                             success: function(response) {
                                 filledCount = 0;
@@ -899,7 +901,8 @@
                     type: 'POST',
                     data: {
                         position_id: positionId,
-                        count: input.value
+                        count: input.value,
+                        "_token": "{{ csrf_token() }}",
                     },
                     success: function(response) {
                         let monthCell = document.querySelector(`#${monthName}-${positionId}`);
@@ -973,7 +976,8 @@
                     type: 'POST',
                     data: {
                         position_id: positionId,
-                        count: input.value
+                        count: input.value,
+                        "_token": "{{ csrf_token() }}",
                     },
                     success: function(response) {
                         let monthCell = document.querySelector(`#${monthName}-${positionId}`);
@@ -1167,7 +1171,8 @@
                 type: 'POST',
                 data: {
                     position_id: positionId,
-                    count: currentValue
+                    count: currentValue,
+                    "_token": "{{ csrf_token() }}",
                 },
                 success: function(response) {
                     let monthCell = document.querySelector(`#${monthName}-${positionId}`);

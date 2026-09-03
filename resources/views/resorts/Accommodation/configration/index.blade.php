@@ -170,6 +170,7 @@
                                 </div>
                             </form>
                             <form id="AvailableAccommodationForm" data-parsley-validate>
+    @csrf
                                 <div class="row g-xl-4 g-3 appendAvailableAccommodation">
                                     <div class="col-lg-3 col-md-4 col-sm-6">
                                         <label for="building" class="form-label">BUILDING NAME</label>
@@ -412,6 +413,7 @@
             <div class="col-lg-12 ">
            
                 <form id="OccupancyThresholdForm" data-parsley-validate>
+    @csrf
                     <div class="card">
                         <div class="card-title">
                             <h3>Occupancy Levels Hit A Critical Threshold</h3>
@@ -552,6 +554,7 @@
                         <h3>Escalation Day</h3>
                     </div>
                     <form id="EscalationDay">
+    @csrf
                         <div class="mb-3">
                             <input type="number" name="EscalationDay"
                             value="{{ old('EscalationDay', isset($EscalationDay) ? $EscalationDay->EscalationDay : '') }}"

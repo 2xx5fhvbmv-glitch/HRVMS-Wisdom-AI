@@ -750,6 +750,18 @@ class GrivanceController extends Controller
                                                         ->where("t1.resort_id",$this->resort->resort_id)
                                                         ->where("grivance_submission_models.id",$id)
                                                         ->first(['t7.Category_Name as CatName','t6.Sub_Category_Name as SubCatName','t5.ActionName','t2.personal_phone','t2.id as Parentid','t2.first_name','t2.last_name','t2.profile_picture','grivance_submission_models.*','t3.name as DepartmentName','t4.position_title as PositiontName']);
+
+            // The joins above are all INNER joins (employee, admin, dept,
+            // position, sub-category, category) — a grievance whose id
+            // doesn't exist, isn't in this resort, or has a deleted/
+            // missing category/subcategory/employee record silently
+            // vanished from this query, and every access below crashed
+            // with "Attempt to read property on null" instead of a clean
+            // not-found page.
+            if (!$Grivance_Parent) {
+                abort(404, 'Grievance record not found.');
+            }
+
             $flag="CommitteeMode";
             $GrivanceSubmissionHistory =[];
             $GrivanceSubmissionHistory =  GrivanceInvestigationModel::join('grivance_investigation_child_models as t1',"t1.investigation_p_id","=","grivance_investigation_models.id")

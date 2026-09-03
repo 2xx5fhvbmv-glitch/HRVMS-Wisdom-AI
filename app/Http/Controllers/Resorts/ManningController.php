@@ -61,6 +61,37 @@ class ManningController extends Controller
         );
     }
 
+    /**
+     * Position -> Rank -> Employee Grade is the real mapping chain (an
+     * employee assigned this position inherits its Rank, and the Benefit
+     * Grid that applies to them is resolved from that rank) — but picking
+     * a rank here gave no indication of which grade(s) it maps to. A rank
+     * can be shared by more than one grade (documented, intentional), so
+     * this returns every grade name currently mapped to it, not just one.
+     */
+    public function getRankGradeMapping(Request $request)
+    {
+        $resort_id = Auth::guard('resort-admin')->user()->resort_id;
+        $rank = $request->input('rank');
+
+        $gradeLevelIds = \App\Models\ResortBenefitGradeLevelRank::where('resort_id', $resort_id)
+            ->where('rank', (int) $rank)
+            ->pluck('grade_level_id');
+
+        $grades = \App\Models\ResortBenefitGradeLevel::where('resort_id', $resort_id)
+            ->where('status', 'active')
+            ->whereIn('id', $gradeLevelIds)
+            ->get(['id', 'name']);
+
+        // 'grades' kept as plain names for the existing read-only hint text;
+        // 'gradeOptions' adds ids so the Employee Grade select can be
+        // filtered to only the grades actually mapped to this rank.
+        return response()->json([
+            'grades' => $grades->pluck('name')->values(),
+            'gradeOptions' => $grades->values(),
+        ]);
+    }
+
     public function getDropdownData()
     {
         $resort_id = Auth::guard('resort-admin')->user()->resort_id;
@@ -72,7 +103,12 @@ class ManningController extends Controller
         $sections = Section::where('status', 'active')->get(['id', 'name']);
         $positions = Position::where('status', 'active')->get(['id', 'position_title']);
         $resort_sections = ResortSection::where('status', 'active')->where('resort_id', $resort_id)->get(['id', 'name']);
-        $eligibility = config('settings.eligibilty');
+        // Was config('settings.eligibilty') — a stale, incomplete copy of
+        // Position_Rank missing HR, Finance, MD, SO, EDHOD, and
+        // CLINIC_STAFF. Same fix already applied to the Add Position
+        // create form; this feeds the inline-edit row's Rank dropdown,
+        // which had the identical gap.
+        $eligibility = config('settings.Position_Rank');
 
         return response()->json([
             'divisions' => $divisions,
@@ -862,6 +898,11 @@ class ManningController extends Controller
             $position->short_title = $request->filled('short_title') ? $request->short_title : '';
             $position->status = $request->status;
             $position->Rank = $request->Rank;
+            // Optional per-position grade override — lets two positions
+            // sharing the same rank sit on different Benefit Grids. Left
+            // unset, the position falls back to its rank's default grade
+            // exactly as before.
+            $position->benefit_grid_level = $request->filled('benefit_grid_level') ? $request->benefit_grid_level : null;
             $position->save();
             // Return success message
             return response()->json(['success' => true, 'message' => 'Position added successfully.']);
@@ -949,6 +990,10 @@ class ManningController extends Controller
                 // short_title not edited from UI; keep existing value
                 $position->status = $request->input('status');
                 $position->Rank = $request->input('Rank');
+                // benefit_grid_level intentionally left untouched here — the
+                // inline-edit row doesn't have a Grade field yet, so there's
+                // nothing in $request to read; touching it would silently
+                // wipe out an override set via the create form.
                 $update = $position->save();
                 // Get the updated division name
                 $divisionName = ResortDivision::find($request->input('division'))->name;

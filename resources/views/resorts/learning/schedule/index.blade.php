@@ -29,6 +29,7 @@
 
             <div>
                 <form id="training-schedule">
+                    @csrf
                     <div class="card">
                         <div class="row g-md-4 g-3 mb-md-4 mb-3">
                             <div class="col-xl-8 col-lg-7 ">
@@ -192,7 +193,7 @@
 
         </div>
     </div>
-@include('resorts.Learning._learning_buttons_v2_styles')
+@include('resorts.learning._learning_buttons_v2_styles')
 @include('resorts._dropdown_styles')
 @include('resorts._dropdown_script')
 @endsection
@@ -233,28 +234,34 @@
             }
         });
 
-        // Pre-fill from query string (?program_id=X&employee_id=Y) so dashboard
-        // "Schedule" buttons land on this page with the program selected and the
-        // target employee's checkbox ticked.
+        // Pre-fill from query string (?program_id=X&employee_id=Y[,Z,...]) so
+        // dashboard/Learning Requests "Schedule Program" buttons land on this
+        // page with the program selected and the target employee(s)' checkbox
+        // ticked. employee_id accepts a comma-separated list (a request can
+        // suggest more than one employee).
         (function preselectFromQuery() {
             var params = new URLSearchParams(window.location.search);
             var programId = params.get('program_id');
-            var employeeId = params.get('employee_id');
+            var employeeIdParam = params.get('employee_id');
 
             if (programId) {
                 $('#learning_title').val(programId).trigger('change');
             }
-            if (employeeId) {
+            if (employeeIdParam) {
+                var employeeIds = employeeIdParam.split(',').map(function (v) { return v.trim(); }).filter(Boolean);
                 // Wait for the employee list (some renders are async); a short delay
                 // also lets Select2 settle first.
                 setTimeout(function () {
-                    var $cb = $('.employee-item input[type="checkbox"][value="' + employeeId + '"]');
-                    if ($cb.length) {
-                        $cb.prop('checked', true);
-                        var $row = $cb.closest('.employee-item');
-                        if ($row.length && $row[0].scrollIntoView) {
-                            $row[0].scrollIntoView({block: 'center', behavior: 'smooth'});
+                    var $firstRow = null;
+                    employeeIds.forEach(function (employeeId) {
+                        var $cb = $('.employee-item input[type="checkbox"][value="' + employeeId + '"]');
+                        if ($cb.length) {
+                            $cb.prop('checked', true);
+                            if (!$firstRow) { $firstRow = $cb.closest('.employee-item'); }
                         }
+                    });
+                    if ($firstRow && $firstRow.length && $firstRow[0].scrollIntoView) {
+                        $firstRow[0].scrollIntoView({block: 'center', behavior: 'smooth'});
                     }
                 }, 200);
             }

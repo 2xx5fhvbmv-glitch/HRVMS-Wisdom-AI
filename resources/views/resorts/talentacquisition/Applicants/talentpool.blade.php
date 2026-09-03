@@ -297,7 +297,7 @@
         $.ajax({
             url: "{{ route('resort.get.position') }}",
             type: "post",
-            data: { deptId: {{ $employeeDeptId }} },
+            data: { deptId: {{ $employeeDeptId }}, "_token": "{{ csrf_token() }}" },
             success: function(data) {
                 if(data.success == true) {
                     let string = '<option selected disabled>Select Positions</option>';
@@ -337,7 +337,8 @@
                         url: "{{ route('resort.get.position') }}",
                         type: "post",
                         data: {
-                            deptId: deptId
+                            deptId: deptId,
+                            "_token": "{{ csrf_token() }}"
                         },
                         success: function(data) {
                             if(data.success == true)
@@ -658,7 +659,8 @@
                                 searchTerm : $('.search').val(),
                                 ResortDepartment: $("#ResortDepartment").val(),
                                 searchTerm: $('.search').val(),
-                                Positions : $('.Positions ').val()
+                                Positions : $('.Positions ').val(),
+                                "_token": "{{ csrf_token() }}"
                             },
                             success: function(response)
                             {
@@ -724,7 +726,7 @@
         $.ajax({
             url: "{{ route('resort.ta.DownloadFile') }}",
             type: "POST",
-            data: { id: fileId, flag: fileFlag },
+            data: { id: fileId, flag: fileFlag, "_token": "{{ csrf_token() }}" },
             success: function(response) {
                 if (response.success) {
                     $("#ViewModeOfFiles").html('<div class="text-center"><p>Loading...</p></div>');
@@ -787,7 +789,7 @@
         $.ajax({
             url: "{{ route('resort.ta.DownloadAllFiles') }}",
             type: "POST",
-            data: { id: fileId },
+            data: { id: fileId, "_token": "{{ csrf_token() }}" },
             success: function(response) {
                 btn.prop('disabled', false).text('Download All');
                 if (response.success) {

@@ -120,9 +120,9 @@
                                 <small class="d-block text-muted">for {{ $MaintanaceRequest->first_name }} {{ $MaintanaceRequest->last_name }}</small>
                             </li>
 
-                            {{-- 2. Sent to HR --}}
+                            {{-- 2. Pending HR approval --}}
                             <li class="{{ $sentToHrActive ? 'active' : '' }} {{ $MaintanaceRequest->Status == 'Rejected' ? 'text-danger' : '' }}">
-                                <span>{{ in_array('Open', $displayedStatuses) ? 'Approved by HR' : 'Sent to HR' }}</span>
+                                <span>{{ in_array('Open', $displayedStatuses) ? 'Approved by HR' : 'Pending HR approval' }}</span>
                                 @if($MaintanaceRequest->Status == 'Rejected')
                                     <small class="d-block text-danger">Rejected: {{ $MaintanaceRequest->RejactionReason ?? '' }}</small>
                                 @elseif($MaintanaceRequest->Status == 'On-Hold')

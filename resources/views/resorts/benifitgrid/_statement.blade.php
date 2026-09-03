@@ -30,6 +30,7 @@
         'health'   => $svg('<path d="M20.8 4.6a5.5 5.5 0 00-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 00-7.8 7.8l1.1 1L12 21l7.7-7.6 1.1-1a5.5 5.5 0 000-7.8z"/>'),
         'stay'     => $svg('<path d="M2 8h20M2 8v10a1 1 0 001 1h18a1 1 0 001-1V8M6 8V6a2 2 0 012-2h8a2 2 0 012 2v2"/>'),
         'fun'      => $svg('<path d="M6 3v18M6 8h9a3 3 0 010 6H6"/>'),
+        'people'   => $svg('<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/>'),
         'check'    => '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6L9 17l-5-5"/></svg>',
     ];
 @endphp
@@ -319,3 +320,22 @@
         <div class="dl"><div class="di"><span class="k">Recreation &amp; entertainment</span><span class="v na">Not set</span></div></div>
     @endif
 </div>
+
+{{-- Positions covered by this grade --}}
+@if(!empty($positionsByRank) && $positionsByRank->isNotEmpty())
+<div class="sec">
+    <div class="sec-h"><span class="ic">{!! $icons['people'] !!}</span><span class="t">Positions covered</span><span class="rule"></span></div>
+    <div class="dl">
+        @foreach($positionsByRank as $rankName => $positions)
+            <div class="di full">
+                <span class="k">{{ $rankName }}</span>
+                <div class="chips">
+                    @foreach($positions as $position)
+                        <span class="chip">{{ $position->position_title }} ({{ $position->employees_count }} employee{{ $position->employees_count == 1 ? '' : 's' }})</span>
+                    @endforeach
+                </div>
+            </div>
+        @endforeach
+    </div>
+</div>
+@endif

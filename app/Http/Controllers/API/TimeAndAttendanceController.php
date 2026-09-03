@@ -3689,7 +3689,14 @@ class TimeAndAttendanceController extends Controller
             // starts the day after last month's cutoff (e.g. cutoff 25,
             // viewing March 2026 -> 26 Feb 2026 to 25 Mar 2026).
             $cutoffDay = PayrollConfig::where('resort_id', $resort_id)->value('cutoff_day') ?? 1;
-            $baseDate = Carbon::now()->startOfMonth();
+            // month/year were accepted by nothing here — every call
+            // returned the current cutoff period regardless of what was
+            // requested, so a previous/next-month navigation UI had
+            // nothing to actually page through. Optional, defaults to the
+            // current month exactly as before when omitted.
+            $baseDate = ($request->filled('month') && $request->filled('year'))
+                ? Carbon::create((int) $request->year, (int) $request->month, 1)->startOfMonth()
+                : Carbon::now()->startOfMonth();
             $prevMonth = $baseDate->copy()->subMonthNoOverflow();
             $startOfMonth = $prevMonth->copy()->day(min($cutoffDay, $prevMonth->daysInMonth))->addDay();
             $endOfMonth = $baseDate->copy()->day(min($cutoffDay, $baseDate->daysInMonth));
@@ -3821,6 +3828,11 @@ class TimeAndAttendanceController extends Controller
                                     'from_date' => $leaveData['from_date'],
                                     'to_date' => $leaveData['to_date'],
                                     'total_days' => $leaveData['total_days'] ?? null,
+                                    // Already flowed this far through
+                                    // Common::GetAttandanceRegister()'s own
+                                    // ->only([...,'status']) select, just
+                                    // never read into the response here.
+                                    'status' => $leaveData['status'] ?? null,
                                 ];
                                 break;
                             }
@@ -3850,6 +3862,12 @@ class TimeAndAttendanceController extends Controller
                     $dayData['check_out_longitude'] = null;
                     $dayData['check_in_geofence_name'] = null;
                     $dayData['check_out_geofence_name'] = null;
+                    // A leave day with no punch already gets a synthesized
+                    // row from Common::getLeaveRegisterEntries() (merged
+                    // into $RosterInternalDataMonth unconditionally), which
+                    // takes the $shiftData branch above — this null is only
+                    // reached for a date with genuinely no roster,
+                    // attendance, absence, or leave activity at all.
                     $dayData['leave_info'] = null;
                     $dayData['is_day_off'] = false;
                 }

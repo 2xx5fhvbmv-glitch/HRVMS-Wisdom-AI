@@ -37,6 +37,25 @@ class ProfileController extends Controller
             $this->resort_id = $this->user->resort_id;
         }
   }
+    /**
+     * Sends a real FCM push to every device token registered against every
+     * active employee AT THE CALLER'S OWN RESORT (never cross-resort — this
+     * app is multi-tenant) and returns the raw per-device result (FCM
+     * credentials missing/invalid, no device token registered, or the
+     * actual FCM send result per device) — a single call to confirm push
+     * notifications are working end to end, not just that the DB insert
+     * (Common::nofitication) succeeded. Hits every logged-in device at the
+     * resort, so use deliberately, not as a routine health check.
+     */
+    public function testPushNotification(Request $request)
+    {
+        if (!$this->user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        return response()->json(Common::sendTestPushToResort($this->resort_id));
+    }
+
   public function getProfile(Request $request)
   {
     if (!Auth::guard('api')->check()) {

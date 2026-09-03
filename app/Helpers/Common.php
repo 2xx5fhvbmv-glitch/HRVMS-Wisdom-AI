@@ -197,72 +197,88 @@ class Common
 	        (int) $employee->main_rank === 3 &&
 	        (int) $employee->rank === 1;
 	}
+	/**
+	 * settings is a single global row (branding + date/time format) read
+	 * by ~20 helpers below, several of them now called per-row in
+	 * DataTables columns / notification loops — memoize per request
+	 * instead of re-querying on every call.
+	 */
+	protected static $settingsCache = null;
+
+	public static function getSettings()
+	{
+		if (self::$settingsCache === null) {
+			self::$settingsCache = Settings::first();
+		}
+		return self::$settingsCache;
+	}
+
 	public static function getWebsiteLogo()
 	{
-		$settings = Settings::first();
+		$settings = self::getSettings();
 		$logo = $settings->header_logo ? url(config('settings.site_logo_folder')).'/'.$settings->header_logo : url('admin_assets/images/logo.svg');
 		return $logo;
 	}
 
 	public static function getWebsiteFavicon()
 	{
-		$settings = Settings::first();
+		$settings = self::getSettings();
 		$siteFavicon = $settings->site_favicon ? url(config('settings.site_favicon_folder'))."/".$settings->site_favicon : asset('front_assets/images/favicon.png');
 		return $siteFavicon;
 	}
 
 	public static function getAdminLogo()
 	{
-		$settings = Settings::first();
+		$settings = self::getSettings();
 		$logo = $settings->admin_logo ? url(config('settings.site_logo_folder'))."/".$settings->admin_logo : url('admin_assets/images/logo.svg');
 		return $logo;
 	}
 
 	public static function getWebsiteContact()
 	{
-		$settings = Settings::first();
+		$settings = self::getSettings();
 		$data = $settings->contact_number ? $settings->contact_number : '01223 322200';
 		return $data;
 	}
 
 	public static function getWebsiteEmail()
 	{
-		$settings = Settings::first();
+		$settings = self::getSettings();
 		$data = $settings->email_address ? $settings->email_address : 'info@rutherfordspunting.com';
 		return $data;
 	}
 
 	public static function getTwitterLink()
 	{
-		$settings = Settings::first();
+		$settings = self::getSettings();
 		$data = $settings->linkedin_link ? $settings->linkedin_link : '#';
 		return $data;
 	}
 
 	public static function getFacebookLink()
 	{
-		$settings = Settings::first();
+		$settings = self::getSettings();
 		$data = $settings->facebook_link ? $settings->facebook_link : '#';
 		return $data;
 	}
 
 	public static function getInstagramLink()
 	{
-		$settings = Settings::first();
+		$settings = self::getSettings();
 		$data = $settings->instagram_link ? $settings->instagram_link : '#';
 		return $data;
 	}
 
 	public static function getYoutubeLink()
 	{
-		$settings = Settings::first();
+		$settings = self::getSettings();
 		$data = $settings->youtube_link ? $settings->youtube_link : '#';
 		return $data;
 	}
 
 	public static function getWebsiteLink()
 	{
-		$settings = Settings::first();
+		$settings = self::getSettings();
 		$data = $settings->website ? $settings->website : 'https://projects.spaculus.live/3/wisdomAI/admin';
 		return $data;
 	}
@@ -306,7 +322,7 @@ class Common
 
 	public static function getDateFormateFromSettings()
 	{
-		$settings = Settings::first();
+		$settings = self::getSettings();
 		$format = $settings->date_format ? $settings->date_format : 'Y-m-d';
 		return $format;
 	}
@@ -323,7 +339,7 @@ class Common
 
 	public static function getDateAndSetFormateToDatepicker()
 	{
-		$settings = Settings::first();
+		$settings = self::getSettings();
 		$format = $settings->date_format ? $settings->date_format : 'Y-m-d';
 		$desiredformat = str_replace(
 			['d', 'm', 'y', 'Y'],
@@ -335,7 +351,7 @@ class Common
 
 	public static function getTimeFromSettings()
 	{
-		$settings = Settings::first();
+		$settings = self::getSettings();
 		$format = $settings->time_format ? $settings->time_format : '24';
 		return $format;
 	}
@@ -355,7 +371,7 @@ class Common
 
     public static function getTimeFromSettingsResort()
 	{
-		$settings = Settings::first();
+		$settings = self::getSettings();
 
 		$format = $settings->time_format ? $settings->time_format : '24';
 		return $format;
@@ -375,14 +391,14 @@ class Common
 
 	public static function getWebsiteHeaderLogo()
 	{
-		$settings = Settings::first();
+		$settings = self::getSettings();
 		$logo = $settings->header_logo ? url(config('settings.site_logo_folder'))."/".$settings->header_logo : url('front_assets/images/logo.svg');
 		return $logo;
 	}
 
 	public static function getWebsiteFooterLogo()
 	{
-		$settings = Settings::first();
+		$settings = self::getSettings();
 		$logo = $settings->footer_logo ? url(config('settings.site_logo_folder'))."/".$settings->footer_logo : url('files/logo.png');
 		return $logo;
 	}
@@ -414,7 +430,7 @@ class Common
 
 	public static function getAdminFavicon()
 	{
-		$settings = Settings::first();
+		$settings = self::getSettings();
 		$siteFavicon = $settings->site_favicon ? url(config('settings.site_favicon_folder'))."/".$settings->site_favicon : asset('admin_assets/images/favicon.png');
 		return $siteFavicon;
 	}
@@ -558,7 +574,7 @@ class Common
 
 	public static function cutString($string)
 	{
-		$settings = Settings::first();
+		$settings = self::getSettings();
 		$length = $settings->tour_title_length ? $settings->tour_title_length : 20;
 
 		if (strlen($string) > $length) {
@@ -571,7 +587,7 @@ class Common
 
 	public static function readMoreString($string, $rating_id)
 	{
-		$settings = Settings::first();
+		$settings = self::getSettings();
 		$length = $settings->review_length ? $settings->review_length : 50;
 
 		if (strlen($string) > $length) {
@@ -712,7 +728,7 @@ class Common
 
 	public static function getDateAndSetFormateToSql($date)
 	{
-		$settings = Settings::first();
+		$settings = self::getSettings();
 		$format = $settings->date_format ? $settings->date_format : 'Y-m-d';
 		$parsedDate = Carbon::createFromFormat($format, $date);
 		return $parsedDate->format('Y-m-d');
@@ -835,7 +851,7 @@ class Common
 
 	public static function getAuthorizedSignature()
 	{
-		$settings = Settings::first();
+		$settings = self::getSettings();
 		$authSign = $settings->auth_sign ? url(config('settings.auth_sign_folder'))."/".$settings->auth_sign : asset('front_assets/images/PowerLabs-logo.png');
 		return $authSign;
 	}
@@ -1669,8 +1685,11 @@ class Common
         // Shopkeeper-guard pages (e.g. the payments dashboard) render
         // employee photos via this same helper — neither resort-admin nor
         // api guard is ever authenticated there, so it always fell through
-        // to the default picture regardless of which id was passed.
-        $isResortContext = (Auth::guard('resort-admin')->check() && $prefixMatch) || Auth::guard('api')->check() || Auth::guard('shopkeeper')->check();
+        // to the default picture regardless of which id was passed. Same
+        // gap for a third-party clinic doctor (temp-clinic-doctor guard,
+        // never resolves through resort-admins/Employee) — every employee
+        // photo in the Clinic doctor mobile screens fell back to default.
+        $isResortContext = (Auth::guard('resort-admin')->check() && $prefixMatch) || Auth::guard('api')->check() || Auth::guard('shopkeeper')->check() || Auth::guard('temp-clinic-doctor')->check();
 
         if (!$isResortContext) {
             return $defaultPicture;
@@ -1747,7 +1766,7 @@ class Common
             // Ignore when route is not available
         }
         $prefixMatch = $routePrefix === 'resort' || $routePrefix === '/resort';
-        $isResortContext = (Auth::guard('resort-admin')->check() && $prefixMatch) || Auth::guard('api')->check() || Auth::guard('shopkeeper')->check();
+        $isResortContext = (Auth::guard('resort-admin')->check() && $prefixMatch) || Auth::guard('api')->check() || Auth::guard('shopkeeper')->check() || Auth::guard('temp-clinic-doctor')->check();
 
         $result = array_fill_keys($userIds, $defaultPicture);
         if (!$isResortContext) {
@@ -2791,12 +2810,35 @@ class Common
 					$vacancy->applicationUrlshow = substr($applicant_link_base, 0, 30) . '...';
 
 					// Generate other links
-					$vacancy->JobAdvertisement = URL::asset(config('settings.Resort_JobAdvertisement') . '/' . Auth::guard('resort-admin')->user()->resort->resort_id . "/" . $vacancy->Jobadvimg);
-					// All job advertisement images for this resort
-					$allJobAds = JobAdvertisement::where('Resort_id', $resort_id)->get();
-					$vacancy->allJobAdImages = $allJobAds->map(function($ad) use ($resort_id) {
-						return URL::asset(config('settings.Resort_JobAdvertisement') . '/' . $resort_id . '/' . $ad->Jobadvimg);
+					// Was building a URL straight from $vacancy->Jobadvimg (often
+					// empty — most vacancies have no per-vacancy override), which
+					// 404'd whenever there was no override. Separately,
+					// allJobAdImages pulled EVERY JobAdvertisement row for the
+					// whole resort with no vacancy_id scoping at all, so the
+					// carousel mixed in every OTHER position's poster too —
+					// fixed by scoping to this vacancy's own poster(s) plus the
+					// resort-wide defaults (vacancy_id IS NULL) a resort can
+					// upload more than one of, which is the actual multi-poster
+					// picker this carousel is for.
+					$posterRows = JobAdvertisement::where('Resort_id', $resort_id)
+						->where(function($q) use ($vacancy) {
+							$q->where('vacancy_id', $vacancy->V_id)->orWhereNull('vacancy_id');
+						})
+						->get();
+					$posterUrls = $posterRows->map(function($ad) use ($resort_id) {
+						return self::GetJobAdvertisementImage($resort_id, $ad->Jobadvimg ?? null);
 					})->values()->toArray();
+					// Raw filenames in the same order as allJobAdImages — the modal's
+					// "pick a poster and submit" flow needs the actual filename to
+					// save, not the resolved (and for Wasabi, presigned/expiring) URL.
+					$posterFiles = $posterRows->pluck('Jobadvimg')->values()->toArray();
+					if (empty($posterUrls)) {
+						$posterUrls = [self::GetJobAdvertisementImage($resort_id, null)];
+						$posterFiles = [null];
+					}
+					$vacancy->JobAdvertisement = $posterUrls[0];
+					$vacancy->allJobAdImages = $posterUrls;
+					$vacancy->allJobAdImageFiles = $posterFiles;
 					$vacancy->profileImg = URL::asset($vacancy->passport_photo);
 					$vacancy->ApplicationStatus = $vacancy->ApplicationStatus == null ? " " : $vacancy->ApplicationStatus;
 					$vacancy->As_ApprovedBy = $vacancy->As_ApprovedBy == null ? 25 : $vacancy->As_ApprovedBy;
@@ -3677,6 +3719,10 @@ class Common
                             'from_date' => $row->from_date,
                             'to_date' => $row->to_date,
                             'total_days' => $row->total_days ?? null,
+                            // The query above only ever selects rows where
+                            // el.status = 'Approved', so this is the only
+                            // value a row reaching this point can have.
+                            'status' => 'Approved',
                         ]],
                         'LeaveFirstName' => substr($row->leave_type ?? 'On Leave', 0, 1),
                         'LeaveColor' => $row->color ?? '',
@@ -4445,6 +4491,39 @@ class Common
     }
 
     /**
+     * Returns the employee IDs in a resort that should receive L&D Manager
+     * notifications: anyone whose position title matches a known L&D Manager
+     * title, plus everyone in the L&D department. Mirrors getResortHrEmployeeIds()
+     * and EnsureLDManagerAccess's own access check — used to fan out
+     * feedback/evaluation submission alerts to L&D leadership.
+     */
+    public static function getResortLdManagerEmployeeIds($resortId)
+    {
+        $ldDeptIds = \App\Models\ResortDepartment::where('resort_id', $resortId)
+            ->pluck('id')
+            ->filter(fn($id) => self::isLDDepartment($id))
+            ->all();
+
+        $ldManagerTitles = ['Training Director', 'L&D Manager', 'Learning & Development Head'];
+
+        return \App\Models\Employee::where('resort_id', $resortId)
+            ->where(function ($q) use ($ldDeptIds, $ldManagerTitles) {
+                $q->whereHas('position', function ($qq) use ($ldManagerTitles) {
+                    $qq->whereIn('position_title', $ldManagerTitles);
+                });
+                if (!empty($ldDeptIds)) {
+                    $q->orWhereIn('Dept_id', $ldDeptIds);
+                }
+            })
+            ->where(function ($q) {
+                $q->whereNull('status')->orWhere('status', 'Active')->orWhere('status', 'Probationary');
+            })
+            ->pluck('id')
+            ->map(fn($v) => (int) $v)
+            ->all();
+    }
+
+    /**
      * Active employees in the resort's Finance / Accounting department(s).
      * Used to notify Finance of visa payment requests (they handle the actual
      * payments). Department matching reuses the same aliases as
@@ -5018,19 +5097,90 @@ class Common
      * getEmpGrade() alone is still correct for position-only lookups where
      * no specific employee exists yet.
      */
-    public static function resolveEmpGrade($resortId, $rank, $benefitGridLevel = null)
+    // Precedence: employee's own override > position's own grade > rank
+    // default. $positionId is optional and backward-compatible — omitted
+    // (the overwhelming majority of existing call sites), this behaves
+    // exactly as before (employee override, else rank default). Only
+    // callers that pass it get the new per-position layer, so two
+    // positions sharing one rank (e.g. Finance Director and Finance
+    // Manager, both rank HOD) can sit on different grades.
+    public static function resolveEmpGrade($resortId, $rank, $benefitGridLevel = null, $positionId = null)
     {
         if (!empty($benefitGridLevel)) {
             $stillValid = \App\Models\ResortBenefitGradeLevel::where('id', $benefitGridLevel)
                 ->where('resort_id', $resortId)
                 ->where('status', 'active')
                 ->exists();
-            if ($stillValid) {
+
+            // Guards against the 2026_04_22_030000_backfill_employee_benefit_grid_level
+            // artifact: that one-time migration wrote the employee's raw
+            // rank NUMBER straight into benefit_grid_level for any employee
+            // who had it empty, before this grade-level system existed. No
+            // UI flow lets a human pick a grade level by typing a bare rank
+            // number (it's always chosen by name), so a value that still
+            // exactly equals the employee's own rank — while the resort has
+            // since mapped that SAME rank to a genuinely different grade
+            // level via Benefit Grade Levels > Map Ranks — can only be that
+            // stale backfill artifact, silently overriding the intended
+            // rank default (this broke OT eligibility for a batch of
+            // rank-6 employees whose value coincidentally still matched a
+            // real, active "GM" grade after the resort remapped rank 6 to
+            // "LINE WORKERS"). Treat it as untrustworthy and fall through
+            // to the rank/position default instead of trusting it forever.
+            $looksLikeStaleRankBackfill = $stillValid
+                && (string) $benefitGridLevel === (string) (int) $rank
+                && \App\Models\ResortBenefitGradeLevelRank::where('resort_id', $resortId)
+                    ->where('rank', (int) $rank)
+                    ->where('grade_level_id', '!=', $benefitGridLevel)
+                    ->exists();
+
+            if ($stillValid && !$looksLikeStaleRankBackfill) {
                 return $benefitGridLevel;
             }
         }
 
+        if (!empty($positionId)) {
+            $positionGrade = \App\Models\ResortPosition::where('id', $positionId)
+                ->where('resort_id', $resortId)
+                ->value('benefit_grid_level');
+            if (!empty($positionGrade)) {
+                $stillValid = \App\Models\ResortBenefitGradeLevel::where('id', $positionGrade)
+                    ->where('resort_id', $resortId)
+                    ->where('status', 'active')
+                    ->exists();
+                if ($stillValid) {
+                    return $positionGrade;
+                }
+            }
+        }
+
         return self::getEmpGrade($resortId, $rank);
+    }
+
+    /**
+     * The Benefit Grid's Salary Paid In is the authoritative source for
+     * which currency an employee's basic_salary is actually paid/displayed
+     * in — not a value copied onto employees.basic_salary_currency at one
+     * point in time (which only ever synced once, at grid-assignment time,
+     * and only when basic_salary was previously unset, so it could go
+     * stale the moment the grid changed or was assigned after a salary
+     * already existed). Always resolves the employee's CURRENT grid live,
+     * so a grid edit takes effect everywhere immediately with nothing to
+     * keep in sync. Falls back to 'USD' if no active grid resolves.
+     */
+    public static function resolveEmpSalaryCurrency($resortId, $rank, $benefitGridLevel = null)
+    {
+        $empGrade = self::resolveEmpGrade($resortId, $rank, $benefitGridLevel);
+        if (!$empGrade) {
+            return 'USD';
+        }
+
+        $salaryPaidIn = \App\Models\ResortBenifitGrid::where('resort_id', $resortId)
+            ->where('emp_grade', $empGrade)
+            ->where('status', 'Active')
+            ->value('salary_paid_in');
+
+        return $salaryPaidIn ?: 'USD';
     }
 
     /**
@@ -7658,6 +7808,17 @@ class Common
         $tempPdfPath = null;
         $fullImagePath = null;
 
+        // A file rejected by php.ini's upload_max_filesize (silently,
+        // before Laravel/Symfony even see it) or otherwise invalid leaves
+        // an UploadedFile whose temp path is empty/unreadable —
+        // file_get_contents() on that resolves to the CWD and blows up
+        // with a confusing "Is a directory" error instead of a clean one.
+        // This is the shared upload path for every module's attachments,
+        // so guard it here once rather than per caller.
+        if (!$file || !$file->isValid()) {
+            return ['status' => false, 'msg' => 'Invalid or missing file upload — it may exceed the server\'s upload size limit.'];
+        }
+
         try {
             // Backfill folder row + placeholder for employees who pre-date the file-management feature.
             $File_structure = FilemangementSystem::firstOrCreate(
@@ -7908,14 +8069,23 @@ class Common
             return null;
         }
 
-        $decoded = json_decode($value, true);
-        if (is_array($decoded) && !empty($decoded['Child_id'])) {
-            $aws = self::GetAWSFile($decoded['Child_id'], $resortId);
-            return $aws['success'] ? $aws['NewURLshow'] : null;
-        }
+        // GetAWSFile() throws a raw \Exception on corrupted/undecryptable
+        // stored data — with 5+ call sites across the app (dashboard cards,
+        // list views), one bad attachment on one request among many would
+        // otherwise 500 the entire response instead of just that one image.
+        try {
+            $decoded = json_decode($value, true);
+            if (is_array($decoded) && !empty($decoded['Child_id'])) {
+                $aws = self::GetAWSFile($decoded['Child_id'], $resortId);
+                return $aws['success'] ? $aws['NewURLshow'] : null;
+            }
 
-        $path_path = config('settings.MaintanceRequest') . '/' . $resortId;
-        return StorageHelper::temporaryUrl($path_path . '/' . $value);
+            $path_path = config('settings.MaintanceRequest') . '/' . $resortId;
+            return StorageHelper::temporaryUrl($path_path . '/' . $value);
+        } catch (\Throwable $e) {
+            \Log::warning('resolveMaintenanceAttachmentUrl failed: ' . $e->getMessage());
+            return null;
+        }
     }
 
     /**
@@ -8752,6 +8922,27 @@ class Common
                     'android' => [
                         'priority' => 'high',
                     ],
+                    // No apns block at all — FCM will best-effort translate
+                    // the bare 'notification' key into an APNs alert, but
+                    // without an explicit aps.sound and apns-priority this
+                    // is unreliable (silent delivery, no sound, sometimes no
+                    // banner depending on app/OS state). This was likely the
+                    // real reason "no push notifications arrive on iOS"
+                    // while Android worked for the same call.
+                    'apns' => [
+                        'headers' => [
+                            'apns-priority' => '10',
+                        ],
+                        'payload' => [
+                            'aps' => [
+                                'alert' => [
+                                    'title' => $title,
+                                    'body'  => $body,
+                                ],
+                                'sound' => 'default',
+                            ],
+                        ],
+                    ],
                     'data' => [
                         'title'  => $title,
                         'module' => $module,
@@ -8800,6 +8991,25 @@ class Common
             if ($http_code !== 200) {
                 $errorMsg = isset($response_arr['error']['message']) ? $response_arr['error']['message'] : $response;
                 \Log::error('FCM Error: ' . $errorMsg);
+
+                // FCM confirming NotRegistered/InvalidRegistration means this
+                // token is permanently dead (app uninstalled/reinstalled,
+                // logged out) — every future push to whichever employee owns
+                // it, from ANY module, would keep silently failing forever
+                // otherwise. Prune it now. Wrapped defensively so a lookup
+                // failure here never breaks sending to the other tokens in
+                // this same batch.
+                if (in_array($errorMsg, ['NotRegistered', 'InvalidRegistration'], true)) {
+                    try {
+                        \App\Models\Employee::where('device_token', $deviceToken)
+                            ->orWhereJsonContains('device_token', $deviceToken)
+                            ->get()
+                            ->each(fn ($emp) => self::removeDeviceToken($emp, $deviceToken));
+                    } catch (\Throwable $e) {
+                        \Log::warning('Failed to prune dead FCM token: ' . $e->getMessage());
+                    }
+                }
+
                 $responses[] = [
                     'deviceToken' => $deviceToken,
                     'status' => false,
@@ -8835,6 +9045,110 @@ class Common
         ], 200);
     }
 
+    /**
+     * Sends a real FCM test push to every device token registered against
+     * every active employee at $resortId and returns a single normalized
+     * result shape. Shared by the mobile test-push API endpoint
+     * (ProfileController::testPushNotification) and the web-side one
+     * (ResortAllNotificationController), so both call sites agree on what
+     * "success" means and neither has to know that
+     * sendPushNotificationForMobile() returns a plain array on one failure
+     * path (FCM auth token unavailable) but a full JsonResponse object on
+     * its normal path — that inconsistency is normalized here, once.
+     */
+    public static function sendTestPushToResort($resortId): array
+    {
+        $tokens = \App\Models\Employee::where('resort_id', $resortId)
+            ->where(function ($q) {
+                $q->whereNull('status')->orWhere('status', 'Active')->orWhere('status', 'Probationary');
+            })
+            ->whereNotNull('device_token')
+            ->pluck('device_token')
+            ->flatMap(fn ($raw) => self::decodeDeviceTokens($raw))
+            ->unique()
+            ->values()
+            ->all();
+
+        if (empty($tokens)) {
+            return [
+                'success' => false,
+                'message' => 'No device tokens registered for this resort — at least one employee needs to have logged into the app first.',
+                'device_count' => 0,
+                'success_count' => 0,
+                'results' => [],
+            ];
+        }
+
+        // FCMTokenPushNotification() (the real send path) returns null for
+        // ALL THREE of these causes indistinguishably and only logs which
+        // one to storage/logs/laravel.log — not much use to whoever's
+        // sitting at this test endpoint without server/log access. Check
+        // the same three things here, up front, so the response itself
+        // says which one it is.
+        $missingCreds = array_filter([
+            'FCM_PROJECT_ID' => empty(config('services.fcm.project_id')),
+            'FCM_SERVICE_ACCOUNT_EMAIL' => empty(config('services.fcm.service_account_email')),
+            'FCM_PRIVATE_KEY' => empty(config('services.fcm.private_key')),
+        ]);
+        if (!empty($missingCreds)) {
+            return [
+                'success' => false,
+                'message' => 'FCM credentials missing from config/env: ' . implode(', ', array_keys($missingCreds))
+                    . '. Set these in the server .env, then (if config is cached) run `php artisan config:clear`.',
+                'device_count' => count($tokens),
+                'success_count' => 0,
+                'results' => [],
+            ];
+        }
+
+        $raw = self::sendPushNotificationForMobile(
+            $tokens,
+            'Test Push Notification',
+            'If you can see this, push notifications are working.',
+            'Test',
+            null,
+            null,
+            null,
+            null
+        );
+
+        $results = $raw instanceof \Illuminate\Http\JsonResponse
+            ? ($raw->getData(true)['response'] ?? [])
+            : (array) $raw;
+
+        // All three credentials are present but the send still failed with
+        // "FCM auth token unavailable" — narrow it down further: either the
+        // private key is malformed (openssl_sign() failed) or Google
+        // rejected the resulting JWT/OAuth request. Neither is checkable
+        // without actually attempting the signed request, which
+        // FCMTokenPushNotification() already just did (inside
+        // sendPushNotificationForMobile() above) — point at the log line
+        // it wrote instead of guessing further here.
+        $authUnavailable = collect($results)->contains(fn ($r) => ($r['message'] ?? '') === 'FCM auth token unavailable, see log for cause');
+        if ($authUnavailable) {
+            return [
+                'success' => false,
+                'message' => 'FCM credentials are present in config, but requesting an FCM auth token still failed — check storage/logs/laravel.log '
+                    . 'on this server for "FCM JWT signing failed" (malformed FCM_PRIVATE_KEY) or "FCM OAuth token request failed" (Google rejected the request — '
+                    . 'check the logged response for the exact reason, e.g. wrong project_id/service_account_email or a revoked key).',
+                'device_count' => count($tokens),
+                'success_count' => 0,
+                'results' => $results,
+            ];
+        }
+
+        $successCount = collect($results)->filter(fn ($r) => ($r['status'] ?? false) === true)->count();
+
+        return [
+            'success' => $successCount > 0,
+            'message' => $successCount > 0
+                ? "Push sent to {$successCount}/" . count($tokens) . ' device(s) — check those devices for the test notification.'
+                : 'Push send failed for every device — see results for the reason (FCM credentials, invalid/stale tokens, etc).',
+            'device_count' => count($tokens),
+            'success_count' => $successCount,
+            'results' => $results,
+        ];
+    }
 
     /**
      * Department head resolution — rank 2 (HOD) first, falls back to rank 1
@@ -8854,6 +9168,65 @@ class Common
             return $emp;
         }
         return Employee::where('resort_id',$resort_id)->where('Dept_id',$department_id)->where("rank",1)->where('status','Active')->first();
+    }
+
+    /**
+     * Valid "Reporting Manager" candidates for the Reporting Person dropdown
+     * (Employee create + Employment Data edit + Visa document wizard).
+     * Scopes by rank per the hierarchy: GM has none, EXCOM reports only to
+     * GM (resort-wide, no dept filter — same pattern as the GM lookup in
+     * Leave approval), HOD reports to GM or their own dept's EXCOM, everyone
+     * else reports to HOD/EXCOM/MGR/SUP within their own department.
+     */
+    public static function getValidReportingManagers($resort_id, $employeeRank, $deptId, $excludeEmployeeId = null)
+    {
+        $rank = (string) $employeeRank;
+
+        if ($rank === '8') {
+            return collect();
+        }
+
+        if ($rank === '1') {
+            $targetRanks = ['8'];
+            $scopeToDept = false;
+        } elseif ($rank === '2') {
+            $targetRanks = ['8', '1'];
+            $scopeToDept = 'excom_only';
+        } else {
+            $targetRanks = ['2', '1', '4', '5'];
+            $scopeToDept = true;
+        }
+
+        $query = DB::table('employees')
+            ->join('resort_admins', 'employees.Admin_Parent_id', '=', 'resort_admins.id')
+            ->where('employees.resort_id', $resort_id)
+            ->where('employees.status', '!=', 'Inactive')
+            ->whereIn('employees.rank', $targetRanks);
+
+        if ($scopeToDept === true) {
+            $query->where('employees.Dept_id', $deptId);
+        } elseif ($scopeToDept === 'excom_only') {
+            $query->where(function ($q) use ($deptId) {
+                $q->where('employees.rank', '8')
+                  ->orWhere(function ($q2) use ($deptId) {
+                      $q2->where('employees.rank', '1')->where('employees.Dept_id', $deptId);
+                  });
+            });
+        }
+
+        if ($excludeEmployeeId) {
+            $query->where('employees.id', '!=', $excludeEmployeeId);
+        }
+
+        return $query->select(
+                'employees.*',
+                'resort_admins.first_name as first_name',
+                'resort_admins.last_name as last_name',
+                'resort_admins.email as admin_email'
+            )
+            ->orderBy('employees.rank', 'asc')
+            ->orderBy('resort_admins.first_name', 'asc')
+            ->get();
     }
 
     /**
@@ -9155,35 +9528,21 @@ class Common
 
             $basePath = $main_folder . '/public/talent_acquisition/' . base64_encode($vacancy_id);
 
-            $driver = config('filesystems.default', 'local');
-            $uploadedToS3 = false;
-
-            if ($driver === 's3') {
-                try {
-                    $s3 = StorageHelper::disk();
-
-                    $folderExists = $s3->exists($basePath . '/.gitkeep');
-                    if (!$folderExists) {
-                        $s3->put($basePath . '/.gitkeep', '');
-                    }
-
-                    $filePath = $basePath . '/' . $newFileName;
-                    $s3->put($filePath, file_get_contents($uploadedFile->getRealPath()));
-                    $uploadedToS3 = true;
-                } catch (\Exception $e) {
-                    \Log::warning('S3 upload failed, falling back to local storage: ' . $e->getMessage());
-                }
-            }
-
-            if (!$uploadedToS3) {
-                $localPath = 'talent_acquisition/' . base64_encode($vacancy_id);
-                $fullDir = public_path($localPath);
-                if (!file_exists($fullDir)) {
-                    mkdir($fullDir, 0755, true);
-                }
-                $uploadedFile->move($fullDir, $newFileName);
-                $filePath = $localPath . '/' . $newFileName;
-            }
+            // Was: picked the disk off config('filesystems.default')
+            // (FILESYSTEM_DRIVER) with a raw public_path()/move() local
+            // fallback whenever that wasn't exactly 's3' — a DIFFERENT env
+            // var than Common::GetApplicantAWSFile() (the download/render
+            // side) uses to pick a disk (settings.storage_driver /
+            // STORAGE_DRIVER). Once the two env vars diverged in prod
+            // (FILESYSTEM_DRIVER=local, STORAGE_DRIVER=wasabi), every
+            // upload silently landed on local disk while every download
+            // looked on Wasabi — "File Not Found!" and the applicant photo
+            // placeholder, and dead after any redeploy/restart wipes that
+            // local file. StorageHelper::disk() resolves from the SAME
+            // config as the download side, so upload and download always
+            // agree on where the file actually lives.
+            $filePath = $basePath . '/' . $newFileName;
+            StorageHelper::disk()->put($filePath, file_get_contents($uploadedFile->getRealPath()));
 
             $data['status'] = true;
             $data['path'] = $filePath;

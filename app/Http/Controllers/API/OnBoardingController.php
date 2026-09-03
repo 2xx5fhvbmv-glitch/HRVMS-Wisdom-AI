@@ -19,6 +19,7 @@ use App\Models\EmployeeOnboardingAcknowledgements;
 use App\Models\CulturalInsights;
 use App\Models\Employee;
 use App\Models\ChildFileManagement;
+use App\Models\FilemangementSystem;
 use App\Models\FacilityTourCategories;
 use App\Models\FacilityTourImages;
 use App\Models\JobDescription;
@@ -120,8 +121,15 @@ class OnBoardingController extends Controller
             $EmployeeItineraries->key_contacts              =   $this->resolveKeyContacts($employee);
 
             $EmployeeItineraries->cultural_insights         =   $CulturalInsights ? $CulturalInsights->cultural_insights : '';
-            $EmployeeItineraries->itinerary_template        =   $ItineraryTemplate;  
-            $EmployeeItineraries->meeting_schedule          =   $meetingSchedule;  
+            $EmployeeItineraries->itinerary_template        =   $ItineraryTemplate;
+            $EmployeeItineraries->meeting_schedule          =   $meetingSchedule;
+            // entry_pass_file/flight_ticket_file/domestic_flight_ticket
+            // came through as raw child_file_management ids — never
+            // resolved to an actual downloadable URL. The resolver
+            // already exists and is wired into 3 sibling endpoints
+            // (culturalInsights, AssignedStaffDashboard, itineraryTimeline)
+            // but was never called from this, the main dashboard.
+            $EmployeeItineraries->download_all               =   $this->resolveItineraryDownloads($EmployeeItineraries);
             // $EmployeeItineraries->facility_tour_categories_image  =   $FacilityTourCategories;  
 
             return response()->json([
@@ -453,52 +461,51 @@ class OnBoardingController extends Controller
                     $pickUpViewSelfieImage              =   asset('/' . $dynamic_path . '/' . $user->selfie_image);
                 }
 
-                if ($itinerary->arrival_date >= $today) {
-                    // Pickup Task
+                // Pickup Task — was gated on arrival_date >= today, so a
+                // still-Pending (never actioned) task whose date had simply
+                // passed vanished from "Assigned Tasks" entirely instead of
+                // showing as overdue. pickup_status/medical_escort_status
+                // already track real completion state; the date only
+                // decides whether a task ALSO counts as "upcoming" (this
+                // week), not whether it's assigned at all.
+                if ($itinerary->pickup_employee_id == $employee->id) {
+                    $pickupTask                         =   [
+                        'itinerary_id'                  =>  $itinerary->id,
+                        'task_type'                     =>  'pickup',
+                        'status'                        =>  $itinerary->pickup_status,
+                        'type'                          =>  'Pick up at the Airport',
+                        'name'                          =>  $name,
+                        'profile_picture'               =>  $profile_picture,
+                        'date'                          =>  $itinerary->arrival_date,
+                        'time'                          =>  $itinerary->arrival_time,
+                        'view_selfie'                   =>  $pickUpViewSelfieImage,
+                        'download_pdf'                  =>  $this->resolveItineraryDownloads($itinerary),
+                    ];
+                    $tasks[]                            =   $pickupTask;
 
-                    if ($itinerary->pickup_employee_id == $employee->id) {
-                        $pickupTask                         =   [
-                            'itinerary_id'                  =>  $itinerary->id,
-                            'task_type'                     =>  'pickup',
-                            'status'                        =>  $itinerary->pickup_status,
-                            'type'                          =>  'Pick up at the Airport',
-                            'name'                          =>  $name,
-                            'profile_picture'               =>  $profile_picture,
-                            'date'                          =>  $itinerary->arrival_date,
-                            'time'                          =>  $itinerary->arrival_time,
-                            'view_selfie'                   =>  $pickUpViewSelfieImage,
-                            'download_pdf'                  =>  $this->resolveItineraryDownloads($itinerary),
-                        ];
-                        $tasks[]                            =   $pickupTask;
-
-                        // Check if within upcoming week range
-                        if ($itinerary->arrival_date >= $today && $itinerary->arrival_date <= $endOfWeek) {
-                            $upcoming_tasks[]                =   $pickupTask;
-                        }
+                    // Check if within upcoming week range
+                    if ($itinerary->arrival_date >= $today && $itinerary->arrival_date <= $endOfWeek) {
+                        $upcoming_tasks[]                =   $pickupTask;
                     }
                 }
 
-                // Upcoming Medical Escort Task
-                if ($itinerary->medical_date >= $today)
-                {
-                    // Medical Escort Task
-                    if ($itinerary->accompany_medical_employee_id == $employee->id) {
-                        $medicalTask = [
-                            'itinerary_id'                  =>  $itinerary->id,
-                            'task_type'                     =>  'medical',
-                            'status'                        =>  $itinerary->medical_escort_status,
-                            'type'                          =>  $itinerary->medical_center_name.' To Medical Center',
-                            'name'                          =>  $name,
-                            'profile_picture'               =>  $profile_picture,
-                            'date'                          =>  $itinerary->medical_date,
-                            'time'                          =>  $itinerary->approx_time,
-                            'location'                      =>  $itinerary->medical_center_name,
-                        ];
-                        $tasks[]                            =   $medicalTask;
-                        
-                        if ($itinerary->medical_date >= $today && $itinerary->medical_date <= $endOfWeek) {
-                            $upcoming_tasks[]                =   $medicalTask;
-                        }
+                // Medical Escort Task — same fix as pickup above.
+                if ($itinerary->accompany_medical_employee_id == $employee->id) {
+                    $medicalTask = [
+                        'itinerary_id'                  =>  $itinerary->id,
+                        'task_type'                     =>  'medical',
+                        'status'                        =>  $itinerary->medical_escort_status,
+                        'type'                          =>  $itinerary->medical_center_name.' To Medical Center',
+                        'name'                          =>  $name,
+                        'profile_picture'               =>  $profile_picture,
+                        'date'                          =>  $itinerary->medical_date,
+                        'time'                          =>  $itinerary->approx_time,
+                        'location'                      =>  $itinerary->medical_center_name,
+                    ];
+                    $tasks[]                            =   $medicalTask;
+
+                    if ($itinerary->medical_date >= $today && $itinerary->medical_date <= $endOfWeek) {
+                        $upcoming_tasks[]                =   $medicalTask;
                     }
                 }
             }
@@ -1086,7 +1093,6 @@ class OnBoardingController extends Controller
      * written yet instead of opening to a blank screen.
      */
     private const HANDBOOK_CATEGORIES = [
-        'code_of_conduct'             => 'Code of Conduct',
         'non_discrimination'         => 'Non-Discrimination Policy',
         'harassment_prevention'      => 'Harassment Prevention',
         'job_roles_responsibilities' => 'Job Roles & Responsibilities',
@@ -1120,10 +1126,37 @@ class OnBoardingController extends Controller
                 ];
             }
 
+            // Employee Handbook now also surfaces real uploaded documents
+            // instead of only free-text categories — HR manages this via
+            // a resort-wide File Management folder named exactly "Employee
+            // Handbook" (Folder_Type=uncategorized, same convention as the
+            // existing facilityTourCategory folder), matched by name since
+            // there's no dedicated "handbook folder" concept in the schema.
+            $handbookFolder = FilemangementSystem::where('resort_id', $this->resort_id)
+                ->where('Folder_Type', 'uncategorized')
+                ->where('Folder_Name', 'Employee Handbook')
+                ->first();
+
+            $handbookFiles = $handbookFolder
+                ? ChildFileManagement::where('Parent_File_ID', $handbookFolder->id)
+                    ->where('resort_id', $this->resort_id)
+                    ->orderByDesc('id')
+                    ->get()
+                    ->map(function ($file) {
+                        $aws = Common::GetAWSFile($file->id, $this->resort_id);
+                        return [
+                            'id'   => $file->id,
+                            'name' => $file->NewFileName ?: $file->File_Name,
+                            'url'  => !empty($aws['success']) ? $aws['NewURLshow'] : null,
+                        ];
+                    })->values()
+                : collect();
+
             return response()->json([
                 'success' => true,
                 'message' => 'Employee handbook categories retrieved successfully.',
                 'data'    => $list,
+                'handbook_files' => $handbookFiles,
             ], 200);
         } catch (\Exception $e) {
             \Log::emergency("File: " . $e->getFile());

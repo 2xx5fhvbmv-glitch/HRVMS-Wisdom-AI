@@ -250,6 +250,9 @@
                         type: "delete",
                         url: url,
                         dataType: "json",
+                        data: {
+                            "_token": "{{ csrf_token() }}"
+                        },
                     }).done(function(response) {
                         if (response.success) {
                             toastr.success(response.msg, "Success", {

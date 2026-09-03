@@ -44,7 +44,21 @@ class Kernel extends HttpKernel
             // \Laravel\Sanctum\Http\Middleware\EnsureFrontendRequestsAreStateful::class,
            // 'throttle:api',
            \Illuminate\Session\Middleware\StartSession::class,
-            'throttle:60,1',
+            // Single shared bucket across the ENTIRE mobile API surface —
+            // every screen's calls count against the same counter, not
+            // just the one that happens to trip it. A single data-dense
+            // screen load (onboarding acknowledgement's several
+            // view-files calls, a dashboard firing off multiple aggregate
+            // endpoints at once, pull-to-refresh) burns through 60/min
+            // fast. Raised to 180/min; still a real ceiling, just sized
+            // for how this app's screens actually behave.
+            //
+            // 'throttle:180,1' keyed on $request->ip() (it ran before any
+            // auth middleware, so no user was resolved yet) — every
+            // employee on the same resort's shared/NAT'd WiFi drew from ONE
+            // bucket collectively. Named limiter below keys by the
+            // authenticated employee instead (see RouteServiceProvider).
+            'throttle:mobile-api',
             \Illuminate\Routing\Middleware\SubstituteBindings::class,
         ],
     ];

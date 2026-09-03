@@ -142,7 +142,14 @@
             {data: 'status', name: 'status'},
             {data: 'rank_status', name: 'rank_status'},
             {data: 'action', name: 'action', orderable: false, searchable: false},
-            { data: 'created_at', visible: false, searchable: false },
+            {{-- PayrollAdvance::getCreatedAtAttribute() returns a
+                 pre-formatted display string (d/m/Y H:i), not a raw
+                 datetime — sorting by it compared that string lexically,
+                 not chronologically (e.g. "05/08/2026" sorted before
+                 "30/07/2026" as text, even though 30 Jul is earlier).
+                 id is monotonic with real creation order and has no
+                 accessor to trip over. --}}
+            { data: 'id', visible: false, searchable: false },
             ],
             columnDefs: [
                 { width: '5%', targets: 0 }, // Action column

@@ -1967,6 +1967,7 @@
                         $('#entitle_public_holiday_overtime').prop('checked', res.holiday_overtime === 'yes');
                         $('#entitle_overtime').prop('checked', res.overtime === 'yes');
                         $('#position_rank').val(res.position_rank);
+                        getReportingPerson($('#department').val(), res.position_rank);
                         $('#benefit_grid_level').html(html).trigger('change');
                     },
                     error: function(xhr) { console.error('getBenefitGridByPosition failed', xhr.status, xhr.responseText); }
@@ -2017,11 +2018,11 @@
         });
     }
 
-     function getReportingPerson(departmentId) {
+     function getReportingPerson(departmentId, rank) {
             $.ajax({
             url: '{{ route("people.getReportingPerson") }}',
             type: 'GET',
-            data: { department_id: departmentId },
+            data: { department_id: departmentId, rank: rank || '' },
             success: function(res) {
                 let html = '<option></option>';
                 $.each(res.data, function(_, person) {

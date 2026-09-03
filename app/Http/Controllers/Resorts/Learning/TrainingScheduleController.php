@@ -15,6 +15,10 @@ use App\Models\LearningRequestEmployee;
 use App\Models\LearningCalendarSession;
 use App\Models\TrainingParticipant;
 use App\Models\TrainingSchedule;
+use App\Models\TrainingFeedbackForm;
+use App\Models\TrainingFeedbackResponse;
+use App\Models\EvaluationForm;
+use App\Models\EvaluationFormResponse;
 use App\Events\ResortNotificationEvent;
 use Illuminate\Support\Facades\Validator;
 use DB;
@@ -751,14 +755,14 @@ class TrainingScheduleController extends Controller
 
     public function feedbackformAssignParticipant(Request $request)
     {
-        if (!$this->user) {
+        if (!$this->resort) {
             return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
         }
 
         $validator = Validator::make($request->all(), [
             'training_schedule_id'      => 'required',
             'feedback_form_id'          => 'required',
-           
+
         ]);
 
         if ($validator->fails()) {
@@ -766,15 +770,24 @@ class TrainingScheduleController extends Controller
         }
 
         try {
-               
+
                 $feedbackFormId                         =   $request->feedback_form_id;
                 $scheduleId                             =   $request->training_schedule_id;
-                $resort_id                              =   $this->resort_id;
-                
+                $resort_id                              =   $this->resort->resort_id;
+
+                // Was matching training_schedules.training_id (the linked
+                // LearningProgram's id) against a value named
+                // training_schedule_id — this method was dead code (unroutable
+                // due to the $this->resort_id/$this->user bugs above) so this
+                // never actually ran against real callers; the field name
+                // makes clear it should match the schedule's own id.
                 $trainingSchedule                    =   TrainingSchedule::with(['learningProgram', 'participants'])
                                                                 ->where('training_schedules.resort_id', $resort_id)
-                                                                ->where('training_schedules.training_id', $scheduleId)
+                                                                ->where('training_schedules.id', $scheduleId)
                                                                 ->first();
+                if (!$trainingSchedule) {
+                    return response()->json(['success' => false, 'message' => 'Training schedule not found.'], 404);
+                }
                 $result  = '';
                 foreach ($trainingSchedule->participants as $key => $value) {
 
@@ -821,6 +834,194 @@ class TrainingScheduleController extends Controller
             return response()->json(['success' => false, 'message' => 'Server error'], 500);
         }
     }
-    
+
+    /**
+     * Structural mirror of feedbackformAssignParticipant() for evaluation
+     * forms — see that method's history for why the resort/id-lookup and
+     * guard checks are written this way.
+     */
+    public function evaluationformAssignParticipant(Request $request)
+    {
+        if (!$this->resort) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'training_schedule_id'      => 'required',
+            'evaluation_form_id'        => 'required',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
+        }
+
+        try {
+                $evaluationFormId                       =   $request->evaluation_form_id;
+                $scheduleId                              =   $request->training_schedule_id;
+                $resort_id                               =   $this->resort->resort_id;
+
+                $trainingSchedule                        =   TrainingSchedule::with(['learningProgram', 'participants'])
+                                                                ->where('training_schedules.resort_id', $resort_id)
+                                                                ->where('training_schedules.id', $scheduleId)
+                                                                ->first();
+                if (!$trainingSchedule) {
+                    return response()->json(['success' => false, 'message' => 'Training schedule not found.'], 404);
+                }
+
+                foreach ($trainingSchedule->participants as $value) {
+
+                    $participant                        =   TrainingParticipant::where('training_schedule_id', $value->training_schedule_id)
+                                                                ->where('employee_id', $value->employee_id)
+                                                                ->first();
+
+                    if ($participant && $participant->train_evaluation_form_id === null) {
+
+                        $participant->train_evaluation_form_id = $evaluationFormId;
+                        $participant->save();
+
+                        Common::sendMobileNotification(
+                            $resort_id,
+                            2,
+                            $evaluationFormId,
+                            $value->training_schedule_id,
+                            'Learning Evaluation Form',
+                            'You have a new evaluation form to complete.',
+                            'Learning',
+                            [$value->employee_id],
+                            $participant->id,
+                            false,
+                            'training-evaluation-form-assigned',
+                        );
+                    }
+                }
+
+            return response()->json(['success' => true, 'message' => 'Evaluation form sent successfully'], 200);
+
+        } catch (\Exception $e) {
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    /**
+     * Feeds the "Assign Form" modal's two dropdowns on the schedule page.
+     */
+    public function getAssignableForms()
+    {
+        if (!$this->resort) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $resort_id = $this->resort->resort_id;
+
+        return response()->json([
+            'success'          => true,
+            'feedback_forms'   => TrainingFeedbackForm::where('resort_id', $resort_id)->get(['id', 'form_name']),
+            'evaluation_forms' => EvaluationForm::where('resort_id', $resort_id)->get(['id', 'form_name']),
+        ]);
+    }
+
+    /**
+     * Shared response-viewer builder for both form types — decodes each
+     * respondent's answers (stored keyed by the dynamic field's `name`,
+     * matching form_structure) into an accordion-ready
+     * [['name' => employee name, 'answers' => [['question','answer'],...]]]
+     * shape, mirroring Survey\SurveyController::GetSurveyResults().
+     * `participant_id` on both response tables is the EMPLOYEE's id (not a
+     * training_participants row id — confirmed by how feedbackStore()/
+     * participantFeedbackFromList() actually read/write it; the Eloquent
+     * `participant()` relation on both response models is mislabeled and
+     * not used here).
+     */
+    private function buildRespondentAnswers($responseRows, $formStructureJson)
+    {
+        // Some real form_structure values are double-JSON-encoded (a JSON
+        // string containing an escaped JSON string) — confirmed against
+        // real data, not just a quirk of one inspection. Decode again if
+        // the first pass still yields a string instead of an array.
+        $fields = json_decode($formStructureJson, true);
+        if (is_string($fields)) {
+            $fields = json_decode($fields, true);
+        }
+        if (!is_array($fields)) {
+            $fields = [];
+        }
+        $labelsByName = [];
+        $optionLabelsByName = [];
+        foreach ($fields as $field) {
+            $name = $field['name'] ?? null;
+            if (!$name) continue;
+            $labelsByName[$name] = strip_tags($field['label'] ?? $name);
+            if (!empty($field['values']) && is_array($field['values'])) {
+                foreach ($field['values'] as $opt) {
+                    $optionLabelsByName[$name][$opt['value'] ?? ''] = $opt['label'] ?? ($opt['value'] ?? '');
+                }
+            }
+        }
+
+        return $responseRows->map(function ($row) use ($labelsByName, $optionLabelsByName) {
+            $answers = is_array($row->responses) ? $row->responses : (json_decode($row->responses, true) ?: []);
+            $qa = [];
+            foreach ($labelsByName as $name => $label) {
+                $rawAnswer = $answers[$name] ?? '';
+                $qa[] = [
+                    'question' => $label,
+                    'answer'   => $optionLabelsByName[$name][$rawAnswer] ?? $rawAnswer,
+                ];
+            }
+            return [
+                'name'    => trim(($row->first_name ?? '') . ' ' . ($row->last_name ?? '')) ?: 'Unknown',
+                'profile' => Common::getResortUserPicture($row->Parentid ?? null),
+                'answers' => $qa,
+            ];
+        })->values();
+    }
+
+    public function feedbackResponses($id)
+    {
+        if (!$this->resort) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $trainingScheduleId = base64_decode($id);
+        $formRow = TrainingFeedbackResponse::where('training_id', $trainingScheduleId)->first();
+        $form = $formRow ? TrainingFeedbackForm::find($formRow->form_id) : null;
+
+        $rows = TrainingFeedbackResponse::join('employees as e', 'e.id', '=', 'training_feedback_responses.participant_id')
+            ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
+            ->where('training_feedback_responses.training_id', $trainingScheduleId)
+            ->select('training_feedback_responses.*', 'ra.id as Parentid', 'ra.first_name', 'ra.last_name')
+            ->get();
+
+        return response()->json([
+            'success'  => true,
+            'form_name' => $form->form_name ?? 'Feedback Form',
+            'responses' => $form ? $this->buildRespondentAnswers($rows, $form->form_structure) : [],
+        ]);
+    }
+
+    public function evaluationResponses($id)
+    {
+        if (!$this->resort) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $trainingScheduleId = base64_decode($id);
+        $formRow = EvaluationFormResponse::where('training_id', $trainingScheduleId)->first();
+        $form = $formRow ? EvaluationForm::find($formRow->form_id) : null;
+
+        $rows = EvaluationFormResponse::join('employees as e', 'e.id', '=', 'evaluation_form_responses.participant_id')
+            ->join('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
+            ->where('evaluation_form_responses.training_id', $trainingScheduleId)
+            ->select('evaluation_form_responses.*', 'ra.id as Parentid', 'ra.first_name', 'ra.last_name')
+            ->get();
+
+        return response()->json([
+            'success'  => true,
+            'form_name' => $form->form_name ?? 'Evaluation Form',
+            'responses' => $form ? $this->buildRespondentAnswers($rows, $form->form_structure) : [],
+        ]);
+    }
+
 
 }

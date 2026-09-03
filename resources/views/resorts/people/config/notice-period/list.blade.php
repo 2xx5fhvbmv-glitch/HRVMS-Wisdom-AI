@@ -255,7 +255,8 @@
                 id: Main_id,
                 title: title,
                 period: period,
-                immediate_release: immediate_release
+                immediate_release: immediate_release,
+                "_token": "{{ csrf_token() }}"
             },
             success: function(response) {
                 if (response.success == true) {

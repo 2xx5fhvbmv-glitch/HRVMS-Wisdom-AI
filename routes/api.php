@@ -25,7 +25,6 @@ use Illuminate\Support\Facades\Route;
 
 		Route::get('on-boarding/get-onboarding-virtual-facility', [App\Http\Controllers\API\OnBoardingController::class, 'getOnboardingVirtualFacility']);
 
-		Route::post('add-device-token', [App\Http\Controllers\API\LoginController::class, 'addDeviceToken']);
 		Route::post('remove-device-token', [App\Http\Controllers\API\LoginController::class, 'removeDeviceToken']);
 		Route::post('logout', [App\Http\Controllers\API\LoginController::class, 'apiLogout'])->name('api.resort.logout');
 
@@ -53,6 +52,7 @@ use Illuminate\Support\Facades\Route;
 		Route::post('resort/profile-img-update', [App\Http\Controllers\API\ProfileController::class, 'changeProfileImage']);
 		Route::get('profile/visa-category', [App\Http\Controllers\API\ProfileController::class, 'getVisaCategory']);
 		Route::get('profile/visa-data/{visa_category}', [App\Http\Controllers\API\ProfileController::class, 'getVisaData']);
+		Route::get('resort/test-push-notification', [App\Http\Controllers\API\ProfileController::class, 'testPushNotification']);
 
 		//Employees Document
 		Route::post('resort/employees-docs', [App\Http\Controllers\API\EmployeeDocumentController::class, 'employeeDocument']);
@@ -62,6 +62,16 @@ use Illuminate\Support\Facades\Route;
 		Route::get('performance/my-reviews', [App\Http\Controllers\API\PerformanceReviewController::class, 'myReviews']);
 		Route::get('performance/review/{id}', [App\Http\Controllers\API\PerformanceReviewController::class, 'reviewDetail']);
 		Route::post('performance/review/{id}/submit', [App\Http\Controllers\API\PerformanceReviewController::class, 'submitReview']);
+
+		//PIP / PDP (self-service — an employee's own plans, any rank)
+		Route::get('performance/my-pip-plans', [App\Http\Controllers\API\PipPdpController::class, 'myPipPlans']);
+		Route::get('performance/pip-plan/{id}', [App\Http\Controllers\API\PipPdpController::class, 'pipPlanDetail']);
+		Route::post('performance/pip-plan/{id}/submit', [App\Http\Controllers\API\PipPdpController::class, 'submitPipPlan']);
+		Route::get('performance/pip-plan/{id}/file/{field}', [App\Http\Controllers\API\PipPdpController::class, 'pipPlanFile']);
+		Route::get('performance/my-pdp-plans', [App\Http\Controllers\API\PipPdpController::class, 'myPdpPlans']);
+		Route::get('performance/pdp-plan/{id}', [App\Http\Controllers\API\PipPdpController::class, 'pdpPlanDetail']);
+		Route::post('performance/pdp-plan/{id}/submit', [App\Http\Controllers\API\PipPdpController::class, 'submitPdpPlan']);
+		Route::get('performance/pdp-plan/{id}/file/{field}', [App\Http\Controllers\API\PipPdpController::class, 'pdpPlanFile']);
 
 		//File Management (mobile parity for the web File Management module)
 		Route::get('resort/filemanagement/my-folder', [App\Http\Controllers\API\FileManagementController::class, 'myFolder']);
@@ -328,6 +338,8 @@ use Illuminate\Support\Facades\Route;
 			Route::post('learning/mark-attendance', [App\Http\Controllers\API\LearningController::class, 'markAttendance']);
 			Route::post('learning/participant-feedback-from-list', [App\Http\Controllers\API\LearningController::class, 'participantFeedbackFromList']);
 			Route::get('learning/feedback-from-res-view/{form_res_id}', [App\Http\Controllers\API\LearningController::class, 'feedbackFormResView']);
+			Route::post('learning/participant-evaluation-from-list', [App\Http\Controllers\API\LearningController::class, 'participantEvaluationFromList']);
+			Route::get('learning/evaluation-from-res-view/{form_res_id}', [App\Http\Controllers\API\LearningController::class, 'evaluationFormResView']);
 
 		});
 
@@ -341,6 +353,8 @@ use Illuminate\Support\Facades\Route;
 		Route::get('learning/emp-lt-dashboard', [App\Http\Controllers\API\LearningController::class, 'employeeLearningDashbaord']);
 		Route::get('learning/feedback-from-list', [App\Http\Controllers\API\LearningController::class, 'feedbackformListing']);
 		Route::post('learning/feedback-data-store', [App\Http\Controllers\API\LearningController::class, 'feedbackStore']);
+		Route::get('learning/evaluation-from-list', [App\Http\Controllers\API\LearningController::class, 'evaluationformListing']);
+		Route::post('learning/evaluation-data-store', [App\Http\Controllers\API\LearningController::class, 'evaluationStore']);
 
 		//L&D Manager module + HR onboarding dashboard (position/department gated, not rank)
 		Route::middleware(['ld.manager'])->group(function () {
@@ -350,6 +364,16 @@ use Illuminate\Support\Facades\Route;
 			Route::get('ld-manager/mark-attendance/participants/{training_schedule_id}', [App\Http\Controllers\API\LearningController::class, 'ldManagerMarkAttendanceParticipants']);
 			Route::post('ld-manager/mark-attendance', [App\Http\Controllers\API\LearningController::class, 'ldManagerMarkAttendanceStore']);
 			Route::get('learning/manager-request-list', [App\Http\Controllers\API\LearningController::class, 'managerRequestList']);
+
+			// participant-feedback-from-list / feedback-from-res-view already exist
+			// above under check.rank:EXCOM only — an L&D Manager who isn't also
+			// EXCOM rank got a 403 "Insufficient rank" from the L&D Manager
+			// Feedback Form screen, which has no EXCOM requirement of its own.
+			// Same controller methods, reachable via the ld.manager gate too.
+			Route::post('ld-manager/participant-feedback-from-list', [App\Http\Controllers\API\LearningController::class, 'participantFeedbackFromList']);
+			Route::get('ld-manager/feedback-from-res-view/{form_res_id}', [App\Http\Controllers\API\LearningController::class, 'feedbackFormResView']);
+			Route::post('ld-manager/participant-evaluation-from-list', [App\Http\Controllers\API\LearningController::class, 'participantEvaluationFromList']);
+			Route::get('ld-manager/evaluation-from-res-view/{form_res_id}', [App\Http\Controllers\API\LearningController::class, 'evaluationFormResView']);
 		});
 
 		// HR onboarding dashboard — self-gated on HR department inside the controller.
@@ -432,24 +456,29 @@ use Illuminate\Support\Facades\Route;
 
 		});
 
-		// Deliberately unrestricted by rank — any employee needs to view
-		// categories to self-book an appointment. Guard widened to also
-		// accept temp-clinic-doctor so the duplicate, rank-12-gated
-		// registration of this same URI further down (which was silently
-		// shadowing this one — Laravel keeps only the last-registered route
-		// per URI+method, 403-ing every non-clinic-staff employee) could be
-		// removed instead of overriding it.
-		Route::middleware(['auth:api,temp-clinic-doctor'])->get('clinic/appointment-categories', [App\Http\Controllers\API\ClinicController::class, 'appointmentCategories']);
+		// appointment-categories, appointment-details/{id} and
+		// treatment-details/{id} used to sit here too, widened to
+		// 'auth:api,temp-clinic-doctor' — but this whole block is inside
+		// the outer Route::middleware(['auth:api', 'applyResortSmtp'])
+		// group opened above (search "'applyResortSmtp'])->group"). Group
+		// middleware ADDS to a route's own middleware, it doesn't get
+		// replaced by it — so the outer group's plain 'auth:api' still
+		// ran first and 401'd any temp-clinic-doctor token unconditionally,
+		// no matter how the route's own guard list was widened. Moved to
+		// after this group closes (see "Deliberately unrestricted" comment
+		// there), which is the only way a temp-doctor token can actually
+		// reach them.
 		Route::post('clinic/appointment-store', [App\Http\Controllers\API\ClinicController::class, 'appointmentStore']);
 		Route::get('clinic/employee-clinic-dashboard', [App\Http\Controllers\API\ClinicController::class, 'employeeClinicDashboard']);
-		// Same shadowing bug as appointment-categories above — this was
-		// duplicated under the rank-12-only clinic.manager gate further
-		// down, which shadowed this open registration and 403'd any
-		// non-clinic-staff employee trying to view their own appointment.
-		Route::middleware(['auth:api,temp-clinic-doctor'])->get('clinic/appointment-details/{appointment_id}', [App\Http\Controllers\API\ClinicController::class, 'appointmentDetails']);
-		Route::post('clinic/appointment-status-update', [App\Http\Controllers\API\ClinicController::class, 'appointmentStatusUpdate']);
-		// Same shadowing bug — see appointment-details above.
-		Route::middleware(['auth:api,temp-clinic-doctor'])->get('clinic/treatment-details/{treatment_id}', [App\Http\Controllers\API\ClinicController::class, 'treatmentDetails']);
+		// clinic/appointment-status-update moved to the Clinic Manager tier
+		// group below (clinic.capability:can_manage_treatment) — this is
+		// the doctor's own "approve/reject/move to treatment" action on
+		// an appointment, not a self-service action any employee should
+		// be able to call on any appointment_id. It had no rank check at
+		// all here (any authenticated employee could approve/reject
+		// someone else's appointment) AND a TemporaryClinicDoctor 401'd
+		// before ever reaching it, since this whole block sits inside the
+		// outer auth:api-only group.
 		Route::get('clinic/medical-certificate-details/{medical_cert_id}', [App\Http\Controllers\API\ClinicController::class, 'medicalCertificateDetail']);
 		Route::get('clinic/past-medical-history', [App\Http\Controllers\API\ClinicController::class, 'pastMedicalHistory']);
 
@@ -463,6 +492,7 @@ use Illuminate\Support\Facades\Route;
 
 		//SOS — general employee-facing (any authenticated employee)
 		Route::get('sos/emergency-types', [App\Http\Controllers\API\SOSController::class, 'getEmergencyTypes']);
+		Route::get('sos/emergency-contacts', [App\Http\Controllers\API\SOSController::class, 'getEmergencyContacts']);
 		Route::post('sos/sos-store', [App\Http\Controllers\API\SOSController::class, 'SOSStore']);
 		Route::get('sos/sos-team-listing', [App\Http\Controllers\API\SOSController::class, 'SOSTeamListing']);
 		Route::post('sos/sos-safe-status', [App\Http\Controllers\API\SOSController::class, 'SOSSafeStatus']);
@@ -559,6 +589,9 @@ use Illuminate\Support\Facades\Route;
 		//employeeInAppNotification
 		Route::get('notification/employee-in-app-notification', [App\Http\Controllers\API\InAppNotificationController::class, 'employeeInAppNotification']);
 		Route::post('notification/delete-message-read', [App\Http\Controllers\API\InAppNotificationController::class, 'deleteMessageRead']);
+		Route::get('notification/active-list', [App\Http\Controllers\API\InAppNotificationController::class, 'activeNotifications']);
+		Route::get('notification/inactive-list', [App\Http\Controllers\API\InAppNotificationController::class, 'inactiveNotifications']);
+		Route::post('notification/mark-read', [App\Http\Controllers\API\InAppNotificationController::class, 'markRead']);
 
 
 
@@ -601,6 +634,25 @@ use Illuminate\Support\Facades\Route;
 	Route::post('clinic-doctor/logout', [App\Http\Controllers\API\TemporaryClinicDoctorAuthController::class, 'logout'])->middleware('auth:temp-clinic-doctor');
 	Route::get('clinic-doctor/profile', [App\Http\Controllers\API\TemporaryClinicDoctorAuthController::class, 'profile'])->middleware('auth:temp-clinic-doctor');
 
+	// add-device-token used to sit only inside the outer auth:api-only
+	// group below — every account (including a TemporaryClinicDoctor)
+	// calls this right after login, so a doctor's very first post-login
+	// request 401'd, and the app surfaced that as a forced logout even
+	// though the login itself succeeded. Same "must live outside the
+	// outer group" reasoning as the 3 routes above.
+	Route::post('add-device-token', [App\Http\Controllers\API\LoginController::class, 'addDeviceToken'])->middleware('auth:api,temp-clinic-doctor');
+
+	// Deliberately unrestricted by rank — any employee needs to view
+	// categories to self-book an appointment, or their own appointment/
+	// treatment record — AND a temp-clinic-doctor needs the same three.
+	// Must live out here, genuinely outside the outer auth:api-only
+	// group above (not just re-widened in place inside it — that alone
+	// doesn't work, see the comment left where these used to be), or a
+	// temp-clinic-doctor's token can never reach them.
+	Route::middleware(['auth:api,temp-clinic-doctor'])->get('clinic/appointment-categories', [App\Http\Controllers\API\ClinicController::class, 'appointmentCategories']);
+	Route::middleware(['auth:api,temp-clinic-doctor'])->get('clinic/appointment-details/{appointment_id}', [App\Http\Controllers\API\ClinicController::class, 'appointmentDetails']);
+	Route::middleware(['auth:api,temp-clinic-doctor'])->get('clinic/treatment-details/{treatment_id}', [App\Http\Controllers\API\ClinicController::class, 'treatmentDetails']);
+
 	// Clinic Manager tier, reachable by either identity — 'clinic.manager'
 	// accepts a real rank-12 employee (unrestricted, same as before) OR an
 	// active TemporaryClinicDoctor, further limited per-endpoint by
@@ -633,6 +685,7 @@ use Illuminate\Support\Facades\Route;
 		Route::middleware(['clinic.capability:can_manage_treatment'])->group(function () {
 			Route::post('clinic/treatment-add', [App\Http\Controllers\API\ClinicController::class, 'treatmentAdd']);
 			Route::post('clinic/treatment-additional-note-update', [App\Http\Controllers\API\ClinicController::class, 'treatmentAdditionalNoteUpdate']);
+			Route::post('clinic/appointment-status-update', [App\Http\Controllers\API\ClinicController::class, 'appointmentStatusUpdate']);
 			// clinic/treatment-details moved to the unrestricted
 			// registration above — see the comment there.
 		});

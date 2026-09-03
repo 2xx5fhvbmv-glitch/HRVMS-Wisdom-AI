@@ -35,6 +35,12 @@ use App\Models\EmployeeManningAndBudgeting;
 use App\Models\EmployeeManningAndBudgetingConfig;
 use App\Models\ResortTransportation;
 use App\Models\EmployeeTravelQuota;
+use App\Models\ProbationLetterTemplate;
+use App\Models\PayrollAdvance;
+use App\Models\Resort;
+use App\Mail\ProbationLetterMail;
+use Illuminate\Support\Facades\Mail;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Auth;
 use App\Models\ResortSiteSettings;
 use Hash;
@@ -1284,9 +1290,22 @@ class EmployeeController extends Controller
             ]);
         }
 
-        // Sort by most-recent created_at and keep top 3 across all sources
+        // Sort by most-recent created_at and keep top 3 across all sources.
+        // `when` comes from 6 different tables' created_at/updated_at — a
+        // historical row with a malformed value (seen in prod as literal
+        // "14/08/2026 15:24", a d/m/Y string in a column Carbon expects
+        // Y-m-d in) must not 500 the whole page; treat it as oldest instead.
         $recentActivities = $recentActivities
-            ->sortByDesc(fn($a) => $a->when ? Carbon::parse($a->when)->timestamp : 0)
+            ->sortByDesc(function ($a) {
+                if (!$a->when) {
+                    return 0;
+                }
+                try {
+                    return Carbon::parse($a->when)->timestamp;
+                } catch (\Throwable $e) {
+                    return 0;
+                }
+            })
             ->take(3)
             ->values();
 
@@ -1316,7 +1335,158 @@ class EmployeeController extends Controller
             ->get()
             ->keyBy('transportation');
 
-        return view('resorts.people.employee.detail',compact('page_title','conversionRate','teams','roles','resort_id','resort_divisions','employee','departments','positions','remianing_leaves','nationality','benefitGrids','sections','costs','emp_benigit_grid','resort_allowances','airports','recentActivities','xpatExpiries','transportationOptions','travelQuotas','travelUsage'));
+        // Surfaces the mobile-submitted request (if any) on the button below
+        // so HR has context on what they're fulfilling — the button itself
+        // works either way, HR can also issue this letter proactively.
+        $pendingEmploymentVerificationRequest = PayrollAdvance::where('resort_id', $resort_id)
+            ->where('employee_id', $employee->id)
+            ->where('request_type', 'Employment Verification Letter')
+            ->where('hr_status', 'Pending')
+            ->latest('id')
+            ->first();
+
+        return view('resorts.people.employee.detail',compact('page_title','conversionRate','teams','roles','resort_id','resort_divisions','employee','departments','positions','remianing_leaves','nationality','benefitGrids','sections','costs','emp_benigit_grid','resort_allowances','airports','recentActivities','xpatExpiries','transportationOptions','travelQuotas','travelUsage','pendingEmploymentVerificationRequest'));
+    }
+
+    /**
+     * HR-triggered "Generate & Send Employment Verification Letter" for an
+     * ACTIVE employee, from their own details page. Deliberately NOT built on
+     * top of ProbationController::sendProbationLetter() — that method has
+     * probation-only side effects (flips employee->status to 'Offboarding',
+     * creates an exit-clearance record) that would corrupt an active
+     * employee's record if invoked with type=experience. Also not built on
+     * ExitClearanceController::employementCertificate() — that requires an
+     * EmployeeResignation row active employees don't have. Mirrors the
+     * placeholder/PDF/email shape of both, adapted for an active employee
+     * (duration of service = joining date -> today, not -> last working day).
+     */
+    public function sendEmploymentVerificationLetter(Request $request, $id)
+    {
+        $resort_id = $this->resort->resort_id;
+        $employee = Employee::with(['resortAdmin','position','department'])
+            ->where('resort_id', $resort_id)
+            ->where('id', $id)
+            ->first();
+        if (!$employee) {
+            return response()->json(['success' => false, 'message' => 'Employee not found.'], 404);
+        }
+
+        $template = ProbationLetterTemplate::where('resort_id', $resort_id)
+            ->where('type', 'experience')
+            ->first();
+        if (!$template) {
+            return response()->json(['success' => false, 'message' => 'Experience/Employment Letter template not found for this resort. Please create one in People > Configuration.'], 404);
+        }
+
+        $resort = Resort::findOrFail($resort_id);
+
+        $duration = '—';
+        if ($employee->joining_date) {
+            $jd = Carbon::parse($employee->joining_date);
+            $now = Carbon::now();
+            if ($now->greaterThanOrEqualTo($jd)) {
+                $diff = $jd->diff($now);
+                $parts = [];
+                if ($diff->y > 0) $parts[] = $diff->y . ' year' . ($diff->y === 1 ? '' : 's');
+                if ($diff->m > 0) $parts[] = $diff->m . ' month' . ($diff->m === 1 ? '' : 's');
+                if (empty($parts)) $parts[] = max(1, $diff->d) . ' day' . ($diff->d === 1 ? '' : 's');
+                $duration = implode(' ', $parts);
+            }
+        }
+
+        $joiningDate = $employee->joining_date ? Carbon::parse($employee->joining_date)->format('d M Y') : '—';
+        $issueDate = now()->format('d M Y');
+
+        $placeholders = [
+            // The seeded experience template literally uses {{date}} for BOTH
+            // "Date of Joining:" and "Issued Date:" (same token, twice) — no
+            // {{joining_date}} token appears in the content at all, so no
+            // code-side mapping can make those two lines show different
+            // values. Matches ExitClearanceController::employementCertificate's
+            // own documented trade-off: {{date}} = joining date (the one that
+            // actually matters for an employment-verification letter); HR can
+            // fix "Issued Date" by editing the template in People >
+            // Configuration to use {{issue_date}} there instead, which this
+            // code already maps correctly.
+            '{{date}}'                => $joiningDate,
+            '{{issue_date}}'          => $issueDate,
+            '{{resort_name}}'         => (string) $resort->resort_name,
+            '{{employee_name}}'       => (string) optional($employee->resortAdmin)->full_name,
+            '{{employee_code}}'       => (string) $employee->Emp_id,
+            '{{Emp_id}}'              => (string) $employee->Emp_id,
+            '{{position_title}}'      => (string) optional($employee->position)->position_title,
+            '{{position}}'            => (string) optional($employee->position)->position_title,
+            '{{Department_title}}'    => (string) optional($employee->department)->name,
+            '{{department_name}}'     => (string) optional($employee->department)->name,
+            '{{employment_type}}'     => (string) ($employee->employment_type ?? ''),
+            '{{joining_date}}'        => $joiningDate,
+            '{{last_working_day}}'    => '—',
+            '{{date_of_separation}}'  => '—',
+            '{{duration_of_service}}' => $duration,
+        ];
+
+        // Same stand-in text the seeded experience template ships with (no
+        // {{token}} for it, just raw text) — see ExitClearanceController's
+        // employementCertificate() for precedent.
+        $letterContent = str_replace('[As per employment records]', $duration, $template->content);
+        $letterContent = strtr($letterContent, $placeholders);
+
+        $defaultEmailBody = '<p>Dear {{employee_name}},</p>'
+            . '<p>Please find your ' . e($template->subject ?? 'Employment Verification Letter') . ' attached.</p>'
+            . '<p>Regards,<br>{{resort_name}} HR</p>';
+        $emailBodyTemplate = !empty($template->email_body) ? $template->email_body : $defaultEmailBody;
+        $emailBody = strtr($emailBodyTemplate, $placeholders);
+
+        $letterhead = Common::getLetterheadData($resort_id);
+        $pdf = Pdf::loadView('resorts.people.probation.probation_letter_pdf', [
+            'letterContent'  => $letterContent,
+            'letterhead'     => $letterhead,
+            'resort'         => $resort,
+            'resortLogo'     => Common::GetResortLogo($resort_id),
+            'signatureImage' => $letterhead['signatureImage'] ?? null,
+            'signatoryName'  => ($letterhead['signatoryName'] ?? null) ?: 'Human Resources Department',
+            'signatoryTitle' => ($letterhead['signatoryTitle'] ?? null)
+                ?: 'For and on behalf of ' . ($resort->resort_name ?? 'the Management'),
+        ])->setPaper('a4', 'portrait');
+        $pdf->getDomPDF()->getOptions()->set('isRemoteEnabled', true);
+
+        $fileName = 'employment-verification_' . $employee->id . '_' . time() . '.pdf';
+        $pdfPath = storage_path('app/' . $fileName);
+        $pdf->save($pdfPath);
+
+        if (!file_exists($pdfPath)) {
+            \Log::error("Employment verification letter PDF not found at $pdfPath");
+            return response()->json(['success' => false, 'message' => 'Letter PDF could not be generated.'], 500);
+        }
+
+        Mail::to($employee->resortAdmin->email)->send(new ProbationLetterMail($employee, $pdfPath, 'experience', $resort, $fileName, $emailBody));
+
+        $pendingRequest = PayrollAdvance::where('resort_id', $resort_id)
+            ->where('employee_id', $employee->id)
+            ->where('request_type', 'Employment Verification Letter')
+            ->where('hr_status', 'Pending')
+            ->latest('id')
+            ->first();
+        if ($pendingRequest) {
+            $pendingRequest->hr_status = 'Approved';
+            $pendingRequest->save();
+        }
+
+        Common::sendMobileNotification(
+            $resort_id,
+            2,
+            null,
+            null,
+            'Employment Verification Letter',
+            'Your Employment Verification Letter has been sent to your email.',
+            'Request',
+            [$employee->id],
+            $pendingRequest->id ?? null,
+            false,
+            'employment-verification-ready'
+        );
+
+        return response()->json(['success' => true, 'message' => 'Employment Verification Letter sent to ' . $employee->resortAdmin->email . ' successfully.']);
     }
 
     /**
@@ -1848,8 +2018,27 @@ class EmployeeController extends Controller
         if( $benefitGrid)
         {
             $employee->entitled_service_charge = $benefitGrid->service_charge == 1 ? 'yes' : 'no';
-            $employee->entitled_overtime = $benefitGrid->overtime;
+            // employees.entitled_overtime is a strict enum('yes','no') — the
+            // benefit grid's own overtime field is 'yes'/'n/a', so copying it
+            // verbatim wrote an invalid value (silently coerced to '' by
+            // MySQL) that never matched DutyRosterController's `== "no"`
+            // check. That's why setting a grade's Overtime to "Not
+            // Applicable" never blocked overtime entries on the roster.
+            $employee->entitled_overtime = $benefitGrid->overtime == 'yes' ? 'yes' : 'no';
             $employee->entitled_public_holiday = $benefitGrid->paid_worked_public_holiday_and_friday == 1 ? 'yes' : 'no';
+            $employee->entitled_annual_leave_ticket = $benefitGrid->annual_leave_ticket == 'yes' ? 'yes' : 'no';
+
+            // basic_salary_currency has a DB default ('USD') rather than a
+            // true null/unset state, so an employee who's never had their
+            // salary configured yet still reads as 'USD'. Only sync the
+            // grid's Salary Paid In while basic_salary is still empty —
+            // once a real salary has been entered via the dedicated
+            // salary/entitlements screen, that currency choice was
+            // deliberate and a later grid reassignment must not silently
+            // flip it under existing pay data.
+            if (empty($employee->basic_salary) && in_array($benefitGrid->salary_paid_in, ['USD', 'MVR'])) {
+                $employee->basic_salary_currency = $benefitGrid->salary_paid_in;
+            }
         }
         $employee->save();
 
@@ -2356,7 +2545,7 @@ class EmployeeController extends Controller
             return response()->json(['success' => false, 'message' => 'The document failed to upload.'], 400);
         }
         $flag = $request->doc_type;
-        $url = env('AI_URL').'extract_education_exp_details?doc_type='.$flag;
+        $url = config('services.ai_extract.base_url').'extract_education_exp_details?doc_type='.$flag;
         if($flag)
         {
             $curl = curl_init();
@@ -2543,30 +2732,13 @@ class EmployeeController extends Controller
 
     public function getReportingPerson(Request $request){
 
-        $Dept_id = $request->department_id;
-        $targetRanks = [
-            array_search('HOD', config('settings.Position_Rank')),
-            array_search('MGR', config('settings.Position_Rank')),
-            array_search('GM', config('settings.Position_Rank')),
-            array_search('SUP', config('settings.Position_Rank')),
-            array_search('EXCOM', config('settings.Position_Rank'))
-        ];
+        $reportingEmployees = Common::getValidReportingManagers(
+            $this->resort->resort_id,
+            $request->rank,
+            $request->department_id,
+            $request->employee_id
+        );
 
-        // Get all employees with reporting ranks (all HODs regardless of department, plus other ranks)
-        $reportingEmployees = DB::table('employees')
-            ->join('resort_admins', 'employees.Admin_Parent_id', '=', 'resort_admins.id')
-            ->where('employees.resort_id', $this->resort->resort_id)
-            ->where('employees.status', '!=', 'Inactive')
-            ->whereIn('employees.rank', $targetRanks)
-            ->select(
-                'employees.*',
-                'resort_admins.first_name as first_name',
-                'resort_admins.last_name as last_name',
-                'resort_admins.email as admin_email'
-            )
-            ->orderBy('employees.rank', 'asc')
-            ->orderBy('resort_admins.first_name', 'asc')
-            ->get();
         return response()->json(['success' => true, 'data' => $reportingEmployees]);
 
     }
