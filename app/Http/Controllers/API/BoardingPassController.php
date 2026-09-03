@@ -1640,6 +1640,22 @@ class BoardingPassController extends Controller
             'visitors.*'                        => 'string',
         ]);
 
+        // Nothing stopped a manifest being saved with every employee_ids[]
+        // slot blank and no visitors either — a completely empty manifest,
+        // which is exactly what happened for two manifests reported as
+        // "No travel pass found for this manifest" (nobody was ever
+        // actually on them to have a pass). Blocking on employee_ids alone
+        // would break the legitimate visitors-only manifest case (see
+        // comment above), so this only rejects the case where BOTH are
+        // empty.
+        $validator->after(function ($validator) use ($request) {
+            $hasEmployees = collect((array) $request->employee_ids)->filter(fn ($id) => $id !== null && $id !== '')->isNotEmpty();
+            $hasVisitors = collect((array) $request->visitors)->filter(fn ($v) => $v !== null && trim((string) $v) !== '')->isNotEmpty();
+            if (!$hasEmployees && !$hasVisitors) {
+                $validator->errors()->add('employee_ids', 'Add at least one employee or visitor before saving the manifest.');
+            }
+        });
+
         if ($validator->fails()) {
             return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
         }
