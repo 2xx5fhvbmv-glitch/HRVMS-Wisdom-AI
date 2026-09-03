@@ -430,11 +430,32 @@
                     </div>
                     <div class="form-group mb-20">
                         <label class="position-rank-label">Select Rank <span class="red-mark">*</span></label>
-                        <select class="form-select select2-modal" name="Rank" required data-parsley-required-message="Please select a rank.">
+                        {{-- Was config('settings.eligibilty') — a stale,
+                             incomplete copy of Position_Rank missing HR,
+                             Finance, MD, SO, EDHOD, and CLINIC_STAFF
+                             entirely, so a position could never be created
+                             with any of those 6 ranks. --}}
+                        <select class="form-select select2-modal" name="Rank" id="new-position-rank" required data-parsley-required-message="Please select a rank.">
                             <option value="">Rank</option>
-                            @foreach (config('settings.eligibilty') as  $k => $item)
+                            @foreach (config('settings.Position_Rank') as  $k => $item)
                                 <option value="{{ $k }}">{{ $item }}</option>
                             @endforeach
+                        </select>
+                        <small class="text-muted" id="new-position-rank-grade-hint"></small>
+                    </div>
+                    <div class="form-group mb-20">
+                        <label class="position-rank-label">Employee Grade (optional)</label>
+                        {{-- Optional override: only needed when this specific
+                             position should sit on a different grade than its
+                             rank's default (e.g. Finance Director and Finance
+                             Manager both rank HOD, but different grades).
+                             Leave unset to just use the rank's default grade.
+                             Options are narrowed to only the grades mapped to
+                             the selected rank (see #new-position-rank change
+                             handler) — picking a rank first is required for
+                             this to show anything beyond the default option. --}}
+                        <select class="form-select select2-modal" name="benefit_grid_level" id="new-position-grid-level">
+                            <option value="">Use rank's default grade</option>
                         </select>
                     </div>
                     <div class="form-group mb-3">
@@ -739,7 +760,8 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
     window.resortDivisions = @json($resort_divisions);
     window.resortDepartments = @json($resort_departments);
     window.resortSections = @json($resort_sections);
-    window.Position_Rank = @json(config('settings.eligibilty'));
+    {{-- Was config('settings.eligibilty') — stale, missing HR/Finance/MD/SO/EDHOD/CLINIC_STAFF. Same fix as the create form. --}}
+    window.Position_Rank = @json(config('settings.Position_Rank'));
 
     // Function to reload all 4 DataTables
     function reloadAllTables() {
@@ -884,6 +906,33 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
 
     $('#new-position-title').on('input', function() {
         togglePositionInput();
+    });
+
+    // Position -> Rank -> Employee Grade is the real mapping chain, but
+    // this form gave no indication of which grade(s) a rank maps to.
+    $('#new-position-rank').on('change', function() {
+        let rank = $(this).val();
+        let hint = $('#new-position-rank-grade-hint');
+        let gradeSelect = $('#new-position-grid-level');
+        if (!rank) {
+            hint.text('');
+            gradeSelect.html('<option value="">Use rank\'s default grade</option>');
+            return;
+        }
+        $.get("{{ route('manning.rank-grade-mapping') }}", { rank: rank }, function(response) {
+            let grades = response.grades || [];
+            hint.text(grades.length ? 'Employee Grade(s) currently using this rank: ' + grades.join(', ') : 'No Employee Grade currently uses this rank yet.');
+
+            // Employee Grade options narrow to only the grades actually
+            // mapped to the selected rank — picking a grade unrelated to
+            // this rank made no sense and just invited mistakes.
+            let gradeOptions = response.gradeOptions || [];
+            let optionsHtml = '<option value="">Use rank\'s default grade</option>';
+            gradeOptions.forEach(function(grade) {
+                optionsHtml += `<option value="${grade.id}">${grade.name}</option>`;
+            });
+            gradeSelect.html(optionsHtml);
+        });
     });
 
     // Function to toggle between select box and textbox
@@ -1653,7 +1702,8 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
                 name: updatedName,
                 division:updatedDivision,
                 department:updatedDepartment,
-                status: updatedStatus
+                status: updatedStatus,
+                "_token": "{{ csrf_token() }}"
             },
             success: function(response) {
                 if(response.success == true) {

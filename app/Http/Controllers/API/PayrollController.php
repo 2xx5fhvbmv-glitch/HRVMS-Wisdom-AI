@@ -9,7 +9,10 @@ use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Storage;
 use App\Models\Employee;
 use App\Models\Payroll;
+use App\Models\Resort;
+use App\Models\PayrollReviewAllowances;
 use App\Helpers\Common;
+use App\Helpers\StorageHelper;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Dompdf\Options;
 use Illuminate\Support\Facades\Response;
@@ -465,18 +468,18 @@ class PayrollController extends Controller
                                                                 ->select(
                                                                     'payroll.*', 'ra.first_name', 'ra.last_name', 'ra.profile_picture',
                                                                     'ra.id as admin_id', 'rp.position_title as position', 'rd.name as department', 'e.joining_date',
-                                                                    'e.Emp_id', 'psc.total_working_days', 'psc.service_charge_amount', 'pr.earnings_basic',
-                                                                    'pr.earnings_allowance', 'pd.ewt', 'pd.staff_shop', 'pd.pension',
+                                                                    'e.Emp_id', 'psc.total_working_days', 'psc.service_charge_amount', 'pr.id as review_id', 'pr.earnings_basic',
+                                                                    'pr.earnings_allowance', 'pd.ewt', 'pd.staff_shop', 'pd.pension', 'pd.advance_loan',
                                                                     'pd.attendance_deduction','pd.city_ledger', 'pd.other', 'pd.total_deductions'
                                                                 )->first();
             if (!$payroll) {
                 return response()->json(['success' => false, 'error' => 'Payroll data not found'], 200);
             }
-                                                        
+
             $totalAmount                                =   ($payroll->earnings_basic ?? 0) + ($payroll->service_charge_amount ?? 0) + ($payroll->earnings_allowance ?? 0) - ($payroll->total_deductions ?? 0);
             $earningtotalAmount                         =   ($payroll->earnings_basic ?? 0) + ($payroll->earnings_allowance?? 0);
             $payrollNetSalary                           =   ($payroll->earnings_allowance ?? 0) + ($payroll->earnings_basic ?? 0) - ($payroll->total_deductions ?? 0);
-           
+
             $payrollEmpData                             =   [
                 'Emp_id'                                =>  $payroll->Emp_id,
                 'first_name'                            =>  $payroll->first_name,
@@ -487,25 +490,66 @@ class PayrollController extends Controller
                 'joining_date'                          =>  $payroll->joining_date,
                 'start_date'                            =>  $payroll->start_date,
                 'end_date'                              =>  $payroll->end_date,
-                'profile_picture'                       =>  Common::getResortUserPicture($payroll->id),
+                // Was passing the payroll RUN's own id, not an admin id —
+                // getResortUserPicture() looks up resort_admins.id, so this
+                // almost never matched and always fell back to the default
+                // picture (same bug shape found elsewhere this session).
+                'profile_picture'                       =>  Common::getResortUserPicture($payroll->admin_id),
             ];
 
             $bankDetails                                =   [
                 'total_amount'                          =>  number_format($totalAmount, 2),
             ];
 
+            // Named allowance line items — payroll_review_allowances is
+            // the actual source pr.earnings_allowance is summed FROM, but
+            // was never surfaced here, only the pre-summed total. Zero-
+            // amount rows (an allowance type that doesn't apply this
+            // period) are dropped rather than shown as empty lines.
+            $allowanceLines                             =   $payroll->review_id
+                                                                ? PayrollReviewAllowances::where('payroll_review_id', $payroll->review_id)
+                                                                    ->where('amount', '>', 0)
+                                                                    ->get(['allowance_type', 'amount', 'amount_unit'])
+                                                                    ->map(fn ($a) => [
+                                                                        'type'   => $a->allowance_type,
+                                                                        'amount' => (float) $a->amount,
+                                                                        'unit'   => $a->amount_unit,
+                                                                    ])->values()
+                                                                : collect();
+
             $earningDetails                             =   [
                 'basic_pay'                             =>  $payroll->earnings_basic,
-                'allowance'                             =>  $payroll->earnings_allowance,
+                'allowances'                            =>  $allowanceLines,
+                'allowance_total'                       =>  $payroll->earnings_allowance,
                 'bonus'                                 =>  '',
                 'earning_total_amount'                  =>  number_format($earningtotalAmount,2),
             ];
 
+            // Named deduction line items — payroll_deductions carries these
+            // as separate columns, but only ewt/city_ledger were ever
+            // surfaced (plus two permanently-blank placeholder fields,
+            // "insurance"/"loans", that never had a real source). Any
+            // deduction outside those two — pension, staff_shop,
+            // advance_loan, attendance_deduction, other — was silently
+            // missing from the breakdown while still counted in
+            // total_deductions, which is exactly why the breakdown so
+            // often didn't add up to the total.
+            $deductionLabels                            =   [
+                'ewt'                   => 'Tax (EWT)',
+                'pension'               => 'Pension',
+                'staff_shop'            => 'Staff Shop',
+                'advance_loan'          => 'Advance / Loan',
+                'attendance_deduction'  => 'Attendance Deduction',
+                'city_ledger'           => 'City Ledger',
+                'other'                 => 'Other',
+            ];
+            $deductionLines                             =   collect($deductionLabels)
+                                                                ->map(fn ($label, $field) => ['type' => $label, 'amount' => (float) ($payroll->$field ?? 0)])
+                                                                ->filter(fn ($row) => $row['amount'] > 0)
+                                                                ->values();
+
             $deductionsDetails                          =   [
-                'monthly_tax_deduction:'                =>  $payroll->ewt,
-                'insurance:'                            =>  '',
-                'loans'                                 =>  '',
-                'city_ledger'                           =>  $payroll->city_ledger,
+                'deductions'                            =>  $deductionLines,
                 'total_deductions'                      =>  $payroll->total_deductions ?? 0,
             ];
 
@@ -527,30 +571,16 @@ class PayrollController extends Controller
         }
     }
 
-    public function downloadPayslip(Request $request)
+    /**
+     * Builds the payslip PDF for one employee/month/year. Shared by
+     * downloadPayslip() and shareEmailPayslip() so both render the exact
+     * same document instead of two copies that can drift apart.
+     * Returns null if there's no payroll data for that period.
+     */
+    private function buildPayslipPdf($employee_id, $year, $month)
     {
-        if (!$this->user) {
-            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
-        }
-        
-        $validator = Validator::make($request->all(), [
-            'month'                                 => 'required',
-            'year'                                  => 'required',
-           
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
-        }
-
-        $employee_id                                    =   $this->user->GetEmployee->id;
-        $year                                           =   $request->year ?? Carbon::now()->format('Y');
-        $month                                          =   $request->month;
-       
-        try {
-             
-            // Fetch Last Month's Payroll Data. Deductions/service-charge stay
-            // left-joined (a missing row there just means $0 deductions/no
+        // Fetch Last Month's Payroll Data. Deductions/service-charge stay
+        // left-joined (a missing row there just means $0 deductions/no
             // service charge, still a real payslip) — but payroll_reviews
             // must be an inner join: no payroll_reviews row means this
             // payroll_employees row is roster-only, earnings never
@@ -602,14 +632,11 @@ class PayrollController extends Controller
                                                                     'pr.earnings_allowance', 'pd.ewt', 'pd.staff_shop', 'pd.pension',
                                                                     'pd.attendance_deduction','pd.city_ledger', 'pd.other', 'pd.total_deductions'
                                                                 )->first();
-            if (!$payroll) {
-                return response()->json(['success' => false, 'error' => 'Payroll data not found'], 200);
-            }
+        if (!$payroll) {
+            return null;
+        }
 
-            
-       
-                                                        
-            $totalAmount                                =   ($payroll->earnings_basic ?? 0) + ($payroll->service_charge_amount ?? 0) + ($payroll->earnings_allowance ?? 0) - ($payroll->total_deductions ?? 0);
+        $totalAmount                                =   ($payroll->earnings_basic ?? 0) + ($payroll->service_charge_amount ?? 0) + ($payroll->earnings_allowance ?? 0) - ($payroll->total_deductions ?? 0);
             $earningtotalAmount                         =   ($payroll->earnings_basic ?? 0) + ($payroll->earnings_allowance?? 0);
             $payrollNetSalary                           =   ($payroll->earnings_allowance ?? 0) + ($payroll->earnings_basic ?? 0) - ($payroll->total_deductions ?? 0);
            
@@ -690,26 +717,58 @@ class PayrollController extends Controller
                 'defaultFont'                           =>  'Poppins'
             ];
 
-                        
-            $pdf                                        =   Pdf::loadView('pdf.payslippdf', compact('payrollArray'));
-            $pdf->setOptions($optionsArray);
-            $folderPath = public_path(config('settings.PayslipPdf'));
+            // Employer letterhead — resort logo/name fallback, or the
+            // configured Letterhead & Signature header when set (same
+            // pattern as the Probation/Transfer letter PDFs).
+            $resort                                     =   Resort::find($this->resort_id);
+            $resortLogo                                 =   Common::GetResortLogo($this->resort_id);
+            $letterhead                                 =   Common::getLetterheadData($this->resort_id);
 
-            if (!File::exists($folderPath)) {
-                File::makeDirectory($folderPath, 0777, true, true);
+        $pdf                                        =   Pdf::loadView('pdf.payslippdf', compact('payrollArray', 'resort', 'resortLogo', 'letterhead'));
+        $pdf->setOptions($optionsArray);
+
+        return $pdf;
+    }
+
+    public function downloadPayslip(Request $request)
+    {
+        if (!$this->user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'month'                                 => 'required',
+            'year'                                  => 'required',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
+        }
+
+        $employee_id                                    =   $this->user->GetEmployee->id;
+        $year                                           =   $request->year ?? Carbon::now()->format('Y');
+        $month                                          =   $request->month;
+
+        try {
+            $pdf = $this->buildPayslipPdf($employee_id, $year, $month);
+            if (!$pdf) {
+                return response()->json(['success' => false, 'error' => 'Payroll data not found'], 200);
             }
 
-
-            $filePath                                   =   public_path(config('settings.PayslipPdf').'/'. time() . '_payslip.pdf');
-                                                            file_put_contents($filePath, $pdf->output());
-                        
-            $pdfUrl                                     =   asset(config('settings.PayslipPdf').'/'. basename($filePath));
+            // Writing to public_path()/File:: only ever works on local
+            // disk — prod runs STORAGE_DRIVER=wasabi, so a raw filesystem
+            // write here either silently disappears or errors depending on
+            // the server's filesystem, while the returned asset() URL
+            // never resolved to a real file there either way.
+            $relativePath                               =   trim(config('settings.PayslipPdf'), '/') . '/' . time() . '_payslip.pdf';
+            StorageHelper::put($relativePath, $pdf->output());
+            $pdfUrl                                     =   StorageHelper::temporaryUrl($relativePath);
 
             return response()->json([
                 'success'                               => true,
                 'pdf_url'                               => $pdfUrl,
             ]);
-            
+
         } catch (\Exception $e) {
             \Log::emergency("File: " . $e->getFile());
             \Log::emergency("Line: " . $e->getLine());
@@ -727,7 +786,6 @@ class PayrollController extends Controller
         $validator = Validator::make($request->all(), [
             'month'                                 => 'required',
             'year'                                  => 'required',
-           
         ]);
 
         if ($validator->fails()) {
@@ -739,19 +797,35 @@ class PayrollController extends Controller
         $year                                           =   $request->year;
 
         try {
-
             $employee                                       =   Employee::with('resortAdmin')->find($employee_id);
             if (!$employee || !$employee->resortAdmin) {
                 return response()->json(['success' => false, 'message' => 'Employee not found.']);
             }
 
             $email                                          =   $employee->resortAdmin->email;
-        
-            // Generate Payslip URL
-            $payslipUrl                                     =   route('payslip.show', ['employee_id' => $employee_id, 'month' => $month, 'year' => $year]);
 
-            // Send Email (Using Laravel Mail)
-            Mail::to($email)->send(new SharePayslipMail($employee, $payslipUrl));
+            $pdf = $this->buildPayslipPdf($employee_id, $year, $month);
+            if (!$pdf) {
+                return response()->json(['success' => false, 'message' => 'Payslip not found for the selected month and year.']);
+            }
+
+            // route('payslip.show') pointed at a web-portal, resort-admin
+            // -guarded page that reads session('payslip_employee_id')/etc —
+            // never the query params this link was built with, and not
+            // reachable by an employee's mobile session anyway. Attach the
+            // PDF directly instead of linking anywhere. Mail::attach()
+            // needs a real local path, so write to a transient temp file
+            // (not StorageHelper — this isn't a stored tenant asset, it's
+            // deleted right after sending) rather than the broken link.
+            $fileName                                       =   'Payslip_' . $month . '_' . $year . '.pdf';
+            $tempPath                                        =   storage_path('app/' . uniqid('payslip_') . '.pdf');
+            file_put_contents($tempPath, $pdf->output());
+
+            try {
+                Mail::to($email)->send(new SharePayslipMail($employee, $month, $year, $tempPath, $fileName));
+            } finally {
+                @unlink($tempPath);
+            }
 
             return response()->json(['success' => true, 'message' => 'Payslip shared successfully.']);
 
@@ -761,7 +835,6 @@ class PayrollController extends Controller
             \Log::error($e->getMessage());
             return response()->json(['success' => false, 'message' => 'Failed to send email.']);
         }
-
     }
 
 }

@@ -100,7 +100,70 @@
         <div class="k"><span class="dot"></span><span id="attCount">Attendees</span></div>
         <div class="list" id="attList"></div>
     </div>
-@include('resorts.Learning._learning_buttons_v2_styles')
+
+    <!-- Assign Feedback/Evaluation Form -->
+    <div class="modal fade" id="assignFormModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Assign Form to Participants</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <form id="assignFormForm">
+                    <input type="hidden" id="assignFormScheduleId">
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <label class="form-label">Feedback Form</label>
+                            <select class="form-select" id="assignFeedbackFormSelect">
+                                <option value="">Don't assign</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Evaluation Form</label>
+                            <select class="form-select" id="assignEvaluationFormSelect">
+                                <option value="">Don't assign</option>
+                            </select>
+                        </div>
+                        <p class="small text-muted mb-0">Assigns the selected form(s) to every participant of this session who hasn't already been assigned one, and notifies them in the app.</p>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn ta-btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn ta-btn-primary" id="assignFormSubmitBtn">Assign</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- View Responses -->
+    <div class="modal fade" id="viewResponsesModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="viewResponsesTitle">Responses</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <ul class="nav nav-tabs mb-3" role="tablist">
+                        <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#feedbackResponsesTab" type="button">Feedback</button></li>
+                        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#evaluationResponsesTab" type="button">Evaluation</button></li>
+                    </ul>
+                    <div class="tab-content">
+                        <div class="tab-pane fade show active" id="feedbackResponsesTab">
+                            <div class="accordion" id="feedbackResponsesAccordion"></div>
+                        </div>
+                        <div class="tab-pane fade" id="evaluationResponsesTab">
+                            <div class="accordion" id="evaluationResponsesAccordion"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn ta-btn-secondary" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+@include('resorts.learning._learning_buttons_v2_styles')
 @include('resorts._dropdown_styles')
 @include('resorts._dropdown_script')
 @endsection
@@ -344,6 +407,8 @@
 
     var TS_EDIT_ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
     var TS_ATTEND_ICON = '<i class="fas fa-calendar-check" aria-hidden="true"></i>';
+    var TS_FORM_ICON = '<i class="fas fa-clipboard-list" aria-hidden="true"></i>';
+    var TS_RESPONSES_ICON = '<i class="fas fa-poll" aria-hidden="true"></i>';
 
     // Multi-day sessions never cram a range into the small date box — it shows
     // only the start day. The full span becomes a teal pill at the front of the
@@ -371,8 +436,10 @@
             '<div class="ts-right">' + tsStack(s) +
                 '<span class="ts-status ' + s.statusClass + '"><span class="d"></span>' + s.statusText + '</span>' +
                 '<div class="ts-acts">' +
-                    '<button type="button" class="abtn ts-edit-btn" title="Edit" data-schedule-id="' + s.id + '">' + TS_EDIT_ICON + '</button>' +
+                    (s.statusClass === 'completed' ? '' : '<button type="button" class="abtn ts-edit-btn" title="Edit" data-schedule-id="' + s.id + '">' + TS_EDIT_ICON + '</button>') +
                     '<a href="{{ route("learning.schedule.attendance") }}?schedule_id=' + btoa(String(s.id)) + '" class="abtn" title="Mark Attendance">' + TS_ATTEND_ICON + '</a>' +
+                    (s.statusClass === 'scheduled' ? '' : '<button type="button" class="abtn ts-assign-form-btn" title="Assign Feedback/Evaluation Form" data-schedule-id="' + s.id + '">' + TS_FORM_ICON + '</button>') +
+                    (s.statusClass === 'completed' ? '<button type="button" class="abtn ts-view-responses-btn" title="View Responses" data-schedule-id="' + s.id + '">' + TS_RESPONSES_ICON + '</button>' : '') +
                 '</div>' +
             '</div>';
     }
@@ -712,6 +779,120 @@
     $(document).ready(function () {
         tsLoad();
         $('#searchInput, #typeFilter').on('keyup change', function () { tsLoad(); });
+    });
+
+    // ---- Assign Feedback/Evaluation Form ----
+    $(document).on('click', '.ts-assign-form-btn', function () {
+        var scheduleId = $(this).data('schedule-id');
+        $('#assignFormScheduleId').val(scheduleId);
+        $('#assignFeedbackFormSelect, #assignEvaluationFormSelect').html('<option value="">Loading...</option>');
+
+        $.ajax({
+            url: "{{ route('learning.forms.list') }}",
+            type: 'GET',
+            success: function (response) {
+                var fbOptions = '<option value="">Don\'t assign</option>';
+                (response.feedback_forms || []).forEach(function (f) {
+                    fbOptions += '<option value="' + f.id + '">' + f.form_name + '</option>';
+                });
+                var evalOptions = '<option value="">Don\'t assign</option>';
+                (response.evaluation_forms || []).forEach(function (f) {
+                    evalOptions += '<option value="' + f.id + '">' + f.form_name + '</option>';
+                });
+                $('#assignFeedbackFormSelect').html(fbOptions);
+                $('#assignEvaluationFormSelect').html(evalOptions);
+            }
+        });
+
+        var modal = new bootstrap.Modal(document.getElementById('assignFormModal'));
+        modal.show();
+    });
+
+    $('#assignFormForm').on('submit', function (e) {
+        e.preventDefault();
+        var scheduleId = $('#assignFormScheduleId').val();
+        var feedbackFormId = $('#assignFeedbackFormSelect').val();
+        var evaluationFormId = $('#assignEvaluationFormSelect').val();
+        var $btn = $('#assignFormSubmitBtn');
+
+        if (!feedbackFormId && !evaluationFormId) {
+            toastr.error('Select at least one form to assign.', 'Error', { positionClass: 'toast-bottom-right' });
+            return;
+        }
+
+        var requests = [];
+        $btn.prop('disabled', true).text('Assigning...');
+
+        if (feedbackFormId) {
+            requests.push($.ajax({
+                url: "{{ route('learning.schedule.assignFeedbackForm') }}",
+                type: 'POST',
+                data: { training_schedule_id: scheduleId, feedback_form_id: feedbackFormId, _token: "{{ csrf_token() }}" }
+            }));
+        }
+        if (evaluationFormId) {
+            requests.push($.ajax({
+                url: "{{ route('learning.schedule.assignEvaluationForm') }}",
+                type: 'POST',
+                data: { training_schedule_id: scheduleId, evaluation_form_id: evaluationFormId, _token: "{{ csrf_token() }}" }
+            }));
+        }
+
+        $.when.apply($, requests).always(function () {
+            $btn.prop('disabled', false).text('Assign');
+            bootstrap.Modal.getInstance(document.getElementById('assignFormModal')).hide();
+            toastr.success('Form(s) assigned to participants.', 'Success', { positionClass: 'toast-bottom-right' });
+        });
+    });
+
+    // ---- View Responses ----
+    function tsRenderResponsesAccordion(containerId, prefix, respondents) {
+        var $container = $('#' + containerId).empty();
+        if (!respondents || !respondents.length) {
+            $container.html('<p class="text-muted mb-0">No responses submitted yet.</p>');
+            return;
+        }
+        respondents.forEach(function (r, idx) {
+            var panelId = prefix + 'Panel' + idx;
+            var qaHtml = (r.answers || []).map(function (qa) {
+                return '<div class="fw-600">' + qa.question + '</div><div class="text-muted mb-2">' + (qa.answer !== '' ? qa.answer : 'No answer') + '</div>';
+            }).join('');
+            $container.append(
+                '<div class="accordion-item">' +
+                    '<h2 class="accordion-header">' +
+                        '<button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#' + panelId + '">' + r.name + '</button>' +
+                    '</h2>' +
+                    '<div id="' + panelId + '" class="accordion-collapse collapse" data-bs-parent="#' + containerId + '">' +
+                        '<div class="accordion-body">' + qaHtml + '</div>' +
+                    '</div>' +
+                '</div>'
+            );
+        });
+    }
+
+    $(document).on('click', '.ts-view-responses-btn', function () {
+        var scheduleId = $(this).data('schedule-id');
+        var encodedId = btoa(String(scheduleId));
+
+        $('#feedbackResponsesAccordion, #evaluationResponsesAccordion').html('<p class="text-muted mb-0">Loading...</p>');
+
+        $.ajax({
+            url: "{{ route('learning.schedule.feedbackResponses', ':id') }}".replace(':id', encodedId),
+            type: 'GET',
+            success: function (response) {
+                tsRenderResponsesAccordion('feedbackResponsesAccordion', 'fb', response.responses);
+            }
+        });
+        $.ajax({
+            url: "{{ route('learning.schedule.evaluationResponses', ':id') }}".replace(':id', encodedId),
+            type: 'GET',
+            success: function (response) {
+                tsRenderResponsesAccordion('evaluationResponsesAccordion', 'ev', response.responses);
+            }
+        });
+
+        var modal = new bootstrap.Modal(document.getElementById('viewResponsesModal'));
+        modal.show();
     });
 </script>
 @endsection

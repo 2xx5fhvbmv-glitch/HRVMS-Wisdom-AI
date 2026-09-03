@@ -229,7 +229,38 @@
                             <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
                         </div>
                     </form>
-                    
+
+                </div>
+            </div>
+            <div class="col-lg-6 ">
+                <div class="card">
+                    <div class="card-title">
+                        <div class="row g-3 align-items-center justify-content-between">
+                            <div class="col-auto">
+                                <h3>Emergency Contact Numbers</h3>
+                            </div>
+                        </div>
+                    </div>
+                    <form id="EmergencyContactsForm" data-parsley-validate>
+                        @csrf
+                        <div class="row g-md-4 g-3 mb-md-4 mb-3">
+                            <div class="col-12">
+                                <label for="emergency_police_number" class="form-label">Police</label>
+                                <input type="text" class="form-control" id="emergency_police_number" name="emergency_police_number" placeholder="Police contact number" value="{{ $siteSettings->emergency_police_number ?? '' }}">
+                            </div>
+                            <div class="col-12">
+                                <label for="emergency_fire_number" class="form-label">Fire</label>
+                                <input type="text" class="form-control" id="emergency_fire_number" name="emergency_fire_number" placeholder="Fire contact number" value="{{ $siteSettings->emergency_fire_number ?? '' }}">
+                            </div>
+                            <div class="col-12">
+                                <label for="emergency_mndf_number" class="form-label">MNDF</label>
+                                <input type="text" class="form-control" id="emergency_mndf_number" name="emergency_mndf_number" placeholder="MNDF contact number" value="{{ $siteSettings->emergency_mndf_number ?? '' }}">
+                            </div>
+                        </div>
+                        <div class="card-footer text-end">
+                            <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>
@@ -643,9 +674,42 @@
                 });
             }
         });
-        
 
-       
+        $('#EmergencyContactsForm').on('submit', function(e) {
+            e.preventDefault();
+
+            let formData = new FormData(this);
+
+            $.ajax({
+                url: "{{ route('sos.config.EmergencyContactsStore') }}",
+                type: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                success: function(response) {
+                    if (response.success) {
+                        toastr.success(response.message, "Success", {
+                            positionClass: 'toast-bottom-right'
+                        });
+                    } else {
+                        toastr.error(response.message, "Error", {
+                            positionClass: 'toast-bottom-right'
+                        });
+                    }
+                },
+                error: function(response) {
+                    var errors = response.responseJSON;
+                    var errs = '';
+                    $.each(errors.errors, function(key, error) {
+                        errs += error + '<br>';
+                    });
+                    toastr.error(errs, "Validation Error", {
+                        positionClass: 'toast-bottom-right'
+                    });
+                }
+            });
+        });
+
     });
 
 </script>

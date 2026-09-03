@@ -155,8 +155,8 @@
                         <div class="idt-klist">
                             <div class="idt-krow"><span class="kk">Employee ID</span><span class="kv">{{ $incident->reporter->Emp_id ?? '-' }}</span></div>
                             <div class="idt-krow"><span class="kk">Department</span><span class="kv">{{ $incident->reporter->department->name ?? 'N/A' }}</span></div>
-                            <div class="idt-krow"><span class="kk">Reported</span><span class="kv">{{ \Carbon\Carbon::parse($incident->created_at)->format('d M Y') }}</span></div>
-                            <div class="idt-krow"><span class="kk">Time</span><span class="kv">{{ \Carbon\Carbon::parse($incident->created_at)->format('h:i A') }}</span></div>
+                            <div class="idt-krow"><span class="kk">Reported</span><span class="kv">{{ \Carbon\Carbon::parse($incident->getRawOriginal('created_at'))->format('d M Y') }}</span></div>
+                            <div class="idt-krow"><span class="kk">Time</span><span class="kv">{{ \Carbon\Carbon::parse($incident->getRawOriginal('created_at'))->format('h:i A') }}</span></div>
                         </div>
                     </div>
                 </div>

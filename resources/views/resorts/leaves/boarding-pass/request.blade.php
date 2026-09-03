@@ -377,6 +377,7 @@ $(document).ready(function () {
                     'a_time':a_time,
                     'd_time':d_time,
                     "reason":reason,
+                    "_token": "{{ csrf_token() }}",
                 },
                 success: function(response) {
 

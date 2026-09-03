@@ -138,7 +138,13 @@ class EmployeeController extends Controller
                                     )
                                     ->join('leave_categories as lc', 'lc.id', '=', 'resort_benefit_grid_child.leave_cat_id')
                                     ->leftJoin('employees_leaves as el', 'el.leave_category_id', '=', 'lc.id')
-                                    ->where('resort_benefit_grid_child.rank', $emp_grade)
+                                    // resort_benefit_grid_child.rank stores the employee RANK the
+                                    // row was saved under, not the grid's emp_grade — filtering by
+                                    // $emp_grade matched only by coincidence. benefit_grid_id scopes
+                                    // to the one grid resolveEmpGrade actually picked, since multiple
+                                    // grids can share a rank.
+                                    ->where('resort_benefit_grid_child.rank', $rank)
+                                    ->where('resort_benefit_grid_child.benefit_grid_id', $benefit_grid->id ?? null)
                                     ->where('lc.resort_id', $resortId)
                                     ->where(function ($query) use ($religion,$gender) {
                                             $query->where('resort_benefit_grid_child.eligible_emp_type', $gender)
@@ -232,7 +238,13 @@ class EmployeeController extends Controller
                         )
                         ->join('leave_categories as lc', 'lc.id', '=', 'resort_benefit_grid_child.leave_cat_id')
                         ->leftJoin('employees_leaves as el', 'el.leave_category_id', '=', 'lc.id')
-                        ->where('resort_benefit_grid_child.rank', $emp_grade)
+                        // resort_benefit_grid_child.rank stores the employee RANK the
+                        // row was saved under, not the grid's emp_grade — filtering by
+                        // $emp_grade matched only by coincidence. benefit_grid_id scopes
+                        // to the one grid resolveEmpGrade actually picked, since multiple
+                        // grids can share a rank.
+                        ->where('resort_benefit_grid_child.rank', $rank)
+                        ->where('resort_benefit_grid_child.benefit_grid_id', $benefit_grid->id ?? null)
                         ->where('lc.resort_id', $resortId)
                         ->where(function ($query) use ($religion,$gender) {
                                 $query->where('resort_benefit_grid_child.eligible_emp_type', $gender)

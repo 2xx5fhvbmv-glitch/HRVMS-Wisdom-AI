@@ -211,7 +211,7 @@
                                 </div>
                                 <div class="col-md-6 ">
                                     <label for="select-country" class="form-label">COUNTRY<span class="red-mark">*</span></label>
-                                    <select class="form-select select2t-none" id="select-country"
+                                    <select class="form-select select2t-none" id="select-country" autocomplete="off"
                                         aria-label="Default select example" name="country" data-parsley-required="true" data-parsley-errors-container="#country-error">
                                         <option value="">Select Country </option>
                                         @foreach($countries as $country)
@@ -268,7 +268,7 @@
                                 <div class="col-lg-3 col-md-6">
                                     <label for="select-location-city" class="form-label">LOCATION (CITY & COUNTRY)
                                         <span class="red-mark">*</span></label>
-                                    <select class="form-select select2t-none" id="select-location-country"
+                                    <select class="form-select select2t-none" id="select-location-country" autocomplete="off"
                                         aria-label="Default select example" name="work_country_name[]" data-parsley-required="true" data-parsley-errors-container="#work-country-error">
                                         <option value="">Country </option>
                                         @foreach($countries as $country)
@@ -349,7 +349,7 @@
                                 <div class="col-md-6 ">
                                     <label for="select-country1 "
                                         class="form-label d-md-inline-block d-none">COUNTRY<span class="red-mark">*</span></label>
-                                    <select class="form-select select2t-none" id="select-country1"
+                                    <select class="form-select select2t-none" id="select-country1" autocomplete="off"
                                         aria-label="Default select example" name="country_educational[]" data-parsley-required="true" data-parsley-errors-container="#select-country1-error">
                                         <option value="">Country </option>
                                         @foreach($countries as $country)
@@ -922,7 +922,7 @@
             $.ajax({
                 url: '{{ route("get.applicantinfo.draft") }}',
                 method: 'POST',
-                data: { step: step },
+                data: { step: step, "_token": "{{ csrf_token() }}" },
                 success: function (response) {
                     if (response.success) {
                         // Populate the previous fieldset with retrieved data
@@ -1189,7 +1189,7 @@
                 </div>
                 <div class="col-lg-3 col-md-6">
                     <label for="select-location-country-${uniqueId}" class="form-label">LOCATION (CITY & COUNTRY)<span class="red-mark">*</span></label>
-                    <select class="form-select select2t-none" id="select-location-country-${uniqueId}" name="work_country_name[]" data-parsley-required="true" data-parsley-errors-container="#work-country-error-${uniqueId}">
+                    <select class="form-select select2t-none" id="select-location-country-${uniqueId}" name="work_country_name[]" autocomplete="off" data-parsley-required="true" data-parsley-errors-container="#work-country-error-${uniqueId}">
                         <option value="">Country</option>
                         @foreach($countries as $country)
                             <option value="{{$country->id}}">{{$country->name}}</option>
@@ -1305,7 +1305,7 @@
                 </div>
                 <div class="col-md-6">
                     <label for="select-country-${uniqueId}" class="form-label">COUNTRY<span class="red-mark">*</span></label>
-                    <select class="form-select select2t-none" id="select-country-${uniqueId}" name="country_educational[]" data-parsley-required="true" data-parsley-errors-container="#select-country-error-${uniqueId}">
+                    <select class="form-select select2t-none" id="select-country-${uniqueId}" name="country_educational[]" autocomplete="off" data-parsley-required="true" data-parsley-errors-container="#select-country-error-${uniqueId}">
                         <option value="">Country</option>
                         @foreach($countries as $country)
                             <option value="{{$country->id}}">{{$country->name}}</option>

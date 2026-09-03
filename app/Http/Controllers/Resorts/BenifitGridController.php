@@ -25,6 +25,7 @@ use App\Models\ResortBenifitGridChild;
 use App\Helpers\Common;
 use App\Models\ResortSiteSettings;
 use App\Models\Resort;
+use App\Models\ResortPosition;
 use DB;
 use Carbon\Carbon;
 use DataTables;
@@ -102,6 +103,32 @@ class BenifitGridController extends Controller
                 ->make(true);
         }
     }
+
+    /**
+     * Position → Rank → Employee Grade is the real mapping chain (a
+     * Position carries its own Rank; an employee assigned that Position
+     * inherits it; the grade a Benefit Grid applies to is resolved from
+     * that rank) — but neither this form nor the Add Position screen ever
+     * showed the other side of that chain, so picking a rank here gave no
+     * hint of which positions it actually affects. [rank => ['count' =>
+     * int, 'names' => "Rooms Director, Waitress"]] for every active
+     * position in this resort, keyed the same way as rankConfig.
+     */
+    private function rankPositionSummary($resort_id)
+    {
+        return ResortPosition::where('resort_id', $resort_id)
+            ->where('status', 'active')
+            ->get(['Rank', 'position_title'])
+            // groupBy('Rank') alone keys by whatever raw type the DB driver
+            // returns — cast to int so lookups from rankConfig's array keys
+            // (plain ints) reliably match.
+            ->groupBy(fn($position) => (int) $position->Rank)
+            ->map(fn($positions) => [
+                'count' => $positions->count(),
+                'names' => $positions->pluck('position_title')->implode(', '),
+            ]);
+    }
+
     public function create()
     {
         if(Common::checkRouteWisePermission('resort.benifitgrid.index',config('settings.resort_permissions.create')) == false){
@@ -123,6 +150,7 @@ class BenifitGridController extends Controller
             $currentGradeName = '';
             $currentGradeRanks = [];
             $rankConfig = config('settings.Position_Rank');
+            $rankPositionSummary = $this->rankPositionSummary($resort_id);
 
             // Initializing arrays for form selection (empty for create)
             $selected_linen_array = [];
@@ -135,7 +163,7 @@ class BenifitGridController extends Controller
             $isViewMode = false;
             $custom_fields = [];
             return view('resorts.benifitgrid.edit', compact(
-                'page_title', 'resort_id', 'sports', 'accomodation_type','isViewMode','currentGradeName','currentGradeRanks','rankConfig', 'benefit_grid', 'selected_linen_array', 'selected_laundry', 'selected_sports','custom_leave','custom_benefits','custom_discounts','custom_fields','LeaveCategories'
+                'page_title', 'resort_id', 'sports', 'accomodation_type','isViewMode','currentGradeName','currentGradeRanks','rankConfig','rankPositionSummary', 'benefit_grid', 'selected_linen_array', 'selected_laundry', 'selected_sports','custom_leave','custom_benefits','custom_discounts','custom_fields','LeaveCategories'
             ));
         } catch (\Exception $e) {
             // Log the error for debugging
@@ -376,6 +404,7 @@ class BenifitGridController extends Controller
                 ->pluck('rank')
                 ->all();
             $rankConfig = config('settings.Position_Rank');
+            $rankPositionSummary = $this->rankPositionSummary($resort_id);
             $benefitGridChildren = ResortBenifitGridChild::where('benefit_grid_id', $id)->get();
 
             // Create a mapping of leave_cat_id to allocated_days
@@ -394,7 +423,7 @@ class BenifitGridController extends Controller
             $custom_discounts = $benefit_grid->customDiscounts;
             $custom_fields = json_decode($benefit_grid->custom_fields, true) ?? [];
             return view('resorts.benifitgrid.edit', compact(
-                'page_title', 'resort_id', 'sports','LeaveCategories','accomodation_type','currentGradeName','currentGradeRanks','rankConfig', 'benefit_grid', 'isViewMode', 'selected_linen_array', 'selected_laundry', 'selected_sports','custom_leave','custom_benefits','custom_discounts','custom_fields','benefitGridChildMap'
+                'page_title', 'resort_id', 'sports','LeaveCategories','accomodation_type','currentGradeName','currentGradeRanks','rankConfig','rankPositionSummary', 'benefit_grid', 'isViewMode', 'selected_linen_array', 'selected_laundry', 'selected_sports','custom_leave','custom_benefits','custom_discounts','custom_fields','benefitGridChildMap'
             ));
         } catch (\Exception $e) {
             // Log the error for debugging
@@ -413,6 +442,16 @@ class BenifitGridController extends Controller
         try {
             $resort_id = Auth::guard('resort-admin')->user()->resort_id;
 
+            // The grid being edited is identified by $id — everything below
+            // used to re-resolve it purely from the submitted Employee
+            // Grade name via updateOrCreate(['emp_grade' => ...]), with $id
+            // never actually used. If that free-text name normalized to a
+            // DIFFERENT existing grade (typo, stale prefill, copy-paste),
+            // this silently wrote the submitted changes onto that OTHER
+            // grade's grid row instead of the one being edited, leaving
+            // grid #$id untouched. Load the real target row up front.
+            $benefitgrid = ResortBenifitGrid::where('resort_id', $resort_id)->findOrFail($id);
+
             // See store() — Employee Grade is a free-text name, resolved
             // to (or created as) the matching grade-level row.
             $gradeLevel = ResortBenefitGradeLevel::firstOrCreate(
@@ -420,6 +459,25 @@ class BenifitGridController extends Controller
                 ['status' => 'active']
             );
             $empGrade = (string) $gradeLevel->id;
+
+            // Renaming this grid to a name that resolves to a DIFFERENT
+            // grade that already has its own grid would otherwise leave two
+            // rows sharing one emp_grade (this row's, plus the other
+            // grade's own) — an ambiguous state every emp_grade lookup
+            // elsewhere assumes can't happen. Reject instead of merging.
+            if ($empGrade !== $benefitgrid->emp_grade) {
+                $collision = ResortBenifitGrid::where('resort_id', $resort_id)
+                    ->where('emp_grade', $empGrade)
+                    ->where('id', '!=', $benefitgrid->id)
+                    ->exists();
+                if ($collision) {
+                    DB::rollBack();
+                    return response()->json([
+                        'success' => false,
+                        'msg' => 'Another benefit grid already uses the grade name "' . trim($request->emp_grade) . '". Choose a different name.'
+                    ]);
+                }
+            }
 
             // See store() — ranks submitted on the same form, same shared
             // assignment logic as the standalone config screen.
@@ -439,9 +497,9 @@ class BenifitGridController extends Controller
                 }
             }
 
-            // ✅ Update or create main benefit grid
-            $benefitgrid = ResortBenifitGrid::updateOrCreate(
-                ["resort_id" => $resort_id, "emp_grade" => $empGrade],
+            // ✅ Update the grid identified by $id in place (not re-matched
+            // by emp_grade — see the collision guard above for why).
+            $benefitgrid->update(
                 [
                     'resort_id' => $resort_id,
                     'emp_grade' => $empGrade,
@@ -629,8 +687,24 @@ class BenifitGridController extends Controller
             $selected_sports =  explode(',', $benefit_grid->sports_and_entertainment_facilities);
             $LeaveCategories = LeaveCategory::where('resort_id',$resort_id)->get();
 
+            // Direct Position -> Grade breakdown: which real positions this
+            // grade actually covers, via the rank(s) it's mapped to. The
+            // view page previously showed nothing at all connecting this
+            // grade back to ranks/positions — only the create/edit form's
+            // rank checkboxes had a position-count hint.
+            $mappedRanks = ResortBenefitGradeLevelRank::where('resort_id', $resort_id)
+                ->where('grade_level_id', $benefit_grid->emp_grade)
+                ->pluck('rank');
+            $rankConfig = config('settings.Position_Rank');
+            $positionsByRank = ResortPosition::where('resort_id', $resort_id)
+                ->where('status', 'active')
+                ->whereIn('Rank', $mappedRanks)
+                ->withCount('employees')
+                ->get()
+                ->groupBy(fn($p) => $rankConfig[(int) $p->Rank] ?? ('Rank ' . $p->Rank));
+
             return view('resorts.benifitgrid.view')->with(compact(
-                'page_title', 'resort_id', 'sports', 'benefit_grid','benefitGridChildren', 'isViewMode','selected_linen_array','selected_laundry','selected_sports','LeaveCategories'
+                'page_title', 'resort_id', 'sports', 'benefit_grid','benefitGridChildren', 'isViewMode','selected_linen_array','selected_laundry','selected_sports','LeaveCategories','positionsByRank'
             ));
         } catch (\Exception $e) {
             \Log::emergency("File: " . $e->getFile());

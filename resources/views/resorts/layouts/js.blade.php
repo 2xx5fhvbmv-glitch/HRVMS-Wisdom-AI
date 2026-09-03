@@ -608,13 +608,19 @@
 </script>
 
 <script type="text/javascript">
+    // Read the CSRF token fresh from the XSRF-TOKEN cookie on every request instead of
+    // baking csrf_token() into a header once at page load — Laravel re-issues that cookie
+    // on every response, so this stays valid even if a tab sits open past session/token
+    // rotation, unlike a value captured once via $.ajaxSetup at document-ready time.
+    $(document).ajaxSend(function(event, jqxhr, settings) {
+        var match = document.cookie.match(/(?:^|;\s*)XSRF-TOKEN=([^;]+)/);
+        if (match) {
+            jqxhr.setRequestHeader('X-XSRF-TOKEN', decodeURIComponent(match[1]));
+        }
+    });
+
     $(document).ready( function() {
         $("#loader").css("display", "none");
-        $.ajaxSetup({
-            headers: {
-            'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
-            }
-        });
 
         $(".select2t-none").select2({
             minimumResultsForSearch: -1,
@@ -639,7 +645,7 @@
             s2SyncEmptyState($(this));
         });
         // setTimeout(0), not $(window).on('load'): most pages reinit
-        // .select2t-none a second time in their own @section('import-
+        // .select2t-none a second time in their own @@section('import-
         // scripts'), which runs later in the same document.ready pass —
         // window 'load' fires too unpredictably late (after images/etc)
         // to be the right signal here. setTimeout(0) just needs to run

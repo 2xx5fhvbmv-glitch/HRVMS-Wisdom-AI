@@ -94,7 +94,7 @@
                                                             data-Resort_id="{{ $t->Resort_id }}"
                                                             data-ta_childid="{{ $t->ta_childid }}"
                                                             data-ExpiryDate ="{{ $t->ExpiryDate}}" data-jobadvertisement="{{$t->JobAdvertisement}}" data-link="{{$t->adv_link}}"  data-applicationUrlshow="{{$t->applicationUrlshow}}" data-applicant_link="{{$t->applicant_link}}"
-                                                            data-source_links="{{ json_encode($t->source_links) }}" data-position="{{ $t->Position }}" data-alljobimages="{{ json_encode($t->allJobAdImages) }}" data-bs-toggle="modal" class="a-link jobAD-modal">Create Job Advertisement</a>
+                                                            data-source_links="{{ json_encode($t->source_links) }}" data-position="{{ $t->Position }}" data-alljobimages="{{ json_encode($t->allJobAdImages) }}" data-alljobimagefiles="{{ json_encode($t->allJobAdImageFiles) }}" data-bs-toggle="modal" class="a-link jobAD-modal">Create Job Advertisement</a>
 
                                                         @endif
                                                         </div>
@@ -747,6 +747,7 @@
                     <input type="hidden" class="form-control link_Job" name="link" placeholder="Job Advertisement Link" />
                     <input type="hidden" class="form-control Resort_id" name="Resort_id" value="{{$resort_id}}"/>
                     <input type="hidden" class="form-control ta_child_id" name="ta_child_id" placeholder="Job Advertisement Link" />
+                    <input type="hidden" class="selected_jobadvimg" name="selected_jobadvimg" />
                     <a href="javascript:void(0)" target="blank" class="a-link AppendJobAdvLink"></a>
                 </div>
                 <div class="source-links-container">
@@ -1352,6 +1353,11 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
             let expiryDate = $(this).data("expirydate");
             let sourceLinks = $(this).data("source_links");
             let allJobImages = $(this).data("alljobimages") || [];
+            // Raw Jobadvimg filenames, same order as allJobImages — lets the
+            // user pick a poster from the carousel and actually have that
+            // choice saved on submit, instead of always saving whichever
+            // poster happened to resolve first server-side.
+            let allJobImageFiles = $(this).data("alljobimagefiles") || [];
 
             // Build carousel images
             let carouselInner = $("#jobAdCarouselInner");
@@ -1359,7 +1365,8 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
             if (allJobImages.length > 0) {
                 $.each(allJobImages, function(i, imgUrl) {
                     let activeClass = i === 0 ? 'active' : '';
-                    carouselInner.append('<div class="carousel-item ' + activeClass + '"><img src="' + imgUrl + '" alt="Job Advertisement" style="max-width:100%;"></div>');
+                    let fileName = allJobImageFiles[i] || '';
+                    carouselInner.append('<div class="carousel-item ' + activeClass + '" data-file="' + fileName + '"><img src="' + imgUrl + '" alt="Job Advertisement" style="max-width:100%;"></div>');
                 });
                 // Show/hide arrows based on image count
                 if (allJobImages.length > 1) {
@@ -1367,12 +1374,14 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
                 } else {
                     $("#jobAdPrevBtn, #jobAdNextBtn").hide();
                 }
-                // Set download link to first image
+                // Set download link and selected-poster field to the first image
                 $(".DowloadAdvertisement").attr("data-hrefLink", allJobImages[0]);
+                $(".selected_jobadvimg").val(allJobImageFiles[0] || '');
             } else {
                 carouselInner.append('<div class="carousel-item active"><img src="' + jobAdv + '" alt="Job Advertisement" style="max-width:100%;"></div>');
                 $("#jobAdPrevBtn, #jobAdNextBtn").hide();
                 $(".DowloadAdvertisement").attr("data-hrefLink", jobAdv);
+                $(".selected_jobadvimg").val('');
             }
 
             $(".JdSumit").show();
@@ -1437,10 +1446,12 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
             }
         });
 
-        // Update download link when carousel slides
+        // Update download link and the selected-poster field when the carousel slides
         $('#jobAdCarousel').on('slid.bs.carousel', function () {
-            var activeImg = $(this).find('.carousel-item.active img').attr('src');
+            var $activeItem = $(this).find('.carousel-item.active');
+            var activeImg = $activeItem.find('img').attr('src');
             $(".DowloadAdvertisement").attr("data-hrefLink", activeImg);
+            $(".selected_jobadvimg").val($activeItem.data('file') || '');
         });
 
         $(document).on("click", ".DowloadAdvertisement", function() {

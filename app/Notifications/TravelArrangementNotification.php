@@ -89,7 +89,7 @@ Best regards,</p><p>[Sender Name],</p><p>HR Department.</p>";
 
         // dd($data['mainbody']);
         $mail = (new MailMessage)
-            ->from(env("MAIL_FROM_ADDRESS"))
+            ->from(config('mail.from.address'), config('mail.from.name'))
             ->view($emailPage, $data)
             ->subject(Lang::get($subject));
         // dd($mail);

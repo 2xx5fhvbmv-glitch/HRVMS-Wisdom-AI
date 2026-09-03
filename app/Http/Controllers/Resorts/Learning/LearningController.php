@@ -84,6 +84,14 @@ class LearningController extends Controller
             // HR sees their own department's employees (excluding self).
             $employees_query->where('Dept_id', $emp->Dept_id);
             $employees_query->where('employees.id', '!=', $emp->id);
+        } elseif (in_array((int) ($emp->rank ?? 0), [1, 2], true) && optional($emp)->Dept_id) {
+            // EXCOM (1) / HOD (2) heading any OTHER department (Finance,
+            // Engineering, etc.) own their whole department too — only the
+            // HR-department case above was handled, so every other
+            // EXCOM/HOD fell through to the reporting_to-only branch below
+            // and saw just their direct peers instead of their department.
+            $employees_query->where('Dept_id', $emp->Dept_id);
+            $employees_query->where('employees.id', '!=', $emp->id);
         } else {
             // Everyone else (regular Manager rank, etc.) sees their reporting tree.
             $scopedDeptIds = Common::getScopedDepartmentIds();
@@ -254,7 +262,8 @@ class LearningController extends Controller
                 // Creator (resort_admin who submitted the request) — second join below.
                 DB::raw("CONCAT(creator.first_name, ' ', creator.last_name) as requested_by"),
 
-                DB::raw("GROUP_CONCAT(CONCAT(resort_admins.first_name, ' ', resort_admins.last_name) SEPARATOR ', ') as employee_names")
+                DB::raw("GROUP_CONCAT(CONCAT(resort_admins.first_name, ' ', resort_admins.last_name) SEPARATOR ', ') as employee_names"),
+                DB::raw("GROUP_CONCAT(DISTINCT learning_requests_employees.employee_id SEPARATOR ',') as employee_ids")
             )
             ->leftJoin('learning_programs', 'learning_requests.learning_id', '=', 'learning_programs.id')
             ->leftJoin('learning_requests_employees', 'learning_requests.id', '=', 'learning_requests_employees.learning_request_id')
@@ -332,11 +341,27 @@ class LearningController extends Controller
                 ->addColumn('action', function ($row) use ($isManager) {
                     if (!$isManager) return ''; // Hide actions for HR & HOD
 
-                    $approveBtn = '<button class="btn lnd-btn-positive btn-sm" onclick="updateLearningRequestStatus(' . $row->id . ', \'Approved\')">Approve</button>';
-                    $onHoldBtn = '<button class="btn lnd-btn-neutral btn-sm" onclick="updateLearningRequestStatus(' . $row->id . ', \'On Hold\')">On Hold</button>';
-                    $rejectBtn = '<button class="btn lnd-btn-critical btn-sm" onclick="rejectLearningRequest(' . $row->id . ')">Deny</button>';
+                    if ($row->status == 'Pending' || $row->status == 'On Hold') {
+                        $approveBtn = '<button class="btn lnd-btn-positive btn-sm" onclick="updateLearningRequestStatus(' . $row->id . ', \'Approved\')">Approve</button>';
+                        $onHoldBtn = '<button class="btn lnd-btn-neutral btn-sm" onclick="updateLearningRequestStatus(' . $row->id . ', \'On Hold\')">On Hold</button>';
+                        $rejectBtn = '<button class="btn lnd-btn-critical btn-sm" onclick="rejectLearningRequest(' . $row->id . ')">Deny</button>';
+                        return $approveBtn . ' ' . $onHoldBtn . ' ' . $rejectBtn;
+                    }
 
-                    return ($row->status == 'Pending' || $row->status == 'On Hold') ? $approveBtn . ' ' . $onHoldBtn . ' ' . $rejectBtn : '';
+                    if ($row->status == 'Approved') {
+                        // Lands the L&D Manager on the schedule-creation page with
+                        // this request's program and suggested employee(s)
+                        // pre-selected (see preselectFromQuery() in
+                        // schedule/index.blade.php) — employee_ids is a
+                        // comma-separated GROUP_CONCAT from learning_requests_employees.
+                        $scheduleUrl = route('learning.schedule', [
+                            'program_id' => $row->learning_id,
+                            'employee_id' => $row->employee_ids,
+                        ]);
+                        return '<a href="' . e($scheduleUrl) . '" class="btn lnd-btn-positive btn-sm">Schedule Program</a>';
+                    }
+
+                    return '';
                 })
                 ->rawColumns(['status', 'action'])
                 ->make(true);
@@ -389,6 +414,15 @@ class LearningController extends Controller
                 return response()->json(['error' => 'Sender not found.'], 404);
             }
 
+            // created_by is a resort_admins.id, not an employees.id — the
+            // notification below needs the employee record (device_token
+            // lives there) reached via Admin_Parent_id, not a direct
+            // Employee::find($sender->id) which silently resolves to
+            // whichever unrelated employee happens to share that numeric id.
+            $senderEmployee = Employee::where('Admin_Parent_id', $sender->id)
+                ->where('resort_id', $this->resort->resort_id)
+                ->first();
+
             // ✅ Save rejection reason if Denied or On Hold
             if ($request->status === 'Denied' || $request->status === 'On Hold') {
                 $learningRequest->rejection_reason = $request->reason;
@@ -417,15 +451,17 @@ class LearningController extends Controller
 
             $moduleName = "Learning";
 
-            event(new ResortNotificationEvent(Common::nofitication(
-                $this->resort->resort_id, 
-                10, 
-                $notificationTitle, 
-                $notificationMessage, 
-                'Learning', 
-                $sender->id, 
-                $moduleName
-            )));
+            if ($senderEmployee) {
+                event(new ResortNotificationEvent(Common::nofitication(
+                    $this->resort->resort_id,
+                    10,
+                    $notificationTitle,
+                    $notificationMessage,
+                    'Learning',
+                    $senderEmployee->id,
+                    $moduleName
+                )));
+            }
 
             // ✅ Notify Selected Employees (Only If Approved)
             if ($request->status === 'Approved') {

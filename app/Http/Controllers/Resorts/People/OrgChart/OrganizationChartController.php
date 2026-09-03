@@ -171,8 +171,8 @@ class OrganizationChartController extends Controller
             ->where('p.status', 'active')
             ->when($departmentId, fn($q) => $q->where('mr.dept_id', $departmentId))
             ->when(!$departmentId && is_array($scopedDeptIds), fn($q) => $q->whereIn('mr.dept_id', $scopedDeptIds))
-            ->groupBy('pmd.position_id', 'p.position_title', 'mr.dept_id')
-            ->selectRaw('pmd.position_id, p.position_title, mr.dept_id, MAX(pmd.headcount) as headcount')
+            ->groupBy('pmd.position_id', 'p.position_title', 'mr.dept_id', 'p.Rank')
+            ->selectRaw('pmd.position_id, p.position_title, mr.dept_id, p.Rank as position_rank, MAX(pmd.headcount) as headcount')
             ->get();
 
         // Currently active employees per position (after the LWD filter
@@ -186,15 +186,54 @@ class OrganizationChartController extends Controller
             return $row;
         })->filter(fn($r) => $r->vacant_count > 0)->values();
 
-        // Per-department head — HOD (rank=2) first, then EXCOM (rank=1).
-        $vacantDeptIds = $vacantRows->pluck('dept_id')->filter()->unique();
-        $deptHeads = [];
-        foreach ($vacantDeptIds as $deptId) {
-            $head = $employees->first(function ($emp) use ($deptId) {
-                return (int)$emp->Dept_id === (int)$deptId && in_array((int)$emp->rank, [2, 1], true);
-            });
-            if ($head) $deptHeads[$deptId] = $head->id;
+        // Nearest present superior for a vacant slot, walking UP the rank
+        // chain from one tier above the vacancy's own rank — SUP(5) ->
+        // MGR(4) -> HOD(2) -> EXCOM(1) — instead of always jumping straight
+        // to HOD/EXCOM regardless of what rank the vacant position actually
+        // is. A line-level vacancy (rank 6, not itself in the chain) starts
+        // the search at SUP; a vacant Manager (rank 4) starts one tier up,
+        // at HOD, since a fellow Manager isn't a superior.
+        $rankChain = [5, 4, 2, 1];
+        $employeeIdsByDeptRank = [];
+        foreach ($employees as $emp) {
+            $employeeIdsByDeptRank[(int) $emp->Dept_id][(int) $emp->rank][] = $emp->id;
         }
+
+        // Real open requisitions (Talent Acquisition/manning) can carry an
+        // explicit reporting_to — the most accurate signal when it exists,
+        // since it reflects who was actually requisitioned against. Takes
+        // priority over the rank-walk below.
+        $vacancyPositionIds = $vacantRows->pluck('position_id')->unique()->values()->all();
+        $vacancyReportingToByPosition = empty($vacancyPositionIds) ? [] : \App\Models\Vacancies::where('Resort_id', $resortId)
+            ->where('status', 'Active')
+            ->whereIn('position', $vacancyPositionIds)
+            ->whereNotNull('reporting_to')
+            ->where('reporting_to', '!=', 0)
+            ->pluck('reporting_to', 'position')
+            ->all();
+
+        $findNearestSuperiorId = function ($deptId, $positionId, $vacantRank) use ($employeeIdsByDeptRank, $rankChain, $vacancyReportingToByPosition, $visibleEmployeeIds) {
+            $reportingTo = (int) ($vacancyReportingToByPosition[$positionId] ?? 0);
+            if ($reportingTo > 0 && in_array($reportingTo, $visibleEmployeeIds, true)) {
+                return $reportingTo;
+            }
+
+            $startIndex = array_search((int) $vacantRank, $rankChain, true);
+            // Rank not in the SUP-MGR-HOD-EXCOM chain at all (e.g. a
+            // line-worker rank) starts the search at the top of the chain
+            // (SUP); a rank that IS one of these tiers starts one step
+            // above its own tier, since a peer isn't a superior.
+            $searchFrom = $startIndex === false ? 0 : $startIndex + 1;
+
+            for ($i = $searchFrom; $i < count($rankChain); $i++) {
+                $rank = $rankChain[$i];
+                if (!empty($employeeIdsByDeptRank[$deptId][$rank])) {
+                    return $employeeIdsByDeptRank[$deptId][$rank][0];
+                }
+            }
+
+            return null;
+        };
 
         // Department name lookup (avoid an extra query per row).
         $deptNameById = $departments->pluck('name', 'id')->all();
@@ -203,14 +242,15 @@ class OrganizationChartController extends Controller
         $vacantSeq = 0;
         foreach ($vacantRows as $row) {
             $slots = max(1, (int) $row->vacant_count);
+            $superiorId = $findNearestSuperiorId($row->dept_id, $row->position_id, $row->position_rank ?? null);
             for ($i = 0; $i < $slots; $i++) {
                 $vacantSeq++;
                 $vacantNodes[] = [
                     // Unique ID per slot so multi-vacancy positions render
                     // as separate boxes (e.g. Waitress x1 + Commis x1).
                     'id' => 'vacant_' . $row->position_id . '_' . $i,
-                    'pid' => isset($deptHeads[$row->dept_id])
-                        ? ('emp_' . $deptHeads[$row->dept_id])
+                    'pid' => $superiorId
+                        ? ('emp_' . $superiorId)
                         : ('dept_' . $row->dept_id),
                     'name' => 'Vacant',
                     'position' => $row->position_title ?? '—',

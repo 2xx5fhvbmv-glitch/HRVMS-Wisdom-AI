@@ -15,6 +15,8 @@ use Illuminate\Support\Facades\File;
 use App\Models\Employee;
 use App\Models\IncidentsMeeting;
 use App\Models\IncidentsEmployeeStatements;
+use App\Models\IncidentCommitteeMember;
+use App\Events\ResortNotificationEvent;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
@@ -400,6 +402,56 @@ class IncidentController extends Controller
             }
     
             DB::commit();
+
+            // Nothing told HR or the reporter's own manager a new incident had
+            // come in — mirrors the notify pattern already used for statement
+            // submissions further down this controller (provideStatement()).
+            // Wrapped in its own try/catch and kept OUTSIDE the DB transaction
+            // logic above: the incident is already committed at this point, so
+            // a notification failure must never turn into a 500 that makes the
+            // app think the whole submission failed.
+            try {
+                $notifyIds = array_values(array_unique(array_filter(array_merge(
+                    Common::getResortHrEmployeeIds($this->resort_id),
+                    [$employee->reporting_to]
+                ))));
+                $notifyIds = array_diff($notifyIds, [$emp_id]);
+
+                if (!empty($notifyIds)) {
+                    $submitterName = trim(($employee->resortAdmin->first_name ?? '') . ' ' . ($employee->resortAdmin->last_name ?? ''));
+                    $title = 'New Incident Reported';
+                    $msg = ($submitterName ?: 'An employee') . ' reported incident "' . $incident->incident_name . '" (#' . $incident->incident_id . ').';
+                    $ModuleName = "Incident";
+
+                    foreach ($notifyIds as $notifyId) {
+                        event(new ResortNotificationEvent(Common::nofitication(
+                            $this->resort_id,
+                            10,
+                            $title,
+                            $msg,
+                            0,
+                            $notifyId,
+                            $ModuleName
+                        )));
+
+                        Common::sendMobileNotification(
+                            $this->resort_id,
+                            2,
+                            '',
+                            '',
+                            $title,
+                            $msg,
+                            $ModuleName,
+                            [$notifyId],
+                            $incident->id,
+                            true,
+                            'incident-notification'
+                        );
+                    }
+                }
+            } catch (\Exception $e) {
+                \Log::error('AddIncident notification failed: ' . $e->getMessage());
+            }
 
             return response()->json([
                 'message' => 'Incident created successfully',
@@ -813,7 +865,7 @@ class IncidentController extends Controller
                         ->where('employee_id', $emp_id)
                         ->orderByDesc('id')
                         ->first();
-                    return $this->formatMyStatementRow($incident, 'involved_employee', $statement->statement ?? null, $statement ? $statement->status === 'submitted' : false);
+                    return $this->formatMyStatementRow($incident, 'involved_employee', $statement->statement ?? null, $statement ? $statement->status === 'submitted' : false, $statement->document_path ?? null);
                 });
 
             $witnessIncidentIds = IncidentsWitness::where('witness_id', $emp_id)->pluck('incident_id');
@@ -824,10 +876,17 @@ class IncidentController extends Controller
                 ->map(function ($incident) use ($emp_id) {
                     $witness = IncidentsWitness::where('incident_id', $incident->id)->where('witness_id', $emp_id)->first();
                     $stmt = $witness->witness_statements ?? null;
-                    return $this->formatMyStatementRow($incident, 'witness', $stmt, !empty($stmt));
+                    return $this->formatMyStatementRow($incident, 'witness', $stmt, !empty($stmt), $witness->witness_statement_file ?? null);
                 });
 
-            $all = $involvedIncidents->merge($witnessIncidents)
+            // ->map() on an Eloquent query result keeps the Eloquent
+            // Collection class even though every item is now the plain
+            // array formatMyStatementRow() returns — Eloquent Collection's
+            // own merge() assumes Model items and calls ->getKey() on
+            // each, which crashes on a plain array. ->toBase() drops back
+            // to a plain Collection first, where merge()/unique() work on
+            // arrays fine.
+            $all = $involvedIncidents->toBase()->merge($witnessIncidents->toBase())
                 ->unique('id')
                 ->sortByDesc('id')
                 ->values();
@@ -849,8 +908,21 @@ class IncidentController extends Controller
         }
     }
 
-    private function formatMyStatementRow($incident, $role, $statementText, $submitted)
+    private function formatMyStatementRow($incident, $role, $statementText, $submitted, $documentPathJson = null)
     {
+        // document_path / witness_statement_file are stored as a JSON array
+        // of StorageHelper-relative paths (see provideStatement()) — never
+        // read back here before, so the mobile statement history had
+        // nowhere to show what was attached even though the file itself
+        // was saved correctly.
+        $paths = json_decode($documentPathJson ?? '', true) ?: [];
+        $attachments = collect($paths)->filter()->map(function ($path) {
+            return [
+                'file_name' => basename($path),
+                'url'       => \App\Helpers\StorageHelper::temporaryUrl($path),
+            ];
+        })->values();
+
         return [
             'id'            => $incident->id,
             'incident_id'   => $incident->incident_id,
@@ -860,6 +932,7 @@ class IncidentController extends Controller
             'your_role'     => $role,
             'status'        => $submitted ? 'submitted' : 'pending',
             'statement'     => $statementText,
+            'attachments'   => $attachments,
         ];
     }
 
@@ -891,7 +964,7 @@ class IncidentController extends Controller
 
             $incident           =       Incidents::where("resort_id", $this->resort_id)
                                                     ->where('id',$data['incident_id'])
-                                                    ->select(['id','incident_name','incident_date','involved_employees','incident_id'])
+                                                    ->select(['id','incident_name','incident_date','involved_employees','incident_id','assigned_to'])
                                                     ->first();
 
             $witness            =       IncidentsWitness::join('incidents as i','i.id','=','incidents_witness.incident_id')
@@ -956,7 +1029,51 @@ class IncidentController extends Controller
                 'incident_date' => date('d M Y', strtotime($incident->incident_date)),  
             ];
 
-            $incidentData['incident']                       =   $formattedIncident;           
+            $incidentData['incident']                       =   $formattedIncident;
+
+            // Notify the committee members assigned to this incident that a
+            // statement has come in — mirrors the notify-on-request flow in
+            // Resorts\Incident\IncidentController::requestStatement(), just
+            // the other direction (submission instead of request). Nothing
+            // told them a mobile-submitted statement had arrived before this.
+            $assignedCommitteeIds = json_decode($incident->assigned_to ?? '[]', true) ?: [];
+            if (!empty($assignedCommitteeIds)) {
+                $committeeMembers = IncidentCommitteeMember::whereIn('commitee_id', $assignedCommitteeIds)
+                    ->get()
+                    ->unique('member_id')
+                    ->values();
+
+                $submitterName = trim(($employee->resortAdmin->first_name ?? '') . ' ' . ($employee->resortAdmin->last_name ?? ''));
+                $title = 'Incident Statement Submitted';
+                $msg = ($submitterName ?: 'An employee') . ' submitted a statement for incident #' . $incident->incident_id . '.';
+                $ModuleName = "Incident";
+
+                foreach ($committeeMembers as $member) {
+                    event(new ResortNotificationEvent(Common::nofitication(
+                        $this->resort_id,
+                        10,
+                        $title,
+                        $msg,
+                        0,
+                        $member->member_id,
+                        $ModuleName
+                    )));
+
+                    Common::sendMobileNotification(
+                        $this->resort_id,
+                        2,
+                        '',
+                        '',
+                        $title,
+                        $msg,
+                        $ModuleName,
+                        [$member->member_id],
+                        $incident->id,
+                        true,
+                        'incident-notification'
+                    );
+                }
+            }
 
             $response['status']                             =   true;
             $response['message']                            =   'Your statement for incident #'. $incident->incident_id .' has been successfully submitted';

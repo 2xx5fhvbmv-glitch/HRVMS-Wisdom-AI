@@ -19,6 +19,8 @@ use App\Models\TrainingAttendance;
 use App\Models\TrainingFeedbackForm;
 use App\Models\TrainingParticipant;
 use App\Models\TrainingFeedbackResponse;
+use App\Models\EvaluationForm;
+use App\Models\EvaluationFormResponse;
 use App\Models\EmployeeItineraries;
 use App\Models\LearningMaterials;
 use App\Helpers\Common;
@@ -184,20 +186,37 @@ class LearningController extends Controller
 
             $scheduleId                             =   base64_decode($scheduleId);
             $resort_id                              =   $this->resort_id;
+            // Route param is named "schedule_id" but callers across the app
+            // disagree on what they send: some pass the schedule's own row
+            // id (training_schedules.id), others pass training_id (the
+            // learning_programs FK, shared across every session of the same
+            // program). Match either — resolving by the schedule's own id
+            // also fixes a program with 2+ sessions always returning
+            // whichever one sorted first under a training_id-only match.
             $sessions                               =   TrainingSchedule::with(['learningProgram', 'participants.employee.resortAdmin','learningProgram.category'])
                                                             ->where('training_schedules.resort_id', $resort_id)
-                                                            ->where('training_schedules.training_id', $scheduleId)
+                                                            ->where(function ($q) use ($scheduleId) {
+                                                                $q->where('training_schedules.id', $scheduleId)
+                                                                  ->orWhere('training_schedules.training_id', $scheduleId);
+                                                            })
                                                             ->first();
+
+            // Was dereferencing $sessions->learningProgram->trainer (and
+            // several other $sessions->learningProgram-> fields below)
+            // BEFORE this check ever ran — a scheduleId that doesn't
+            // resolve to a real session, or a session whose learningProgram
+            // relation is missing, crashed with a 500 ("Learning request
+            // doesn't have the session details" on the client) instead of
+            // a clean "not found".
+            if (!$sessions || !$sessions->learningProgram) {
+                return response()->json(['success' => false, 'message' => 'Training session not found'], 200);
+            }
+
             $trainerData                            =   Employee::with('resortAdmin')->where('id',$sessions->learningProgram->trainer)
                                                             ->first();
 
             if ($trainerData) {
                 $trainerData->profile = Common::getResortUserPicture($trainerData->Admin_Parent_id);
-            }
-
-            //Check if session exists
-            if (!$sessions) {
-                return response()->json(['success' => false, 'message' => 'Training session not found'], 200);
             }
 
             $data = [
@@ -207,11 +226,12 @@ class LearningController extends Controller
                 'training_end_date'                 =>  $sessions->end_date,
                 'training_start_time'               =>  $sessions->start_time,
                 'training_end_time'                 =>  $sessions->end_time,
+                'location'                           =>  $sessions->venue,
                 'category'                          =>  $sessions->learningProgram->category->category ?? 'N/A',
                 'description'                       =>  $sessions->learningProgram->description ?? '',
-                'trainer_first_name'                =>  $trainerData->resortAdmin->first_name,
-                'trainer_last_name'                 =>  $trainerData->resortAdmin->last_name,
-                'trainer_profile'                   =>  $trainerData->profile,
+                'trainer_first_name'                =>  optional(optional($trainerData)->resortAdmin)->first_name,
+                'trainer_last_name'                 =>  optional(optional($trainerData)->resortAdmin)->last_name,
+                'trainer_profile'                   =>  optional($trainerData)->profile,
             ];
 
             $data['participants'] = [];
@@ -560,6 +580,7 @@ class LearningController extends Controller
 
                 $sessionData =  [
                     'id'                            =>  $session['learningProgram']['id'],
+                    'training_schedule_id'          =>  $session->id,
                     'title'                         =>  $session->learningProgram->name,
                     'session_date'                  =>  $session->start_date,
                     'start_time'                    =>  date('h:i A', strtotime($session->start_time)),
@@ -570,7 +591,17 @@ class LearningController extends Controller
 
                 $events[]                           =   $sessionData;
             }
-            
+
+            // Programs this employee already has an actual scheduled session
+            // for (rendered above with real venue/trainer/dates via $sessions).
+            // A learning request has no persisted link to the schedule it
+            // eventually becomes — matched only by training_id == learning_id
+            // — so once scheduled it must be skipped below, otherwise it
+            // renders twice: once correctly, once as a stale stub with no
+            // training_schedule_id, hardcoded 9-5 times, and the request's
+            // own approval status instead of "Scheduled".
+            $scheduledProgramIds                    =   $sessions->pluck('training_id')->filter()->unique();
+
             $learningRequests                       =   LearningRequest::join("learning_requests_employees as lre", "learning_requests.id", "=", 'lre.learning_request_id')
                                                             ->where('lre.employee_id', $employeeId)
                                                             ->where('learning_requests.resort_id', $this->resort_id)
@@ -578,8 +609,13 @@ class LearningController extends Controller
 
             // Process Learning Requests
             foreach ($learningRequests as $request) {
+                if ($scheduledProgramIds->contains($request->learning_id)) {
+                    continue;
+                }
+
                 $requestData                        =   [
                     'id'                            =>  $request->learning->id,
+                    'training_schedule_id'          =>  null,
                     'title'                         =>  "Learning Request: " . $request->learning->name,
                     'session_date'                  =>  $request->start_date,
                     'start_time'                    =>  '09:00 AM', // Adjust if necessary
@@ -593,6 +629,53 @@ class LearningController extends Controller
 
             $dashboardArr['assign_trainig_prog_comp_percen']    =   $completedPercentage;
             $dashboardArr['assign_trainig_programs']            =   $events;
+
+            // completed_training_count above was already correct — the
+            // employee L&D screens ("Past Training Programs",
+            // "Pending Feedback & Evaluation") need the actual items, not
+            // just a count. Neither array existed at all before this.
+            $completedSessions                      =   $sessions->filter(function ($session) use ($today) {
+                                                            return $session->end_date < $today;
+                                                        })->values();
+
+            $dashboardArr['completed_trainings']    =   $completedSessions->map(function ($session) {
+                                                            return [
+                                                                'id'            =>  $session->id,
+                                                                'title'         =>  $session->learningProgram->name ?? null,
+                                                                'session_date'  =>  $session->start_date,
+                                                                'end_date'      =>  $session->end_date,
+                                                                'start_time'    =>  date('h:i A', strtotime($session->start_time)),
+                                                                'end_time'      =>  date('h:i A', strtotime($session->end_time)),
+                                                                'description'   =>  $session->learningProgram->description ?? null,
+                                                                'status'        =>  $session->status,
+                                                            ];
+                                                        })->values();
+
+            // Feedback forms are resort-wide (training_feedback_form has no
+            // per-training link — see feedbackformListing()), a response is
+            // keyed to (form_id, training_id, participant_id). "Pending" =
+            // a completed training this employee attended that has no
+            // response row yet, using whichever form the resort has
+            // configured to submit against.
+            $feedbackFormId                         =   TrainingFeedbackForm::where('resort_id', $this->resort_id)->value('id');
+            $pendingFeedbackForms                   =   collect();
+            if ($feedbackFormId && $completedSessions->isNotEmpty()) {
+                $respondedTrainingIds               =   TrainingFeedbackResponse::where('participant_id', $employeeId)
+                                                            ->whereIn('training_id', $completedSessions->pluck('id'))
+                                                            ->pluck('training_id')->unique();
+                $pendingFeedbackForms               =   $completedSessions->reject(function ($session) use ($respondedTrainingIds) {
+                                                            return $respondedTrainingIds->contains($session->id);
+                                                        })->map(function ($session) use ($feedbackFormId) {
+                                                            return [
+                                                                'training_schedule_id' =>  $session->id,
+                                                                'feedback_form_id'     =>  $feedbackFormId,
+                                                                'title'                =>  $session->learningProgram->name ?? null,
+                                                                'session_date'         =>  $session->start_date,
+                                                            ];
+                                                        })->values();
+            }
+            $dashboardArr['pending_feedback_forms'] =   $pendingFeedbackForms;
+
             return response()->json(['success' => true, 'message' => 'Employee dashboard data fetched Successfully', 'emp_dashboard_data' => $dashboardArr], 200);
 
         } catch (\Exception $e) {
@@ -671,6 +754,8 @@ class LearningController extends Controller
                     'participant_id'                    => $participant_id,
                     'responses'                         => $responses,
                 ]);
+
+                $this->notifyFormSubmitted($resort_id, $participant_id, $trainingScheduleId, $feedbackFormId, 'feedback');
 
                 DB::commit();
             return response()->json(['success' => true, 'message' => 'Feedback data stored successfully'], 200);
@@ -769,7 +854,7 @@ class LearningController extends Controller
                 'message'                           =>  'Feedback data retrieved successfully',
                 'feedback_form_res_view'            =>  $trainingFeedbackResponse
             ], 200);
-        
+
 
         } catch (\Exception $e) {
             \Log::emergency("File: " . $e->getFile());
@@ -777,6 +862,215 @@ class LearningController extends Controller
             \Log::error($e->getMessage());
             return response()->json(['success' => false, 'message' => 'Server error'], 500);
         }
+    }
+
+    /**
+     * Structural mirror of feedbackformListing()/feedbackStore()/
+     * participantFeedbackFromList()/feedbackFormResView() for evaluation
+     * forms — same shapes, same conventions, see those methods' comments
+     * for the reasoning behind them.
+     */
+    public function evaluationformListing()
+    {
+        if (!$this->user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        try {
+            $form = EvaluationForm::where('resort_id', $this->resort_id)->get();
+
+            return response()->json(['success' => true, 'message' => 'Evaluation form data fetched Successfully', 'evaluation_form_listing' => $form], 200);
+
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    public function evaluationStore(Request $request)
+    {
+        if (!$this->user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'evaluation_form_id'                        => 'required',
+            'training_schedule_id'                      => 'required',
+            'responses'                                  => 'required',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
+        }
+
+        DB::beginTransaction();
+        try {
+                $evaluationFormId                       =   $request->evaluation_form_id;
+                $trainingScheduleId                     =   $request->training_schedule_id;
+                $participant_id                         =   $this->user->GetEmployee->id;
+                $responses                              =   $request->responses;
+
+                $existing                               =   EvaluationFormResponse::where('form_id', $evaluationFormId)
+                                                                ->where('training_id', $trainingScheduleId)
+                                                                ->where('participant_id', $participant_id)
+                                                                ->first();
+                if ($existing) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Evaluation has already been submitted for this participant.'
+                    ], 200);
+                }
+
+                EvaluationFormResponse::create([
+                    'form_id'                           => $evaluationFormId,
+                    'training_id'                       => $trainingScheduleId,
+                    'participant_id'                    => $participant_id,
+                    'responses'                         => $responses,
+                ]);
+
+                $this->notifyFormSubmitted($this->resort_id, $participant_id, $trainingScheduleId, $evaluationFormId, 'evaluation');
+
+                DB::commit();
+            return response()->json(['success' => true, 'message' => 'Evaluation data stored successfully'], 200);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    public function participantEvaluationFromList(Request $request)
+    {
+        if (!$this->user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $validator = Validator::make($request->all(), [
+            'training_schedule_id'      => 'required',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
+        }
+
+        try {
+                $trainingScheduleId                     =   $request->training_schedule_id;
+
+                $evaluationResponse                     =   EvaluationFormResponse::join('employees as e','e.id','evaluation_form_responses.participant_id')
+                                                                ->join('resort_admins as t1', "t1.id", "=", "e.Admin_Parent_id")
+                                                                ->join('resort_positions as t2', "t2.id", "=", "e.Position_id")
+                                                                ->when($trainingScheduleId, function ($query, $trainingScheduleId) {
+                                                                    return $query->where('evaluation_form_responses.training_id', $trainingScheduleId);
+                                                                })
+                                                                ->select(
+                                                                   'evaluation_form_responses.*',
+                                                                    't1.id as Parentid',
+                                                                    't1.first_name',
+                                                                    't1.last_name',
+                                                                    't1.profile_picture',
+                                                                    'e.id as emp_id',
+                                                                    't2.position_title',
+                                                                )->get()
+                                                                ->map(function ($item) {
+                                                                    $item->profile_picture = Common::getResortUserPicture($item->Parentid);
+                                                                    return $item;
+                                                                });
+
+                if ($evaluationResponse->isEmpty()) {
+                    return response()->json([
+                        'success'                       => true,
+                        'message'                       => 'No evaluation records found',
+                        'evaluation_listing'            => []
+                    ]);
+                }
+
+                return response()->json([
+                    'success'                           =>  true,
+                    'message'                           =>  'Evaluation data retrieved successfully',
+                    'evaluation_listing'                =>  $evaluationResponse
+                ], 200);
+
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    public function evaluationFormResView($formResId)
+    {
+        if (!$this->user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        try {
+            $evaluationResponse                         =   EvaluationFormResponse::join('evaluation_form as ef','ef.id','evaluation_form_responses.form_id')
+                                                                ->when($formResId, function ($query, $formResId) {
+                                                                    return $query->where('evaluation_form_responses.id', $formResId);
+                                                                })
+                                                                ->select(
+                                                                    'evaluation_form_responses.*',
+                                                                   'ef.form_name',
+                                                                   'ef.form_structure',
+                                                                )->first();
+
+            return response()->json([
+                'success'                           =>  true,
+                'message'                           =>  'Evaluation data retrieved successfully',
+                'evaluation_form_res_view'          =>  $evaluationResponse
+            ], 200);
+
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    /**
+     * Alerts HR (Common::getResortHrEmployeeIds) and L&D Manager
+     * (Common::getResortLdManagerEmployeeIds) whenever an employee submits a
+     * feedback or evaluation form, so review isn't missed. Excludes the
+     * submitter themself in case they happen to also be HR/L&D.
+     */
+    private function notifyFormSubmitted($resortId, $submitterEmployeeId, $trainingScheduleId, $formId, string $formType)
+    {
+        $notifyIds = array_values(array_diff(
+            array_unique(array_merge(
+                Common::getResortHrEmployeeIds($resortId),
+                Common::getResortLdManagerEmployeeIds($resortId)
+            )),
+            [(int) $submitterEmployeeId]
+        ));
+
+        if (empty($notifyIds)) {
+            return;
+        }
+
+        $submitterName = optional($this->user)->full_name ?? 'An employee';
+        $trainingName  = optional(optional(TrainingSchedule::with('learningProgram')->find($trainingScheduleId))->learningProgram)->name;
+        $label         = $formType === 'evaluation' ? 'Evaluation' : 'Feedback';
+
+        Common::sendMobileNotification(
+            $resortId,
+            2,
+            $formId,
+            $trainingScheduleId,
+            "{$label} Form Submitted",
+            "{$submitterName} submitted {$label}" . ($trainingName ? " for {$trainingName}" : '') . '.',
+            'Learning',
+            $notifyIds,
+            null,
+            false,
+            "training-{$formType}-form-submitted"
+        );
     }
 
     /**

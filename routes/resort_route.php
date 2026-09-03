@@ -200,6 +200,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     /***Manning page  */
     Route::get('/manning', 'ManningController@index')->name('resort.manning.index');
     Route::get('/manning/dropdown-data', 'ManningController@getDropdownData')->name('manning.dropdown.data');
+    Route::get('/manning/rank-grade-mapping', 'ManningController@getRankGradeMapping')->name('manning.rank-grade-mapping');
 
     // Listing all divisions with DataTables
     Route::get('/manning/getdivisions', 'ManningController@get_divisions')->name('manning.divisions.data');
@@ -342,6 +343,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::post('/get/occupancy-data', ['App\Http\Controllers\Resorts\OccupancyController', 'getOccupancyData'])->name('occupancy.getData');
 
     // Notifications
+    Route::get('test-push-notification', 'ResortAllNotificationController@testPushNotification')->name('resort.testPushNotification');
     Route::post('workforce-planning/requestmanning', 'ResortAllNotificationController@ManningNotification')->name('resort.manning.notification');
     Route::post('workforce-planning/reminder/request-manning', 'ResortAllNotificationController@ReminderRequestManning')->name('resort.reminder.manning.notification');
     Route::post('workforce-planning/send-to-finance', 'ResortAllNotificationController@SendToFinance')->name('resort.SendToFinance.manning.notification');
@@ -1235,6 +1237,11 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
     Route::post('learning/employees/get-dept-wise','Learning\TrainingScheduleController@getEmployeesDeptwise')->name('get.employees.deptwise');
     Route::get('learning/program/{id}/detail','Learning\TrainingScheduleController@getProgramDetail')->name('learning.program.detail');
     Route::post('learning/schedule/inline-update','Learning\TrainingScheduleController@inlineUpdate')->name('learning.schedule.update');
+    Route::post('learning/schedule/assign-feedback-form','Learning\TrainingScheduleController@feedbackformAssignParticipant')->name('learning.schedule.assignFeedbackForm');
+    Route::post('learning/schedule/assign-evaluation-form','Learning\TrainingScheduleController@evaluationformAssignParticipant')->name('learning.schedule.assignEvaluationForm');
+    Route::get('learning/schedule/{id}/feedback-responses','Learning\TrainingScheduleController@feedbackResponses')->name('learning.schedule.feedbackResponses');
+    Route::get('learning/schedule/{id}/evaluation-responses','Learning\TrainingScheduleController@evaluationResponses')->name('learning.schedule.evaluationResponses');
+    Route::get('learning/forms/list','Learning\TrainingScheduleController@getAssignableForms')->name('learning.forms.list');
 
     Route::get('learning/schedule/attendance', 'Learning\AttendanceController@index')->name('learning.schedule.attendance');
     Route::get('learning/schedule/attendance/list', 'Learning\AttendanceController@list')->name('learning.schedule.attendance.list');
@@ -1633,15 +1640,6 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
 
        Route::post('/people/configuration/resignation-withdrawal', 'People\ConfigController@EmployeeResignationWithdrawalConfigStore')->name('people.config.resignation-withdrawal-config');
 
-       //Benefit Grade Levels (resort-configurable grade tags for Benefit Grid, e.g. "HOD L1")
-       Route::get('/people/benefit-grade-level', 'People\BenefitGradeLevelController@index')->name('resort.benefitgradelevel.index');
-       Route::get('/people/benefit-grade-level/list', 'People\BenefitGradeLevelController@list')->name('resort.benefitgradelevel.list');
-       Route::post('/people/benefit-grade-level/store', 'People\BenefitGradeLevelController@store')->name('resort.benefitgradelevel.store');
-       Route::put('/people/benefit-grade-level/inline-update/{id}', 'People\BenefitGradeLevelController@inlineUpdate')->name('resort.benefitgradelevel.inlineUpdate');
-       Route::delete('/people/benefit-grade-level/destroy/{id}', 'People\BenefitGradeLevelController@destroy')->name('resort.benefitgradelevel.destroy');
-       Route::post('/people/benefit-grade-level/update-ranks/{id}', 'People\BenefitGradeLevelController@updateRanks')->name('resort.benefitgradelevel.updateRanks');
-       Route::get('/people/benefit-grade-level/ranks-for/{id}', 'People\BenefitGradeLevelController@ranksFor')->name('resort.benefitgradelevel.ranksFor');
-
        // Letterhead & E-signature configuration (used by document/letter PDFs).
        Route::get('/people/configuration/letterhead', 'People\ConfigController@letterheadIndex')->name('people.config.letterhead');
        Route::post('/people/configuration/letterhead/store', 'People\ConfigController@letterheadStore')->name('people.config.letterhead.store');
@@ -1756,6 +1754,7 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
        Route::post('/people/employees/activate', 'People\Employee\EmployeeController@activate')->name('people.employees.activate');
       Route::post('/people/employees/bulk-delete', 'People\Employee\EmployeeController@bulkDelete')->name('employee.bulk.delete');
       Route::post('/people/employees/send-credentials', 'People\Employee\EmployeeController@sendCredentials')->name('people.employee.send-credentials');
+      Route::post('/people/employees/{id}/send-employment-verification-letter', 'People\Employee\EmployeeController@sendEmploymentVerificationLetter')->name('people.employees.sendEmploymentVerificationLetter');
 
 
 
@@ -1961,6 +1960,9 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
     Route::get('sos/emergency-type/index', 'SOS\ConfigurationController@IndexSOSEmergencyTypes')->name('sos.config.IndexSOSEmergencyTypes');
     Route::delete('sos/emergency-type/destroy/{id}', 'SOS\ConfigurationController@SOSEmergencyTypesDestory')->name('sos.config.SOSEmergencyTypesDestory');
     Route::post('sos/emergency-type/update/{id}', 'SOS\ConfigurationController@updateEmergencyTypes')->name('sos.emergencyType.update');
+
+    // SOS Emergency Contact Numbers (Police/Fire/MNDF, used by the mobile Receive SOS screen's Call buttons)
+    Route::post('sos/emergency-contacts/store', 'SOS\ConfigurationController@EmergencyContactsStore')->name('sos.config.EmergencyContactsStore');
 
     // SOS Dashboard
     Route::get('sos/dashboard', 'SOS\DashboardController@index')->name('sos.dashboard.index');

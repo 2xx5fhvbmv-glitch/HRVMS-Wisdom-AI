@@ -725,7 +725,7 @@ class PayrollController extends Controller
             // active grade for this resort (resolveEmpGrade() guards against
             // stale/poisoned values); otherwise falls back to the rank-based
             // default grade mapping.
-            $empGrade = Common::resolveEmpGrade($resortId, $employee->rank, $employee->benefit_grid_level);
+            $empGrade = Common::resolveEmpGrade($resortId, $employee->rank, $employee->benefit_grid_level, $employee->Position_id);
             $grid = ResortBenifitGrid::where('resort_id', $resortId)
                 ->where('emp_grade', $empGrade)
                 ->where('service_charge', 1)
@@ -2118,9 +2118,29 @@ class PayrollController extends Controller
             $employeeNames = Employee::with('resortAdmin')->whereIn('id', $employeeIds)->where('resort_id', $this->resort->resort_id)->get()
                 ->map(fn($e) => $e->resortAdmin->first_name . ' ' . $e->resortAdmin->last_name)->implode(', ');
 
+            // The OT approval screen (Time & Attendance > Overtime) defaults
+            // its month/year filter to today's calendar month, computed
+            // independently of whichever payroll period is actually being
+            // run — so an entry from an earlier period (exactly what this
+            // check just found) is invisible there until HR manually picks
+            // the right month/year. Nothing told them which one, so name
+            // it explicitly. The dropdown's "month" is a payroll-cutoff
+            // period label, not the entry's own calendar month — a date
+            // after cutoff_day belongs to next calendar month's label
+            // (same inversion OverTime()/OverTimeFilter() use to build the
+            // period from a selected month/year).
+            $cutoffDay = PayrollConfig::where('resort_id', $this->resort->resort_id)->value('cutoff_day') ?? 1;
+            $periodLabels = $invalidOTs->map(function ($ot) use ($cutoffDay) {
+                $d = \Carbon\Carbon::parse($ot->date);
+                $label = $d->day > $cutoffDay ? $d->copy()->addMonthNoOverflow() : $d->copy();
+                return $label->format('F Y');
+            })->unique()->values();
+            $periodHint = $periodLabels->implode(', ');
+
             return response()->json([
                 'success' => false,
                 'message' => 'Cannot proceed. The following employees have OT entries with missing OT status: ' . $employeeNames
+                    . '. Go to Time & Attendance > Overtime and select ' . $periodHint . ' to review and approve/reject them.'
             ], 422);
         }
 

@@ -84,6 +84,7 @@ class ChatController extends Controller
                                    'last_seen' => $ResortAdmin->updated_at,
                                    'profile' => Common::getResortUserPicture($ResortAdmin->id),
                                    'last_msg' => $lastMessage->message ?? null,
+                                   'last_message_time' => optional($lastMessage)->created_at,
                                    'unread_count' => $unreadCount,
                                    'type' => 'individual',
                               ];
@@ -117,13 +118,25 @@ class ChatController extends Controller
                                    'last_seen' => $group->updated_at,
                                    'profile' => $group->profile_picture ? \App\Helpers\StorageHelper::temporaryUrl($group->profile_picture) : null,
                                    'last_msg' => $lastMessage->message ?? null,
+                                   'last_message_time' => optional($lastMessage)->created_at,
                                    'unread_count' => $unreadCount,
                                    'type' => 'group',
                               ];
                       });
 
-               $chats = $chatWithEmp->merge($chatInGroups);
-          
+               // Was returned in whatever order the underlying ResortAdmin/
+               // GroupChat queries happened to return (registration order),
+               // completely unrelated to which conversation most recently
+               // received a message — the newest message never bumped its
+               // thread to the top. Sort by last_message_time descending;
+               // conversations with no messages yet sink to the bottom
+               // instead of being scattered in with active ones.
+               $chats = $chatWithEmp->merge($chatInGroups)
+                    ->sortByDesc(function ($chat) {
+                         return $chat['last_message_time'] ?? '0000-00-00 00:00:00';
+                    })
+                    ->values();
+
                return response()->json([
                     'success' => true,
                     'chats' => $chats,
@@ -160,13 +173,21 @@ class ChatController extends Controller
 
           $employees = $employees->get();
 
+          // getResortUserPicture() runs one query per call — on a resort
+          // with hundreds of employees this was one query per row (the
+          // reported 3-4s load), all to build a picture URL. Batch-resolve
+          // every picture in a single query instead, same pattern already
+          // used elsewhere via getResortUserPicturesBatch().
+          $adminIds = $employees->pluck('resortAdmin.id')->filter()->values()->all();
+          $pictures = Common::getResortUserPicturesBatch($adminIds);
+
           $datas = [];
           foreach ($employees as $employee) {
                if($employee->resortAdmin != null ){
                     $datas[] = [
                          'id' => $employee->resortAdmin->id,
                          'name' => $employee->resortAdmin->full_name,
-                         'profile' => Common::getResortUserPicture($employee->resortAdmin->id),
+                         'profile' => $pictures[$employee->resortAdmin->id] ?? Common::getResortUserPicture($employee->resortAdmin->id),
                          'type' => 'individual',
                     ];
                }
@@ -297,13 +318,16 @@ class ChatController extends Controller
                          $query->whereNotIn('id', $members);
                     })->get();
 
+               $adminIds = $newMemberList->pluck('resortAdmin.id')->filter()->values()->all();
+               $pictures = Common::getResortUserPicturesBatch($adminIds);
+
                $datas = [];
                foreach ($newMemberList as $employee) {
                          if($employee->resortAdmin != null ){
                               $datas[] = [
                                    'id' => $employee->resortAdmin->id,
                                    'name' => $employee->resortAdmin->full_name,
-                                   'profile' => Common::getResortUserPicture($employee->resortAdmin->id),
+                                   'profile' => $pictures[$employee->resortAdmin->id] ?? Common::getResortUserPicture($employee->resortAdmin->id),
                               ];
                          }
                     }

@@ -254,7 +254,17 @@ $(document).on("click",".Employee",function(){
                         </div>`);
 });
 $(document).on("click",".AddTraning",function(){
+    // Same link toggles both ways, but nothing showed that or reset the
+    // fields on hide — so "removing" training left the (now-invisible)
+    // select values still populated and still submitted with the form.
+    let isHiding = !$(".checkTraning").first().hasClass("d-none");
     $(".checkTraning").toggleClass("d-none");
+    if (isHiding) {
+        $("#select_training, #select_learning_manager_id").val("").trigger("change");
+        $(this).text("Add Training");
+    } else {
+        $(this).text("Remove Training");
+    }
 });
 
 $(document).on("keyup",".search",function(){
@@ -417,7 +427,7 @@ function loadApprovedList() {
                             <span class="badge badge-themeSuccess">Approved</span>
                         </div>
                         <div class="small mt-2">
-                            <div><strong>Date:</strong> ${row.date_discussion}</div>
+                            <div><strong>Date:</strong> ${row.date_discussion || '-'}</div>
                             <div><strong>Time:</strong> ${row.start_time} - ${row.end_time}</div>
                             <div><strong>Place:</strong> ${row.Meeting_Place}</div>
                         </div>

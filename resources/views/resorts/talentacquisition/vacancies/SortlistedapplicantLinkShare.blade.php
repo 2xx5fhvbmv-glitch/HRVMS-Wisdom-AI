@@ -866,7 +866,7 @@ $(document).on("change", '[name="MalidivanManualTime"]', function () {
             $.ajax({
                 url: "{{ route('resort.ta.DownloadFile') }}",
                 type: "POST",
-                data: { id: fileId, flag: fileFlag },
+                data: { id: fileId, flag: fileFlag, "_token": "{{ csrf_token() }}" },
                 success: function(response) {
                     if (response.success) {
                         let fileUrl = response.NewURLshow;
@@ -924,7 +924,7 @@ $(document).on("change", '[name="MalidivanManualTime"]', function () {
             $.ajax({
                 url: "{{ route('resort.ta.DownloadAllFiles') }}",
                 type: "POST",
-                data: { id: fileId },
+                data: { id: fileId, "_token": "{{ csrf_token() }}" },
                 success: function(response) {
                     btn.prop('disabled', false).text('Download All');
                     if (response.success) {

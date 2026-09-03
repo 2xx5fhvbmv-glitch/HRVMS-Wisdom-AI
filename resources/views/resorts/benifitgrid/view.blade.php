@@ -36,6 +36,7 @@
                     'selected_linen_array' => $selected_linen_array,
                     'selected_laundry' => $selected_laundry,
                     'selected_sports' => $selected_sports,
+                    'positionsByRank' => $positionsByRank ?? null,
                 ])
             </div>
         </div>

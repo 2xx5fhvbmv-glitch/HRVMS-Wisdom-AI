@@ -38,7 +38,21 @@ class PaymentController extends Controller
     {
         $page_title ='Payments';
         $shopkeeper = $this->shopkeeper;
-        return view('shopkeeper.payments.index',compact('page_title','shopkeeper'));
+
+        // The AJAX list() endpoint already defaults to the resort's real
+        // payroll period when no explicit range is sent — but this page's
+        // date-range picker was hardcoded to the calendar month
+        // (moment().startOf('month')/endOf('month')) and always sends
+        // that explicit range, overriding list()'s correct default. Pass
+        // the real period through so the picker opens on the same cycle
+        // the Dashboard page already shows.
+        $currentPayroll = Payroll::where('resort_id', $shopkeeper->resort_id)
+            ->orderBy('start_date', 'desc')
+            ->first();
+        $payrollStartDate = $currentPayroll->start_date ?? now()->startOfMonth()->format('Y-m-d');
+        $payrollEndDate = $currentPayroll->end_date ?? now()->endOfMonth()->format('Y-m-d');
+
+        return view('shopkeeper.payments.index',compact('page_title','shopkeeper','payrollStartDate','payrollEndDate'));
     }
 
     public function list(Request $request)
@@ -240,8 +254,21 @@ class PaymentController extends Controller
             // this server (only GD is) — 'svg' renders identically as a
             // scannable QR once displayed in an <img> tag or printed, with
             // no extra extension dependency.
+            //
+            // Was encoding a bare base64 number (e.g. "ODI=") with no URL
+            // or scheme at all — nothing for a phone's camera/scanner to
+            // act on, which is why scanning it did nothing/appeared to
+            // freeze. A real https:// URL always does *something*
+            // sensible on scan (opens a browser at worst); if the mobile
+            // app registers Android App Links / iOS Universal Links for
+            // this path, scanning opens the app directly to the consent
+            // screen instead. No web page exists at this path yet — that
+            // and the app-side link registration are follow-up work, not
+            // built here.
             $qrCodeBase64 = 'data:image/svg+xml;base64,' . base64_encode(
-                QrCode::format('svg')->size(256)->generate(base64_encode((string) $payment->id))
+                QrCode::format('svg')->size(256)->generate(
+                    url('shop/consent-request/' . base64_encode((string) $payment->id))
+                )
             );
             $payment->qr_code = $qrCodeBase64;
             $payment->save();
@@ -350,6 +377,13 @@ class PaymentController extends Controller
                 'message' => $message,
                 'request_id' => $payment->id,
             ]);
+
+            // Was in-app only — never actually pushed to the phone, so the
+            // employee only saw it after reopening the app.
+            $employee = Employee::find($payment->emp_id);
+            if ($employee && !empty($employee->device_token)) {
+                Common::sendPushNotificationForMobile([$employee->device_token], $title, $message, 'Payment Consent', null, null, null, null);
+            }
         } catch (\Throwable $e) {
             \Log::error('Shopkeeper sendConsent failed: ' . $e->getMessage(), ['payment_id' => $payment->id]);
             return response()->json(['success' => false, 'message' => 'Failed to send consent notification.'], 500);

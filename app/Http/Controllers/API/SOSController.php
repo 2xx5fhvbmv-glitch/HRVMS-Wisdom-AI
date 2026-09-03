@@ -19,6 +19,7 @@ use App\Models\Employee;
 use App\Models\ChildSOSHistoryStatus;
 use App\Models\SOSRolesAndPermission;
 use App\Models\SOSChildEmergencyType;
+use App\Models\ResortSiteSettings;
 use Illuminate\Support\Facades\Http;
 use App\Helpers\Common;
 use GuzzleHttp\Client;
@@ -70,6 +71,33 @@ class SOSController extends Controller
         }
     }
     
+    public function getEmergencyContacts()
+    {
+        if (!Auth::guard('api')->check()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        try {
+            $siteSettings = ResortSiteSettings::where('resort_id', $this->resort_id)->first();
+
+            return response()->json([
+                'success' => true,
+                'message' => "Emergency contact numbers retrieved successfully.",
+                'data' => [
+                    'police' => $siteSettings->emergency_police_number ?? null,
+                    'fire' => $siteSettings->emergency_fire_number ?? null,
+                    'mndf' => $siteSettings->emergency_mndf_number ?? null,
+                ],
+            ], 200);
+
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
     public function SOSStore(Request $request)
     {
         if (!Auth::guard('api')->check()) {
@@ -78,7 +106,13 @@ class SOSController extends Controller
         
         $validator = Validator::make($request->all(), [
             'emergency_id'                              =>  'required',
-            'location'                                  =>  'required',
+            // A hard requirement on a typed location string blocked every
+            // SOS trigger that had real GPS coordinates but an empty
+            // location field — exactly backwards for a panic button, where
+            // speed matters and lat/long are the authoritative source of
+            // location anyway. Only require the text fallback when
+            // coordinates genuinely aren't available.
+            'location'                                  =>  'nullable|required_without_all:latitude,longitude',
             'latitude'                                  =>  'required',
             'longitude'                                 =>  'required',
         ]);
@@ -302,6 +336,14 @@ class SOSController extends Controller
                         'team_id'                       =>  $teamId,
                         'emp_id'                        =>  $member->admin_id,
                         'status'                        =>  'Unacknowledged',
+                        // ::insert() is a raw bulk query, not ::create() — it
+                        // never auto-populates Eloquent timestamps, unlike
+                        // $teamHistoryInsertData above which sets them
+                        // explicitly. Every row inserted here previously got
+                        // a permanent NULL updated_at, crashing any view
+                        // calling ->diffForHumans() on it.
+                        'created_at'                    =>  now(),
+                        'updated_at'                    =>  now(),
                     ];
                 }
             }
@@ -661,6 +703,18 @@ class SOSController extends Controller
             if($sosHistoryEmployees){
                 $sosData->sos_history_employee          =   $sosHistoryEmployees;
             }
+
+            // date/time/emergency_description already come through via
+            // sos_history.* above — but nothing here ever resolved WHO
+            // raised it, so the Security Manager's detail screen had no
+            // name or photo to show for the initiating employee.
+            $initiator                                  =   Employee::join('resort_admins as ra', 'ra.id', '=', 'employees.Admin_Parent_id')
+                                                                ->where('employees.id', $sosData->emp_initiated_by)
+                                                                ->select('ra.id as admin_id', 'ra.first_name', 'ra.last_name', 'employees.Emp_id')
+                                                                ->first();
+            $sosData->initiator_name                    =   $initiator ? trim($initiator->first_name . ' ' . $initiator->last_name) : null;
+            $sosData->initiator_emp_id                  =   $initiator->Emp_id ?? null;
+            $sosData->initiator_photo                   =   $initiator ? Common::getResortUserPicture($initiator->admin_id) : null;
 
             $teamMemberStats                            =   SosTeamMemberActivity::where('sos_history_id', $sosId)
                                                                 ->selectRaw("
@@ -1411,7 +1465,8 @@ class SOSController extends Controller
         // sos_history_id was never checked against the resort before
         // insert — a message could be attached to another resort's SOS
         // event log.
-        if (!SOSHistoryModel::where('id', $request->sos_history_id)->where('resort_id', $this->resort_id)->exists()) {
+        $sosHistory                                      =   SOSHistoryModel::where('id', $request->sos_history_id)->where('resort_id', $this->resort_id)->first();
+        if (!$sosHistory) {
             return response()->json(['success' => false, 'message' => 'SOS event not found.'], 404);
         }
 
@@ -1422,6 +1477,18 @@ class SOSController extends Controller
                 'sender_id'                               =>  $this->user->id,
                 'message'                                 =>  $request->message,
             ]);
+
+            // The chat log only ever updated if the employee's app happened
+            // to poll it — nothing told them a new instruction arrived, so
+            // it never showed "in real time". Push it immediately, same as
+            // every other SOS status change.
+            $recipient                                   =   Employee::where('resort_id', $this->resort_id)
+                                                                ->where('id', $sosHistory->emp_initiated_by)
+                                                                ->first(['id', 'device_token']);
+            if ($recipient && $recipient->id != ($this->user->GetEmployee->id ?? null)) {
+                Common::sendPushNotificationForMobile([$recipient->device_token], 'Security Instructions', $request->message, 'SOS', 'Active', 'siren_sound', 'custom_sound_channel', NULL);
+                Common::sendMobileNotification($this->resort_id, 2, null, null, 'Security Instructions', $request->message, 'SOS', [$recipient->id], $sosHistory->id, false, 'sos-chat-message');
+            }
 
             return response()->json([
                 'success'                               =>  true,

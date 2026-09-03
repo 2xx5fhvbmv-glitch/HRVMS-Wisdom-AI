@@ -390,6 +390,15 @@ class ClinicController extends Controller
                 return response()->json(['success' => false, 'message' => 'Appointment not found'], 200);
             }
 
+            // Same reachability as treatmentDetails() — patient employee OR
+            // clinic staff/doctor. Was scoped only by resort_id, so any
+            // employee could view any other employee's appointment by
+            // guessing the id.
+            $isClinicStaff = Auth::guard('temp-clinic-doctor')->check() || (int) ($this->user->GetEmployee->rank ?? 0) === 12;
+            if (!$isClinicStaff && (int) $appointment->employee_id !== (int) $this->actorEmployeeId()) {
+                return response()->json(['success' => false, 'message' => 'Appointment not found'], 200);
+            }
+
             $age                                    =   null;
 
             if ($appointment->employee && $appointment->employee->dob) {
@@ -796,7 +805,15 @@ class ClinicController extends Controller
 
         DB::beginTransaction();
         try {
-            $employee_id                                =   $this->user->GetEmployee->id;
+            // Dead: never read again below (the treatment's own employee_id
+            // comes from $request->employee_id). Left in place, it fatals
+            // for a TemporaryClinicDoctor caller — treatment-add's real,
+            // reachable-by-doctor registration is the SECOND one in
+            // routes/api.php (Laravel keeps only the last-registered route
+            // per URI+method) — GetEmployee is null for that guard, so
+            // ->id on it is a null-dereference that's a fatal error under
+            // prod's stricter handling (confirmed elsewhere in this file,
+            // see actorEmployeeId()'s docblock above).
 
             $treatmentData                              =   ClinicTreatment::create([
                 'resort_id'                             =>  $this->resort_id,
@@ -860,6 +877,27 @@ class ClinicController extends Controller
                     $appointment->save();
                 }
             }
+
+            // Was never sent — treatmentAdd() had no notification call at
+            // all, so the patient found out about a submitted treatment
+            // only by opening the app. appointmentStatusUpdate() (a
+            // separate endpoint) still fires its own "Appointment Approved"
+            // notification when the doctor approves the appointment; this
+            // one is specifically for the treatment being submitted.
+            Common::sendMobileNotification(
+                $this->user->resort_id,
+                2,
+                null,
+                null,
+                'Treatment Submitted',
+                'Your doctor has submitted a treatment for your appointment.',
+                'Clinic',
+                [$request->employee_id],
+                $treatmentData->id,
+                false,
+                'clinic-treatment-submitted'
+            );
+
             DB::commit();
             return response()->json([
                 'success'                           => true,
@@ -1038,6 +1076,19 @@ class ClinicController extends Controller
                                                                 ->where('clinic_treatment.resort_id', $this->resort_id)
                                                                 ->where('clinic_treatment.id', $treatment_id)
                                                                 ->first(['clinic_treatment.*', 'e.Admin_Parent_id','e.rank','e.dob','ra.gender','ra.personal_phone','ra.first_name', 'ra.last_name', 'rp.position_title as position', 'cac.appointment_type']);
+
+            if (!$treatmentData) {
+                return response()->json(['success' => false, 'message' => 'Treatment not found'], 200);
+            }
+
+            // This route is reachable by a patient employee (to view their
+            // own treatment) as well as clinic staff/doctor (to view any
+            // patient's) — was scoped only by resort_id, so any employee
+            // could view any other employee's treatment by guessing the id.
+            $isClinicStaff = Auth::guard('temp-clinic-doctor')->check() || (int) ($this->user->GetEmployee->rank ?? 0) === 12;
+            if (!$isClinicStaff && (int) $treatmentData->employee_id !== (int) $this->actorEmployeeId()) {
+                return response()->json(['success' => false, 'message' => 'Treatment not found'], 200);
+            }
 
             $treatmentData->profile_picture             =   Common::getResortUserPicture($treatmentData->Admin_Parent_id);
             $rankConfig                                 =   config('settings.Position_Rank');

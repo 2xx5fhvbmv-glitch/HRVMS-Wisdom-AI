@@ -308,7 +308,7 @@ class RenewalController extends Controller
         }
         $file = $request->file('file');
         $doc_type = $request->flag;
-        $url = env('AI_extract_work_details_URL').$doc_type;
+        $url = config('services.ai_extract.url').$doc_type;
 
 
         if($doc_type=="insurance")
@@ -324,8 +324,24 @@ class RenewalController extends Controller
             $doc_type = "visa";
         }
 
-                       
-            $url = env('AI_extract_work_details_URL').$doc_type; 
+        // $doc_type stays lower_snake_case here — it also builds the AI
+        // extraction service's URL below, which expects that exact casing.
+        // VisaEmployeeExpiryData.DocumentName must match one of the
+        // VisaCategory config keys instead (Insurance/Visa/Medical_Report),
+        // since that's an EXACT string match ProfileController::getVisaData()
+        // does for the mobile Visa Information screen — writing the lowercase
+        // $doc_type there meant a document renewed here saved and displayed
+        // fine on the web portal but was invisible to mobile under its
+        // correct category.
+        $visaCategoryKey = match ($doc_type) {
+            'insurance' => 'Insurance',
+            'medical_report' => 'Medical_Report',
+            'visa' => 'Visa',
+            default => $doc_type,
+        };
+
+
+            $url = config('services.ai_extract.url').$doc_type;
 
             $ResortBudgetCost = Common::VisaRenewalCost($this->resort->resort_id);
             $curl = curl_init();
@@ -445,13 +461,13 @@ class RenewalController extends Controller
                             
                             VisaEmployeeExpiryData::where('resort_id', $this->resort->resort_id)
                             ->where('employee_id', $employee->id)
-                            ->where('DocumentName', $doc_type)
+                            ->where('DocumentName', $visaCategoryKey)
                             ->delete();
                             VisaEmployeeExpiryData::create(['resort_id' => $this->resort->resort_id,
                                 'employee_id' => $employee->id,
                                 'File_child_id' =>  $aws['Chil_file_id']?? null,
                                 'Ai_extracted_data' => $ai_encode ?? null,
-                                'DocumentName' => $doc_type ?? null
+                                'DocumentName' => $visaCategoryKey ?? null
                             ]);
 
 
@@ -511,14 +527,14 @@ class RenewalController extends Controller
 
                         VisaEmployeeExpiryData::where('resort_id', $this->resort->resort_id)
                             ->where('employee_id', $employee->id)
-                            ->where('DocumentName', $doc_type)
+                            ->where('DocumentName', $visaCategoryKey)
                             ->delete();
                         VisaEmployeeExpiryData::create([
                             'resort_id'         => $this->resort->resort_id,
                             'employee_id'       => $employee->id,
                             'File_child_id'     => $aws['Chil_file_id'] ?? null,
                             'Ai_extracted_data' => $ai_encode ?? null,
-                            'DocumentName'      => $doc_type ?? null,
+                            'DocumentName'      => $visaCategoryKey ?? null,
                         ]);
 
                         DB::Commit();
@@ -668,13 +684,13 @@ class RenewalController extends Controller
                             $TotalExpensessSinceJoing->save();
                             VisaEmployeeExpiryData::where('resort_id', $this->resort->resort_id)
                             ->where('employee_id', $employee->id)
-                            ->where('DocumentName', $doc_type)
+                            ->where('DocumentName', $visaCategoryKey)
                             ->delete();
                             VisaEmployeeExpiryData::create(['resort_id' => $this->resort->resort_id,
                                 'employee_id' => $employee->id,
                                 'File_child_id' =>  $aws['Chil_file_id']?? null,
                                 'Ai_extracted_data' => $ai_encode ?? null,
-                                'DocumentName' => $doc_type ?? null
+                                'DocumentName' => $visaCategoryKey ?? null
                             ]);
                         // Payment-request bookkeeping only when launched from that workflow.
                         $PaymentRequestChild = $child_id ? PaymentRequestChild::where('employee_id', $emp_id)->where('id', $child_id)->first() : null;
@@ -1521,7 +1537,7 @@ class RenewalController extends Controller
         $flag=$request->flag;
         $file = $request->file('file');
         
-            $url = env('AI_extract_work_details_URL').$flag; 
+            $url = config('services.ai_extract.url').$flag;
             $curl = curl_init();
             $postFields = [
                 'file' => new \CURLFile($file->getRealPath(), $file->getMimeType(), $file->getClientOriginalName()),
@@ -1633,7 +1649,7 @@ class RenewalController extends Controller
         $file = $request->file('file');
         if($file)
         {
-            $url = env('AI_URL').'extract_education_exp_details?doc_type=cv'; 
+            $url = config('services.ai_extract.base_url').'extract_education_exp_details?doc_type=cv';
             $curl = curl_init();
             $postFields = [
                 'file' => new \CURLFile($file->getRealPath(), $file->getMimeType(), $file->getClientOriginalName()),
@@ -1686,7 +1702,7 @@ class RenewalController extends Controller
         $file = $request->file('file');
         if($file)
         {
-            $url = env('AI_URL').'extract_education_exp_details?doc_type=education';
+            $url = config('services.ai_extract.base_url').'extract_education_exp_details?doc_type=education';
             $curl = curl_init();
             $postFields = [
                 'file' => new \CURLFile($file->getRealPath(), $file->getMimeType(), $file->getClientOriginalName()),
@@ -1743,7 +1759,7 @@ class RenewalController extends Controller
 
         if($file)
         {
-            $url = env('AI_URL').'extract_education_exp_details?doc_type=experience'; 
+            $url = config('services.ai_extract.base_url').'extract_education_exp_details?doc_type=experience';
             $curl = curl_init();
             $postFields = [
                 'file' => new \CURLFile($file->getRealPath(), $file->getMimeType(), $file->getClientOriginalName()),

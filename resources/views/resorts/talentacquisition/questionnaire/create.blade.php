@@ -28,6 +28,7 @@
                 </div>
             </div>
             <form id="StoreQuestionnaire">
+    @csrf
                 <div class="card">
                     <div class="card-title">
                         <h3>Add Questionnaire For Interview</h3>
@@ -235,6 +236,7 @@
                             type: "post",
                             data: {
                                 division_id: $(this).val(),
+                                "_token": "{{ csrf_token() }}",
                             },
                             success: function(data) {
 
@@ -274,7 +276,8 @@
                         url: "{{ route('resort.get.position') }}",
                         type: "post",
                         data: {
-                            deptId: deptId
+                            deptId: deptId,
+                            "_token": "{{ csrf_token() }}"
                         },
                         success: function(data) {
                             // Clear the dropdown and add a placeholder option

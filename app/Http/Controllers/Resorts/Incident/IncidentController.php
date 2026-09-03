@@ -301,7 +301,7 @@ class IncidentController extends Controller
         // a non-HR user must not be able to load an out-of-scope incident
         // by guessing/typing the URL.
         $incident = Common::scopeIncidentsForViewer(Incidents::query())
-            ->with(['reporter.resortAdmin','reporter.position','witness.employee'])
+            ->with(['reporter.resortAdmin','reporter.position','witness.employee.resortAdmin'])
             ->where('id', $id)
             ->first();
         if (!$incident) {
@@ -421,12 +421,12 @@ class IncidentController extends Controller
         if (!Common::canViewIncidentInvestigation($incident)) {
             abort(403, 'Only HR and committee members assigned to this incident can view the investigation.');
         }
-        $investigations = IncidentsInvestigation::with(['addedBy.employee','followupAction'])->where('incident_id',$id)->orderBy('created_at','desc')->get();
+        $investigations = IncidentsInvestigation::with(['addedBy.employee.resortAdmin','followupAction'])->where('incident_id',$id)->orderBy('created_at','desc')->get();
         // dd($investigations);
-        $incident_committee = IncidentCommittee::where('resort_id',$resort_id)->get();  
-        $incident_witness_statements = IncidentsWitness::with('employee')->where('incident_id',$id)->get();
+        $incident_committee = IncidentCommittee::where('resort_id',$resort_id)->get();
+        $incident_witness_statements = IncidentsWitness::with('employee.resortAdmin')->where('incident_id',$id)->get();
         // dd($incident_witness_statements);
-        $incident_employee_statements = IncidentsEmployeeStatements::with('employee')->where('incident_id',$id)->get();
+        $incident_employee_statements = IncidentsEmployeeStatements::with('employee.resortAdmin')->where('incident_id',$id)->get();
         
         // dd($incident_employee_statements);
         $followup_actions = IncidentFollowupActions::where('resort_id',$resort_id)->get(); 
@@ -492,8 +492,19 @@ class IncidentController extends Controller
         ]);
 
         $incident_details = Incidents::where('resort_id', $this->resort->resort_id)->findOrFail($request->incident_id);
-        $incident_details->priority = $request->priority;
-        $incident_details->severity = $request->severity;
+
+        // Priority/Severity are only editable on the FIRST investigation
+        // submission — an existing IncidentsInvestigation row means they've
+        // already been classified, so keep whatever was saved then and
+        // ignore any value posted now (the select is disabled client-side
+        // for this same reason, but that alone doesn't stop a bypassed
+        // request from reaching here).
+        $alreadyClassified = IncidentsInvestigation::where('incident_id', $incident_details->id)->exists();
+        if (!$alreadyClassified) {
+            $incident_details->priority = $request->priority;
+            $incident_details->severity = $request->severity;
+        }
+
         $incident_details->status = $request->status;
         $incident_details->outcome_type =  $request->outcomeType;
         $incident_details->preventive_measures =  $request->pre_mea;

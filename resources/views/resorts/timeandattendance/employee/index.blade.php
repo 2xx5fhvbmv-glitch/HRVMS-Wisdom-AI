@@ -245,7 +245,8 @@
                     url: "{{ route('resort.ta.PositionSections') }}",
                     type: "post",
                     data: {
-                        deptId: deptId
+                        deptId: deptId,
+                        "_token": "{{ csrf_token() }}"
                     },
                     success: function(d) {
                         if (d.success == true) {
