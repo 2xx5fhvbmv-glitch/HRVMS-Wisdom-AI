@@ -2,9 +2,15 @@
 @section('page_tab_title', $page_title)
 
 @section('content')
+<style>
+    #evaluation-preview-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #evaluation-preview-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="evaluation-preview-hero">
             <div class="row justify-content-between g-3">
                 <div class="col-auto">
                     <div class="page-title">
@@ -42,7 +48,7 @@
     .preview-section { margin: 20px 0 12px; padding: 8px 0; border-bottom: 1px solid #e9ecef; }
     .preview-section h2, .preview-section h3, .preview-section h4 { margin: 0; }
     .preview-table { width:100%; margin-bottom: 10px; }
-    .preview-table th { background:#014653; color:#fff; padding: 8px 12px; font-weight: 500; }
+    .preview-table th { background:var(--teal); color:#fff; padding: 8px 12px; font-weight: 500; }
     .preview-table td { padding: 8px 12px; border: 1px solid #dee2e6; }
 </style>
 @endsection

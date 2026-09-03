@@ -8,9 +8,15 @@
     @endif
 
     @section('content')
+    <style>
+        #ta-jobdescription-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #ta-jobdescription-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="ta-jobdescription-hero">
                 <div class="row justify-content-between g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -37,10 +43,22 @@
                                 </div>
                             </div>
                             <div class="col-xl-2 col-md-3 col-sm-4 col-6">
-                                <select class="form-select" id="complianceSelect">
+                                <select class="form-select dd-native-select" id="complianceSelect">
                                     <option value="Approved" selected>Compliance Passed</option>
                                     <option value="Rejected">Compliance Rejected</option>
                                 </select>
+                                <div class="dd" data-target="#complianceSelect">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">Compliance Passed</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Compliance">
+                                        <div class="dd-scroll">
+                                            <div class="dd-item active" role="option" data-value="Approved"><span class="dd-nm">Compliance Passed</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            <div class="dd-item" role="option" data-value="Rejected"><span class="dd-nm">Compliance Rejected</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -126,6 +144,7 @@
     @endsection
 
     @section('import-css')
+@include('resorts._dropdown_styles')
 @include('resorts.talentacquisition._ta_buttons_v2_styles')
     @endsection
 
@@ -368,4 +387,5 @@
 
     });
     </script>
+    @include('resorts._dropdown_script')
     @endsection

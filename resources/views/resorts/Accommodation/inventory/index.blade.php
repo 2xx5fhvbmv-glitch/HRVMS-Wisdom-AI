@@ -9,9 +9,15 @@
 @endif
 
 @section('content')
+<style>
+    #accommodation-inventory-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #accommodation-inventory-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="accommodation-inventory-hero">
             <div class="row justify-content-between g-3">
                 <div class="col-auto">
                     <div class="page-title">
@@ -40,13 +46,30 @@
                                 </div>
                                 <div class="col-lg-4 col-sm-6">
                                     <label for="category" class="form-label">Category</label>
-                                    <select class="form-select select2t-none Inv_Cat_id" id="Inv_Cat_id_1" name="Inv_Cat_id[]" required data-parsley-required-message="Please select a category.">
+                                    <select class="form-select dd-native-select Inv_Cat_id" id="Inv_Cat_id_1" name="Inv_Cat_id[]" required data-parsley-required-message="Please select a category.">
                                             @if($InventoryCategory->isNotEmpty())
                                                 @foreach($InventoryCategory as $ic)
                                                     <option value="{{$ic->id}}">{{$ic->CategoryName}}</option>
                                                 @endforeach
                                             @endif
                                         </select>
+                                        @php $firstCat = $InventoryCategory->first(); @endphp
+                                        <div class="dd" data-target="#Inv_Cat_id_1">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">{{ $firstCat->CategoryName ?? 'Select Category' }}</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Category">
+                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a category…"></div>
+                                                <div class="dd-scroll">
+                                                    @if($InventoryCategory->isNotEmpty())
+                                                        @foreach($InventoryCategory as $ic)
+                                                        <div class="dd-item{{ $loop->first ? ' active' : '' }}" role="option" data-value="{{ $ic->id }}"><span class="dd-nm">{{ $ic->CategoryName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @endforeach
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </div>
                                 </div>
                                 <div class="col-lg-4 col-sm-6">
                                     <label for="quantity" class="form-label">QUANTITY</label>
@@ -79,10 +102,22 @@
                                 </div>
                                 <div class="col-lg-4 col-sm-6">
                                     <label for="assignType" class="form-label">ASSIGNMENT TYPE</label>
-                                    <select class="form-select" name="AssignmentType[]" id="AssignmentType_1" required data-parsley-required-message="Please select assignment type.">
+                                    <select class="form-select dd-native-select" name="AssignmentType[]" id="AssignmentType_1" required data-parsley-required-message="Please select assignment type.">
                                         <option value="per_person">Per Person</option>
                                         <option value="per_room">Per Room</option>
                                     </select>
+                                    <div class="dd" data-target="#AssignmentType_1">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Per Person</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Assignment Type">
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value="per_person"><span class="dd-nm">Per Person</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="per_room"><span class="dd-nm">Per Room</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="col-lg-4 col-sm-6">
                                     <label for="defaultQty" class="form-label">DEFAULT QTY PER UNIT</label>
@@ -116,7 +151,7 @@
                             </div>
                         </div>
                         <div class="col-auto">
-                            <select class="form-select"  id="ItemsFilter">
+                            <select class="form-select dd-native-select"  id="ItemsFilter">
                                 <option value="All"> All </option>
                                 @if($InventoryItems->isNotEmpty())
                                     @foreach($InventoryItems as $ic)
@@ -125,9 +160,26 @@
                                 @endif
 
                             </select>
+                            <div class="dd" data-target="#ItemsFilter">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">All</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Item">
+                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an item…"></div>
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value="All"><span class="dd-nm">All</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @if($InventoryItems->isNotEmpty())
+                                            @foreach($InventoryItems as $ic)
+                                            <div class="dd-item" role="option" data-value="{{ $ic->id }}"><span class="dd-nm">{{ $ic->ItemName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @endforeach
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="col-auto">
-                            <select class="form-select Inv_Cat_id" id="Inv_Cat_idFilter">
+                            <select class="form-select dd-native-select Inv_Cat_id" id="Inv_Cat_idFilter">
                                 <option value="All"> All </option>
                                     @if($InventoryCategory->isNotEmpty())
                                         @foreach($InventoryCategory as $ic)
@@ -135,6 +187,23 @@
                                         @endforeach
                                     @endif
                             </select>
+                            <div class="dd" data-target="#Inv_Cat_idFilter">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">All</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Category">
+                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a category…"></div>
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value="All"><span class="dd-nm">All</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @if($InventoryCategory->isNotEmpty())
+                                            @foreach($InventoryCategory as $ic)
+                                            <div class="dd-item" role="option" data-value="{{ $ic->id }}"><span class="dd-nm">{{ $ic->CategoryName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @endforeach
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <!-- <div class="col-auto">
                             <select class="form-select">
@@ -212,25 +281,13 @@
 @endsection
 
 @section('import-css')
+@include('resorts._dropdown_styles')
 @endsection
 
 @section('import-scripts')
 <script>
 $(document).ready(function()
 {
-
-    $("#Inv_Cat_id_1").select2({
-        placeholder: 'Category',
-        allowClear: true
-    });
-    $("#Inv_Cat_idFilter").select2({
-        placeholder: 'Category',
-        allowClear: true
-    });
-    $("#ItemsFilter").select2({
-        placeholder: 'Item',
-        allowClear: true
-    });
 
     window.Parsley.addValidator('noScript', {
         validateString: function(value) {
@@ -351,7 +408,7 @@ $(document).ready(function()
                         </div>
                         <div class="col-lg-4 col-sm-6">
                             <label for="category" class="form-label">Category</label>
-                            <select class="form-select select2t-none Inv_Cat_id" id="Inv_Cat_id_${counts}" name="Inv_Cat_id[]"
+                            <select class="form-select dd-native-select Inv_Cat_id" id="Inv_Cat_id_${counts}" name="Inv_Cat_id[]"
                                     required data-parsley-required-message="Please select a category.">
                                 <option></option>
                                 @if($InventoryCategory->isNotEmpty())
@@ -360,6 +417,23 @@ $(document).ready(function()
                                     @endforeach
                                 @endif
                             </select>
+                            <div class="dd" data-target="#Inv_Cat_id_${counts}">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Select Category</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Category">
+                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a category…"></div>
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Category</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @if($InventoryCategory->isNotEmpty())
+                                            @foreach($InventoryCategory as $ic)
+                                            <div class="dd-item" role="option" data-value="{{ $ic->id }}"><span class="dd-nm">{{ $ic->CategoryName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @endforeach
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="col-lg-4 col-sm-6">
                             <label for="quantity" class="form-label">QUANTITY</label>
@@ -392,10 +466,22 @@ $(document).ready(function()
                         </div>
                         <div class="col-lg-4 col-sm-6">
                             <label for="assignType" class="form-label">ASSIGNMENT TYPE</label>
-                            <select class="form-select" name="AssignmentType[]" id="AssignmentType_${counts}" required data-parsley-required-message="Please select assignment type.">
+                            <select class="form-select dd-native-select" name="AssignmentType[]" id="AssignmentType_${counts}" required data-parsley-required-message="Please select assignment type.">
                                 <option value="per_person">Per Person</option>
                                 <option value="per_room">Per Room</option>
                             </select>
+                            <div class="dd" data-target="#AssignmentType_${counts}">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Per Person</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Assignment Type">
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value="per_person"><span class="dd-nm">Per Person</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="per_room"><span class="dd-nm">Per Room</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="col-lg-4 col-sm-6">
                             <label for="defaultQty" class="form-label">DEFAULT QTY PER UNIT</label>
@@ -428,12 +514,6 @@ $(document).ready(function()
             allowInput: true,
             appendTo: document.body
         });
-
-        $("#Inv_Cat_id_"+counts).select2({
-            placeholder: 'Category',
-            allowClear: true
-        });
-
     }
 
     $(document).on("change","#ItemsFilter",function(){
@@ -496,8 +576,10 @@ if ( $(".historical_inventory").is(':checked'))
             var AssignType = $row.find("td:nth-child(7)").text().trim();
 
             var categoryOptions = '';
+            var categoryDdItems = '';
             @foreach($InventoryCategory as $ic)
                 categoryOptions += `<option value="{{ $ic->id }}" ${('{{ $ic->CategoryName }}' === Category) ? 'selected' : ''}>{{ $ic->CategoryName }}</option>`;
+                categoryDdItems += `<div class="dd-item${('{{ $ic->CategoryName }}' === Category) ? ' active' : ''}" role="option" data-value="{{ $ic->id }}"><span class="dd-nm">{{ $ic->CategoryName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>`;
             @endforeach
 
             var editRowHtml = `
@@ -513,7 +595,17 @@ if ( $(".historical_inventory").is(':checked'))
                     </td>
                     <td class="py-1">
                         <div class="form-group">
-                            <select class="form-select edit-category">${categoryOptions}</select>
+                            <select class="form-select dd-native-select edit-category" id="edit-category-${invenotry_id}">${categoryOptions}</select>
+                            <div class="dd" data-target="#edit-category-${invenotry_id}">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">${Category}</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Category">
+                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a category…"></div>
+                                    <div class="dd-scroll">${categoryDdItems}</div>
+                                </div>
+                            </div>
                         </div>
                     </td>
                     <td class="py-1">
@@ -533,10 +625,22 @@ if ( $(".historical_inventory").is(':checked'))
                     </td>
                     <td class="py-1">
                         <div class="form-group">
-                            <select class="form-select edit-assignment-type">
+                            <select class="form-select dd-native-select edit-assignment-type" id="edit-assignment-type-${invenotry_id}">
                                 <option value="per_person" ${AssignType === 'Per Person' ? 'selected' : ''}>Per Person</option>
                                 <option value="per_room" ${AssignType === 'Per Room' ? 'selected' : ''}>Per Room</option>
                             </select>
+                            <div class="dd" data-target="#edit-assignment-type-${invenotry_id}">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">${AssignType === 'Per Room' ? 'Per Room' : 'Per Person'}</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Assignment Type">
+                                    <div class="dd-scroll">
+                                        <div class="dd-item${AssignType === 'Per Room' ? '' : ' active'}" role="option" data-value="per_person"><span class="dd-nm">Per Person</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item${AssignType === 'Per Room' ? ' active' : ''}" role="option" data-value="per_room"><span class="dd-nm">Per Room</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </td>
                     <td class="py-1">
@@ -694,4 +798,5 @@ if ( $(".historical_inventory").is(':checked'))
     }
 
 </script>
+@include('resorts._dropdown_script')
 @endsection

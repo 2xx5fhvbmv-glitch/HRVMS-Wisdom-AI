@@ -7,10 +7,16 @@
 </div>
 @endif
 
-@section('content')  
+@section('content')
+    <style>
+        #incident-meeting-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #incident-meeting-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="incident-meeting-hero">
                 <div class="row justify-content-between g-3 align-items-center">
                     <div class="col-auto">
                         <div class="page-title">
@@ -75,12 +81,26 @@
                 </div>
                 <div class="modal-body">
                     <label for="select_incident_for_meeting" class="form-label">INCIDENT <span class="red-mark">*</span></label>
-                    <select class="form-select select2t-none" id="select_incident_for_meeting">
+                    <select class="form-select dd-native-select" id="select_incident_for_meeting">
                         <option value="">Select Incident</option>
                         @foreach($incidents as $inc)
                             <option value="{{ base64_encode($inc->id) }}">{{ $inc->incident_id }} — {{ $inc->incident_name }}</option>
                         @endforeach
                     </select>
+                    <div class="dd" data-target="#select_incident_for_meeting">
+                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                            <span class="dd-lbl">Select Incident</span>
+                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                        </button>
+                        <div class="dd-panel" role="listbox" aria-label="Incident">
+                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an incident…"></div>
+                            <div class="dd-scroll">
+                                @foreach($incidents as $inc)
+                                    <div class="dd-item" role="option" data-value="{{ base64_encode($inc->id) }}"><span class="dd-nm">{{ $inc->incident_id }} — {{ $inc->incident_name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                @endforeach
+                            </div>
+                        </div>
+                    </div>
                     @if($incidents->isEmpty())
                         <p class="text-muted mt-2 mb-0">No active incidents available. Resolve or create an incident first.</p>
                     @endif
@@ -96,6 +116,8 @@
 
      @include('partials._file_view_modal')
 @include('resorts._emotional_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -114,15 +136,6 @@
 
 <script>
     $(document).ready(function () {
-        // Initialize select2 inside the create-meeting picker modal once it opens
-        // so the dropdown doesn't render with zero width.
-        $('#selectIncidentForMeetingModal').on('shown.bs.modal', function () {
-            $('#select_incident_for_meeting').select2({
-                dropdownParent: $('#selectIncidentForMeetingModal'),
-                placeholder: 'Select Incident',
-                width: '100%'
-            });
-        });
 
         $('#proceedToCreateMeeting').on('click', function () {
             var encodedId = $('#select_incident_for_meeting').val();

@@ -183,7 +183,18 @@
 
         {{-- Incident Trends (line, built from getIncidentTrends()/gethodIncidentTrends() JSON — {labels:[], data:[]}) --}}
         <div class="dbi-card dbi-sp2">
-            <div class="dbi-card-h"><div class="ttl">Incident Trends</div><select class="dbi-sel" id="dbiTrendYear"></select></div>
+            <div class="dbi-card-h"><div class="ttl">Incident Trends</div>
+                <select class="dbi-sel dd-native-select" id="dbiTrendYear"></select>
+                <div class="dd" data-target="#dbiTrendYear">
+                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                        <span class="dd-lbl"></span>
+                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                    </button>
+                    <div class="dd-panel" role="listbox" aria-label="Year">
+                        <div class="dd-scroll"></div>
+                    </div>
+                </div>
+            </div>
             <div id="dbiTrendChart" class="dbi-line"><div class="dbi-empty"><div class="t">Loading&hellip;</div></div></div>
         </div>
 
@@ -255,3 +266,5 @@
 
     </div>
 </div>
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')

@@ -2,9 +2,15 @@
 @section('page_tab_title', $page_title)
 
 @section('content')
+<style>
+    #survey-create-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #survey-create-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding page-appHedding">
+        <div class="page-hedding page-appHedding" id="survey-create-hero">
             <div class="row justify-content-between g-md-2 g-1">
                 <div class="col-auto">
                     <div class="page-title">
@@ -47,9 +53,9 @@
                                 <div class="col-sm-6">
                                     <label for="question_type" class="form-label">QUESTION TYPE</label>
                                  
-                                    <select class="form-select que_type select2t-none" 
-                                        name="que_type" 
-                                        id="que_type_1" 
+                                    <select class="form-select que_type dd-native-select"
+                                        name="que_type"
+                                        id="que_type_1"
                                         data-id="1"
                                         required
                                         data-parsley-required-message="Please select a question type"
@@ -63,6 +69,21 @@
                                     <option value="Radio">Single Choice</option>
                                     <option value="Rating">Rating/Scaling Button</option>
                                  </select>
+                                 <div class="dd" data-target="#que_type_1">
+                                     <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                         <span class="dd-lbl">Select question type</span>
+                                         <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                     </button>
+                                     <div class="dd-panel" role="listbox" aria-label="Question type">
+                                         <div class="dd-scroll">
+                                             <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select question type</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                             <div class="dd-item" role="option" data-value="text"><span class="dd-nm">Text</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                             <div class="dd-item" role="option" data-value="multiple"><span class="dd-nm">Multi-Choice</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                             <div class="dd-item" role="option" data-value="Radio"><span class="dd-nm">Single Choice</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                             <div class="dd-item" role="option" data-value="Rating"><span class="dd-nm">Rating/Scaling Button</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                         </div>
+                                     </div>
+                                 </div>
                                 <div id="que_type_error"></div>
                                 </div>
                                 <div class="col-sm-6 ">
@@ -144,11 +165,24 @@
                                                 </div>
                                                 <div class="col-sm-6 col-lg-3">
                                                     <label for="gender" class="form-label">GENDER</label>
-                                                    <select class="form-select select2t-none" name="gender" id="gender" data-placeholder="Male / Female">
+                                                    <select class="form-select dd-native-select" name="gender" id="gender" data-placeholder="Male / Female">
                                                         <option value="">Male / Female</option>
                                                         <option value="Male">Male</option>
                                                         <option value="Female">Female</option>
                                                     </select>
+                                                    <div class="dd" data-target="#gender">
+                                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                            <span class="dd-lbl">Male / Female</span>
+                                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                        </button>
+                                                        <div class="dd-panel" role="listbox" aria-label="Gender">
+                                                            <div class="dd-scroll">
+                                                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Male / Female</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                <div class="dd-item" role="option" data-value="Male"><span class="dd-nm">Male</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                <div class="dd-item" role="option" data-value="Female"><span class="dd-nm">Female</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                                 <div class="col-auto">
                                                     <a href="javascript:void(0)" class="FilterSubmit btn eb-btn-primary">Submit</a>
@@ -256,7 +290,7 @@
                             
                             <div class="col-sm-6">
                                 <label for="recurringSurvey" class="form-label">RECURRING SURVEY</label>
-                                <select class="form-select select2t-none" id="recurringSurvey" name="recurring_survey"
+                                <select class="form-select dd-native-select" id="recurringSurvey" name="recurring_survey"
                                     data-parsley-required="true"
                                     data-parsley-required-message="Please select a recurring survey option"
                                     data-parsley-group="block-2"
@@ -268,6 +302,22 @@
                                     <option value="Quarterly">Quarterly</option>
                                     <option value="Annually">Annually</option>
                                 </select>
+                                <div class="dd" data-target="#recurringSurvey">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">One time</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Recurring survey">
+                                        <div class="dd-scroll">
+                                            <div class="dd-item active" role="option" data-value="One time"><span class="dd-nm">One time</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            <div class="dd-item" role="option" data-value="Daily"><span class="dd-nm">Daily</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            <div class="dd-item" role="option" data-value="Weekly"><span class="dd-nm">Weekly</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            <div class="dd-item" role="option" data-value="Monthly"><span class="dd-nm">Monthly</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            <div class="dd-item" role="option" data-value="Quarterly"><span class="dd-nm">Quarterly</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            <div class="dd-item" role="option" data-value="Annually"><span class="dd-nm">Annually</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             
                             <div class="col-sm-6">
@@ -321,6 +371,7 @@
 
 @section('import-css')
 @section('import-css')
+@include('resorts._dropdown_styles')
 <style>
     .is-invalid {
         border-color: #dc3545;
@@ -375,36 +426,28 @@
                 errorClass: 'is-invalid'
             });
 
-             // Initialize Select2
-            $('.select2t-none').select2({
-                allowClear: true,
-                closeOnSelect: false
-            });
-         
-
-             // Manually trigger Parsley validation when Select2 changes
-            $(".select2t-none").on('change', function () {
+             // Manually trigger Parsley validation when a dropdown changes
+            $(".dd-native-select").on('change', function () {
                 var parsleyField = $(this).parsley();
                 parsleyField.validate();
 
-                // Add/remove the error class to the Select2 container based on validation
+                // Add/remove the error class on the .dd-trigger based on validation
                 if (parsleyField.isValid()) {
-                    $(this).next('.select2-container').find('.select2-selection').removeClass('is-invalid');
+                    $(this).siblings('.dd').find('.dd-trigger').removeClass('is-invalid');
                 } else {
-                    $(this).next('.select2-container').find('.select2-selection').addClass('is-invalid');
+                    $(this).siblings('.dd').find('.dd-trigger').addClass('is-invalid');
                 }
             });
 
             // Parsley field validation handler
             window.Parsley.on('field:validated', function (fieldInstance) {
                 var $element = fieldInstance.$element;
-                if ($element.hasClass('select2t-none')) {
-                    // Update the Select2 container's appearance
-                    var $select2Container = $element.next('.select2-container').find('.select2-selection');
+                if ($element.hasClass('dd-native-select')) {
+                    var $trigger = $element.siblings('.dd').find('.dd-trigger');
                     if (fieldInstance.isValid()) {
-                        $select2Container.removeClass('is-invalid');
+                        $trigger.removeClass('is-invalid');
                     } else {
-                        $select2Container.addClass('is-invalid');
+                        $trigger.addClass('is-invalid');
                     }
                 }
             });
@@ -412,10 +455,6 @@
             $('#startDate_step_3').on('change', function () {
                 $('#endDate').parsley().validate();
             });
-        $("#que_type_1").select2({
-            "Placeholder": "Select Question Type",
-            "width": "100%"
-        });
 
 
         $(".next").click(function (e) {
@@ -1151,13 +1190,12 @@
 
                 window.Parsley.on('field:validated', function (fieldInstance) {
                     var $element = fieldInstance.$element;
-                    if ($element.hasClass('select2t-none')) {
-                        // Update the Select2 container's appearance
-                        var $select2Container = $element.next('.select2-container').find('.select2-selection');
+                    if ($element.hasClass('dd-native-select')) {
+                        var $trigger = $element.siblings('.dd').find('.dd-trigger');
                         if (fieldInstance.isValid()) {
-                            $select2Container.removeClass('is-invalid');
+                            $trigger.removeClass('is-invalid');
                         } else {
-                            $select2Container.addClass('is-invalid');
+                            $trigger.addClass('is-invalid');
                         }
                     }
                 });
@@ -1292,4 +1330,5 @@
     });
 
 </script>
+@include('resorts._dropdown_script')
 @endsection

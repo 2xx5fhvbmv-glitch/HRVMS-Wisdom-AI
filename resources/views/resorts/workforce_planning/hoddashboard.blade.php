@@ -522,6 +522,7 @@
         const _myLineChartEl = document.getElementById('myLineChart');
         if (_myLineChartEl) {
         var ctz = _myLineChartEl.getContext('2d');
+        var _pWfpHodLine = window.WaiChart ? window.WaiChart.palette().teal : '#014653';
         var myLineChart = new Chart(ctz, {
             type: 'line',
             data: {
@@ -530,8 +531,8 @@
                     {
                         label: 'Occupancy Rates',
                         data: [7, 10, 15, 20, 30],
-                        borderColor: '#014653',
-                        backgroundColor: '#014653',
+                        borderColor: _pWfpHodLine,
+                        backgroundColor: _pWfpHodLine,
                         borderWidth: 1,
                         fill: false,
                         tension: 0.4, // Creates smooth curves
@@ -539,6 +540,7 @@
                         pointRadius: 0 // Remove dots
                     },
                     {
+                        // #4C88BB has no exact SSOT token match — left literal.
                         label: 'Seasonal Data',
                         data: [4, 7, 20, 35, 25], // Data points for the dataset
                         borderColor: ' #4C88BB', // Line color
@@ -549,6 +551,7 @@
                         pointRadius: 0 // Remove dots
                     },
                     {
+                        // #DFFF00 has no exact SSOT token match — left literal.
                         label: 'Hiring Data',
                         data: [10, 8, 6, 15, 30], // Data points for the dataset
                         borderColor: '#DFFF00 ', // Line color
@@ -597,6 +600,9 @@
                     }
                 }
             }
+        });
+        if (window.WaiChart) window.WaiChart.registerForTheme(myLineChart, function (c, p) {
+            c.data.datasets[0].borderColor = c.data.datasets[0].backgroundColor = p.teal;
         });
         } // end _myLineChartEl guard
     </script>

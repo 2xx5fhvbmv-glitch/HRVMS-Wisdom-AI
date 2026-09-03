@@ -143,20 +143,45 @@
                             @csrf
                             <div class="mb-3">
                                 <label class="form-label">Decision <span class="text-danger">*</span></label>
-                                <select class="form-select" name="decision" required>
+                                <select class="form-select dd-native-select" name="decision" id="appealDecision" required>
                                     <option value="">Select decision</option>
                                     <option value="Upheld">Upheld — original decision stands</option>
                                     <option value="Overturned">Overturned — original decision reversed</option>
                                     <option value="Modified">Modified — original decision partly changed</option>
                                 </select>
+                                <div class="dd" data-target="#appealDecision">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">Select decision</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Decision">
+                                        <div class="dd-scroll">
+                                            <div class="dd-item" role="option" data-value="Upheld"><span class="dd-nm">Upheld — original decision stands</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            <div class="dd-item" role="option" data-value="Overturned"><span class="dd-nm">Overturned — original decision reversed</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            <div class="dd-item" role="option" data-value="Modified"><span class="dd-nm">Modified — original decision partly changed</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             <div class="mb-3">
                                 <label class="form-label">Final Status <span class="text-danger">*</span></label>
-                                <select class="form-select" name="final_status" required>
+                                <select class="form-select dd-native-select" name="final_status" id="appealFinalStatus" required>
                                     <option value="">Select status</option>
                                     <option value="Resolved">Resolved</option>
                                     <option value="Rejected">Rejected</option>
                                 </select>
+                                <div class="dd" data-target="#appealFinalStatus">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">Select status</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Final status">
+                                        <div class="dd-scroll">
+                                            <div class="dd-item" role="option" data-value="Resolved"><span class="dd-nm">Resolved</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            <div class="dd-item" role="option" data-value="Rejected"><span class="dd-nm">Rejected</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             <div class="mb-3">
                                 <label class="form-label">Decision Notes</label>
@@ -221,6 +246,8 @@
 </div>
 @endif
 @include('resorts._emotional_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-scripts')

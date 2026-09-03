@@ -6,9 +6,15 @@
 </div>
 @endif
 @section('content')
+<style>
+    #file-employees-folder-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #file-employees-folder-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
    <div class="container-fluid">
-      <div class="page-hedding">
+      <div class="page-hedding" id="file-employees-folder-hero">
          <div class="row  g-3">
             <div class="col-auto">
                <div class="page-title">
@@ -29,7 +35,7 @@
                            <h3 class="text-nowrap">My Drive</h3>
                         </div>
                         <div class="col-auto">
-                           <select class="form-select " name="Folderselect" id="Folderselect">
+                           <select class="form-select dd-native-select" name="Folderselect" id="Folderselect">
                               <option value="Main">Folder</option>
                               @if($AllFolderList->isNotEmpty())
                               @foreach($AllFolderList as $folder)
@@ -37,6 +43,23 @@
                               @endforeach
                               @endif
                            </select>
+                           <div class="dd" data-target="#Folderselect">
+                               <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                   <span class="dd-lbl">Folder</span>
+                                   <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                               </button>
+                               <div class="dd-panel" role="listbox" aria-label="Folder">
+                                   <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a folder…"></div>
+                                   <div class="dd-scroll">
+                                       <div class="dd-item active" role="option" data-value="Main"><span class="dd-nm">Folder</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                       @if($AllFolderList->isNotEmpty())
+                                       @foreach($AllFolderList as $folder)
+                                       <div class="dd-item" role="option" data-value="{{ base64_encode($folder->id) }}"><span class="dd-nm">{{ $folder->Display_Name ?? $folder->Folder_Name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                       @endforeach
+                                       @endif
+                                   </div>
+                               </div>
+                           </div>
                         </div>
                         {{-- Create Folder button hidden — employee folders are
                              auto-created from the EmployeeController save flow
@@ -90,9 +113,6 @@
                                         <li><a class="dropdown-item text-danger folder-delete-trigger" href="javascript:void(0)"><i class="fa-solid fa-trash-can me-2"></i>Delete</a></li>
                                     </ul>
                                 </div>
-                                <div class="form-check no-label">
-                                <input class="form-check-input FolderName internacheck d-none" type="checkbox" name="FolderName[]"  data-id="{{ $folder->Folder_unique_id}}" value="{{ $folder->Folder_unique_id}}" >
-                                </div>
                             </div>
                         @endforeach
                      @endif
@@ -137,7 +157,6 @@
                      </table>
                   </div>
                </div>
-               <div class="card-footer text-end"><a href="javascript:void(0)" class="MoveAllFiles btn eb-btn-primary btn-sm" >Submit</a></div>
             </div>
          </div>
       </div>
@@ -229,29 +248,35 @@
    .share-option { display: flex; align-items: flex-start; gap: 10px; border: 1.5px solid #e2e8f0; border-radius: 10px; padding: 12px 14px; cursor: pointer; }
    .share-option input[type=radio] { margin-top: 4px; }
    .share-option label { cursor: pointer; margin-bottom: 0; flex: 1; }
-   .share-option-title { font-weight: 600; color: #014653; font-size: 13.5px; }
+   .share-option-title { font-weight: 600; color: var(--teal); font-size: 13.5px; }
    .share-option-desc { font-size: 12px; color: #6c757d; }
-   .share-option:has(input:checked) { border-color: #014653; background: #e8f4f4; }
+   .share-option:has(input:checked) { border-color: var(--teal); background: #e8f4f4; }
    .share-scope-body { padding: 10px 14px 0; }
    .share-search-results { border: 1px solid #e2e8f0; border-radius: 6px; max-height: 200px; overflow-y: auto; margin-top: 6px; display: none; }
    .share-search-results.show { display: block; }
    .share-search-results .item { padding: 8px 12px; cursor: pointer; font-size: 13px; border-bottom: 1px solid #f1f1f1; }
    .share-search-results .item:hover { background: #f5f9f9; }
    .share-search-results .item .meta { color: #6c757d; font-size: 11px; }
-   .emp-chip { display: inline-flex; align-items: center; gap: 6px; background: #e8f4f4; border: 1px solid #014653; border-radius: 16px; padding: 3px 10px; font-size: 12px; color: #014653; margin: 2px; }
+   .emp-chip { display: inline-flex; align-items: center; gap: 6px; background: #e8f4f4; border: 1px solid var(--teal); border-radius: 16px; padding: 3px 10px; font-size: 12px; color: var(--teal); margin: 2px; }
    .emp-chip .remove { cursor: pointer; font-weight: 700; }
    .dept-checkbox-list .item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; font-size: 13px; border-radius: 6px; cursor: pointer; }
    .dept-checkbox-list .item input { margin: 0; }
    .dept-checkbox-list .item:has(input:checked) { background: #e8f4f4; }
    .active-shares-list .item { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; border-bottom: 1px solid #f1f1f1; font-size: 13px; }
    .active-shares-list .item:last-child { border-bottom: none; }
-   .active-shares-list .recipients { color: #014653; }
+   .active-shares-list .recipients { color: var(--teal); }
    .active-shares-list .revoke { color: #c0392b; cursor: pointer; background: none; border: 0; font-size: 14px; padding: 2px 6px; }
    .folder-row { align-items: center; position: relative; }
    .folder-action-dd { opacity: 0; transition: opacity .15s ease; }
    .folder-row:hover .folder-action-dd, .folder-action-dd.show { opacity: 1; }
    .folder-action-btn { color: #555; background: transparent; border: 0; }
-   .folder-action-btn:hover { color: #014653; }
+   .folder-action-btn:hover { color: var(--teal); }
+   /* Destination folder is now chosen via the "Move Files" modal's dropdown,
+      not by checking a folder in the sidebar. This checkbox is still
+      rendered server-side (FileManageController@GetFolder, out of scope
+      here) whenever the sidebar refreshes after search/actions — hide it
+      unconditionally rather than leaving dead, confusing UI on screen. */
+   .ListofFolder input[name="FolderName[]"] { display: none !important; }
 </style>
 <!-- modal -->
 <div class="modal fade" id="renameDocument-modal" tabindex="-1" aria-labelledby="renameDocumentLabel"
@@ -306,17 +331,31 @@
                     
                     <div class="col-12">
                         <label for="date_modified" class="form-label">DATE MODIFIED</label>
-                        <select class="form-select select2t-none" id="date_modified" name="date_modified"
+                        <select class="form-select dd-native-select" id="date_modified" name="date_modified"
                             aria-label="Default select example">
                             <option ></option>
-                            @for($i=1; $i<=90; $i++)    
+                            @for($i=1; $i<=90; $i++)
                             <option value="{{$i}}">Last {{$i}} days </option>
                             @endfor
                         </select>
+                        <div class="dd" data-target="#date_modified">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">Select Date Modified</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Date Modified">
+                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a day range…"></div>
+                                <div class="dd-scroll">
+                                    @for($i=1; $i<=90; $i++)
+                                    <div class="dd-item" role="option" data-value="{{ $i }}"><span class="dd-nm">Last {{ $i }} days</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    @endfor
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="col-12">
                         <label for="department" class="form-label">DEPARTMENT</label>
-                        <select class="form-select select2t-none" name="department" id="department"aria-label="Default select example">
+                        <select class="form-select dd-native-select" name="department" id="department"aria-label="Default select example">
                             <option >Select Department </option>
                             @if($department->isNotEmpty())
                                 @foreach($department as $d)
@@ -324,6 +363,22 @@
                                 @endforeach
                             @endif
                         </select>
+                        <div class="dd" data-target="#department">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">Select Department</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Department">
+                                <div class="dd-scroll">
+                                    <div class="dd-item active" role="option" data-value="Select Department "><span class="dd-nm">Select Department</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    @if($department->isNotEmpty())
+                                        @foreach($department as $d)
+                                            <div class="dd-item" role="option" data-value="{{ $d->id }}"><span class="dd-nm">{{ $d->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @endforeach
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     </div>
                 </div>
@@ -364,6 +419,48 @@
     </div>
 </div> <!-- Closing first modal properly -->
 
+<div class="modal fade" id="moveFiles-modal" tabindex="-1" aria-labelledby="moveFilesLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="moveFilesLabel">Move Files</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <label for="MoveDestinationFolder" class="form-label">Destination Folder</label>
+                <select class="form-select dd-native-select" id="MoveDestinationFolder">
+                    <option value="">Select a folder</option>
+                    @if($FolderList->isNotEmpty())
+                        @foreach($FolderList as $folder)
+                            <option value="{{ $folder->Folder_unique_id }}">{{ $folder->Display_Name ?? $folder->Folder_Name }}</option>
+                        @endforeach
+                    @endif
+                </select>
+                <div class="dd" data-target="#MoveDestinationFolder">
+                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                        <span class="dd-lbl">Select a folder</span>
+                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                    </button>
+                    <div class="dd-panel" role="listbox" aria-label="Destination Folder">
+                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a folder…"></div>
+                        <div class="dd-scroll">
+                            @if($FolderList->isNotEmpty())
+                                @foreach($FolderList as $folder)
+                                    <div class="dd-item" role="option" data-value="{{ $folder->Folder_unique_id }}"><span class="dd-nm">{{ $folder->Display_Name ?? $folder->Folder_Name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                @endforeach
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Cancel</a>
+                <a href="javascript:void(0)" class="ConfirmMoveFiles btn eb-btn-primary">Move</a>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Second Modal (Separate from the First One) -->
 @include('partials._file_view_modal', ['modalId' => 'bd-iframeModel-modal-lg'])
 <div class="overlayFileModule" id="overlay" onclick="hideImage()">
@@ -372,6 +469,8 @@
 </div>
 
 @include('resorts._emotional_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 @section('import-css')
 
@@ -448,16 +547,6 @@
             return this.optional(element) || /^[^<>:"/\\|?*\x00-\x1F]+$/.test(value);
         }, "Folder name contains invalid characters.");
 
-       $('#Folderselect').select2({
-           placeholder: "Select Folder", allowClear: true
-       });
-       $('#department').select2({
-           placeholder: "Select department", allowClear: true
-       });
-       $('#date_modified').select2({
-           placeholder: "Select Date Modified", sallowClear: true
-       });
-       
        $('#RemameFileForm').validate({
            rules: {
                renameFile: {
@@ -620,13 +709,7 @@
             // Reset select elements
             $('#date_modified').val('').trigger('change');
             $('#department').val('Select Department').trigger('change');
-            
-            // If you're using select2 for your dropdowns
-            if ($.fn.select2) {
-                $('#date_modified').select2('val', '');
-                $('#department').select2('val', 'Select Department');
-            }
-            
+
             // Reset any hidden fields
             $('#MainFolderType').val('uncategorized');
             
@@ -724,12 +807,44 @@
        });
         
    });
-   $(document).on( "click","#MoveDoc", function() 
-   {   
-       $('.internacheck').prop('checked',false);
-       $(".internacheck").toggleClass('d-none');   
+   // Single "Move" button, two states — derived from the checkboxes'
+   // current visibility rather than a separate tracked flag:
+   //  1st click: reveal the file checkboxes, relabel to "Confirm Move".
+   //  2nd click with a selection: open the destination-folder modal.
+   //  2nd click with nothing selected: cancel back to the "Move" state
+   //  (same as the old plain toggle-off behavior).
+   $(document).on( "click","#MoveDoc", function()
+   {
+       var $checkboxes = $("#TableBody .internacheck");
+       var inSelectionMode = $checkboxes.length > 0 && !$checkboxes.first().hasClass('d-none');
+
+       if (!inSelectionMode) {
+           $checkboxes.removeClass('d-none');
+           $(this).text('Confirm Move');
+           return;
+       }
+
+       if ($("input[name='FilesName[]']:checked").length === 0) {
+           $('.internacheck').prop('checked', false);
+           $checkboxes.addClass('d-none');
+           $(this).text('Move');
+           return;
+       }
+
+       $("#MoveDestinationFolder").val("");
+       wisdomDD.sync('#MoveDestinationFolder');
+       $("#moveFiles-modal").modal("show");
    });
-//    $(document).on( "click",".checkCheck", function() 
+
+   // Fires on every way the modal can close — Cancel, the × button,
+   // Escape, or clicking the backdrop — so selection mode always ends
+   // cleanly instead of leaving stale checked/visible checkboxes and a
+   // stuck "Confirm Move" label behind.
+   $('#moveFiles-modal').on('hidden.bs.modal', function () {
+       $('#MoveDoc').text('Move');
+       $('.internacheck').prop('checked', false).addClass('d-none');
+   });
+//    $(document).on( "click",".checkCheck", function()
 //    {   
    
 //        if(($("input[name='FolderName[]']:checked").length > 0) == false)
@@ -1220,17 +1335,13 @@
            }
        });
     });
-    $(document).on( "click",".MoveAllFiles", function() 
+    $(document).on( "click",".ConfirmMoveFiles", function()
    {
+        let FolderName = $("#MoveDestinationFolder").val();
 
-
-        let FolderName = $("input[name='FolderName[]']:checked").map(function() {
-                        return $(this).val();
-                    }).get();
-
-        if(FolderName.length>1)
+        if (!FolderName)
         {
-            toastr.error("Please Select Only One Folder", "Error", {
+            toastr.error("Please select a destination folder.", "Error", {
                 positionClass: "toast-bottom-right",
             });
             return false;
@@ -1245,11 +1356,13 @@
         $.ajax({
            url: "{{ route('FileManage.MoveFolder') }}", // Your route for file upload
            type: "post",
-           data: {"_token":"{{ csrf_token() }}","FilesName":selectedFiles,'FolderName':FolderName},
-       
+           data: {"_token":"{{ csrf_token() }}","FilesName":selectedFiles,'FolderName':[FolderName]},
+
            success: function(response) {
                if(response.success == true)
                {
+                   $("#moveFiles-modal").modal("hide");
+                   $("#MoveDoc").text('Move');
                    $(".breadcrumb").html(response.breadcrumb);
                    $("#TableBody").html(response.data);
 
@@ -1258,20 +1371,20 @@
                    toastr.success(response.message, "Success", {
                        positionClass: "toast-bottom-right",
                    });
-               
+
                } else {
-   
+
                    toastr.error(response.message, "Error", {
                        positionClass: "toast-bottom-right",
                    });
                }
-   
+
            },
-           error: function(xhr, status, error) 
+           error: function(xhr, status, error)
            {
                try {
                    const response = xhr.responseJSON;
-                   
+
                    if (response && response.success === false) {
                        toastr.error(response.message, "Error", {
                            positionClass: 'toast-bottom-right'

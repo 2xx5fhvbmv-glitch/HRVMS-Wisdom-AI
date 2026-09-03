@@ -9,9 +9,15 @@
 @endif
 
 @section('content')
+<style>
+    #inventory-management-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #inventory-management-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="inventory-management-hero">
             <div class="row justify-content-between g-3">
                 <div class="col-auto">
                     <div class="page-title">
@@ -36,26 +42,67 @@
                         </div>
                     </div>
                     <div class="col-xl-2  col-lg-4 col-md-5 col-sm-4 col-6">
-                        <select class="form-select" id="buildingAvailable">
+                        <select class="form-select dd-native-select" id="buildingAvailable">
                             <option value=""></option>
-                            @if($BuildingModel->isNotEmpty()) 
+                            @if($BuildingModel->isNotEmpty())
                                 @foreach($BuildingModel as $b)
                                     <option value="{{$b->id}}">{{$b->BuildingName}}</option>
                                 @endforeach
                             @endif
                         </select>
+                        <div class="dd" data-target="#buildingAvailable">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">Select Building</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Building">
+                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a building…"></div>
+                                <div class="dd-scroll">
+                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Building</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    @if($BuildingModel->isNotEmpty())
+                                        @foreach($BuildingModel as $b)
+                                        <div class="dd-item" role="option" data-value="{{ $b->id }}"><span class="dd-nm">{{ $b->BuildingName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @endforeach
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="col-xl-2 col-md-3 col-sm-4 col-6">
-                        <select class="form-select" id="AvailableFloor" >
+                        <select class="form-select dd-native-select" id="AvailableFloor" >
                             <option value=""></option>
-                         
+
                         </select>
+                        <div class="dd" data-target="#AvailableFloor">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">Select Floor</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Floor">
+                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a floor…"></div>
+                                <div class="dd-scroll">
+                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Floor</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="col-xl-2 col-md-3 col-sm-4 col-6">
-                        <select class="form-select"id="FloorWiseRoom">
+                        <select class="form-select dd-native-select"id="FloorWiseRoom">
                             <option value=""></option>
-                          
+
                         </select>
+                        <div class="dd" data-target="#FloorWiseRoom">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">Select Room</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Room">
+                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a room…"></div>
+                                <div class="dd-scroll">
+                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Room</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -98,15 +145,38 @@
                 <div class="modal-body">
                     <div class="mb-3">
                         <label for="assignEmpSelect" class="form-label">Select Employee</label>
-                        <select class="form-select" id="assignEmpSelect" name="emp_id" required>
+                        <select class="form-select dd-native-select" id="assignEmpSelect" name="emp_id" required>
                             <option value="">Select Employee</option>
                         </select>
+                        <div class="dd" data-target="#assignEmpSelect">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">Select Employee</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Employee">
+                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an employee…"></div>
+                                <div class="dd-scroll">
+                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Employee</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label for="assignBedSelect" class="form-label">Select Bed</label>
-                        <select class="form-select" id="assignBedSelect" name="assignId" required>
+                        <select class="form-select dd-native-select" id="assignBedSelect" name="assignId" required>
                             <option value="">Select Bed</option>
                         </select>
+                        <div class="dd" data-target="#assignBedSelect">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">Select Bed</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Bed">
+                                <div class="dd-scroll">
+                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Bed</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label for="assignQuantity" class="form-label">Quantity</label>
@@ -129,24 +199,13 @@
 @endsection
 
 @section('import-css')
+@include('resorts._dropdown_styles')
 @endsection
 
 @section('import-scripts')
 <script>
 $(document).ready(function()
 {
-    $("#buildingAvailable").select2({
-        placeholder: 'Select Building',
-        allowClear: true,
-    });
-    $("#AvailableFloor").select2({
-        placeholder: 'Select Floor',
-        allowClear: true,
-    });
-    $("#FloorWiseRoom").select2({
-        placeholder: 'Select Room',
-        allowClear: true,
-    });
     InventoryList();
 });
     // Assign Employee - open modal with employee list
@@ -177,6 +236,7 @@ $(document).ready(function()
                         options += `<option value="${v.EmployeeId}">${v.first_name} ${v.last_name} (${v.Emp_id})</option>`;
                     });
                     $('#assignEmpSelect').html(options);
+                    window.wisdomDD.rebuild('#assignEmpSelect');
 
                     // Populate available beds
                     var bedOptions = '<option value="">Select Bed</option>';
@@ -184,24 +244,7 @@ $(document).ready(function()
                         bedOptions += `<option value="${v.id}">${v.BedNo}</option>`;
                     });
                     $('#assignBedSelect').html(bedOptions);
-
-                    if ($('#assignEmpSelect').data('select2')) {
-                        $('#assignEmpSelect').select2('destroy');
-                    }
-                    $('#assignEmpSelect').select2({
-                        placeholder: 'Select Employee',
-                        allowClear: true,
-                        dropdownParent: $('#assignEmployeeModal')
-                    });
-
-                    if ($('#assignBedSelect').data('select2')) {
-                        $('#assignBedSelect').select2('destroy');
-                    }
-                    $('#assignBedSelect').select2({
-                        placeholder: 'Select Bed',
-                        allowClear: true,
-                        dropdownParent: $('#assignEmployeeModal')
-                    });
+                    window.wisdomDD.rebuild('#assignBedSelect');
 
                     $('#assignEmployeeModal').modal('show');
                 } else {
@@ -367,15 +410,12 @@ $(document).ready(function()
 
                     if (response.success)
                     {
-                        var floor='<option></option>';
+                        var floor='<option value="">Select Floor</option>';
                         $.each(response.data, function(i, v) {
                             floor += `<option value="${v}">${v}</option>`;
                         });
-                            $("#AvailableFloor").html(floor) .select2({
-                                                                        placeholder: 'Select Floor',
-                                                                        allowClear: true,
-                                                                    });
-             
+                        $("#AvailableFloor").html(floor);
+                        window.wisdomDD.rebuild('#AvailableFloor');
 
                     } else {
                         toastr.error(response.message, "Error", {
@@ -412,17 +452,13 @@ $(document).ready(function()
                 success: function(response) {
                     if (response.success)
                     {
-                        var rooms='<option></option>';
+                        var rooms='<option value="">Select Room</option>';
                         console.log(response.data);
                         $.each(response.data, function(i, v) {
                             rooms += `<option value="${v}">${v}</option>`;
                         });
-                        
-                            $("#FloorWiseRoom").html(rooms).select2({
-                                                                        placeholder: 'Select Rooms',
-                                                                        allowClear: true,
-                                                                    });
-                        
+                        $("#FloorWiseRoom").html(rooms);
+                        window.wisdomDD.rebuild('#FloorWiseRoom');
 
 
 
@@ -496,4 +532,5 @@ function InventoryList()
     });
 }
 </script>
+@include('resorts._dropdown_script')
 @endsection

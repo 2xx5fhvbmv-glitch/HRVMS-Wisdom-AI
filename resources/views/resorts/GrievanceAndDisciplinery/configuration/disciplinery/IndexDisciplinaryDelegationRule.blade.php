@@ -56,6 +56,8 @@
     </div>
 </div>
 @include('resorts._emotional_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -134,21 +136,36 @@
             
             var DiscriplineryName = $row.find("td:nth-child(1)").text().trim();
             var Description = $row.find("td:nth-child(2)").text().trim();
+
+            var DisciplinaryCategories = @json($DisciplinaryCategories);
+            var tickSvg = '<svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg>';
+            // Values stay base64-encoded ids (btoa on the plain numeric id
+            // string) — same encoding the backend's own base64_encode($id)
+            // produces, so data-del_cat_id/the update handler's payload are
+            // unchanged.
+            var catOptions = DisciplinaryCategories.map(item => ({ value: btoa(String(item.id)), label: item.DisciplinaryCategoryName }));
+            var selectedCat = catOptions.find(o => o.value === Del_cat_id);
+
             var editRowHtml = `
                     <td class="py-1">
                         <div class="form-group">
-                            <select class="form-select select2t-none DelegationRuleCategory" 
-                                        id="DelegationRuleCategory_1"  data-id="1" name="Del_cat_id"  aria-label="Default select example" required  data-parsley-required-message="Please select a disciplinary category">
-                                    <option value=""></option>
-                                    @if($DisciplinaryCategories->isNotEmpty())
-                                       @foreach($DisciplinaryCategories as $item)
-                                            <option value="{{ base64_encode($item->id) }}" 
-                                                ${Del_cat_id === "{{ base64_encode($item->id) }}" ? 'selected' : ''}>
-                                                {{ $item->DisciplinaryCategoryName }}
-                                            </option>
-                                        @endforeach
-                                    @endif
-                                </select>
+                            <select class="form-select dd-native-select" id="DelegationRuleCategory_1" data-id="1" name="Del_cat_id" aria-label="Disciplinary category" required data-parsley-required-message="Please select a disciplinary category">
+                                <option value="">Select category</option>
+                                ${catOptions.map(o => `<option value="${o.value}" ${o.value === Del_cat_id ? 'selected' : ''}>${o.label}</option>`).join('')}
+                            </select>
+                            <div class="dd" data-target="#DelegationRuleCategory_1">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">${selectedCat ? selectedCat.label : 'Select category'}</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Disciplinary category">
+                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a category…"></div>
+                                    <div class="dd-scroll">
+                                        <div class="dd-item${Del_cat_id ? '' : ' active'}" role="option" data-value=""><span class="dd-nm">Select category</span>${tickSvg}</div>
+                                        ${catOptions.map(o => `<div class="dd-item${o.value === Del_cat_id ? ' active' : ''}" role="option" data-value="${o.value}"><span class="dd-nm">${o.label}</span>${tickSvg}</div>`).join('')}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </td>
                     <td class="py-1">
@@ -163,11 +180,6 @@
 
             // Replace row content with editable form
             $row.html(editRowHtml);
-                $("#DelegationRuleCategory_1").select2({
-                placeholder: "Select category",
-                allowClear: true,
-                width: '100%'        
-            });
         });
 
         $(document).on("click", "#DisciplineryCategory .update-row-btn_cat", function (event) {

@@ -7,10 +7,16 @@
 </div>
 @endif
 
-@section('content')    
+@section('content')
+    <style>
+        #incident-index-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #incident-index-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="incident-index-hero">
                 <div class="row  g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -31,12 +37,27 @@
                             </div>
                         </div>
                         <div class="col-xl-2 col-md-3 col-sm-4 col-6">
-                            <select id="categoryFilter" class="form-select select2t-none">
+                            <select id="categoryFilter" class="form-select dd-native-select">
                                 <option value="">All Category</option>
                                 @foreach($categories as $category)
                                     <option value="{{ $category->id }}">{{ $category->category_name }}</option>
                                 @endforeach
                             </select>
+                            <div class="dd" data-target="#categoryFilter">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">All Category</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Category">
+                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a category…"></div>
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">All Category</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @foreach($categories as $category)
+                                            <div class="dd-item" role="option" data-value="{{ $category->id }}"><span class="dd-nm">{{ $category->category_name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="col-xl-2 col-lg-4 col-md-5  col-6">
                             <input type="text" name="dateFilter" id="dateFilter" class="form-control datepicker"/>
@@ -110,6 +131,8 @@
         </div>
     </div>
 @include('resorts._emotional_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')

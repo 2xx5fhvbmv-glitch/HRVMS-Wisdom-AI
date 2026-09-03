@@ -113,11 +113,24 @@
                                                 </a>
                                             </span>
                                             <span class="location-edit d-none">
-                                                <select class="form-select form-select-sm location-select" style="display:inline-block;width:auto;">
+                                                <select class="form-select form-select-sm location-select dd-native-select" id="location-select" style="display:inline-block;width:auto;">
                                                     <option value="">-</option>
                                                     <option value="Malé" {{ $loc === 'Malé' ? 'selected' : '' }}>Malé</option>
                                                     <option value="Resorts" {{ $loc === 'Resorts' ? 'selected' : '' }}>Resorts</option>
                                                 </select>
+                                                <div class="dd" data-target="#location-select" style="display:inline-block;width:auto;min-width:100px;vertical-align:middle;">
+                                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                        <span class="dd-lbl">{{ $loc === 'Malé' ? 'Malé' : ($loc === 'Resorts' ? 'Resorts' : '-') }}</span>
+                                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                    </button>
+                                                    <div class="dd-panel" role="listbox" aria-label="Location">
+                                                        <div class="dd-scroll">
+                                                            <div class="dd-item{{ ($loc === 'Malé' || $loc === 'Resorts') ? '' : ' active' }}" role="option" data-value=""><span class="dd-nm">-</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                            <div class="dd-item{{ $loc === 'Malé' ? ' active' : '' }}" role="option" data-value="Malé"><span class="dd-nm">Malé</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                            <div class="dd-item{{ $loc === 'Resorts' ? ' active' : '' }}" role="option" data-value="Resorts"><span class="dd-nm">Resorts</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                                 <a href="javascript:void(0);" class="location-save-btn ms-1" title="Save"><i class="fa-solid fa-check text-success"></i></a>
                                                 <a href="javascript:void(0);" class="location-cancel-btn ms-1" title="Cancel"><i class="fa-solid fa-xmark text-danger"></i></a>
                                             </span>
@@ -266,12 +279,26 @@
                                                                 <th>Title:</th>
                                                                 <td>
                                                                     <span class="view-mode">{{$employee->title}}</span>
-                                                                    <select name="title" class="form-select edit-mode d-none" required>
+                                                                    <select name="title" id="detail-title" class="form-select dd-native-select edit-mode d-none" required>
                                                                         <option value="">Select title</option>
                                                                         <option {{$employee->title == "Mr" ? "Selected" : ""}} value="Mr">Mr</option>
                                                                         <option {{$employee->title == "Miss" ? "Selected" : ""}} value="Miss">Miss</option>
                                                                         <option {{$employee->title == "Mrs" ? "Selected" : ""}} value="Mrs">Mrs</option>
                                                                     </select>
+                                                                    <div class="dd edit-mode d-none" data-target="#detail-title">
+                                                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                                            <span class="dd-lbl">{{ $employee->title ?: 'Select title' }}</span>
+                                                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                                        </button>
+                                                                        <div class="dd-panel" role="listbox" aria-label="Title">
+                                                                            <div class="dd-scroll">
+                                                                                <div class="dd-item{{ $employee->title ? '' : ' active' }}" role="option" data-value=""><span class="dd-nm">Select title</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                <div class="dd-item{{ $employee->title == 'Mr' ? ' active' : '' }}" role="option" data-value="Mr"><span class="dd-nm">Mr</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                <div class="dd-item{{ $employee->title == 'Miss' ? ' active' : '' }}" role="option" data-value="Miss"><span class="dd-nm">Miss</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                <div class="dd-item{{ $employee->title == 'Mrs' ? ' active' : '' }}" role="option" data-value="Mrs"><span class="dd-nm">Mrs</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
                                                                 </td>
                                                             </tr>
                                                             <tr>
@@ -292,7 +319,7 @@
                                                                 <th>Gender:</th>
                                                                 <td>
                                                                     <span class="view-mode">{{$employee->resortAdmin->gender}}</span>
-                                                                    <select name="gender" class="form-select edit-mode d-none" required>
+                                                                    <select name="gender" id="detail-gender" class="form-select dd-native-select edit-mode d-none" required>
                                                                         <option value="">Select Gender</option>
                                                                         <option {{$employee->resortAdmin->gender == "male" ? "Selected" : ""}} value="male">Male</option>
                                                                         <option {{$employee->resortAdmin->gender == "female" ? "Selected" : ""}} value="female">Female</option>
@@ -300,6 +327,19 @@
                                                                              gender is collected only for legal/visa records
                                                                              where Male / Female are the only accepted values. --}}
                                                                     </select>
+                                                                    <div class="dd edit-mode d-none" data-target="#detail-gender">
+                                                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                                            <span class="dd-lbl">{{ $employee->resortAdmin->gender == 'male' ? 'Male' : ($employee->resortAdmin->gender == 'female' ? 'Female' : 'Select Gender') }}</span>
+                                                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                                        </button>
+                                                                        <div class="dd-panel" role="listbox" aria-label="Gender">
+                                                                            <div class="dd-scroll">
+                                                                                <div class="dd-item{{ $employee->resortAdmin->gender ? '' : ' active' }}" role="option" data-value=""><span class="dd-nm">Select Gender</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                <div class="dd-item{{ $employee->resortAdmin->gender == 'male' ? ' active' : '' }}" role="option" data-value="male"><span class="dd-nm">Male</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                <div class="dd-item{{ $employee->resortAdmin->gender == 'female' ? ' active' : '' }}" role="option" data-value="female"><span class="dd-nm">Female</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
                                                                 </td>
                                                             </tr>
                                                             <tr>
@@ -333,13 +373,28 @@
                                                                 <th>Marital Status:</th>
                                                                 <td>
                                                                     <span class="view-mode">{{$employee->marital_status}}</span>
-                                                                    <select name="marital_status" class="form-select edit-mode d-none" required>
+                                                                    <select name="marital_status" id="detail-marital-status" class="form-select dd-native-select edit-mode d-none" required>
                                                                         <option value="">Select Marital Status</option>
                                                                         <option {{$employee->marital_status == "Single" ? "Selected" : ""}} value="Single">Single</option>
                                                                         <option {{$employee->marital_status == "Married" ? "Selected" : ""}} value="Married">Married</option>
                                                                         <option {{$employee->marital_status == "Divorced" ? "Selected" : ""}} value="Divorced">Divorced</option>
                                                                         <option {{$employee->marital_status == "Widowed" ? "Selected" : ""}} value="Widowed">Widowed</option>
                                                                     </select>
+                                                                    <div class="dd edit-mode d-none" data-target="#detail-marital-status">
+                                                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                                            <span class="dd-lbl">{{ $employee->marital_status ?: 'Select Marital Status' }}</span>
+                                                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                                        </button>
+                                                                        <div class="dd-panel" role="listbox" aria-label="Marital Status">
+                                                                            <div class="dd-scroll">
+                                                                                <div class="dd-item{{ $employee->marital_status ? '' : ' active' }}" role="option" data-value=""><span class="dd-nm">Select Marital Status</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                <div class="dd-item{{ $employee->marital_status == 'Single' ? ' active' : '' }}" role="option" data-value="Single"><span class="dd-nm">Single</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                <div class="dd-item{{ $employee->marital_status == 'Married' ? ' active' : '' }}" role="option" data-value="Married"><span class="dd-nm">Married</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                <div class="dd-item{{ $employee->marital_status == 'Divorced' ? ' active' : '' }}" role="option" data-value="Divorced"><span class="dd-nm">Divorced</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                <div class="dd-item{{ $employee->marital_status == 'Widowed' ? ' active' : '' }}" role="option" data-value="Widowed"><span class="dd-nm">Widowed</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
                                                                 </td>
                                                             </tr>
                                                         </tbody>
@@ -354,7 +409,7 @@
                                                                 <th>Nationality:</th>
                                                                 <td>
                                                                     <span class="view-mode">{{$employee->nationality}}</span>
-                                                                    <select name="nationality" class="form-select edit-mode d-none" required>
+                                                                    <select name="nationality" id="detail-nationality" class="form-select dd-native-select edit-mode d-none" required>
                                                                         <option value="">Select Nationality</option>
                                                                         @if($nationality)
                                                                             @foreach($nationality as $val)
@@ -362,24 +417,54 @@
                                                                             @endforeach
                                                                         @endif
                                                                     </select>
+                                                                    <div class="dd edit-mode d-none" data-target="#detail-nationality">
+                                                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                                            <span class="dd-lbl">{{ $employee->nationality ?: 'Select Nationality' }}</span>
+                                                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                                        </button>
+                                                                        <div class="dd-panel" role="listbox" aria-label="Nationality">
+                                                                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a nationality…"></div>
+                                                                            <div class="dd-scroll">
+                                                                                <div class="dd-item{{ $employee->nationality ? '' : ' active' }}" role="option" data-value=""><span class="dd-nm">Select Nationality</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                @if($nationality)
+                                                                                    @foreach($nationality as $val)
+                                                                                        <div class="dd-item{{ $val == $employee->nationality ? ' active' : '' }}" role="option" data-value="{{$val}}"><span class="dd-nm">{{$val}}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                    @endforeach
+                                                                                @endif
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
                                                                 </td>
                                                             </tr>
                                                             <tr>
                                                                 <th>Religion:</th>
                                                                 <td>
                                                                     <span class="view-mode">{{ ($employee->religion === null || $employee->religion === '') ? "N/A" : ($employee->religion === '0' ? "Non-Muslim" : "Muslim") }}</span>
-                                                                    <select name="religion" class="form-select edit-mode d-none" required>
+                                                                    <select name="religion" id="detail-religion" class="form-select dd-native-select edit-mode d-none" required>
                                                                         <option value="">Select Religion</option>
                                                                         <option {{$employee->religion == 1 ? "Selected" : ""}} value="1">Muslim</option>
                                                                         <option {{$employee->religion == 0 ? "Selected" : ""}} value="0">Non-Muslim</option>
                                                                     </select>
+                                                                    <div class="dd edit-mode d-none" data-target="#detail-religion">
+                                                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                                            <span class="dd-lbl">{{ $employee->religion == '1' ? 'Muslim' : ($employee->religion == '0' ? 'Non-Muslim' : 'Select Religion') }}</span>
+                                                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                                        </button>
+                                                                        <div class="dd-panel" role="listbox" aria-label="Religion">
+                                                                            <div class="dd-scroll">
+                                                                                <div class="dd-item{{ ($employee->religion === null || $employee->religion === '') ? ' active' : '' }}" role="option" data-value=""><span class="dd-nm">Select Religion</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                <div class="dd-item{{ $employee->religion == 1 ? ' active' : '' }}" role="option" data-value="1"><span class="dd-nm">Muslim</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                <div class="dd-item{{ $employee->religion == 0 ? ' active' : '' }}" role="option" data-value="0"><span class="dd-nm">Non-Muslim</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
                                                                 </td>
                                                             </tr>
                                                             <tr>
                                                                 <th>Blood Group:</th>
                                                                 <td>
                                                                     <span class="view-mode">{{$employee->blood_group}}</span>
-                                                                    <select name="blood_group" class="form-select edit-mode d-none" required>
+                                                                    <select name="blood_group" id="detail-blood-group" class="form-select dd-native-select edit-mode d-none" required>
                                                                         <option value="">Select Blood Group</option>
                                                                         <option {{$employee->blood_group == "A+" ? "Selected" : ""}} value="A+">A+</option>
                                                                         <option {{$employee->blood_group == "A-" ? "Selected" : ""}} value="A-">A-</option>
@@ -390,6 +475,25 @@
                                                                         <option {{$employee->blood_group == "O+" ? "Selected" : ""}} value="O+">O+</option>
                                                                         <option {{$employee->blood_group == "O-" ? "Selected" : ""}} value="O-">O-</option>
                                                                     </select>
+                                                                    <div class="dd edit-mode d-none" data-target="#detail-blood-group">
+                                                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                                            <span class="dd-lbl">{{ $employee->blood_group ?: 'Select Blood Group' }}</span>
+                                                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                                        </button>
+                                                                        <div class="dd-panel" role="listbox" aria-label="Blood Group">
+                                                                            <div class="dd-scroll">
+                                                                                <div class="dd-item{{ $employee->blood_group ? '' : ' active' }}" role="option" data-value=""><span class="dd-nm">Select Blood Group</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                <div class="dd-item{{ $employee->blood_group == 'A+' ? ' active' : '' }}" role="option" data-value="A+"><span class="dd-nm">A+</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                <div class="dd-item{{ $employee->blood_group == 'A-' ? ' active' : '' }}" role="option" data-value="A-"><span class="dd-nm">A-</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                <div class="dd-item{{ $employee->blood_group == 'B+' ? ' active' : '' }}" role="option" data-value="B+"><span class="dd-nm">B+</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                <div class="dd-item{{ $employee->blood_group == 'B-' ? ' active' : '' }}" role="option" data-value="B-"><span class="dd-nm">B-</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                <div class="dd-item{{ $employee->blood_group == 'AB+' ? ' active' : '' }}" role="option" data-value="AB+"><span class="dd-nm">AB+</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                <div class="dd-item{{ $employee->blood_group == 'AB-' ? ' active' : '' }}" role="option" data-value="AB-"><span class="dd-nm">AB-</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                <div class="dd-item{{ $employee->blood_group == 'O+' ? ' active' : '' }}" role="option" data-value="O+"><span class="dd-nm">O+</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                <div class="dd-item{{ $employee->blood_group == 'O-' ? ' active' : '' }}" role="option" data-value="O-"><span class="dd-nm">O-</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
                                                                 </td>
                                                             </tr>
                                                             <tr>
@@ -673,7 +777,7 @@
                                                                         </td>
                                                                         <td>
                                                                             <span class="view-mode">{{ $lang->proficiency_level }}</span>
-                                                                            <select class="form-control edit-mode d-none" name="languages[{{ $index }}][proficiency_level]">
+                                                                            <select class="form-control dd-native-select edit-mode d-none proficiency-level-select" id="proficiency-level-{{ $index }}" name="languages[{{ $index }}][proficiency_level]">
                                                                                 <option value="" selected disabled readonly>Select Level</option>
                                                                                 <option value="Beginner" @if($lang->proficiency_level == "Beginner") selected @endif >Beginner</option>
                                                                                 <option value="Intermediate" @if($lang->proficiency_level == "Intermediate") selected @endif >Intermediate</option>
@@ -681,6 +785,22 @@
                                                                                 <option value="Fluent" @if($lang->proficiency_level == "Fluent") selected @endif >Fluent</option>
                                                                                 <option value="Native" @if($lang->proficiency_level == "Native") selected @endif >Native</option>
                                                                             </select>
+                                                                            <div class="dd edit-mode d-none" data-target="#proficiency-level-{{ $index }}">
+                                                                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                                                    <span class="dd-lbl">{{ $lang->proficiency_level ?: 'Select Level' }}</span>
+                                                                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                                                </button>
+                                                                                <div class="dd-panel" role="listbox" aria-label="Proficiency Level">
+                                                                                    <div class="dd-scroll">
+                                                                                        <div class="dd-item{{ $lang->proficiency_level ? '' : ' active' }}" role="option" data-value="" aria-disabled="true"><span class="dd-nm">Select Level</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                        <div class="dd-item{{ $lang->proficiency_level == 'Beginner' ? ' active' : '' }}" role="option" data-value="Beginner"><span class="dd-nm">Beginner</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                        <div class="dd-item{{ $lang->proficiency_level == 'Intermediate' ? ' active' : '' }}" role="option" data-value="Intermediate"><span class="dd-nm">Intermediate</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                        <div class="dd-item{{ $lang->proficiency_level == 'Advanced' ? ' active' : '' }}" role="option" data-value="Advanced"><span class="dd-nm">Advanced</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                        <div class="dd-item{{ $lang->proficiency_level == 'Fluent' ? ' active' : '' }}" role="option" data-value="Fluent"><span class="dd-nm">Fluent</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                        <div class="dd-item{{ $lang->proficiency_level == 'Native' ? ' active' : '' }}" role="option" data-value="Native"><span class="dd-nm">Native</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                    </div>
+                                                                                </div>
+                                                                            </div>
                                                                             {{-- <input type="text" name="languages[{{ $index }}][proficiency_level]" class="" value="{{ $lang->proficiency_level }}"> --}}
                                                                         </td>
                                                                         <td class="edit-mode d-none">
@@ -766,7 +886,8 @@
                                                                 <th>Division:</th>
                                                                 <td>
                                                                     <span class="view-mode"> {{$employee->division->name ?? "N/A"}}</span>
-                                                                    <select name="division_id" class="form-select devision-select edit-mode d-none">
+                                                                    @php $selectedDivision = $resort_divisions ? collect($resort_divisions)->firstWhere('id', $employee->division->id ?? null) : null; @endphp
+                                                                    <select name="division_id" id="detail-division" class="form-select dd-native-select devision-select edit-mode d-none">
                                                                         <option value="" selected>Select Division</option>
                                                                         @if($resort_divisions)
                                                                             @foreach($resort_divisions as $div)
@@ -774,35 +895,88 @@
                                                                             @endforeach
                                                                         @endif
                                                                     </select>
+                                                                    <div class="dd edit-mode d-none" data-target="#detail-division">
+                                                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                                            <span class="dd-lbl">{{ $selectedDivision->name ?? 'Select Division' }}</span>
+                                                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                                        </button>
+                                                                        <div class="dd-panel" role="listbox" aria-label="Division">
+                                                                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a division…"></div>
+                                                                            <div class="dd-scroll">
+                                                                                <div class="dd-item{{ $selectedDivision ? '' : ' active' }}" role="option" data-value=""><span class="dd-nm">Select Division</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                @if($resort_divisions)
+                                                                                    @foreach($resort_divisions as $div)
+                                                                                        <div class="dd-item{{ (isset($employee->division->id) && $div->id == $employee->division->id) ? ' active' : '' }}" role="option" data-value="{{$div->id}}"><span class="dd-nm">{{$div->name}}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                    @endforeach
+                                                                                @endif
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
                                                                 </td>
                                                             </tr>
                                                             <tr>
                                                                 <th>Department:</th>
                                                                 <td>
                                                                     <span class="view-mode"> {{$employee->department->name ?? 'N/A'}}</span>
-                                                                    <select name="Dept_id" id="department-select" class="form-select edit-mode d-none"
+                                                                    <select name="Dept_id" id="department-select" class="form-select dd-native-select edit-mode d-none"
                                                                             data-current-division="{{ $employee->division->id ?? '' }}"
                                                                             data-current-department="{{ $employee->department->id ?? '' }}">
                                                                         <option value="">Select Department</option>
                                                                     </select>
+                                                                    <div class="dd edit-mode d-none" data-target="#department-select">
+                                                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                                            <span class="dd-lbl">Select Department</span>
+                                                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                                        </button>
+                                                                        <div class="dd-panel" role="listbox" aria-label="Department">
+                                                                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a department…"></div>
+                                                                            <div class="dd-scroll">
+                                                                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Department</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
                                                                 </td>
                                                             </tr>
                                                             <tr>
                                                                 <th>Section:</th>
                                                                 <td>
                                                                     <span class="view-mode"> {{$employee->section->name ?? "N/A"}}</span>
-                                                                    <select name="Section_id" id="section-select" class="form-select edit-mode d-none" data-current-department="{{ $employee->department->id ?? ''}}" data-current-section="{{ $employee->section->id ?? '' }}">
+                                                                    <select name="Section_id" id="section-select" class="form-select dd-native-select edit-mode d-none" data-current-department="{{ $employee->department->id ?? ''}}" data-current-section="{{ $employee->section->id ?? '' }}">
                                                                         <option value="">Select Section</option>
                                                                     </select>
+                                                                    <div class="dd edit-mode d-none" data-target="#section-select">
+                                                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                                            <span class="dd-lbl">Select Section</span>
+                                                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                                        </button>
+                                                                        <div class="dd-panel" role="listbox" aria-label="Section">
+                                                                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a section…"></div>
+                                                                            <div class="dd-scroll">
+                                                                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Section</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
                                                                 </td>
                                                             </tr>
                                                             <tr>
                                                                 <th>Position:</th>
                                                                 <td>
                                                                     <span class="view-mode">{{$employee->position->position_title}}</span>
-                                                                    <select name="Position_id" id="position-select" class="form-select edit-mode d-none" data-current-section="{{ $employee->section->id ?? '' }}" data-current-position="{{ $employee->position->id ?? ''}}">
+                                                                    <select name="Position_id" id="position-select" class="form-select dd-native-select edit-mode d-none" data-current-section="{{ $employee->section->id ?? '' }}" data-current-position="{{ $employee->position->id ?? ''}}">
                                                                         <option value="">Select Position</option>
                                                                     </select>
+                                                                    <div class="dd edit-mode d-none" data-target="#position-select">
+                                                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                                            <span class="dd-lbl">Select Position</span>
+                                                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                                        </button>
+                                                                        <div class="dd-panel" role="listbox" aria-label="Position">
+                                                                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a position…"></div>
+                                                                            <div class="dd-scroll">
+                                                                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Position</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
                                                                 </td>
                                                             </tr>
 
@@ -886,7 +1060,7 @@
                                                                 <th>Employment Status:</th>
                                                                 <td>
                                                                     <span class="view-mode">{{$employee->status}}</span>
-                                                                    <select name="status" id="employment-status" class="form-select edit-mode d-none">
+                                                                    <select name="status" id="employment-status" class="form-select dd-native-select edit-mode d-none">
                                                                         <option value="">Select Status</option>
                                                                         <option {{$employee->status == "Active" ? "Selected" : ""}} value="Active">Active</option>
                                                                         <option {{$employee->status == "Onboarding" ? "Selected" : ""}} value="Onboarding">Onboarding</option>
@@ -896,13 +1070,31 @@
                                                                         <option {{$employee->status == "On Leave" ? "Selected" : ""}} value="On Leave">On Leave</option>
                                                                         <option {{$employee->status == "Suspended" ? "Selected" : ""}} value="Suspended">Suspended</option>
                                                                     </select>
+                                                                    <div class="dd edit-mode d-none" data-target="#employment-status">
+                                                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                                            <span class="dd-lbl">{{ $employee->status ?: 'Select Status' }}</span>
+                                                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                                        </button>
+                                                                        <div class="dd-panel" role="listbox" aria-label="Status">
+                                                                            <div class="dd-scroll">
+                                                                                <div class="dd-item{{ $employee->status ? '' : ' active' }}" role="option" data-value=""><span class="dd-nm">Select Status</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                <div class="dd-item{{ $employee->status == 'Active' ? ' active' : '' }}" role="option" data-value="Active"><span class="dd-nm">Active</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                <div class="dd-item{{ $employee->status == 'Onboarding' ? ' active' : '' }}" role="option" data-value="Onboarding"><span class="dd-nm">Onboarding</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                <div class="dd-item{{ $employee->status == 'Inactive' ? ' active' : '' }}" role="option" data-value="Inactive"><span class="dd-nm">Inactive</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                <div class="dd-item{{ $employee->status == 'Terminated' ? ' active' : '' }}" role="option" data-value="Terminated"><span class="dd-nm">Terminated</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                <div class="dd-item{{ $employee->status == 'Resigned' ? ' active' : '' }}" role="option" data-value="Resigned"><span class="dd-nm">Resigned</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                <div class="dd-item{{ $employee->status == 'On Leave' ? ' active' : '' }}" role="option" data-value="On Leave"><span class="dd-nm">On Leave</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                <div class="dd-item{{ $employee->status == 'Suspended' ? ' active' : '' }}" role="option" data-value="Suspended"><span class="dd-nm">Suspended</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
                                                                 </td>
                                                             </tr>
                                                             <tr>
                                                                 <th>Employment Type:</th>
                                                                 <td>
                                                                     <span class="view-mode">{{$employee->employment_type}}</span>
-                                                                    <select name="employment_type" id="employment-type" class="form-select edit-mode d-none">
+                                                                    <select name="employment_type" id="employment-type" class="form-select dd-native-select edit-mode d-none">
                                                                         <option value="">Select Employment Type</option>
                                                                         <option {{$employee->employment_type == "Full-Time" ? "Selected" : ""}} value="Full-Time">Full-Time</option>
                                                                         <option {{$employee->employment_type == "Part-Time" ? "Selected" : ""}} value="Part-Time">Part-Time</option>
@@ -912,6 +1104,24 @@
                                                                         <option {{$employee->employment_type == "Internship" ? "Selected" : ""}} value="Internship">Internship</option>
                                                                         <option {{$employee->employment_type == "Temporary" ? "Selected" : ""}} value="Temporary">Temporary</option>
                                                                     </select>
+                                                                    <div class="dd edit-mode d-none" data-target="#employment-type">
+                                                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                                            <span class="dd-lbl">{{ $employee->employment_type ?: 'Select Employment Type' }}</span>
+                                                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                                        </button>
+                                                                        <div class="dd-panel" role="listbox" aria-label="Employment Type">
+                                                                            <div class="dd-scroll">
+                                                                                <div class="dd-item{{ $employee->employment_type ? '' : ' active' }}" role="option" data-value=""><span class="dd-nm">Select Employment Type</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                <div class="dd-item{{ $employee->employment_type == 'Full-Time' ? ' active' : '' }}" role="option" data-value="Full-Time"><span class="dd-nm">Full-Time</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                <div class="dd-item{{ $employee->employment_type == 'Part-Time' ? ' active' : '' }}" role="option" data-value="Part-Time"><span class="dd-nm">Part-Time</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                <div class="dd-item{{ $employee->employment_type == 'Contract' ? ' active' : '' }}" role="option" data-value="Contract"><span class="dd-nm">Contract</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                <div class="dd-item{{ $employee->employment_type == 'Casual' ? ' active' : '' }}" role="option" data-value="Casual"><span class="dd-nm">Casual</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                <div class="dd-item{{ $employee->employment_type == 'Probationary' ? ' active' : '' }}" role="option" data-value="Probationary"><span class="dd-nm">Probationary</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                <div class="dd-item{{ $employee->employment_type == 'Internship' ? ' active' : '' }}" role="option" data-value="Internship"><span class="dd-nm">Internship</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                <div class="dd-item{{ $employee->employment_type == 'Temporary' ? ' active' : '' }}" role="option" data-value="Temporary"><span class="dd-nm">Temporary</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
                                                                 </td>
                                                             </tr>
                                                             @php
@@ -949,7 +1159,7 @@
                                                                     {{-- Edit Mode --}}
                                                                     <select name="benefit_grid_level"
                                                                             id="benefit_grid_level"
-                                                                            class="form-select edit-mode d-none"
+                                                                            class="form-select dd-native-select edit-mode d-none"
                                                                             data-placeholder="Benefit Grid Level">
                                                                         @if($effectiveBgl && $effectiveGradeName)
                                                                             <option value="{{ $effectiveBgl }}" selected>
@@ -957,6 +1167,19 @@
                                                                             </option>
                                                                         @endif
                                                                     </select>
+                                                                    <div class="dd edit-mode d-none" data-target="#benefit_grid_level">
+                                                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                                            <span class="dd-lbl">{{ $effectiveGradeName ?? 'Benefit Grid Level' }}</span>
+                                                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                                        </button>
+                                                                        <div class="dd-panel" role="listbox" aria-label="Benefit Grid Level">
+                                                                            <div class="dd-scroll">
+                                                                                @if($effectiveBgl && $effectiveGradeName)
+                                                                                    <div class="dd-item active" role="option" data-value="{{ $effectiveBgl }}"><span class="dd-nm">{{ $effectiveGradeName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                @endif
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
                                                                 </td>
 
 
@@ -1018,9 +1241,21 @@
                                                                 <th>Reporting To:</th>
                                                                 <td>
                                                                     <span class="view-mode">{{ $employee->reportingTo ? $employee->reportingTo->resortAdmin->full_name . ' (' . $employee->reportingTo->Emp_id . ')' : 'N/A' }}</span>
-                                                                    <select name="reporting_to" id="reporting-to-select" class="form-select edit-mode d-none">
+                                                                    <select name="reporting_to" id="reporting-to-select" class="form-select dd-native-select edit-mode d-none">
                                                                         <option value="">Select Reporting Person</option>
                                                                     </select>
+                                                                    <div class="dd edit-mode d-none" data-target="#reporting-to-select">
+                                                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                                            <span class="dd-lbl">Select Reporting Person</span>
+                                                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                                        </button>
+                                                                        <div class="dd-panel" role="listbox" aria-label="Reporting Person">
+                                                                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an employee…"></div>
+                                                                            <div class="dd-scroll">
+                                                                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Reporting Person</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
                                                                 </td>
                                                             </tr>
                                                         </tbody>
@@ -1068,20 +1303,44 @@
                                                                 <td>
                                                                     <span class="view-mode">{{ number_format($employee->basic_salary, 2) ?? 0 }} {{ $employee->basic_salary_currency }}</span>
                                                                     <input type="text" name="basic_salary" class="form-control edit-mode d-none" value="{{ $employee->basic_salary }}">
-                                                                    <select class="form-select edit-mode d-none" name="basic_salary_currency">
+                                                                    <select class="form-select dd-native-select edit-mode d-none" id="detail-basic-salary-currency" name="basic_salary_currency">
                                                                         <option value="USD" {{ $employee->basic_salary_currency == "USD" ? "selected" : "" }}>USD</option>
                                                                         <option value="MVR" {{ $employee->basic_salary_currency == "MVR" ? "selected" : "" }}>MVR</option>
                                                                     </select>
+                                                                    <div class="dd edit-mode d-none" data-target="#detail-basic-salary-currency">
+                                                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                                            <span class="dd-lbl">{{ $employee->basic_salary_currency == 'MVR' ? 'MVR' : 'USD' }}</span>
+                                                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                                        </button>
+                                                                        <div class="dd-panel" role="listbox" aria-label="Currency">
+                                                                            <div class="dd-scroll">
+                                                                                <div class="dd-item{{ $employee->basic_salary_currency == 'MVR' ? '' : ' active' }}" role="option" data-value="USD"><span class="dd-nm">USD</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                <div class="dd-item{{ $employee->basic_salary_currency == 'MVR' ? ' active' : '' }}" role="option" data-value="MVR"><span class="dd-nm">MVR</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
                                                                 </td>
                                                             </tr>
                                                             <tr>
                                                                 <th>Payment Mode:</th>
                                                                 <td>
                                                                     <span class="view-mode">{{ $employee->payment_mode ?? 'Bank' }}</span>
-                                                                    <select name="payment_mode" class="form-select edit-mode d-none">
+                                                                    <select name="payment_mode" id="detail-payment-mode" class="form-select dd-native-select edit-mode d-none">
                                                                         <option value="Bank" {{ ($employee->payment_mode ?? '') == 'Bank' ? 'selected' : '' }}>Bank</option>
                                                                         <option value="Cash" {{ ($employee->payment_mode ?? '') == 'Cash' ? 'selected' : '' }}>Cash</option>
                                                                     </select>
+                                                                    <div class="dd edit-mode d-none" data-target="#detail-payment-mode">
+                                                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                                            <span class="dd-lbl">{{ ($employee->payment_mode ?? '') == 'Cash' ? 'Cash' : 'Bank' }}</span>
+                                                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                                        </button>
+                                                                        <div class="dd-panel" role="listbox" aria-label="Payment Mode">
+                                                                            <div class="dd-scroll">
+                                                                                <div class="dd-item{{ ($employee->payment_mode ?? '') == 'Cash' ? '' : ' active' }}" role="option" data-value="Bank"><span class="dd-nm">Bank</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                <div class="dd-item{{ ($employee->payment_mode ?? '') == 'Cash' ? ' active' : '' }}" role="option" data-value="Cash"><span class="dd-nm">Cash</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
                                                                 </td>
                                                             </tr>
                                                             @if($employee->nationality == 'Maldivian')
@@ -1222,7 +1481,7 @@
                                                             @foreach($employee->allowance as $index => $allowance)
                                                             <div class="row mb-2 allowance-row">
                                                                 <div class="col-4">
-                                                                    <select name="allowances[{{ $index }}][type]" class="form-select">
+                                                                    <select name="allowances[{{ $index }}][type]" id="detail-allowance-type-{{ $index }}" class="form-select dd-native-select">
                                                                         <option value="">Select Type</option>
                                                                         @if($resort_allowances)
                                                                             @foreach($resort_allowances as $resort_allowance)
@@ -1230,15 +1489,45 @@
                                                                             @endforeach
                                                                         @endif
                                                                     </select>
+                                                                    @php $selectedAllowanceType = $resort_allowances ? collect($resort_allowances)->firstWhere('id', $allowance->allowance_id) : null; @endphp
+                                                                    <div class="dd" data-target="#detail-allowance-type-{{ $index }}">
+                                                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                                            <span class="dd-lbl">{{ $selectedAllowanceType->particulars ?? 'Select Type' }}</span>
+                                                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                                        </button>
+                                                                        <div class="dd-panel" role="listbox" aria-label="Allowance Type">
+                                                                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an allowance…"></div>
+                                                                            <div class="dd-scroll">
+                                                                                <div class="dd-item{{ $selectedAllowanceType ? '' : ' active' }}" role="option" data-value=""><span class="dd-nm">Select Type</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                @if($resort_allowances)
+                                                                                    @foreach($resort_allowances as $resort_allowance)
+                                                                                        <div class="dd-item{{ $allowance->allowance_id == $resort_allowance->id ? ' active' : '' }}" role="option" data-value="{{ $resort_allowance->id }}"><span class="dd-nm">{{ $resort_allowance->particulars }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                    @endforeach
+                                                                                @endif
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
                                                                 </div>
                                                                 <div class="col-3">
                                                                     <input type="text" name="allowances[{{ $index }}][amount]" class="form-control" value="{{ $allowance->amount }}" placeholder="Amount">
                                                                 </div>
                                                                 <div class="col-3">
-                                                                    <select name="allowances[{{ $index }}][amount_unit]" class="form-select">
+                                                                    <select name="allowances[{{ $index }}][amount_unit]" id="detail-allowance-unit-{{ $index }}" class="form-select dd-native-select">
                                                                         <option value="USD" {{ $allowance->amount_unit == 'USD' ? 'selected' : '' }}>USD</option>
                                                                         <option value="MVR" {{ $allowance->amount_unit == 'MVR' ? 'selected' : '' }}>MVR</option>
                                                                     </select>
+                                                                    <div class="dd" data-target="#detail-allowance-unit-{{ $index }}">
+                                                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                                            <span class="dd-lbl">{{ $allowance->amount_unit == 'MVR' ? 'MVR' : 'USD' }}</span>
+                                                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                                        </button>
+                                                                        <div class="dd-panel" role="listbox" aria-label="Unit">
+                                                                            <div class="dd-scroll">
+                                                                                <div class="dd-item{{ $allowance->amount_unit == 'MVR' ? '' : ' active' }}" role="option" data-value="USD"><span class="dd-nm">USD</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                <div class="dd-item{{ $allowance->amount_unit == 'MVR' ? ' active' : '' }}" role="option" data-value="MVR"><span class="dd-nm">MVR</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
                                                                 </div>
                                                                 <div class="col-2">
                                                                     <button type="button" class="btn eb-btn-critical btn-sm remove-allowance">
@@ -1343,10 +1632,22 @@
                                                                             <th>Currency:</th>
                                                                             <td>
                                                                                 <span class="view-mode">{{$bankDetail->currency ?? "Not Available"}}</span>
-                                                                                <select name="currency" class="form-control edit-mode d-none" >
+                                                                                <select name="currency" id="detail-bank-currency-{{ $bankDetail->id }}" class="form-control dd-native-select edit-mode d-none" >
                                                                                     <option {{$bankDetail->currency == "USD" ? "Selected" : "" }} value="USD">USD</option>
                                                                                     <option {{$bankDetail->currency == "MVR" ? "Selected" : "" }} value="MVR">MVR</option>
                                                                                 </select>
+                                                                                <div class="dd edit-mode d-none" data-target="#detail-bank-currency-{{ $bankDetail->id }}">
+                                                                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                                                        <span class="dd-lbl">{{ $bankDetail->currency == 'MVR' ? 'MVR' : 'USD' }}</span>
+                                                                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                                                    </button>
+                                                                                    <div class="dd-panel" role="listbox" aria-label="Currency">
+                                                                                        <div class="dd-scroll">
+                                                                                            <div class="dd-item{{ $bankDetail->currency == 'MVR' ? '' : ' active' }}" role="option" data-value="USD"><span class="dd-nm">USD</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                            <div class="dd-item{{ $bankDetail->currency == 'MVR' ? ' active' : '' }}" role="option" data-value="MVR"><span class="dd-nm">MVR</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
                                                                             </td>
                                                                         </tr>
                                                                         <tr>
@@ -1543,7 +1844,7 @@
                                                                             <td>
                                                                                 <span class="view-mode">{{ $exp->employment_type }}</span>
 
-                                                                                <select name="employment_type" class="form-select edit-mode d-none">
+                                                                                <select name="employment_type" id="detail-exp-employment-type-{{ $exp->id }}" class="form-select dd-native-select edit-mode d-none">
                                                                                     <option value="">Select employment_type</option>
                                                                                     <option {{$exp->employment_type == "Full-Time" ? "Selected" : ""}} value="Full-Time">Full-Time</option>
                                                                                     <option {{$exp->employment_type == "Part-Time" ? "Selected" : ""}} value="Part-Time">Part-Time</option>
@@ -1553,6 +1854,24 @@
                                                                                     <option {{$exp->employment_type == "Internship" ? "Selected" : ""}} value="Internship">Internship</option>
                                                                                     <option {{$exp->employment_type == "Temporary" ? "Selected" : ""}} value="Temporary">Temporary</option>
                                                                                 </select>
+                                                                                <div class="dd edit-mode d-none" data-target="#detail-exp-employment-type-{{ $exp->id }}">
+                                                                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                                                        <span class="dd-lbl">{{ $exp->employment_type ?: 'Select employment_type' }}</span>
+                                                                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                                                    </button>
+                                                                                    <div class="dd-panel" role="listbox" aria-label="Employment Type">
+                                                                                        <div class="dd-scroll">
+                                                                                            <div class="dd-item{{ $exp->employment_type ? '' : ' active' }}" role="option" data-value=""><span class="dd-nm">Select employment_type</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                            <div class="dd-item{{ $exp->employment_type == 'Full-Time' ? ' active' : '' }}" role="option" data-value="Full-Time"><span class="dd-nm">Full-Time</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                            <div class="dd-item{{ $exp->employment_type == 'Part-Time' ? ' active' : '' }}" role="option" data-value="Part-Time"><span class="dd-nm">Part-Time</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                            <div class="dd-item{{ $exp->employment_type == 'Contract' ? ' active' : '' }}" role="option" data-value="Contract"><span class="dd-nm">Contract</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                            <div class="dd-item{{ $exp->employment_type == 'Casual' ? ' active' : '' }}" role="option" data-value="Casual"><span class="dd-nm">Casual</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                            <div class="dd-item{{ $exp->employment_type == 'Probationary' ? ' active' : '' }}" role="option" data-value="Probationary"><span class="dd-nm">Probationary</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                            <div class="dd-item{{ $exp->employment_type == 'Internship' ? ' active' : '' }}" role="option" data-value="Internship"><span class="dd-nm">Internship</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                            <div class="dd-item{{ $exp->employment_type == 'Temporary' ? ' active' : '' }}" role="option" data-value="Temporary"><span class="dd-nm">Temporary</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </div>
                                                                             </td>
                                                                         </tr>
                                                                         <tr>
@@ -1797,21 +2116,49 @@
                     <div class="modal-body">
                         <div class="mb-3">
                             <label for="team_id">Select Team</label>
-                            <select name="team_id" class="form-select select2t-none" required>
+                            <select name="team_id" id="detail-assign-team-id" class="form-select dd-native-select" required>
                                 <option value="">Select Team</option>
                                 @foreach($teams as $team)
                                     <option value="{{ $team->id }}">{{ $team->name }}</option>
                                 @endforeach
                             </select>
+                            <div class="dd" data-target="#detail-assign-team-id">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Select Team</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Team">
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Team</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @foreach($teams as $team)
+                                            <div class="dd-item" role="option" data-value="{{ $team->id }}"><span class="dd-nm">{{ $team->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="mb-3">
                             <label for="role_id">Select Role</label>
-                            <select name="role_id" class="form-select select2t-none" required>
+                            <select name="role_id" id="detail-assign-role-id" class="form-select dd-native-select" required>
                                 <option value="">Select Role</option>
                                 @foreach($roles as $role)
                                     <option value="{{ $role->id }}">{{ $role->name }}</option>
                                 @endforeach
                             </select>
+                            <div class="dd" data-target="#detail-assign-role-id">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Select Role</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Role">
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Role</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @foreach($roles as $role)
+                                            <div class="dd-item" role="option" data-value="{{ $role->id }}"><span class="dd-nm">{{ $role->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -1833,7 +2180,7 @@
                 <div class="modal-body">
                 <input type="hidden" name="emp_id" id="modal-emp-id">
 
-                <select name="status" id="modal-status" class="form-select select2-modal">
+                <select name="status" id="modal-status" class="form-select dd-native-select">
                     <option value="">Status</option>
                     <option {{$employee->status == "Active" ? "Selected" : ""}} value="Active">Active</option>
                     <option {{$employee->status == "Onboarding" ? "Selected" : ""}} value="Onboarding">Onboarding</option>
@@ -1844,6 +2191,25 @@
                     <option {{$employee->status == "On Leave" ? "Selected" : ""}} value="On Leave">On Leave</option>
                     <option {{$employee->status == "Suspended" ? "Selected" : ""}} value="Suspended">Suspended</option>
                 </select>
+                <div class="dd" data-target="#modal-status">
+                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                        <span class="dd-lbl">{{ $employee->status ?: 'Status' }}</span>
+                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                    </button>
+                    <div class="dd-panel" role="listbox" aria-label="Status">
+                        <div class="dd-scroll">
+                            <div class="dd-item{{ $employee->status ? '' : ' active' }}" role="option" data-value=""><span class="dd-nm">Status</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                            <div class="dd-item{{ $employee->status == 'Active' ? ' active' : '' }}" role="option" data-value="Active"><span class="dd-nm">Active</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                            <div class="dd-item{{ $employee->status == 'Onboarding' ? ' active' : '' }}" role="option" data-value="Onboarding"><span class="dd-nm">Onboarding</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                            <div class="dd-item{{ $employee->status == 'Probationary' ? ' active' : '' }}" role="option" data-value="Probationary"><span class="dd-nm">Probationary</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                            <div class="dd-item{{ $employee->status == 'Inactive' ? ' active' : '' }}" role="option" data-value="Inactive"><span class="dd-nm">Inactive</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                            <div class="dd-item{{ $employee->status == 'Terminated' ? ' active' : '' }}" role="option" data-value="Terminated"><span class="dd-nm">Terminated</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                            <div class="dd-item{{ $employee->status == 'Resigned' ? ' active' : '' }}" role="option" data-value="Resigned"><span class="dd-nm">Resigned</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                            <div class="dd-item{{ $employee->status == 'On Leave' ? ' active' : '' }}" role="option" data-value="On Leave"><span class="dd-nm">On Leave</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                            <div class="dd-item{{ $employee->status == 'Suspended' ? ' active' : '' }}" role="option" data-value="Suspended"><span class="dd-nm">Suspended</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                        </div>
+                    </div>
+                </div>
                 </div>
                 <div class="modal-footer">
                 <button type="submit" class="btn eb-btn-primary">Update</button>
@@ -1920,6 +2286,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts._dropdown_styles')
 <style>
     /* Pin the 3-dot kebab to the top-right corner of the profile sidebar.
        default.css already absolute-positions
@@ -2035,11 +2402,13 @@
                         }
                         $select.append(`<option value="${emp.id}" ${selected}>${fullName.trim()} (${empId})</option>`);
                     });
+                    window.wisdomDD.rebuild('#reporting-to-select');
                 } else {
                     console.warn('No reporting persons found or empty response');
                     const $select = $('#reporting-to-select');
                     $select.empty();
                     $select.append('<option value="">No Reporting Persons Available</option>');
+                    window.wisdomDD.rebuild('#reporting-to-select');
                 }
             },
             error: function(xhr) {
@@ -2047,6 +2416,7 @@
                 const $select = $('#reporting-to-select');
                 $select.empty();
                 $select.append('<option value="">Error loading reporting persons</option>');
+                window.wisdomDD.rebuild('#reporting-to-select');
             }
         });
     }
@@ -2147,7 +2517,9 @@
                         // Reset form + select2 so a second assignment starts
                         // clean.
                         $form[0].reset();
-                        $form.find('select.select2t-none').trigger('change');
+                        $form.find('select.dd-native-select').each(function () {
+                            window.wisdomDD.sync('#' + $(this).attr('id'));
+                        });
                         // Reload to refresh the Teams row in the sidebar
                         // with the new assignment.
                         setTimeout(function () { window.location.reload(); }, 800);
@@ -2497,30 +2869,74 @@
 
 
         // Add new allowance row
+        // NOTE: allowanceIndex reads `$employee->allowances` (plural) which
+        // is not a real property on Employee (only the singular `allowance`
+        // relation exists) — isset() is always false here, so this always
+        // starts at 0 regardless of how many rows were server-rendered
+        // above, and a newly-added row's `name` index can collide with an
+        // existing row's. Pre-existing bug, not fixed here (out of scope
+        // for this pass) — documented in docs/dropdown-unification-backend-
+        // findings.md. ddRowIndex below is a SEPARATE, correctly-seeded
+        // counter used only for this .dd's own element ids, so the dropdown
+        // conversion doesn't compound the bug with an id collision of its
+        // own on top of the existing name-index one.
         let allowanceIndex = {{ isset($employee->allowances) ? count($employee->allowances) : 0 }};
+        let allowanceDdRowIndex = {{ isset($employee->allowance) ? count($employee->allowance) : 0 }};
 
         $('#add-allowance').on('click', function() {
+            const rowId = allowanceDdRowIndex++;
+            const typeId = 'detail-allowance-type-new-' + rowId;
+            const unitId = 'detail-allowance-unit-new-' + rowId;
             const newRow = `
                  <div class="row mb-2 allowance-row">
                     <div class="col-4">
-                        <select name="allowances[${allowanceIndex}][type]" class="form-select">
+                        <select name="allowances[${allowanceIndex}][type]" id="${typeId}" class="form-select dd-native-select">
                             <option value="">Select Type</option>
                             @if($resort_allowances)
                                 @foreach($resort_allowances as $resort_allowance)
-                                    <option value="{{ $resort_allowance->id }}" {{ $resort_allowance->allowance_id == $resort_allowance->id ? 'selected' : '' }}>{{ $resort_allowance->particulars }}</option>
+                                    <option value="{{ $resort_allowance->id }}">{{ $resort_allowance->particulars }}</option>
                                 @endforeach
                             @endif
                         </select>
+                        <div class="dd" data-target="#${typeId}">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">Select Type</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Allowance Type">
+                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an allowance…"></div>
+                                <div class="dd-scroll">
+                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Type</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    @if($resort_allowances)
+                                        @foreach($resort_allowances as $resort_allowance)
+                                            <div class="dd-item" role="option" data-value="{{ $resort_allowance->id }}"><span class="dd-nm">{{ $resort_allowance->particulars }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @endforeach
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="col-3">
                         <input type="text" name="allowances[${allowanceIndex}][amount]" class="form-control" placeholder="Amount">
                     </div>
                     <div class="col-3">
-                        <select name="allowances[${allowanceIndex}][amount_unit]" class="form-select">
+                        <select name="allowances[${allowanceIndex}][amount_unit]" id="${unitId}" class="form-select dd-native-select">
                             <option value="USD">USD</option>
                             <option value="MVR">MVR</option>
 
                         </select>
+                        <div class="dd" data-target="#${unitId}">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">USD</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Unit">
+                                <div class="dd-scroll">
+                                    <div class="dd-item active" role="option" data-value="USD"><span class="dd-nm">USD</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    <div class="dd-item" role="option" data-value="MVR"><span class="dd-nm">MVR</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="col-2">
                         <button type="button" class="btn eb-btn-critical btn-sm remove-allowance">
@@ -3140,10 +3556,22 @@
                                 <th>Currency:</th>
                                 <td>
                                     <span class="view-mode d-none"></span>
-                                    <select name="currency" class="form-control edit-mode">
+                                    <select name="currency" id="detail-bank-currency-${newId}" class="form-control dd-native-select edit-mode">
                                         <option value="USD">USD</option>
                                         <option value="MVR">MVR</option>
                                     </select>
+                                    <div class="dd edit-mode" data-target="#detail-bank-currency-${newId}">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">USD</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Currency">
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value="USD"><span class="dd-nm">USD</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="MVR"><span class="dd-nm">MVR</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </td>
                             </tr>
                             <tr>
@@ -3458,7 +3886,7 @@
                                 <td>
                                     <span class="view-mode d-none"></span>
 
-                                    <select name="employment_type" class="form-select edit-mode d-none">
+                                    <select name="employment_type" id="detail-exp-employment-type-${newId}" class="form-select dd-native-select edit-mode">
                                         <option value="">Select employment_type</option>
                                         <option value="Full-Time">Full-Time</option>
                                         <option value="Part-Time">Part-Time</option>
@@ -3468,6 +3896,24 @@
                                         <option value="Internship">Internship</option>
                                         <option value="Temporary">Temporary</option>
                                     </select>
+                                    <div class="dd edit-mode" data-target="#detail-exp-employment-type-${newId}">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Select employment_type</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Employment Type">
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select employment_type</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="Full-Time"><span class="dd-nm">Full-Time</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="Part-Time"><span class="dd-nm">Part-Time</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="Contract"><span class="dd-nm">Contract</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="Casual"><span class="dd-nm">Casual</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="Probationary"><span class="dd-nm">Probationary</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="Internship"><span class="dd-nm">Internship</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="Temporary"><span class="dd-nm">Temporary</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </td>
                             </tr>
                             <tr>
@@ -3547,11 +3993,12 @@
 
         document.getElementById('add-language').addEventListener('click', function () {
             const row = document.createElement('tr');
+            const rowId = 'proficiency-level-' + languageIndex;
             row.innerHTML = `
                 <td><input type="text" name="languages[${languageIndex}][language]" class="form-control" /></td>
                 <td>
 
-                    <select class="form-select select2t-none proficiency-level-select" name="languages[${languageIndex }][proficiency_level]">
+                    <select class="form-select dd-native-select proficiency-level-select" id="${rowId}" name="languages[${languageIndex }][proficiency_level]">
                         <option value="" selected disabled readonly>Select Level</option>
                         <option value="Beginner"  >Beginner</option>
                         <option value="Intermediate" >Intermediate</option>
@@ -3559,6 +4006,22 @@
                         <option value="Fluent"  >Fluent</option>
                         <option value="Native"  >Native</option>
                     </select>
+                    <div class="dd" data-target="#${rowId}">
+                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                            <span class="dd-lbl">Select Level</span>
+                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                        </button>
+                        <div class="dd-panel" role="listbox" aria-label="Proficiency Level">
+                            <div class="dd-scroll">
+                                <div class="dd-item active" role="option" data-value="" aria-disabled="true"><span class="dd-nm">Select Level</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                <div class="dd-item" role="option" data-value="Beginner"><span class="dd-nm">Beginner</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                <div class="dd-item" role="option" data-value="Intermediate"><span class="dd-nm">Intermediate</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                <div class="dd-item" role="option" data-value="Advanced"><span class="dd-nm">Advanced</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                <div class="dd-item" role="option" data-value="Fluent"><span class="dd-nm">Fluent</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                <div class="dd-item" role="option" data-value="Native"><span class="dd-nm">Native</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                            </div>
+                        </div>
+                    </div>
                 </td>
                 <td><button type="button" class="btn eb-btn-critical btn-sm remove-language">Remove</button></td>
             `;
@@ -3590,6 +4053,7 @@
                     res.departments.forEach(dep => {
                         $('#department-select').append(`<option value="${dep.id}" ${dep.id == currentDepartment ? 'selected' : ''}>${dep.name}</option>`);
                     });
+                    window.wisdomDD.rebuild('#department-select');
 
                     preloadSectionsAndPositions(currentDepartment);
                 }
@@ -3613,6 +4077,7 @@
                             res.sections.forEach(sec => {
                                 $('#section-select').append(`<option value="${sec.id}" ${sec.id == currentSection ? 'selected' : ''}>${sec.name}</option>`);
                             });
+                            window.wisdomDD.rebuild('#section-select');
 
                             if (currentSection) {
                                 // Load positions under section
@@ -3623,6 +4088,7 @@
                             }
                         } else {
                             // No sections at all, load positions from department
+                            window.wisdomDD.rebuild('#section-select');
                             loadPositions({ department_id: departmentId }, currentPosition);
                         }
                     }
@@ -3641,6 +4107,7 @@
                 res.positions.forEach(pos => {
                     $('#position-select').append(`<option value="${pos.id}" ${pos.id == selectedId ? 'selected' : ''}>${pos.position_title}</option>`);
                 });
+                window.wisdomDD.rebuild('#position-select');
             }
         });
     }
@@ -3652,6 +4119,9 @@
         $('#department-select').empty().append('<option value="">Select Department</option>');
         $('#section-select').empty().append('<option value="">Select Section</option>');
         $('#position-select').empty().append('<option value="">Select Position</option>');
+        window.wisdomDD.rebuild('#department-select');
+        window.wisdomDD.rebuild('#section-select');
+        window.wisdomDD.rebuild('#position-select');
 
         if (divisionId) {
             $.ajax({
@@ -3663,6 +4133,7 @@
                         response.departments.forEach(dept => {
                             $('#department-select').append(`<option value="${dept.id}">${dept.name}</option>`);
                         });
+                        window.wisdomDD.rebuild('#department-select');
                     }
                 }
             });
@@ -3673,6 +4144,8 @@
         const departmentId = $(this).val();
         $('#section-select').empty().append('<option value="">Select Section</option>');
         $('#position-select').empty().append('<option value="">Select Position</option>');
+        window.wisdomDD.rebuild('#section-select');
+        window.wisdomDD.rebuild('#position-select');
 
         // Reload HOD list when department changes
         loadHODList();
@@ -3684,18 +4157,16 @@
                 data: { department_id: departmentId },
                 success: function (response) {
                     if (response.success) {
-                        if (response.sections.length > 0) {
-                            let html = '<option value="">Select Section</option>';
-                            response.sections.forEach(section => {
-                                html += `<option value="${section.id}">${section.name}</option>`;
-                            });
-                            $('#section-select').html(html).trigger('change');
-
-                            // Wait for section to be selected before loading positions
-                        } else {
-                            // No sections, load positions directly from department
-                            loadPositions({ department_id: departmentId });
-                        }
+                        let html = '<option value="">Select Section</option>';
+                        response.sections.forEach(section => {
+                            html += `<option value="${section.id}">${section.name}</option>`;
+                        });
+                        $('#section-select').html(html);
+                        window.wisdomDD.rebuild('#section-select');
+                        // No section selected yet — show the department's
+                        // section-less positions (e.g. Commis) by default,
+                        // same fallback the section-select handler below uses.
+                        loadPositions({ department_id: departmentId });
                     }
                 }
             });
@@ -3704,15 +4175,22 @@
 
     $('#section-select').on('change', function() {
         let sectionId = $(this).val();
-        $('#position-select').html('<option></option>').trigger('change');
-        if (!sectionId) return;
+        $('#position-select').html('<option value="">Select Position</option>').trigger('change');
+        window.wisdomDD.rebuild('#position-select');
+        if (!sectionId) {
+            // Section cleared — fall back to the department's own positions.
+            const departmentId = $('#department-select').val();
+            if (departmentId) loadPositions({ department_id: departmentId });
+            return;
+        }
         loadPositions({ section_id: sectionId });
     });
 
 
     $('#position-select').on('change', function () {
         let positionId = $(this).val();
-        $('#benefit_grid_level').empty().append('<option></option>');
+        $('#benefit_grid_level').empty().append('<option value="">Select Employee Grid</option>');
+        window.wisdomDD.rebuild('#benefit_grid_level');
 
         if (!positionId) return;
 
@@ -3729,6 +4207,7 @@
                     html += `<option value="${o.emp_grade}"${sel}>${o.name}</option>`;
                 });
                 $('#benefit_grid_level').html(html).trigger('change');
+                window.wisdomDD.rebuild('#benefit_grid_level');
             }
         });
     });
@@ -3737,27 +4216,8 @@
 </script>
 <script>
     $(document).ready(function() {
-        // Initialize Select2 and Parsley validation
-            initSelect2AndValidation();
-            initParsleyValidation();
+        initParsleyValidation();
         });
-
-        function initSelect2AndValidation() {
-            if ($.fn.select2 && $.fn.parsley) {
-                // Initialize Select2
-                $(".select2t-none").select2();
-
-                // Add Parsley validation specifically for Select2
-                $(".select2t-none").on('change', function() {
-                    $(this).parsley().validate();
-                });
-
-                // Ensure Select2 trigger changes in Parsley
-                $(".select2t-none").on('select2:select', function() {
-                    $(this).trigger('change');
-                });
-            }
-        }
 
         function initParsleyValidation() {
             if ($.fn.parsley) {
@@ -3946,4 +4406,5 @@
             } catch (e) { /* URLSearchParams unsupported — silently skip */ }
         });
 </script>
+@include('resorts._dropdown_script')
 @endsection

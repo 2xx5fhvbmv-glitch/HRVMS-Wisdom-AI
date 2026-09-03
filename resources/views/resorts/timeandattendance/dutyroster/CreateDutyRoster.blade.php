@@ -8,9 +8,15 @@
     @endif
 
     @section('content')
+    <style>
+        #create-duty-roster-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #create-duty-roster-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5 drc-page">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="create-duty-roster-hero">
                 <div class="row justify-content-between g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -150,7 +156,7 @@
                                     </div>
                                     <div class="col-lg-12 col-sm-6">
                                         <label class="drc-label">Shift</label>
-                                        <select class="form-select select2t-none" id="Shift"
+                                        <select class="form-select dd-native-select" id="Shift"
                                             aria-label="Default select example" name="Shift">
                                             <option></option> <!-- Leave this blank for the placeholder -->
                                             @if($ShiftSettings->isNotEmpty())
@@ -170,6 +176,34 @@
                                                 @endforeach
                                             @endif
                                         </select>
+                                        <div class="dd" data-target="#Shift">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">Select a Shift</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Shift">
+                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a shift…"></div>
+                                                <div class="dd-scroll">
+                                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select a Shift</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @if($ShiftSettings->isNotEmpty())
+                                                        @foreach ($ShiftSettings as $s)
+                                                            @php
+                                                                $shiftTimeLabel = '';
+                                                                if ($s->StartTime && $s->EndTime) {
+                                                                    $shiftTimeLabel = ' (' . \Carbon\Carbon::parse($s->StartTime)->format('g:i A') . ' - ' . \Carbon\Carbon::parse($s->EndTime)->format('g:i A') . ')';
+                                                                }
+                                                                $shiftHoursLabel = '';
+                                                                if ($s->TotalHours) {
+                                                                    [$shiftHrsPart, $shiftMinPart] = array_pad(explode(':', $s->TotalHours), 2, 0);
+                                                                    $shiftHoursLabel = ' · ' . (int) $shiftHrsPart . 'h' . ((int) $shiftMinPart ? ' ' . (int) $shiftMinPart . 'm' : '');
+                                                                }
+                                                            @endphp
+                                                            <div class="dd-item" role="option" data-value="{{ $s->id }}"><span class="dd-nm">{{ ucfirst($s->ShiftName) . $shiftTimeLabel . $shiftHoursLabel }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @endforeach
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div class="col-12 hideoverTimeTr">
                                         <a href="javascript:void(0)" class="a-link addOvertime-modal d-block mb-3 drc-overtime-link drc-ot-link-disabled"><i class="fa fa-plus-circle me-1"></i>Add Overtime</a>
@@ -681,7 +715,7 @@
 
                             <div class="col-md-12 mt-3">
                                 <lable>Shift </lable>
-                                <select class="form-select select2t-none" id="Shiftpopup"  aria-label="Default select example" name="Shiftpopup">
+                                <select class="form-select dd-native-select" id="Shiftpopup"  aria-label="Default select example" name="Shiftpopup">
                                     <option></option>
                                     @if($ShiftSettings->isNotEmpty())
                                         @foreach ($ShiftSettings as $s)
@@ -690,6 +724,23 @@
                                         @endforeach
                                     @endif
                                 </select>
+                                <div class="dd" data-target="#Shiftpopup">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">Select a Shift</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Shift">
+                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a shift…"></div>
+                                        <div class="dd-scroll">
+                                            <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select a Shift</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @if($ShiftSettings->isNotEmpty())
+                                                @foreach ($ShiftSettings as $s)
+                                                <div class="dd-item" role="option" data-value="{{ $s->id }}"><span class="dd-nm">{{ ucfirst($s->ShiftName) }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @endforeach
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
                             <div class="col-md-12 mt-3 ShiftOverTimetr">
@@ -761,6 +812,7 @@
 
 @section('import-css')
 @include('resorts.timeandattendance._taa_buttons_v2_styles')
+@include('resorts._dropdown_styles')
 <style>
     /* Flatpickr custom styling for selected dates in multiple mode */
     .flatpickr-day.selected,
@@ -994,12 +1046,13 @@
     /* Neutral/geometry tokens (--teal/--teal-2/--teal-3/--teal-soft/--lime/
        --ink/--muted/--faint/--line/--line-2/--card) now come from the
        shared :root palette (resorts/layouts/_design_tokens.blade.php).
-       --bg/--off/--leave stay local — page-specific/semantic, not part
-       of the shared set. */
+       --off/--leave are exact-hex matches for the shared --error/
+       --warning, now pointing there too. --bg has no shared equivalent
+       and stays local. */
     .drc-page {
         --bg: #f2f6f6;
-        --off: #e5573f;
-        --leave: #d98a00;
+        --off: var(--error);
+        --leave: var(--warning);
         color: var(--ink);
     }
 
@@ -1012,7 +1065,7 @@
     .drc-card {
         background: var(--card);
         border-radius: 14px;
-        box-shadow: 0 1px 3px rgba(1,70,83,0.08);
+        box-shadow: 0 1px 3px rgba(var(--teal-rgb),0.08);
         height: 100%;
         display: flex;
         flex-direction: column;
@@ -1178,7 +1231,7 @@
         background: var(--teal);
     }
     .drc-avatar img { width: 100%; height: 100%; object-fit: cover; }
-    .drc-avatar-0 { background: #014653; }
+    .drc-avatar-0 { background: var(--teal); }
     .drc-avatar-1 { background: #6c4fd6; }
     .drc-avatar-2 { background: #c65b3f; }
     .drc-avatar-3 { background: #2e7d5b; }
@@ -1393,7 +1446,7 @@
         align-items: baseline;
         justify-content: space-between;
         padding: 7px 0;
-        border-bottom: 1px solid rgba(1,70,83,0.08);
+        border-bottom: 1px solid rgba(var(--teal-rgb),0.08);
     }
     .drc-summary-label { font-size: 12.5px; color: var(--ink); margin: 0; }
     .drc-summary-sublabel { font-size: 10px; color: var(--muted); display: block; }
@@ -1533,7 +1586,7 @@
         overflow: hidden;
     }
     .drc-ot-header {
-        background: linear-gradient(135deg, #035b6c, #014653);
+        background: linear-gradient(135deg, var(--teal-2), var(--teal));
         padding: 18px 24px;
         display: flex;
         align-items: center;
@@ -1561,7 +1614,7 @@
        the header or down the sides. */
     .drc-ot-body { padding: 16px 0; background: #f2f6f6; }
     .drc-ot-emp-section { background: #fff; padding: 14px 24px; margin-bottom: 12px; }
-    .drc-ot-note { color: #5d6f75; font-size: 12px; font-weight: 400; margin: 8px 0 0; }
+    .drc-ot-note { color: var(--muted); font-size: 12px; font-weight: 400; margin: 8px 0 0; }
     .drc-ot-legend {
         display: flex;
         align-items: center;
@@ -1569,12 +1622,12 @@
         padding: 0 24px 12px;
         font-size: 12px;
         font-weight: 600;
-        color: #5d6f75;
+        color: var(--muted);
     }
     .drc-ot-legend-item { display: inline-flex; align-items: center; gap: 6px; }
     #OvertimeEmployees.select2-hidden-accessible { display: none !important; }
     .drc-ot-emp-section .select2-container .select2-selection--multiple {
-        border: 1px solid #e2ebec;
+        border: 1px solid var(--line);
         border-radius: 10px;
         min-height: 42px;
         padding: 4px;
@@ -1594,9 +1647,9 @@
     .drc-ot-emp-section .select2-selection__choice {
         display: inline-flex !important;
         align-items: center;
-        background: #e6f0f1 !important;
+        background: var(--teal-3) !important;
         border: none !important;
-        color: #014653 !important;
+        color: var(--teal) !important;
         font-size: 12.5px;
         font-weight: 600;
         border-radius: 20px !important;
@@ -1615,7 +1668,7 @@
         overflow: hidden;
         flex-shrink: 0;
         display: inline-flex;
-        background: #014653;
+        background: var(--teal);
         margin-right: 6px;
     }
     .drc-ot-chip-avatar img { width: 100%; height: 100%; object-fit: cover; }
@@ -1626,7 +1679,7 @@
            is put back to normal flow here. */
         position: static !important;
         order: 2;
-        color: #014653 !important;
+        color: var(--teal) !important;
         border: none !important;
         background: none !important;
         margin: 0 0 0 8px !important;
@@ -1638,8 +1691,8 @@
     }
     .drc-ot-emp-section .select2-selection--multiple:focus-within,
     .drc-ot-emp-section .select2-container--default.select2-container--focus .select2-selection--multiple {
-        border-color: #014653;
-        box-shadow: 0 0 0 3px #e6f0f1;
+        border-color: var(--teal);
+        box-shadow: 0 0 0 3px var(--teal-3);
     }
     .drc-ot-grid-wrap {
         background: #fff;
@@ -1648,7 +1701,7 @@
         overflow-y: auto;
     }
     .drc-ot-table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 12.5px; }
-    .drc-ot-table th, .drc-ot-table td { border-bottom: 1px solid #eef4f4; white-space: nowrap; }
+    .drc-ot-table th, .drc-ot-table td { border-bottom: 1px solid var(--line-2); white-space: nowrap; }
     .drc-ot-emp-cell {
         position: sticky;
         left: 0;
@@ -1659,44 +1712,44 @@
         align-items: center;
         gap: 8px;
         min-width: 180px;
-        box-shadow: 1px 0 0 #eef4f4;
+        box-shadow: 1px 0 0 var(--line-2);
     }
     .drc-ot-emp-head {
         display: table-cell;
-        color: #93a4a9;
+        color: var(--faint);
         font-size: 10.5px;
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.05em;
         background: #f8fafa;
     }
-    .drc-ot-emp-name { font-weight: 600; color: #14232a; overflow: hidden; text-overflow: ellipsis; }
+    .drc-ot-emp-name { font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; }
     .drc-ot-date-th {
         padding: 10px 8px;
         text-align: center;
-        color: #5d6f75;
+        color: var(--muted);
         font-size: 11px;
         font-weight: 700;
         background: #f8fafa;
         min-width: 78px;
     }
-    .drc-ot-date-th small { display: block; font-weight: 500; color: #93a4a9; font-size: 10px; }
-    .drc-ot-date-th-off { background: #fdece8; color: #e5573f; }
+    .drc-ot-date-th small { display: block; font-weight: 500; color: var(--faint); font-size: 10px; }
+    .drc-ot-date-th-off { background: #fdece8; color: var(--error); }
     .drc-ot-total-head, .drc-ot-action-head { background: #f8fafa; min-width: 70px; padding-right: 10px; }
     .drc-ot-action-head, .drc-ot-action-cell { padding-right: 20px; }
     .drc-ot-cell { padding: 5px; text-align: center; }
     .drc-ot-input {
         width: 76px;
-        border: 1px solid #e2ebec;
+        border: 1px solid var(--line);
         border-radius: 8px;
         padding: 6px 4px;
         text-align: center;
         font-size: 12.5px;
-        color: #14232a;
+        color: var(--ink);
         font-weight: 600;
     }
-    .drc-ot-input:focus { outline: none; border-color: #014653; box-shadow: 0 0 0 3px #e6f0f1; }
-    .drc-ot-locked { background: repeating-linear-gradient(135deg, #f8fafa, #f8fafa 4px, #eef4f4 4px, #eef4f4 8px); }
+    .drc-ot-input:focus { outline: none; border-color: var(--teal); box-shadow: 0 0 0 3px var(--teal-3); }
+    .drc-ot-locked { background: repeating-linear-gradient(135deg, #f8fafa, #f8fafa 4px, var(--line-2) 4px, var(--line-2) 8px); }
     .drc-ot-lock-marker {
         display: inline-flex;
         align-items: center;
@@ -1707,20 +1760,20 @@
         font-size: 11px;
         font-weight: 800;
     }
-    .drc-ot-lock-off { background: #fdece8; color: #e5573f; }
-    .drc-ot-lock-leave { background: #fff6e5; color: #d98a00; }
+    .drc-ot-lock-off { background: #fdece8; color: var(--error); }
+    .drc-ot-lock-leave { background: #fff6e5; color: var(--warning); }
     .drc-ot-row-total-cell { text-align: center; background: #f8fafa; }
-    .drc-ot-row-total { font-weight: 700; color: #014653; }
+    .drc-ot-row-total { font-weight: 700; color: var(--teal); }
     .drc-ot-action-cell { text-align: center; }
     .drc-ot-remove-btn {
         border: none;
         background: none;
-        color: #93a4a9;
+        color: var(--faint);
         font-size: 12px;
         cursor: pointer;
         padding: 4px 8px;
     }
-    .drc-ot-remove-btn:hover { color: #e5573f; }
+    .drc-ot-remove-btn:hover { color: var(--error); }
     .drc-ot-footer {
         background: #f2f6f6;
         padding: 14px 24px;
@@ -1728,14 +1781,14 @@
         align-items: center;
         justify-content: space-between;
         gap: 12px;
-        border-top: 1px solid #e2ebec;
+        border-top: 1px solid var(--line);
     }
-    .drc-ot-footer-summary { font-size: 12.5px; font-weight: 600; color: #5d6f75; }
+    .drc-ot-footer-summary { font-size: 12.5px; font-weight: 600; color: var(--muted); }
     .drc-ot-footer-actions { display: flex; gap: 10px; }
     .drc-ot-btn-cancel {
         background: #fff;
-        border: 1px solid #e2ebec;
-        color: #5d6f75;
+        border: 1px solid var(--line);
+        color: var(--muted);
         border-radius: 10px;
         padding: 9px 20px;
         font-size: 13px;
@@ -1744,16 +1797,16 @@
     }
     .drc-ot-btn-cancel:hover { background: #f2f6f6; }
     .drc-ot-btn-save {
-        background: #014653;
+        background: var(--teal);
         border: none;
-        color: #e0ff02;
+        color: var(--lime);
         border-radius: 10px;
         padding: 9px 22px;
         font-size: 13px;
         font-weight: 700;
         cursor: pointer;
     }
-    .drc-ot-btn-save:hover { background: #035b6c; }
+    .drc-ot-btn-save:hover { background: var(--teal-2); }
 
     /* "Add Overtime" link dimmed when no roster employees are selected
        yet — the click handler already blocks opening with a toast in
@@ -1790,17 +1843,17 @@
     #toast-container > div {
         background-image: none !important;
         background-color: #fff;
-        color: #14232a;
+        color: var(--ink);
         border-radius: 12px;
         padding: 14px 16px 14px 46px;
         width: 320px;
-        box-shadow: 0 10px 28px rgba(1,70,83,0.16);
+        box-shadow: 0 10px 28px rgba(var(--teal-rgb),0.16);
         opacity: 1;
-        border-left: 4px solid #93a4a9;
+        border-left: 4px solid var(--faint);
         position: relative;
     }
     #toast-container > div:hover {
-        box-shadow: 0 12px 32px rgba(1,70,83,0.22);
+        box-shadow: 0 12px 32px rgba(var(--teal-rgb),0.22);
         opacity: 1;
     }
     #toast-container > div::before {
@@ -1811,25 +1864,25 @@
         top: 15px;
         font-size: 15px;
     }
-    .toast-success { border-left-color: #014653; }
-    .toast-success::before { content: '\f058'; color: #014653; }
-    .toast-error { border-left-color: #e5573f; }
-    .toast-error::before { content: '\f057'; color: #e5573f; }
-    .toast-warning { border-left-color: #d98a00; }
-    .toast-warning::before { content: '\f071'; color: #d98a00; }
-    .toast-info { border-left-color: #014653; }
-    .toast-info::before { content: '\f05a'; color: #014653; }
-    .toast-title { color: #14232a; font-weight: 700; font-size: 13px; margin-bottom: 2px; }
-    .toast-message { color: #5d6f75; font-size: 12.5px; line-height: 1.4; }
-    .toast-message a, .toast-message label { color: #014653; }
+    .toast-success { border-left-color: var(--teal); }
+    .toast-success::before { content: '\f058'; color: var(--teal); }
+    .toast-error { border-left-color: var(--error); }
+    .toast-error::before { content: '\f057'; color: var(--error); }
+    .toast-warning { border-left-color: var(--warning); }
+    .toast-warning::before { content: '\f071'; color: var(--warning); }
+    .toast-info { border-left-color: var(--teal); }
+    .toast-info::before { content: '\f05a'; color: var(--teal); }
+    .toast-title { color: var(--ink); font-weight: 700; font-size: 13px; margin-bottom: 2px; }
+    .toast-message { color: var(--muted); font-size: 12.5px; line-height: 1.4; }
+    .toast-message a, .toast-message label { color: var(--teal); }
     .toast-close-button {
-        color: #93a4a9;
+        color: var(--faint);
         text-shadow: none;
         opacity: 1;
         font-size: 15px;
     }
-    .toast-close-button:hover { color: #14232a; opacity: 1; }
-    .toast-progress { background-color: #93a4a9; opacity: 0.3; }
+    .toast-close-button:hover { color: var(--ink); opacity: 1; }
+    .toast-progress { background-color: var(--faint); opacity: 0.3; }
 </style>
 @endsection
 
@@ -2069,17 +2122,8 @@
                 return '<span class="drc-ot-chip-avatar">' + avatarHtml + '</span><span class="drc-ot-chip-name">' + name + '</span>';
             }
         });
-        $('#Shift').select2({
-            placeholder: "Select a Shift", // Placeholder text
-            allowClear: true // Adds a clear (X) button to reset the dropdown
-        });
-
         $('#Position').select2({
             placeholder: "Select a Position", // Placeholder text
-            allowClear: true // Adds a clear (X) button to reset the dropdown
-        });
-        $('#Shiftpopup').select2({
-            placeholder: "Select a Shift", // Placeholder text
             allowClear: true // Adds a clear (X) button to reset the dropdown
         });
 
@@ -3419,5 +3463,6 @@
     renderDayOffChips();
 })();
 </script>
+@include('resorts._dropdown_script')
 @endsection
 

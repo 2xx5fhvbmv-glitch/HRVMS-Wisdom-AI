@@ -29,7 +29,7 @@
                     <div class="row g-md-3 g-2 align-items-center">
                         
                         <div class="col-xl-2 col-md-3 col-sm-4 col-6">
-                        <select class="form-select" name="ResortDivision" id="ResortDivision">
+                        <select class="form-select dd-native-select" name="ResortDivision" id="ResortDivision">
                                     <option ></option>
                                     @if($ResortDivision->isNotEmpty())
                                         @foreach ($ResortDivision as $d)
@@ -39,12 +39,36 @@
                                     @endif
 
                                 </select>
+                        <div class="dd" data-target="#ResortDivision">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">Select Division</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Division">
+                                <div class="dd-scroll">
+                                    @if($ResortDivision->isNotEmpty())
+                                        @foreach ($ResortDivision as $d)
+                                            <div class="dd-item" role="option" data-value="{{ $d->id }}"><span class="dd-nm">{{ $d->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @endforeach
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
                         </div>
                         <div class="col-xl-2 col-md-3 col-sm-4 col-6">
-                           
-                            <select class="form-control form-select" name="department" id="department">
+
+                            <select class="form-control form-select dd-native-select" name="department" id="department">
                                 <option></option>
                             </select>
+                            <div class="dd" data-target="#department">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Select Department</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Department">
+                                    <div class="dd-scroll"></div>
+                                </div>
+                            </div>
                         </div>
                         <div class="col-xl-2 col-md-3 col-sm-auto col-6">
                         <select class="form-control form-select" multiple name="position[]" id="position">
@@ -53,7 +77,7 @@
                             </select>
                         </div>
                         <div class="col-xl-2 col-md-3 col-sm-4 col-6">
-                            <select class="form-select Select_folder" name="Select_folder" id='Select_folder' data-placeholder="Select Folder">
+                            <select class="form-select dd-native-select Select_folder" name="Select_folder" id='Select_folder' data-placeholder="Select Folder">
                                 <option></option>
                                 @if($FolderList->isNotEmpty())
                                     @foreach($FolderList as $f)
@@ -61,6 +85,22 @@
                                     @endforeach
                                 @endif
                             </select>
+                            <div class="dd" data-target="#Select_folder">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Select Folder</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Folder">
+                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a folder…"></div>
+                                    <div class="dd-scroll">
+                                        @if($FolderList->isNotEmpty())
+                                            @foreach($FolderList as $f)
+                                                <div class="dd-item" role="option" data-value="{{ $f->Folder_unique_id }}"><span class="dd-nm">{{ $f->Folder_Name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @endforeach
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="col-xxl-3 col-xl-2 col-lg-5 col-md-7 col-sm-5 ">
                             <div class="input-group">
@@ -104,6 +144,8 @@
         </div>
     </div>
 @include('resorts._emotional_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -113,23 +155,12 @@
 @section('import-scripts')
 <script>
 $(document).ready(function() {
-    
-    $('#Select_folder').select2({
-        placeholder: "Select Folder",
-        allowClear: true
-    });
-    
+
     $('#Folderselect').select2({
         placeholder: "Select Folder",
         allowClear: true
     });
 
-    $("#ResortDivision").select2({
-    'placeholder':'Select ResortDivision',
-    });
-    $("#department").select2({
-    'placeholder':'Select Department',
-    });
     $("#position").select2({
     'placeholder':'Select position',
     });
@@ -169,6 +200,7 @@ $(document).ready(function() {
                     // If no data, just keep the placeholder
                     $("#department").empty().append('<option value="">Select Department</option>');
                 }
+                wisdomDD.rebuild('#department');
             },
             error: function(response) {
                // toastr.error("Position Not Found", { positionClass: 'toast-bottom-right' });

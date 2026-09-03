@@ -32,11 +32,24 @@
                         </div>     
                         
                         <div class="col-xl-2 col-lg-4 col-md-5  col-sm-6">
-                            <select class="form-select select2t-none" id="statusFilter">
+                            <select class="form-select dd-native-select" id="statusFilter">
                                 <option value="">Select Status</option>
                                 <option value="Absent">Absent</option>
                                 <option value="Present">Present</option>
                             </select>
+                            <div class="dd" data-target="#statusFilter">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Select Status</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Status">
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Status</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="Absent"><span class="dd-nm">Absent</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="Present"><span class="dd-nm">Present</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         {{--
@@ -125,6 +138,8 @@
     </div>
 
 @include('resorts.Learning._learning_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -272,11 +287,23 @@
 
         // Populate dropdown for status selection
         let statusOptions = ['Present', 'Absent'];
-        let selectHTML = `<select class="form-select attendance-status">`;
+        let tickSvg = '<svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg>';
+        let selectHTML = `<select class="form-select dd-native-select attendance-status" id="attendance-status-select">`;
         statusOptions.forEach(opt => {
             selectHTML += `<option value="${opt}" ${opt === status ? 'selected' : ''}>${opt}</option>`;
         });
-        selectHTML += `</select>`;
+        selectHTML += `</select>
+            <div class="dd" data-target="#attendance-status-select">
+                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                    <span class="dd-lbl">${status}</span>
+                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                </button>
+                <div class="dd-panel" role="listbox" aria-label="Attendance Status">
+                    <div class="dd-scroll">
+                        ${statusOptions.map(opt => `<div class="dd-item${opt === status ? ' active' : ''}" role="option" data-value="${opt}"><span class="dd-nm">${opt}</span>${tickSvg}</div>`).join('')}
+                    </div>
+                </div>
+            </div>`;
 
         $('#attendanceModalBody').html(`
             <tr>

@@ -35,17 +35,19 @@
     .wfp-btn-neutral:focus-visible,
     .wfp-btn-critical:focus-visible,
     .wfp-icon-positive:focus-visible {
-        outline: 2px solid #014653;
+        outline: 2px solid var(--teal);
         outline-offset: 2px;
     }
 
-    /* Everyday action — Submit, Send Response, Change Password, Save Crop, Upload File. */
+    /* Everyday action — Submit, Send Response, Change Password, Save Crop,
+       Upload File. Text stays literal #fff (contrast-on-solid-teal) —
+       box-shadows stay literal rgba(20,35,42,…) throughout this file. */
     .wfp-btn-primary {
-        background: #014653;
+        background: var(--teal);
         color: #fff;
     }
     .wfp-btn-primary:hover {
-        background: #014653;
+        background: var(--teal);
         color: #fff;
         transform: translateY(-2px);
         box-shadow: 0 8px 18px -8px rgba(20,35,42,.35);
@@ -54,16 +56,17 @@
     /* Low-stakes, recedes on purpose — Cancel, Download, Back. Hover is a
        light paper tint (the app's #F9F8F1 neutral, per the confirmed
        proposal), never a solid fill, so it never reads as heavier than
-       the page's actual primary action. */
+       the page's actual primary action. #C9D6D7 border has no token
+       match — left literal. */
     .wfp-btn-secondary {
         background: transparent;
-        color: #014653;
+        color: var(--teal);
         border: 1.5px solid #C9D6D7;
     }
     .wfp-btn-secondary:hover {
-        background: #F9F8F1;
-        border-color: #014653;
-        color: #014653;
+        background: var(--paper);
+        border-color: var(--teal);
+        color: var(--teal);
         transform: translateY(-2px);
         box-shadow: 0 8px 18px -8px rgba(20,35,42,.18);
     }
@@ -80,7 +83,10 @@
         box-shadow: 0 8px 18px -8px rgba(20,35,42,.25);
     }
 
-    /* Additive icon action — the "+ Add Occupancy" circular button. */
+    /* Additive icon action — the "+ Add Occupancy" circular button.
+       rgba(31,157,107,.09) is --positive's exact RGB as a tint — no
+       --positive-rgb primitive exists (this phase adds no new tokens),
+       left literal. */
     .wfp-icon-positive {
         width: 25px;
         height: 25px;
@@ -100,11 +106,11 @@
 
     /* Waiting on someone else — Send Reminder. */
     .wfp-btn-attention {
-        background: #FBF0DC;
-        color: #D98A00;
+        background: var(--warning-bg);
+        color: var(--warning);
     }
     .wfp-btn-attention:hover {
-        background: #D98A00;
+        background: var(--warning);
         color: #fff;
         transform: translateY(-2px);
         box-shadow: 0 8px 18px -8px rgba(20,35,42,.25);
@@ -115,11 +121,11 @@
        dark teal band behind the page header (body::before), which is
        exactly why a solid-teal button disappeared into it here before. */
     .wfp-btn-accent {
-        background: #E0FF02;
+        background: var(--lime);
         color: #17260a;
     }
     .wfp-btn-accent:hover {
-        background: #E0FF02;
+        background: var(--lime);
         color: #17260a;
         transform: translateY(-2px);
         box-shadow: 0 8px 18px -8px rgba(20,35,42,.35);
@@ -128,12 +134,12 @@
     /* Saved, not final — Save As Draft. Its own neutral weight so it
        doesn't read as identical to Cancel or as heavy as Submit. */
     .wfp-btn-neutral {
-        background: #DEDEDE;
-        color: #222;
+        background: var(--neutral-bg);
+        color: var(--darkblack);
     }
     .wfp-btn-neutral:hover {
-        background: #F5F8F8;
-        color: #222;
+        background: var(--teal-soft);
+        color: var(--darkblack);
         transform: translateY(-2px);
         box-shadow: 0 8px 18px -8px rgba(20,35,42,.18);
     }
@@ -143,11 +149,11 @@
        Positive and Attention, so weight scales the same way across the
        whole system — only the hue changes. */
     .wfp-btn-critical {
-        background: #FFDED9;
-        color: #FF2400;
+        background: var(--critical-bg);
+        color: var(--critical);
     }
     .wfp-btn-critical:hover {
-        background: #FF2400;
+        background: var(--critical);
         color: #fff;
         transform: translateY(-2px);
         box-shadow: 0 8px 18px -8px rgba(20,35,42,.25);
@@ -157,14 +163,14 @@
        final, whole-cycle completion (e.g. Approve Budget), not routine
        positives. Only ever one of these per page. */
     .wfp-btn-celebrate {
-        background: linear-gradient(135deg, #014653, #E0FF02);
+        background: var(--grad-celebrate);
         color: #fff;
     }
     .wfp-btn-celebrate:hover {
-        background: linear-gradient(135deg, #013641, #c7e102);
+        background: var(--grad-celebrate-hover);
         color: #fff;
         transform: translateY(-2px);
-        box-shadow: 0 10px 22px -8px rgba(1,70,83,.45);
+        box-shadow: 0 10px 22px -8px rgba(var(--teal-rgb),.45);
     }
 
     /* Press feedback — declared after every :hover rule above on purpose

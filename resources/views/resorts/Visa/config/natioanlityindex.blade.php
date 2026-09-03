@@ -8,9 +8,15 @@
 @endif
 
 @section('content')
+<style>
+    #visa-nationality-index-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #visa-nationality-index-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="visa-nationality-index-hero">
             <div class="row justify-content-between g-3">
                 <div class="col-auto">
                     <div class="page-title">
@@ -64,6 +70,8 @@
 </div>
 
 @include('resorts._emotional_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -159,18 +167,28 @@ $(document).on('click', '.delete-row-btn', function (e) {
             // Use the RAW amount (data-amt), not the formatted "MVR 4,000.00" cell text,
             // so the edit input holds a clean number that submits correctly.
             var Description = $(this).attr('data-amt') || '';
+            var tickSvg = '<svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg>';
+            var nationalityList = @json($nationality ?? []);
             var editRowHtml = `
                     <td class="py-1">
                         <div class="form-group">
-                            <select class="form-select select2t-none nationality" 
-                                        id="nationality_1"  data-id="1" name="Del_cat_id"  aria-label="Default select example" required  data-parsley-required-message="Please select a disciplinary category">
+                            <select class="form-select dd-native-select nationality"
+                                        id="nationality_1"  data-id="1" name="Del_cat_id"  aria-label="Nationality" required  data-parsley-required-message="Please select a nationality">
                                     <option value=""></option>
-                                    @if(!empty($nationality))
-                                        @foreach($nationality as $item)
-                                            <option value="{{ $item }}"   ${Del_cat_id === "{{$item}}" ? 'selected' : ''}>{{ $item }} </option>
-                                        @endforeach
-                                    @endif
+                                    ${nationalityList.map(item => `<option value="${item}" ${Del_cat_id === item ? 'selected' : ''}>${item}</option>`).join('')}
                                 </select>
+                            <div class="dd" data-target="#nationality_1">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Select Nationality</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Nationality">
+                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a nationality…"></div>
+                                    <div class="dd-scroll">
+                                        ${nationalityList.map(item => `<div class="dd-item${Del_cat_id === item ? ' active' : ''}" role="option" data-value="${item}"><span class="dd-nm">${item}</span>${tickSvg}</div>`).join('')}
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </td>
                     <td class="py-1">
@@ -185,11 +203,7 @@ $(document).on('click', '.delete-row-btn', function (e) {
 
             // Replace row content with editable form
             $row.html(editRowHtml);
-                $("#nationality_1").select2({
-                placeholder: "Select Nationality",
-                allowClear: true,
-                width: '100%'        
-            });
+            wisdomDD.sync('#nationality_1');
         });
         $(document).on("click", "#IndexNationality .update-row-btn_cat", function (event) 
         {

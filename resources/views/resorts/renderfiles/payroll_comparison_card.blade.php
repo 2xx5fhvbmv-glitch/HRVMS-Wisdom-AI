@@ -9,7 +9,7 @@
         // already used elsewhere on this dashboard except the softest tint,
         // which is a lighter extension of the same family rather than a new hue.
         $pcCategories = [
-            'basicSalary'   => ['label' => 'Basic Salary', 'color' => '#014653'],
+            'basicSalary'   => ['label' => 'Basic Salary', 'color' => 'var(--teal)'],
             'serviceCharge' => ['label' => 'Service Charge', 'color' => '#0E8A9E'],
             'normalOT'      => ['label' => 'Normal OT', 'color' => '#6FB7C2'],
             'holidayOT'     => ['label' => 'Holiday OT', 'color' => '#B7DEE2'],

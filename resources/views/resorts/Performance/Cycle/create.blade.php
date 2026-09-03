@@ -8,9 +8,15 @@
 @endif
 
 @section('content')
+<style>
+    #performance-create-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #performance-create-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding page-appHedding">
+        <div class="page-hedding page-appHedding" id="performance-create-hero">
             <div class="row justify-content-between g-md-2 g-1">
                 <div class="col-auto">
                     <div class="page-title">
@@ -18,7 +24,7 @@
                         <h1>{{ $page_title }}</h1>
                     </div>
                 </div>
-                
+
             </div>
         </div>
 
@@ -79,7 +85,7 @@
                             <div class="row g-md-4 g-3 align-items-end">
                                 <div class="col-xl-3 col-md-4 col-sm-6">
                                     <label for="select_dep" class="form-label">SELECT DEPARTMENT</label>
-                                    <select class="form-select select2t-none" id="select_dep" name="select_dep"
+                                    <select class="form-select dd-native-select" id="select_dep" name="select_dep"
                                         aria-label="Default select example">
                                         <option ></option>
                                         @if($ResortDepartment->isNotEmpty())
@@ -88,17 +94,46 @@
                                             @endforeach
                                         @endif
                                     </select>
+                                    <div class="dd" data-target="#select_dep">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Select Department</span>
+                                            <svg class="dd-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Department">
+                                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a department…"></div>
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Department</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @if($ResortDepartment->isNotEmpty())
+                                                    @foreach ($ResortDepartment as $d)
+                                                    <div class="dd-item" role="option" data-value="{{ $d->id }}"><span class="dd-nm">{{ $d->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @endforeach
+                                                @endif
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="col-xl-3 col-md-4 col-sm-6">
                                     <label for="select_position" class="form-label">SELECT POSITION</label>
-                                    <select class="form-select select2t-none" id="select_position"  name="select_position"
+                                    <select class="form-select dd-native-select" id="select_position"  name="select_position"
                                         aria-label="Default select example">
-                                        <option ></option>
+                                        <option value="">Select Position</option>
                                     </select>
+                                    <div class="dd" data-target="#select_position">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Select Position</span>
+                                            <svg class="dd-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Position">
+                                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a position…"></div>
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Position</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="col-xl-3 col-md-4 col-sm-6">
                                     <label for="emp_status" class="form-label">EMPLOYMENT TYPE</label>
-                                    <select class="form-select select2t-none" id="emp_status" name="emp_status"
+                                    <select class="form-select dd-native-select" id="emp_status" name="emp_status"
                                         aria-label="Default select example">
                                      <option value=""></option>
                                         @php
@@ -109,15 +144,44 @@
                                             <option value="{{ $s }}">{{ $s }}</option>
                                         @endforeach
                                     </select>
+                                    <div class="dd" data-target="#emp_status">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Select Status</span>
+                                            <svg class="dd-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Employment type">
+                                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a status…"></div>
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Status</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @foreach ($employmentTypes as $s)
+                                                <div class="dd-item" role="option" data-value="{{ $s }}"><span class="dd-nm">{{ $s }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="col-xl-3 col-md-4 col-sm-6">
                                     <label for="gender" class="form-label">GENDER</label>
-                                    <select class="form-select select2t-none" id="gender"  name="gender" aria-label="Default select example">
+                                    <select class="form-select dd-native-select" id="gender"  name="gender" aria-label="Default select example">
                                         <option value=""></option>
                                         @foreach ($GenderType as $g)
                                                 <option value="{{ $g }}">{{ucfirst($g)}}</option>
                                             @endforeach
                                     </select>
+                                    <div class="dd" data-target="#gender">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Select gender</span>
+                                            <svg class="dd-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Gender">
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select gender</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @foreach ($GenderType as $g)
+                                                <div class="dd-item" role="option" data-value="{{ $g }}"><span class="dd-nm">{{ ucfirst($g) }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="col-xl-3 col-md-4 col-sm-6">
                                     <label for="joining_date_from" class="form-label">JOINING DATE RANGE</label>
@@ -134,12 +198,26 @@
                                 </div>
                                 <div class="col-xl-3 col-md-4 col-sm-6">
                                     <label for="location" class="form-label">Location</label>
-                                    <select class="form-select select2t-none" id="Location"  name="Location" aria-label="Default select example">
+                                    <select class="form-select dd-native-select" id="Location"  name="Location" aria-label="Default select example">
                                         <option value=""></option>
                                         @foreach ($Location as $g)
                                                 <option value="{{  $g }}">{{$g}}</option>
                                             @endforeach
                                     </select>
+                                    <div class="dd" data-target="#Location">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Select location</span>
+                                            <svg class="dd-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Location">
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select location</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @foreach ($Location as $g)
+                                                <div class="dd-item" role="option" data-value="{{ $g }}"><span class="dd-nm">{{ $g }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    </div>
 
 
                                 </div>
@@ -188,9 +266,21 @@
                         <div class="row gx-md-4 g-3 mb-md-4 mb-3 justify-content-center">
                             <div class="col-lg-6 col-md-8">
                                 <label for="CycleTemplateSelect" class="form-label">TEMPLATE</label>
-                                <select class="form-control select2t-none" name="CycleTemplate" id="CycleTemplateSelect" required data-parsley-required-message="Please select a template" data-parsley-group="block-2">
+                                <select class="form-control dd-native-select" name="CycleTemplate" id="CycleTemplateSelect" required data-parsley-required-message="Please select a template" data-parsley-group="block-2">
                                     <option value="">Select Template</option>
                                 </select>
+                                <div class="dd" data-target="#CycleTemplateSelect">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">Select Template</span>
+                                        <svg class="dd-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Template">
+                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a template…"></div>
+                                        <div class="dd-scroll">
+                                            <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Template</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -341,6 +431,8 @@
     </div>
 </div>
 @include('resorts.Performance._performance_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -398,7 +490,7 @@
                 if ($el.val() === val) $el.prop('checked', true);
             } else {
                 $el.val(val);
-                if ($el.hasClass('select2-hidden-accessible')) $el.trigger('change.select2');
+                if ($el.is('select') && this.id) window.wisdomDD.sync('#' + this.id);
             }
         });
     }
@@ -440,27 +532,6 @@
         setTimeout(restorePerfCycleStep, 300); // after select2/datepickers init
 
 
-            $("#select_dep").select2({
-                placeholder: "Select Department",
-                allowClear: true
-            });
-            $("#select_position").select2({
-                placeholder: "Select Position",
-                allowClear: true
-            });
-
-            $("#emp_status").select2({
-                placeholder: "Select Status",
-                allowClear: true
-            });
-            $("#Location").select2({
-                placeholder: "Select location",
-                allowClear: true
-            });
-            $("#gender").select2({
-                placeholder: "Select gender",
-                allowClear: true
-            });
             $(".SelectTemplete").select2({
                 placeholder: "Select Template",
                 allowClear: true
@@ -540,8 +611,8 @@
                     $el.prop('checked', data[key]);
                 } else {
                     $el.val(data[key]);
-                    if ($el.hasClass('select2-hidden-accessible') || $el.hasClass('select2')) {
-                        $el.trigger('change.select2');
+                    if ($el.is('select') && $el.attr('id')) {
+                        window.wisdomDD.sync('#' + $el.attr('id'));
                     }
                 }
             });
@@ -810,7 +881,8 @@
         {
             e.preventDefault();
             $('#select_dep').val(null).trigger('change');
-            $('#select_position').html('<option></option>').val(null).trigger('change');
+            $('#select_position').html('<option value="">Select Position</option>').val(null).trigger('change');
+            window.wisdomDD.rebuild('#select_position');
             $('#emp_status').val(null).trigger('change');
             $('#gender').val(null).trigger('change');
             $('#Location').val(null).trigger('change');
@@ -826,22 +898,18 @@
         // Load templates on page load
         GetTheTemplete();
 
-        // Initialize Select2 for template dropdown
-        $("#CycleTemplateSelect").select2({
-            placeholder: "Select Template",
-            allowClear: true
-        });
-        $(".select2t-none").on('change', function () 
+        $(".dd-native-select").on('change', function ()
         {
                 var parsleyField = $(this).parsley();
                 parsleyField.validate();
-            if (parsleyField.isValid()) 
+            var $ddTrigger = $(this).siblings('.dd').find('.dd-trigger');
+            if (parsleyField.isValid())
             {
-                $(this).next('.select2-container').find('.select2-selection').removeClass('is-invalid');
+                $ddTrigger.removeClass('is-invalid');
             }
-            else 
+            else
             {
-                $(this).next('.select2-container').find('.select2-selection').addClass('is-invalid');
+                $ddTrigger.addClass('is-invalid');
             }
         });
 });
@@ -872,12 +940,13 @@
                 {
                     if(d.success == true)
                     {
-                        let string='<option></option>';
+                        let string='<option value="">Select Position</option>';
                         $.each(d.data.ResortPosition, function(key, value)
                         {
                             string+='<option value="'+value.id+'">'+value.position_title+'</option>';
                         });
                         $("#select_position").html(string);
+                        window.wisdomDD.rebuild('#select_position');
                     }
                 },
                 error: function(response) {
@@ -1041,6 +1110,7 @@
                             string+='<option value="'+value.id+'">'+value.FormName+'</option>';
                         });
                         $('#CycleTemplateSelect').html(string);
+                        window.wisdomDD.rebuild('#CycleTemplateSelect');
                     }
                 },
                 error: function(response) 
@@ -1108,13 +1178,12 @@
     });
     window.Parsley.on('field:validated', function (fieldInstance) {
         var $element = fieldInstance.$element;
-        if ($element.hasClass('select2t-none')) {
-            // Update the Select2 container's appearance
-            var $select2Container = $element.next('.select2-container').find('.select2-selection');
+        if ($element.hasClass('dd-native-select')) {
+            var $ddTrigger = $element.siblings('.dd').find('.dd-trigger');
             if (fieldInstance.isValid()) {
-                $select2Container.removeClass('is-invalid');
+                $ddTrigger.removeClass('is-invalid');
             } else {
-                $select2Container.addClass('is-invalid');
+                $ddTrigger.addClass('is-invalid');
             }
         }
     });

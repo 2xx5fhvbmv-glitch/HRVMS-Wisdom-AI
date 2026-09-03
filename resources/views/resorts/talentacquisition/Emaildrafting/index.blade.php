@@ -8,9 +8,15 @@
 @endif
 
 @section('content')
+    <style>
+        #ta-email-templates-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #ta-email-templates-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="ta-email-templates-hero">
                 <div class="row justify-content-between g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -34,7 +40,7 @@
                         @foreach ($emailTamplate as  $e)
                             <div class="col-xl-3 col-md-4 col-sm-6">
                                 <div class="emailDrafting-block d-flex align-items-center gap-2 p-3" style="border:1px solid #E3E0D6;border-radius:12px;">
-                                    <span class="d-inline-flex align-items-center justify-content-center rounded-circle flex-shrink-0" style="width:40px;height:40px;background:rgba(1,70,83,.08);color:#014653;">
+                                    <span class="d-inline-flex align-items-center justify-content-center rounded-circle flex-shrink-0" style="width:40px;height:40px;background:rgba(var(--teal-rgb),.08);color:var(--teal);">
                                         <i class="fa-solid fa-envelope"></i>
                                     </span>
                                     <h5 id="template_id_{{ $e->id }}" class="mb-0 text-truncate flex-fill">{{ $e->TempleteName }}</h5>

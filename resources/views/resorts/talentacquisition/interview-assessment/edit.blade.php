@@ -8,9 +8,15 @@
 @endif
 
 @section('content')
+    <style>
+        #ta-interview-assessment-edit-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #ta-interview-assessment-edit-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="ta-interview-assessment-edit-hero">
                 <div class="row justify-content-between g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -43,7 +49,7 @@
                                     </div>
                                     <div class="col-6">
                                         <label for="position" class="form-label">Select Positions:</label>
-                                        <select name="positions" id="positions" class="select2t-none">
+                                        <select name="positions" id="positions" class="dd-native-select">
                                             <option value="">Select Positions</option>
                                             @if($positions)
                                                 @foreach($positions as $pos)
@@ -51,6 +57,24 @@
                                                 @endforeach
                                             @endif
                                         </select>
+                                        @php $selectedPos = $positions ? $positions->firstWhere('id', $form->position) : null; @endphp
+                                        <div class="dd" data-target="#positions">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">{{ $selectedPos->position_title ?? 'Select Positions' }}</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Position">
+                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a position…"></div>
+                                                <div class="dd-scroll">
+                                                    <div class="dd-item{{ $selectedPos ? '' : ' active' }}" role="option" data-value=""><span class="dd-nm">Select Positions</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @if($positions)
+                                                        @foreach($positions as $pos)
+                                                        <div class="dd-item{{ ($form->position == $pos->id) ? ' active' : '' }}" role="option" data-value="{{ $pos->id }}"><span class="dd-nm">{{ $pos->position_title }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @endforeach
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div class="col-12"> <!-- Full width for the form builder -->
                                         <label for="form_structure" class="form-label">Form Structure</label>
@@ -73,6 +97,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts._dropdown_styles')
 @include('resorts.talentacquisition._ta_buttons_v2_styles')
 <style>
     #ui-datepicker-div{
@@ -87,8 +112,6 @@
     <script src="https://formbuilder.online/assets/js/form-render.min.js"></script>
     <script>
         $(document).ready(function () {
-            $(".select2t-none").select2();
-
             // Load the existing form structure
             let existingFormStructure = @json($form->form_structure);
 
@@ -186,4 +209,5 @@
             });
         });
     </script>
+@include('resorts._dropdown_script')
 @endsection

@@ -19,7 +19,7 @@
                         </div>
                     </div>
                     <div class="col-auto ms-auto">
-                        <a href="{{ route('resort.ta.shortlistedapplicants') }}" class="btn ta-btn-secondary">Shortlisted Applicants</a>
+                        <a href="{{ route('resort.ta.shortlistedapplicants') }}" class="btn ta-btn-neutral">Shortlisted Applicants</a>
                     </div>
                     <!-- <div class="col-auto">
                         <div class="d-flex justify-content-end">

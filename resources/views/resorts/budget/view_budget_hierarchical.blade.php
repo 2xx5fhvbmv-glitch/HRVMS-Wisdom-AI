@@ -10,6 +10,20 @@
 @section('content')
 
 <style>
+    /* Same requested push as the other module dashboards/pages — extra
+       breathing room between the hero and the content below it, scoped to
+       this page (.page-hedding's own margin-bottom is shared by every
+       page's hero). padding-bottom, not margin: adjacent sibling margins
+       collapse to the larger of the two rather than summing. Below
+       Bootstrap's sm breakpoint the extra padding pushes content into the
+       teal hero curve's rounded bottom-left corner (body::before,
+       border-radius 0 0 50px 50px) — same collision found on Payroll —
+       neutralized below 576px. */
+    #view-budget-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #view-budget-hero { padding-bottom: 0; }
+    }
+
     /* Enhanced Budget Table Styling */
     .budget-monthly-table tbody tr:hover {
         background-color: #f8f9fa !important;
@@ -76,13 +90,16 @@
        shared :root palette (resorts/layouts/_design_tokens.blade.php) —
        this block previously redefined them on :root itself (not scoped
        to a wrapper class), which would have silently overridden the
-       shared palette page-wide; removed rather than renamed. --wb-bg and
-       the semantic/category tokens below stay local. */
+       shared palette page-wide; removed rather than renamed. --wb-vacant/
+       --wb-increase are exact-hex matches for the shared --warning/
+       --positive, now pointing there too. --wb-bg/--wb-vacant-bg/
+       --wb-increase-bg have no shared equivalent (their -bg values don't
+       match --warning-bg/--positive-bg) and stay local. */
     :root {
         --wb-bg: #F2F6F6;
-        --wb-vacant: #D98A00;
+        --wb-vacant: var(--warning);
         --wb-vacant-bg: #FFF6E5;
-        --wb-increase: #1F9D6B;
+        --wb-increase: var(--positive);
         --wb-increase-bg: #EAF7F0;
     }
 
@@ -285,7 +302,7 @@
     }
     .wb-annual-stat-value { font-size: 15px; font-weight: 800; color: var(--teal); }
     .wb-annual-stat-delta.wb-delta-up { color: var(--wb-increase); }
-    .wb-annual-stat-delta.wb-delta-down { color: #E5573F; }
+    .wb-annual-stat-delta.wb-delta-down { color: var(--error); }
 
     /* ---- Group toggle chips (Phase 5) ---- */
     .wb-group-toggles { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
@@ -442,7 +459,7 @@
 
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="view-budget-hero">
             <div class="row justify-content-between g-3">
                 <div class="col-auto">
                     <div class="page-title">

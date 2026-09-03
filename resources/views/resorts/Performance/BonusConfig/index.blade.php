@@ -2,9 +2,15 @@
 @section('page_tab_title', $page_title)
 
 @section('content')
+<style>
+    #performance-bonus-config-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #performance-bonus-config-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="performance-bonus-config-hero">
             <div class="row g-3 justify-content-between align-items-center">
                 <div class="col-auto">
                     <div class="page-title">
@@ -48,21 +54,54 @@
                                 </td>
                                 <td>
                                     <span class="view-cell" data-col="month">{{ $row->month ?: '-' }}</span>
-                                    <select class="form-select edit-cell d-none month-input" style="max-width:180px;">
-                                        <option value="">Select Month</option>
-                                        @foreach($months as $m)
-                                            <option value="{{ $m }}" {{ $row->month === $m ? 'selected' : '' }}>{{ $m }}</option>
-                                        @endforeach
-                                    </select>
+                                    <div class="edit-cell d-none" style="max-width:180px;">
+                                        <select class="form-select dd-native-select month-input" id="month-input-{{ $row->rank }}">
+                                            <option value="">Select Month</option>
+                                            @foreach($months as $m)
+                                                <option value="{{ $m }}" {{ $row->month === $m ? 'selected' : '' }}>{{ $m }}</option>
+                                            @endforeach
+                                        </select>
+                                        <div class="dd" data-target="#month-input-{{ $row->rank }}">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">{{ $row->month ?: 'Select Month' }}</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Month">
+                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a month…"></div>
+                                                <div class="dd-scroll">
+                                                    <div class="dd-item{{ !$row->month ? ' active' : '' }}" role="option" data-value=""><span class="dd-nm">Select Month</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @foreach($months as $m)
+                                                        <div class="dd-item{{ $row->month === $m ? ' active' : '' }}" role="option" data-value="{{ $m }}"><span class="dd-nm">{{ $m }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @endforeach
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </td>
                                 <td>
                                     <span class="view-cell" data-col="year">{{ $row->year ?: '-' }}</span>
-                                    <select class="form-select edit-cell d-none year-input" style="max-width:140px;">
-                                        <option value="">Select Year</option>
-                                        @foreach($years as $y)
-                                            <option value="{{ $y }}" {{ (int)$row->year === (int)$y ? 'selected' : '' }}>{{ $y }}</option>
-                                        @endforeach
-                                    </select>
+                                    <div class="edit-cell d-none" style="max-width:140px;">
+                                        <select class="form-select dd-native-select year-input" id="year-input-{{ $row->rank }}">
+                                            <option value="">Select Year</option>
+                                            @foreach($years as $y)
+                                                <option value="{{ $y }}" {{ (int)$row->year === (int)$y ? 'selected' : '' }}>{{ $y }}</option>
+                                            @endforeach
+                                        </select>
+                                        <div class="dd" data-target="#year-input-{{ $row->rank }}">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">{{ $row->year ?: 'Select Year' }}</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Year">
+                                                <div class="dd-scroll">
+                                                    <div class="dd-item{{ !$row->year ? ' active' : '' }}" role="option" data-value=""><span class="dd-nm">Select Year</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @foreach($years as $y)
+                                                        <div class="dd-item{{ (int)$row->year === (int)$y ? ' active' : '' }}" role="option" data-value="{{ $y }}"><span class="dd-nm">{{ $y }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @endforeach
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </td>
                                 <td>
                                     <button class="btn perf-btn-secondary btn-sm edit-bonus-btn" data-rank="{{ $row->rank }}">Edit</button>
@@ -78,6 +117,8 @@
     </div>
 </div>
 @include('resorts.Performance._performance_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-scripts')

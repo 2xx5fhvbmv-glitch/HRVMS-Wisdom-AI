@@ -8,9 +8,15 @@
 @endif
 
 @section('content')
+    <style>
+        #onboarding-events-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #onboarding-events-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="onboarding-events-hero">
                 <div class="row justify-content-between g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -53,6 +59,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts._dropdown_styles')
 @endsection
 
 @section('import-scripts')
@@ -134,19 +141,33 @@
                 let eventName = $row.find("td").eq(0).text().trim();
                 let currentNotificationTime = $row.find("td").eq(1).text().trim();
 
+                let hasMatch = Object.values(window.notificationTimings).includes(currentNotificationTime);
                 let options = '<option value="">Notification Time</option>';
-                console.log(window.notificationTimings);
+                let ddItems = `<div class="dd-item${hasMatch ? '' : ' active'}" role="option" data-value=""><span class="dd-nm">Notification Time</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>`;
+                let selectedLbl = 'Notification Time';
                 for (const [key, value] of Object.entries(window.notificationTimings)) {
-                    let selected = (value === currentNotificationTime) ? 'selected' : '';
+                    let isSelected = (value === currentNotificationTime);
+                    let selected = isSelected ? 'selected' : '';
                     options += `<option value="${key}" ${selected}>${value}</option>`;
+                    ddItems += `<div class="dd-item${isSelected ? ' active' : ''}" role="option" data-value="${key}"><span class="dd-nm">${value}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>`;
+                    if (isSelected) selectedLbl = value;
                 }
-                console.log(options);
+                let notifSelectId = 'notification_timing-' + Main_id;
                 let editRowHtml = `
                     <td class="py-1">
                         <input type="text" class="form-control eventName" value="${eventName}" />
                     </td>
                     <td class="py-1">
-                        <select class="form-select notification_timing select2t-none">${options}</select>
+                        <select class="form-select notification_timing dd-native-select" id="${notifSelectId}">${options}</select>
+                        <div class="dd" data-target="#${notifSelectId}">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">${selectedLbl}</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Notification Time">
+                                <div class="dd-scroll">${ddItems}</div>
+                            </div>
+                        </div>
                     </td>
                     <td class="py-1">
                         <a href="javascript:void(0)" class="btn btn-theme update-row-btn" data-id="${Main_id}">Submit</a>
@@ -154,7 +175,6 @@
                 `;
 
                 $row.html(editRowHtml);
-                $row.find('.select2t-none').select2(); // reinitialize select2 if needed
             });
 
             $(document).on("click", ".update-row-btn", function (event) {
@@ -203,4 +223,5 @@
             });
         });
     </script>
+@include('resorts._dropdown_script')
 @endsection

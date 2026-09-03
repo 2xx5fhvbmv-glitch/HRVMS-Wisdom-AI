@@ -9,9 +9,15 @@
 @endif
 
 @section('content')
+<style>
+    #accommodation-event-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #accommodation-event-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="accommodation-event-hero">
             <div class="row justify-content-between g-3">
                 <div class="col-auto">
                     <div class="page-title">
@@ -60,7 +66,7 @@
 
                     <div class="mb-3">
                         <label for="building" class="form-label">BUILDING <span class="red-mark">*</span></label>
-                        <select class="form-select select2t-none buildingAvailable"
+                        <select class="form-select dd-native-select buildingAvailable"
                                 name="building_id"
                                 id="Building"
                                 required
@@ -71,28 +77,63 @@
                                 <option value="{{ $b->id }}">{{ $b->BuildingName }}</option>
                             @endforeach
                         </select>
+                        <div class="dd" data-target="#Building">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">-- Select Building --</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Building">
+                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a building…"></div>
+                                <div class="dd-scroll">
+                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">-- Select Building --</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    @foreach ($Building as $b)
+                                    <div class="dd-item" role="option" data-value="{{ $b->id }}"><span class="dd-nm">{{ $b->BuildingName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        </div>
                         <div id="building_error"></div>
                     </div>
 
                     <div class="mb-3">
                         <label for="floor" class="form-label">FLOOR <small class="text-muted">(Optional)</small></label>
-                        <select class="form-select select2t-none AvailableFloor"
+                        <select class="form-select dd-native-select AvailableFloor"
                                 id="AvailableFloor_1"
                                 data-id="1"
                                 name="FloorNo"
                                 data-parsley-errors-container="#floor_error">
                         </select>
+                        <div class="dd" data-target="#AvailableFloor_1">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">Select Floor</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Floor">
+                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a floor…"></div>
+                                <div class="dd-scroll"></div>
+                            </div>
+                        </div>
                         <div id="floor_error"></div>
                     </div>
 
                     <div class="mb-3">
                         <label for="roomNo" class="form-label">ROOM NO <small class="text-muted">(Optional)</small></label>
-                        <select class="form-select select2t-none RoomNo"
+                        <select class="form-select dd-native-select RoomNo"
                                 id="RoomNo_1"
                                 data-id="1"
                                 name="RoomNo"
                                 data-parsley-errors-container="#room_error">
                         </select>
+                        <div class="dd" data-target="#RoomNo_1">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">Select Room</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Room">
+                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a room…"></div>
+                                <div class="dd-scroll"></div>
+                            </div>
+                        </div>
                         <div id="room_error"></div>
                     </div>
 
@@ -113,13 +154,27 @@
 
                     <div class="mb-3">
                         <label for="priority" class="form-label">PRIORITY <span class="red-mark">*</span></label>
-                        <select class="form-select" name="priority" id="priority"
+                        <select class="form-select dd-native-select" name="priority" id="priority"
                             required data-parsley-required-message="Please select priority.">
                             <option value="">-- Select Priority --</option>
                             <option value="High">High</option>
                             <option value="Medium">Medium</option>
                             <option value="Low">Low</option>
                         </select>
+                        <div class="dd" data-target="#priority">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">-- Select Priority --</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Priority">
+                                <div class="dd-scroll">
+                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">-- Select Priority --</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    <div class="dd-item" role="option" data-value="High"><span class="dd-nm">High</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    <div class="dd-item" role="option" data-value="Medium"><span class="dd-nm">Medium</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    <div class="dd-item" role="option" data-value="Low"><span class="dd-nm">Low</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <div class="mb-0">
@@ -146,6 +201,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts._dropdown_styles')
 @endsection
 
 @section('import-scripts')
@@ -154,16 +210,6 @@
         // $('#CreateMaintenanceForm').parsley().validate();
            GetSliderList();
         FullCalanderEvent();
-        $("#Building").select2({
-            placeholder: "Select Building",
-            allowClear: true,
-        });
-        $(".AvailableFloor").select2({
-          placeholder:'Select Floor',
-        });
-        $(".RoomNo").select2({
-          placeholder:'Select RoomNo',
-        });
         flatpickr('#start_date', {
                 dateFormat: 'd/m/Y',
                 allowInput: true,
@@ -232,6 +278,10 @@
                                 positionClass: 'toast-bottom-right'
                             });
                             form.reset();
+                            window.wisdomDD.sync('#Building');
+                            window.wisdomDD.sync('#priority');
+                            window.wisdomDD.rebuild('#AvailableFloor_1');
+                            window.wisdomDD.rebuild('#RoomNo_1');
                             GetSliderList();
                             $("#createTask-modal").modal('hide');
 
@@ -284,15 +334,13 @@
                 success: function(response) {
                     if (response.success)
                     {
-                        var floor='<option></option>';
+                        var floor='<option value="">Select Floor</option>';
                         $.each(response.data, function(i, v) {
                             console.log('Creating option:', v);
                             floor += `<option value="${v}">${v}</option>`;
                         });
-                        $("#AvailableFloor_1").html(floor).select2({
-                                                                        placeholder: 'Select Floor',
-                                                                        allowClear: true,
-                                                                    });
+                        $("#AvailableFloor_1").html(floor);
+                        window.wisdomDD.rebuild('#AvailableFloor_1');
 
                     } else {
                         toastr.error(response.message, "Error", {
@@ -324,15 +372,13 @@
                 success: function(response) {
                     if (response.success)
                     {
-                        var floor='<option></option>';
+                        var floor='<option value="">Select Room</option>';
                         $.each(response.data, function(i, v) {
                             console.log('Creating option:', v);
                             floor += `<option value="${v}">${v}</option>`;
                         });
-                        $("#RoomNo_1").html(floor).select2({
-                                                              placeholder: 'Select Room',
-                                                              allowClear: true,
-                                                            });
+                        $("#RoomNo_1").html(floor);
+                        window.wisdomDD.rebuild('#RoomNo_1');
                     }
                     else
                     {
@@ -413,4 +459,5 @@ function GetSliderList()
             });
 }
 </script>
+@include('resorts._dropdown_script')
 @endsection

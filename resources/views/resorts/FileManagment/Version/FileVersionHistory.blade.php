@@ -8,9 +8,15 @@
 @endif
 
 @section('content')
+<style>
+    #file-version-history-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #file-version-history-hero { padding-bottom: 0; }
+    }
+</style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="file-version-history-hero">
                 <div class="row  g-3">
                     <div class="col-auto">
                         <div class="page-title">

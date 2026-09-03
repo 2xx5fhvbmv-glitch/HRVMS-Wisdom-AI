@@ -8,9 +8,15 @@
 @endif
 
 @section('content')
+    <style>
+        #learning-probationary-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #learning-probationary-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="learning-probationary-hero">
                 <div class="row  g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -18,7 +24,7 @@
                             <h1>{{ $page_title }}</h1>
                         </div>
                     </div>
-                   
+
                 </div>
             </div>
 

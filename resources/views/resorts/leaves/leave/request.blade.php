@@ -8,9 +8,15 @@
 @endif
 
 @section('content')
+    <style>
+        #leave-request-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #leave-request-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding page-appHedding">
+            <div class="page-hedding page-appHedding" id="leave-request-hero">
                 <div class="row justify-content-between g-md-2 g-1">
                     <div class="col-auto">
                         <div class="page-title">
@@ -32,7 +38,7 @@
                         </div>
                         @if($show_department_filter ?? true)
                         <div class="col-xl-2 col-md-5 col-sm-4 col-6">
-                            <select id="department-filter" class="form-select select2t-none Department "name="department" aria-label="Default select example">
+                            <select id="department-filter" class="form-select dd-native-select Department" name="department" aria-label="Default select example">
                                 <option value="" selected>All Departments</option>
                                 @if($resort_departments ?? null)
                                     @foreach($resort_departments as $dept)
@@ -40,10 +46,26 @@
                                     @endforeach
                                 @endif
                             </select>
+                            <div class="dd" data-target="#department-filter">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">All Departments</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Department">
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">All Departments</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @if($resort_departments ?? null)
+                                            @foreach($resort_departments as $dept)
+                                                <div class="dd-item" role="option" data-value="{{ $dept->id }}"><span class="dd-nm">{{ $dept->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @endforeach
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         @endif
                         <div class="col-xl-2 col-md-3 col-sm-4 col-6">
-                            <select id="position-filter" class="form-select select2t-none mb-2 Position" name="position" aria-label="Default select example">
+                            <select id="position-filter" class="form-select dd-native-select mb-2 Position" name="position" aria-label="Default select example">
                                 <option selected value="">Select Position</option>
                                 @if(isset($ResortPositions))
                                     @foreach ($ResortPositions as $pos)
@@ -51,9 +73,25 @@
                                     @endforeach
                                 @endif
                             </select>
+                            <div class="dd" data-target="#position-filter">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Select Position</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Position">
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Position</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @if(isset($ResortPositions))
+                                            @foreach ($ResortPositions as $pos)
+                                                <div class="dd-item" role="option" data-value="{{ $pos->id }}"><span class="dd-nm">{{ $pos->position_title }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @endforeach
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="col-xl-2 col-md-4 col-sm-4 col-6">
-                            <select id="year-filter" class="form-select select2t-none" aria-label="Year">
+                            <select id="year-filter" class="form-select dd-native-select" aria-label="Year">
                                 @if(isset($filter_years) && is_array($filter_years))
                                     @foreach($filter_years as $y)
                                         <option value="{{ $y }}" @if(isset($filter_year) && (int)$filter_year === (int)$y) selected @endif>{{ $y }}</option>
@@ -62,6 +100,29 @@
                                     <option value="{{ date('Y') }}" selected>{{ date('Y') }}</option>
                                 @endif
                             </select>
+                            <div class="dd" data-target="#year-filter">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">
+                                        @if(isset($filter_years) && is_array($filter_years) && isset($filter_year))
+                                            {{ $filter_year }}
+                                        @else
+                                            {{ date('Y') }}
+                                        @endif
+                                    </span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Year">
+                                    <div class="dd-scroll">
+                                        @if(isset($filter_years) && is_array($filter_years))
+                                            @foreach($filter_years as $y)
+                                                <div class="dd-item{{ (isset($filter_year) && (int)$filter_year === (int)$y) ? ' active' : '' }}" role="option" data-value="{{ $y }}"><span class="dd-nm">{{ $y }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @endforeach
+                                        @else
+                                            <div class="dd-item active" role="option" data-value="{{ date('Y') }}"><span class="dd-nm">{{ date('Y') }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="col-xl-2 col-md-3 col-sm-4 col-6">
@@ -260,6 +321,8 @@
         </div>
     </div>
 @include('resorts.leaves._leave_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -270,7 +333,6 @@
 
     // new DataTable('#example');
     $(document).ready(function () {
-        $(".select2t-none").select2();
 
         // Handle Department change event
         $(document).on('change', '.Department', function () {
@@ -284,6 +346,7 @@
                     @endforeach
                 @endif
                 $(".Position").html(allPositions);
+                wisdomDD.rebuild('#position-filter');
                 return;
             }
             $.ajax({
@@ -299,10 +362,10 @@
                             positionOptions += `<option value="${value.id}">${value.position_title}</option>`;
                         });
                         $(".Position").html(positionOptions);
-                        $(".Position").select2({ placeholder: "Select Position" });
                     } else {
                         toastr.warning("No Positions found for the selected Department.", { positionClass: 'toast-bottom-right' });
                     }
+                    wisdomDD.rebuild('#position-filter');
                 },
                 error: function () {
                     toastr.error("Error fetching Positions.", { positionClass: 'toast-bottom-right' });

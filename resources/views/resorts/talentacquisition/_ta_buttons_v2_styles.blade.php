@@ -17,7 +17,7 @@
     .ta-btn-primary:focus-visible, .ta-btn-secondary:focus-visible, .ta-btn-positive:focus-visible,
     .ta-btn-attention:focus-visible, .ta-btn-accent:focus-visible, .ta-btn-neutral:focus-visible,
     .ta-btn-critical:focus-visible, .ta-btn-celebrate:focus-visible {
-        outline: 2px solid #014653;
+        outline: 2px solid var(--teal);
         outline-offset: 2px;
     }
     .ta-btn-ghost:focus-visible {
@@ -25,13 +25,17 @@
         outline-offset: 2px;
     }
 
-    /* Everyday action — Submit, Save. */
-    .ta-btn-primary { background: #014653; color: #fff; }
-    .ta-btn-primary:hover { background: #014653; color: #fff; transform: translateY(-2px); box-shadow: 0 8px 18px -8px rgba(20,35,42,.35); }
+    /* Everyday action — Submit, Save. Text stays literal #fff
+       (contrast-on-solid-teal, not a surface) — box-shadows stay literal
+       rgba(20,35,42,…) throughout, same reasoning as --shadow's own dark
+       override. */
+    .ta-btn-primary { background: var(--teal); color: #fff; }
+    .ta-btn-primary:hover { background: var(--teal); color: #fff; transform: translateY(-2px); box-shadow: 0 8px 18px -8px rgba(20,35,42,.35); }
 
-    /* Low-stakes, recedes on purpose — Cancel, Back, View, Download. */
-    .ta-btn-secondary { background: transparent; color: #014653; border: 1.5px solid #C9D6D7; }
-    .ta-btn-secondary:hover { background: #F9F8F1; border-color: #014653; color: #014653; transform: translateY(-2px); box-shadow: 0 8px 18px -8px rgba(20,35,42,.18); }
+    /* Low-stakes, recedes on purpose — Cancel, Back, View, Download.
+       #C9D6D7 border has no token match — left literal. */
+    .ta-btn-secondary { background: transparent; color: var(--teal); border: 1.5px solid #C9D6D7; }
+    .ta-btn-secondary:hover { background: var(--paper); border-color: var(--teal); color: var(--teal); transform: translateY(-2px); box-shadow: 0 8px 18px -8px rgba(20,35,42,.18); }
 
     /* Affirming completion — Approved (vacancy request), Set Default. */
     .ta-btn-positive { background: var(--positive-bg); color: var(--positive); }
@@ -39,31 +43,38 @@
 
     /* Consequential/external-facing, not destructive — Send Interview,
        Send Offer Letter/Contract, On Hold, Reject request, Extend Ad Link. */
-    .ta-btn-attention { background: #FBF0DC; color: #D98A00; }
-    .ta-btn-attention:hover { background: #D98A00; color: #fff; transform: translateY(-2px); box-shadow: 0 8px 18px -8px rgba(20,35,42,.25); }
+    .ta-btn-attention { background: var(--warning-bg); color: var(--warning); }
+    .ta-btn-attention:hover { background: var(--warning); color: #fff; transform: translateY(-2px); box-shadow: 0 8px 18px -8px rgba(20,35,42,.25); }
 
     /* Rare, single header-level CTA / AI feature — New Hire, WAI CV,
-       Regenerate AI Analysis. */
-    .ta-btn-accent { background: #E0FF02; color: #17260a; }
-    .ta-btn-accent:hover { background: #E0FF02; color: #17260a; transform: translateY(-2px); box-shadow: 0 8px 18px -8px rgba(20,35,42,.35); }
+       Regenerate AI Analysis. --lime is unchanged across themes. */
+    .ta-btn-accent { background: var(--lime); color: #17260a; }
+    .ta-btn-accent:hover { background: var(--lime); color: #17260a; transform: translateY(-2px); box-shadow: 0 8px 18px -8px rgba(20,35,42,.35); }
 
     /* Saved, not final — Save as Draft. */
-    .ta-btn-neutral { background: #DEDEDE; color: #222; }
-    .ta-btn-neutral:hover { background: #F5F8F8; color: #222; transform: translateY(-2px); box-shadow: 0 8px 18px -8px rgba(20,35,42,.18); }
+    .ta-btn-neutral { background: var(--neutral-bg); color: var(--darkblack); }
+    .ta-btn-neutral:hover { background: var(--teal-soft); color: var(--darkblack); transform: translateY(-2px); box-shadow: 0 8px 18px -8px rgba(20,35,42,.18); }
 
     /* Can't be undone — deletes, Confirm Reject, Yes Delete Slot. */
-    .ta-btn-critical { background: #FFDED9; color: #FF2400; }
-    .ta-btn-critical:hover { background: #FF2400; color: #fff; transform: translateY(-2px); box-shadow: 0 8px 18px -8px rgba(20,35,42,.25); }
+    .ta-btn-critical { background: var(--critical-bg); color: var(--critical); }
+    .ta-btn-critical:hover { background: var(--critical); color: #fff; transform: translateY(-2px); box-shadow: 0 8px 18px -8px rgba(20,35,42,.25); }
 
     /* The one true "we did it" moment — brand gradient. Confirm Select
        (hiring someone) is the genuine good-news moment in this module.
-       Only ever one of these per page. */
-    .ta-btn-celebrate { background: linear-gradient(135deg, #014653, #E0FF02); color: #fff; }
-    .ta-btn-celebrate:hover { background: linear-gradient(135deg, #013641, #c7e102); color: #fff; transform: translateY(-2px); box-shadow: 0 10px 22px -8px rgba(1,70,83,.45); }
+       Only ever one of these per page. Both gradients are exact matches
+       for the SSOT's --grad-celebrate/--grad-celebrate-hover (added
+       there specifically for this reason). The shadow's rgba(1,70,83,…)
+       is --teal-rgb's exact value — unlike this file's other (neutral,
+       --ink-toned) shadows, this one is deliberately teal-branded to
+       match the gradient, so it's correct for it to tint with the theme
+       too; --teal-rgb already has Dark/Teal values from Phase 1. */
+    .ta-btn-celebrate { background: var(--grad-celebrate); color: #fff; }
+    .ta-btn-celebrate:hover { background: var(--grad-celebrate-hover); color: #fff; transform: translateY(-2px); box-shadow: 0 10px 22px -8px rgba(var(--teal-rgb),.45); }
 
     /* On a teal surface only — header bands, the email-template hover
        overlay. White outline at rest, soft white wash on hover; never a
-       solid fill (that's what Accent is for). */
+       solid fill (that's what Accent is for). Left literal throughout —
+       contrast-on-the-teal-band white/black, not surface colors. */
     .ta-btn-ghost { background: transparent; color: #fff; border: 1.5px solid rgba(255,255,255,.55); }
     .ta-btn-ghost:hover { background: rgba(255,255,255,.14); border-color: #fff; color: #fff; transform: translateY(-2px); box-shadow: 0 8px 18px -8px rgba(0,0,0,.35); }
 
@@ -79,21 +90,24 @@
 
     /* Page-switcher nav (Shortlisted / Upcoming / Rejected / Reminders) —
        wayfinding, not an action, so it doesn't borrow an emotional variant.
-       Sits on the same teal header band Ghost was built for. */
-    .ta-tabnav { display: inline-flex; gap: 4px; background: #014653; padding: 5px; border-radius: 10px; flex-wrap: wrap; }
+       Sits on the same teal header band Ghost was built for — its own
+       rgba(255,255,255,…) contrast values left literal for the same
+       reason as Ghost above. */
+    .ta-tabnav { display: inline-flex; gap: 4px; background: var(--teal); padding: 5px; border-radius: 10px; flex-wrap: wrap; }
     .ta-tabnav a { padding: 7px 13px; border-radius: 7px; font-size: 13px; font-weight: 500; color: rgba(255,255,255,.72); transition: background .16s ease, color .16s ease; }
     .ta-tabnav a:hover { color: #fff; background: rgba(255,255,255,.1); }
     .ta-tabnav a.active { background: rgba(255,255,255,.16); color: #fff; }
 
     /* Status indicator, not a button — e.g. "No Slot Found". Never
        clickable (href="javascript:void(0)" with no handler), so it must
-       not borrow a warning/attention color that implies it does something. */
-    .ta-badge-muted { background: #F9F8F1; color: #8a8a80; border: 1px solid #E3E0D6; cursor: default; }
+       not borrow a warning/attention color that implies it does something.
+       #8a8a80/#E3E0D6 have no token match — left literal. */
+    .ta-badge-muted { background: var(--paper); color: #8a8a80; border: 1px solid #E3E0D6; cursor: default; }
 
     /* Text-only tint for actions tucked inside a .dropdown-item — full
        pill buttons don't fit a full-width menu row. Same hues as the
        matching ta-btn-* variant so the same action reads the same way
        whether it's an icon button or a dropdown line. */
-    .ta-text-secondary { color: #014653; }
-    .ta-text-critical { color: #FF2400; }
+    .ta-text-secondary { color: var(--teal); }
+    .ta-text-critical { color: var(--critical); }
 </style>

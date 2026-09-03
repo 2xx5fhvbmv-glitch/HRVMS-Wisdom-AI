@@ -9,6 +9,28 @@
 
 @section('content')
 <style>
+    /* Requested extra breathing room between the hero and the KPI row —
+       .page-hedding's own margin-bottom (30px, default.css) is shared by
+       every page's hero, so this adds the extra 40px scoped to just this
+       page instead of touching that shared rule.
+       padding-bottom on the hero itself, not margin/padding on the row
+       below: sibling margins collapse (30px + margin-top would just become
+       max(30,X), not a sum), and the row's own Bootstrap gutter classes
+       (g-3/g-xxl-4) put a negative margin-top on the row that ate into a
+       padding-top tried there first. Padding on .page-hedding sits outside
+       both of those and is reliably additive. */
+    #payroll-hero { padding-bottom: 40px; }
+    /* Below Bootstrap's sm breakpoint the KPI cards go full-width (one
+       per row, col-sm-6 collapses), and the extra 40px pushes the first
+       card's top edge into the teal curve's rounded bottom-left corner
+       (body::before, border-radius 0 0 50px 50px) — the curve visibly
+       cuts a diagonal notch into the card. Desktop/tablet (>=576px) don't
+       have this collision (confirmed by direct comparison at 375/768/1440px)
+       — only neutralize it below that width, keep the requested push above it. */
+    @media (max-width: 575.98px) {
+        #payroll-hero { padding-bottom: 0; }
+    }
+
     /* WAI Insights: fixed card height (matching the Talent Acquisition
        module's WAI Insights card, the reference for this pattern) instead
        of the previous JS-driven sync to Payroll Comparison's height — the
@@ -37,26 +59,26 @@
     .wai-narrative .wai-head { position: relative; overflow: hidden; padding: 17px 18px; flex-shrink: 0; }
     .wai-narrative .wai-head::before {
         content: ""; position: absolute; inset: 0; pointer-events: none;
-        background: linear-gradient(110deg, #014653 0%, #0e8a9e 40%, #7fa61e 70%, #e0ff02 100%);
+        background: linear-gradient(110deg, var(--teal) 0%, #0e8a9e 40%, #7fa61e 70%, var(--lime) 100%);
     }
     .wai-narrative .wai-head::after {
         content: ""; position: absolute; inset: 0; pointer-events: none;
         background: linear-gradient(110deg, rgba(1,40,48,.35), transparent 55%);
     }
-    .wai-narrative .wai-head h2 { position: relative; color: #fff; font-size: 15px; font-weight: 800; margin: 0; }
-    .wai-narrative .wai-head-meta { position: relative; margin-top: 4px; font-size: 11.5px; color: rgba(255,255,255,.75); display: flex; gap: 6px; }
+    .wai-narrative .wai-head h2 { position: relative; color: #fff; font-size: 18px; font-weight: 600; margin: 0; }
+    .wai-narrative .wai-head-meta { position: relative; margin-top: 4px; font-size: 10.5px; font-weight: 500; color: rgba(255,255,255,.75); display: flex; gap: 6px; }
     .wai-narrative .wai-head-meta a { color: #fff; font-weight: 600; text-decoration: underline; }
 
     .wai-narrative-body { padding: 16px; }
     .wai-narrative .wai-row { display: flex; align-items: flex-start; gap: 12px; padding: 12px 2px; border-bottom: 1px solid #F2F6F6; }
     .wai-narrative .wai-row:last-child { border-bottom: none; }
     .wai-narrative .wai-row-icon { width: 32px; height: 32px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; margin-top: 2px; }
-    .wai-narrative .wai-row-icon.is-ok { background: #E9F7F0; color: #1F9D6B; }
-    .wai-narrative .wai-row-icon.is-flagged { background: #FBF0DC; color: #D98A00; }
+    .wai-narrative .wai-row-icon.is-ok { background: var(--positive-bg); color: var(--positive); }
+    .wai-narrative .wai-row-icon.is-flagged { background: var(--warning-bg); color: var(--warning); }
     .wai-narrative .wai-row-body { flex: 1 1 auto; min-width: 0; }
-    .wai-narrative .wai-row-body h6 { margin: 0 0 4px; font-size: 13.5px; font-weight: 700; color: #14232A; }
-    .wai-narrative .wai-row-text { margin: 0 0 4px; font-size: 12.5px; color: #5D6F75; line-height: 1.5; }
-    .wai-narrative .wai-row-link { display: inline-block; margin-top: 2px; font-size: 12px; font-weight: 600; color: #014653; }
+    .wai-narrative .wai-row-body h6 { margin: 0 0 4px; font-size: 14px; font-weight: 600; color: var(--ink); }
+    .wai-narrative .wai-row-text { margin: 0 0 4px; font-size: 14px; color: var(--muted); line-height: 1.5; }
+    .wai-narrative .wai-row-link { display: inline-block; margin-top: 2px; font-size: 14px; font-weight: 600; color: var(--teal); }
 
     /* ---- Payroll Overview card (redesigned Payroll Expenses chart) ----
        border-radius matches the site-wide .card default (25px) — same
@@ -65,7 +87,7 @@
        from the original spec standing out against its neighbors. */
     .payroll-overview-card {
         background: #FFFFFF;
-        border: 1px solid #E2EBEC;
+        border: 1px solid var(--line);
         border-radius: 25px;
         box-shadow: 0 4px 16px rgba(20,35,42,0.06);
         padding: 20px 22px;
@@ -77,8 +99,8 @@
         gap: 12px;
         flex-wrap: wrap;
     }
-    .payroll-overview-header h3 { margin: 0; font-weight: 700; color: #14232A; }
-    .payroll-overview-subtitle { margin: 4px 0 0; font-size: 13px; color: #5D6F75; }
+    .payroll-overview-header h3 { margin: 0; font-size: 18px; font-weight: 600; color: var(--ink); }
+    .payroll-overview-subtitle { margin: 4px 0 0; font-size: 14px; color: var(--muted); }
     /* Same filter-dropdown size/spacing as the Service Charges card's
        filter (matched to its actual rendered computed style — this
        header isn't wrapped in .card-title itself, since that class also
@@ -101,13 +123,13 @@
         border: none;
         background: none;
         padding: 0;
-        font-size: 13px;
+        font-size: 14px;
         font-weight: 600;
-        color: #14232A;
+        color: var(--ink);
         cursor: pointer;
         transition: color .15s ease, opacity .15s ease;
     }
-    .po-legend-item.po-dimmed { color: #93A4A9; opacity: .6; }
+    .po-legend-item.po-dimmed { color: var(--faint); opacity: .6; }
     .po-legend-swatch {
         width: 18px;
         height: 3px;
@@ -131,12 +153,12 @@
         border-radius: 12px;
         box-shadow: 0 8px 24px rgba(20,35,42,0.16);
         padding: 12px 16px;
-        font-size: 13px;
-        color: #14232A;
+        font-size: 14px;
+        color: var(--ink);
         z-index: 10;
         min-width: 175px;
     }
-    .po-tooltip-title { font-weight: 700; margin-bottom: 6px; }
+    .po-tooltip-title { font-weight: 600; margin-bottom: 6px; }
     .po-tooltip-row { display: flex; align-items: center; gap: 8px; margin-top: 4px; white-space: nowrap; }
     .po-tooltip-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
     .po-tooltip-value { margin-left: auto; font-weight: 600; padding-left: 14px; }
@@ -153,25 +175,25 @@
         height: 20px;
         padding: 0 6px;
         border-radius: 10px;
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 600;
-        background: #E7E7E7;
+        background: var(--line);
         color: #666666;
     }
     .payroll-status-tabs .nav-tabs .nav-link.active .payroll-tab-badge {
-        background: #014653;
+        background: var(--teal);
         color: #FFFFFF;
     }
     .payroll-tab-table thead th {
         text-transform: uppercase;
-        font-size: 12px;
+        font-size: 11px;
         letter-spacing: .02em;
         color: #667085;
-        background: rgba(1,70,83,0.06);
-        border-bottom: 1px solid rgba(1,70,83,0.12);
+        background: rgba(var(--teal-rgb),0.06);
+        border-bottom: 1px solid rgba(var(--teal-rgb),0.12);
         padding: 12px 10px !important;
     }
-    .payroll-tab-table tbody tr:hover { background: rgba(1,70,83,0.04); }
+    .payroll-tab-table tbody tr:hover { background: rgba(var(--teal-rgb),0.04); }
     .payroll-tab-table td.text-end,
     .payroll-tab-table th.text-end { font-variant-numeric: tabular-nums; }
 
@@ -182,7 +204,7 @@
     .dept-distribution-card,
     .payroll-distributions-card { min-height: 472px; }
     .dept-distribution-card {
-        border: 1px solid #E2EBEC;
+        border: 1px solid var(--line);
         border-radius: 20px;
         box-shadow: 0 6px 24px rgba(20,35,42,0.06);
     }
@@ -213,20 +235,20 @@
        card's title lines up with OT Trend / Pension / etc — the card's own
        20px padding already accounts for the top gap, so no extra top
        padding is added here (that had been double-counting before). */
-    .dept-card-header { padding-bottom: 8px; border-bottom: 1px solid #E7E7E7; margin-bottom: 12px; }
-    .dept-modal-header { padding: 20px 24px; border-bottom: 1px solid #E2EBEC; }
+    .dept-card-header { padding-bottom: 8px; border-bottom: 1px solid var(--line); margin-bottom: 12px; }
+    .dept-modal-header { padding: 20px 24px; border-bottom: 1px solid var(--line); }
     .dept-header-left { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
-    .dept-header-title { margin: 0; font-size: 18px; font-weight: 700; color: #14232A; }
-    .dept-total-line { font-size: 14px; color: #5D6F75; margin-top: 2px; }
-    .dept-total-line-modal { margin-top: 0; font-size: 15px; }
-    .dept-total-value { font-weight: 700; color: #14232A; }
-    .dept-modal-subtitle { font-size: 13px; color: #5D6F75; margin-top: 2px; }
+    .dept-header-title { margin: 0; font-size: 18px; font-weight: 600; color: var(--ink); }
+    .dept-total-line { font-size: 14px; color: var(--muted); margin-top: 2px; }
+    .dept-total-line-modal { margin-top: 0; font-size: 14px; }
+    .dept-total-value { font-weight: 600; color: var(--ink); }
+    .dept-modal-subtitle { font-size: 14px; color: var(--muted); margin-top: 2px; }
     .dept-modal-header-right { display: flex; align-items: center; gap: 16px; flex-shrink: 0; }
     .dept-expand-btn {
         width: 40px;
         height: 40px;
         border-radius: 50%;
-        background: #014653;
+        background: var(--teal);
         color: #fff;
         border: none;
         display: flex;
@@ -268,22 +290,22 @@
         overflow: hidden;
     }
     .dept-tile-name {
-        font-size: 13px;
+        font-size: 14px;
         font-weight: 600;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
     }
     .dept-tile-pct {
-        font-size: 24px;
-        font-weight: 700;
+        font-size: 22px;
+        font-weight: 600;
         line-height: 1.1;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
     }
     .dept-tile-amount {
-        font-size: 12px;
+        font-size: 11px;
         opacity: .85;
         margin-top: 2px;
         white-space: nowrap;
@@ -300,7 +322,7 @@
     /* Payroll Distributions — paired beside Distribution by Department,
        same white/border/radius/shadow language. */
     .payroll-distributions-card {
-        border: 1px solid #E2EBEC;
+        border: 1px solid var(--line);
         border-radius: 20px;
         box-shadow: 0 6px 24px rgba(20,35,42,0.06);
         display: flex;
@@ -309,30 +331,30 @@
     /* Matches the site's standard .card-title spacing (default.css) so this
        card's title lines up with Distribution by Department, OT Trend,
        Pension, etc. */
-    .pdist-header { padding-bottom: 8px; border-bottom: 1px solid #E7E7E7; margin-bottom: 12px; }
-    .pdist-header-title { margin: 0; font-size: 18px; font-weight: 700; color: #14232A; }
-    .pdist-header-subtitle { margin: 4px 0 0; font-size: 13px; color: #5D6F75; }
+    .pdist-header { padding-bottom: 8px; border-bottom: 1px solid var(--line); margin-bottom: 12px; }
+    .pdist-header-title { margin: 0; font-size: 18px; font-weight: 600; color: var(--ink); }
+    .pdist-header-subtitle { margin: 4px 0 0; font-size: 14px; color: var(--muted); }
     .pdist-gauge-wrap { position: relative; width: 100%; height: 190px; margin-bottom: 28px; }
     .pdist-legend-row { margin: 0 0 16px; }
     .pdist-tile {
-        border: 1px solid #E2EBEC;
+        border: 1px solid var(--line);
         border-radius: 14px;
         padding: 12px 14px;
         height: 100%;
     }
     .pdist-tile-top { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
     .pdist-tile-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
-    .pdist-tile-name { font-size: 13px; color: #5D6F75; }
+    .pdist-tile-name { font-size: 14px; color: var(--muted); }
     .pdist-tile-amount {
-        font-size: 16px;
+        font-size: 14px;
         font-weight: 500;
-        color: #14232A;
+        color: var(--ink);
         font-variant-numeric: tabular-nums;
         margin-bottom: 4px;
     }
-    .pdist-tile-pct { font-size: 13px; font-weight: 600; }
-    .pdist-total { text-align: center; margin: auto 0 0; font-size: 13px; color: #5D6F75; }
-    .pdist-total .pdist-total-value { font-weight: 700; color: #14232A; }
+    .pdist-tile-pct { font-size: 14px; font-weight: 600; }
+    .pdist-total { text-align: center; margin: auto 0 0; font-size: 14px; color: var(--muted); }
+    .pdist-total .pdist-total-value { font-weight: 600; color: var(--ink); }
 
     .dept-modal-backdrop {
         position: fixed;
@@ -350,7 +372,7 @@
         width: 90vw;
         height: 82vh;
         border-radius: 20px;
-        border: 1px solid #E2EBEC;
+        border: 1px solid var(--line);
         box-shadow: 0 20px 60px rgba(20,35,42,0.25);
         display: flex;
         flex-direction: column;
@@ -374,7 +396,7 @@
         gap: 12px;
         padding: 20px 20px 4px;
     }
-    .pc-header-title { margin: 0; font-size: 18px; font-weight: 700; color: #14232A; }
+    .pc-header-title { margin: 0; font-size: 18px; font-weight: 600; color: var(--ink); }
     .pc-header .form-select { font-size: 14px; padding: 4px 24px 4px 10px; }
     .pc-columns { padding: 8px 20px 4px; margin: 0; }
     .pc-col {
@@ -390,23 +412,23 @@
     .pc-legend-row { display: flex; align-items: center; gap: 8px; }
     .pc-legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
     .pc-legend-label {
-        font-size: 13px;
-        color: #5D6F75;
+        font-size: 14px;
+        color: var(--muted);
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
     }
     .pc-legend-amount {
-        font-size: 13px;
+        font-size: 14px;
         font-weight: 600;
-        color: #14232A;
+        color: var(--ink);
         margin-left: auto;
         padding-left: 8px;
         white-space: nowrap;
     }
     .pc-compare-line { margin: 16px 0 4px; align-self: center; }
     .pc-compare-pill i { font-size: 10px; margin-right: 4px; }
-    .pc-compare-text { font-size: 13px; color: #5D6F75; margin-left: 6px; }
+    .pc-compare-text { font-size: 14px; color: var(--muted); margin-left: 6px; }
     .pc-empty {
         flex: 1;
         display: flex;
@@ -414,13 +436,13 @@
         align-items: center;
         justify-content: center;
         padding: 20px 10px;
-        color: #93A4A9;
+        color: var(--faint);
     }
-    .pc-empty p { margin-bottom: 12px; font-size: 13px; }
+    .pc-empty p { margin-bottom: 12px; font-size: 14px; }
 </style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="payroll-hero">
             <div class="row g-3">
                 <div class="col-auto">
                     <div class="page-title">
@@ -534,7 +556,7 @@
                             <p class="payroll-overview-subtitle">Monthly salary, overtime &amp; service charge</p>
                         </div>
                         <div class="form-group">
-                            <select class="form-select YearWisePayrollExpense" id="yearFilter" aria-label="Default select example">
+                            <select class="form-select dd-native-select YearWisePayrollExpense" id="yearFilter" aria-label="Default select example">
                                 <?php
                                 $currentYear = date('Y');
                                 for ($i = 0; $i < 3; $i++) {
@@ -549,6 +571,23 @@
                                 }
                                 ?>
                             </select>
+                            <div class="dd" data-target="#yearFilter">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">{{ date('Y') }}</span>
+                                    <svg class="dd-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Year">
+                                    <div class="dd-scroll">
+                                        <?php
+                                        for ($i = 0; $i < 3; $i++) {
+                                            $startYear = $currentYear - $i;
+                                            $activeCls = $i == 0 ? ' active' : '';
+                                            echo '<div class="dd-item' . $activeCls . '" role="option" data-value="' . $startYear . '"><span class="dd-nm">' . $startYear . '</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>';
+                                        }
+                                        ?>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div class="payroll-overview-chart-wrap">
@@ -577,7 +616,7 @@
                             </div>
                             <div class="col-auto">
                                 <div class="form-group">
-                                    <select class="form-select YearWiseServichCharges" aria-label="Default select example">
+                                    <select class="form-select dd-native-select YearWiseServichCharges" id="yearWiseServiceChargesFilter" aria-label="Default select example">
                                         <?php
                                         $currentYear = date('Y');
                                         for ($i = 0; $i < 3; $i++) {
@@ -592,6 +631,23 @@
                                         }
                                         ?>
                                     </select>
+                                    <div class="dd" data-target="#yearWiseServiceChargesFilter">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">{{ date('Y') }}</span>
+                                            <svg class="dd-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Year">
+                                            <div class="dd-scroll">
+                                                <?php
+                                                for ($i = 0; $i < 3; $i++) {
+                                                    $startYear = $currentYear - $i;
+                                                    $activeCls = $i == 0 ? ' active' : '';
+                                                    echo '<div class="dd-item' . $activeCls . '" role="option" data-value="' . $startYear . '"><span class="dd-nm">' . $startYear . '</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>';
+                                                }
+                                                ?>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -613,23 +669,50 @@
                     </div>
                     <div class="mb-xl-4 mb-3">
                         <label for="month" class="form-label">MONTH</label>
-                        <select class="form-select select2t-none" id="month" aria-label="Default select example">
+                        <select class="form-select dd-native-select" id="month" aria-label="Default select example">
                             @foreach(range(1, 12) as $m)
                                 <option value="{{ $m }}" {{ now()->month == $m ? 'selected' : '' }}>
                                     {{ \Carbon\Carbon::create()->month($m)->format('F') }}
                                 </option>
                             @endforeach
                         </select>
+                        <div class="dd" data-target="#month">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">{{ \Carbon\Carbon::create()->month(now()->month)->format('F') }}</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Month">
+                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a month…"></div>
+                                <div class="dd-scroll">
+                                    @foreach(range(1, 12) as $m)
+                                    <div class="dd-item{{ now()->month == $m ? ' active' : '' }}" role="option" data-value="{{ $m }}"><span class="dd-nm">{{ \Carbon\Carbon::create()->month($m)->format('F') }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="mb-xl-4 mb-3 pb-1 pb-xxl-3">
                         <label for="year" class="form-label">YEAR</label>
-                        <select class="form-select select2t-none" id="year" aria-label="Default select example">
+                        <select class="form-select dd-native-select" id="year" aria-label="Default select example">
                             @foreach(range(now()->year - 5, now()->year + 1) as $y)
                                 <option value="{{ $y }}" {{ now()->year == $y ? 'selected' : '' }}>
                                     {{ $y }}
                                 </option>
                             @endforeach
                         </select>
+                        <div class="dd" data-target="#year">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">{{ now()->year }}</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Year">
+                                <div class="dd-scroll">
+                                    @foreach(range(now()->year - 5, now()->year + 1) as $y)
+                                    <div class="dd-item{{ now()->year == $y ? ' active' : '' }}" role="option" data-value="{{ $y }}"><span class="dd-nm">{{ $y }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <a href="#" class="btn payroll-btn-secondary @if(App\Helpers\Common::checkRouteWisePermission('payroll.run',config('settings.resort_permissions.view')) == false) d-none @endif" id="viewPayroll">View Payroll</a>
                 </div>
@@ -979,11 +1062,11 @@
                             <div class="col-6">
                                 <div class="pdist-tile">
                                     <div class="pdist-tile-top">
-                                        <span class="pdist-tile-dot" style="background:#014653;"></span>
+                                        <span class="pdist-tile-dot" style="background:var(--teal);"></span>
                                         <span class="pdist-tile-name">Cash Payments</span>
                                     </div>
                                     <div class="pdist-tile-amount">{{ Common::GetResortCurrencySymbol() }} 0.00</div>
-                                    <div class="pdist-tile-pct" style="color:#014653;">0% of payout</div>
+                                    <div class="pdist-tile-pct" style="color:var(--teal);">0% of payout</div>
                                 </div>
                             </div>
                         </div>
@@ -1021,11 +1104,24 @@
                             </div>
                             <div class="col-auto">
                                 <div class="form-group">
-                                   <select id="yearSelect" class="form-select" style="width: auto; display: inline-block;">
+                                   <select id="yearSelect" class="form-select dd-native-select" style="width: auto; display: inline-block;">
                                         @for ($y = now()->year; $y >= now()->year - 5; $y--)
                                             <option value="{{ $y }}">{{ $y }}</option>
                                         @endfor
                                     </select>
+                                    <div class="dd" data-target="#yearSelect">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">{{ now()->year }}</span>
+                                            <svg class="dd-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Year">
+                                            <div class="dd-scroll">
+                                                @for ($y = now()->year; $y >= now()->year - 5; $y--)
+                                                <div class="dd-item{{ $y == now()->year ? ' active' : '' }}" role="option" data-value="{{ $y }}"><span class="dd-nm">{{ $y }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @endfor
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1043,7 +1139,7 @@
                             </div>
                             <div class="col-auto">
                                 <div class="form-group">
-                                    <select class="form-select YearWisePensionData" aria-label="Default select example">
+                                    <select class="form-select dd-native-select YearWisePensionData" id="yearWisePensionDataFilter" aria-label="Default select example">
                                         <?php
                                         $currentYear = date('Y');
                                         for ($i = 0; $i < 3; $i++) {
@@ -1057,6 +1153,23 @@
                                         }
                                         ?>
                                     </select>
+                                    <div class="dd" data-target="#yearWisePensionDataFilter">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">{{ date('Y') }}</span>
+                                            <svg class="dd-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Year">
+                                            <div class="dd-scroll">
+                                                <?php
+                                                for ($i = 0; $i < 3; $i++) {
+                                                    $startYear = $currentYear - $i;
+                                                    $activeCls = $i == 0 ? ' active' : '';
+                                                    echo '<div class="dd-item' . $activeCls . '" role="option" data-value="' . $startYear . '"><span class="dd-nm">' . $startYear . '</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>';
+                                                }
+                                                ?>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1095,11 +1208,24 @@
                                 <h3 class="text-nowrap">Budget Comparison</h3>
                             </div>
                             <div class="col-auto">
-                                <select class="form-select YearWiseBudgetComparison" aria-label="Default select example" style="width: auto; display: inline-block;">
+                                <select class="form-select dd-native-select YearWiseBudgetComparison" id="yearWiseBudgetComparisonFilter" aria-label="Default select example" style="width: auto; display: inline-block;">
                                     @for ($i = date('Y'); $i >= date('Y') - 5; $i--)
                                         <option value="{{ $i }}" {{ $i == date('Y') ? 'selected' : '' }}>{{ $i }}</option>
                                     @endfor
                                 </select>
+                                <div class="dd" data-target="#yearWiseBudgetComparisonFilter">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">{{ date('Y') }}</span>
+                                        <svg class="dd-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Year">
+                                        <div class="dd-scroll">
+                                            @for ($i = date('Y'); $i >= date('Y') - 5; $i--)
+                                            <div class="dd-item{{ $i == date('Y') ? ' active' : '' }}" role="option" data-value="{{ $i }}"><span class="dd-nm">{{ $i }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @endfor
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1129,6 +1255,7 @@
 
 @section('import-css')
 @include('resorts.payroll._payroll_buttons_v2_styles')
+@include('resorts._dropdown_styles')
 @include('resorts.payroll.dashboard._estimate_breakdown_styles')
 @endsection
 
@@ -1464,21 +1591,33 @@
             var centerTextPlugin = {
                 id: canvasId + 'CenterText',
                 afterDraw: function (chart) {
+                    // Reads WaiChart.palette() fresh on every draw (not a
+                    // value captured once at chart-build time), so this
+                    // retheme's itself automatically whenever
+                    // WaiChart.retheme() calls chart.update() below.
+                    var p = window.WaiChart ? window.WaiChart.palette() : { faint: '#93A4A9', ink: '#14232A' };
                     var ctx = chart.ctx;
                     var width = chart.width, height = chart.height;
                     ctx.save();
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
                     ctx.font = '500 12px Poppins';
-                    ctx.fillStyle = '#93A4A9';
+                    ctx.fillStyle = p.faint;
                     ctx.fillText('TOTAL', width / 2, height / 2 - 14);
                     ctx.font = '600 21px Poppins';
-                    ctx.fillStyle = '#14232A';
+                    ctx.fillStyle = p.ink;
                     ctx.fillText(currencySymbol + ' ' + Math.round(convertAmount(period.total, 'USD')).toLocaleString(), width / 2, height / 2 + 12);
                     ctx.restore();
                 }
             };
 
+            // Slice colours (period.items[].color) are server-supplied, one
+            // per expense category — left as-is, not reassigned from the
+            // ramp: that data doesn't come from this JS at all, so there's
+            // no theme-aware value to read it from without a backend change
+            // (out of scope for this phase). borderColor (the gap between
+            // slices) does theme — it should match whatever surface the
+            // donut sits on, same as --card does everywhere else.
             var chart = new Chart(canvasEl.getContext('2d'), {
                 type: 'doughnut',
                 data: {
@@ -1486,7 +1625,7 @@
                     datasets: [{
                         data: period.items.map(function (it) { return it.amount; }),
                         backgroundColor: period.items.map(function (it) { return it.color; }),
-                        borderColor: '#FFFFFF',
+                        borderColor: window.WaiChart ? window.WaiChart.palette().card : '#FFFFFF',
                         borderWidth: 2
                     }]
                 },
@@ -1508,6 +1647,11 @@
                 plugins: [centerTextPlugin]
             });
             requestAnimationFrame(function () { chart.resize(); });
+            if (window.WaiChart) {
+                window.WaiChart.registerForTheme(chart, function (c, p) {
+                    c.data.datasets[0].borderColor = p.card;
+                });
+            }
             return chart;
         }
 
@@ -1561,14 +1705,15 @@
             ctx.textAlign = 'center';
 
             // Total number
+            var _p = window.WaiChart ? window.WaiChart.palette() : { darkblack: '#222222' };
             ctx.font = '500 22px Poppins';
-            ctx.fillStyle = '#222222';
+            ctx.fillStyle = _p.darkblack;
             // ctx.fillText('$' + total, width / 2, height / 2 - 15);
             ctx.fillText(formattedTotal, width / 2, height / 2 - 15);
 
             // "Total" label
             ctx.font = '500 13px Poppins';
-            ctx.fillStyle = '#222222';
+            ctx.fillStyle = _p.darkblack;
             ctx.fillText('Avg', width / 2, height / 2 + 15);
 
             ctx.save();
@@ -1769,6 +1914,11 @@
                 // inside the hole, or they spill past the canvas/card edge
                 // and collide with whatever sits right below (here, the
                 // legend tiles).
+                // #0E8A9E (the "Bank Transfer" brand colour, both here and
+                // in the dataset below) has no matching SSOT token — left
+                // literal rather than force a partial migration that would
+                // pair a themed teal against an unthemed one.
+                var _pg = window.WaiChart ? window.WaiChart.palette() : { muted: '#5D6F75' };
                 ctx.save();
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
@@ -1776,7 +1926,7 @@
                 ctx.fillStyle = '#0E8A9E';
                 ctx.fillText(bankPercentage.toFixed(0) + '%', x, y - 45);
                 ctx.font = '500 12px Poppins';
-                ctx.fillStyle = '#5D6F75';
+                ctx.fillStyle = _pg.muted;
                 ctx.fillText('via Bank Transfer', x, y - 20);
                 ctx.restore();
             }
@@ -1788,8 +1938,11 @@
                 labels: ['Bank Transfers', 'Cash Payments'],
                 datasets: [{
                     data: [bankAmount, cashAmount],
+                    // #0E8A9E has no token match (see note above) — the
+                    // pairing stays literal rather than only migrating
+                    // #014653 and leaving its partner unthemed.
                     backgroundColor: ['#0E8A9E', '#014653'],
-                    borderColor: '#FFFFFF',
+                    borderColor: window.WaiChart ? window.WaiChart.palette().card : '#FFFFFF',
                     borderWidth: 2
                 }]
             },
@@ -2096,7 +2249,7 @@
             ctx.moveTo(x, chart.chartArea.top);
             ctx.lineTo(x, chart.chartArea.bottom);
             ctx.lineWidth = 1;
-            ctx.strokeStyle = 'rgba(1,70,83,0.3)';
+            ctx.strokeStyle = (window.WaiChart ? window.WaiChart.palette().teal : '#014653') + '4D'; // ~0.3 alpha
             ctx.stroke();
             ctx.restore();
         }
@@ -2210,6 +2363,9 @@
         },
         plugins: [payrollOverviewCrosshair]
     });
+    // Dataset colours (#0E8A9E/#14603F/#6F74E0) are literal brand hues with
+    // no SSOT token match — left as-is; only axes/grid retheme.
+    if (window.WaiChart) window.WaiChart.registerForTheme(myStackedBarChart);
 
     // Clickable legend: toggle a series' visibility and dim its label.
     $(document).on('click', '#payrollOverviewLegend .po-legend-item', function () {
@@ -2278,6 +2434,7 @@
                     window.myLineChart.destroy();
                 }
 
+                var _pOt = window.WaiChart ? window.WaiChart.palette().aqua : '#2EACB3';
                 window.myLineChart = new Chart(ctx, {
                     type: 'line',
                     data: {
@@ -2285,13 +2442,13 @@
                         datasets: [{
                             label: 'OT Hours',
                             data: data,
-                            borderColor: '#2EACB3',
-                            backgroundColor: 'rgba(46, 172, 179, 0.1)',
+                            borderColor: _pOt,
+                            backgroundColor: _pOt + '1A', // ~0.1 alpha
                             borderWidth: 2,
                             fill: true,
                             tension: 0.4,
                             pointRadius: 5,
-                            pointBackgroundColor: '#2EACB3'
+                            pointBackgroundColor: _pOt
                         }]
                     },
                     options: {
@@ -2309,6 +2466,11 @@
                         }
                     }
                 });
+                if (window.WaiChart) window.WaiChart.registerForTheme(window.myLineChart, function (c, p) {
+                    c.data.datasets[0].borderColor = p.aqua;
+                    c.data.datasets[0].backgroundColor = p.aqua + '1A';
+                    c.data.datasets[0].pointBackgroundColor = p.aqua;
+                });
             },
             error: function (xhr) {
                 console.error("Failed to load OT trend data", xhr);
@@ -2323,6 +2485,7 @@
             window.myLineChart.destroy(); // Destroy previous instance if needed
         }
 
+        var _pOt2 = window.WaiChart ? window.WaiChart.palette().aqua : '#2EACB3';
         window.myLineChart = new Chart(ctx, {
             type: 'line',
             data: {
@@ -2330,8 +2493,8 @@
                 datasets: [{
                     label: 'Total OT Hours',
                     data: dataPoints,
-                    borderColor: '#2EACB3',
-                    backgroundColor: '#2EACB3',
+                    borderColor: _pOt2,
+                    backgroundColor: _pOt2,
                     borderWidth: 1,
                     fill: false,
                     tension: 0.4,
@@ -2357,6 +2520,10 @@
                     }
                 }
             }
+        });
+        if (window.WaiChart) window.WaiChart.registerForTheme(window.myLineChart, function (c, p) {
+            c.data.datasets[0].borderColor = p.aqua;
+            c.data.datasets[0].backgroundColor = p.aqua;
         });
     }
 
@@ -2387,6 +2554,7 @@
             window.pensionChart.destroy(); // Destroy previous chart instance
         }
 
+        var _pPen = window.WaiChart ? window.WaiChart.palette() : { teal: '#014653', aqua: '#2EACB3' };
         window.pensionChart = new Chart(ctx, {
             type: 'bar',
             data: {
@@ -2395,8 +2563,8 @@
                     {
                         label: 'Employee',
                         data: employeeData,
-                        backgroundColor: '#014653',
-                        borderColor: '#014653',
+                        backgroundColor: _pPen.teal,
+                        borderColor: _pPen.teal,
                         borderWidth: 1,
                         borderRadius: 3,
                         barThickness: 14
@@ -2404,8 +2572,8 @@
                     {
                         label: 'Employer',
                         data: employerData,
-                        backgroundColor: '#2EACB3',
-                        borderColor: '#2EACB3',
+                        backgroundColor: _pPen.aqua,
+                        borderColor: _pPen.aqua,
                         borderWidth: 1,
                         borderRadius: 3,
                         barThickness: 14
@@ -2440,6 +2608,10 @@
                 }
             }
         });
+        if (window.WaiChart) window.WaiChart.registerForTheme(window.pensionChart, function (c, p) {
+            c.data.datasets[0].backgroundColor = c.data.datasets[0].borderColor = p.teal;
+            c.data.datasets[1].backgroundColor = c.data.datasets[1].borderColor = p.aqua;
+        });
     }
 
     var budgetCompChart = null;
@@ -2464,6 +2636,7 @@
                     return label.replace(/\s+\d{2,4}$/, '');
                 });
 
+                var _pBudget = window.WaiChart ? window.WaiChart.palette() : { teal: '#014653', aqua: '#2EACB3' };
                 budgetCompChart = new Chart(ctd, {
                     type: 'line',
                     data: {
@@ -2472,8 +2645,8 @@
                             {
                                 label: 'Budgeted Amount',
                                 data: response.budgeted,
-                                borderColor: '#014653',
-                                backgroundColor: '#014653',
+                                borderColor: _pBudget.teal,
+                                backgroundColor: _pBudget.teal,
                                 borderWidth: 1,
                                 fill: false,
                                 tension: 0.4,
@@ -2482,8 +2655,8 @@
                             {
                                 label: 'Actual Amount',
                                 data: response.actual,
-                                borderColor: '#2EACB3',
-                                backgroundColor: '#2EACB3',
+                                borderColor: _pBudget.aqua,
+                                backgroundColor: _pBudget.aqua,
                                 borderWidth: 1,
                                 fill: false,
                                 tension: 0.4,
@@ -2519,6 +2692,10 @@
                             }
                         }
                     }
+                });
+                if (window.WaiChart) window.WaiChart.registerForTheme(budgetCompChart, function (c, p) {
+                    c.data.datasets[0].borderColor = c.data.datasets[0].backgroundColor = p.teal;
+                    c.data.datasets[1].borderColor = c.data.datasets[1].backgroundColor = p.aqua;
                 });
             },
             error: function (xhr) {
@@ -2601,6 +2778,10 @@
                         }
                     }]
                 });
+                // backgroundColor array (#014653/#2EACB3/#EFB408/#50B9BF/#333333)
+                // only partially matches SSOT tokens — left literal to avoid a
+                // half-themed slice set; legend/tooltip still retheme.
+                if (window.WaiChart) window.WaiChart.registerForTheme(window.taxChartInstance);
             }
         });
     }
@@ -2696,4 +2877,5 @@
     // });
 
 </script>
+@include('resorts._dropdown_script')
 @endsection

@@ -418,7 +418,7 @@
         transform: translateX(-50%);
         width: 8px;
         height: 8px;
-        background: #2EACB3;
+        background: var(--aqua);
         border-radius: 50%;
     }
 </style>
@@ -842,6 +842,8 @@
                 },
                 plugins: [doughnutLabelsInsideN]
             });
+            // backgroundColor (chartData.colors) is server-supplied — out of scope.
+            if (window.WaiChart) window.WaiChart.registerForTheme(window.myDoughnutChart);
 
             // ✅ Update the legend after the chart is created
             updateLegend(chartData.labels, chartData.colors);
@@ -951,6 +953,8 @@
                     }
                 }
             });
+            // datasets (chartData.datasets) are server-supplied — out of scope.
+            if (window.WaiChart) window.WaiChart.registerForTheme(window.myStackedBarChart);
         }
     </script>
     <script>
@@ -967,7 +971,10 @@
             var colors = JSON.parse(canvas.dataset.colors || '[]');
             if (!labels.length) return;
 
-            new Chart(canvas.getContext('2d'), {
+            // backgroundColor is server-supplied per program — out of scope;
+            // borderColor is the card-background gap between bars.
+            var _pBreakdown = window.WaiChart ? window.WaiChart.palette().card : '#fff';
+            var _breakdownChart = new Chart(canvas.getContext('2d'), {
                 type: 'bar',
                 data: {
                     labels: labels,
@@ -975,7 +982,7 @@
                         label: 'Programs',
                         data: values,
                         backgroundColor: colors,
-                        borderColor: '#fff',
+                        borderColor: _pBreakdown,
                         borderWidth: 1,
                         borderRadius: 6,
                     }]
@@ -1007,6 +1014,9 @@
                         }
                     }
                 }
+            });
+            if (window.WaiChart) window.WaiChart.registerForTheme(_breakdownChart, function (c, p) {
+                c.data.datasets[0].borderColor = p.card;
             });
         }
 
@@ -1072,6 +1082,8 @@
                     }
                 }
             });
+            // datasets (chartData.datasets) are server-supplied — out of scope.
+            if (window.WaiChart) window.WaiChart.registerForTheme(window.onboardingChartInstance);
 
             renderOnboardingLegend(chartData.datasets);
         }

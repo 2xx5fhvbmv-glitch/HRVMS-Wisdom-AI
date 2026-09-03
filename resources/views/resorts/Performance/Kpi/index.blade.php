@@ -2,9 +2,15 @@
 @section('page_tab_title', $page_title)
 
 @section('content')
+<style>
+    #performance-kpi-list-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #performance-kpi-list-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="performance-kpi-list-hero">
             <div class="row g-3">
                 <div class="col-auto">
                     <div class="page-title">
@@ -37,11 +43,24 @@
                             $currentYear = date('Y');
                             $futureYear = $currentYear + 1;
                         @endphp
-                        <select class="form-select Year">
+                        <select class="form-select dd-native-select Year" id="kpiYearFilter">
                             <option value="All">Select Duration</option>
                             <option value="{{ $currentYear }}">{{ $currentYear }}</option>
                             <option value="{{ $futureYear }}">{{ $futureYear }}</option>
                         </select>
+                        <div class="dd" data-target="#kpiYearFilter">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">Select Duration</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Duration">
+                                <div class="dd-scroll">
+                                    <div class="dd-item active" role="option" data-value="All"><span class="dd-nm">Select Duration</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    <div class="dd-item" role="option" data-value="{{ $currentYear }}"><span class="dd-nm">{{ $currentYear }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    <div class="dd-item" role="option" data-value="{{ $futureYear }}"><span class="dd-nm">{{ $futureYear }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -89,13 +108,14 @@
     </div>
 </div>
 @include('resorts.Performance._performance_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-scripts')
 <script>
 $(document).ready(function () {
     datatablelist();
-    $(".Year").select2({ placeholder: "Select Year" });
 });
 
 $(document).on("change", ".Year", datatablelist);

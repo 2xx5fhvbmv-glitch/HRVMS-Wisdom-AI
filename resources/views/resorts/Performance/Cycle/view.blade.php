@@ -2,9 +2,15 @@
 @section('page_tab_title', $page_title)
 
 @section('content')
+<style>
+    #performance-cycle-view-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #performance-cycle-view-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="performance-cycle-view-hero">
             <div class="row g-3 justify-content-between">
                 <div class="col-auto">
                     <div class="page-title">
@@ -182,12 +188,26 @@
                 <div class="modal-body">
                     <p class="text-muted small">Selecting a template will apply it to this cycle and all its participants. Reviewers will be able to open the form right after.</p>
                     <label class="form-label">Template <span class="text-danger">*</span></label>
-                    <select class="form-select" name="template_id" required>
+                    <select class="form-select dd-native-select" id="template_id" name="template_id" required>
                         <option value="">— Select template —</option>
                         @foreach($availableTemplates as $t)
                             <option value="{{ $t['id'] }}">{{ $t['label'] }}</option>
                         @endforeach
                     </select>
+                    <div class="dd" data-target="#template_id">
+                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                            <span class="dd-lbl">— Select template —</span>
+                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                        </button>
+                        <div class="dd-panel" role="listbox" aria-label="Template">
+                            <div class="dd-scroll">
+                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">— Select template —</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                @foreach($availableTemplates as $t)
+                                    <div class="dd-item" role="option" data-value="{{ $t['id'] }}"><span class="dd-nm">{{ $t['label'] }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                @endforeach
+                            </div>
+                        </div>
+                    </div>
                     @if(empty($availableTemplates))
                         <div class="alert alert-warning mt-3 mb-0 small">No templates exist for this resort yet. Create one first under Performance Configuration.</div>
                     @endif
@@ -202,14 +222,16 @@
 </div>
 @endif
 @include('resorts.Performance._performance_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
 <style>
-    .cycle-header h3 { color: #014653; }
+    .cycle-header h3 { color: var(--teal); }
     .progress-box { background: #f8f9fa; padding: 16px 20px; border-radius: 10px; border: 1px solid #e9ecef; }
     .progress-label { font-weight: 600; color: #555; font-size: 14px; }
-    .progress-value { font-weight: 700; color: #014653; font-size: 20px; }
+    .progress-value { font-weight: 700; color: var(--teal); font-size: 20px; }
     .progress-box .progress { background: #e9ecef; border-radius: 10px; }
     .progress-box .progress-bar { border-radius: 10px; }
     .table-cycleDetail { width: 100%; }

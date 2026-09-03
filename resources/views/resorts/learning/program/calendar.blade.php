@@ -8,9 +8,15 @@
 @endif
 
 @section('content')
+<style>
+    #learning-calendar-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #learning-calendar-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="learning-calendar-hero">
             <div class="row justify-content-between g-3">
                 <div class="col-auto">
                     <div class="page-title">
@@ -101,7 +107,7 @@
     /* Frosted day popover — same material as the L&D "View details" modal. */
     .ld-day-pop { position: fixed; z-index: 1070; width: 340px; border-radius: 22px; padding: 18px;
         background: rgba(255,255,255,.82); backdrop-filter: blur(28px) saturate(160%); -webkit-backdrop-filter: blur(28px) saturate(160%);
-        border: 1px solid rgba(255,255,255,.7); box-shadow: 0 24px 70px rgba(1,70,83,.20);
+        border: 1px solid rgba(255,255,255,.7); box-shadow: 0 24px 70px rgba(var(--teal-rgb),.20);
         opacity: 0; transform: translateY(8px) scale(.985); pointer-events: none;
         transition: opacity .2s, transform .24s cubic-bezier(.16,1,.3,1); font-family: 'Poppins', sans-serif; }
     .ld-day-pop.open { opacity: 1; transform: none; pointer-events: auto; }

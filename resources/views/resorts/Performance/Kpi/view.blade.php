@@ -307,21 +307,50 @@
                                 <div class="row g-md-4 g-3 mb-md-4 mb-3">
                                     <div class="col-sm-6">
                                         <label class="form-label">INDIVIDUAL GOAL</label>
-                                        <select class="form-select" name="entries[0][individual_goal]" required>
+                                        <select class="form-select dd-native-select actual-goal-select" id="individual_goal_0" name="entries[0][individual_goal]" required>
                                             <option value="">Select Individual Goal</option>
                                             @foreach(($goalOptions ?? []) as $goal)
                                                 <option value="{{ $goal }}">{{ $goal }}</option>
                                             @endforeach
                                         </select>
+                                        <div class="dd" data-target="#individual_goal_0">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">Select Individual Goal</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Individual Goal">
+                                                <div class="dd-scroll">
+                                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Individual Goal</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @foreach(($goalOptions ?? []) as $goal)
+                                                        <div class="dd-item" role="option" data-value="{{ $goal }}"><span class="dd-nm">{{ $goal }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @endforeach
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div class="col-sm-6">
                                         <label class="form-label">MONTH</label>
-                                        <select class="form-select" name="entries[0][month]" required>
+                                        <select class="form-select dd-native-select actual-month-select" id="entry_month_0" name="entries[0][month]" required>
                                             <option value="">Select Month</option>
                                             @foreach(($months ?? []) as $m)
                                                 <option value="{{ $m }}">{{ $m }}</option>
                                             @endforeach
                                         </select>
+                                        <div class="dd" data-target="#entry_month_0">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">Select Month</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Month">
+                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a month…"></div>
+                                                <div class="dd-scroll">
+                                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Month</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @foreach(($months ?? []) as $m)
+                                                        <div class="dd-item" role="option" data-value="{{ $m }}"><span class="dd-nm">{{ $m }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @endforeach
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div class="col-sm-6">
                                         <label class="form-label">BUDGET</label>
@@ -393,6 +422,8 @@
     </div>
 </div>
 @include('resorts.Performance._performance_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-scripts')
@@ -415,6 +446,21 @@ $(document).ready(function () {
                 $(this).attr('name', name.replace(/entries\[\d+\]/, 'entries[' + entryIndex + ']'));
             }
         });
+        // The .dd wrapper's data-target and the mirrored <select>'s id were
+        // cloned verbatim (still "_0") — remap both to a unique id per entry
+        // so each row's dropdown addresses its own select, not row 0's.
+        var goalSelect = newBlock.find('.actual-goal-select');
+        var goalId = 'individual_goal_' + entryIndex;
+        goalSelect.attr('id', goalId);
+        newBlock.find('.dd').eq(0).attr('data-target', '#' + goalId);
+        var monthSelect = newBlock.find('.actual-month-select');
+        var monthId = 'entry_month_' + entryIndex;
+        monthSelect.attr('id', monthId);
+        newBlock.find('.dd').eq(1).attr('data-target', '#' + monthId);
+        newBlock.find('.dd-lbl').eq(0).text('Select Individual Goal');
+        newBlock.find('.dd-lbl').eq(1).text('Select Month');
+        newBlock.find('.dd-item').removeClass('active');
+        newBlock.find('.dd-item[data-value=""]').addClass('active');
         newBlock.find('.remove-col').removeClass('d-none');
         $('.actualKpi-main').append(newBlock);
         entryIndex++;

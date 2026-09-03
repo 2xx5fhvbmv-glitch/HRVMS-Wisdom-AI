@@ -8,10 +8,16 @@
 @endif
 
 @section('content')
+<style>
+    #disciplinary-code-of-conduct-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #disciplinary-code-of-conduct-hero { padding-bottom: 0; }
+    }
+</style>
 
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="disciplinary-code-of-conduct-hero">
             <div class="row justify-content-between g-3">
                 <div class="col-auto">
                     <div class="page-title">
@@ -70,11 +76,11 @@
                     <div class="row">
                         <div class="col-sm-6">
                             <label for="disciplinary_cate" class="form-label">DISCIPLINARY CATEGORIES</label>
-                            <select class="form-select select2t-none Code_of_disciplinary_cate" 
-                                    id="Code_of_disciplinary_cate_1" 
-                                    data-id="1" 
-                                    name="Deciplinery_cat_id[]" 
-                                    aria-label="Default select example"
+                            <select class="form-select dd-native-select Code_of_disciplinary_cate"
+                                    id="Code_of_disciplinary_cate_1"
+                                    data-id="1"
+                                    name="Deciplinery_cat_id[]"
+                                    aria-label="Disciplinary category"
                                     required
                                     data-parsley-required-message="Please select a disciplinary category">
                                 <option value=""></option>
@@ -84,29 +90,53 @@
                                     @endforeach
                                 @endif
                             </select>
+                            <div class="dd" data-target="#Code_of_disciplinary_cate_1">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Select Category</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Disciplinary category">
+                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a category…"></div>
+                                    <div class="dd-scroll">
+                                        @foreach($DisciplinaryCategories as $item)
+                                            <div class="dd-item" role="option" data-value="{{ base64_encode($item->id) }}"><span class="dd-nm">{{ $item->DisciplinaryCategoryName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-        
+
                         <div class="col-sm-6">
                             <label for="offenses" class="form-label">OFFENSES</label>
-                            <select class="form-select select2t-none" 
-                                    name="Offenses_id[]" 
-                                    data-id="1" 
-                                    id="offenses_1" 
-                                    aria-label="Default select example"
+                            <select class="form-select dd-native-select"
+                                    name="Offenses_id[]"
+                                    data-id="1"
+                                    id="offenses_1"
+                                    aria-label="Offense"
                                     required
                                     data-parsley-required-message="Please select an offense">
                                 <option value=""></option>
 
                             </select>
+                            <div class="dd" data-target="#offenses_1">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Select Offense</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Offense">
+                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an offense…"></div>
+                                    <div class="dd-scroll"></div>
+                                </div>
+                            </div>
                         </div>
-        
+
                         <div class="col-sm-6">
                             <label for="actions" class="form-label">ACTIONS</label>
-                            <select class="form-select select2t-none" 
-                                    id="actions_1"  
-                                    data-id="1" 
-                                    name="Action_id[]" 
-                                    aria-label="Default select example"
+                            <select class="form-select dd-native-select"
+                                    id="actions_1"
+                                    data-id="1"
+                                    name="Action_id[]"
+                                    aria-label="Action"
                                     required
                                     data-parsley-required-message="Please select an action">
                                 <option value=""></option>
@@ -116,11 +146,25 @@
                                     @endforeach
                                 @endif
                             </select>
+                            <div class="dd" data-target="#actions_1">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Select Action</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Action">
+                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an action…"></div>
+                                    <div class="dd-scroll">
+                                        @foreach($ActionStore as $item)
+                                            <div class="dd-item" role="option" data-value="{{ base64_encode($item->id) }}"><span class="dd-nm">{{ $item->ActionName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-        
+
                         <div class="col-sm-6">
                             <label for="severity" class="form-label">SEVERITY</label>
-                            <select class="form-select select2t-none" name="Severity_id[]"  data-id="1"      id="severity_1" aria-label="Default select example" required data-parsley-required-message="Please select a severity level">
+                            <select class="form-select dd-native-select" name="Severity_id[]" data-id="1" id="severity_1" aria-label="Severity" required data-parsley-required-message="Please select a severity level">
                                 <option value=""></option>
                                 @if($SeverityStore->isNotEmpty())
                                     @foreach($SeverityStore as $item)
@@ -128,6 +172,19 @@
                                     @endforeach
                                 @endif
                             </select>
+                            <div class="dd" data-target="#severity_1">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Select Severity</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Severity">
+                                    <div class="dd-scroll">
+                                        @foreach($SeverityStore as $item)
+                                            <div class="dd-item" role="option" data-value="{{ base64_encode($item->id) }}"><span class="dd-nm">{{ $item->SeverityName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <input type="hidden" name="Self_id" id="Self_id">
                         <input type="hidden" name="Offence_selected_id" id="Offence_selected_id">
@@ -143,6 +200,8 @@
     </div>
 </div>
 @include('resorts._emotional_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -223,33 +282,16 @@
             var Severity_id  =  $(this).attr('data-severity_id');
             var Self_id  =  $(this).attr('data-self_id');
             $("#Offence_selected_id").val(Offenses_id);
-            // Set the values for all Select2 fields
+            // Set the values for all fields, then resync each dropdown's
+            // visual trigger/list to match (the AJAX cascade below rebuilds
+            // #offenses_1's own <option>s and syncs it once they're in).
             $("#Code_of_disciplinary_cate_1").val(Disciplinery_cat_id).trigger('change');
             $("#actions_1").val(Action_id).trigger('change');
             $("#severity_1").val(Severity_id).trigger('change');
             $("#Self_id").val(Self_id);
-
-            // Initialize Select2 for each dropdown
-            $("#Code_of_disciplinary_cate_1").select2({
-                placeholder: "Select Category",
-                allowClear: true,
-                width: '100%'        
-            });
-            $("#offenses_1").select2({
-                placeholder: "Select Offense",
-                allowClear: true,
-                width: '100%'        
-            });
-            $("#actions_1").select2({
-                placeholder: "Select Action",
-                allowClear: true,
-                width: '100%'        
-            });
-            $("#severity_1").select2({
-                placeholder: "Select Severity",
-                allowClear: true,
-                width: '100%'        
-            });
+            wisdomDD.sync('#Code_of_disciplinary_cate_1');
+            wisdomDD.sync('#actions_1');
+            wisdomDD.sync('#severity_1');
         });
         $(document).on('change', '#Code_of_disciplinary_cate_1', function() {
             var id = $(this).val();
@@ -269,6 +311,7 @@
                         });
 
                         $("#offenses_1").html(option);
+                        wisdomDD.rebuild('#offenses_1');
 
                         // Re-enable the change event listener after the dropdown is updated
                         $("#offenses_1").on('change', function() {

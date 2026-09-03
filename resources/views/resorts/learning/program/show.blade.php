@@ -2,10 +2,16 @@
 @section('page_tab_title', $page_title)
 
 @section('content')
+<style>
+    #learning-program-show-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #learning-program-show-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
         <div class="lp-wrap">
-            <div class="page-hedding">
+            <div class="page-hedding" id="learning-program-show-hero">
                 <div class="row justify-content-between g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -158,7 +164,7 @@
 
 @section('import-css')
 <style>
-    .lp-hero { background: #fff; border: 1px solid var(--line); border-radius: 25px; box-shadow: 0 1px 2px rgba(1,70,83,.05), 0 8px 24px rgba(1,70,83,.05); overflow: hidden; margin-bottom: 16px; }
+    .lp-hero { background: #fff; border: 1px solid var(--line); border-radius: 25px; box-shadow: 0 1px 2px rgba(var(--teal-rgb),.05), 0 8px 24px rgba(var(--teal-rgb),.05); overflow: hidden; margin-bottom: 16px; }
     .lp-hero-in { padding: 28px 30px 26px; background: linear-gradient(180deg, var(--teal-soft), #fff); }
     .lp-cat { font-size: 11px; font-weight: 600; letter-spacing: .7px; text-transform: uppercase; color: var(--teal); }
     .lp-hero h1 { font-size: 25px; font-weight: 500; letter-spacing: -.02em; margin-top: 7px; color: var(--ink); line-height: 1.2; }
@@ -174,7 +180,7 @@
     .trainer-av { width: 20px; height: 20px; border-radius: 50%; background: var(--line); object-fit: cover; flex: none; }
 
     .lp-body { display: grid; grid-template-columns: 1fr 300px; gap: 16px; align-items: start; }
-    .lp-card { background: #fff; border: 1px solid var(--line); border-radius: 25px; box-shadow: 0 1px 2px rgba(1,70,83,.05), 0 8px 24px rgba(1,70,83,.05); padding: 24px 26px; }
+    .lp-card { background: #fff; border: 1px solid var(--line); border-radius: 25px; box-shadow: 0 1px 2px rgba(var(--teal-rgb),.05), 0 8px 24px rgba(var(--teal-rgb),.05); padding: 24px 26px; }
     .lp-stack { display: flex; flex-direction: column; gap: 16px; }
     .lp-rail .lp-card + .lp-card { margin-top: 16px; }
     .sec-t { font-size: 11px; font-weight: 600; letter-spacing: .8px; text-transform: uppercase; color: var(--muted); margin-bottom: 14px; }

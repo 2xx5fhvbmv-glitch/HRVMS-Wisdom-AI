@@ -8,9 +8,24 @@
 @endif
 
 @section('content')
+<style>
+    /* Same requested push as the Payroll / Talent Acquisition dashboards —
+       extra breathing room between the hero and the KPI row below it,
+       scoped to this page (.page-hedding's own margin-bottom is shared by
+       every page's hero). padding-bottom, not margin: adjacent sibling
+       margins collapse to the larger of the two rather than summing.
+       Below Bootstrap's sm breakpoint the extra padding pushes the KPI
+       row's first card into the teal hero curve's rounded bottom-left
+       corner (body::before, border-radius 0 0 50px 50px) — same collision
+       found on Payroll — neutralized below 576px. */
+    #people-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #people-hero { padding-bottom: 0; }
+    }
+</style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="people-hero">
                 <div class="row  g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -109,7 +124,7 @@
                                     <h3 class="text-nowrap">Distribution by department</h3>
                                 </div>
                                 <div class="col-auto">
-                                    <select class="form-select select2t-none" aria-label="Default select example" id="divisionFilter">
+                                    <select class="form-select dd-native-select" aria-label="Default select example" id="divisionFilter">
                                         <option value="" selected>All Divisions</option>
                                         @if($resort_divisions)
                                             @foreach($resort_divisions as $division)
@@ -117,6 +132,23 @@
                                             @endforeach
                                         @endif
                                     </select>
+                                    <div class="dd" data-target="#divisionFilter">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">All Divisions</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Division">
+                                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a division…"></div>
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">All Divisions</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @if($resort_divisions)
+                                                    @foreach($resort_divisions as $division)
+                                                        <div class="dd-item" role="option" data-value="{{$division->id}}"><span class="dd-nm">{{$division->name}}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @endforeach
+                                                @endif
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -299,7 +331,7 @@
                                 </div>
                                 --}}
                                 <div class="col-auto">
-                                        <select class="form-select form-select-large" aria-label="Default select example" id="exitDeptSelect">
+                                        <select class="form-select form-select-large dd-native-select" aria-label="Default select example" id="exitDeptSelect">
                                         {{-- Empty value = no department filter; controller's
                                              `if ($departmentId)` then aggregates across all
                                              departments. --}}
@@ -308,6 +340,21 @@
                                             <option value="{{$department->id}}">{{$department->name}}</option>
                                         @endforeach
                                         </select>
+                                        <div class="dd" data-target="#exitDeptSelect">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">All Departments</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Department">
+                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a department…"></div>
+                                                <div class="dd-scroll">
+                                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">All Departments</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @foreach($departments as $department)
+                                                        <div class="dd-item" role="option" data-value="{{$department->id}}"><span class="dd-nm">{{$department->name}}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @endforeach
+                                                </div>
+                                            </div>
+                                        </div>
                                 </div>
 
                             </div>
@@ -1073,6 +1120,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts._dropdown_styles')
 @endsection
 
 @section('import-scripts')
@@ -1146,14 +1194,15 @@
                     function renderExitInterviewCharts(response) {
                         if (document.getElementById('myBarReasonsChart')) {
                             const ctz = document.getElementById('myBarReasonsChart').getContext('2d');
-                            new Chart(ctz, {
+                            var _pReasons = window.WaiChart ? window.WaiChart.palette().teal : '#014653';
+                            var _reasonsChart = new Chart(ctz, {
                                 type: 'bar',
                                 data: {
                                     labels: response.reasonLabels,
                                     datasets: [{
                                         data: response.reasonCounts,
-                                        backgroundColor: '#014653',
-                                        borderColor: '#014653',
+                                        backgroundColor: _pReasons,
+                                        borderColor: _pReasons,
                                         borderWidth: 1,
                                         borderRadius: 5,
                                         barThickness: 32
@@ -1188,19 +1237,23 @@
                                     }
                                 }
                             });
+                            if (window.WaiChart) window.WaiChart.registerForTheme(_reasonsChart, function (c, p) {
+                                c.data.datasets[0].backgroundColor = c.data.datasets[0].borderColor = p.teal;
+                            });
                         }
 
                         // Bar Chart: Attrition Rates
                         if (document.getElementById('myBarAttrRateChart')) {
                             const cta = document.getElementById('myBarAttrRateChart').getContext('2d');
-                            new Chart(cta, {
+                            var _pAttr = window.WaiChart ? window.WaiChart.palette().aqua : '#2EACB3';
+                            var _attrChart = new Chart(cta, {
                                 type: 'bar',
                                 data: {
                                     labels: response.attritionLabels,
                                     datasets: [{
                                         data: response.attritionCounts,
-                                        backgroundColor: '#2EACB3',
-                                        borderColor: '#2EACB3',
+                                        backgroundColor: _pAttr,
+                                        borderColor: _pAttr,
                                         borderWidth: 1,
                                         borderRadius: 6,
                                         barThickness: 36
@@ -1250,20 +1303,24 @@
                                     }
                                 }
                             });
+                            if (window.WaiChart) window.WaiChart.registerForTheme(_attrChart, function (c, p) {
+                                c.data.datasets[0].backgroundColor = c.data.datasets[0].borderColor = p.aqua;
+                            });
                         }
 
                         // Line Chart: Turnover Trends
                         if (document.getElementById('myLineChart')) {
                             const ctp = document.getElementById('myLineChart').getContext('2d');
-                            new Chart(ctp, {
+                            var _pTurnover = window.WaiChart ? window.WaiChart.palette().teal : '#014653';
+                            var _turnoverChart = new Chart(ctp, {
                                 type: 'line',
                                 data: {
                                     labels: response.lineLabels,
                                     datasets: [{
                                         label: 'Resignations',
                                         data: response.lineData,
-                                        borderColor: '#014653',
-                                        backgroundColor: '#014653',
+                                        borderColor: _pTurnover,
+                                        backgroundColor: _pTurnover,
                                         borderWidth: 1,
                                         fill: false,
                                         tension: 0.4,
@@ -1286,6 +1343,9 @@
                                         }
                                     }
                                 }
+                            });
+                            if (window.WaiChart) window.WaiChart.registerForTheme(_turnoverChart, function (c, p) {
+                                c.data.datasets[0].borderColor = c.data.datasets[0].backgroundColor = p.teal;
                             });
                         }
                     }
@@ -1359,6 +1419,7 @@
         }
 
         const ctx = document.getElementById('myBarChart').getContext('2d');
+        var _pDeptBar = window.WaiChart ? window.WaiChart.palette().aqua : '#2EACB3';
         myBarChart = new Chart(ctx, {
             type: 'bar',
             data: {
@@ -1367,8 +1428,8 @@
                     {
                         label: 'Departments',
                         data: data, // Dynamic data
-                        backgroundColor: '#2EACB3',
-                        borderColor: '#2EACB3',
+                        backgroundColor: _pDeptBar,
+                        borderColor: _pDeptBar,
                         borderWidth: 1,
                         borderRadius: 6,
                         barThickness: 36
@@ -1422,6 +1483,9 @@
                     }
                 }
             }
+        });
+        if (window.WaiChart) window.WaiChart.registerForTheme(myBarChart, function (c, p) {
+            c.data.datasets[0].backgroundColor = c.data.datasets[0].borderColor = p.aqua;
         });
     }
 
@@ -1526,12 +1590,13 @@
                 if (res.success) {
                     const temp = res.data.temporary;
                     const perm = res.data.permanent;
+                    var _pTransfer = window.WaiChart ? window.WaiChart.palette() : { teal: '#014653', aqua: '#2EACB3' };
 
                     const chartData = {
                         labels: ['Temporary', 'Permanent'],
                         datasets: [{
                             data: [temp, perm],
-                            backgroundColor: ['#014653', '#2EACB3'],
+                            backgroundColor: [_pTransfer.teal, _pTransfer.aqua],
                             borderWidth: 0
                         }]
                     };
@@ -1582,6 +1647,9 @@
                             plugins: [transferPieLabelsInside]
                         });
                     }
+                    if (window.WaiChart) window.WaiChart.registerForTheme(transferEmpChart, function (c, p) {
+                        c.data.datasets[0].backgroundColor = [p.teal, p.aqua];
+                    });
                 }
             }
         });
@@ -1638,13 +1706,14 @@
     };
 
     // Chart config
+    var _pGenderDough = window.WaiChart ? window.WaiChart.palette() : { teal: '#014653', aqua: '#2EACB3' };
     var myDoughnutChart = new Chart(ctx, {
         type: 'doughnut',
         data: {
             labels: ['Male', 'Female'],
             datasets: [{
                 data: [maleCount, femaleCount],
-                backgroundColor: ['#2EACB3', '#014653'],
+                backgroundColor: [_pGenderDough.aqua, _pGenderDough.teal],
                 borderWidth: 0
             }]
         },
@@ -1664,6 +1733,9 @@
             }
         },
         plugins: [doughnutLabelsInside]
+    });
+    if (window.WaiChart) window.WaiChart.registerForTheme(myDoughnutChart, function (c, p) {
+        c.data.datasets[0].backgroundColor = [p.aqua, p.teal];
     });
 
     var locCanvas = document.getElementById('locationEmpChart');
@@ -1697,13 +1769,14 @@
         }
     };
     // Create the pie chart
+    var _pLocEmp = window.WaiChart ? window.WaiChart.palette() : { teal: '#014653', aqua: '#2EACB3' };
     var locationEmpChart = new Chart(cte, {
         type: 'pie', // Change to 'pie' for pie chart
         data: {
             // labels: ['January 2024', 'February 2024', 'March 2024', 'April 2024', 'May 2024', 'June 2024'],
             datasets: [{
                 data: [resortLocationCount, maleLocationCount],
-                backgroundColor: ['#014653', '#2EACB3',],
+                backgroundColor: [_pLocEmp.teal, _pLocEmp.aqua],
                 borderWidth: 0
             }]
         },
@@ -1726,8 +1799,14 @@
         },
         plugins: [pieLabelsInside] // Attach the plugin to this chart only
     });
+    if (window.WaiChart) window.WaiChart.registerForTheme(locationEmpChart, function (c, p) {
+        c.data.datasets[0].backgroundColor = [p.teal, p.aqua];
+    });
 
     const ctq = document.getElementById('myBarsalaryIncreChart').getContext('2d');
+    // Only #C80000 (Rejected) matches an SSOT token (--danger); the other 3
+    // don't — left literal as a whole set (status colours, avoid a
+    // half-themed status palette).
     const myBarsalaryIncreChart = new Chart(ctq, {
         type: 'bar',
         data: {
@@ -1791,8 +1870,9 @@
             }
         }
     });
+    if (window.WaiChart) window.WaiChart.registerForTheme(myBarsalaryIncreChart);
 
-    
+
     var ctr = document.getElementById('mySalaryChart').getContext('2d');
     // Custom plugin only registered for this chart
     const doughnutSalaryLabelsInside = {
@@ -1823,13 +1903,14 @@
         }
     };
     // Custom plugin for center text
+    var _pSalaryDough = window.WaiChart ? window.WaiChart.palette() : { teal: '#014653', aqua: '#2EACB3' };
     var mySalaryChart = new Chart(ctr, {
         type: 'doughnut',
         data: {
             labels: ['Salary Advance', 'Loan'],
             datasets: [{
                 data: [{{$totalAdvanceRequests}}, {{$totalLoanRequests}}],
-                backgroundColor: ['#2EACB3', '#014653',],
+                backgroundColor: [_pSalaryDough.aqua, _pSalaryDough.teal],
                 borderWidth: 0
             }]
         },
@@ -1852,6 +1933,9 @@
             // hoverOffset: 30
         },
         plugins: [doughnutSalaryLabelsInside] // Attach the plugin to this chart only
+    });
+    if (window.WaiChart) window.WaiChart.registerForTheme(mySalaryChart, function (c, p) {
+        c.data.datasets[0].backgroundColor = [p.aqua, p.teal];
     });
 
     // Update And Reject info Update request
@@ -1959,5 +2043,5 @@
             });
         });
 </script>
-
+@include('resorts._dropdown_script')
 @endsection

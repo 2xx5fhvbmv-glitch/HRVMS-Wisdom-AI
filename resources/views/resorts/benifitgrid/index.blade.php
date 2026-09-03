@@ -8,10 +8,15 @@
 @endif
 
 @section('content')
-
+<style>
+    #benifitgrid-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #benifitgrid-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="benifitgrid-hero">
             <div class="row justify-content-between g-3">
                 <div class="col-auto">
                     <div class="page-title">
@@ -82,7 +87,7 @@
         "bInfo": true,
         "bAutoWidth": false,
         "scrollX": true,
-        "iDisplayLength": 6,
+        "iDisplayLength": 10,
         processing: true,
         serverSide: true,
         order:[[4, 'desc']],

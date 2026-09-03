@@ -8,10 +8,15 @@
 @endif
 
 @section('content')
-
+    <style>
+        #leave-apply-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #leave-apply-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="leave-apply-hero">
                 <div class="row justify-content-between g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -30,11 +35,28 @@
                                 <div class="row align-items-end g-md-4 g-3">
                                     <div class="col-xl-6 col-sm-8">
                                         <label for="applyForEmployee" class="form-label">APPLYING LEAVE FOR</label>
-                                        <select class="form-select" id="applyForEmployee">
+                                        <select class="form-select dd-native-select" id="applyForEmployee">
                                             @foreach($applicableEmployees as $emp)
                                                 <option value="{{ $emp->id }}" @selected((int) $selectedEmployeeId === (int) $emp->id)>{{ ucfirst($emp->first_name . ' ' . $emp->last_name) }} ({{ $emp->Emp_id }})</option>
                                             @endforeach
                                         </select>
+                                        <div class="dd" data-target="#applyForEmployee">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">
+                                                    @php $selectedEmp = $applicableEmployees->firstWhere('id', (int) $selectedEmployeeId); @endphp
+                                                    {{ $selectedEmp ? ucfirst($selectedEmp->first_name . ' ' . $selectedEmp->last_name) . ' (' . $selectedEmp->Emp_id . ')' : 'Select Employee' }}
+                                                </span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Applying Leave For">
+                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an employee…"></div>
+                                                <div class="dd-scroll">
+                                                    @foreach($applicableEmployees as $emp)
+                                                        <div class="dd-item{{ (int) $selectedEmployeeId === (int) $emp->id ? ' active' : '' }}" role="option" data-value="{{ $emp->id }}"><span class="dd-nm">{{ ucfirst($emp->first_name . ' ' . $emp->last_name) }} ({{ $emp->Emp_id }})</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @endforeach
+                                                </div>
+                                            </div>
+                                        </div>
                                         <small class="text-muted">Leave categories, balances, and approvals below reflect whoever is selected here.</small>
                                     </div>
                                 </div>
@@ -47,7 +69,7 @@
                                         <div class="row align-items-end g-md-4 g-3 ">
                                             <div class="col-xl-6 col-sm-4">
                                                 <label for="leaveCat1" class="form-label">LEAVE CATEGORY<span class="red-mark">*</span></label>
-                                                <select class="form-control LeaveCate_id leave-category-select2" name="leave_category_id[0]" id="leaveCat1" aria-label="Default select example" data-parsley-required="true" data-parsley-errors-container="#leave-cat-error">
+                                                <select class="form-control dd-native-select LeaveCate_id" name="leave_category_id[0]" id="leaveCat1" aria-label="Default select example" data-parsley-required="true" data-parsley-errors-container="#leave-cat-error">
                                                     <option value="">Select Leave Category</option>
                                                     @if($leave_categories)
                                                         @foreach($leave_categories as $value)
@@ -58,6 +80,23 @@
                                                         @endforeach
                                                     @endif
                                                 </select>
+                                                <div class="dd" data-target="#leaveCat1">
+                                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                        <span class="dd-lbl">Select Leave Category</span>
+                                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                    </button>
+                                                    <div class="dd-panel" role="listbox" aria-label="Leave Category">
+                                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a category…"></div>
+                                                        <div class="dd-scroll">
+                                                            <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Leave Category</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                            @if($leave_categories)
+                                                                @foreach($leave_categories as $value)
+                                                                    <div class="dd-item" role="option" data-value="{{ $value->leave_cat_id }}"><span class="dd-nm">{{ $value->leave_type }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                @endforeach
+                                                            @endif
+                                                        </div>
+                                                    </div>
+                                                </div>
                                                 <div id="leave-cat-error"></div>
                                             </div>
                                             <div class="col-xl-3 col-sm-4 col-6">
@@ -86,7 +125,7 @@
                                     </div>
                                     <div class="col-md-6" id="field-task_delegation">
                                         <label for="taskDel" class="form-label">TASK DELEGATION<span class="red-mark task_delegation-required-mark d-none">*</span></label>
-                                        <select class="form-select select2t-none" name="task_delegation" id="taskDel" data-parsley-errors-container="#task_delegation-error">
+                                        <select class="form-select dd-native-select" name="task_delegation" id="taskDel" data-parsley-errors-container="#task_delegation-error">
                                             <option value="">Select Person</option>
                                             @if($delegations)
                                                 @foreach($delegations as $emp)
@@ -94,6 +133,23 @@
                                                 @endforeach
                                             @endif
                                         </select>
+                                        <div class="dd" data-target="#taskDel">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">Select Person</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Task Delegation">
+                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a person…"></div>
+                                                <div class="dd-scroll">
+                                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Person</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @if($delegations)
+                                                        @foreach($delegations as $emp)
+                                                            <div class="dd-item" role="option" data-value="{{ $emp->id }}"><span class="dd-nm">{{ $emp->first_name }} {{ $emp->last_name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @endforeach
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </div>
                                         <div id="task_delegation-error"></div>
                                     </div>
                                     <div class="col-md-6" id="field-destination">
@@ -275,6 +331,8 @@
         </div>
     </div>
 @include('resorts.leaves._leave_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -539,22 +597,6 @@
             $(this).parsley().validate();
         });
 
-        // Init Leave Category selects (not .select2t-none so layout doesn't double-init and break selection)
-        $(".leave-category-select2, .LeaveCate_id").each(function() {
-            var $sel = $(this);
-            if ($sel.hasClass('select2-hidden-accessible')) { try { $sel.select2('destroy'); } catch (e) {} }
-            $sel.select2({
-                width: '100%',
-                allowClear: true,
-                placeholder: 'Select Leave Category'
-            });
-        });
-        // Init other Select2 (task delegation etc.) – skip if layout already inited
-        $(".select2t-none").each(function() {
-            var $sel = $(this);
-            if ($sel.hasClass('select2-hidden-accessible')) return;
-            $sel.select2({ width: '100%', allowClear: true });
-        });
 
         // File upload UX: surface the chosen filename (input is opacity:0 so
         // the browser's "No file chosen" hint is invisible) and reject files
@@ -611,27 +653,31 @@
         });
         applyLeaveCategoryValidation();
 
-        // Trigger Parsley when any Select2 (leave category or task delegation) changes
-        $(document).on('change', '.select2t-none, .select2-airport-search, .LeaveCate_id', function () {
+        // Trigger Parsley when any Select2/dropdown (leave category, task delegation, destination) changes
+        $(document).on('change', '.dd-native-select, .select2-airport-search', function () {
             var parsleyField = $(this).parsley();
             if (parsleyField && parsleyField.validate) {
                 parsleyField.validate();
-                var $sel = $(this).next('.select2-container').find('.select2-selection');
+                var $sel = $(this).hasClass('dd-native-select')
+                    ? $(this).next('.dd').find('.dd-trigger')
+                    : $(this).next('.select2-container').find('.select2-selection');
                 if ($sel.length) {
                     $sel.toggleClass('is-invalid', !parsleyField.isValid());
                 }
             }
         });
 
-        // Parsley field validation handler (both select2t-none and leave category Select2)
+        // Parsley field validation handler (dd-native-select dropdowns and the airport Select2)
         window.Parsley.on('field:validated', function (fieldInstance) {
             var $element = fieldInstance.$element;
-            var $select2Container = $element.next('.select2-container').find('.select2-selection');
-            if ($select2Container.length) {
+            var $container = $element.hasClass('dd-native-select')
+                ? $element.next('.dd').find('.dd-trigger')
+                : $element.next('.select2-container').find('.select2-selection');
+            if ($container.length) {
                 if (fieldInstance.isValid()) {
-                    $select2Container.removeClass('is-invalid');
+                    $container.removeClass('is-invalid');
                 } else {
-                    $select2Container.addClass('is-invalid');
+                    $container.addClass('is-invalid');
                 }
             }
         });
@@ -834,6 +880,7 @@
                         window.__combineInfoSuppressed = true;
                         try {
                             $(this).val(null).trigger('change.select2');
+                            wisdomDD.sync('#' + $(this).attr('id'));
                         } finally {
                             // Release the suppression on the next tick so
                             // future user selections still validate.
@@ -1145,7 +1192,7 @@
                 <div class="row align-items-end g-md-4 g-3" id="leave-row-${uniqueId}">
                     <div class="col-xl-6 col-sm-4">
                         <label for="leaveCat-${uniqueId}" class="form-label">LEAVE CATEGORY*</label>
-                        <select class="form-select select2t-none LeaveCate_id" name="leave_category_id[]" id="leaveCat-${uniqueId}" data-parsley-required="true" data-parsley-errors-container="#leave-cat-error-${uniqueId}">
+                        <select class="form-select dd-native-select LeaveCate_id" name="leave_category_id[]" id="leaveCat-${uniqueId}" data-parsley-required="true" data-parsley-errors-container="#leave-cat-error-${uniqueId}">
                             <option value="">Select Leave Category</option>
                             @if($leave_categories)
                                 @foreach($leave_categories as $value)
@@ -1153,6 +1200,23 @@
                                 @endforeach
                             @endif
                         </select>
+                        <div class="dd" data-target="#leaveCat-${uniqueId}">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">Select Leave Category</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Leave Category">
+                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a category…"></div>
+                                <div class="dd-scroll">
+                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Leave Category</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    @if($leave_categories)
+                                        @foreach($leave_categories as $value)
+                                            <div class="dd-item" role="option" data-value="{{ $value->leave_cat_id }}"><span class="dd-nm">{{ $value->leave_type }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @endforeach
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
                         <div id="leave-cat-error-${uniqueId}"></div>
                     </div>
                     <div class="col-xl-3 col-sm-4 col-6">

@@ -8,9 +8,15 @@
 @endif
 
 @section('content')
+<style>
+    #visa-xpact-employee-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #visa-xpact-employee-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="visa-xpact-employee-hero">
             <div class="row  g-3">
                 <div class="col-auto">
                     <div class="page-title">
@@ -47,10 +53,7 @@
 
                     </div> -->
                     <div class="col-xl-2 col-md-4 col-sm-4 col-6">
-                        <select class="form-select" name="departmentFilter" id="departmentFilter">
-                            {{-- Non-empty value "all" so Select2 renders it as a real
-                                 selectable row (an empty value is consumed as the
-                                 placeholder slot and never appears in the list). --}}
+                        <select class="form-select dd-native-select" name="departmentFilter" id="departmentFilter">
                             <option value="all" selected>All Department</option>
                             @if($departments->isNotEmpty())
                                 @foreach($departments as $department)
@@ -58,13 +61,43 @@
                                 @endforeach
                             @endif
                         </select>
+                        <div class="dd" data-target="#departmentFilter">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">All Department</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Department">
+                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a department…"></div>
+                                <div class="dd-scroll">
+                                    <div class="dd-item active" role="option" data-value="all"><span class="dd-nm">All Department</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    @if($departments->isNotEmpty())
+                                        @foreach($departments as $department)
+                                            <div class="dd-item" role="option" data-value="{{ $department->id }}"><span class="dd-nm">{{ $department->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @endforeach
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="col-xl-auto col-md-4 col-sm-4 col-6">
-                        <select class="form-select" id="statusFilter">
+                        <select class="form-select dd-native-select" id="statusFilter">
                             <option value="All">All</option>
                             <option value="Active">Active</option>
                             <option value="InActive">InActive</option>
                         </select>
+                        <div class="dd" data-target="#statusFilter">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">All</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Status">
+                                <div class="dd-scroll">
+                                    <div class="dd-item active" role="option" data-value="All"><span class="dd-nm">All</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    <div class="dd-item" role="option" data-value="Active"><span class="dd-nm">Active</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    <div class="dd-item" role="option" data-value="InActive"><span class="dd-nm">InActive</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                 </div>
@@ -100,6 +133,8 @@
     </div>
 </div>
 @include('resorts._emotional_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -110,19 +145,8 @@
 
 $(document).ready(function() 
 {
-        FetchIndexDate();    
+        FetchIndexDate();
 
-        $("#statusFilter").select2({
-            placeholder: "Select Status",
-            allowClear: true,
-            
-        });
-        $("#departmentFilter").select2({
-            // "All Department" is now a real option (value="all"), selected by
-            // default — no placeholder needed. A placeholder here would only
-            // re-introduce the empty-slot behaviour.
-            minimumResultsForSearch: 0,
-        });
         flatpickr('.datepickerXpact', {
             dateFormat: 'd-m-Y',
             allowInput: true,

@@ -637,7 +637,7 @@
                                                                     <div>                                                                        <div class="d-flex justify-content-center date-slider">
                                                                             <a href="#" data-bs-toggle="tooltip" data-bs-placement="right" title="Tooltip on right">{{ date('d M Y',strtotime($oc->occupancydate))}}</a>
                                                                         </div>
-                                                                        <div class="pie my-3" style="--p:{{ $oc->occupancyinPer}};--green:#014653;--border:10px" data-bs-toggle="tooltip"
+                                                                        <div class="pie my-3" style="--p:{{ $oc->occupancyinPer}};--green:var(--teal);--border:10px" data-bs-toggle="tooltip"
                                                                             data-bs-placement="right" title="{{ $oc->occupancyinPer}}% Occupancy">
                                                                             <div>
                                                                                 <strong class="d-block"> {{ $oc->occupancyinPer}}%</strong>
@@ -660,7 +660,7 @@
                                                                 <div>                                                                    <div class="d-flex justify-content-center date-slider">
                                                                         <a href="#" data-bs-toggle="tooltip" data-bs-placement="right" title="Tooltip on right">{{ date('d M Y')}}</a>
                                                                     </div>
-                                                                    <div class="pie my-3" style="--p:0;--green:#014653;--border:10px" data-bs-toggle="tooltip"
+                                                                    <div class="pie my-3" style="--p:0;--green:var(--teal);--border:10px" data-bs-toggle="tooltip"
                                                                         data-bs-placement="right" title="0% Occupancy">
                                                                         <div>
                                                                             <strong class="d-block">0%</strong>
@@ -2717,6 +2717,7 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         }
 
         // Initialize the chart
+        var _pMdA1 = window.WaiChart ? window.WaiChart.palette() : { teal: '#014653', aqua: '#2EACB3', card: '#fff' };
         var myStackedBarChart = new Chart(cty, {
             type: 'bar',
             data: {
@@ -2725,16 +2726,16 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
                     {
                         label: 'Payroll Cost',
                         data: [],
-                        backgroundColor: '#014653',
-                        borderColor: '#fff',
+                        backgroundColor: _pMdA1.teal,
+                        borderColor: _pMdA1.card,
                         borderWidth: 2,
                         borderRadius: 10,
                     },
                     {
                         label: 'OT Cost',
                         data: [],
-                        backgroundColor: '#2EACB3',
-                        borderColor: '#fff',
+                        backgroundColor: _pMdA1.aqua,
+                        borderColor: _pMdA1.card,
                         borderWidth: 2,
                         borderRadius: 10,
                     },
@@ -2742,7 +2743,7 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
                         label: 'Service Charge',
                         data: [],
                         backgroundColor: '#EFB408',
-                        borderColor: '#fff',
+                        borderColor: _pMdA1.card,
                         borderWidth: 2,
                         borderRadius: 10,
                     },
@@ -2771,6 +2772,11 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
                     y: { stacked: true, beginAtZero: true, grid: { display: false } }
                 }
             }
+        });
+        if (window.WaiChart) window.WaiChart.registerForTheme(myStackedBarChart, function (c, p) {
+            c.data.datasets[0].backgroundColor = p.teal;
+            c.data.datasets[1].backgroundColor = p.aqua;
+            c.data.datasets.forEach(function (ds) { ds.borderColor = p.card; });
         });
 
         // Fetch initial chart data
@@ -2948,6 +2954,7 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         }    });
      
      const cty = document.getElementById('myBarChart').getContext('2d');
+    var _pMdA2 = window.WaiChart ? window.WaiChart.palette() : { teal: '#014653', aqua: '#2EACB3' };
     const myBarChart = new Chart(cty, {
         type: 'bar', // Type of chart
         data: {
@@ -2956,14 +2963,14 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
                 {
                     label: 'Budgeted', // Label for the first dataset
                     data: [1800, 2300, 2400, 1800], // Data for the first dataset
-                    backgroundColor: '#014653',
+                    backgroundColor: _pMdA2.teal,
                     borderRadius: 3, // Set the border radius for bars
                     barThickness: 14 // Set the width of the bars
                 },
                 {
                     label: 'Actual', // Label for the second dataset
                     data: [2000, 2200, 2000, 2400], // Data for the second dataset
-                    backgroundColor: '#2EACB3',
+                    backgroundColor: _pMdA2.aqua,
                     borderRadius: 3, // Set the border radius for bars
                     barThickness: 14 // Set the width of the bars
                 }
@@ -3020,6 +3027,10 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
                 }
             }
         }
+    });
+    if (window.WaiChart) window.WaiChart.registerForTheme(myBarChart, function (c, p) {
+        c.data.datasets[0].backgroundColor = p.teal;
+        c.data.datasets[1].backgroundColor = p.aqua;
     });
 
     $(document).ready(function(){
@@ -3095,6 +3106,9 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
             }
 
         });
+        // datasets are populated entirely by the AJAX response below (server-
+        // supplied colours, out of scope) — only axes/legend/tooltip retheme.
+        if (window.WaiChart) window.WaiChart.registerForTheme(myAttendance);
         function updateAttendanceChart(year) {
             $.ajax({
                 url: "{{ route('resort.recruitement.getAttandanceData') }}",
@@ -3197,13 +3211,14 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
         };
 
         // Chart config
+        var _pMdA3 = window.WaiChart ? window.WaiChart.palette() : { teal: '#014653', aqua: '#2EACB3' };
         var myDoughnutChart = new Chart(ctx, {
             type: 'doughnut',
             data: {
                 labels: ['Male', 'Female'],
                 datasets: [{
                     data: [maleCount, femaleCount],
-                    backgroundColor: ['#2EACB3', '#014653'],
+                    backgroundColor: [_pMdA3.aqua, _pMdA3.teal],
                     borderWidth: 0
                 }]
             },
@@ -3223,6 +3238,9 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
                 }
             },
             plugins: [doughnutLabelsInside]
+        });
+        if (window.WaiChart) window.WaiChart.registerForTheme(myDoughnutChart, function (c, p) {
+            c.data.datasets[0].backgroundColor = [p.aqua, p.teal];
         });
 
 
@@ -3279,14 +3297,15 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
                 ctx.textAlign = 'center';
 
                 // Total number
+                var _pMdSvc = window.WaiChart ? window.WaiChart.palette().darkblack : '#222222';
                 ctx.font = '500 22px Poppins';
-                ctx.fillStyle = '#222222';
+                ctx.fillStyle = _pMdSvc;
                 // ctx.fillText('$' + total, width / 2, height / 2 - 15);
                 ctx.fillText(formattedTotal, width / 2, height / 2 - 15);
 
                 // "Total" label
                 ctx.font = '500 13px Poppins';
-                ctx.fillStyle = '#222222';
+                ctx.fillStyle = _pMdSvc;
                 ctx.fillText('Avg', width / 2, height / 2 + 15);
 
                 ctx.save();
@@ -3308,6 +3327,8 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
                 const labels = data.map(item => item.label);
                 const serviceCharges = data.map(item => item.service_charge);
                 const serviceChargespercentage = data.map(item => item.percentage);
+                // Only 1 of 6 matches an SSOT token — left literal as a
+                // whole set (also reused for the side-label swatches).
                 const colors = ['#014653', '#53CAFF', '#EFB408', '#50B9BF', '#333333', '#8DC9C9'];
 
                 // Check if the chart exists and destroy it
@@ -3343,6 +3364,7 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
                     },
                     plugins: [doughnutLabelsInsideN, centerText] // Attach the plugin to this chart only
                 });
+                if (window.WaiChart) window.WaiChart.registerForTheme(myDoughnutChartService);
                 // Update the side labels
                 const labelContainer = document.getElementById('myDoughnutChartServiceLabel');
                 let labelsHTML = '';

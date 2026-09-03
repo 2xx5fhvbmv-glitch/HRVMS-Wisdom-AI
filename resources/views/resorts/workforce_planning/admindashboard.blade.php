@@ -128,7 +128,7 @@
                                                 <a href="#" data-bs-toggle="tooltip" data-bs-placement="right" title="Tooltip on right">{{ date('d M Y',strtotime($oc->occupancydate))}}</a>
                                                 <!-- <a href="#"><i class="fa-solid fa-angle-right"></i></a> -->
                                             </div>
-                                            <div class="pie my-3" style="--p:{{ $oc->occupancyinPer}};--green:#014653;--border:10px" data-bs-toggle="tooltip"
+                                            <div class="pie my-3" style="--p:{{ $oc->occupancyinPer}};--green:var(--teal);--border:10px" data-bs-toggle="tooltip"
                                                 data-bs-placement="right" title="{{ $oc->occupancyinPer}}% Occupancy">
                                                 <div>
                                                     <strong class="d-block"> {{ $oc->occupancyinPer}}%</strong>
@@ -154,7 +154,7 @@
                                             <a href="#" data-bs-toggle="tooltip" data-bs-placement="right" title="Tooltip on right">{{ date('d M Y')}}</a>
                                             <!-- <a href="#"><i class="fa-solid fa-angle-right"></i></a> -->
                                         </div>
-                                        <div class="pie my-3" style="--p:0;--green:#014653;--border:10px" data-bs-toggle="tooltip"
+                                        <div class="pie my-3" style="--p:0;--green:var(--teal);--border:10px" data-bs-toggle="tooltip"
                                             data-bs-placement="right" title="0% Occupancy">
                                             <div>
                                                 <strong class="d-block">0%</strong>
@@ -762,13 +762,14 @@
 
     // Initialize the Doughnut chart
     var ctx = document.getElementById('myDoughnutChart').getContext('2d');
+    var _pWfpAdm1 = window.WaiChart ? window.WaiChart.palette() : { teal: '#014653', aqua: '#2EACB3' };
     var myDoughnutChart = new Chart(ctx, {
         type: 'doughnut',
         data: {
             labels: ['Loading...', 'Loading...'], // Placeholder labels
             datasets: [{
                 data: [0, 0], // Placeholder data
-                backgroundColor: ['#014653', '#2EACB3']
+                backgroundColor: [_pWfpAdm1.teal, _pWfpAdm1.aqua]
             }]
         },
         options: {
@@ -801,6 +802,9 @@
             hoverOffset: 30
         },
         plugins: [doughnutLabelsInside]
+    });
+    if (window.WaiChart) window.WaiChart.registerForTheme(myDoughnutChart, function (c, p) {
+        c.data.datasets[0].backgroundColor = [p.teal, p.aqua];
     });
 
     // Fetch data and update the chart
@@ -851,6 +855,7 @@ document.getElementById('downloadManningBudget').addEventListener('click', funct
 
 <script type="module">
     const cty = document.getElementById('myBarChart').getContext('2d');
+    var _pWfpAdm2 = window.WaiChart ? window.WaiChart.palette() : { teal: '#014653', aqua: '#2EACB3' };
     const myBarChart = new Chart(cty, {
         type: 'bar', // Type of chart
         data: {
@@ -859,14 +864,14 @@ document.getElementById('downloadManningBudget').addEventListener('click', funct
                 {
                     label: 'Budgeted', // Label for the first dataset
                     data: [1800, 2300, 2400, 1800], // Data for the first dataset
-                    backgroundColor: '#014653',
+                    backgroundColor: _pWfpAdm2.teal,
                     borderRadius: 3, // Set the border radius for bars
                     barThickness: 14 // Set the width of the bars
                 },
                 {
                     label: 'Actual', // Label for the second dataset
                     data: [2000, 2200, 2000, 2400], // Data for the second dataset
-                    backgroundColor: '#2EACB3',
+                    backgroundColor: _pWfpAdm2.aqua,
                     borderRadius: 3, // Set the border radius for bars
                     barThickness: 14 // Set the width of the bars
                 }
@@ -924,9 +929,14 @@ document.getElementById('downloadManningBudget').addEventListener('click', funct
             }
         }
     });
+    if (window.WaiChart) window.WaiChart.registerForTheme(myBarChart, function (c, p) {
+        c.data.datasets[0].backgroundColor = p.teal;
+        c.data.datasets[1].backgroundColor = p.aqua;
+    });
 
 
     var ctz = document.getElementById('myLineChart').getContext('2d');
+    var _pWfpAdm3 = window.WaiChart ? window.WaiChart.palette() : { teal: '#014653', aqua: '#2EACB3' };
     var myLineChart = new Chart(ctz, {
         type: 'line',
         data: {
@@ -935,8 +945,8 @@ document.getElementById('downloadManningBudget').addEventListener('click', funct
                 {
                     label: 'Occupancy Rates',
                     data: [7, 10, 15, 20, 30],
-                    borderColor: '#014653',
-                    backgroundColor: '#014653',
+                    borderColor: _pWfpAdm3.teal,
+                    backgroundColor: _pWfpAdm3.teal,
                     borderWidth: 1,
                     fill: false,
                     tension: 0.4, // Creates smooth curves
@@ -946,14 +956,16 @@ document.getElementById('downloadManningBudget').addEventListener('click', funct
                 {
                     label: 'Seasonal Data',
                     data: [4, 7, 20, 35, 25], // Data points for the dataset
-                    borderColor: ' #2EACB3', // Line color
-                    backgroundColor: '#2EACB3',
+                    borderColor: _pWfpAdm3.aqua, // Line color
+                    backgroundColor: _pWfpAdm3.aqua,
                     borderWidth: 1,
                     fill: false,
                     tension: 0.4, // Default cubic Bézier curve (smooth curve)
                     pointRadius: 0 // Remove dots
                 },
                 {
+                    // #DFFF00 is close to but not an exact match for --lime
+                    // (#E0FF02) — left literal per the no-approximation rule.
                     label: 'Hiring Data',
                     data: [10, 8, 6, 15, 30], // Data points for the dataset
                     borderColor: '#DFFF00 ', // Line color
@@ -1002,6 +1014,10 @@ document.getElementById('downloadManningBudget').addEventListener('click', funct
                 }
             }
         }
+    });
+    if (window.WaiChart) window.WaiChart.registerForTheme(myLineChart, function (c, p) {
+        c.data.datasets[0].borderColor = c.data.datasets[0].backgroundColor = p.teal;
+        c.data.datasets[1].borderColor = c.data.datasets[1].backgroundColor = p.aqua;
     });
 </script>
 @endsection

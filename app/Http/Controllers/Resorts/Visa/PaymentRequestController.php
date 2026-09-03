@@ -873,7 +873,7 @@ class PaymentRequestController extends Controller
         $PaymentRequest = PaymentRequest::where('id', base64_decode($id))->where('resort_id', $this->resort->resort_id)->first();
         if (!$PaymentRequest)
         {
-            return redirect()->route('resort.Visa.PaymentRequestIndex')->with('error', 'Payment Request not found');
+            return redirect()->route('resort.visa.PaymentRequestIndex')->with('error', 'Payment Request not found');
         }
         else
         {
@@ -934,7 +934,7 @@ class PaymentRequestController extends Controller
                          
             if ($PaymentRequestChildren->isEmpty()) 
             {
-                return redirect()->route('resort.Visa.PaymentRequestIndex')->with('error', 'No payment request details found');
+                return redirect()->route('resort.visa.PaymentRequestIndex')->with('error', 'No payment request details found');
             }
             
             $PaymentRequest->children = $PaymentRequestChildren;

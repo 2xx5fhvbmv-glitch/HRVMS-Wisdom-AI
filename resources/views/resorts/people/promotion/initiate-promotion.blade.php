@@ -7,10 +7,16 @@
 </div>
 @endif
 
-@section('content') 
+@section('content')
+    <style>
+        #promotion-initiate-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #promotion-initiate-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="promotion-initiate-hero">
                 <div class="row  g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -62,7 +68,7 @@
                         <div class="row g-md-4 g-3 mb-md-4 mb-3 align-items-center">
                             <div class="col-lg-4">
                                 <label for="select_employee" class="form-label">SELECT EMPLOYEE <span class="red-mark">*</span></label>
-                                <select id="select_employee" name="select_employee" class="select2t-none form-select" aria-label="Default select example" onchange="getEmpDetails(this.value)" required 
+                                <select id="select_employee" name="select_employee" class="dd-native-select form-select" aria-label="Default select example" onchange="getEmpDetails(this.value)" required
                                 data-parsley-required-message="Please select an Employee" data-parsley-errors-container="#emp-error">
                                     <option value="">Select Employee</option>
                                     @foreach($employees as $employee)
@@ -71,6 +77,21 @@
                                         </option>
                                     @endforeach
                                 </select>
+                                <div class="dd" data-target="#select_employee">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">Select Employee</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Employee">
+                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an employee…"></div>
+                                        <div class="dd-scroll">
+                                            <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Employee</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @foreach($employees as $employee)
+                                                <div class="dd-item" role="option" data-value="{{ $employee->id }}"><span class="dd-nm">{{ $employee->Emp_id }} - {{ $employee->resortAdmin->full_name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                </div>
                                 <div id="emp-error"></div>
                             </div>
                             <div class="col-lg-4 col-sm-6">
@@ -128,7 +149,7 @@
                         <div class="row g-md-4 g-3 align-items-end">
                             <div class="col-sm-6">
                                 <label for="new_position" class="form-label">NEW POSITION <span class="red-mark">*</span></label>
-                                <select class="form-select select2t-none" name="new_position" id="new_position" aria-label="Default select example" required
+                                <select class="form-select dd-native-select" name="new_position" id="new_position" aria-label="Default select example" required
                                 data-parsley-required-message="Please select new position" data-parsley-errors-container="#pos-error" onchange="getDetails(this.value)">
                                     <option value="">Select New Position</option>
                                     @if($positions)
@@ -137,6 +158,23 @@
                                         @endforeach
                                     @endif
                                 </select>
+                                <div class="dd" data-target="#new_position">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">Select New Position</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="New Position">
+                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a position…"></div>
+                                        <div class="dd-scroll">
+                                            <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select New Position</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @if($positions)
+                                                @foreach($positions as $pos)
+                                                    <div class="dd-item" role="option" data-value="{{$pos->id}}"><span class="dd-nm">{{$pos->position_title}}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @endforeach
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
                                 <div id="pos-error"></div>
                                 <div id="position-vacancy-info" class="mt-2" style="display:none;">
                                     <span id="position-vacancy-badge" class="badge"></span>
@@ -148,7 +186,7 @@
                                      the selected New Position via getDetails(). The hidden
                                      input below carries the value to the server since a
                                      disabled <select> doesn't submit. --}}
-                                <select id="level" class="form-select select2t-none" disabled
+                                <select id="level" class="form-select dd-native-select" disabled
                                     data-parsley-errors-container="#level-error">
                                     <option value="">Select Level</option>
                                     @if(!empty($emp_grade))
@@ -157,6 +195,22 @@
                                         @endforeach
                                     @endif
                                 </select>
+                                <div class="dd" data-target="#level">
+                                    <button type="button" class="dd-trigger" disabled aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">Select Level</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Level">
+                                        <div class="dd-scroll">
+                                            <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Level</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @if(!empty($emp_grade))
+                                                @foreach ($emp_grade as $key => $value)
+                                                    <div class="dd-item" role="option" data-value="{{ $key }}"><span class="dd-nm">{{ $value }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @endforeach
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
                                 <input type="hidden" id="level_value" name="level" required
                                     data-parsley-required-message="Please select a New Position to auto-fill Level"
                                     data-parsley-errors-container="#level-error">
@@ -233,7 +287,7 @@
                                      from the selected New Position (matches the chosen Level)
                                      via getDetails(). The hidden input below carries the value
                                      to the server since a disabled <select> doesn't submit. --}}
-                                <select class="form-select select2t-none" id="benefit_grid" disabled
+                                <select class="form-select dd-native-select" id="benefit_grid" disabled
                                     aria-label="Default select example"
                                     data-parsley-errors-container="#benefitgrid-error">
                                     <option value="">BENEFIT GRID UPDATE</option>
@@ -243,6 +297,22 @@
                                         @endforeach
                                     @endif
                                 </select>
+                                <div class="dd" data-target="#benefit_grid">
+                                    <button type="button" class="dd-trigger" disabled aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">BENEFIT GRID UPDATE</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Benefit Grid">
+                                        <div class="dd-scroll">
+                                            <div class="dd-item active" role="option" data-value=""><span class="dd-nm">BENEFIT GRID UPDATE</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @if($benefitGrids)
+                                                @foreach($benefitGrids as $grid)
+                                                <div class="dd-item" role="option" data-value="{{ $grid->emp_grade }}"><span class="dd-nm">{{ config('settings.eligibilty')[$grid->emp_grade] ?? 'N/A' }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @endforeach
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
                                 <input type="hidden" id="benefit_grid_value" name="benefit_grid" required
                                     data-parsley-required-message="Please select a New Position to auto-fill Benefit Grid"
                                     data-parsley-errors-container="#benefitgrid-error">
@@ -270,6 +340,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts._dropdown_styles')
 @endsection
 
 @section('import-scripts')
@@ -327,8 +398,6 @@
             appendTo: document.body,
             minDate: "today" // Disables all past dates
         });
-
-        $('.select2t-none').select2();
 
         function parseSalary(value) {
             return parseFloat(value.replace(/,/g, '')) || 0;
@@ -621,16 +690,14 @@
             $dropdown.append(opt.clone());
         });
 
-        // Helper — rebuild the Select2 widget after we change the underlying
+        // Helper — rebuild the .dd widget after we change the underlying
         // <option> set so the picker reflects the filtered list. Without this
-        // step Select2 keeps showing the original option set even though
+        // step the .dd keeps showing the original option set even though
         // the DOM <select> has changed, which is exactly why the checkboxes
         // "did nothing" visually.
         function refreshSelect2() {
-            if ($dropdown.data('select2')) {
-                $dropdown.select2('destroy');
-            }
-            $dropdown.val('').select2();
+            $dropdown.val('');
+            window.wisdomDD.rebuild('#select_employee');
         }
 
         if (filters.length === 0) {
@@ -659,4 +726,5 @@
         });
     }
 </script>
+@include('resorts._dropdown_script')
 @endsection

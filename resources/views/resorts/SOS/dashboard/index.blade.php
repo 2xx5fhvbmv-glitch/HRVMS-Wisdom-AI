@@ -9,9 +9,27 @@
 @endif --}}
 
 @section('content')
+<style>
+    /* Same requested push as the other module dashboards/pages (Payroll /
+       Talent Acquisition / People / Time and Attendance / Leave /
+       Performance / Learning / Accommodation / Incident / Survey /
+       Reports / Support / Visa / Grievance and Disciplinary / File
+       Management) — extra breathing room between the hero and the content
+       card below it, scoped to this page (.page-hedding's own
+       margin-bottom is shared by every page's hero). padding-bottom, not
+       margin: adjacent sibling margins collapse to the larger of the two
+       rather than summing. Below Bootstrap's sm breakpoint the extra
+       padding pushes the card into the teal hero curve's rounded
+       bottom-left corner (body::before, border-radius 0 0 50px 50px) —
+       same collision found on Payroll — neutralized below 576px. */
+    #sos-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #sos-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="sos-hero">
             <div class="row justify-content-between g-3">
                 <div class="col-auto">
                     <div class="page-title">
@@ -34,13 +52,28 @@
                         <input type="text" class="form-control datepicker" name="dateFilter" id="dateFilter">
                     </div>
                     <div class="col-xl-2 col-md-3 col-sm-4 col-6">
-                        <select class="form-select select2t-none" id="statusFilter">
+                        <select class="form-select dd-native-select" id="statusFilter">
                             <option value="" selected>Select Status</option>
                             <option value="Completed">Completed</option>
                             <option value="Pending">Pending</option>
                             <option value="Drilled">Drilled</option>
                             <option value="Rejected">Rejected</option>
                         </select>
+                        <div class="dd" data-target="#statusFilter">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">Select Status</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Status">
+                                <div class="dd-scroll">
+                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Status</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    <div class="dd-item" role="option" data-value="Completed"><span class="dd-nm">Completed</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    <div class="dd-item" role="option" data-value="Pending"><span class="dd-nm">Pending</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    <div class="dd-item" role="option" data-value="Drilled"><span class="dd-nm">Drilled</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    <div class="dd-item" role="option" data-value="Rejected"><span class="dd-nm">Rejected</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="col-auto ms-auto">
                         <div class="d-flex align-items-center">
@@ -90,6 +123,8 @@
 </div>
 
 @include('resorts._emotional_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -111,11 +146,6 @@
 
 <script type="text/javascript">
     $(document).ready(function () {
-
-        $('#statusFilter').select2({
-            minimumResultsForSearch: -1,
-            width: '100%'
-        });
 
         flatpickr('.datepicker', {
             dateFormat: 'd/m/Y',
