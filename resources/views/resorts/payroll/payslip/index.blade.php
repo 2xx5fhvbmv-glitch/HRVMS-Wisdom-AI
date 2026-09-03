@@ -8,9 +8,15 @@
 @endif
 
 @section('content')
+<style>
+    #payslip-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #payslip-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="payslip-hero">
             <div class="row  g-3">
                 <div class="col-auto">
                     <div class="page-title">
@@ -31,21 +37,51 @@
                         </div>
                     </div>
                     <div class="col-xl-2 col-md-3 col-sm-4 col-6">
-                        <select id="departmentFilter" class="form-select select2t-none">
+                        <select id="departmentFilter" class="form-select dd-native-select">
                             <option value="">All Departments</option>
                             @foreach($departments as $department)
                                 <option value="{{ $department->id }}">{{ $department->name }}</option>
                             @endforeach
                         </select>
+                        <div class="dd" data-target="#departmentFilter">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">All Departments</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Department">
+                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a department…"></div>
+                                <div class="dd-scroll">
+                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">All Departments</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    @foreach($departments as $department)
+                                    <div class="dd-item" role="option" data-value="{{ $department->id }}"><span class="dd-nm">{{ $department->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="col-xl-2 col-md-3 col-sm-4 col-6">
-                        <select  id="positionFilter" class="form-select select2t-none">
+                        <select  id="positionFilter" class="form-select dd-native-select">
                             <option value="">All Positions</option>
                             <!-- Example: populate dynamically or statically -->
                             @foreach($positions as $position)
                                 <option value="{{ $position->id }}">{{ $position->position_title }}</option>
                             @endforeach
                         </select>
+                        <div class="dd" data-target="#positionFilter">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">All Positions</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Position">
+                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a position…"></div>
+                                <div class="dd-scroll">
+                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">All Positions</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    @foreach($positions as $position)
+                                    <div class="dd-item" role="option" data-value="{{ $position->id }}"><span class="dd-nm">{{ $position->position_title }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <!-- <div class="col-auto ms-auto">
                         <a href="#" class="a-link">View Previous Payslips</a>
@@ -82,20 +118,53 @@
             </div>
             <div class="modal-body">
                 <div class="mb-3"><label for="select_emp" class="form-label">SELECT EMPLOYEE</label>
-                    <select class="form-select select2-modal" id="select_emp" aria-label="Default select example">
+                    <select class="form-select dd-native-select" id="select_emp" aria-label="Default select example">
                         <option selected>Select</option>
                         @foreach($employees as $employee)
                             <option value="{{ $employee->id }}">{{ $employee->resortAdmin->first_name}} {{ $employee->resortAdmin->last_name}}</option>
                         @endforeach
                     </select>
+                    <div class="dd" data-target="#select_emp">
+                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                            <span class="dd-lbl">Select</span>
+                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                        </button>
+                        <div class="dd-panel" role="listbox" aria-label="Employee">
+                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an employee…"></div>
+                            <div class="dd-scroll">
+                                <div class="dd-item active" role="option" data-value="Select"><span class="dd-nm">Select</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                @foreach($employees as $employee)
+                                <div class="dd-item" role="option" data-value="{{ $employee->id }}"><span class="dd-nm">{{ $employee->resortAdmin->first_name }} {{ $employee->resortAdmin->last_name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                @endforeach
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div>
                     <label for="month" class="form-label">MONTH</label>
-                    <select class="form-select select2-modal month" id="month" aria-label="Default select example"></select>
+                    <select class="form-select dd-native-select month" id="month" aria-label="Default select example"></select>
+                    <div class="dd" data-target="#month">
+                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                            <span class="dd-lbl"></span>
+                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                        </button>
+                        <div class="dd-panel" role="listbox" aria-label="Month">
+                            <div class="dd-scroll"></div>
+                        </div>
+                    </div>
                 </div>
                 <div>
                     <label for="year" class="form-label">YEAR</label>
-                    <select class="form-select select2-modal year" id="year" aria-label="Default select example"></select>
+                    <select class="form-select dd-native-select year" id="year" aria-label="Default select example"></select>
+                    <div class="dd" data-target="#year">
+                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                            <span class="dd-lbl"></span>
+                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                        </button>
+                        <div class="dd-panel" role="listbox" aria-label="Year">
+                            <div class="dd-scroll"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
@@ -115,20 +184,53 @@
             </div>
             <div class="modal-body">
                 <div class="mb-3"><label for="select_emp1" class="form-label">SELECT EMPLOYEE</label>
-                    <select class="form-select select2-modal" id="select_emp1" aria-label="Default select example">
+                    <select class="form-select dd-native-select" id="select_emp1" aria-label="Default select example">
                         <option selected>Select</option>
                         @foreach($employees as $employee)
                             <option value="{{ $employee->id }}">{{ $employee->resortAdmin->first_name}} {{ $employee->resortAdmin->last_name}}</option>
                         @endforeach
                     </select>
+                    <div class="dd" data-target="#select_emp1">
+                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                            <span class="dd-lbl">Select</span>
+                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                        </button>
+                        <div class="dd-panel" role="listbox" aria-label="Employee">
+                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an employee…"></div>
+                            <div class="dd-scroll">
+                                <div class="dd-item active" role="option" data-value="Select"><span class="dd-nm">Select</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                @foreach($employees as $employee)
+                                <div class="dd-item" role="option" data-value="{{ $employee->id }}"><span class="dd-nm">{{ $employee->resortAdmin->first_name }} {{ $employee->resortAdmin->last_name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                @endforeach
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div>
                     <label for="month1" class="form-label">MONTH</label>
-                    <select class="form-select select2-modal month" id="month1" aria-label="Default select example"></select>
+                    <select class="form-select dd-native-select month" id="month1" aria-label="Default select example"></select>
+                    <div class="dd" data-target="#month1">
+                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                            <span class="dd-lbl"></span>
+                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                        </button>
+                        <div class="dd-panel" role="listbox" aria-label="Month">
+                            <div class="dd-scroll"></div>
+                        </div>
+                    </div>
                 </div>
                 <div>
                     <label for="year1" class="form-label">YEAR</label>
-                    <select class="form-select select2-modal year" id="year1" aria-label="Default select example"></select>
+                    <select class="form-select dd-native-select year" id="year1" aria-label="Default select example"></select>
+                    <div class="dd" data-target="#year1">
+                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                            <span class="dd-lbl"></span>
+                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                        </button>
+                        <div class="dd-panel" role="listbox" aria-label="Year">
+                            <div class="dd-scroll"></div>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
@@ -143,13 +245,13 @@
 
 @section('import-css')
 @include('resorts.payroll._payroll_buttons_v2_styles')
+@include('resorts._dropdown_styles')
 @endsection
 
 @section('import-scripts')
 <script>
     $(document).ready(function()
     {
-        $('.select2t-none').select2();
         employeeList();
 
         $('#searchInput, #departmentFilter, #positionFilter').on('keyup change', function () {
@@ -162,6 +264,7 @@
         
             // Set employee ID in the modal
             $('#share-modal').find('#select_emp').val(employeeId);
+            window.wisdomDD.sync('#select_emp');
 
             // If there's a field displaying the employee name in the modal, update it too
             let employeeName = $(this).closest('tr').find('td:nth-child(2)').text().trim();
@@ -173,6 +276,7 @@
         
             // Set employee ID in the modal
             $('#view-modal').find('#select_emp1').val(employeeId);
+            window.wisdomDD.sync('#select_emp1');
 
             // If there's a field displaying the employee name in the modal, update it too
             let employeeName = $(this).closest('tr').find('td:nth-child(2)').text().trim();
@@ -353,6 +457,10 @@
             let isSelected = i === currentMonth && selectedYear == currentYear ? "selected" : "";
             monthDropdown.append(`<option value="${i}" ${isSelected}>${months[i - 1]}</option>`);
         }
+        window.wisdomDD.rebuild('#year');
+        window.wisdomDD.rebuild('#year1');
+        window.wisdomDD.rebuild('#month');
+        window.wisdomDD.rebuild('#month1');
 
         // Update months when the year dropdown changes
         yearDropdown.change(function () {
@@ -364,8 +472,11 @@
                 let isSelected = i === currentMonth && selectedYear == currentYear ? "selected" : "";
                 monthDropdown.append(`<option value="${i}" ${isSelected}>${months[i - 1]}</option>`);
             }
+            window.wisdomDD.rebuild('#month');
+            window.wisdomDD.rebuild('#month1');
         });
     }
 
 </script>
+@include('resorts._dropdown_script')
 @endsection

@@ -236,16 +236,30 @@
                         <div class="idt-frow">
                             <div class="idt-fld">
                                 <label for="priority_level">Priority level</label>
-                                <select class="form-select select2t-none" id="priority_level" name="priority" aria-label="Priority level">
+                                <select class="form-select dd-native-select" id="priority_level" name="priority" aria-label="Priority level">
                                     <option value="">Select Priority</option>
                                     <option value="Low" {{ $incident->priority == "Low" ? 'selected' : '' }}>Low</option>
                                     <option value="Medium" {{ $incident->priority == "Medium" ? 'selected' : '' }}>Medium</option>
                                     <option value="High" {{ $incident->priority == "High" ? 'selected' : '' }}>High</option>
                                 </select>
+                                <div class="dd" data-target="#priority_level">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">{{ in_array($incident->priority, ['Low','Medium','High']) ? $incident->priority : 'Select Priority' }}</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Priority">
+                                        <div class="dd-scroll">
+                                            <div class="dd-item{{ !in_array($incident->priority, ['Low','Medium','High']) ? ' active' : '' }}" role="option" data-value=""><span class="dd-nm">Select Priority</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            <div class="dd-item{{ $incident->priority == 'Low' ? ' active' : '' }}" role="option" data-value="Low"><span class="dd-nm">Low</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            <div class="dd-item{{ $incident->priority == 'Medium' ? ' active' : '' }}" role="option" data-value="Medium"><span class="dd-nm">Medium</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            <div class="dd-item{{ $incident->priority == 'High' ? ' active' : '' }}" role="option" data-value="High"><span class="dd-nm">High</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             <div class="idt-fld">
                                 <label for="status">Status</label>
-                                <select class="form-select select2t-none" name="status" id="status" aria-label="Status">
+                                <select class="form-select dd-native-select" name="status" id="status" aria-label="Status">
                                     <option value="">Select Status</option>
                                     @if($statuses)
                                         @foreach($statuses as $st)
@@ -253,6 +267,23 @@
                                         @endforeach
                                     @endif
                                 </select>
+                                <div class="dd" data-target="#status">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">{{ $incident->status ?: 'Select Status' }}</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Status">
+                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a status…"></div>
+                                        <div class="dd-scroll">
+                                            <div class="dd-item{{ !$incident->status ? ' active' : '' }}" role="option" data-value=""><span class="dd-nm">Select Status</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @if($statuses)
+                                                @foreach($statuses as $st)
+                                                    <div class="dd-item{{ $incident->status == $st ? ' active' : '' }}" role="option" data-value="{{ $st }}"><span class="dd-nm">{{ $st }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @endforeach
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             <div class="idt-fld">
                                 <label for="assign_to">Assign to</label>
@@ -282,6 +313,8 @@
     </div>
      @include('partials._file_view_modal')
 @include('resorts._emotional_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')

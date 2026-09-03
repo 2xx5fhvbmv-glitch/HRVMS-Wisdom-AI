@@ -152,12 +152,26 @@
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Grace Period</label>
-                            <select id="zf-grace-period" class="form-select">
+                            <select id="zf-grace-period" class="form-select dd-native-select">
                                 <option value="5">5 minutes</option>
                                 <option value="10" selected>10 minutes</option>
                                 <option value="15">15 minutes</option>
                                 <option value="30">30 minutes</option>
                             </select>
+                            <div class="dd" data-target="#zf-grace-period">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">10 minutes</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Grace Period">
+                                    <div class="dd-scroll">
+                                        <div class="dd-item" role="option" data-value="5"><span class="dd-nm">5 minutes</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item active" role="option" data-value="10"><span class="dd-nm">10 minutes</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="15"><span class="dd-nm">15 minutes</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="30"><span class="dd-nm">30 minutes</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="mb-3" id="zf-coords-info" style="display:none;">
                             <label class="form-label">Coordinates <span class="badge bg-secondary" id="zf-point-count">0</span></label>
@@ -185,6 +199,7 @@
 
 @section('import-css')
 @include('resorts.timeandattendance._taa_buttons_v2_styles')
+@include('resorts._dropdown_styles')
 @endsection
 
 @section('import-scripts')
@@ -486,6 +501,7 @@ $(document).ready(function() {
         $('#zf-edit-id').val('');
         $('#zf-zone-name').val('');
         $('#zf-grace-period').val('10');
+        window.wisdomDD.sync('#zf-grace-period');
         $('#zoneModalTitle').html('<i class="fa-solid fa-draw-polygon me-2"></i>Add New Zone');
         $('.zf-color-dot').removeClass('active').first().addClass('active');
         zfClearDrawing();
@@ -536,6 +552,7 @@ $(document).ready(function() {
         $('#zf-edit-id').val(zone.id);
         $('#zf-zone-name').val(zone.name);
         $('#zf-grace-period').val(zone.grace_period);
+        window.wisdomDD.sync('#zf-grace-period');
         $('#zoneModalTitle').html('<i class="fa-solid fa-pen me-2"></i>Edit Zone: ' + zone.name);
 
         // Set color
@@ -662,4 +679,5 @@ $(document).ready(function() {
     });
 });
 </script>
+@include('resorts._dropdown_script')
 @endsection

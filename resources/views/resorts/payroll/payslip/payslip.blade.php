@@ -19,7 +19,7 @@
                     </div>
                 </div>
                 <div class="col-auto ms-auto">
-                    <a href="#" class="btn payroll-btn-secondary" id="printPayslip" onclick="printPaySlip()">Print</a>
+                    <a href="#" class="btn payroll-btn-neutral" id="printPayslip" onclick="printPaySlip()">Print</a>
                 </div>
             </div>
         </div>

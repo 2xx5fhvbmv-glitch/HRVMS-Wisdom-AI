@@ -159,13 +159,30 @@
                                     </div>
 
                                     <div class="col-auto">
-                                        <select class="form-control select2" name="ResortPosition" id="ResortPosition">
+                                        <select class="form-control dd-native-select" name="ResortPosition" id="ResortPosition">
                                             @if( isset($Resort_Position) &&  $Resort_Position->isNotEmpty())
                                                 @foreach ($Resort_Position as $position)
                                                     <option value="{{ $position->id }}">{{ $position->position_title }}</option>
                                                 @endforeach
                                             @endif
                                         </select>
+                                        @php $firstResortPos = isset($Resort_Position) ? $Resort_Position->first() : null; @endphp
+                                        <div class="dd" data-target="#ResortPosition">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">{{ $firstResortPos->position_title ?? 'Select Position' }}</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Position">
+                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a position…"></div>
+                                                <div class="dd-scroll">
+                                                    @if( isset($Resort_Position) &&  $Resort_Position->isNotEmpty())
+                                                        @foreach ($Resort_Position as $position)
+                                                        <div class="dd-item{{ $loop->first ? ' active' : '' }}" role="option" data-value="{{ $position->id }}"><span class="dd-nm">{{ $position->position_title }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @endforeach
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div class="col-auto">
                                         <div class="h-45 d-none d-lg-block"></div>
@@ -204,7 +221,9 @@
 
                                         <div class="talentPool-block" id="talentPool_{{$t->id}}">
                                             <div class="img-circle">
-                                                <img src="{{ URL::asset($t->passport_photo)}}" alt="image">
+                                                @if(!empty($t->passport_photo))
+                                                    <img src="{{ Common::GetApplicantAWSFile($t->passport_photo)['NewURLshow'] }}" alt="image" onerror="this.style.display='none'">
+                                                @endif
                                             </div>
                                             <div>
                                                 <h6>{{ $t->first_name }} {{ $t->last_name }}</h6>
@@ -393,7 +412,7 @@
                 @csrf
                 <div class="modal-body">
                     <label>Select Email Template </label>
-                    <select class="form-control EmailTemplate" name='EmailTemplate'>
+                    <select class="form-control dd-native-select EmailTemplate" name='EmailTemplate' id="EmailTemplate-timeslots">
                         <option selected disabled value="">Select Email Template </option>
                         @if(isset($EmailTamplete))
                         @foreach ($EmailTamplete as $e)
@@ -401,6 +420,23 @@
                         @endforeach
                         @endif
                     </select>
+                    <div class="dd" data-target="#EmailTemplate-timeslots">
+                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                            <span class="dd-lbl">Select Email Template</span>
+                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                        </button>
+                        <div class="dd-panel" role="listbox" aria-label="Email Template">
+                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a template…"></div>
+                            <div class="dd-scroll">
+                                <div class="dd-item active" role="option" data-value="" aria-disabled="true"><span class="dd-nm">Select Email Template</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                @if(isset($EmailTamplete))
+                                @foreach ($EmailTamplete as $e)
+                                <div class="dd-item" role="option" data-value="{{ $e->id }}"><span class="dd-nm">{{ $e->TempleteName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                @endforeach
+                                @endif
+                            </div>
+                        </div>
+                    </div>
                     <div class="mb-3 mt-3">
                         <label class="form-label">Meeting Link</label>
                         <input type="text" class="form-control" name="MeetingLink" placeholder="Enter Meeting Link (Google Meet, Zoom, etc.)">
@@ -525,10 +561,12 @@
 @endsection
 
 @section('import-css')
+@include('resorts._dropdown_styles')
 @include('resorts.talentacquisition._ta_buttons_v2_styles')
 @endsection
 
 @section('import-scripts')
+@include('resorts.talentacquisition.dashboard._top_hiring_sources_scripts')
 <script type="text/javascript">
 const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
@@ -1470,5 +1508,6 @@ $(document).on("change", "#ResortPosition", function () {
 });
 
 </script>
+@include('resorts._dropdown_script')
 @endsection
 

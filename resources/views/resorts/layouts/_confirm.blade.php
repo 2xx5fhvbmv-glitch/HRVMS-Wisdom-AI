@@ -10,24 +10,24 @@
         margin: 28px auto 16px !important;
         border: 0 !important;
         border-radius: 50% !important;
-        background: #E6F0F1 !important;
-        color: #014653 !important;
+        background: var(--teal-3) !important;
+        color: var(--teal) !important;
     }
     .wisdom-swal-icon.wisdom-swal-icon-destructive {
-        background: #FFDED9 !important;
-        color: #FF2400 !important;
+        background: var(--critical-bg) !important;
+        color: var(--critical) !important;
     }
     .wisdom-swal-icon .swal2-icon-content { padding: 0; }
     .wisdom-swal-title {
         font-size: 18px !important;
         font-weight: 800 !important;
-        color: #14232A !important;
+        color: var(--ink) !important;
         padding: 0 0 4px !important;
         margin: 0 !important;
     }
     .wisdom-swal-text {
         font-size: 13px !important;
-        color: #5D6F75 !important;
+        color: var(--muted) !important;
         margin: 0 0 8px !important;
     }
     .wisdom-swal-actions {
@@ -54,32 +54,32 @@
         box-shadow: none !important;
     }
     .wisdom-swal-confirm {
-        background: #014653 !important;
+        background: var(--teal) !important;
         color: #fff !important;
         border: none !important;
     }
     .wisdom-swal-confirm.wisdom-swal-confirm-destructive {
-        background: #FF2400 !important;
+        background: var(--critical) !important;
     }
     .wisdom-swal-confirm.wisdom-swal-confirm-positive {
-        background: #1F9D6B !important;
+        background: var(--positive) !important;
     }
     .wisdom-swal-cancel {
-        background: #DEDEDE !important;
-        color: #14232A !important;
+        background: var(--neutral-bg) !important;
+        color: var(--ink) !important;
         border: none !important;
         font-weight: 600;
     }
     .wisdom-swal-icon.wisdom-swal-icon-positive {
-        background: #E9F7F0 !important;
-        color: #1F9D6B !important;
+        background: var(--positive-bg) !important;
+        color: var(--positive) !important;
     }
     .wisdom-swal-icon.wisdom-swal-icon-warning {
-        background: #FBF0DC !important;
-        color: #D98A00 !important;
+        background: var(--warning-bg) !important;
+        color: var(--warning) !important;
     }
     .wisdom-swal-confirm.wisdom-swal-confirm-warning {
-        background: #D98A00 !important;
+        background: var(--warning) !important;
     }
 </style>
 <script>

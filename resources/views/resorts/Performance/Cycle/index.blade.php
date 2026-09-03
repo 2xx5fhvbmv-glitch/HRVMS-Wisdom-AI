@@ -8,9 +8,15 @@
 @endif
 
 @section('content')
+<style>
+    #performance-cycle-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #performance-cycle-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="performance-cycle-hero">
             <div class="row  g-3">
                 <div class="col-auto">
                     <div class="page-title">
@@ -37,12 +43,26 @@
                         </div>
                     </div>
                     <div class="col-xl-2 col-md-3 col-sm-4 col-7">
-                        <select class="form-select" id="cycleYearFilter">
+                        <select class="form-select dd-native-select" id="cycleYearFilter">
                             <option value="">All Years</option>
                             @foreach($availableYears as $year)
                                 <option value="{{ $year }}" {{ $selectedYear == $year ? 'selected' : '' }}>{{ $year }}</option>
                             @endforeach
                         </select>
+                        <div class="dd" data-target="#cycleYearFilter">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">{{ $selectedYear ?: 'All Years' }}</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Year">
+                                <div class="dd-scroll">
+                                    <div class="dd-item{{ !$selectedYear ? ' active' : '' }}" role="option" data-value=""><span class="dd-nm">All Years</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    @foreach($availableYears as $year)
+                                        <div class="dd-item{{ $selectedYear == $year ? ' active' : '' }}" role="option" data-value="{{ $year }}"><span class="dd-nm">{{ $year }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -92,6 +112,8 @@
     </div>
 </div>
 @include('resorts.Performance._performance_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -100,8 +122,8 @@
        with an old dark-red (#A90000), not the agreed brand Critical
        scarlet — override just this page's delete icon rather than the
        shared class, which would silently recolor the other module too. */
-    .btn-tableIcon.cycle-delete { color: #FF2400; background: rgba(255,36,0,.09); }
-    .btn-tableIcon.cycle-delete:hover { color: #fff; background: #FF2400; }
+    .btn-tableIcon.cycle-delete { color: var(--critical); background: rgba(255,36,0,.09); }
+    .btn-tableIcon.cycle-delete:hover { color: #fff; background: var(--critical); }
 </style>
 @endsection
 

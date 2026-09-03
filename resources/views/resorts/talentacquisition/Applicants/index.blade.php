@@ -8,9 +8,15 @@
 @endif
 
 @section('content')
+    <style>
+        #ta-applicants-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #ta-applicants-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding page-appHedding">
+            <div class="page-hedding page-appHedding" id="ta-applicants-hero">
                 <div class="row justify-content-between g-md-2 g-1">
                     <div class="col-auto">
                         <div class="page-title">
@@ -333,12 +339,27 @@
                 <form id='EmailTemplateForm'>
                     @csrf
                     <div class="modal-body">
-                    <select class="form-control EmailTemplate" name="EmailTemplate-popup" id="EmailTemplate-popup" required>
+                    <select class="form-control dd-native-select EmailTemplate" name="EmailTemplate-popup" id="EmailTemplate-popup" required>
                         <option selected disabled value="">Select Email Template</option>
                         @foreach ($EmailTamplete as $e)
                             <option value="{{ $e->id }}">{{ $e->TempleteName }}</option>
                         @endforeach
                     </select>
+                    <div class="dd" data-target="#EmailTemplate-popup">
+                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                            <span class="dd-lbl">Select Email Template</span>
+                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                        </button>
+                        <div class="dd-panel" role="listbox" aria-label="Email Template">
+                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a template…"></div>
+                            <div class="dd-scroll">
+                                <div class="dd-item active" role="option" data-value="" aria-disabled="true"><span class="dd-nm">Select Email Template</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                @foreach ($EmailTamplete as $e)
+                                <div class="dd-item" role="option" data-value="{{ $e->id }}"><span class="dd-nm">{{ $e->TempleteName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                @endforeach
+                            </div>
+                        </div>
+                    </div>
                     <div class="mb-3 mt-3" id="rejectionReasonGroup" style="display:none;">
                         <label class="form-label">Rejection Reason<span class="text-danger">*</span></label>
                         <textarea class="form-control" name="rejectionReason" id="rejectionReasonText" rows="3" placeholder="Enter reason for rejection..." required></textarea>
@@ -372,7 +393,7 @@
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Select Email Template</label>
-                            <select class="form-control" name="emailTemplateID" required>
+                            <select class="form-control dd-native-select" name="emailTemplateID" id="rejectEmailTemplateID" required>
                                 <option selected disabled value="">Select Email Template</option>
                                 @if(isset($EmailTamplete))
                                 @foreach ($EmailTamplete as $e)
@@ -380,6 +401,23 @@
                                 @endforeach
                                 @endif
                             </select>
+                            <div class="dd" data-target="#rejectEmailTemplateID">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Select Email Template</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Email Template">
+                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a template…"></div>
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value="" aria-disabled="true"><span class="dd-nm">Select Email Template</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @if(isset($EmailTamplete))
+                                        @foreach ($EmailTamplete as $e)
+                                        <div class="dd-item" role="option" data-value="{{ $e->id }}"><span class="dd-nm">{{ $e->TempleteName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @endforeach
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Rejection Reason (Optional)</label>
@@ -414,7 +452,7 @@
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Select Email Template</label>
-                            <select class="form-control" name="emailTemplateID" required>
+                            <select class="form-control dd-native-select" name="emailTemplateID" id="selectEmailTemplateID" required>
                                 <option selected disabled value="">Select Email Template</option>
                                 @if(isset($EmailTamplete))
                                 @foreach ($EmailTamplete as $e)
@@ -422,6 +460,23 @@
                                 @endforeach
                                 @endif
                             </select>
+                            <div class="dd" data-target="#selectEmailTemplateID">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Select Email Template</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Email Template">
+                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a template…"></div>
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value="" aria-disabled="true"><span class="dd-nm">Select Email Template</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @if(isset($EmailTamplete))
+                                        @foreach ($EmailTamplete as $e)
+                                        <div class="dd-item" role="option" data-value="{{ $e->id }}"><span class="dd-nm">{{ $e->TempleteName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @endforeach
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <input type="hidden" name="ApplicantID" id="select_ApplicantID">
                         <input type="hidden" name="applicantstatusid" id="select_applicantstatusid">
@@ -449,13 +504,31 @@
                         @if(isset($offerLetterTemplates) && $offerLetterTemplates->count() > 0)
                             <div class="mb-3">
                                 <label class="form-label fw-semibold">Select Template</label>
-                                <select name="template_id" class="form-select" id="offerLetterTemplateSelect">
+                                <select name="template_id" class="form-select dd-native-select" id="offerLetterTemplateSelect">
                                     @foreach($offerLetterTemplates as $tpl)
                                         <option value="{{ $tpl->id }}" {{ $tpl->is_default ? 'selected' : '' }}>
                                             {{ $tpl->name }}{{ $tpl->is_default ? ' (Default)' : '' }}
                                         </option>
                                     @endforeach
                                 </select>
+                                @php
+                                    $hasDefaultOfferTpl = $offerLetterTemplates->contains('is_default', true);
+                                    $selectedOfferTpl = $hasDefaultOfferTpl ? $offerLetterTemplates->first(fn($t) => $t->is_default) : $offerLetterTemplates->first();
+                                @endphp
+                                <div class="dd" data-target="#offerLetterTemplateSelect">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">{{ $selectedOfferTpl ? $selectedOfferTpl->name . ($selectedOfferTpl->is_default ? ' (Default)' : '') : 'Select Template' }}</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Offer Letter Template">
+                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a template…"></div>
+                                        <div class="dd-scroll">
+                                            @foreach($offerLetterTemplates as $tpl)
+                                            <div class="dd-item{{ ($tpl->is_default || (!$hasDefaultOfferTpl && $loop->first)) ? ' active' : '' }}" role="option" data-value="{{ $tpl->id }}"><span class="dd-nm">{{ $tpl->name }}{{ $tpl->is_default ? ' (Default)' : '' }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             <p class="text-muted mb-3" style="font-size:13px;">
                                 <i class="fa-solid fa-file-word me-1"></i>
@@ -505,13 +578,31 @@
                         @if(isset($contractTemplates) && $contractTemplates->count() > 0)
                             <div class="mb-3">
                                 <label class="form-label fw-semibold">Select Template</label>
-                                <select name="template_id" class="form-select" id="contractTemplateSelect">
+                                <select name="template_id" class="form-select dd-native-select" id="contractTemplateSelect">
                                     @foreach($contractTemplates as $tpl)
                                         <option value="{{ $tpl->id }}" {{ $tpl->is_default ? 'selected' : '' }}>
                                             {{ $tpl->name }}{{ $tpl->is_default ? ' (Default)' : '' }}
                                         </option>
                                     @endforeach
                                 </select>
+                                @php
+                                    $hasDefaultContractTpl = $contractTemplates->contains('is_default', true);
+                                    $selectedContractTpl = $hasDefaultContractTpl ? $contractTemplates->first(fn($t) => $t->is_default) : $contractTemplates->first();
+                                @endphp
+                                <div class="dd" data-target="#contractTemplateSelect">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">{{ $selectedContractTpl ? $selectedContractTpl->name . ($selectedContractTpl->is_default ? ' (Default)' : '') : 'Select Template' }}</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Contract Template">
+                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a template…"></div>
+                                        <div class="dd-scroll">
+                                            @foreach($contractTemplates as $tpl)
+                                            <div class="dd-item{{ ($tpl->is_default || (!$hasDefaultContractTpl && $loop->first)) ? ' active' : '' }}" role="option" data-value="{{ $tpl->id }}"><span class="dd-nm">{{ $tpl->name }}{{ $tpl->is_default ? ' (Default)' : '' }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             <p class="text-muted mb-3" style="font-size:13px;">
                                 <i class="fa-solid fa-file-word me-1"></i>
@@ -568,6 +659,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts._dropdown_styles')
 @include('resorts.talentacquisition._ta_buttons_v2_styles')
 <style>
     .toast-bottom-right {
@@ -739,12 +831,27 @@
                                             }
 
                                             nextRoundRow = `<tr>
-                                                            <td><select class="form-control EmailTemplate EmailTemplate-next" name='EmailTemplate'>
+                                                            <td><select class="form-control dd-native-select EmailTemplate EmailTemplate-next" id="EmailTemplateNext-${rowId}" name='EmailTemplate'>
                                                                 <option selected disabled>Select Email Template </option>
                                                                     @foreach ($EmailTamplete as $e)
                                                                         <option value="{{ $e->id}}" data-name="{{ $e->TempleteName }}">{{ $e->TempleteName }}</option>
                                                                     @endforeach
                                                                     </select>
+                                                                    <div class="dd" data-target="#EmailTemplateNext-${rowId}">
+                                                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                                            <span class="dd-lbl">Select Email Template</span>
+                                                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                                        </button>
+                                                                        <div class="dd-panel" role="listbox" aria-label="Email Template">
+                                                                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a template…"></div>
+                                                                            <div class="dd-scroll">
+                                                                                <div class="dd-item active" role="option" data-value="" aria-disabled="true"><span class="dd-nm">Select Email Template</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                @foreach ($EmailTamplete as $e)
+                                                                                <div class="dd-item" role="option" data-value="{{ $e->id }}"><span class="dd-nm">{{ $e->TempleteName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                @endforeach
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>
                                                             </td>
                                                             <td>${nr.rank_name}</td>
                                                             <td>${nr.round}</td>
@@ -801,12 +908,27 @@
                                                         <tr>
                                                             <td>${['Completed','Pending Review','Invitation Sent','Slot Booked'].includes(response.data.InterviewStatus) && response.data.emailTemplate && response.data.emailTemplate !== '-'
                                                                 ? response.data.emailTemplate
-                                                                : `<select class="form-control EmailTemplate" name='EmailTemplate'>
+                                                                : `<select class="form-control dd-native-select EmailTemplate" id="EmailTemplate-${rowId}" name='EmailTemplate'>
                                                                 <option selected disabled>Select Email Template </option>
                                                                     @foreach ($EmailTamplete as $e)
                                                                         <option value="{{ $e->id}}" data-name="{{ $e->TempleteName }}">{{ $e->TempleteName }}</option>
                                                                     @endforeach
-                                                                    </select>`}
+                                                                    </select>
+                                                                    <div class="dd" data-target="#EmailTemplate-${rowId}">
+                                                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                                            <span class="dd-lbl">Select Email Template</span>
+                                                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                                        </button>
+                                                                        <div class="dd-panel" role="listbox" aria-label="Email Template">
+                                                                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a template…"></div>
+                                                                            <div class="dd-scroll">
+                                                                                <div class="dd-item active" role="option" data-value="" aria-disabled="true"><span class="dd-nm">Select Email Template</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                @foreach ($EmailTamplete as $e)
+                                                                                <div class="dd-item" role="option" data-value="{{ $e->id }}"><span class="dd-nm">{{ $e->TempleteName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                @endforeach
+                                                                            </div>
+                                                                        </div>
+                                                                    </div>`}
                                                             </td>
                                                             <td>${response.data.rank_name}</td>
                                                             <td>${response.data.round}</td>
@@ -849,9 +971,6 @@
                                         </tr>`;
 
                                         $currentRow.after(newRow);
-                                            $(".EmailTemplate").select2({
-                                                "Placeholder": "Select Email Template",
-                                            });
                                     }
                                 },
                                 error: function(response) {
@@ -966,12 +1085,27 @@
                                         }
 
                                         nextRoundRow = `<tr>
-                                                        <td><select class="form-control EmailTemplate EmailTemplate-next" name='EmailTemplate'>
+                                                        <td><select class="form-control dd-native-select EmailTemplate EmailTemplate-next" id="EmailTemplateNext-${rowId}" name='EmailTemplate'>
                                                             <option selected disabled>Select Email Template </option>
                                                                 @foreach ($EmailTamplete as $e)
                                                                     <option value="{{ $e->id}}" data-name="{{ $e->TempleteName }}">{{ $e->TempleteName }}</option>
                                                                 @endforeach
                                                                 </select>
+                                                                <div class="dd" data-target="#EmailTemplateNext-${rowId}">
+                                                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                                        <span class="dd-lbl">Select Email Template</span>
+                                                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                                    </button>
+                                                                    <div class="dd-panel" role="listbox" aria-label="Email Template">
+                                                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a template…"></div>
+                                                                        <div class="dd-scroll">
+                                                                            <div class="dd-item active" role="option" data-value="" aria-disabled="true"><span class="dd-nm">Select Email Template</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                            @foreach ($EmailTamplete as $e)
+                                                                            <div class="dd-item" role="option" data-value="{{ $e->id }}"><span class="dd-nm">{{ $e->TempleteName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                            @endforeach
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
                                                         </td>
                                                         <td>${nr.rank_name}</td>
                                                         <td>${nr.round}</td>
@@ -1028,12 +1162,27 @@
                                                     <tr>
                                                         <td>${['Completed','Pending Review','Invitation Sent','Slot Booked'].includes(response.data.InterviewStatus) && response.data.emailTemplate && response.data.emailTemplate !== '-'
                                                             ? response.data.emailTemplate
-                                                            : `<select class="form-control EmailTemplate" name='EmailTemplate'>
+                                                            : `<select class="form-control dd-native-select EmailTemplate" id="EmailTemplate-${rowId}" name='EmailTemplate'>
                                                             <option selected disabled>Select Email Template </option>
                                                                 @foreach ($EmailTamplete as $e)
                                                                     <option value="{{ $e->id}}" data-name="{{ $e->TempleteName }}">{{ $e->TempleteName }}</option>
                                                                 @endforeach
-                                                                </select>`}
+                                                                </select>
+                                                                <div class="dd" data-target="#EmailTemplate-${rowId}">
+                                                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                                        <span class="dd-lbl">Select Email Template</span>
+                                                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                                    </button>
+                                                                    <div class="dd-panel" role="listbox" aria-label="Email Template">
+                                                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a template…"></div>
+                                                                        <div class="dd-scroll">
+                                                                            <div class="dd-item active" role="option" data-value="" aria-disabled="true"><span class="dd-nm">Select Email Template</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                            @foreach ($EmailTamplete as $e)
+                                                                            <div class="dd-item" role="option" data-value="{{ $e->id }}"><span class="dd-nm">{{ $e->TempleteName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                            @endforeach
+                                                                        </div>
+                                                                    </div>
+                                                                </div>`}
                                                         </td>
                                                         <td>${response.data.rank_name}</td>
                                                         <td>${response.data.round}</td>
@@ -1077,9 +1226,6 @@
 
                                     $("#intDetail-modal").modal('show');
                                     $("#popupInterviewDetails").html(newRow);
-                                        $(".EmailTemplate").select2({
-                                            "Placeholder": "Select Email Template",
-                                        });
                                 }
                             },
                             error: function(response) {
@@ -2505,6 +2651,7 @@
             $("#offerLetter_applicantstatusid").val(applicantStatusId);
             // Reset form state
             $('#offerLetterForm')[0].reset();
+            window.wisdomDD.sync('#offerLetterTemplateSelect');
             $('#offerLetterUploadSection').hide();
             $('#toggleOfferLetterUpload').html('<i class="fa-solid fa-upload me-1"></i> Or upload a PDF manually');
             $("#offerLetter-modal").modal("show");
@@ -2529,6 +2676,7 @@
                         toastr.success(response.message, "Success", { positionClass: 'toast-bottom-right' });
                         $("#offerLetter-modal").modal("hide");
                         $('#offerLetterForm')[0].reset();
+                        window.wisdomDD.sync('#offerLetterTemplateSelect');
                         $('.table-applicants').DataTable().ajax.reload();
                     } else {
                         toastr.error(response.message || "Something went wrong.", "Error", { positionClass: 'toast-bottom-right' });
@@ -2564,6 +2712,7 @@
             $("#contract_applicantstatusid").val(applicantStatusId);
             // Reset form state
             $('#contractForm')[0].reset();
+            window.wisdomDD.sync('#contractTemplateSelect');
             $('#contractUploadSection').hide();
             $('#toggleContractUpload').html('<i class="fa-solid fa-upload me-1"></i> Or upload a PDF manually');
             $("#contract-modal").modal("show");
@@ -2588,6 +2737,7 @@
                         toastr.success(response.message, "Success", { positionClass: 'toast-bottom-right' });
                         $("#contract-modal").modal("hide");
                         $('#contractForm')[0].reset();
+                        window.wisdomDD.sync('#contractTemplateSelect');
                         $('.table-applicants').DataTable().ajax.reload();
                     } else {
                         toastr.error(response.message || "Something went wrong.", "Error", { positionClass: 'toast-bottom-right' });
@@ -2731,5 +2881,6 @@
             });
         });
     </script>
+@include('resorts._dropdown_script')
 @endsection
 

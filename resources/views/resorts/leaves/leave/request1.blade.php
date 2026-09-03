@@ -30,7 +30,7 @@
                             </div>
                         </div>
                         <div class="col-xl-2 col-md-5 col-sm-4 col-6">
-                            <select id="department-filter" class="form-select select2t-none Department "name="department" aria-label="Default select example">
+                            <select id="department-filter" class="form-select dd-native-select Department" name="department" aria-label="Default select example">
                                 <option value="">All Departments</option>
                                 @if($resort_departments)
                                     @foreach($resort_departments as $dept)
@@ -38,11 +38,36 @@
                                     @endforeach
                                 @endif
                             </select>
+                            <div class="dd" data-target="#department-filter">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">All Departments</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Department">
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">All Departments</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @if($resort_departments)
+                                            @foreach($resort_departments as $dept)
+                                                <div class="dd-item" role="option" data-value="{{ $dept->id }}"><span class="dd-nm">{{ $dept->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @endforeach
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="col-xl-2 col-md-3 col-sm-4 col-6">
-                            <select id="position-filter" class="form-select select2t-none mb-2 Position" name="position" aria-label="Default select example">
+                            <select id="position-filter" class="form-select dd-native-select mb-2 Position" name="position" aria-label="Default select example">
                                 <option selected value="">Select Position</option>
                             </select>
+                            <div class="dd" data-target="#position-filter">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Select Position</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Position">
+                                    <div class="dd-scroll"></div>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="col-auto ms-auto">
@@ -211,6 +236,8 @@
         </div>
     </div>
 @include('resorts.leaves._leave_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -220,7 +247,6 @@
 <script type="text/javascript">
     // new DataTable('#example');
     $(document).ready(function () {
-        $(".select2t-none").select2();
 
         // Handle Department change event
         $(document).on('change', '.Department', function () {
@@ -238,10 +264,10 @@
                             positionOptions += `<option value="${value.id}">${value.position_title}</option>`;
                         });
                         $(".Position").html(positionOptions);
-                        $(".Position").select2({ placeholder: "Select Position" });
                     } else {
                         toastr.warning("No Positions found for the selected Department.", { positionClass: 'toast-bottom-right' });
                     }
+                    wisdomDD.rebuild('#position-filter');
                 },
                 error: function () {
                     toastr.error("Error fetching Positions.", { positionClass: 'toast-bottom-right' });

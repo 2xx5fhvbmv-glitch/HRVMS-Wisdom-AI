@@ -2,9 +2,15 @@
 @section('page_tab_title', $page_title)
 
 @section('content')
+<style>
+    #performance-pdp-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #performance-pdp-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="performance-pdp-hero">
             <div class="row g-3 justify-content-between">
                 <div class="col-auto">
                     <div class="page-title">
@@ -132,7 +138,7 @@
                 <div class="modal-body">
                     <div class="mb-3">
                         <label class="form-label">SELECT EMPLOYEE <span class="text-danger">*</span></label>
-                        <select class="form-select select2pdp" name="employee_id" id="pdpEmployee" required>
+                        <select class="form-select dd-native-select" name="employee_id" id="pdpEmployee" required>
                             <option value="">Select</option>
                             @foreach($employees as $e)
                                 <option value="{{ $e->id }}" data-position="{{ $e->Position_id }}">
@@ -140,6 +146,20 @@
                                 </option>
                             @endforeach
                         </select>
+                        <div class="dd" data-target="#pdpEmployee">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">Select</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Employee">
+                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an employee…"></div>
+                                <div class="dd-scroll">
+                                    @foreach($employees as $e)
+                                        <div class="dd-item" role="option" data-value="{{ $e->id }}"><span class="dd-nm">{{ optional($e->resortAdmin)->first_name }} {{ optional($e->resortAdmin)->last_name }} ({{ $e->Emp_id }})</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">POSITION</label>
@@ -148,16 +168,30 @@
                     </div>
                     <div class="mb-3">
                         <label class="form-label">TEMPLATE</label>
-                        <select class="form-select select2pdp" name="template_id" id="pdpTemplate">
+                        <select class="form-select dd-native-select" name="template_id" id="pdpTemplate">
                             <option value="">Select Template</option>
                             @foreach($templates as $t)
                                 <option value="{{ $t->id }}">{{ $t->FormName }}</option>
                             @endforeach
                         </select>
+                        <div class="dd" data-target="#pdpTemplate">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">Select Template</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Template">
+                                <div class="dd-scroll">
+                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Template</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    @foreach($templates as $t)
+                                        <div class="dd-item" role="option" data-value="{{ $t->id }}"><span class="dd-nm">{{ $t->FormName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">DURATION <span class="text-danger">*</span></label>
-                        <select class="form-select select2pdp" name="duration" id="pdpDuration" required>
+                        <select class="form-select dd-native-select" name="duration" id="pdpDuration" required>
                             <option value="">Select</option>
                             <option value="30 Days">30 Days</option>
                             <option value="60 Days">60 Days</option>
@@ -165,6 +199,22 @@
                             <option value="6 Months">6 Months</option>
                             <option value="1 Year">1 Year</option>
                         </select>
+                        <div class="dd" data-target="#pdpDuration">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">Select</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Duration">
+                                <div class="dd-scroll">
+                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    <div class="dd-item" role="option" data-value="30 Days"><span class="dd-nm">30 Days</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    <div class="dd-item" role="option" data-value="60 Days"><span class="dd-nm">60 Days</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    <div class="dd-item" role="option" data-value="90 Days"><span class="dd-nm">90 Days</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    <div class="dd-item" role="option" data-value="6 Months"><span class="dd-nm">6 Months</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    <div class="dd-item" role="option" data-value="1 Year"><span class="dd-nm">1 Year</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label">FACTORS</label>
@@ -180,6 +230,8 @@
     </div>
 </div>
 @include('resorts.Performance._performance_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -202,11 +254,6 @@
 @section('import-scripts')
 <script>
     $(document).ready(function() {
-        $('.select2pdp').select2({
-            dropdownParent: $('#addPdpModal'),
-            width: '100%'
-        });
-
         var pdpPositions = @json($positions->pluck('position_title', 'id'));
         $('#pdpEmployee').on('change', function() {
             var posId = $(this).find(':selected').data('position');

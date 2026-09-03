@@ -8,9 +8,15 @@
     @endif
 
     @section('content')
+    <style>
+        #exit-clearance-forms-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #exit-clearance-forms-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="exit-clearance-forms-hero">
                 <div class="row justify-content-between g-3">
                     <div class="col-auto">
                         <div class="page-title">

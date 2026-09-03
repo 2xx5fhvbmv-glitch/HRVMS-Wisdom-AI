@@ -7,10 +7,16 @@
 </div>
 @endif
 
-@section('content') 
+@section('content')
+    <style>
+        #advance-salary-show-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #advance-salary-show-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="advance-salary-show-hero">
                 <div class="row  g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -227,15 +233,52 @@
                                                                            {{-- Still-unpaid installment — HR/Finance can move it to a
                                                                                 different upcoming month (e.g. April instead of March).
                                                                                 Server blocks picking a month another row already uses. --}}
-                                                                           <select class="form-select month-select" data-schedule-id="{{ $value->id }}" data-amount="{{ $value->amount }}" data-original="{{ $month }}" aria-label="Payroll month">
+                                                                           @php
+                                                                                // A real <select> falls back to its FIRST option when
+                                                                                // $month (the DB's repayment_date) isn't among
+                                                                                // $availableMonths (e.g. an overdue installment whose
+                                                                                // month has already passed) — no <option> ends up
+                                                                                // `selected`, so the browser just shows option #1.
+                                                                                // Mirror that exact fallback here instead of trusting
+                                                                                // $month, or the .dd's initial label would show a value
+                                                                                // the real select was never actually going to submit.
+                                                                                $monthInList = in_array($month, $availableMonths, true);
+                                                                                $monthDisplay = $monthInList ? $month : ($availableMonths[0] ?? $month);
+                                                                           @endphp
+                                                                           <select class="form-select dd-native-select month-select" id="month-select-{{ $value->id }}" data-schedule-id="{{ $value->id }}" data-amount="{{ $value->amount }}" data-original="{{ $month }}" aria-label="Payroll month">
                                                                                 @foreach($availableMonths as $m)
                                                                                      <option value="{{ $m }}" @if($m == $month) selected @endif>{{ $m }}</option>
                                                                                 @endforeach
                                                                            </select>
+                                                                           <div class="dd" data-target="#month-select-{{ $value->id }}">
+                                                                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                                                     <span class="dd-lbl">{{ $monthDisplay }}</span>
+                                                                                     <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                                                </button>
+                                                                                <div class="dd-panel" role="listbox" aria-label="Payroll month">
+                                                                                     <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a month…"></div>
+                                                                                     <div class="dd-scroll">
+                                                                                          @foreach($availableMonths as $m)
+                                                                                          <div class="dd-item{{ ($monthInList ? $m == $month : $loop->first) ? ' active' : '' }}" role="option" data-value="{{ $m }}"><span class="dd-nm">{{ $m }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                          @endforeach
+                                                                                     </div>
+                                                                                </div>
+                                                                           </div>
                                                                       @else
-                                                                           <select class="form-select" aria-label="Payroll month" disabled>
+                                                                           <select class="form-select dd-native-select" id="month-fixed-{{ $value->id }}" aria-label="Payroll month" disabled>
                                                                                 <option selected value="{{$month}}">{{ $month }}</option>
                                                                            </select>
+                                                                           <div class="dd" data-target="#month-fixed-{{ $value->id }}">
+                                                                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false" disabled>
+                                                                                     <span class="dd-lbl">{{ $month }}</span>
+                                                                                     <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                                                </button>
+                                                                                <div class="dd-panel" role="listbox" aria-label="Payroll month">
+                                                                                     <div class="dd-scroll">
+                                                                                          <div class="dd-item active" role="option" data-value="{{ $month }}"><span class="dd-nm">{{ $month }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                                     </div>
+                                                                                </div>
+                                                                           </div>
                                                                       @endif
                                                                  </td>
                                                                  <td>{{ Common::formatRequestCurrency($value->amount, $advance_salary->currency ?: 'USD') }}</td>
@@ -290,13 +333,28 @@
                                              <div class="row g-md-3 g-2 align-items-end mt-lg-3 mb-lg-4 mt-2 mb-3">
                                                   <div class="col-xl-3 col-lg-5 col-md-6 col-sm-8 col">
                                                        <label for="select_total" class="form-label">SELECT TOTAL MONTHS TO DIVIDE</label>
-                                                       <select class="form-select select2t-none" id="select_total"
+                                                       <select class="form-select dd-native-select" id="select_total"
                                                             aria-label="Default select example">
                                                             <option selected disabled>Select Month</option>
                                                             @for ($i = 1; $i <= 60; $i++)
                                                                  <option value="{{$i}}">{{$i}}</option>
                                                             @endfor
                                                        </select>
+                                                       <div class="dd" data-target="#select_total">
+                                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                                 <span class="dd-lbl">Select Month</span>
+                                                                 <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                            </button>
+                                                            <div class="dd-panel" role="listbox" aria-label="Total Months">
+                                                                 <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a month…"></div>
+                                                                 <div class="dd-scroll">
+                                                                      <div class="dd-item active" role="option" data-value="" aria-disabled="true"><span class="dd-nm">Select Month</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                      @for ($i = 1; $i <= 60; $i++)
+                                                                      <div class="dd-item" role="option" data-value="{{ $i }}"><span class="dd-nm">{{ $i }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                      @endfor
+                                                                 </div>
+                                                            </div>
+                                                       </div>
                                                   </div>
                                                   <div class="col-auto"><button type="submit" class="btn btn-themeBlue">Submit</button></div>
                                              </div>
@@ -404,6 +462,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts._dropdown_styles')
 @endsection
 
 @section('import-scripts')
@@ -435,6 +494,7 @@ $(document).on('change', '.month-select', function () {
                     });
                } else {
                     $select.val(previousMonth);
+                    window.wisdomDD.sync('#' + $select.attr('id'));
                     toastr.error(response.message, "Error", {
                          positionClass: 'toast-bottom-right'
                     });
@@ -443,6 +503,7 @@ $(document).on('change', '.month-select', function () {
           error: function () {
                $select.prop('disabled', false);
                $select.val(previousMonth);
+               window.wisdomDD.sync('#' + $select.attr('id'));
                toastr.error("Something went wrong while updating the repayment month.", "Error", {
                     positionClass: 'toast-bottom-right'
                });
@@ -637,5 +698,6 @@ function submitStatusChange(status, action_by, advance_salary_id, reject_reason,
 }
 
 </script>
+@include('resorts._dropdown_script')
 @endsection
 

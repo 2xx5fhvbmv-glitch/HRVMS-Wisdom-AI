@@ -8,10 +8,15 @@
 @endif
 
 @section('content')
-
+<style>
+    #incident-committee-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #incident-committee-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="incident-committee-hero">
             <div class="row justify-content-between g-3">
                 <div class="col-auto">
                     <div class="page-title">

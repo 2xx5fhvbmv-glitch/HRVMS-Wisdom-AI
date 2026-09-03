@@ -1876,13 +1876,14 @@
         };
 
         // Custom plugin for center text
+        var _pMdHod = window.WaiChart ? window.WaiChart.palette() : { teal: '#014653', aqua: '#2EACB3' };
         var myDoughnutChart = new Chart(ctr, {
             type: 'doughnut',
             data: {
             labels: ['Local Maldivian', 'Expatriate Employees'],
             datasets: [{
                 data: [localEmployees, expatriateEmployees],
-                backgroundColor: ['#2EACB3', '#014653'],
+                backgroundColor: [_pMdHod.aqua, _pMdHod.teal],
                 borderWidth: 0
             }]
             },
@@ -1904,6 +1905,9 @@
             },
             },
             plugins: [doughnutLabels] // Attach the plugin to this chart only
+        });
+        if (window.WaiChart) window.WaiChart.registerForTheme(myDoughnutChart, function (c, p) {
+            c.data.datasets[0].backgroundColor = [p.aqua, p.teal];
         });
 
     </script>

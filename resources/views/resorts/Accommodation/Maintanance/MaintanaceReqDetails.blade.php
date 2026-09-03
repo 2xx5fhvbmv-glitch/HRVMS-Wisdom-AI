@@ -8,8 +8,14 @@
 @endif
 
 @section('content')
+    <style>
+        #maintenance-request-details-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #maintenance-request-details-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="maintenance-request-details-hero">
             <div class="row justify-content-between g-3">
                 <div class="col-auto">
                     <div class="page-title">

@@ -8,15 +8,26 @@
     @endif
 
     @section('content')
+    <style>
+        #view-duty-roster-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #view-duty-roster-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="view-duty-roster-hero">
                 <div class="row justify-content-between g-3">
                     <div class="col-auto">
                         <div class="page-title">
                             <span>Time And Attendance </span>
                             <h1>{{ $page_title }}</h1>
                         </div>
+                    </div>
+                    <div class="col-auto">
+                        <a href="{{ route('resort.timeandattendance.CreateDutyRoster') }}" class="btn btn-sm taa-btn-positive @if(App\Helpers\Common::checkRouteWisePermission('resort.timeandattendance.CreateDutyRoster',config('settings.resort_permissions.view')) == false) d-none @endif">
+                            <i class="fa-solid fa-plus"></i> Create Duty Roster
+                        </a>
                     </div>
                 </div>
             </div>
@@ -944,7 +955,7 @@
 
                             <div class="col-md-12 mt-3">
                                 <lable>Shift </lable>
-                                <select class="form-select select2t-none" id="Shiftpopup"  aria-label="Default select example" name="Shiftpopup">
+                                <select class="form-select dd-native-select" id="Shiftpopup"  aria-label="Default select example" name="Shiftpopup">
                                     <option></option>
                                     @if($ShiftSettings->isNotEmpty())
                                         @foreach ($ShiftSettings as $s)
@@ -953,6 +964,23 @@
                                         @endforeach
                                     @endif
                                 </select>
+                                <div class="dd" data-target="#Shiftpopup">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">Select a Shift</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Shift">
+                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a shift…"></div>
+                                        <div class="dd-scroll">
+                                            <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select a Shift</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @if($ShiftSettings->isNotEmpty())
+                                                @foreach ($ShiftSettings as $s)
+                                                <div class="dd-item" role="option" data-value="{{ $s->id }}"><span class="dd-nm">{{ ucfirst($s->ShiftName) }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @endforeach
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
                             <div class="col-md-12 mt-3 ShiftOverTimetr">
@@ -1031,6 +1059,7 @@
 
 @section('import-css')
 @include('resorts.timeandattendance._taa_buttons_v2_styles')
+@include('resorts._dropdown_styles')
 <style>
     /* Day Off cell: show "Day Off" for whole column, no shift details */
     .createDuty-tableBlock.dayoff-cell {
@@ -1283,7 +1312,7 @@
        child) so only the employee name strip stays visible, like a
        collapsed accordion item. */
     .table-createDutymonthly tbody tr.emp-collapsed > td:not(:first-child) { display: none !important; }
-    .table-createDutymonthly .emp-collapse-toggle { color: #014653; font-size: 14px; }
+    .table-createDutymonthly .emp-collapse-toggle { color: var(--teal); font-size: 14px; }
     .table-createDutymonthly tbody tr.emp-collapsed .emp-collapse-toggle .fa-chevron-up { display: none; }
     .table-createDutymonthly tbody tr:not(.emp-collapsed) .emp-collapse-toggle .fa-chevron-down { display: none; }
 
@@ -1302,7 +1331,7 @@
     .table-createDutymonthly .day-cell-date .day-num {
         font-weight: 700;
         font-size: 13px;
-        color: #014653;
+        color: var(--teal);
     }
     /* Redundant now that dates align under a Sun–Sat header row per
        employee (see .duty-roster-dow-header below) — column position
@@ -1386,14 +1415,14 @@
         margin-right: 5px;
         vertical-align: -1px;
     }
-    .duty-roster-legend .dot-blue { background: #014653; }
+    .duty-roster-legend .dot-blue { background: var(--teal); }
     .duty-roster-legend .dot-yellow { background: #FED049; }
-    .duty-roster-legend .dot-skyblue { background: #2EACB3; }
+    .duty-roster-legend .dot-skyblue { background: var(--aqua); }
     .duty-roster-legend .dot-purple { background: #9E5CF7; }
     .duty-roster-legend .dot-off { background: #495057; }
     .duty-roster-legend .dot-unassigned { background: transparent; border: 1.5px dashed #adb5bd; }
     .duty-roster-legend .dot-holiday { background: transparent; border: 1.5px solid #dc3545; }
-    .duty-roster-legend .dot-today { background: transparent; border: 1.5px solid #014653; }
+    .duty-roster-legend .dot-today { background: transparent; border: 1.5px solid var(--teal); }
 
     /* ==================================================================
        Department / Section accordion — scoped to #accordionDutyRoster
@@ -1452,13 +1481,13 @@
         min-width: 32px;
         border-radius: 50%;
         background: #01465314;
-        color: #014653;
+        color: var(--teal);
         font-size: 13px;
         margin-right: 10px;
     }
     .duty-roster-accordion-icon-sky {
         background: #2EACB31A;
-        color: #2EACB3;
+        color: var(--aqua);
     }
 
     /* Section level (nested inside a department) — same card language,
@@ -1509,9 +1538,9 @@
        shift keeps its own tint even when it also falls on a holiday —
        the holiday-worked ring layers on top separately. */
     .table-createDutymonthly .day-cell:has(.createDuty-blue) {
-        background: color-mix(in srgb, #014653 16%, #fff) !important;
-        border-color: color-mix(in srgb, #014653 40%, transparent);
-        border-bottom-color: color-mix(in srgb, #014653 40%, transparent) !important;
+        background: color-mix(in srgb, var(--teal) 16%, #fff) !important;
+        border-color: color-mix(in srgb, var(--teal) 40%, transparent);
+        border-bottom-color: color-mix(in srgb, var(--teal) 40%, transparent) !important;
     }
     .table-createDutymonthly .day-cell:has(.createDuty-yellow) {
         background: color-mix(in srgb, #FED049 28%, #fff) !important;
@@ -1519,9 +1548,9 @@
         border-bottom-color: color-mix(in srgb, #FED049 55%, transparent) !important;
     }
     .table-createDutymonthly .day-cell:has(.createDuty-skyBlue) {
-        background: color-mix(in srgb, #2EACB3 20%, #fff) !important;
-        border-color: color-mix(in srgb, #2EACB3 45%, transparent);
-        border-bottom-color: color-mix(in srgb, #2EACB3 45%, transparent) !important;
+        background: color-mix(in srgb, var(--aqua) 20%, #fff) !important;
+        border-color: color-mix(in srgb, var(--aqua) 45%, transparent);
+        border-bottom-color: color-mix(in srgb, var(--aqua) 45%, transparent) !important;
     }
     .table-createDutymonthly .day-cell:has(.createDuty-purple) {
         background: color-mix(in srgb, #9E5CF7 16%, #fff) !important;
@@ -1570,7 +1599,7 @@
        White gap + brand-color ring mirrors the mockup's dark-theme
        double-ring translated to a light background. ---- */
     .table-createDutymonthly .today-cell {
-        box-shadow: 0 0 0 2px #fff, 0 0 0 4px #014653;
+        box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--teal);
     }
     /* Inline, not a corner overlay — the header row already fills both
        top corners with day-num (left) and day-name (right), so an
@@ -1581,7 +1610,7 @@
         letter-spacing: 0.04em;
         text-transform: uppercase;
         color: #fff;
-        background: #014653;
+        background: var(--teal);
         padding: 1.5px 5px;
         border-radius: 3px;
     }
@@ -1641,7 +1670,7 @@
     }
     .duty-roster-view-btn.active {
         background: #fff;
-        color: #014653;
+        color: var(--teal);
         box-shadow: 0 1px 2px rgba(16, 24, 40, 0.08);
     }
     .duty-roster-week-nav {
@@ -1696,7 +1725,7 @@
     .duty-roster-dept-table th,
     .duty-roster-dept-table td { vertical-align: middle; }
     .duty-roster-dept-table thead th {
-        background: #f5f8f8;
+        background: var(--teal-soft);
         font-size: 10.5px;
         text-transform: uppercase;
         letter-spacing: 0.04em;
@@ -1714,7 +1743,7 @@
         margin-top: 2px;
     }
     .duty-roster-dept-table thead th.today-col { background: #e9f4f4; }
-    .duty-roster-dept-table thead th.today-col .dnum { color: #014653; }
+    .duty-roster-dept-table thead th.today-col .dnum { color: var(--teal); }
 
     /* Sticky employee column, per the reference spec ("first column is
        sticky/frozen ... so it stays visible when scrolling horizontally"). */
@@ -1731,7 +1760,7 @@
            rhythm as every day cell next to it. */
         padding: 4px;
     }
-    .duty-roster-dept-table thead .dept-emp-col { z-index: 3; background: #f5f8f8; }
+    .duty-roster-dept-table thead .dept-emp-col { z-index: 3; background: var(--teal-soft); }
     .duty-roster-dept-table .dept-emp-col .img-circle {
         width: 32px;
         height: 32px;
@@ -1747,7 +1776,7 @@
        states used in Individual View (colors/off/unassigned/leave),
        appropriate for scanning many rows at once. ---- */
     .duty-roster-dept-cell { padding: 4px; min-width: 108px; }
-    .duty-roster-dept-cell.today-cell { box-shadow: 0 0 0 1.5px #014653 inset; }
+    .duty-roster-dept-cell.today-cell { box-shadow: 0 0 0 1.5px var(--teal) inset; }
     .duty-roster-dept-cell.public-holiday-cell { background: #ff5a5712; }
     .dept-cell-inner {
         border-radius: 6px;
@@ -1760,9 +1789,9 @@
         font-size: 10px;
         border: 1px solid transparent;
     }
-    .dept-cell-inner.createDuty-blue { background: color-mix(in srgb, #014653 14%, #fff); border-color: color-mix(in srgb, #014653 35%, transparent); }
+    .dept-cell-inner.createDuty-blue { background: color-mix(in srgb, var(--teal) 14%, #fff); border-color: color-mix(in srgb, var(--teal) 35%, transparent); }
     .dept-cell-inner.createDuty-yellow { background: color-mix(in srgb, #FED049 26%, #fff); border-color: color-mix(in srgb, #FED049 50%, transparent); }
-    .dept-cell-inner.createDuty-skyBlue { background: color-mix(in srgb, #2EACB3 18%, #fff); border-color: color-mix(in srgb, #2EACB3 40%, transparent); }
+    .dept-cell-inner.createDuty-skyBlue { background: color-mix(in srgb, var(--aqua) 18%, #fff); border-color: color-mix(in srgb, var(--aqua) 40%, transparent); }
     .dept-cell-inner.createDuty-purple { background: color-mix(in srgb, #9E5CF7 14%, #fff); border-color: color-mix(in srgb, #9E5CF7 40%, transparent); }
     .dept-cell-inner.holiday-worked { box-shadow: 0 0 0 1.5px #dc3545 inset; }
     .dept-cell-type { font-weight: 700; font-size: 10px; }
@@ -1800,7 +1829,7 @@
         animation: dutyRosterJumpFlash 1.6s ease-out;
     }
     @keyframes dutyRosterJumpFlash {
-        0% { box-shadow: 0 0 0 3px #014653; }
+        0% { box-shadow: 0 0 0 3px var(--teal); }
         100% { box-shadow: 0 0 0 0 transparent; }
     }
 </style>
@@ -1849,11 +1878,6 @@
             onReady: function (selectedDates, dateStr, instance) {
                 instance.amPM.style.setProperty('display', 'inline-block', 'important');
             }
-        });
-
-        $('#Shiftpopup').select2({
-            placeholder: "Select a Shift", // Placeholder text
-            allowClear: true // Adds a clear (X) button to reset the dropdown
         });
 
         $('.data-Table').dataTable({
@@ -2206,5 +2230,6 @@
     renderWeekNav();
 })();
 </script>
+@include('resorts._dropdown_script')
 @endsection
 

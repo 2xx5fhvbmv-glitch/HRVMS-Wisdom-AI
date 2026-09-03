@@ -10,7 +10,7 @@
 @section('content')
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="ta-attendance-hero">
             <div class="row justify-content-between g-3">
                 <div class="col-auto">
                     <div class="page-title">
@@ -25,6 +25,20 @@
             </div>
         </div>
         <style>
+    /* Same requested push as the Payroll / Talent Acquisition / People
+       dashboards — extra breathing room between the hero and the KPI row
+       below it, scoped to this page (.page-hedding's own margin-bottom is
+       shared by every page's hero). padding-bottom, not margin: adjacent
+       sibling margins collapse to the larger of the two rather than
+       summing. Below Bootstrap's sm breakpoint the extra padding pushes
+       the KPI row's first card into the teal hero curve's rounded
+       bottom-left corner (body::before, border-radius 0 0 50px 50px) —
+       same collision found on Payroll — neutralized below 576px. */
+    #ta-attendance-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #ta-attendance-hero { padding-bottom: 0; }
+    }
+
     /* Custom 5 column layout for large screens */
     @media (min-width: 992px) {
         .col-custom-5 {
@@ -185,7 +199,7 @@
                             </div>
                             <div class="col-auto">
                                 <div class="form-group">
-                                    <select class="form-select YearWiseDateattandance" aria-label="Default select example">
+                                    <select class="form-select YearWiseDateattandance dd-native-select" id="hrYearWiseDateattandance" aria-label="Default select example">
                                         @for ($i = -1; $i < 2; $i++) <!-- Start from one year before the current year -->
                                         @php
                                             $year = date('Y') + $i;
@@ -196,6 +210,26 @@
                                             </option>
                                         @endfor
                                     </select>
+                                    <div class="dd" data-target="#hrYearWiseDateattandance">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">{{ date('Y') }}</span>
+                                            <svg class="dd-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Attendance year">
+                                            <div class="dd-scroll">
+                                                @for ($i = -1; $i < 2; $i++)
+                                                @php
+                                                    $year = date('Y') + $i;
+                                                    $current = date("Y");
+                                                @endphp
+                                                <div class="dd-item @if($year == $current) active @endif" role="option" data-value="{{ $year }}">
+                                                    <span class="dd-nm">{{ $year }}</span>
+                                                    <svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg>
+                                                </div>
+                                                @endfor
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -220,7 +254,7 @@
                     <div class="todoList-main ta-todo-list-v2">
                         @php
                             $todoDefaultPhoto = url(config('settings.default_picture'));
-                            $todoPalette = ['#014653', '#0E8A9E', '#2EACB3', '#4A5F8A', '#5D6F75'];
+                            $todoPalette = ['var(--teal)', '#0E8A9E', 'var(--aqua)', '#4A5F8A', 'var(--muted)'];
                             $todoInitials = function ($name) {
                                 $parts = preg_split('/\s+/', trim((string) $name));
                                 $initials = '';
@@ -440,6 +474,7 @@
 
 @section('import-css')
 @include('resorts.timeandattendance._taa_buttons_v2_styles')
+@include('resorts._dropdown_styles')
 @endsection
 
 @section('import-scripts')
@@ -470,6 +505,11 @@ if (!ctx) {
     }
 
     // Initialize the chart
+    // Placeholder colour only — GetAttandance() below replaces
+    // data.datasets wholesale with the backend response on load, so the
+    // real colour is server-supplied (out of scope); this just keeps the
+    // brief pre-AJAX flash on-theme.
+    var _pTaa1 = window.WaiChart ? window.WaiChart.palette().teal : '#014653';
     myAttendance = new Chart(ctx2d, {
         type: 'bar',
         data: {
@@ -477,8 +517,8 @@ if (!ctx) {
             datasets: [{
                 label: 'Attendance Percentage',
                 data: new Array(12).fill(0),
-                backgroundColor: '#014653',
-                borderColor: '#014653',
+                backgroundColor: _pTaa1,
+                borderColor: _pTaa1,
                 borderWidth: 1,
                 borderRadius: 6,
                 barThickness: 25
@@ -507,8 +547,9 @@ if (!ctx) {
             }
         }
     });
+    if (window.WaiChart) window.WaiChart.registerForTheme(myAttendance);
 }
-    
+
     if (typeof myAttendance !== 'undefined') {
         GetAttandance();
        
@@ -634,6 +675,9 @@ if (!ctx) {
             }
         }
     });
+    // datasets are populated entirely from the AJAX response below (server-
+    // supplied colours, out of scope) — only axes/legend/tooltip retheme.
+    if (window.WaiChart) window.WaiChart.registerForTheme(myOTHours);
     GetmyOTHours()
     function GetmyOTHours()
     {
@@ -933,5 +977,6 @@ if (!ctx) {
     }
 
 </script>
+@include('resorts._dropdown_script')
 @endsection
 

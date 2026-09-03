@@ -33,7 +33,7 @@
     .payroll-btn-accent:focus-visible,
     .payroll-btn-neutral:focus-visible,
     .payroll-btn-critical:focus-visible {
-        outline: 2px solid #014653;
+        outline: 2px solid var(--teal);
         outline-offset: 2px;
     }
     .payroll-btn-ghost:focus-visible {
@@ -41,29 +41,32 @@
         outline-offset: 2px;
     }
 
-    /* Main forward action — Run Payroll, Continue/Next, Submit (config saves). */
+    /* Main forward action — Run Payroll, Continue/Next, Submit (config
+       saves). Text stays literal #fff (contrast-on-solid-teal) —
+       box-shadows stay literal rgba(20,35,42,…) throughout this file. */
     .payroll-btn-primary {
-        background: #014653;
+        background: var(--teal);
         color: #fff;
     }
     .payroll-btn-primary:hover {
-        background: #014653;
+        background: var(--teal);
         color: #fff;
         transform: translateY(-2px);
         box-shadow: 0 8px 18px -8px rgba(20,35,42,.35);
     }
 
     /* Low-stakes, recedes on purpose — Back, Cancel, View, Download,
-       Clear Filter. Light paper tint on hover, never a solid fill. */
+       Clear Filter. Light paper tint on hover, never a solid fill.
+       #C9D6D7 border has no token match — left literal. */
     .payroll-btn-secondary {
         background: transparent;
-        color: #014653;
+        color: var(--teal);
         border: 1.5px solid #C9D6D7;
     }
     .payroll-btn-secondary:hover {
-        background: #F9F8F1;
-        border-color: #014653;
-        color: #014653;
+        background: var(--paper);
+        border-color: var(--teal);
+        color: var(--teal);
         transform: translateY(-2px);
         box-shadow: 0 8px 18px -8px rgba(20,35,42,.18);
     }
@@ -84,11 +87,11 @@
     /* Consequential workflow step, not destructive — Send Payroll for
        Approval, Reject. */
     .payroll-btn-attention {
-        background: #FBF0DC;
-        color: #D98A00;
+        background: var(--warning-bg);
+        color: var(--warning);
     }
     .payroll-btn-attention:hover {
-        background: #D98A00;
+        background: var(--warning);
         color: #fff;
         transform: translateY(-2px);
         box-shadow: 0 8px 18px -8px rgba(20,35,42,.25);
@@ -103,11 +106,11 @@
        (owner's call) — unlike Workforce Planning's single-CTA header,
        both header actions here get the same lime treatment on purpose. */
     .payroll-btn-accent {
-        background: #E0FF02;
+        background: var(--lime);
         color: #17260a;
     }
     .payroll-btn-accent:hover {
-        background: #E0FF02;
+        background: var(--lime);
         color: #17260a;
         transform: translateY(-2px);
         box-shadow: 0 8px 18px -8px rgba(20,35,42,.35);
@@ -139,26 +142,26 @@
        Paid — is the one genuine "this is settled" completion. Only ever
        one of these per page. */
     .payroll-btn-celebrate {
-        background: linear-gradient(135deg, #014653, #E0FF02);
+        background: var(--grad-celebrate);
         color: #fff;
     }
     .payroll-btn-celebrate:hover {
-        background: linear-gradient(135deg, #013641, #c7e102);
+        background: var(--grad-celebrate-hover);
         color: #fff;
         transform: translateY(-2px);
-        box-shadow: 0 10px 22px -8px rgba(1,70,83,.45);
+        box-shadow: 0 10px 22px -8px rgba(var(--teal-rgb),.45);
     }
 
     /* Saved, not final — Save as Draft. Its own neutral weight so it
        doesn't read as identical to Cancel or as heavy as the Primary
        Submit action. */
     .payroll-btn-neutral {
-        background: #DEDEDE;
-        color: #222;
+        background: var(--neutral-bg);
+        color: var(--darkblack);
     }
     .payroll-btn-neutral:hover {
-        background: #F5F8F8;
-        color: #222;
+        background: var(--teal-soft);
+        color: var(--darkblack);
         transform: translateY(-2px);
         box-shadow: 0 8px 18px -8px rgba(20,35,42,.18);
     }
@@ -166,11 +169,11 @@
     /* Irreversible — Confirm & Lock Payroll (both the opening button and
        the modal's real confirm button), Finalize Full & Final Settlement. */
     .payroll-btn-critical {
-        background: #FFDED9;
-        color: #FF2400;
+        background: var(--critical-bg);
+        color: var(--critical);
     }
     .payroll-btn-critical:hover {
-        background: #FF2400;
+        background: var(--critical);
         color: #fff;
         transform: translateY(-2px);
         box-shadow: 0 8px 18px -8px rgba(20,35,42,.25);

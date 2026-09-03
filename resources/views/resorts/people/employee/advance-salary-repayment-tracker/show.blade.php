@@ -7,10 +7,16 @@
 </div>
 @endif
 
-@section('content') 
+@section('content')
+    <style>
+        #advance-salary-show-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #advance-salary-show-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="advance-salary-show-hero">
                 <div class="row  g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -289,6 +295,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts._dropdown_styles')
 @endsection
 
 @section('import-scripts')
@@ -305,16 +312,29 @@ $(document).on("click", ".edit-row-btn", function(event) {
 
         var editRowHtml = `
             <td>
-                <select class="form-control repayment-date">
+                <select class="form-control repayment-date dd-native-select" id="repayment-date-${scheduleId}">
                     @foreach($availableMonths as $month)
                         <option value="{{ $month }}" >{{ $month }}</option>
                     @endforeach
                 </select>
+                <div class="dd" data-target="#repayment-date-${scheduleId}">
+                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                        <span class="dd-lbl">{{ $availableMonths[0] ?? '' }}</span>
+                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                    </button>
+                    <div class="dd-panel" role="listbox" aria-label="Repayment Date">
+                        <div class="dd-scroll">
+                            @foreach($availableMonths as $month)
+                                <div class="dd-item{{ $loop->first ? ' active' : '' }}" role="option" data-value="{{ $month }}"><span class="dd-nm">{{ $month }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
             </td>
             <td>
                 <input type="text" class="form-control amount" value="${amount}" />
             </td>
-            
+
             <td >
                 <a href="javascript:void(0)" class="btn btn-theme update-row-btn" data-id="${scheduleId}">Submit</a>
             </td>
@@ -403,5 +423,6 @@ $(document).on("click", "#submitBtn", function(event) {
 });
 
 </script>
+@include('resorts._dropdown_script')
 @endsection
 

@@ -8,10 +8,15 @@
 @endif
 
 @section('content')
-
+<style>
+    #floor-room-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #floor-room-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="floor-room-hero">
             <div class="row justify-content-between g-3">
                 <div class="col-auto">
                     <div class="page-title">
@@ -67,6 +72,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts._dropdown_styles')
 @endsection
 
 @section('import-scripts')
@@ -155,7 +161,7 @@
             var editRowHtml = `
                     <td class="py-1">
                         <div class="form-group">
-                             <select class="form-select select2t-none" id="building_id" name="building_id">
+                             <select class="form-select dd-native-select" id="building_id" name="building_id">
                                     <option></option>
                                     @if($BuildingData->isNotEmpty())
                                             @foreach ($BuildingData as $a)
@@ -163,6 +169,23 @@
                                             @endforeach
                                     @endif
                                 </select>
+                                <div class="dd" data-target="#building_id">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">Select Building</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Building">
+                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a building…"></div>
+                                        <div class="dd-scroll">
+                                            <div class="dd-item" role="option" data-value=""><span class="dd-nm">Select Building</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @if($BuildingData->isNotEmpty())
+                                                @foreach ($BuildingData as $a)
+                                                <div class="dd-item ${Builing_id == '{{ $a->id }}' ? 'active' : ''}" role="option" data-value="{{ $a->id }}"><span class="dd-nm">{{ $a->BuildingName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @endforeach
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
                         </div>
                     </td>
                     <td class="py-1">
@@ -182,9 +205,7 @@
 
             // Replace row content with editable form
             $row.html(editRowHtml);
-            $("#building_id").select2({
-                placeholder:"Select Building"
-            });
+            window.wisdomDD.sync('#building_id');
         });
 
         $(document).on("click", "#FloorAndRoomIndex .update-row-btn_cat", function (event) {
@@ -240,4 +261,5 @@
             });
         });
 </script>
+@include('resorts._dropdown_script')
 @endsection

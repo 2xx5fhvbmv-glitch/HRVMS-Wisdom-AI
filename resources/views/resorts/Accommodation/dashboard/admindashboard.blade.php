@@ -86,12 +86,27 @@
                             </div>
                             <div class="col-auto">
                                 <div class="form-group">
-                                    <select class="form-select ResortDepartment" aria-label="Default select example">
+                                    <select class="form-select dd-native-select ResortDepartment" id="adminDashResortDepartment" aria-label="Default select example">
                                         <option ></option>
                                         @foreach ($ResortDepartment as $d)
                                             <option value="{{ $d->id }}">{{ $d->name }}</option>
                                         @endforeach
                                     </select>
+                                    <div class="dd" data-target="#adminDashResortDepartment">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Select Department</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Department">
+                                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a department…"></div>
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Department</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @foreach ($ResortDepartment as $d)
+                                                <div class="dd-item" role="option" data-value="{{ $d->id }}"><span class="dd-nm">{{ $d->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                             <div class="col-auto"><a href="{{ route('resort.accommodation.MaintanaceRequestlist') }}" class="a-link">View All</a>
@@ -278,7 +293,7 @@
                             </div>
                             <div class="col-auto">
                                 <div class="form-group">
-                                    <select class="form-select InventoryCategory"  aria-label="Default select example">
+                                    <select class="form-select dd-native-select InventoryCategory" id="adminDashInventoryCategory" aria-label="Default select example">
                                         <option ></option>
                                         @if($InventoryCategory->isNotEmpty())
                                             @foreach ($InventoryCategory as $s)
@@ -286,6 +301,23 @@
                                             @endforeach
                                         @endif
                                     </select>
+                                    <div class="dd" data-target="#adminDashInventoryCategory">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Select Category</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Category">
+                                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a category…"></div>
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Category</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @if($InventoryCategory->isNotEmpty())
+                                                    @foreach ($InventoryCategory as $s)
+                                                    <div class="dd-item" role="option" data-value="{{ $s->id }}"><span class="dd-nm">{{ $s->CategoryName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @endforeach
+                                                @endif
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                             <div class="col-auto"><a href="{{ route('resort.accommodation.inventory')}}" class="a-link">View All</a>
@@ -456,7 +488,7 @@
 
                     </div>
                     <div><label for="select_emp" class="form-label">SELECT EMPLOYEE</label>
-                        <select class="form-select select2t-none" name="HOD_id" id="select_emp" aria-label="Default select example">
+                        <select class="form-select dd-native-select" name="HOD_id" id="select_emp" aria-label="Default select example">
                             <option> </option>
                             @if($Employee->isNotEmpty())
 
@@ -465,6 +497,23 @@
                                 @endforeach
                             @endif
                         </select>
+                        <div class="dd" data-target="#select_emp">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">Select Employee</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Employee">
+                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an employee…"></div>
+                                <div class="dd-scroll">
+                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Employee</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    @if($Employee->isNotEmpty())
+                                        @foreach ($Employee as $e)
+                                        <div class="dd-item" role="option" data-value="{{ $e->id }}"><span class="dd-nm">{{ $e->first_name }} {{ $e->last_name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @endforeach
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <input type="hidden" name="task_id" id="task_id">
                 </div>
@@ -513,9 +562,21 @@
                 <div class="row">
                     <div class="col-12">
 
-                        <select class="form-select" name="emp_id" id="EmployeeList">
+                        <select class="form-select dd-native-select" name="emp_id" id="EmployeeList">
                             <option selected>Select Employee</option>
                         </select>
+                        <div class="dd" data-target="#EmployeeList">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">Select Employee</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Employee">
+                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an employee…"></div>
+                                <div class="dd-scroll">
+                                    <div class="dd-item active" role="option" data-value="Select Employee"><span class="dd-nm">Select Employee</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <br>
@@ -545,15 +606,12 @@
 @endsection
 
 @section('import-css')
+@include('resorts._dropdown_styles')
 @endsection
 
 @section('import-scripts')
 <script type="text/javascript">
     $(document).ready(function () {
-        $("#EmployeeList").select2({
-            placeholder: "Select Employee",
-            allowClear: true,
-        })
         // $('.data-Table').dataTable({
         //     "searching": false,
         //     "bLengthChange": false,
@@ -563,20 +621,6 @@
         //     scrollX: true,
         //     "iDisplayLength": 10,
         // });
-        $("#select_emp").select2({
-            placeholder: "Select Employee",
-            allowClear: true
-        });
-        $(".InventoryCategory").select2({
-            placeholder: "Select Category",
-            allowClear: true
-        });
-
-
-        $(".ResortDepartment").select2({
-            placeholder: "Select Department",
-            allowClear: true
-        });
 
         $(".ResortDepartment").on("change",function()
         {
@@ -617,6 +661,7 @@
                                 positionClass: 'toast-bottom-right'
                             });
                             form.reset();
+                            window.wisdomDD.sync('#select_emp');
                             PendingTaskList();
                             $("#ForwardToHOD-Model").modal('hide');
 
@@ -1032,12 +1077,13 @@
                 if (response.success)
                 {
                     var row = '';
-                    var option = '<option></option>';
+                    var option = '<option value="">Select Employee</option>';
                     $.each(response.Employees, function (i, v)
                     {
                         option +=`<option value='${v.EmployeeId}'>${v.first_name}  ${v.last_name}</option>`;
                     });
                     $("#EmployeeList").html(option);
+                    window.wisdomDD.rebuild('#EmployeeList');
                             $.each(response.AssingAccommodation, function (i, v)
                             {
 
@@ -1086,6 +1132,7 @@
 </script>
 <script type="module">
     var ctx = document.getElementById('myLineChart').getContext('2d');
+    var _pAcc = window.WaiChart ? window.WaiChart.palette().teal : '#014653';
     var myLineChart = new Chart(ctx, {
         type: 'line',
         data: {
@@ -1094,8 +1141,8 @@
                 {
                     label: 'Occupancy Rates',
                     data: [7, 20, 17, 22, 35],
-                    borderColor: '#014653',
-                    backgroundColor: '#014653',
+                    borderColor: _pAcc,
+                    backgroundColor: _pAcc,
                     borderWidth: 1,
                     fill: false,
                     tension: 0.4, // Creates smooth curves
@@ -1141,7 +1188,11 @@
         }
 
     });
+    if (window.WaiChart) window.WaiChart.registerForTheme(myLineChart, function (c, p) {
+        c.data.datasets[0].borderColor = c.data.datasets[0].backgroundColor = p.teal;
+    });
 
 </script>
+@include('resorts._dropdown_script')
 @endsection
 

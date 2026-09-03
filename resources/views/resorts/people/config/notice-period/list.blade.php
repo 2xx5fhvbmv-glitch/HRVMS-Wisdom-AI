@@ -8,10 +8,15 @@
 @endif
 
 @section('content')
-
+<style>
+    #notice-period-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #notice-period-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="notice-period-hero">
             <div class="row justify-content-between g-3">
                 <div class="col-auto">
                     <div class="page-title">
@@ -59,6 +64,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts._dropdown_styles')
 @endsection
 
 @section('import-scripts')
@@ -163,17 +169,33 @@
 
      // Assume 'title' holds the selected value (id)
      var optionsHtml = '';
+     var titleItemsHtml = '';
+     var selectedTitleLbl = 'Select Task';
      tasks.forEach(function(t) {
-     optionsHtml += `<option value="${t.position_title}" ${t.position_title == title ? 'selected' : ''}>${t.position_title}</option>`;
+     var isSelected = t.position_title == title;
+     optionsHtml += `<option value="${t.position_title}" ${isSelected ? 'selected' : ''}>${t.position_title}</option>`;
+     titleItemsHtml += `<div class="dd-item${isSelected ? ' active' : ''}" role="option" data-value="${t.position_title}"><span class="dd-nm">${t.position_title}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>`;
+     if (isSelected) selectedTitleLbl = t.position_title;
      });
 
+    var titleSelectId = 'notice-title-' + Main_id;
+    var releaseSelectId = 'notice-release-' + Main_id;
 
     var editRowHtml = `
         <td class="py-1">
             <div class="form-group">
-                <select class="form-control select2 title">
+                <select class="form-control title dd-native-select" id="${titleSelectId}">
                     ${optionsHtml}
                 </select>
+                <div class="dd" data-target="#${titleSelectId}">
+                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                        <span class="dd-lbl">${selectedTitleLbl}</span>
+                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                    </button>
+                    <div class="dd-panel" role="listbox" aria-label="Task">
+                        <div class="dd-scroll">${titleItemsHtml}</div>
+                    </div>
+                </div>
             </div>
         </td>
         <td class="py-1">
@@ -183,10 +205,22 @@
         </td>
         <td class="py-1">
             <div class="form-group">
-                    <select class="form-control immediate_release">
+                    <select class="form-control immediate_release dd-native-select" id="${releaseSelectId}">
                          <option value="1" ${immediate_release === 'Yes' ? 'selected' : ''}>Yes</option>
                          <option value="0" ${immediate_release === 'No' ? 'selected' : ''}>No</option>
                     </select>
+                    <div class="dd" data-target="#${releaseSelectId}">
+                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                            <span class="dd-lbl">${immediate_release === 'No' ? 'No' : 'Yes'}</span>
+                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                        </button>
+                        <div class="dd-panel" role="listbox" aria-label="Immediate Release">
+                            <div class="dd-scroll">
+                                <div class="dd-item ${immediate_release === 'No' ? '' : 'active'}" role="option" data-value="1"><span class="dd-nm">Yes</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                <div class="dd-item ${immediate_release === 'No' ? 'active' : ''}" role="option" data-value="0"><span class="dd-nm">No</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                            </div>
+                        </div>
+                    </div>
             </div>
         </td>
         <td class="py-1">
@@ -251,4 +285,5 @@
         });
     });
 </script>
+@include('resorts._dropdown_script')
 @endsection

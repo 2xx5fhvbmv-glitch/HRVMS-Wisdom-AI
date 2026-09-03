@@ -123,7 +123,7 @@
                     <button type="button" id="uc-list-close" title="Close"><i class="fa-solid fa-xmark"></i></button>
                 </div>
             </div>
-            <div class="uc-search"><input type="text" id="uc-list-search" placeholder="Search conversations…"></div>
+            <div class="uc-search"><div class="uc-search-box"><i class="fa-solid fa-magnifying-glass"></i><input type="text" id="uc-list-search" placeholder="Search conversations…"></div></div>
             <div class="uc-list" id="uc-conversations"><div class="uc-empty">Loading…</div></div>
         </div>
 
@@ -444,6 +444,74 @@
 .uc-info-action { display: block; width: 100%; text-align: left; background: #fff; border: 1px solid #e3e6f0; border-radius: 10px; padding: 9px 12px; margin-bottom: 8px; font-size: 13px; color: #25243a; cursor: pointer; }
 .uc-info-action.uc-danger { color: #c0455a; border-color: #f1d5da; }
 .uc-info-name-edit { width: 100%; border: 1px solid #d8e2de; border-radius: 10px; padding: 8px 10px; font-size: 14px; margin-bottom: 10px; }
+
+/* ---- Colleague chat (#uc-panel) — teal redesign -----------------------
+   Scoped entirely under #uc-panel so the Wisdom AI assistant panel above
+   (which shares several base classes: .wai-header, .wai-row, .wai-bubble,
+   .wai-input, .wai-mini-avatar) keeps its own existing look untouched.
+   No presence dots — the only "presence" field the API returns
+   (last_seen) is a ResortAdmin row's updated_at, not real activity
+   tracking, so a dot/"Active now" text driven by it would just be wrong. */
+#uc-panel .wai-header { background: var(--teal); }
+#uc-panel .uc-back,
+#uc-panel .wai-header-actions button { background: rgba(255,255,255,.14); }
+#uc-panel .uc-back:hover,
+#uc-panel .wai-header-actions button:hover { background: rgba(255,255,255,.26); }
+
+/* Search */
+#uc-panel .uc-search-box { display: flex; align-items: center; gap: 8px; background: var(--line-2); border: 1px solid var(--line); border-radius: 11px; padding: 8px 12px; }
+#uc-panel .uc-search-box i { color: var(--faint); font-size: 12.5px; flex: none; }
+#uc-panel .uc-search-box input { border: none; background: none; outline: none; font-family: inherit; font-size: 13.5px; color: var(--ink); width: 100%; padding: 0; }
+#uc-panel .uc-search-box input::placeholder { color: var(--faint); }
+
+/* Photo-first avatars with initials fallback (list rows, picker, thread
+   header, member rows, and thread sender avatars all funnel through the
+   same ucAvatarInner() JS helper into this markup). */
+#uc-panel .uc-conv-avatar, #uc-panel .uc-picker-avatar, #uc-panel #uc-thread-avatar {
+    position: relative; background: var(--neutral-bg);
+}
+#uc-panel .uc-conv-avatar img, #uc-panel .uc-picker-avatar img, #uc-panel #uc-thread-avatar img {
+    position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+}
+#uc-panel .uc-av-fallback {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 600; font-size: inherit;
+}
+
+/* List rows */
+#uc-panel .uc-conv-item:hover, #uc-panel .uc-conv-item.uc-active { background: var(--teal-soft); }
+#uc-panel .uc-conv-row2 { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 1px; }
+#uc-panel .uc-conv-last { flex: 1; min-width: 0; }
+#uc-panel .uc-conv-last.uc-conv-last-none { color: var(--faint); font-style: italic; }
+#uc-panel .uc-badge { background: var(--teal); color: #fff; flex: none; }
+
+/* Thread */
+#uc-panel #uc-messages { background: var(--teal-soft); }
+#uc-panel .uc-daysep {
+    align-self: center; font-size: 10.5px; color: var(--muted); background: var(--card);
+    border: 1px solid var(--line); padding: 3px 11px; border-radius: 20px; margin: 4px 0;
+}
+#uc-panel .wai-bot .wai-bubble { border: 1px solid var(--line); box-shadow: none; }
+#uc-panel .wai-user .wai-bubble { background: var(--teal); }
+#uc-panel .uc-bt { font-size: 10px; margin-top: 4px; opacity: .65; }
+#uc-panel .wai-user .uc-bt { text-align: right; }
+#uc-panel .wai-mini-avatar { border-radius: 50%; }
+#uc-panel .uc-msg-avatar-ghost { visibility: hidden; }
+#uc-panel .uc-thread-empty { margin: auto; text-align: center; padding: 20px; color: var(--muted); }
+#uc-panel .uc-thread-empty-ic {
+    width: 44px; height: 44px; border-radius: 50%; background: var(--teal-3); color: var(--teal);
+    display: flex; align-items: center; justify-content: center; font-size: 18px; margin: 0 auto 10px;
+}
+#uc-panel .uc-thread-empty-t { font-size: 13.5px; font-weight: 600; color: var(--ink); }
+#uc-panel .uc-thread-empty-s { font-size: 12px; color: var(--muted); margin-top: 3px; }
+
+/* Send button — lime is used only here, nowhere else in the panel */
+#uc-panel #uc-send { background: var(--lime); box-shadow: 0 4px 14px rgba(224,255,2,.35); }
+#uc-panel #uc-send:hover { box-shadow: 0 6px 18px rgba(224,255,2,.45); }
+
+@media (prefers-reduced-motion: reduce) {
+    #uc-panel #uc-send, #uc-panel .uc-choice, #uc-panel .uc-conv-item { transition: none; }
+}
 </style>
 
 <script>
@@ -686,6 +754,42 @@
     }
     function isImageAttachment(url) { return /\.(jpe?g|png|gif|webp)(\?|$)/i.test(url); }
 
+    // Photo-first avatar with an initials fallback — Common::getResortUserPicture()
+    // (server side) already guarantees a non-empty URL, but that URL can still
+    // 404 (a missing/never-uploaded file), so this covers that case rather than
+    // trusting the URL always resolves.
+    var UC_AV_PALETTE = ['#0E8A9E', '#6B4FA0', '#1F9D6B', '#D98A00', '#4A5F8A', '#A0527A'];
+    function ucAvatarColor(name) {
+        var hash = 0, s = String(name || '');
+        for (var i = 0; i < s.length; i++) { hash = (s.charCodeAt(i) + ((hash << 5) - hash)) % 1000000007; }
+        return UC_AV_PALETTE[Math.abs(hash) % UC_AV_PALETTE.length];
+    }
+    function ucInitials(name) {
+        var parts = String(name || '').trim().split(/\s+/).slice(0, 2);
+        var s = parts.map(function (p) { return p.charAt(0).toUpperCase(); }).join('');
+        return s || '?';
+    }
+    function ucAvatarInner(profile, name) {
+        return (profile ? '<img src="' + profile + '" alt="" onerror="this.remove()">' : '') +
+            '<span class="uc-av-fallback" style="background:' + ucAvatarColor(name) + '">' + escapeHtml(ucInitials(name)) + '</span>';
+    }
+    function ucDayLabel(dateStr) {
+        if (!dateStr) return '';
+        var d = new Date(String(dateStr).replace(' ', 'T'));
+        if (isNaN(d.getTime())) return '';
+        var today = new Date(), yest = new Date(today.getTime()); yest.setDate(today.getDate() - 1);
+        var sameDay = function (a, b) { return a.toDateString() === b.toDateString(); };
+        if (sameDay(d, today)) return 'Today';
+        if (sameDay(d, yest)) return 'Yesterday';
+        return d.toLocaleDateString(undefined, d.getFullYear() === today.getFullYear() ? { month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+    function ucTimeLabel(dateStr) {
+        if (!dateStr) return '';
+        var d = new Date(String(dateStr).replace(' ', 'T'));
+        if (isNaN(d.getTime())) return '';
+        return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    }
+
     var launcher = document.getElementById('wai-launcher');
     var waiPanel = document.getElementById('wai-panel');
     var ucPanel = document.getElementById('uc-panel');
@@ -829,14 +933,16 @@
             item.className = 'uc-conv-item';
             var avatar = c.type === 'group'
                 ? '<div class="uc-conv-avatar"><i class="fa-solid fa-user-group"></i></div>'
-                : '<div class="uc-conv-avatar"><img src="' + c.profile + '" alt=""></div>';
+                : '<div class="uc-conv-avatar">' + ucAvatarInner(c.profile, c.name) + '</div>';
             item.innerHTML = avatar +
                 '<div class="uc-conv-body">' +
                     '<div class="uc-conv-name-row"><span class="uc-conv-name">' + escapeHtml(c.name) + '</span>' +
                     '<span class="uc-conv-time">' + timeAgo(c.last_seen) + '</span></div>' +
-                    '<div class="uc-conv-last">' + (c.last_msg ? escapeHtml(c.last_msg) : 'No messages yet') + '</div>' +
-                '</div>' +
-                (c.unread_count > 0 ? '<span class="uc-badge">' + c.unread_count + '</span>' : '');
+                    '<div class="uc-conv-row2">' +
+                        '<span class="uc-conv-last' + (c.last_msg ? '' : ' uc-conv-last-none') + '">' + (c.last_msg ? escapeHtml(c.last_msg) : 'No messages yet') + '</span>' +
+                        (c.unread_count > 0 ? '<span class="uc-badge">' + c.unread_count + '</span>' : '') +
+                    '</div>' +
+                '</div>';
             item.addEventListener('click', function () { openThread(c.type, c.id, c.name, c.profile); });
             wrap.appendChild(item);
         });
@@ -891,7 +997,7 @@
             var checkable = state.pickerMode === 'group' || state.pickerMode === 'add-member';
             item.innerHTML =
                 (checkable ? '<input type="checkbox" data-id="' + p.id + '">' : '') +
-                '<div class="uc-picker-avatar"><img src="' + p.profile + '" alt=""></div>' +
+                '<div class="uc-picker-avatar">' + ucAvatarInner(p.profile, p.name) + '</div>' +
                 '<span class="uc-picker-name">' + escapeHtml(p.name) + '</span>';
             if (checkable) {
                 var cb = item.querySelector('input');
@@ -951,13 +1057,13 @@
 
     // ---- Thread view ----------------------------------------------------------
     function openThread(type, id, name, profile) {
-        state.current = { type: type, id: id, name: name, isAdmin: false, members: [] };
+        state.current = { type: type, id: id, name: name, profile: profile || null, isAdmin: false, members: [] };
         document.getElementById('uc-thread-title').textContent = name || '';
         document.getElementById('uc-thread-subtitle').textContent = type === 'group' ? 'Group' : '';
         var avatarEl = document.getElementById('uc-thread-avatar');
         avatarEl.innerHTML = type === 'group'
             ? '<i class="fa-solid fa-user-group"></i>'
-            : (profile ? '<img src="' + profile + '" alt="">' : '<i class="fa-solid fa-user"></i>');
+            : ucAvatarInner(profile, name);
         document.getElementById('uc-thread-info').style.display = type === 'group' ? 'flex' : 'none';
         showView(viewThread);
         loadThread();
@@ -980,6 +1086,8 @@
                     state.current.members = res.body.data.members || [];
                     document.getElementById('uc-thread-title').textContent = res.body.data.name;
                     document.getElementById('uc-thread-subtitle').textContent = state.current.members.length + ' members';
+                } else if (res.body.data && res.body.data.profile) {
+                    state.current.profile = res.body.data.profile;
                 }
                 renderMessages(res.body.messages || []);
                 markRead(res.body.messages || []);
@@ -988,14 +1096,54 @@
             .catch(function () { msgsEl.innerHTML = '<div class="uc-empty">Something went wrong.</div>'; });
     }
 
+    // Looks up a message's sender name/photo from data already fetched into
+    // state.current (data.profile for a 1-1 thread, data.members for a
+    // group) — no new request per message.
+    function ucSenderInfo(senderId) {
+        if (state.current.type === 'group') {
+            var m = (state.current.members || []).find(function (x) { return parseInt(x.id, 10) === parseInt(senderId, 10); });
+            return m ? { name: m.name, profile: m.profile } : { name: '', profile: null };
+        }
+        return { name: state.current.name, profile: state.current.profile };
+    }
+
     function renderMessages(messages) {
         var msgsEl = document.getElementById('uc-messages');
         msgsEl.innerHTML = '';
-        if (!messages.length) { msgsEl.innerHTML = '<div class="uc-empty">Say hello 👋</div>'; return; }
+        if (!messages.length) {
+            msgsEl.innerHTML =
+                '<div class="uc-thread-empty">' +
+                    '<div class="uc-thread-empty-ic"><i class="fa-solid fa-comment-dots"></i></div>' +
+                    '<div class="uc-thread-empty-t">No messages yet</div>' +
+                    '<div class="uc-thread-empty-s">Your first message starts the conversation.</div>' +
+                '</div>';
+            return;
+        }
+        var lastDay = null, lastSenderId = null;
         messages.forEach(function (m) {
             var mine = parseInt(m.sender_id, 10) === MY_ID;
+
+            var thisDay = ucDayLabel(m.created_at);
+            if (thisDay && thisDay !== lastDay) {
+                var sep = document.createElement('div');
+                sep.className = 'uc-daysep';
+                sep.textContent = thisDay;
+                msgsEl.appendChild(sep);
+                lastDay = thisDay;
+                lastSenderId = null; // show the avatar again after a day break
+            }
+
             var row = document.createElement('div');
             row.className = 'wai-row ' + (mine ? 'wai-user' : 'wai-bot');
+
+            var avatarHtml = '';
+            if (!mine) {
+                var showAvatar = parseInt(m.sender_id, 10) !== lastSenderId;
+                var s = ucSenderInfo(m.sender_id);
+                avatarHtml = '<div class="wai-mini-avatar uc-msg-avatar' + (showAvatar ? '' : ' uc-msg-avatar-ghost') + '">' +
+                    (showAvatar ? ucAvatarInner(s.profile, s.name) : '') + '</div>';
+            }
+
             var bubble = '<div class="wai-bubble">';
             if (m.message) bubble += escapeHtml(m.message).replace(/\n/g, '<br>');
             if (m.attachment) {
@@ -1003,9 +1151,12 @@
                     ? '<img src="' + m.attachment + '" onclick="window.open(this.src)">'
                     : '<a href="' + m.attachment + '" target="_blank" rel="noopener"><i class="fa-solid fa-paperclip"></i> Attachment</a>') + '</div>';
             }
+            bubble += '<div class="uc-bt">' + ucTimeLabel(m.created_at) + '</div>';
             bubble += '</div>';
-            row.innerHTML = bubble;
+            row.innerHTML = avatarHtml + bubble;
             msgsEl.appendChild(row);
+
+            lastSenderId = mine ? lastSenderId : parseInt(m.sender_id, 10);
         });
         msgsEl.scrollTop = msgsEl.scrollHeight;
     }
@@ -1083,7 +1234,7 @@
             : '<div>' + escapeHtml(g.name) + '</div>';
         html += '<h5>Members (' + g.members.length + ')</h5>';
         g.members.forEach(function (m) {
-            html += '<div class="uc-member-row"><div class="uc-conv-avatar"><img src="' + m.profile + '" alt=""></div>' +
+            html += '<div class="uc-member-row"><div class="uc-conv-avatar">' + ucAvatarInner(m.profile, m.name) + '</div>' +
                 '<span>' + escapeHtml(m.name) + (m.role === 'admin' ? ' · Admin' : '') + '</span>' +
                 (isAdmin && m.role !== 'admin' ? '<button data-id="' + m.id + '" class="uc-remove-member">Remove</button>' : '') +
                 '</div>';

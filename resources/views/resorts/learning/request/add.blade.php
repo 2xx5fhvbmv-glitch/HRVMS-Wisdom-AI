@@ -8,9 +8,15 @@
 @endif
 
 @section('content')
+    <style>
+        #learning-request-add-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #learning-request-add-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="learning-request-add-hero">
                 <div class="row justify-content-between g-3 align-items-center">
                     <div class="col-auto">
                         <div class="page-title">
@@ -59,7 +65,7 @@
                                 <div class="row gx-md-4 g-3 ">
                                     <div class="col-lg-12">
                                         <label for="suggested_Learning" class="form-label">SUGGESTED LEARNING <span class="req_span">*</span></label>
-                                        <select class="form-select select2t-none" id="suggested_Learning" name="suggested_Learning">
+                                        <select class="form-select dd-native-select" id="suggested_Learning" name="suggested_Learning">
                                             <option value="">Select Learning</option>
                                             @if($programs)
                                                 @foreach($programs as $program)
@@ -67,6 +73,22 @@
                                                 @endforeach
                                             @endif
                                         </select>
+                                        <div class="dd" data-target="#suggested_Learning">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">Select Learning</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Suggested Learning">
+                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a program…"></div>
+                                                <div class="dd-scroll">
+                                                    @if($programs)
+                                                        @foreach($programs as $program)
+                                                            <div class="dd-item" role="option" data-value="{{ $program->id }}"><span class="dd-nm">{{ $program->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @endforeach
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </div>
                                         <div id="div-suggested_Learning"></div>
                                     </div>
                                     <div class="col-lg-6">
@@ -75,7 +97,7 @@
                                     </div>
                                     <div class="col-lg-6">
                                         <label for="training_manager" class="form-label">L&D Manager <span class="req_span">*</span></label>
-                                        <select class="form-select select2t-none" id="learning_manager" name="learning_manager">
+                                        <select class="form-select dd-native-select" id="learning_manager" name="learning_manager">
                                             <option value="">Select Learning Manager</option>
                                             @if($learningManagers)
                                                 @foreach($learningManagers as $manager)
@@ -83,6 +105,22 @@
                                                 @endforeach
                                             @endif
                                         </select>
+                                        <div class="dd" data-target="#learning_manager">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">Select Learning Manager</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Learning Manager">
+                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a manager…"></div>
+                                                <div class="dd-scroll">
+                                                    @if($learningManagers)
+                                                        @foreach($learningManagers as $manager)
+                                                            <div class="dd-item" role="option" data-value="{{ $manager->id }}"><span class="dd-nm">{{ $manager->resortAdmin->full_name }} ({{ $manager->position->position_title }})</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @endforeach
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div class="col-lg-6">
                                         <label for="start_date" class="form-label">EXPECTED START DATE <span class="req_span">*</span></label>
@@ -112,6 +150,8 @@
         </div>
     </div>
 @include('resorts.Learning._learning_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -136,8 +176,6 @@
             allowInput: true,
             appendTo: document.body
         });
-
-        $('.select2t-none').select2();
 
         $.validator.addMethod("greaterThan", function (value, element, param) {
             let startDate = $(param).val();

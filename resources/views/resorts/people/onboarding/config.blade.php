@@ -8,9 +8,15 @@
 @endif
 
 @section('content')
+    <style>
+        #onboarding-config-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #onboarding-config-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="onboarding-config-hero">
                 <div class="row  g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -92,7 +98,7 @@
                                             <input type="text" name="events[]" class="form-control" placeholder="Event Name">
                                         </div>
                                         <div class="col-sm-6">
-                                            <select class="form-select select2t-none" id="notification_timing"
+                                            <select class="form-select dd-native-select" id="notification_timing-0"
                                                 aria-label="Default select example" name="notification_timing[]">
                                                 <option value="">Notification Time</option>
                                                 @if($notificationTimings)
@@ -101,6 +107,22 @@
                                                     @endforeach
                                                 @endif
                                             </select>
+                                            <div class="dd" data-target="#notification_timing-0">
+                                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                    <span class="dd-lbl">Notification Time</span>
+                                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                </button>
+                                                <div class="dd-panel" role="listbox" aria-label="Notification Time">
+                                                    <div class="dd-scroll">
+                                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Notification Time</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @if($notificationTimings)
+                                                            @foreach ($notificationTimings as $key => $value)
+                                                                <div class="dd-item" role="option" data-value="{{ $key }}"><span class="dd-nm">{{ $value }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                            @endforeach
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                         <div class="col-auto">
                                             <button type="button" class="btn btn-sm eb-btn-critical remove-task">Remove</button>
@@ -174,6 +196,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts._dropdown_styles')
 @endsection
 
 @section('import-scripts')
@@ -222,9 +245,6 @@
 
 <script type="text/javascript">
     $(document).ready(function () {
-        // Initialize Select2
-        $('.select2t-none').select2();
-
         CKEDITOR.replace('cultural_insights');
         
         $('#cultural_insights_form').on('submit', function (e) {
@@ -269,16 +289,18 @@
     });
     document.addEventListener('DOMContentLoaded', function () {
         // Add More Task
+        var notificationTimingRowCount = 1;
         document.getElementById('addMoreTask').addEventListener('click', function () {
             const container = document.getElementById('event-container');
             const row = document.createElement('div');
             row.className = 'event-row row g-2 mb-md-3 mb-2';
+            const selectId = 'notification_timing-' + notificationTimingRowCount++;
             row.innerHTML = `
                 <div class="col">
                     <input type="text" name="events[]" class="form-control" placeholder="Event Name">
                 </div>
                 <div class="col-sm-6">
-                    <select class="form-select select2t-none" id="notification_timing" name="notification_timing[]"
+                    <select class="form-select dd-native-select" id="${selectId}" name="notification_timing[]"
                         aria-label="Default select example">
                         <option value="">Notification Time</option>
                         @if($notificationTimings)
@@ -287,13 +309,28 @@
                             @endforeach
                         @endif
                     </select>
+                    <div class="dd" data-target="#${selectId}">
+                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                            <span class="dd-lbl">Notification Time</span>
+                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                        </button>
+                        <div class="dd-panel" role="listbox" aria-label="Notification Time">
+                            <div class="dd-scroll">
+                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Notification Time</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                @if($notificationTimings)
+                                    @foreach ($notificationTimings as $key => $value)
+                                        <div class="dd-item" role="option" data-value="{{ $key }}"><span class="dd-nm">{{ $value }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    @endforeach
+                                @endif
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div class="col-auto">
                     <button type="button" class="btn btn-sm eb-btn-critical remove-task">Remove</button>
                 </div>
             `;
             container.appendChild(row);
-            $('.select2t-none').select2(); // Reinitialize Select2
         });
 
         // Remove Task Row
@@ -433,4 +470,5 @@
         });
     });
 </script>
+@include('resorts._dropdown_script')
 @endsection

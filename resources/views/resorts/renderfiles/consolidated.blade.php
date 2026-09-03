@@ -145,22 +145,22 @@
         align-items: center;
         gap: 12px;
         width: 100%;
-        border: 1px solid var(--wb-line);
+        border: 1px solid var(--line);
         border-radius: 10px;
         padding: 10px 14px;
-        background: var(--wb-card) !important;
-        color: var(--wb-ink);
+        background: var(--card) !important;
+        color: var(--ink);
         font-weight: 600;
         transition: background .12s, border-color .12s;
     }
-    .cb-accordion-btn:hover { background: var(--wb-teal-tint-2) !important; border-color: var(--wb-teal-tint-1); }
+    .cb-accordion-btn:hover { background: var(--teal-soft) !important; border-color: var(--teal-3); }
     /* Suppress Bootstrap's default right-side caret — using our own
        chevron instead, so it stays brand-colored, not the theme's default. */
     .cb-accordion-btn::after { display: none !important; }
 
     .cb-row-main { flex: 1; min-width: 0; }
     .cb-chevron {
-        color: var(--wb-faint);
+        color: var(--faint);
         font-size: 12px;
         flex-shrink: 0;
         transition: transform 0.2s ease;

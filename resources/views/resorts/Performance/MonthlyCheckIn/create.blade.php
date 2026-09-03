@@ -132,7 +132,7 @@
                                             </div>
                                             <div class="col-md-5 checkTraning d-none">
                                                 <label for="select_training" class="form-label">SELECT TRAINING</label>
-                                                <select class="form-select" id="select_training" name="tranining_id">
+                                                <select class="form-select dd-native-select" id="select_training" name="tranining_id">
                                                     <option value="">Select Training</option>
                                                     @if(isset($learningProgram) && $learningProgram->isNotempty())
                                                         @foreach($learningProgram as $l)
@@ -140,10 +140,26 @@
                                                         @endforeach
                                                     @endif
                                                 </select>
+                                                <div class="dd" data-target="#select_training">
+                                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                        <span class="dd-lbl">Select Training</span>
+                                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                    </button>
+                                                    <div class="dd-panel" role="listbox" aria-label="Training">
+                                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a training…"></div>
+                                                        <div class="dd-scroll">
+                                                            @if(isset($learningProgram) && $learningProgram->isNotempty())
+                                                                @foreach($learningProgram as $l)
+                                                                    <div class="dd-item" role="option" data-value="{{ $l->id }}"><span class="dd-nm">{{ $l->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                @endforeach
+                                                            @endif
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
                                             <div class="col-md-5 checkTraning d-none">
                                                 <label for="select_learning_manager_id" class="form-label">SELECT LEARNING MANAGER</label>
-                                                <select class="form-select" id="select_learning_manager_id" name="learning_manager_id">
+                                                <select class="form-select dd-native-select" id="select_learning_manager_id" name="learning_manager_id">
                                                     <option value="">Select Learning Manager</option>
                                                     @if(isset($learningManagers) && $learningManagers->isNotempty())
                                                         @foreach($learningManagers as $l)
@@ -151,6 +167,21 @@
                                                         @endforeach
                                                     @endif
                                                 </select>
+                                                <div class="dd" data-target="#select_learning_manager_id">
+                                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                        <span class="dd-lbl">Select Learning Manager</span>
+                                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                    </button>
+                                                    <div class="dd-panel" role="listbox" aria-label="Learning Manager">
+                                                        <div class="dd-scroll">
+                                                            @if(isset($learningManagers) && $learningManagers->isNotempty())
+                                                                @foreach($learningManagers as $l)
+                                                                    <div class="dd-item" role="option" data-value="{{ $l->id }}"><span class="dd-nm">{{ $l->resortAdmin->first_name }} {{ $l->resortAdmin->last_name }} ({{ $l->position->position_title }})</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                @endforeach
+                                                            @endif
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -184,6 +215,8 @@
         </div>
     </div>
 @include('resorts.Performance._performance_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -194,9 +227,6 @@
 $(document).ready(function(){
     $('#MonthlyCheckinForm').parsley();
 
-    $("#select_training").select2({
-        placeholder:"Select Training"
-    });
     flatpickr('#date_discussion', {
         dateFormat: 'd/m/Y',
         allowInput: true,

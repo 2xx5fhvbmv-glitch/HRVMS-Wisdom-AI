@@ -7,10 +7,16 @@
 </div>
 @endif
 
-@section('content') 
+@section('content')
+    <style>
+        #transfer-list-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #transfer-list-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="transfer-list-hero">
                 <div class="row  g-3">
                     <div class="col-auto">
                         <div class="page-title">

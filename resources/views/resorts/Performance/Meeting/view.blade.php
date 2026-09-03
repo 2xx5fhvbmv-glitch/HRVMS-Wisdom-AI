@@ -189,7 +189,7 @@
 
 @section('import-css')
 <style>
-    .info-item { padding: 12px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #014653; }
+    .info-item { padding: 12px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid var(--teal); }
     .info-label { color: #666; font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px; }
     .info-value { color: #333; font-size: 15px; font-weight: 500; }
     .summary-stats { display: flex; flex-direction: column; gap: 10px; }
@@ -197,7 +197,7 @@
     .stat-item.accepted { background: #e8f5e9; border-left: 4px solid #28a745; }
     .stat-item.declined { background: #ffeaea; border-left: 4px solid #dc3545; }
     .stat-item.pending { background: #fff8e1; border-left: 4px solid #EFB408; }
-    .stat-item.total { background: #e3f2fd; border-left: 4px solid #014653; }
+    .stat-item.total { background: #e3f2fd; border-left: 4px solid var(--teal); }
     .stat-label { font-weight: 600; color: #555; }
     .stat-count { font-size: 22px; font-weight: 700; color: #333; }
     .participant-card { padding: 14px; border-radius: 8px; border: 1px solid #e0e0e0; height: 100%; }

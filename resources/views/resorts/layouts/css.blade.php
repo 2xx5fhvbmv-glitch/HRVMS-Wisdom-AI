@@ -52,7 +52,7 @@
         }
 
         .menu-box .dropdown-menu ul {
-            background-color: #013842;
+            background-color: var(--teal-deep);
             border-radius: 12px;
             padding: 4px 0;
         }
@@ -67,7 +67,7 @@
             height: 8px;
             border-width: 12px;
             border-style: solid;
-            border-color: transparent transparent #013842 transparent;
+            border-color: transparent transparent var(--teal-deep) transparent;
         }
 
         .menu-box .dropdown-menu li {

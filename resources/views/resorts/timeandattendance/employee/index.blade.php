@@ -8,9 +8,15 @@
     @endif
 
     @section('content')
+    <style>
+        #ta-employee-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #ta-employee-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding page-appHedding">
+            <div class="page-hedding page-appHedding" id="ta-employee-hero">
                 <div class="row justify-content-between g-md-2 g-1">
                     <div class="col-auto">
                         <div class="page-title">
@@ -33,16 +39,31 @@
                         </div>
                         @if(isset($showDepartmentFilter) && $showDepartmentFilter)
                         <div class="col-xl-2 col-md-5 col-sm-4 col-6">
-                            <select class="form-select Department" id="department" name="department">
+                            <select class="form-select Department dd-native-select" id="department" name="department">
                                 <option ></option>
                                 @foreach ($ResortDepartment as $r)
                                     <option value="{{$r->id}}">{{$r->name}}</option>
                                 @endforeach
                             </select>
+                            <div class="dd" data-target="#department">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Department</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Department">
+                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a department…"></div>
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Department</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @foreach ($ResortDepartment as $r)
+                                        <div class="dd-item" role="option" data-value="{{ $r->id }}"><span class="dd-nm">{{ $r->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         @endif
                         <div class="col-xl-2 col-md-3 col-sm-4 col-6">
-                            <select class="form-select Position" name="position" id="position">
+                            <select class="form-select Position dd-native-select" name="position" id="position">
                                 <option></option>
                                 @if(isset($ResortPositions))
                                     @foreach ($ResortPositions as $pos)
@@ -50,6 +71,23 @@
                                     @endforeach
                                 @endif
                             </select>
+                            <div class="dd" data-target="#position">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Position</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Position">
+                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a position…"></div>
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Position</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @if(isset($ResortPositions))
+                                            @foreach ($ResortPositions as $pos)
+                                            <div class="dd-item" role="option" data-value="{{ $pos->id }}"><span class="dd-nm">{{ $pos->position_title }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @endforeach
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="col-xl-2 col-md-3 col-sm-4 col-6">
                             <button class="btn taa-btn-secondary btn-sm" id="clearFilter">Clear Filter</button>
@@ -179,6 +217,7 @@
     @endsection
     @section('import-css')
     @include('resorts.timeandattendance._taa_buttons_v2_styles')
+    @include('resorts._dropdown_styles')
     @endsection
 
     @section('import-scripts')
@@ -188,26 +227,18 @@
 
 
 
-        $("#position").select2({
-            placeholder: "Position",
-            allowClear: true
-        });
-        $(".Department").select2({
-            placeholder: "Department",
-            allowClear: true
-        });
-
             $(document).on('change', '.Department', function() {
                 var deptId = $(this).val();
                 if (!deptId) {
                     // Department cleared - restore all positions
-                    let allPositions = '<option></option>';
+                    let allPositions = '<option value="">Position</option>';
                     @if(isset($ResortPositions))
                         @foreach ($ResortPositions as $pos)
                             allPositions += '<option value="{{ $pos->id }}">{{ $pos->position_title }}</option>';
                         @endforeach
                     @endif
                     $(".Position").html(allPositions);
+                    window.wisdomDD.rebuild('#position');
                     return;
                 }
                 $.ajax({
@@ -218,12 +249,13 @@
                     },
                     success: function(d) {
                         if (d.success == true) {
-                            let string = '<option></option>';
+                            let string = '<option value="">Position</option>';
                             $.each(d.data.ResortPosition, function(key, value) {
                                 string += '<option value="' + value.id + '">' + value
                                     .position_title + '</option>';
                             });
                             $(".Position").html(string);
+                            window.wisdomDD.rebuild('#position');
 
                             let string1 = '<option></option>';
                             $.each(d.data.ResortSection, function(key, value) {
@@ -423,4 +455,5 @@
         }
     });
     </script>
+    @include('resorts._dropdown_script')
     @endsection

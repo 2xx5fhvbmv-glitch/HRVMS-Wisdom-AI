@@ -8,9 +8,15 @@
 @endif
 
 @section('content')
+    <style>
+        #learning-schedule-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #learning-schedule-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="learning-schedule-hero">
                 <div class="row justify-content-between g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -29,7 +35,7 @@
                                 <div class="row g-md-4 g-3">
                                     <div class="col-12">
                                         <label for="title" class="form-label">TITLE <span class="req_span">*</span></label>
-                                        <select class="form-select select2t-none" id="learning_title" name="learning_title">
+                                        <select class="form-select dd-native-select" id="learning_title" name="learning_title">
                                             <option value="">Select Learning Title</option>
                                             @if($programs)
                                                 @foreach($programs as $program)
@@ -37,6 +43,22 @@
                                                 @endforeach
                                             @endif
                                         </select>
+                                        <div class="dd" data-target="#learning_title">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">Select Learning Title</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Learning Title">
+                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a program…"></div>
+                                                <div class="dd-scroll">
+                                                    @if($programs)
+                                                        @foreach($programs as $program)
+                                                            <div class="dd-item" role="option" data-value="{{ $program->id }}"><span class="dd-nm">{{ $program->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @endforeach
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </div>
                                         <div id="div-learning_title"></div>
                                         <div id="programDetailsCard" class="d-none mt-3">
                                             <div class="row g-md-4 g-3">
@@ -118,12 +140,26 @@
                                     </div>
                                     <input type="search" class="form-control" id="searchInput" placeholder="Search" />
                                     <div class="my-2">    
-                                        <select id="departmentFilter" class="form-select select2t-none">
+                                        <select id="departmentFilter" class="form-select dd-native-select">
                                             <option value="">All Departments</option>
                                             @foreach($departments as $department)
                                                 <option value="{{ $department->id }}">{{ $department->name }}</option>
                                             @endforeach
                                         </select>
+                                        <div class="dd" data-target="#departmentFilter">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">All Departments</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Department">
+                                                <div class="dd-scroll">
+                                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">All Departments</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @foreach($departments as $department)
+                                                        <div class="dd-item" role="option" data-value="{{ $department->id }}"><span class="dd-nm">{{ $department->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @endforeach
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div class="overflow-auto pe-1" id="employeeList">
                                         @if($employees)
@@ -157,6 +193,8 @@
         </div>
     </div>
 @include('resorts.Learning._learning_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -194,8 +232,6 @@
                 instance.amPM.style.setProperty('display', 'inline-block', 'important');
             }
         });
-
-        $('.select2t-none').select2();
 
         // Pre-fill from query string (?program_id=X&employee_id=Y) so dashboard
         // "Schedule" buttons land on this page with the program selected and the

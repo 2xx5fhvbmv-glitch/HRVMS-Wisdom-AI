@@ -8,9 +8,15 @@
 @endif
 
 @section('content')
+    <style>
+        #people-approvel-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #people-approvel-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding page-appHedding">
+            <div class="page-hedding page-appHedding" id="people-approvel-hero">
                 <div class="row justify-content-between g-md-2 g-1">
                     <div class="col-auto">
                         <div class="page-title">
@@ -30,7 +36,7 @@
                             </div>
                         </div>
                         <div class="col-xl-2 col-md-5 col-sm-4 col-6">
-                            <select id="department-filter" class="form-select select2t-none Department "name="department" aria-label="Default select example">
+                            <select id="department-filter" class="form-select Department dd-native-select" name="department" aria-label="Default select example">
                                 <option value="">All Departments</option>
                                 @if($resort_departments)
                                     @foreach($resort_departments as $dept)
@@ -38,15 +44,44 @@
                                     @endforeach
                                 @endif
                             </select>
+                            <div class="dd" data-target="#department-filter">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">All Departments</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Department">
+                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a department…"></div>
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">All Departments</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @if($resort_departments)
+                                            @foreach($resort_departments as $dept)
+                                                <div class="dd-item" role="option" data-value="{{$dept->id}}"><span class="dd-nm">{{$dept->name}}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @endforeach
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         {{-- Position filter hidden by request. Select stays in
                              the DOM (display:none) because JS elsewhere reads
                              $('.Position') / $('#position-filter') and would
                              otherwise error. --}}
                         <div class="col-xl-2 col-md-3 col-sm-4 col-6" style="display:none;">
-                            <select id="position-filter" class="form-select select2t-none mb-2 Position" name="position" aria-label="Default select example">
+                            <select id="position-filter" class="form-select mb-2 Position dd-native-select" name="position" aria-label="Default select example">
                                 <option selected value="">Select Position</option>
                             </select>
+                            <div class="dd" data-target="#position-filter">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Select Position</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Position">
+                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a position…"></div>
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Position</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                     </div>
@@ -97,6 +132,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts._dropdown_styles')
 @endsection
 
 @section('import-scripts')
@@ -252,15 +288,15 @@
                     $(".Position").html('<option value="">Select Position</option>'); // Reset Position dropdown
 
                     if (response.success) {
-                        let positionOptions = '<option value=""></option>';
+                        let positionOptions = '<option value="">Select Position</option>';
                         $.each(response.data.ResortPosition, function (key, value) {
                             positionOptions += `<option value="${value.id}">${value.position_title}</option>`;
                         });
                         $(".Position").html(positionOptions);
-                        $(".Position").select2({ placeholder: "Select Position" });
                     } else {
                         toastr.warning("No Positions found for the selected Department.", { positionClass: 'toast-bottom-right' });
                     }
+                    window.wisdomDD.rebuild('#position-filter');
                 },
                 error: function () {
                     toastr.error("Error fetching Positions.", { positionClass: 'toast-bottom-right' });
@@ -371,4 +407,5 @@
     return table;
 }
 </script>
+@include('resorts._dropdown_script')
 @endsection

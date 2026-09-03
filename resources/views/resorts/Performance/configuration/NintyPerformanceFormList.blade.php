@@ -113,9 +113,9 @@
     .rating-stars { display: flex; gap: 4px; }
     .rating-star { font-size: 28px !important; cursor: pointer; color: #ccc; transition: color 0.2s; }
     .table-field table { width: 100%; margin-top: 8px; }
-    .table-field th { background: #014653; color: #fff; font-weight: 500; padding: 8px 12px; }
+    .table-field th { background: var(--teal); color: #fff; font-weight: 500; padding: 8px 12px; }
     .table-field td { background: #fff; padding: 8px 12px; }
-    .table-field th[contenteditable]:focus, .table-field td[contenteditable]:focus { outline: 2px solid #2EACB3; }
+    .table-field th[contenteditable]:focus, .table-field td[contenteditable]:focus { outline: 2px solid var(--aqua); }
 </style>
 @endsection
 

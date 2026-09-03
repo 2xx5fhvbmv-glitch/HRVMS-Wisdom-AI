@@ -8,9 +8,15 @@
 @endif
 
 @section('content')
+<style>
+    #visa-config-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #visa-config-hero { padding-bottom: 0; }
+    }
+</style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="visa-config-hero">
                 <div class="row justify-content-between g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -45,9 +51,9 @@
                                     <div class="row g-2 mb-md-4 mb-3">
                                         <div class="col-sm-6">
                                             <label for="txt-nationality" class="form-label">NATIONALITY <span class="red-mark">*</span></label>
-                                                <select class="form-select" name="nationality[]" id="nationality_1"
+                                                <select class="form-select dd-native-select" name="nationality[]" id="nationality_1"
                                                     aria-label="Default select example"
-                                                    required 
+                                                    required
                                                     data-parsley-required-message="Please select a nationality"
                                                     data-parsley-errors-container="#nationality_error_1">
                                                     <option value=""> </option>
@@ -57,6 +63,22 @@
                                                         @endforeach
                                                     @endif
                                                 </select>
+                                                <div class="dd" data-target="#nationality_1">
+                                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                        <span class="dd-lbl">Select Nationality</span>
+                                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                    </button>
+                                                    <div class="dd-panel" role="listbox" aria-label="Nationality">
+                                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a nationality…"></div>
+                                                        <div class="dd-scroll">
+                                                            @if(!empty($nationality))
+                                                                @foreach ($nationality as $item)
+                                                                    <div class="dd-item" role="option" data-value="{{ $item }}"><span class="dd-nm">{{ $item }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                @endforeach
+                                                            @endif
+                                                        </div>
+                                                    </div>
+                                                </div>
                                                 <div id="nationality_error_1" class="text-danger mt-1"></div>
                                         </div>
 
@@ -497,6 +519,8 @@
         </div>
     </div>
 @include('resorts._emotional_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -518,9 +542,6 @@ $(document).ready(function(){
     $("#VisaDocumentType").select2({
         allowClear: true,
         placeholder: "Select Document Type"
-    }); $("#nationality_1").select2({
-        allowClear: true,
-        placeholder: "Select Nationality"
     });
     $("#nationalityAmt").select2({
         allowClear: true,
@@ -579,39 +600,45 @@ $(document).on("click",".blockAdd-Nationality",function(){
 
     var count = $("#NationalityCount").val();
     count= parseInt(count) +1;
+    var nationalityList = @json($nationality ?? []);
+    var tickSvg = '<svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg>';
     $(".AppendNationalityRow").append(`<div class="row g-2 mb-md-4 mb-3 RemoveNationality_${count}">
                                         <div class="col-sm-4">
                                             <label for="txt-nationality" class="form-label">NATIONALITY<span class="red-mark">*</span></label>
-                                            <select class="form-select" name="nationality[]" id="nationality_${count}"
+                                            <select class="form-select dd-native-select" name="nationality[]" id="nationality_${count}"
                                                 aria-label="Default select example"
                                                 required data-parsley-required-message="Please select a nationality"
                                                  data-parsley-required-message="Please select a nationality"
                                                     data-parsley-errors-container="#nationality_error_${count}">
                                                 <option value=""> </option>
-                                                @if(!empty($nationality))
-                                                    @foreach ($nationality as $item)
-                                                        <option value="{{$item}}">{{$item}}</option>
-                                                    @endforeach
-                                                @endif
+                                                ${nationalityList.map(item => `<option value="${item}">${item}</option>`).join('')}
                                             </select>
+                                            <div class="dd" data-target="#nationality_${count}">
+                                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                    <span class="dd-lbl">Select Nationality</span>
+                                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                </button>
+                                                <div class="dd-panel" role="listbox" aria-label="Nationality">
+                                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a nationality…"></div>
+                                                    <div class="dd-scroll">
+                                                        ${nationalityList.map(item => `<div class="dd-item" role="option" data-value="${item}"><span class="dd-nm">${item}</span>${tickSvg}</div>`).join('')}
+                                                    </div>
+                                                </div>
+                                            </div>
                                               <div id="nationality_error_${count}" class="text-danger mt-1"></div>
                                         </div>
                                         <div class="col-sm-4">
                                             <label for="txt-amount" class="form-label">AMOUNT (MVR) <span class="red-mark">*</span></label>
                                             <input type="number" min="0" name="amt[]" id="txt-amount_${count}" class="form-control" placeholder="Amount" required data-parsley-type="number" data-parsley-required-message="Please enter an amount">
                                         </div>
-                                        
+
                                         <div class="col-sm-2">
                                             <input type="button" value="Remove" style="margin-top:33px;" class="btn eb-btn-critical btn-sm RemoveNationality" data-id="${count}">
                                         </div>
                                         <input type="hidden" name="id" id="NationalityCount" value="1">
-                                    </div>`); 
+                                    </div>`);
     $("#NationalityCount").val(count);
-    
-    $("#nationality_"+count).select2({
-        allowClear: true,
-        placeholder: "Select Nationality"
-    });
+    wisdomDD.sync('#nationality_'+count);
 });
 $(document).on("click",".RemoveNationality",function(){
     var id = $(this).data("id");

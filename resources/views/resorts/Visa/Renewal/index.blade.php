@@ -8,9 +8,15 @@
 @endif
 
 @section('content')
+<style>
+    #visa-renewal-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #visa-renewal-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="visa-renewal-hero">
                 <div class="row justify-content-between g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -31,15 +37,31 @@
                         <div class="col-xxl-4 col-xl-5 col-md-6">
                             <label for="Visa_select_emp" class="form-label">SELECT
                                 EMPLOYEE</label>
-                            <select class="form-select select2t-none" id="Visa_select_emp">
+                            <select class="form-select dd-native-select" id="Visa_select_emp">
                                 @if($Employee->isNotEmpty())
                                     <option value="" ></option>
                                     @foreach ($Employee as $emp)
                                         <option data-profile="{{$emp->profile}}" data-name="{{ $emp->resortAdmin->first_name }}  {{ $emp->resortAdmin->last_name }}" data-position="{{$emp->position->position_title}}" data-emp_id="{{$emp->Emp_id}}" value="{{base64_encode($emp->id) }}">{{ $emp->resortAdmin->first_name }}  {{ $emp->resortAdmin->last_name }}</option>
                                     @endforeach
                                 @endif
-                            
+
                             </select>
+                            <div class="dd" data-target="#Visa_select_emp">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Select Employee</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Employee">
+                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an employee…"></div>
+                                    <div class="dd-scroll">
+                                        @if($Employee->isNotEmpty())
+                                            @foreach ($Employee as $emp)
+                                                <div class="dd-item" role="option" data-value="{{ base64_encode($emp->id) }}"><span class="dd-nm">{{ $emp->resortAdmin->first_name }} {{ $emp->resortAdmin->last_name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @endforeach
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="col-xxl-8 col-xl-7 col-md-6">
                             <div class="empDetails-user">
@@ -143,6 +165,8 @@
         </div>
     </div>
 @include('resorts._emotional_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -159,10 +183,6 @@ $(document).ready(function ()
             return val.name;
         }).join(", ");
         $("#fileNameDisplay").text("Selected file: " + fileNames);
-    });
-    $("#Visa_select_emp").select2({
-        placeholder: "Select Employee",
-        allowClear: true,
     });
     var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'))
     var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {

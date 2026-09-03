@@ -7,10 +7,16 @@
 </div>
 @endif
 
-@section('content') 
+@section('content')
+    <style>
+        #incident-config-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #incident-config-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="incident-config-hero">
                 <div class="row justify-content-between g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -72,7 +78,7 @@
                                 <div class="incidentCategories-block">
                                     <div class="row g-2 mb-md-4 mb-3">
                                         <div class="col-12">
-                                            <select name="category_id" id="category_id" class="form-select select2t-none" required data-parsley-required-message="Please select a category" data-parsley-errors-container="#category-error">
+                                            <select name="category_id" id="category_id" class="form-select dd-native-select" required data-parsley-required-message="Please select a category" data-parsley-errors-container="#category-error">
                                                 <option value="">Select Category</option>
                                                 @if($categories)
                                                     @foreach($categories as $category)
@@ -80,6 +86,21 @@
                                                     @endforeach
                                                 @endif
                                             </select>
+                                            <div class="dd" data-target="#category_id">
+                                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                    <span class="dd-lbl">Select Category</span>
+                                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                </button>
+                                                <div class="dd-panel" role="listbox" aria-label="Category">
+                                                    <div class="dd-scroll">
+                                                        @if($categories)
+                                                            @foreach($categories as $category)
+                                                                <div class="dd-item" role="option" data-value="{{ $category->id }}"><span class="dd-nm">{{ $category->category_name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                            @endforeach
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                            </div>
                                             <div id="category-error"></div>
                                         </div>
                                         <div class="col-12">
@@ -89,13 +110,27 @@
                                             data-parsley-maxlength="255" >
                                         </div>
                                         <div class="col-12">
-                                            <select class="form-select select2t-none" name="priority[]" required 
+                                            <select class="form-select dd-native-select" id="priority_static" name="priority[]" required
                                             data-parsley-required-message="Please select a priority" data-parsley-errors-container=".priority-error">
                                                 <option value="">Priority</option>
                                                 <option value="Low">Low</option>
                                                 <option value="Medium">Medium</option>
                                                 <option value="High">High</option>
                                             </select>
+                                            <div class="dd" data-target="#priority_static">
+                                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                    <span class="dd-lbl">Priority</span>
+                                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                </button>
+                                                <div class="dd-panel" role="listbox" aria-label="Priority">
+                                                    <div class="dd-scroll">
+                                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Priority</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        <div class="dd-item" role="option" data-value="Low"><span class="dd-nm">Low</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        <div class="dd-item" role="option" data-value="Medium"><span class="dd-nm">Medium</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        <div class="dd-item" role="option" data-value="High"><span class="dd-nm">High</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    </div>
+                                                </div>
+                                            </div>
                                             <div class="priority-error"></div>
                                         </div>
                                         <div class="col-12">
@@ -119,7 +154,7 @@
                             <div class="row g-3 mb-3">
                                 <div class="col-12">
                                     <label for="high_priority" class="form-label">HIGH PRIORITY</label>
-                                    <select class="form-select select2t-none" id="high_priority" name="high_priority">
+                                    <select class="form-select dd-native-select" id="high_priority" name="high_priority">
                                         @php
                                             $selectedHigh = $resoltion_timeline['High'] ?? " ";
                                         @endphp
@@ -130,10 +165,24 @@
                                             </option>
                                         @endfor
                                     </select>
+                                    <div class="dd" data-target="#high_priority">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">{{ trim($selectedHigh) ? trim($selectedHigh) : 'Select Days' }}</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="High Priority Days">
+                                            <div class="dd-scroll">
+                                                <div class="dd-item{{ !trim($selectedHigh) ? ' active' : '' }}" role="option" data-value=""><span class="dd-nm">Select Days</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @for ($i = 2; $i <= 7; $i++)
+                                                    <div class="dd-item{{ $selectedHigh == "$i Business Days" ? ' active' : '' }}" role="option" data-value="{{ $i }} Business Days"><span class="dd-nm">{{ $i }} Business Days</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @endfor
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="col-12">
                                     <label for="medium_priority" class="form-label">MEDIUM PRIORITY</label>
-                                    <select class="form-select select2t-none" id="medium_priority" name="medium_priority">
+                                    <select class="form-select dd-native-select" id="medium_priority" name="medium_priority">
                                         @php
                                             $selectedMedium = $resoltion_timeline['Medium'] ?? " ";
                                         @endphp
@@ -144,10 +193,24 @@
                                             </option>
                                         @endfor
                                     </select>
+                                    <div class="dd" data-target="#medium_priority">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">{{ trim($selectedMedium) ? trim($selectedMedium) : 'Select Days' }}</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Medium Priority Days">
+                                            <div class="dd-scroll">
+                                                <div class="dd-item{{ !trim($selectedMedium) ? ' active' : '' }}" role="option" data-value=""><span class="dd-nm">Select Days</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @for ($i = 2; $i <= 7; $i++)
+                                                    <div class="dd-item{{ $selectedMedium == "$i Business Days" ? ' active' : '' }}" role="option" data-value="{{ $i }} Business Days"><span class="dd-nm">{{ $i }} Business Days</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @endfor
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="col-12">
                                     <label for="low_priority" class="form-label">LOW PRIORITY</label>
-                                    <select class="form-select select2t-none" id="low_priority" name="low_priority">
+                                    <select class="form-select dd-native-select" id="low_priority" name="low_priority">
                                         @php
                                             $selectedLow = $resoltion_timeline['Low'] ?? " ";
                                         @endphp
@@ -158,6 +221,20 @@
                                             </option>
                                         @endfor
                                     </select>
+                                    <div class="dd" data-target="#low_priority">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">{{ trim($selectedLow) ? trim($selectedLow) : 'Select Days' }}</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Low Priority Days">
+                                            <div class="dd-scroll">
+                                                <div class="dd-item{{ !trim($selectedLow) ? ' active' : '' }}" role="option" data-value=""><span class="dd-nm">Select Days</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @for ($i = 2; $i <= 7; $i++)
+                                                    <div class="dd-item{{ $selectedLow == "$i Business Days" ? ' active' : '' }}" role="option" data-value="{{ $i }} Business Days"><span class="dd-nm">{{ $i }} Business Days</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @endfor
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                             <div class="card-footer text-end">
@@ -475,7 +552,7 @@
                             <div class="row g-3 mb-3">
                                 <div class="col-12">
                                     <label for="set_reminders" class="form-label">SET REMINDERS FOR THE INVESTIGATION MEETING FOR THE PARTICIPANTS</label>
-                                    <select class="form-select select2t-none" id="set_reminders"
+                                    <select class="form-select dd-native-select" id="set_reminders"
                                         aria-label="Default select example">
                                         @php
                                             $selectedValue = isset($meeting_reminder) ? json_decode($meeting_reminder->setting_value, true)['reminder_days'] ?? "" : "";
@@ -487,6 +564,23 @@
                                             </option>
                                         @endfor
                                     </select>
+                                    <div class="dd" data-target="#set_reminders">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">
+                                                @php $selectedReminderDay = null; for ($i = 1; $i <= 7; $i++) { if ($selectedValue == "$i Business Days") { $selectedReminderDay = $i; break; } } @endphp
+                                                {{ $selectedReminderDay ? $selectedReminderDay . ' days before' : 'Set Reminder' }}
+                                            </span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Set Reminder">
+                                            <div class="dd-scroll">
+                                                <div class="dd-item{{ !$selectedReminderDay ? ' active' : '' }}" role="option" data-value=""><span class="dd-nm">Set Reminder</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @for ($i = 1; $i <= 7; $i++)
+                                                    <div class="dd-item{{ $selectedValue == "$i Business Days" ? ' active' : '' }}" role="option" data-value="{{ $i }} Business Days"><span class="dd-nm">{{ $i }} days before</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @endfor
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                             <div class="card-footer text-end">
@@ -586,6 +680,8 @@
         </div>
     </div>
 @include('resorts._emotional_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -626,20 +722,34 @@
             var newField = `
                 <div class="row g-2 mb-md-4 mb-3 dynamic-field">
                     <div class="col-12">
-                        <input type="text" class="form-control" id="subcategory_name"           name="subcategory_name[]" 
+                        <input type="text" class="form-control" id="subcategory_name"           name="subcategory_name[]"
                         placeholder="Sub-category" required
                         data-parsley-required-message="Sub-category is required"
                         data-parsley-maxlength="255" >
                     </div>
                     <div class="col-12">
-                        <select class="form-select select2t-none" name="priority[]" required 
-                        data-parsley-required-message="Please select a priority" 
+                        <select class="form-select dd-native-select" id="priority_${uniqueId}" name="priority[]" required
+                        data-parsley-required-message="Please select a priority"
                         data-parsley-errors-container=".priority-error-${uniqueId}">
                             <option value="">Priority</option>
                             <option value="Low">Low</option>
                             <option value="Medium">Medium</option>
                             <option value="High">High</option>
                         </select>
+                        <div class="dd" data-target="#priority_${uniqueId}">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">Priority</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Priority">
+                                <div class="dd-scroll">
+                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Priority</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    <div class="dd-item" role="option" data-value="Low"><span class="dd-nm">Low</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    <div class="dd-item" role="option" data-value="Medium"><span class="dd-nm">Medium</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    <div class="dd-item" role="option" data-value="High"><span class="dd-nm">High</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                </div>
+                            </div>
+                        </div>
                         <div class="priority-error-${uniqueId}"></div>
                     </div>
                     <div class="col-12">
@@ -647,9 +757,8 @@
                     </div>
                 </div>
             `;
-            
+
             $(".incidentCategories-main1").append(newField);
-            $('.select2t-none').select2();
 
                 // Reinitialize Parsley for new fields
             form1.destroy();

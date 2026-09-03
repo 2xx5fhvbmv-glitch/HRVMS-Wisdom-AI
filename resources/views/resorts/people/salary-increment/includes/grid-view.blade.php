@@ -78,20 +78,49 @@
                               data-parsley-validate>
                             <input type="hidden" name="emp_id" value="{{$employee->id}}" id="">
                             <div class="col-12">
-                                <select class="form-select select2t-none increment-type" name="increment_type" required data-parsley-required-message="Please select an increment type.">
+                                <select class="form-select increment-type dd-native-select" id="increment-type-{{ $employee->id }}" name="increment_type" required data-parsley-required-message="Please select an increment type.">
                                     <option value="">Increment Type</option>
                                     @foreach ($incrementTypes as $increment_type)
                                         <option value="{{$increment_type->name}}">{{$increment_type->name}}</option>
                                     @endforeach
-                                </select></div>
+                                </select>
+                                <div class="dd" data-target="#increment-type-{{ $employee->id }}">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">Increment Type</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Increment Type">
+                                        <div class="dd-scroll">
+                                            <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Increment Type</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @foreach ($incrementTypes as $increment_type)
+                                                <div class="dd-item" role="option" data-value="{{ $increment_type->name }}"><span class="dd-nm">{{ $increment_type->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                             <div class="col-12">
                                 {{-- "Pay Increase Type" placeholder option removed per
                                      request. Defaults to Fixed; switchable to Percentage. --}}
-                                <select class="form-select select2t-none pay-increase-type" name="pay_increase_type">
+                                @php $selectedPayIncrease = $payIncreaseTypes['Fixed'] ?? reset($payIncreaseTypes); @endphp
+                                <select class="form-select pay-increase-type dd-native-select" id="pay-increase-type-{{ $employee->id }}" name="pay_increase_type">
                                     @foreach ($payIncreaseTypes as $key => $type)
                                         <option value="{{$key}}" {{ $key === 'Fixed' ? 'selected' : '' }}>{{$type}}</option>
                                     @endforeach
                                 </select>
+                                <div class="dd" data-target="#pay-increase-type-{{ $employee->id }}">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">{{ $selectedPayIncrease }}</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Pay Increase Type">
+                                        <div class="dd-scroll">
+                                            @foreach ($payIncreaseTypes as $key => $type)
+                                                <div class="dd-item{{ $key === 'Fixed' ? ' active' : '' }}" role="option" data-value="{{ $key }}"><span class="dd-nm">{{ $type }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             {{-- Drop `form-control-small` on the three text inputs so they
                                  match the default-size selects above. Font size + height

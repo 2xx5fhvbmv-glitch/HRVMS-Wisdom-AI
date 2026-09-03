@@ -2,9 +2,15 @@
 @section('page_tab_title' ,$page_title)
 
     @section('content')
+    <style>
+        #ta-jobadvertisement-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #ta-jobadvertisement-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="ta-jobadvertisement-hero">
                 <div class="row justify-content-between g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -14,7 +20,7 @@
                     </div>
                     <div class="col-auto">
                         <div class="d-flex justify-content-end">
-                            <a href="{{ route('resort.ta.configration') }}" class="btn ta-btn-secondary">Back to Configuration</a>
+                            <a href="{{ route('resort.ta.configration') }}" class="btn ta-btn-neutral">Back to Configuration</a>
                         </div>
                     </div>
                 </div>

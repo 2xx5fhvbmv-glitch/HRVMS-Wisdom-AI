@@ -9,6 +9,21 @@
 
 @section('content')
 <style>
+    /* Same requested push as the Payroll / Talent Acquisition / People /
+       Time and Attendance / Leave dashboards — extra breathing room
+       between the hero and the KPI row below it, scoped to this page
+       (.page-hedding's own margin-bottom is shared by every page's hero).
+       padding-bottom, not margin: adjacent sibling margins collapse to the
+       larger of the two rather than summing. Below Bootstrap's sm
+       breakpoint the extra padding pushes the KPI row's first card into
+       the teal hero curve's rounded bottom-left corner (body::before,
+       border-radius 0 0 50px 50px) — same collision found on Payroll —
+       neutralized below 576px. */
+    #performance-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #performance-hero { padding-bottom: 0; }
+    }
+
     /* WAI Insights — same gradient-header treatment as the other modules'
        WAI Insights cards (Time and Attendance / Payroll / Talent Acquisition
        / Leave). These are 3 narrative performance insights (title +
@@ -32,31 +47,31 @@
     .wai-narrative .wai-head { position: relative; overflow: hidden; padding: 17px 18px; flex-shrink: 0; }
     .wai-narrative .wai-head::before {
         content: ""; position: absolute; inset: 0; pointer-events: none;
-        background: linear-gradient(110deg, #014653 0%, #0e8a9e 40%, #7fa61e 70%, #e0ff02 100%);
+        background: linear-gradient(110deg, var(--teal) 0%, #0e8a9e 40%, #7fa61e 70%, var(--lime) 100%);
     }
     .wai-narrative .wai-head::after {
         content: ""; position: absolute; inset: 0; pointer-events: none;
         background: linear-gradient(110deg, rgba(1,40,48,.35), transparent 55%);
     }
-    .wai-narrative .wai-head h2 { position: relative; color: #fff; font-size: 15px; font-weight: 800; margin: 0; }
-    .wai-narrative .wai-head-meta { position: relative; margin-top: 4px; font-size: 11.5px; color: rgba(255,255,255,.75); display: flex; gap: 6px; }
+    .wai-narrative .wai-head h2 { position: relative; color: #fff; font-size: 18px; font-weight: 600; margin: 0; }
+    .wai-narrative .wai-head-meta { position: relative; margin-top: 4px; font-size: 10.5px; font-weight: 500; color: rgba(255,255,255,.75); display: flex; gap: 6px; }
     .wai-narrative .wai-head-meta a { color: #fff; font-weight: 600; text-decoration: underline; }
 
     .wai-narrative-body { padding: 16px; }
     .wai-narrative .wai-row { display: flex; align-items: flex-start; gap: 12px; padding: 12px 2px; border-bottom: 1px solid #F2F6F6; }
     .wai-narrative .wai-row:last-child { border-bottom: none; }
     .wai-narrative .wai-row-icon { width: 32px; height: 32px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; margin-top: 2px; }
-    .wai-narrative .wai-row-icon.is-ok { background: #E9F7F0; color: #1F9D6B; }
-    .wai-narrative .wai-row-icon.is-flagged { background: #FBF0DC; color: #D98A00; }
+    .wai-narrative .wai-row-icon.is-ok { background: var(--positive-bg); color: var(--positive); }
+    .wai-narrative .wai-row-icon.is-flagged { background: var(--warning-bg); color: var(--warning); }
     .wai-narrative .wai-row-body { flex: 1 1 auto; min-width: 0; }
-    .wai-narrative .wai-row-body h6 { margin: 0 0 4px; font-size: 13.5px; font-weight: 700; color: #14232A; }
-    .wai-narrative .wai-row-text { margin: 0 0 4px; font-size: 12.5px; color: #5D6F75; line-height: 1.5; }
-    .wai-narrative .wai-row-link { display: inline-block; margin-top: 2px; font-size: 12px; font-weight: 600; color: #014653; }
+    .wai-narrative .wai-row-body h6 { margin: 0 0 4px; font-size: 14px; font-weight: 600; color: var(--ink); }
+    .wai-narrative .wai-row-text { margin: 0 0 4px; font-size: 14px; color: var(--muted); line-height: 1.5; }
+    .wai-narrative .wai-row-link { display: inline-block; margin-top: 2px; font-size: 14px; font-weight: 600; color: var(--teal); }
 </style>
 @include('resorts.Performance._performance_buttons_v2_styles')
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="performance-hero">
             <div class="row  g-3">
                 <div class="col-auto">
                     <div class="page-title">
@@ -66,12 +81,25 @@
                 </div>
                 <div class="col-xl-2 col-auto ms-auto">
                     <form method="GET" action="{{ url()->current() }}" id="yearFilterForm">
-                        <select class="form-select select2t-none" id="select-year" name="year"
+                        <select class="form-select dd-native-select" id="select-year" name="year"
                                 onchange="document.getElementById('yearFilterForm').submit();">
                             @foreach($availableYears as $year)
                                 <option value="{{ $year }}" {{ (int)$selectedYear === (int)$year ? 'selected' : '' }}>{{ $year }}</option>
                             @endforeach
                         </select>
+                        <div class="dd" data-target="#select-year">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">{{ $selectedYear }}</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Year">
+                                <div class="dd-scroll">
+                                    @foreach($availableYears as $year)
+                                        <div class="dd-item{{ (int)$selectedYear === (int)$year ? ' active' : '' }}" role="option" data-value="{{ $year }}"><span class="dd-nm">{{ $year }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        </div>
                     </form>
                 </div>
                 <!-- <div class="col-auto"><a href="#" class="btn btn-theme">Notify HOD</a></div> -->
@@ -154,7 +182,7 @@
                         </div>
                     </div>
                     @php
-                        $deptColors = ['#014653', '#2EACB3', '#53CAFF', '#333333', '#EFB408', '#8DC9C9', '#d9534f', '#5cb85c', '#f0ad4e', '#5bc0de'];
+                        $deptColors = ['var(--teal)', 'var(--aqua)', '#53CAFF', '#333333', '#EFB408', '#8DC9C9', '#d9534f', '#5cb85c', '#f0ad4e', '#5bc0de'];
                         $deptTotal = $department_data->sum('count');
                     @endphp
                     @if($deptTotal > 0)
@@ -351,11 +379,24 @@
                             </div>
                             <div class="col-auto">
                                 <div class="form-group">
-                                    <select class="form-select" aria-label="Default select example">
+                                    <select class="form-select dd-native-select" id="kpiAlertsDeptFilter" aria-label="Default select example">
                                         <option selected="">Select Department</option>
                                         <option value="1">AAA</option>
                                         <option value="2">AAA</option>
                                     </select>
+                                    <div class="dd" data-target="#kpiAlertsDeptFilter">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Select Department</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Department">
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Department</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="1"><span class="dd-nm">AAA</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="2"><span class="dd-nm">AAA</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -491,6 +532,8 @@
 
 @include('resorts.Performance.dashboard._insight_modals')
 @includeWhen(isset($pi), 'partials._wai_insight_modals')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -578,6 +621,9 @@
         },
         plugins: [doughnutLabelsInsideN] // Attach the plugin to this chart only
     });
+    // deptBgColors: only 2 of 10 match SSOT tokens — left literal as a
+    // whole categorical set to avoid a half-themed department palette.
+    if (window.WaiChart) window.WaiChart.registerForTheme(myDoughnutChart);
     }
 </script>
 @endsection

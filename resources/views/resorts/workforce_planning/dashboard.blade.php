@@ -128,7 +128,7 @@
                                                 <a href="#" data-bs-toggle="tooltip" data-bs-placement="right" title="Tooltip on right">{{ date('d M Y',strtotime($oc->occupancydate))}}</a>
                                                 <!-- <a href="#"><i class="fa-solid fa-angle-right"></i></a> -->
                                             </div>
-                                            <div class="pie my-3" style="--p:{{ $oc->occupancyinPer}};--green:#014653;--border:10px" data-bs-toggle="tooltip"
+                                            <div class="pie my-3" style="--p:{{ $oc->occupancyinPer}};--green:var(--teal);--border:10px" data-bs-toggle="tooltip"
                                                 data-bs-placement="right" title="{{ $oc->occupancyinPer}}% Occupancy">
                                                 <div>
                                                     <strong class="d-block"> {{ $oc->occupancyinPer}}%</strong>
@@ -154,7 +154,7 @@
                                             <a href="#" data-bs-toggle="tooltip" data-bs-placement="right" title="Tooltip on right">{{ date('d M Y')}}</a>
                                             <!-- <a href="#"><i class="fa-solid fa-angle-right"></i></a> -->
                                         </div>
-                                        <div class="pie my-3" style="--p:0;--green:#014653;--border:10px" data-bs-toggle="tooltip"
+                                        <div class="pie my-3" style="--p:0;--green:var(--teal);--border:10px" data-bs-toggle="tooltip"
                                             data-bs-placement="right" title="0% Occupancy">
                                             <div>
                                                 <strong class="d-block">0%</strong>
@@ -932,7 +932,7 @@
 <style>
     .pdf-header, .pdf-footer {
         display: none;
-        background-color: #014653;
+        background-color: var(--teal);
         color: white;
         padding: 10px;
     }
@@ -981,13 +981,13 @@
        any wrapper that would give custom properties something to
        cascade from anyway. ================================== */
     .wct-block { padding: 14px 0; }
-    .wct-block-border { border-bottom: 1px solid #EEF4F4; }
+    .wct-block-border { border-bottom: 1px solid var(--line-2); }
     .wct-label {
         font-size: 11px;
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.04em;
-        color: #93A4A9;
+        color: var(--faint);
         margin: 0 0 8px;
     }
 
@@ -1000,11 +1000,11 @@
         text-align: center;
     }
     .wct-stat-ok { background: #EAF7F0; }
-    .wct-stat-ok .wct-stat-count { color: #1F9D6B; }
-    .wct-stat-bad { background: #FDEEEB; }
-    .wct-stat-bad .wct-stat-count { color: #E5573F; }
-    .wct-stat-expat { background: #E6F0F1; }
-    .wct-stat-expat .wct-stat-count { color: #014653; }
+    .wct-stat-ok .wct-stat-count { color: var(--positive); }
+    .wct-stat-bad { background: var(--error-bg); }
+    .wct-stat-bad .wct-stat-count { color: var(--error); }
+    .wct-stat-expat { background: var(--teal-3); }
+    .wct-stat-expat .wct-stat-count { color: var(--teal); }
     .wct-stat-count { display: block; font-size: 22px; font-weight: 800; line-height: 1.2; }
     .wct-stat-caption {
         display: block;
@@ -1012,7 +1012,7 @@
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.05em;
-        color: #5D6F75;
+        color: var(--muted);
         margin-top: 2px;
     }
 
@@ -1023,7 +1023,7 @@
         height: 26px;
         border-radius: 7px;
         overflow: hidden;
-        background: #EEF4F4;
+        background: var(--line-2);
     }
     .wct-ratio-fill {
         display: flex;
@@ -1032,9 +1032,9 @@
         min-width: 0;
         transition: width .2s ease;
     }
-    .wct-fill-ok { background: #1F9D6B; }
-    .wct-fill-bad { background: #E5573F; }
-    .wct-fill-expat { background: #014653; }
+    .wct-fill-ok { background: var(--positive); }
+    .wct-fill-bad { background: var(--error); }
+    .wct-fill-expat { background: var(--teal); }
     .wct-ratio-fill-label { font-size: 10.5px; font-weight: 700; color: #fff; white-space: nowrap; }
     .wct-ratio-marker {
         position: absolute;
@@ -1049,7 +1049,7 @@
         height: 0;
         border-left: 5px solid transparent;
         border-right: 5px solid transparent;
-        border-top: 6px solid #14232A;
+        border-top: 6px solid var(--ink);
     }
     .wct-ratio-marker::after {
         content: '';
@@ -1060,7 +1060,7 @@
     }
     .wct-ratio-caption {
         font-size: 10.5px;
-        color: #93A4A9;
+        color: var(--faint);
         margin: 6px 0 0;
     }
     .wct-status {
@@ -1078,10 +1078,10 @@
        was overriding the emphasised numbers here to render larger than
        the sentence around them — pull it back to match. */
     .wct-status strong { font-size: inherit; font-weight: 700; line-height: inherit; }
-    .wct-status-ok { background: #EAF7F0; color: #1F9D6B; }
-    .wct-status-ok strong { color: #1F9D6B; }
-    .wct-status-bad { background: #FDEEEB; color: #E5573F; }
-    .wct-status-bad strong { color: #E5573F; }
+    .wct-status-ok { background: #EAF7F0; color: var(--positive); }
+    .wct-status-ok strong { color: var(--positive); }
+    .wct-status-bad { background: var(--error-bg); color: var(--error); }
+    .wct-status-bad strong { color: var(--error); }
 
     /* ---- Section 3: minimum-wage pill, avatars, view-all ---- */
     .wct-pill {
@@ -1096,9 +1096,9 @@
         cursor: pointer;
         border: none;
     }
-    .wct-pill-bad { background: #FDEEEB; color: #E5573F; }
-    .wct-pill-bad:hover { background: #fbdcd6; color: #E5573F; }
-    .wct-pill-ok { background: #EAF7F0; color: #1F9D6B; }
+    .wct-pill-bad { background: var(--error-bg); color: var(--error); }
+    .wct-pill-bad:hover { background: #fbdcd6; color: var(--error); }
+    .wct-pill-ok { background: #EAF7F0; color: var(--positive); }
     .wct-avatar-scroller {
         display: flex;
         flex-wrap: nowrap;
@@ -1120,14 +1120,14 @@
         height: 42px;
         border-radius: 50%;
         object-fit: cover;
-        border: 2px solid #E5573F;
+        border: 2px solid var(--error);
     }
     .wct-avatar-initials {
         display: flex;
         align-items: center;
         justify-content: center;
-        background: #E6F0F1;
-        color: #014653;
+        background: var(--teal-3);
+        color: var(--teal);
         font-size: 13px;
         font-weight: 700;
     }
@@ -1136,31 +1136,31 @@
         width: 100%;
         font-size: 10px;
         line-height: 1.2;
-        color: #14232A;
+        color: var(--ink);
         margin-top: 4px;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
     }
-    .wct-avatar-code { display: block; font-size: 9px; color: #93A4A9; }
+    .wct-avatar-code { display: block; font-size: 9px; color: var(--faint); }
     .wct-view-all {
         display: inline-flex;
         align-items: center;
         gap: 5px;
         font-size: 12px;
         font-weight: 600;
-        color: #014653;
+        color: var(--teal);
         text-decoration: none;
         margin-top: 4px;
     }
-    .wct-view-all:hover { color: #035b6c; text-decoration: underline; }
+    .wct-view-all:hover { color: var(--teal-2); text-decoration: underline; }
     .wct-view-all i { font-size: 10px; }
 
     /* ---- Under Minimum Wage modal ---- */
     .wct-modal .modal-content { border: none; border-radius: 14px; }
-    .wct-modal .modal-header { align-items: flex-start; border-bottom: 1px solid #EEF4F4; }
-    .wct-modal .modal-title { font-size: 16px; font-weight: 700; color: #14232A; }
-    .wct-modal-subtitle { font-size: 12px; color: #93A4A9; margin: 4px 0 0; }
+    .wct-modal .modal-header { align-items: flex-start; border-bottom: 1px solid var(--line-2); }
+    .wct-modal .modal-title { font-size: 16px; font-weight: 700; color: var(--ink); }
+    .wct-modal-subtitle { font-size: 12px; color: var(--faint); margin: 4px 0 0; }
     .wct-modal-list { padding: 4px 0; }
     .wct-modal-row {
         display: flex;
@@ -1168,7 +1168,7 @@
         justify-content: space-between;
         gap: 12px;
         padding: 10px 20px;
-        border-bottom: 1px solid #EEF4F4;
+        border-bottom: 1px solid var(--line-2);
     }
     .wct-modal-row:last-child { border-bottom: none; }
     .wct-modal-row-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
@@ -1177,16 +1177,16 @@
         margin: 0;
         font-size: 13px;
         font-weight: 600;
-        color: #14232A;
+        color: var(--ink);
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;
     }
-    .wct-modal-code { margin: 0; font-size: 11px; color: #93A4A9; }
+    .wct-modal-code { margin: 0; font-size: 11px; color: var(--faint); }
     .wct-modal-row-right { text-align: right; flex-shrink: 0; }
-    .wct-modal-salary { font-size: 13px; font-weight: 700; color: #14232A; }
-    .wct-modal-currency { font-size: 11px; color: #5D6F75; margin-left: 4px; }
-    .wct-modal-salary-missing { font-size: 14px; font-weight: 700; color: #E5573F; }
+    .wct-modal-salary { font-size: 13px; font-weight: 700; color: var(--ink); }
+    .wct-modal-currency { font-size: 11px; color: var(--muted); margin-left: 4px; }
+    .wct-modal-salary-missing { font-size: 14px; font-weight: 700; color: var(--error); }
 </style>
 @endsection
 @section('import-scripts')
@@ -1250,13 +1250,14 @@
         }
     };
     // Initialize the Doughnut chart
+    var _pWfp1 = window.WaiChart ? window.WaiChart.palette() : { teal: '#014653', aqua: '#2EACB3' };
     var myDoughnutChart = new Chart(ctx, {
         type: 'doughnut',
         data: {
             labels: ['Loading...', 'Loading...'], // Placeholder labels
             datasets: [{
                 data: [0, 0], // Placeholder data
-                backgroundColor: ['#014653', '#2EACB3'],
+                backgroundColor: [_pWfp1.teal, _pWfp1.aqua],
                 hoverOffset: 10, // Initial hover offset
             }]
         },
@@ -1294,6 +1295,9 @@
         },
         plugins: [doughnutLabelsInside]
     });
+    if (window.WaiChart) window.WaiChart.registerForTheme(myDoughnutChart, function (c, p) {
+        c.data.datasets[0].backgroundColor = [p.teal, p.aqua];
+    });
 
     // Fetch data and update the chart
     fetchEmployeeData();
@@ -1329,6 +1333,7 @@
     // basic salary * 12, over the last 4 years. Replaces the hardcoded
     // [1800,2300,...] mockup that used to ship for every resort.
     const budgetChartPayload = @json($budgetChart ?? ['labels' => [], 'budgeted' => [], 'actual' => []]);
+    var _pWfp2 = window.WaiChart ? window.WaiChart.palette() : { teal: '#014653', aqua: '#2EACB3' };
     const myBarChart = new Chart(cty, {
         type: 'bar',
         data: {
@@ -1337,14 +1342,14 @@
                 {
                     label: 'Budgeted',
                     data: budgetChartPayload.budgeted,
-                    backgroundColor: '#014653',
+                    backgroundColor: _pWfp2.teal,
                     borderRadius: 3,
                     barThickness: 14
                 },
                 {
                     label: 'Actual',
                     data: budgetChartPayload.actual,
-                    backgroundColor: '#2EACB3',
+                    backgroundColor: _pWfp2.aqua,
                     borderRadius: 3,
                     barThickness: 14
                 }
@@ -1401,6 +1406,10 @@
                 }
             }
         }
+    });
+    if (window.WaiChart) window.WaiChart.registerForTheme(myBarChart, function (c, p) {
+        c.data.datasets[0].backgroundColor = p.teal;
+        c.data.datasets[1].backgroundColor = p.aqua;
     });
 
 
@@ -1467,6 +1476,7 @@
         });
     }
 
+    var _pWfp3 = window.WaiChart ? window.WaiChart.palette() : { teal: '#014653' };
     var myLineChart = new Chart(ctz, {
         type: 'line',
         data: {
@@ -1475,8 +1485,8 @@
                 {
                     label: 'Occupancy Rates',
                     data: [], // Placeholder dynamic data
-                    borderColor: '#014653',
-                    backgroundColor: '#014653',
+                    borderColor: _pWfp3.teal,
+                    backgroundColor: _pWfp3.teal,
                     borderWidth: 1,
                     fill: false,
                     tension: 0.4,
@@ -1485,6 +1495,8 @@
                 {
                     label: 'Hiring Data',
                     data: [], // Placeholder dynamic data
+                    // #DFFF00 is close to but not an exact match for --lime
+                    // (#E0FF02) — left literal per the no-approximation rule.
                     borderColor: '#DFFF00',
                     backgroundColor: '#DFFF00',
                     borderWidth: 1,
@@ -1556,6 +1568,9 @@
                 }
             }
         }
+    });
+    if (window.WaiChart) window.WaiChart.registerForTheme(myLineChart, function (c, p) {
+        c.data.datasets[0].borderColor = c.data.datasets[0].backgroundColor = p.teal;
     });
 
     $(document).ready(function () {

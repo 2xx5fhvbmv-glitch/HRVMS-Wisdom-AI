@@ -8,10 +8,16 @@
 @endif
 
 @section('content')
+<style>
+    #disciplinary-category-index-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #disciplinary-category-index-hero { padding-bottom: 0; }
+    }
+</style>
 
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="disciplinary-category-index-hero">
             <div class="row justify-content-between g-3">
                 <div class="col-auto">
                     <div class="page-title">

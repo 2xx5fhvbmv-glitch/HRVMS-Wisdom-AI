@@ -30,7 +30,7 @@
                         <div class="col-lg-4 col-md-6 createDuty-emp">
                             <div class="mb-md-4 mb-3">
                                 <label for="select-emp" class="form-label">SELECT EMPLOYEE</label>
-                                    <select class="form-select" name="Emp_id" id="Employee">
+                                    <select class="form-select dd-native-select" name="Emp_id" id="Employee">
                                         <option></option> <!-- Leave this blank for the placeholder -->
                                         @if($employees->isNotEmpty())
                                             @foreach ($employees as $e)
@@ -38,6 +38,23 @@
                                             @endforeach
                                         @endif
                                     </select>
+                                    <div class="dd" data-target="#Employee">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Select an Employee</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Employee">
+                                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an employee…"></div>
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select an Employee</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @if($employees->isNotEmpty())
+                                                    @foreach ($employees as $e)
+                                                    <div class="dd-item" role="option" data-value="{{ $e->id }}"><span class="dd-nm">{{ ucfirst($e->first_name . ' ' . $e->last_name) }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @endforeach
+                                                @endif
+                                            </div>
+                                        </div>
+                                    </div>
                             </div>
                             <div class="createduty-Append">
 
@@ -68,7 +85,7 @@
 
                                     </div>
                                     <div class="col-lg-12 col-sm-6">
-                                        <select class="form-select select2t-none" id="Shift"
+                                        <select class="form-select dd-native-select" id="Shift"
                                             aria-label="Default select example" name="Shift">
                                             <option></option> <!-- Leave this blank for the placeholder -->
                                             @if($ShiftSettings->isNotEmpty())
@@ -89,13 +106,30 @@
                                                 @endforeach
                                             @endif
                                         </select>
+                                        <div class="dd" data-target="#Shift">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">Select a Shift</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Shift">
+                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a shift…"></div>
+                                                <div class="dd-scroll">
+                                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select a Shift</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @if($ShiftSettings->isNotEmpty())
+                                                        @foreach ($ShiftSettings as $s)
+                                                        <div class="dd-item" role="option" data-value="{{ $s->id }}"><span class="dd-nm">{{ ucfirst($s->ShiftName) }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @endforeach
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div class="col-12">
                                         <a href="javascript:void(0)" class="a-link addOvertime-modal">Add Overtime</a>
                                         <input type="text" class="form-control overtime"  name="overtime" >
                                     </div>
                                     <div class="col-lg-12 col-sm-6">
-                                        <select class="form-select select2t-none DayOfDate" id="DayOfDate"
+                                        <select class="form-select DayOfDate dd-native-select" id="DayOfDate"
                                             aria-label="Default select example" name="DayOfDate">
                                             <option selected value=""></option> <!-- Leave this blank for the placeholder -->
                                             @if(!empty($days))
@@ -105,6 +139,22 @@
                                                 @endforeach
                                             @endif
                                         </select>
+                                        <div class="dd" data-target="#DayOfDate">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">Select a Day Off</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Day off">
+                                                <div class="dd-scroll">
+                                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select a Day Off</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @if(!empty($days))
+                                                        @foreach ($days as $d)
+                                                        <div class="dd-item" role="option" data-value="{{ $d }}"><span class="dd-nm">{{ $d }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @endforeach
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div class="col-12">
                                         <div class="bg-white">
@@ -140,7 +190,7 @@
                                     <input type="text" class="form-control " placeholder="Management">
                                 </div>
                                 <div class="col-xl-2 col-md-4 col-sm-4 col-6">
-                                    <select class="form-select" name="Poitions" id="Poitions">
+                                    <select class="form-select dd-native-select" name="Poitions" id="Poitions">
                                         <option ></option>
                                         @if($ResortPosition->isNotEmpty())
 
@@ -149,6 +199,23 @@
                                             @endforeach
                                         @endif
                                     </select>
+                                    <div class="dd" data-target="#Poitions">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Select a Poitions</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Position">
+                                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a position…"></div>
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select a Poitions</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @if($ResortPosition->isNotEmpty())
+                                                    @foreach ($ResortPosition as $p)
+                                                    <div class="dd-item" role="option" data-value="{{ $p->id }}"><span class="dd-nm">{{ ucfirst($p->position_title) }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @endforeach
+                                                @endif
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="col-xl-2 col-md-4 col-sm-4 col-6">
                                     <input type="text" class="form-control " id="txt-bod"
@@ -387,7 +454,7 @@
 
                             <div class="col-md-12 mt-3">
                                 <lable>Shift </lable>
-                                <select class="form-select select2t-none" id="Shiftpopup"  aria-label="Default select example" name="Shiftpopup">
+                                <select class="form-select dd-native-select" id="Shiftpopup"  aria-label="Default select example" name="Shiftpopup">
                                     <option></option>
                                     @if($ShiftSettings->isNotEmpty())
                                         @foreach ($ShiftSettings as $s)
@@ -396,6 +463,23 @@
                                         @endforeach
                                     @endif
                                 </select>
+                                <div class="dd" data-target="#Shiftpopup">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">Select a Shift</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Shift">
+                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a shift…"></div>
+                                        <div class="dd-scroll">
+                                            <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select a Shift</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @if($ShiftSettings->isNotEmpty())
+                                                @foreach ($ShiftSettings as $s)
+                                                <div class="dd-item" role="option" data-value="{{ $s->id }}"><span class="dd-nm">{{ ucfirst($s->ShiftName) }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @endforeach
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
                             <div class="col-md-12 mt-3 ">
@@ -403,7 +487,7 @@
                                 <input type="text" class="form-control ShiftOverTime" id="ShiftOverTime" name="ShiftOverTime" placeholder="Over Time">
                             </div>
                             <div class="col-md-12 mt-3">
-                                <select class="form-select select2t-none DayOfDate" id="DayOfDateModel"aria-label="Default select example" name="DayOfDateModel">
+                                <select class="form-select DayOfDate dd-native-select" id="DayOfDateModel"aria-label="Default select example" name="DayOfDateModel">
                                     <option selected value=""></option> <!-- Leave this blank for the placeholder -->
                                     @if(!empty($days))
 
@@ -412,6 +496,22 @@
                                         @endforeach
                                     @endif
                                 </select>
+                                <div class="dd" data-target="#DayOfDateModel">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">Select a Day Off</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Day off">
+                                        <div class="dd-scroll">
+                                            <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select a Day Off</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @if(!empty($days))
+                                                @foreach ($days as $d)
+                                                <div class="dd-item" role="option" data-value="{{ $d }}"><span class="dd-nm">{{ $d }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @endforeach
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
 
                             </div>
 
@@ -439,7 +539,7 @@
 
 @section('import-css')
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-
+@include('resorts._dropdown_styles')
 @endsection
 
 @section('import-scripts')
@@ -482,27 +582,6 @@
             minuteIncrement: 1, // Allows 1-minute steps
             onReady: cdr1AmPmOnReady
         });
-        $('#Employee').select2({
-            placeholder: "Select an Employee", // Placeholder text
-            allowClear: true // Adds a clear (X) button to reset the dropdown
-        });
-        $('#Shift').select2({
-            placeholder: "Select a Shift", // Placeholder text
-            allowClear: true // Adds a clear (X) button to reset the dropdown
-        });
-        $('.DayOfDate').select2({
-            placeholder: "Select a Day Off", // Placeholder text
-            allowClear: true // Adds a clear (X) button to reset the dropdown
-        });
-        $('#Poitions').select2({
-            placeholder: "Select a Poitions", // Placeholder text
-            allowClear: true // Adds a clear (X) button to reset the dropdown
-        });
-        $('#Shiftpopup').select2({
-            placeholder: "Select a Shift", // Placeholder text
-            allowClear: true // Adds a clear (X) button to reset the dropdown
-        });
-
         $('.data-Table').dataTable({
             "searching": false,
             "bLengthChange": false,
@@ -956,5 +1035,6 @@
         }
     }
 </script>
+@include('resorts._dropdown_script')
 @endsection
 

@@ -13,17 +13,23 @@
     }
     .taa-btn-primary:focus-visible, .taa-btn-secondary:focus-visible, .taa-btn-positive:focus-visible,
     .taa-btn-attention:focus-visible, .taa-btn-neutral:focus-visible, .taa-btn-critical:focus-visible {
-        outline: 2px solid #014653;
+        outline: 2px solid var(--teal);
         outline-offset: 2px;
     }
 
-    /* Everyday action — Submit, Save. */
-    .taa-btn-primary { background: #014653; color: #fff; }
-    .taa-btn-primary:hover { background: #014653; color: #fff; transform: translateY(-2px); box-shadow: 0 8px 18px -8px rgba(20,35,42,.35); }
+    /* Everyday action — Submit, Save.
+       Button text stays literal #fff (contrast-on-solid-teal, not a
+       surface — --card goes dark in Dark/Teal and would hide the text).
+       Box-shadows stay literal rgba(20,35,42,…) throughout this file for
+       the same reason --shadow's own dark override uses rgba(0,0,0,…)
+       instead of following --ink. */
+    .taa-btn-primary { background: var(--teal); color: #fff; }
+    .taa-btn-primary:hover { background: var(--teal); color: #fff; transform: translateY(-2px); box-shadow: 0 8px 18px -8px rgba(20,35,42,.35); }
 
-    /* Low-stakes, recedes on purpose — Cancel, Back, View, Download, Edit-a-row, toolbar tools. */
-    .taa-btn-secondary { background: transparent; color: #014653; border: 1.5px solid #C9D6D7; }
-    .taa-btn-secondary:hover { background: #F9F8F1; border-color: #014653; color: #014653; transform: translateY(-2px); box-shadow: 0 8px 18px -8px rgba(20,35,42,.18); }
+    /* Low-stakes, recedes on purpose — Cancel, Back, View, Download, Edit-a-row, toolbar tools.
+       #C9D6D7 border has no token match — left literal. */
+    .taa-btn-secondary { background: transparent; color: var(--teal); border: 1.5px solid #C9D6D7; }
+    .taa-btn-secondary:hover { background: var(--paper); border-color: var(--teal); color: var(--teal); transform: translateY(-2px); box-shadow: 0 8px 18px -8px rgba(20,35,42,.18); }
 
     /* Affirming, additive — Approve, Add Shift/Entry/Zone/Holiday. */
     .taa-btn-positive { background: var(--positive-bg); color: var(--positive); }
@@ -31,16 +37,16 @@
 
     /* Consequential/needs-a-decision, not destructive — Reject, manual
        Check-In/Check-Out, Update Overtime Status, Pause zone. */
-    .taa-btn-attention { background: #FBF0DC; color: #D98A00; }
-    .taa-btn-attention:hover { background: #D98A00; color: #fff; transform: translateY(-2px); box-shadow: 0 8px 18px -8px rgba(20,35,42,.25); }
+    .taa-btn-attention { background: var(--warning-bg); color: var(--warning); }
+    .taa-btn-attention:hover { background: var(--warning); color: #fff; transform: translateY(-2px); box-shadow: 0 8px 18px -8px rgba(20,35,42,.25); }
 
     /* Removes an unsaved draft row, not a real delete — remove shift/OT/entry row. */
-    .taa-btn-neutral { background: #DEDEDE; color: #222; }
-    .taa-btn-neutral:hover { background: #F5F8F8; color: #222; transform: translateY(-2px); box-shadow: 0 8px 18px -8px rgba(20,35,42,.18); }
+    .taa-btn-neutral { background: var(--neutral-bg); color: var(--darkblack); }
+    .taa-btn-neutral:hover { background: var(--teal-soft); color: var(--darkblack); transform: translateY(-2px); box-shadow: 0 8px 18px -8px rgba(20,35,42,.18); }
 
     /* Can't be undone — Delete zone/holiday. */
-    .taa-btn-critical { background: #FFDED9; color: #FF2400; }
-    .taa-btn-critical:hover { background: #FF2400; color: #fff; transform: translateY(-2px); box-shadow: 0 8px 18px -8px rgba(20,35,42,.25); }
+    .taa-btn-critical { background: var(--critical-bg); color: var(--critical); }
+    .taa-btn-critical:hover { background: var(--critical); color: #fff; transform: translateY(-2px); box-shadow: 0 8px 18px -8px rgba(20,35,42,.25); }
 
     /* Press feedback — after every :hover rule on purpose (hover+active
        tie at equal specificity; later rule wins per property). */
@@ -65,18 +71,20 @@
         transform: none;
         box-shadow: none;
     }
-    .taa-btn-primary[disabled] { background: #014653; color: #fff; }
-    .taa-btn-secondary[disabled] { background: transparent; color: #014653; }
+    .taa-btn-primary[disabled] { background: var(--teal); color: #fff; }
+    .taa-btn-secondary[disabled] { background: transparent; color: var(--teal); }
     .taa-btn-positive[disabled] { background: var(--positive-bg); color: var(--positive); }
-    .taa-btn-attention[disabled] { background: #FBF0DC; color: #D98A00; }
-    .taa-btn-neutral[disabled] { background: #DEDEDE; color: #222; }
-    .taa-btn-critical[disabled] { background: #FFDED9; color: #FF2400; }
+    .taa-btn-attention[disabled] { background: var(--warning-bg); color: var(--warning); }
+    .taa-btn-neutral[disabled] { background: var(--neutral-bg); color: var(--darkblack); }
+    .taa-btn-critical[disabled] { background: var(--critical-bg); color: var(--critical); }
 
     /* View-mode switcher (Normal/Detailed, Individual/Department, grid/list) —
        wayfinding, not an action, so it doesn't borrow an emotional variant.
-       Same pattern as Talent Acquisition's .ta-tabnav. */
-    .taa-tabnav { display: inline-flex; gap: 4px; background: #F5F8F8; padding: 4px; border-radius: 10px; }
+       Same pattern as Talent Acquisition's .ta-tabnav. #4b5457 label has no
+       token match — left literal. The active tab is an elevated surface
+       (unlike button text), so its background does map to --card. */
+    .taa-tabnav { display: inline-flex; gap: 4px; background: var(--teal-soft); padding: 4px; border-radius: 10px; }
     .taa-tabnav a, .taa-tabnav button { padding: 6px 12px; border-radius: 7px; font-size: 13px; font-weight: 500; color: #4b5457; border: none; background: transparent; transition: background .16s ease, color .16s ease; }
-    .taa-tabnav a:hover, .taa-tabnav button:hover { color: #014653; }
-    .taa-tabnav a.active, .taa-tabnav button.active { background: #fff; color: #014653; box-shadow: 0 1px 3px rgba(20,35,42,.12); }
+    .taa-tabnav a:hover, .taa-tabnav button:hover { color: var(--teal); }
+    .taa-tabnav a.active, .taa-tabnav button.active { background: var(--card); color: var(--teal); box-shadow: 0 1px 3px rgba(20,35,42,.12); }
 </style>

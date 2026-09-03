@@ -8,10 +8,16 @@
 @endif
 
 @section('content')
+<style>
+    #grievance-cat-subcat-index-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #grievance-cat-subcat-index-hero { padding-bottom: 0; }
+    }
+</style>
 
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="grievance-cat-subcat-index-hero">
             <div class="row justify-content-between g-3">
                 <div class="col-auto">
                     <div class="page-title">
@@ -57,6 +63,8 @@
     </div>
 </div>
 @include('resorts._emotional_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -65,22 +73,6 @@
 @section('import-scripts')
 
 <script>
-
-            $(".Grievance_Cat_idMain").select2({
-                placeholder: "Select Grievance Category",
-                allowClear: true,
-                width: '100%'        
-            });
-            $(".GrievanceSubcategories").select2({
-                placeholder: `Select Grievance Sub Category `,
-                allowClear: true,
-                width: '100%'        
-            });
-            $(".priority_level").select2({
-                placeholder: `Select Priority Level `,
-                allowClear: true,
-                width: '100%'        
-            });
         var DisciplineryCategory = $('#IndexGrievanceCatAndSuBcat').DataTable({
             "searching": false,
             "bLengthChange": false,
@@ -156,54 +148,85 @@
             var Gri_Sub_cat_id = $(this).attr('data-Gri_Sub_cat_id');
             var Priority_Level = $(this).attr('data-Priority_Level');
            
+            var tickSvg = '<svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg>';
+            var GrievanceCategory = @json($GrievanceCategory);
+            var selectedCat = GrievanceCategory.find(item => item.id == Grievance_Cat_id);
+            var priorities = ['High', 'Medium', 'Low'];
+
             var editRowHtml = `
                 <td class="py-1">
                     <div class="form-group">
-                        <select class="form-select select2t-none Grievance_Cat_idMain"
+                        <select class="form-select dd-native-select Grievance_Cat_idMain"
                             data-parsley-required="true"
                             data-parsley-error-message="Please select a grievance category Grievance_Cat_idMain"
-                            name="Grievance_Cat_id" id="Grievance_Cat_idMain_1" data-id="1" aria-label="Default select example">
-                            <option value=""></option>
-                            @if($GrievanceCategory->isNotEmpty())
-                                @foreach($GrievanceCategory as $item)
-                                    <option value="{{$item->id}}" ${Grievance_Cat_id == '{{$item->id}}' ? 'selected' : ''}>
-                                        {{$item->Category_Name}}
-                                    </option>
-                                @endforeach
-                            @endif
+                            name="Grievance_Cat_id" id="Grievance_Cat_idMain_1" data-id="1" aria-label="Grievance category">
+                            <option value="">Select Grievance Category</option>
+                            ${GrievanceCategory.map(item => `
+                            <option value="${item.id}" ${Grievance_Cat_id == item.id ? 'selected' : ''}>${item.Category_Name}</option>
+                        `).join('')}
                         </select>
+                        <div class="dd" data-target="#Grievance_Cat_idMain_1">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">${selectedCat ? selectedCat.Category_Name : 'Select Grievance Category'}</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Grievance category">
+                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a category…"></div>
+                                <div class="dd-scroll">
+                                    ${GrievanceCategory.map(item => `<div class="dd-item${item.id == Grievance_Cat_id ? ' active' : ''}" role="option" data-value="${item.id}"><span class="dd-nm">${item.Category_Name}</span>${tickSvg}</div>`).join('')}
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </td>
                 <td class="py-1">
                     <div class="form-group">
-                        <select class="form-select select2t-none GrievanceSubcategories" aria-label="Select Subcategory" 
+                        <select class="form-select dd-native-select GrievanceSubcategories" aria-label="Subcategory"
                             required
                             data-parsley-required="true"
                             data-parsley-error-message="Please select a subcategory"
-                            name="Gri_Sub_cat_id" id="GrievanceSubcategories_1" data-id="1" aria-label="Default select example">
+                            name="Gri_Sub_cat_id" id="GrievanceSubcategories_1" data-id="1">
                             <option value=""></option>
-                           
                         </select>
+                        <div class="dd" data-target="#GrievanceSubcategories_1">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">Select Subcategory</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Subcategory">
+                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a subcategory…"></div>
+                                <div class="dd-scroll"></div>
+                            </div>
+                        </div>
                     </div>
                 </td>
                 <td>
                     <div class="form-group">
-                        <select class="form-select select2t-none priority_level" name="priority_level[]" id="priority_level_1" data-id="1" aria-label="Select Priority Level"
+                        <select class="form-select dd-native-select priority_level" name="priority_level[]" id="priority_level_1" data-id="1" aria-label="Priority level"
                             required
                             data-parsley-required="true"
                             data-parsley-error-message="Please select a priority level">
-                            <option value="High" ${Priority_Level == 'High' ? 'selected' : ''}>High</option>
-                            <option value="Medium" ${Priority_Level == 'Medium' ? 'selected' : ''}>Medium</option>
-                            <option value="Low" ${Priority_Level == 'Low' ? 'selected' : ''}>Low</option>
+                            ${priorities.map(p => `<option value="${p}" ${Priority_Level == p ? 'selected' : ''}>${p}</option>`).join('')}
                         </select>
-                    </div>    
+                        <div class="dd" data-target="#priority_level_1">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">${priorities.includes(Priority_Level) ? Priority_Level : 'Select Priority Level'}</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Priority level">
+                                <div class="dd-scroll">
+                                    ${priorities.map(p => `<div class="dd-item${Priority_Level == p ? ' active' : ''}" role="option" data-value="${p}"><span class="dd-nm">${p}</span>${tickSvg}</div>`).join('')}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </td>
                 <td class="py-1">
                     <a href="javascript:void(0)" class="btn eb-btn-primary update-row-btn_cat" data-cat-id="${Main_id}">Submit</a>
                 </td>
             `;
             $row.html(editRowHtml);
-            
+
                 $.ajax({
                     url: "{{ route('GrievanceAndDisciplinery.config.GrievanceCategoryWiseSubCategoryData') }}",
                     type: "POST",
@@ -216,28 +239,13 @@
                         $.each(response.data.GrievanceSubcategory, function (i, v) {
                             option += `<option value="${v.id}" ${Gri_Sub_cat_id == v.id ? 'selected' : ''}>${v.Sub_Category_Name}</option>`;
                         });
-                        $row.find('select[name="Gri_Sub_cat_id"]').html(option);                   
+                        $row.find('select[name="Gri_Sub_cat_id"]').html(option);
+                        wisdomDD.rebuild('#GrievanceSubcategories_1');
                     },
                     error: function(response) {
                         console.error("Error fetching subcategories", response);
                     }
                 });
-                
-            $("#Grievance_Cat_idMain_1").select2({
-                placeholder: "Select Grievance Category",
-                allowClear: true,
-                width: '100%'        
-            });
-            $("#GrievanceSubcategories_1").select2({
-                placeholder: `Select Grievance Sub Category `,
-                allowClear: true,
-                width: '100%'        
-            });
-            $("#priority_level_1").select2({
-                placeholder: `Select Priority Level `,
-                allowClear: true,
-                width: '100%'        
-            });
         });
 
         $(document).on("click", "#IndexGrievanceCatAndSuBcat .update-row-btn_cat", function (event) {
@@ -310,17 +318,12 @@
                         $.each(response.data.GrievanceSubcategory, function (i, v) {
                             option += `<option value="${v.id}" >${v.Sub_Category_Name}</option>`;
                         });
-                        $row.find('select[name="Gri_Sub_cat_id"]').html(option);                   
+                        $row.find('select[name="Gri_Sub_cat_id"]').html(option);
+                        wisdomDD.rebuild('#GrievanceSubcategories_1');
                     },
                     error: function(response) {
                         console.error("Error fetching subcategories", response);
                     }
-                });
-
-                $row.find('select[name="Gri_Sub_cat_id"]').select2({
-                    placeholder: `Select Grievance Sub Category `,
-                    allowClear: true,
-                    width: '100%'        
                 });
         });
 

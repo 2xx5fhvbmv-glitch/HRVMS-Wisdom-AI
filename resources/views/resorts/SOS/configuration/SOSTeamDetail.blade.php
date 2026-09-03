@@ -62,6 +62,8 @@
     </div>
 </div>
 @include('resorts._emotional_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -153,22 +155,46 @@
             var orgMember = $memberCell.text().trim();
             var orgRole = $roleCell.text().trim();
 
+            var tickSvg = '<svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg>';
             var roleOptions = `<option value=""></option>`;
             var employeeOptions = `<option value=""></option>`;
+            var roleItems = '';
+            var employeeItems = '';
             @foreach($getMembers as $emp)
                 employeeOptions += `<option value="{{ $emp->id }}" ${member_id == "{{ $emp->id }}" ? 'selected' : ''}>{{ $emp->first_name. ' ' . $emp->last_name}}</option>`;
+                employeeItems += `<div class="dd-item${member_id == "{{ $emp->id }}" ? ' active' : ''}" role="option" data-value="{{ $emp->id }}"><span class="dd-nm">{{ $emp->first_name. ' ' . $emp->last_name}}</span>${tickSvg}</div>`;
             @endforeach
 
             @foreach($Roles as $item)
                 roleOptions += `<option value="{{ $item->id }}" ${role_id == "{{ $item->id }}" ? 'selected' : ''}>{{ $item->name }}</option>`;
+                roleItems += `<div class="dd-item${role_id == "{{ $item->id }}" ? ' active' : ''}" role="option" data-value="{{ $item->id }}"><span class="dd-nm">{{ $item->name }}</span>${tickSvg}</div>`;
             @endforeach
 
-            $memberCell.html(`<select class="form-select select2t-none" name="member_id" id="member_id">
+            $memberCell.html(`<select class="form-select dd-native-select" name="member_id" id="member_id">
                                 ${employeeOptions}
-                                </select>`);
-            $roleCell.html(`<select class="form-select select2t-none" name="role_id" id="role_id">
+                                </select>
+                                <div class="dd" data-target="#member_id">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">Select Member</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Member">
+                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a member…"></div>
+                                        <div class="dd-scroll">${employeeItems}</div>
+                                    </div>
+                                </div>`);
+            $roleCell.html(`<select class="form-select dd-native-select" name="role_id" id="role_id">
                                 ${roleOptions}
-                                </select>`);
+                                </select>
+                                <div class="dd" data-target="#role_id">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">Select Role</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Role">
+                                        <div class="dd-scroll">${roleItems}</div>
+                                    </div>
+                                </div>`);
 
             $row.find("td:last-child").html(`
                 <button class="btn btn-sm eb-btn-positive update-row-btn me-1" data-id="${Main_id}">Update</button>
@@ -177,6 +203,9 @@
 
             $row.data('original-member', orgMember);
             $row.data('original-role', orgRole);
+
+            wisdomDD.sync('#member_id');
+            wisdomDD.sync('#role_id');
 
         });
         // Cancel edit

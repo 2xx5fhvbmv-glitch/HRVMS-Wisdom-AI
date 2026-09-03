@@ -875,6 +875,9 @@ const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
                 }
             }
         });
+        // datasets are populated entirely by the AJAX response below
+        // (server-supplied colours, out of scope) — only axes/legend retheme.
+        if (window.WaiChart) window.WaiChart.registerForTheme(myStackedBarChart);
         GetHiringSource();
 
         $(document).on("change",".YearWiseTopSource",function(){

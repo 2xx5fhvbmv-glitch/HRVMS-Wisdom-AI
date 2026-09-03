@@ -8,6 +8,23 @@
     <meta name=keywords content="">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
+    {{-- Dark/Teal theme system — disabled 2026-08-30, not production-ready
+         (contrast/legibility issues found in the user's own testing beyond
+         what the regression audit caught and fixed). This is the ONLY
+         switch that ever sets data-theme on <html>; with it off, every
+         var(--token)/[data-theme=...] rule already in the codebase stays
+         permanently inert and the app renders exactly as it did before
+         this work (Light values were verified pixel-identical). To resume
+         this work later, uncomment this include (and its 5 siblings —
+         see resources/views/shopkeeper/layouts/app.blade.php,
+         resources/views/resorts/layouts/header.blade.php,
+         resources/views/shopkeeper/layouts/header.blade.php, and the
+         chart-theme.js <script> tag in both resorts/shopkeeper
+         layouts/js.blade.php) and pick up the remaining known issues from
+         there.
+    @include('partials._theme_engine')
+    --}}
+
     @include('partials.sentry-init')
 
     @include('resorts.layouts.css')

@@ -8,9 +8,15 @@
 @endif
 
 @section('content')
+<style>
+    #leave-config-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #leave-config-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="leave-config-hero">
             <div class="row justify-content-between g-3">
                 <div class="col-auto">
                     <div class="page-title">
@@ -294,7 +300,7 @@
                                     </div>
                                     <div class="col-sm-6">
                                         <label for="add_frequency" class="form-label">FREQUENCY <span class="red-mark">*</span></label>
-                                        <select class="form-select select2t-none" name="frequency" id="add_frequency" aria-label="Default select example" data-parsley-required="true"
+                                        <select class="form-select dd-native-select" name="frequency" id="add_frequency" aria-label="Default select example" data-parsley-required="true"
                                         data-parsley-errors-container="#add-frequency-error" >
                                             <option value="">Select Frequency</option>
                                             <option value="Weekly">Weekly</option>
@@ -302,6 +308,21 @@
                                             <option value="Quarterly">Quarterly</option>
                                             <option value="Yearly">Yearly</option>
                                         </select>
+                                        <div class="dd" data-target="#add_frequency">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">Select Frequency</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Frequency">
+                                                <div class="dd-scroll">
+                                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Frequency</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    <div class="dd-item" role="option" data-value="Weekly"><span class="dd-nm">Weekly</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    <div class="dd-item" role="option" data-value="Monthly"><span class="dd-nm">Monthly</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    <div class="dd-item" role="option" data-value="Quarterly"><span class="dd-nm">Quarterly</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    <div class="dd-item" role="option" data-value="Yearly"><span class="dd-nm">Yearly</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                </div>
+                                            </div>
+                                        </div>
                                         <div id="add-frequency-error"></div>
                                     </div>
                                     <div class="col-sm-6">
@@ -318,19 +339,43 @@
                                     </div>
                                     <div class="col-sm-6">
                                         <label for="is_paid" class="form-label">LEAVE TYPE (PAID/UNPAID) <span class="red-mark">*</span></label>
-                                        <select class="form-select select2t-none" name="is_paid" id="is_paid">
+                                        <select class="form-select dd-native-select" name="is_paid" id="is_paid">
                                             <option value="paid">Paid Leave</option>
                                             <option value="unpaid">Unpaid Leave</option>
                                         </select>
+                                        <div class="dd" data-target="#is_paid">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">Paid Leave</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Leave Type">
+                                                <div class="dd-scroll">
+                                                    <div class="dd-item active" role="option" data-value="paid"><span class="dd-nm">Paid Leave</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    <div class="dd-item" role="option" data-value="unpaid"><span class="dd-nm">Unpaid Leave</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
 
                                     @if(count($LeaveCategories ?? []) >= 1)
                                         <div class="col-sm-6">
                                             <label for="combine_with_other" class="form-label">IS THIS LEAVE COMBINED WITH ANOTHER?</label>
-                                            <select class="form-select select2t-none" name="combine_with_other" id="combine_with_other" aria-label="Default select example">
+                                            <select class="form-select dd-native-select" name="combine_with_other" id="combine_with_other" aria-label="Default select example">
                                                 <option value="0">No</option>
                                                 <option value="1">Yes</option>
                                             </select>
+                                            <div class="dd" data-target="#combine_with_other">
+                                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                    <span class="dd-lbl">No</span>
+                                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                </button>
+                                                <div class="dd-panel" role="listbox" aria-label="Combine With Other">
+                                                    <div class="dd-scroll">
+                                                        <div class="dd-item active" role="option" data-value="0"><span class="dd-nm">No</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        <div class="dd-item" role="option" data-value="1"><span class="dd-nm">Yes</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
 
                                         <div class="col-sm-6" id="add_leave_category_wrap" style="display: none;">
@@ -432,13 +477,28 @@
                         </div>
                         <div class="col-sm-6">
                             <label for="edit_frequency" class="form-label">FREQUENCY <span class="red-mark">*</span></label>
-                            <select class="form-select select2t-none" name="frequency" id="edit_frequency" aria-label="Default select example" data-parsley-required="true" data-parsley-errors-container="#edit-frequency-error" >
+                            <select class="form-select dd-native-select" name="frequency" id="edit_frequency" aria-label="Default select example" data-parsley-required="true" data-parsley-errors-container="#edit-frequency-error" >
                                 <option value="">Select Frequency</option>
                                 <option value="Weekly">Weekly</option>
                                 <option value="Monthly">Monthly</option>
                                 <option value="Quarterly">Quarterly</option>
                                 <option value="Yearly">Yearly</option>
                             </select>
+                            <div class="dd" data-target="#edit_frequency">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Select Frequency</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Frequency">
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Frequency</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="Weekly"><span class="dd-nm">Weekly</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="Monthly"><span class="dd-nm">Monthly</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="Quarterly"><span class="dd-nm">Quarterly</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="Yearly"><span class="dd-nm">Yearly</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    </div>
+                                </div>
+                            </div>
                             <div id="edit-frequency-error"></div>
                         </div>
                         <div class="col-sm-6">
@@ -455,20 +515,44 @@
                         </div>
                         <div class="col-sm-6">
                             <label for="edit_is_paid" class="form-label">LEAVE TYPE (PAID/UNPAID) <span class="red-mark">*</span></label>
-                            <select class="form-select select2t-none" name="is_paid" id="edit_is_paid">
+                            <select class="form-select dd-native-select" name="is_paid" id="edit_is_paid">
                                 <option value="paid">Paid Leave</option>
                                 <option value="unpaid">Unpaid Leave</option>
                             </select>
+                            <div class="dd" data-target="#edit_is_paid">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Paid Leave</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Leave Type">
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value="paid"><span class="dd-nm">Paid Leave</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="unpaid"><span class="dd-nm">Unpaid Leave</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         @if(!empty($LeaveCategories) && count($LeaveCategories) >= 1)
                             <div class="col-sm-6">
                                 <label for="edit_combine_with_other" class="form-label">IS THIS LEAVE COMBINED WITH
                                     ANOTHER?</label>
-                                <select class="form-select select2t-none" name="combine_with_other" id="edit_combine_with_other" aria-label="Default select example">
+                                <select class="form-select dd-native-select" name="combine_with_other" id="edit_combine_with_other" aria-label="Default select example">
                                     <option value="0">No</option>
                                     <option value="1">Yes</option>
                                 </select>
+                                <div class="dd" data-target="#edit_combine_with_other">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">No</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Combine With Other">
+                                        <div class="dd-scroll">
+                                            <div class="dd-item active" role="option" data-value="0"><span class="dd-nm">No</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            <div class="dd-item" role="option" data-value="1"><span class="dd-nm">Yes</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div> 
                             <div class="col-sm-6" id="edit_leave_category_wrap" style="display: none;">
                                 <label for="edit_leave_category" class="form-label">LEAVE CATEGORY <span class="red-mark">*</span></label>
@@ -496,6 +580,8 @@
     </div>
 </div>
 @include('resorts.leaves._leave_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')

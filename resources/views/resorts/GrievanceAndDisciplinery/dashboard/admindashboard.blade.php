@@ -319,11 +319,24 @@
                             </div>
                             <div class="col-auto">
                                 <div class="form-group">
-                                    <select class="form-select" aria-label="Default select example">
-                                        <option selected="">By Category</option>
+                                    <select class="form-select dd-native-select" id="breakdownCasesFilter" aria-label="Breakdown filter">
+                                        <option selected value="">By Category</option>
                                         <option value="1">AAA</option>
                                         <option value="2">AAA</option>
                                     </select>
+                                    <div class="dd" data-target="#breakdownCasesFilter">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">By Category</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Breakdown filter">
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">By Category</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="1"><span class="dd-nm">AAA</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="2"><span class="dd-nm">AAA</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -500,6 +513,8 @@
         </div>
     </div>
 </div>
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -587,6 +602,7 @@
 <script type="module">
 
     const cty = document.getElementById('appealsByCategory').getContext('2d');
+    var _pGad1 = window.WaiChart ? window.WaiChart.palette().teal : '#014653';
     const appealsByCategory = new Chart(cty, {
         type: 'bar',
         data: {
@@ -595,8 +611,8 @@
                 {
                     // label: 'Preplannned OT',
                     data: [12, 17, 8, 14],
-                    backgroundColor: '#014653',
-                    borderColor: '#014653',
+                    backgroundColor: _pGad1,
+                    borderColor: _pGad1,
                     borderWidth: 1,
                     borderRadius: 6,
                     barThickness: 25
@@ -651,6 +667,9 @@
             }
         }
     });
+    if (window.WaiChart) window.WaiChart.registerForTheme(appealsByCategory, function (c, p) {
+        c.data.datasets[0].backgroundColor = c.data.datasets[0].borderColor = p.teal;
+    });
 
 
     var ctx = document.getElementById('myDoughnutChartPeopleRelation').getContext('2d');
@@ -686,13 +705,14 @@
         }
     };
 
+    var _pGad2 = window.WaiChart ? window.WaiChart.palette() : { teal: '#014653', aqua: '#2EACB3' };
     var myDoughnutChartPeopleRelation = new Chart(ctx, {
         type: 'doughnut',
         data: {
             labels: ['Pending', 'Resolved'],
             datasets: [{
                 data: [70, 30],
-                backgroundColor: ['#014653', '#2EACB3'], borderWidth: 0 // Removes the border
+                backgroundColor: [_pGad2.teal, _pGad2.aqua], borderWidth: 0 // Removes the border
             }]
         },
         options: {
@@ -726,8 +746,12 @@
         },
         plugins: [doughnutLabelsInside] // Attach the plugin to this chart only
     });
+    if (window.WaiChart) window.WaiChart.registerForTheme(myDoughnutChartPeopleRelation, function (c, p) {
+        c.data.datasets[0].backgroundColor = [p.teal, p.aqua];
+    });
 
     const ctz = document.getElementById('breakdownCases').getContext('2d');
+    var _pGad3 = window.WaiChart ? window.WaiChart.palette().teal : '#014653';
     const breakdownCases = new Chart(ctz, {
         type: 'bar',
         data: {
@@ -736,8 +760,8 @@
                 {
                     // label: 'Preplannned OT',
                     data: [80, 70, 90, 76, 96, 62, 80, 90, 74, 80, 90, 60],
-                    backgroundColor: '#014653',
-                    borderColor: '#014653',
+                    backgroundColor: _pGad3,
+                    borderColor: _pGad3,
                     borderWidth: 1,
                     borderRadius: 6,
                     barThickness: 25
@@ -791,6 +815,9 @@
                 }
             }
         }
+    });
+    if (window.WaiChart) window.WaiChart.registerForTheme(breakdownCases, function (c, p) {
+        c.data.datasets[0].backgroundColor = c.data.datasets[0].borderColor = p.teal;
     });
 </script>
 @endsection

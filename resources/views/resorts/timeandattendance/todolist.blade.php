@@ -194,6 +194,7 @@
     @endsection
     @section('import-css')
     @include('resorts.timeandattendance._taa_buttons_v2_styles')
+    @include('resorts._dropdown_styles')
     @endsection
 
     @section('import-scripts')
@@ -290,11 +291,13 @@
     });
 
     // Add overtime entry row
+    var overtimeEntryUidCounter = 0; // always-incrementing, never reused — safe as a .dd data-target id even after rows are removed/re-added out of order
     function addOvertimeEntry(entry = null, entryNumber = null) {
         // Get current entry count if not provided
         if (entryNumber === null) {
             entryNumber = $('#overtimeEntriesContainer .overtime-entry-row').length + 1;
         }
+        var statusUid = 'overtimeStatus_' + (++overtimeEntryUidCounter);
 
         let entryHtml = '<div class="overtime-entry-row mb-3 p-3 border rounded">';
         if (entry && entry.id) {
@@ -315,11 +318,24 @@
         entryHtml += '</div>';
         entryHtml += '<div class="col-md-4">';
         entryHtml += '<label class="form-label">Status</label>';
-        entryHtml += '<select class="form-select overtime-status">';
+        var statusVal = entry && entry.status ? entry.status : 'pending';
+        var statusLabels = { pending: 'Pending', approved: 'Approved', rejected: 'Rejected' };
+        entryHtml += '<select class="form-select overtime-status dd-native-select" id="' + statusUid + '">';
         entryHtml += '<option value="pending"' + (entry && entry.status === 'pending' ? ' selected' : '') + '>Pending</option>';
         entryHtml += '<option value="approved"' + (entry && entry.status === 'approved' ? ' selected' : '') + '>Approved</option>';
         entryHtml += '<option value="rejected"' + (entry && entry.status === 'rejected' ? ' selected' : '') + '>Rejected</option>';
         entryHtml += '</select>';
+        entryHtml += '<div class="dd" data-target="#' + statusUid + '">';
+        entryHtml += '<button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">';
+        entryHtml += '<span class="dd-lbl">' + statusLabels[statusVal] + '</span>';
+        entryHtml += '<svg class="dd-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>';
+        entryHtml += '</button>';
+        entryHtml += '<div class="dd-panel" role="listbox" aria-label="Overtime status"><div class="dd-scroll">';
+        ['pending', 'approved', 'rejected'].forEach(function (val) {
+            entryHtml += '<div class="dd-item' + (val === statusVal ? ' active' : '') + '" role="option" data-value="' + val + '"><span class="dd-nm">' + statusLabels[val] + '</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>';
+        });
+        entryHtml += '</div></div>';
+        entryHtml += '</div>';
         entryHtml += '</div>';
         entryHtml += '</div>';
         entryHtml += '</div>';
@@ -586,4 +602,5 @@
         });
     }
     </script>
+    @include('resorts._dropdown_script')
     @endsection

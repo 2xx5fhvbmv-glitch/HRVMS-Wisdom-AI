@@ -33,16 +33,23 @@
   toastr.options.closeOnHover = false; // toastr's native hover-pause snaps the bar to empty; ours pauses in place
   toastr.options.showMethod = 'show';
   toastr.options.hideMethod = 'hide';
-  toastr.options.timeOut = 4500;
-  toastr.options.extendedTimeOut = 4500;
+  var WT_DURATION = 5000; // visible-toast duration for the .wt-prog bar
+  toastr.options.timeOut = 0; // toastr's own internal auto-hide timer would race our .wt-prog bar's animationend
+  toastr.options.extendedTimeOut = 0;
   var wtPendingSticky = false;
   toastr.options.onShown = function () {
       var $t = $(this);
       if (wtPendingSticky) { wtPendingSticky = false; return; }
       $t.append(
           $('<span class="wt-prog"></span>')
-              .css('animation-duration', toastr.options.timeOut + 'ms')
-              .on('animationend', function () { toastr.clear($t); })
+              .css('animation-duration', WT_DURATION + 'ms')
+              .on('animationend', function () {
+                  if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                      toastr.clear($t);
+                      return;
+                  }
+                  $t.addClass('wt-out').one('animationend', function () { toastr.clear($t); });
+              })
       );
   };
 
@@ -60,8 +67,8 @@
       }
       wtPendingSticky = sticky;
       var $toast = toastr[type](html, title, {
-          timeOut: sticky ? 0 : toastr.options.timeOut,
-          extendedTimeOut: sticky ? 0 : toastr.options.timeOut,
+          timeOut: 0,
+          extendedTimeOut: 0,
           escapeHtml: false
       });
       return $toast;

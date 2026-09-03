@@ -7,10 +7,16 @@
 </div>
 @endif
 
-@section('content') 
+@section('content')
+<style>
+    #salary-increment-list-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #salary-increment-list-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
       <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="salary-increment-list-hero">
                  <div class="row  g-3">
                       <div class="col-auto">
                             <div class="page-title">
@@ -47,21 +53,49 @@
                          <form action="{{ route('people.salary-increment.bulk-update') }}" method="POST" class="row g-md-3 g-2 salary-increment-bulk-form">
                               @csrf
                               <div class="col-xxl col-xl-3 col-md-4 col-sm-6">
-                                   <select class="form-select select2t-none" name="increment_type" id="select_build">
+                                   <select class="form-select dd-native-select" name="increment_type" id="select_build">
                                         <option selected disabled>Increment Type</option>
                                         @foreach ($incrementTypes as $increment_type)
                                              <option value="{{ $increment_type->name }}">{{ $increment_type->name }}</option>
                                         @endforeach
                                    </select>
+                                   <div class="dd" data-target="#select_build">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                             <span class="dd-lbl">Increment Type</span>
+                                             <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Increment Type">
+                                             <div class="dd-scroll">
+                                                  <div class="dd-item active" role="option" data-value="Increment Type" aria-disabled="true"><span class="dd-nm">Increment Type</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                  @foreach ($incrementTypes as $increment_type)
+                                                       <div class="dd-item" role="option" data-value="{{ $increment_type->name }}"><span class="dd-nm">{{ $increment_type->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                  @endforeach
+                                             </div>
+                                        </div>
+                                   </div>
                               </div>
                               <div class="col-xxl col-xl-3 col-md-4 col-sm-6">
                                    {{-- Default to Fixed; matches the create flow which no
                                         longer shows the "Pay Increase Type" placeholder. --}}
-                                   <select class="form-select select2t-none pay-increase-type" name="pay_increase_type" required>
+                                   @php $bulkSelectedPayIncrease = $payIncreaseTypes['Fixed'] ?? reset($payIncreaseTypes); @endphp
+                                   <select class="form-select pay-increase-type dd-native-select" name="pay_increase_type" id="bulk_pay_increase_type" required>
                                         @foreach ($payIncreaseTypes as $key => $type)
                                              <option value="{{ $key }}" {{ $key === 'Fixed' ? 'selected' : '' }}>{{ $type }}</option>
                                         @endforeach
                                    </select>
+                                   <div class="dd" data-target="#bulk_pay_increase_type">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                             <span class="dd-lbl">{{ $bulkSelectedPayIncrease }}</span>
+                                             <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Pay Increase Type">
+                                             <div class="dd-scroll">
+                                                  @foreach ($payIncreaseTypes as $key => $type)
+                                                       <div class="dd-item{{ $key === 'Fixed' ? ' active' : '' }}" role="option" data-value="{{ $key }}"><span class="dd-nm">{{ $type }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                  @endforeach
+                                             </div>
+                                        </div>
+                                   </div>
                               </div>
                               <div class="col-xxl col-xl-3 col-md-4 col-sm-6">
                                    <div class="input-group value-input-group">
@@ -141,6 +175,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts._dropdown_styles')
 <style>
     /* Salary Increment list — when resort displays MVR, currency cells
        become "MVR 1,542.00" (3 tokens) and used to wrap "MVR" on one
@@ -405,6 +440,7 @@
           });
      });
 </script>
+@include('resorts._dropdown_script')
 @endsection
 
 

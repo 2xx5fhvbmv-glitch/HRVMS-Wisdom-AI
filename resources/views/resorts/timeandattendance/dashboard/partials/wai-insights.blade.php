@@ -62,24 +62,26 @@
        (resorts/layouts/_design_tokens.blade.php). --teal-mid stays local
        (used as a gradient stop, not a flat teal — see mapping guide).
        --ok/--ok-bg folded into --positive/--positive-bg (same #1f9d6b/
-       #e9f7f0 value, now canonical). --warn/--err stay local for now
-       (out of scope for this pass). */
+       #e9f7f0 value, now canonical). --warn/--err/--err-bg are exact-hex
+       matches for the shared --warning/--error/--error-bg, now pointing
+       there too. --warn-bg has no shared equivalent (#fff6e5 doesn't
+       match --warning-bg's #FBF0DC) and stays local. */
     .card-wiINsight {
         --teal-mid: #0e8a9e;
-        --warn: #d98a00; --warn-bg: #fff6e5; --err: #e5573f; --err-bg: #fdeeeb;
+        --warn: var(--warning); --warn-bg: #fff6e5; --err: var(--error); --err-bg: var(--error-bg);
     }
     .card-wiINsight { display: flex; flex-direction: column; padding: 0; overflow: hidden; border-radius: 16px; }
 
     .wai-head { position: relative; overflow: hidden; padding: 17px 18px; }
     .wai-head::before {
         content: ""; position: absolute; inset: 0; pointer-events: none;
-        background: linear-gradient(110deg, #014653 0%, #0e8a9e 40%, #7fa61e 70%, #e0ff02 100%);
+        background: linear-gradient(110deg, var(--teal) 0%, #0e8a9e 40%, #7fa61e 70%, var(--lime) 100%);
     }
     .wai-head::after {
         content: ""; position: absolute; inset: 0; pointer-events: none;
         background: linear-gradient(110deg, rgba(1,40,48,.35), transparent 55%);
     }
-    .wai-head h2 { position: relative; color: #fff; font-size: 15px; font-weight: 800; margin: 0; }
+    .wai-head h2 { position: relative; color: #fff; font-size: 18px; font-weight: 600; margin: 0; }
 
     .wai-body { padding: 16px; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
 
@@ -99,12 +101,12 @@
         background: linear-gradient(150deg, #eef8f2, #f3faf6);
         border: 1px solid #d7ecdf;
     }
-    .wai-hero-count { font-size: 28px; font-weight: 800; color: var(--err); line-height: 1; flex-shrink: 0; }
+    .wai-hero-count { font-size: 32px; font-weight: 600; color: var(--err); line-height: 1; flex-shrink: 0; }
     .wai-hero-icon { font-size: 22px; color: var(--positive); flex-shrink: 0; }
     .wai-hero-text { flex: 1 1 auto; min-width: 0; }
-    .wai-hero-text p { margin: 0; font-size: 13.5px; color: var(--ink); line-height: 1.4; }
-    .wai-hero-text small { color: var(--muted); font-size: 12px; }
-    .wai-hero-link { display: inline-block; margin-top: 6px; font-size: 13px; font-weight: 600; color: var(--err); }
+    .wai-hero-text p { margin: 0; font-size: 14px; color: var(--ink); line-height: 1.4; }
+    .wai-hero-text small { color: var(--muted); font-size: 10.5px; font-weight: 500; }
+    .wai-hero-link { display: inline-block; margin-top: 6px; font-size: 14px; font-weight: 600; color: var(--err); }
     .wai-hero-link:hover { color: var(--err); }
 
     .wai-row { display: flex; align-items: flex-start; gap: 12px; padding: 10px 2px; border-bottom: 1px solid var(--line-2); }
@@ -118,12 +120,12 @@
     .wai-row-icon.is-ok { background: var(--positive-bg); color: var(--positive); }
     .wai-row-icon.is-flagged { background: var(--err-bg); color: var(--err); }
     .wai-row-body { flex: 1 1 auto; min-width: 0; }
-    .wai-row-body h6 { margin: 0; font-size: 13.5px; font-weight: 600; color: var(--ink); }
-    .wai-row-status { font-size: 12px; margin-top: 2px; }
+    .wai-row-body h6 { margin: 0; font-size: 14px; font-weight: 600; color: var(--ink); }
+    .wai-row-status { font-size: 11px; font-weight: 500; margin-top: 2px; }
     .wai-row-status.is-clear { color: var(--faint); }
     .wai-row-status.is-flagged { color: var(--err); }
-    .wai-row-status a { display: block; margin-top: 2px; font-size: 12px; font-weight: 600; color: var(--teal); }
-    .wai-row-count { font-size: 18px; font-weight: 800; flex-shrink: 0; }
+    .wai-row-status a { display: block; margin-top: 2px; font-size: 11px; font-weight: 600; color: var(--teal); }
+    .wai-row-count { font-size: 14px; font-weight: 600; flex-shrink: 0; }
     .wai-row-count.is-clear { color: var(--faint); font-weight: 400; }
     .wai-row-count.is-flagged { color: var(--err); }
 </style>

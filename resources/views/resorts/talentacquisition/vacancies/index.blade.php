@@ -37,25 +37,64 @@
                                     </div>
                                 </div>
                                 <div class="col-xl-2 col-md-3 col-sm-4 col-6">
-                                    <select class="form-select">
+                                    <select class="form-select dd-native-select" id="vacIndexAllVacancy">
                                         <option selected>All Vacancy</option>
                                         <option value="1">abc</option>
                                         <option value="2">abc</option>
                                     </select>
+                                    <div class="dd" data-target="#vacIndexAllVacancy">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">All Vacancy</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Vacancy">
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">All Vacancy</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="1"><span class="dd-nm">abc</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="2"><span class="dd-nm">abc</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="col-xl-2 col-md-3 col-sm-4 col-6">
-                                    <select class="form-select">
+                                    <select class="form-select dd-native-select" id="vacIndexDepartment">
                                         <option selected>Department</option>
                                         <option value="1">abc</option>
                                         <option value="2">abc</option>
                                     </select>
+                                    <div class="dd" data-target="#vacIndexDepartment">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Department</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Department">
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Department</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="1"><span class="dd-nm">abc</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="2"><span class="dd-nm">abc</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="col-xl-2 col-md-3 col-sm-4 col-6">
-                                    <select class="form-select">
+                                    <select class="form-select dd-native-select" id="vacIndexPositions">
                                         <option selected>Positions</option>
                                         <option value="1">abc</option>
                                         <option value="2">abc</option>
                                     </select>
+                                    <div class="dd" data-target="#vacIndexPositions">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Positions</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Position">
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Positions</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="1"><span class="dd-nm">abc</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="2"><span class="dd-nm">abc</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="col-auto ms-auto">
                                     <a href="#" class="btn btn-grid"><img src="{{ URL::asset('resorts_assets/images/grid.svg')}}" alt="icon"></a>
@@ -823,6 +862,7 @@
 @endsection
 
     @section('import-css')
+    @include('resorts._dropdown_styles')
     @endsection
 
     @section('import-scripts')
@@ -858,4 +898,5 @@
             });
 
         </script>
+    @include('resorts._dropdown_script')
     @endsection

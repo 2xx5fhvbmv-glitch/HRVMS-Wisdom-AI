@@ -39,7 +39,7 @@
     <div class="row g-xl-4 g-3 mb-md-4 mb-3">
         <div class="col-lg-4 col-sm-6">
             <label for="select_type" class="form-label">SELECT TYPE</label>
-            <select class="form-select select2t-none" name="Grivance_Cat_id" id="Grivance_Cat_id"
+            <select class="form-select dd-native-select" name="Grivance_Cat_id" id="Grivance_Cat_id"
                 required data-parsley-errors-container="#error-Grivance_Cat_id"
                 data-parsley-required-message="Please select a category type">
                 <option value=""></option>
@@ -47,16 +47,40 @@
                     <option value="{{ $item->id }}">{{ $item->Category_Name }}</option>
                 @endforeach
             </select>
+            <div class="dd" data-target="#Grivance_Cat_id">
+                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                    <span class="dd-lbl">Select Grievance Category</span>
+                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                </button>
+                <div class="dd-panel" role="listbox" aria-label="Grievance category">
+                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a category…"></div>
+                    <div class="dd-scroll">
+                        @foreach($GrievanceCategory as $item)
+                            <div class="dd-item" role="option" data-value="{{ $item->id }}"><span class="dd-nm">{{ $item->Category_Name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
             <div id="error-Grivance_Cat_id"></div>
         </div>
 
         <div class="col-lg-4 col-sm-6">
             <label for="select_type" class="form-label">SELECT OFFENSE</label>
-            <select class="form-select select2t-none" name="Grivance_Sub_cat" id="Grivance_Sub_cat" 
+            <select class="form-select dd-native-select" name="Grivance_Sub_cat" id="Grivance_Sub_cat"
                 required data-parsley-errors-container="#error-Grivance_Sub_cat"
                 data-parsley-required-message="Please select an offense">
                 <option value=""></option>
             </select>
+            <div class="dd" data-target="#Grivance_Sub_cat">
+                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                    <span class="dd-lbl">Select Grievance Subcategory</span>
+                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                </button>
+                <div class="dd-panel" role="listbox" aria-label="Grievance subcategory">
+                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a subcategory…"></div>
+                    <div class="dd-scroll"></div>
+                </div>
+            </div>
             <div id="error-Grivance_Sub_cat"></div>
         </div>
     </div>
@@ -67,7 +91,7 @@
     <div class="row g-xl-4 g-3 mb-md-4 mb-3">
         <div class="col-md-4 col-sm-6">
             <label for="employee_name" class="form-label">Employee Name</label>
-            <select class="form-select select2t-none" name="Employee_id" id="Employee_id" 
+            <select class="form-select dd-native-select" name="Employee_id" id="Employee_id"
                 required data-parsley-errors-container="#error-Employee_id"
                 data-parsley-required-message="Please select an employee">
                 <option value=""></option>
@@ -77,6 +101,20 @@
                     </option>
                 @endforeach
             </select>
+            <div class="dd" data-target="#Employee_id">
+                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                    <span class="dd-lbl">Select Employee</span>
+                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                </button>
+                <div class="dd-panel" role="listbox" aria-label="Employee">
+                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an employee…"></div>
+                    <div class="dd-scroll">
+                        @foreach($Employee as $item)
+                            <div class="dd-item" role="option" data-value="{{ base64_encode($item->id) }}"><span class="dd-nm">{{ $item->resortAdmin->first_name }} {{ $item->resortAdmin->last_name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
             <div id="error-Employee_id"></div>
         </div>
 
@@ -193,6 +231,8 @@
     </div>
 </div>
 @include('resorts._emotional_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -216,26 +256,6 @@ $(document).ready(function() {
         dateFormat: 'd/m/Y',
         allowInput: true,
         appendTo: document.body
-    });
-    $('#Employee_id').select2({
-        placeholder: 'Select Employee',
-        minimumResultsForSearch: -1,
-        width: '100%'
-    });
-    $('#Grivance_Sub_cat').select2({
-        placeholder: 'Select Grievance Subcategory',
-        width: '100%'
-    });
-    
-    $('#Grivance_offence_id').select2({
-        placeholder: 'Select Grievance Offence',
-        minimumResultsForSearch: -1,
-        width: '100%'
-    });
-    $('#Grivance_Cat_id').select2({
-        placeholder: 'Select Grievance Category',
-        minimumResultsForSearch: -1,
-        width: '100%'
     });
     $('#witness_id').select2({
         placeholder: 'Select Witness',
@@ -366,6 +386,7 @@ $(document).ready(function() {
                         option  =`<option value="${a.id}" >${a.Sub_Category_Name}</option>`;
                     });
                     $("#Grivance_Sub_cat").html(option);
+                    wisdomDD.rebuild('#Grivance_Sub_cat');
                 }
                 else
                 {

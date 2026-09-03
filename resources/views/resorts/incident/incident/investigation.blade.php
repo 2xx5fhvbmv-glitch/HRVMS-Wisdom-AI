@@ -62,9 +62,15 @@
             }
         }
     @endphp
+    <style>
+        #incident-investigation-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #incident-investigation-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="incident-investigation-hero">
                 <div class="row  g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -151,18 +157,32 @@
                             <div>
                                 <label for="priority_level" class="iv-fl">Priority level</label>
                                 <div class="iv-selwrap">
-                                    <select class="form-select select2t-none" id="priority_level" name="priority" aria-label="Priority level">
+                                    <select class="form-select dd-native-select" id="priority_level" name="priority" aria-label="Priority level">
                                         <option value="">Select Priority</option>
                                         <option value="Low" {{ $incident->priority == "Low" ? 'selected' : '' }}>Low</option>
                                         <option value="Medium" {{ $incident->priority == "Medium" ? 'selected' : '' }}>Medium</option>
                                         <option value="High" {{ $incident->priority == "High" ? 'selected' : '' }}>High</option>
                                     </select>
+                                    <div class="dd" data-target="#priority_level">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">{{ in_array($incident->priority, ['Low','Medium','High']) ? $incident->priority : 'Select Priority' }}</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Priority">
+                                            <div class="dd-scroll">
+                                                <div class="dd-item{{ !in_array($incident->priority, ['Low','Medium','High']) ? ' active' : '' }}" role="option" data-value=""><span class="dd-nm">Select Priority</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item{{ $incident->priority == 'Low' ? ' active' : '' }}" role="option" data-value="Low"><span class="dd-nm">Low</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item{{ $incident->priority == 'Medium' ? ' active' : '' }}" role="option" data-value="Medium"><span class="dd-nm">Medium</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item{{ $incident->priority == 'High' ? ' active' : '' }}" role="option" data-value="High"><span class="dd-nm">High</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                             <div>
                                 <label for="severity" class="iv-fl">Incident severity</label>
                                 <div class="iv-selwrap">
-                                    <select class="form-select select2t-none" name="severity" id="severity" aria-label="Incident severity">
+                                    <select class="form-select dd-native-select" name="severity" id="severity" aria-label="Incident severity">
                                         <option value="">Select Severity</option>
                                         @if($severities)
                                             @foreach($severities as $severity)
@@ -170,6 +190,22 @@
                                             @endforeach
                                         @endif
                                     </select>
+                                    <div class="dd" data-target="#severity">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">{{ $incident->severity ?: 'Select Severity' }}</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Severity">
+                                            <div class="dd-scroll">
+                                                <div class="dd-item{{ !$incident->severity ? ' active' : '' }}" role="option" data-value=""><span class="dd-nm">Select Severity</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @if($severities)
+                                                    @foreach($severities as $severity)
+                                                        <div class="dd-item{{ $incident->severity == $severity ? ' active' : '' }}" role="option" data-value="{{ $severity }}"><span class="dd-nm">{{ $severity }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @endforeach
+                                                @endif
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -337,7 +373,7 @@
                                 <div>
                                     <label for="followUpActions" class="iv-fl">Follow-up action</label>
                                     <div class="iv-selwrap">
-                                        <select class="form-select select2t-none" id="followUpActions" aria-label="Follow-up action">
+                                        <select class="form-select dd-native-select" id="followUpActions" aria-label="Follow-up action">
                                             <option value="">Select a follow-up action</option>
                                             @if($followup_actions)
                                                 @foreach($followup_actions as $action)
@@ -345,6 +381,22 @@
                                                 @endforeach
                                             @endif
                                         </select>
+                                        <div class="dd" data-target="#followUpActions">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">Select a follow-up action</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Follow-up Action">
+                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an action…"></div>
+                                                <div class="dd-scroll">
+                                                    @if($followup_actions)
+                                                        @foreach($followup_actions as $action)
+                                                            <div class="dd-item" role="option" data-value="{{ $action->id }}"><span class="dd-nm">{{ $action->followup_action }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @endforeach
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div class="d-none mt-3" id="request-witness-statement">
                                         <a href="#" class="btn eb-btn-accent" id="btn-request-statement" data-incident-id="{{ $incident->id }}">
@@ -539,7 +591,7 @@
                                 <div>
                                     <label for="outcomeType" class="iv-fl">Outcome type</label>
                                     <div class="iv-selwrap">
-                                        <select class="form-select select2t-none" id="outcomeType" aria-label="Outcome type">
+                                        <select class="form-select dd-native-select" id="outcomeType" aria-label="Outcome type">
                                             <option value="">Select outcome type</option>
                                             @if($outcome_types)
                                                 @foreach($outcome_types as $type)
@@ -547,6 +599,21 @@
                                                 @endforeach
                                             @endif
                                         </select>
+                                        <div class="dd" data-target="#outcomeType">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">Select outcome type</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Outcome Type">
+                                                <div class="dd-scroll">
+                                                    @if($outcome_types)
+                                                        @foreach($outcome_types as $type)
+                                                            <div class="dd-item" role="option" data-value="{{ $type->id }}"><span class="dd-nm">{{ $type->outcome_type }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @endforeach
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                                 <div>
@@ -556,7 +623,7 @@
                                 <div>
                                     <label for="action_taken" class="iv-fl">Action taken</label>
                                     <div class="iv-selwrap">
-                                        <select class="form-select select2t-none" id="action_taken" aria-label="Action taken">
+                                        <select class="form-select dd-native-select" id="action_taken" aria-label="Action taken">
                                             <option value="">Select action taken</option>
                                             @if($action_takens)
                                                 @foreach($action_takens as $action)
@@ -564,6 +631,21 @@
                                                 @endforeach
                                             @endif
                                         </select>
+                                        <div class="dd" data-target="#action_taken">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">Select action taken</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Action Taken">
+                                                <div class="dd-scroll">
+                                                    @if($action_takens)
+                                                        @foreach($action_takens as $action)
+                                                            <div class="dd-item" role="option" data-value="{{ $action->id }}"><span class="dd-nm">{{ $action->action_taken }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @endforeach
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -582,7 +664,7 @@
                                 <div>
                                     <label for="status" class="iv-fl">Status</label>
                                     <div class="iv-selwrap">
-                                        <select class="form-select select2t-none" name="status" id="status" aria-label="Status">
+                                        <select class="form-select dd-native-select" name="status" id="status" aria-label="Status">
                                             <option value="">Select status</option>
                                             @if($statuses)
                                                 @foreach($statuses as $st)
@@ -590,6 +672,23 @@
                                                 @endforeach
                                             @endif
                                         </select>
+                                        <div class="dd" data-target="#status">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">{{ $incident->status ?: 'Select status' }}</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Status">
+                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a status…"></div>
+                                                <div class="dd-scroll">
+                                                    <div class="dd-item{{ !$incident->status ? ' active' : '' }}" role="option" data-value=""><span class="dd-nm">Select status</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @if($statuses)
+                                                        @foreach($statuses as $st)
+                                                            <div class="dd-item{{ $incident->status == $st ? ' active' : '' }}" role="option" data-value="{{ $st }}"><span class="dd-nm">{{ $st }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @endforeach
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -607,6 +706,8 @@
     </div>
      @include('partials._file_view_modal')
 @include('resorts._emotional_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -774,7 +875,6 @@ textarea.iv-inp{max-width:820px}
 @section('import-scripts')
 <script>
     $(document).ready(function(){
-        $('.select2t-none').select2();
         $('.datepicker').each(function () {
             if (!$(this).prop('readonly')) {
                 flatpickr(this, {
@@ -810,6 +910,7 @@ textarea.iv-inp{max-width:820px}
                 }).then((result) => {
                     if (!result.isConfirmed) {
                         $('#priority_level').val(originalPriority); // Revert if not confirmed
+                        wisdomDD.sync('#priority_level');
                     }
                 });
             }

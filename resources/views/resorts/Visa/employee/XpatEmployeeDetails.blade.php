@@ -8,9 +8,15 @@
 @endif
 
 @section('content')
+<style>
+    #visa-xpact-employee-details-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #visa-xpact-employee-details-hero { padding-bottom: 0; }
+    }
+</style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding page-appHedding">
+            <div class="page-hedding page-appHedding" id="visa-xpact-employee-details-hero">
                 <div class="row justify-content-between g-md-2 g-1">
                     <div class="col-auto">
                         <div class="page-title">
@@ -277,8 +283,8 @@
                             <div class="col-6">
                                 <div class="row justify-content-end g-md-3 g-2 align-items-center">
                                     <div class="col-xl-3 col-md-4 col-sm-4 col-6">
-                                        <select class="form-select" id="SelectYear" name="SelectYear">
-                                            <option value="ALL"> All Year</option>
+                                        <select class="form-select dd-native-select" id="SelectYear" name="SelectYear">
+                                            <option value="ALL" selected> All Year</option>
                                            <?php
                                             $Years = range(date('Y') + 1, date('Y') - 14);
                                             array_multisort($Years, SORT_DESC);
@@ -287,6 +293,21 @@
                                                 <option value="{{$year}}">{{$year}}</option>
                                             @endforeach
                                         </select>
+                                        <div class="dd" data-target="#SelectYear">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">All Year</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Year">
+                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a year…"></div>
+                                                <div class="dd-scroll">
+                                                    <div class="dd-item active" role="option" data-value="ALL"><span class="dd-nm">All Year</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @foreach($Years as $year)
+                                                        <div class="dd-item" role="option" data-value="{{ $year }}"><span class="dd-nm">{{ $year }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @endforeach
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
 
                                 </div>
@@ -432,8 +453,8 @@
                                 <input type="hidden" name="emp_id" id="upload_emp_id" class="form-control" value="{{base64_encode($Employee->id)}}">
 
                                 <label for="DocumentType" class="form-label">Document Type <span class="red-mark">*</span></label>
-                                <select class="form-select" id="DocumentType" name="DocumentType" required 
-                                    data-parsley-required-message="Please select document type." 
+                                <select class="form-select dd-native-select" id="DocumentType" name="DocumentType" required
+                                    data-parsley-required-message="Please select document type."
                                     data-parsley-errors-container="#div-DocumentType">
                                     <option value="">Select Document Type</option>
                                     <option value="Insurance">Insurance</option>
@@ -443,6 +464,22 @@
                                     <option value="Work_Permit_Card">Work Permit Card</option>
                                     <option value="Medical_Report">Medical Report</option>
                                 </select>
+                                <div class="dd" data-target="#DocumentType">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">Select Document Type</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Document type">
+                                        <div class="dd-scroll">
+                                            <div class="dd-item" role="option" data-value="Insurance"><span class="dd-nm">Insurance</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            <div class="dd-item" role="option" data-value="Passport_Copy"><span class="dd-nm">Passport Copy</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            <div class="dd-item" role="option" data-value="Work_Permit_Entry_Pass"><span class="dd-nm">Work Permit Entry Pass</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            <div class="dd-item" role="option" data-value="Visa"><span class="dd-nm">Visa</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            <div class="dd-item" role="option" data-value="Work_Permit_Card"><span class="dd-nm">Work Permit Card</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            <div class="dd-item" role="option" data-value="Medical_Report"><span class="dd-nm">Medical Report</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        </div>
+                                    </div>
+                                </div>
                                 <div id="div-DocumentType" class="text-danger"></div>
                             </div>
 
@@ -515,6 +552,8 @@
     <!-- Second Modal (Separate from the First One) -->
     @include('partials._file_view_modal')
 @include('resorts._emotional_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 @section('import-css')
 @endsection
@@ -522,15 +561,6 @@
 @section('import-scripts')
 <script>
 $(document).ready(function(){
-    $("#SelectYear").select2({
-        placeholder: "Select Year",
-        allowClear: true
-    });
-    $("#DocumentType").select2({
-        placeholder: "Select Document Type",
-        allowClear: true
-    });
-
      $("#MarkAsReadForm").parsley();
     $("#MarkAsRead").parsley();
      QuotaSlotFeeTable();

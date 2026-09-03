@@ -305,7 +305,7 @@
     overflow: auto;
     max-height: 420px;
     border-radius: 8px;
-    border: 1px solid var(--wb-line-2);
+    border: 1px solid var(--line-2);
 }
 
 .cb-table {
@@ -317,9 +317,9 @@
     position: sticky;
     top: 0;
     z-index: 5;
-    background: var(--wb-teal-tint-1) !important;
-    color: var(--wb-teal) !important;
-    border-bottom: 2px solid var(--wb-teal) !important;
+    background: var(--teal-3) !important;
+    color: var(--teal) !important;
+    border-bottom: 2px solid var(--teal) !important;
     white-space: normal !important;
     overflow-wrap: break-word;
     font-size: 12px !important;
@@ -332,15 +332,15 @@
 
 .cb-table tbody td { font-size: 0.813rem; }
 
-.cb-table tbody tr:nth-child(even) td { background-color: var(--wb-teal-tint-2); }
-.cb-table tbody tr:hover td { background-color: var(--wb-teal-tint-1) !important; }
+.cb-table tbody tr:nth-child(even) td { background-color: var(--teal-soft); }
+.cb-table tbody tr:hover td { background-color: var(--teal-3) !important; }
 
 .cb-total-row td {
-    background-color: var(--wb-line-2) !important;
-    border-top: 2px solid var(--wb-teal);
+    background-color: var(--line-2) !important;
+    border-top: 2px solid var(--teal);
     font-weight: 700;
 }
-.cb-total-row:hover td { background-color: var(--wb-line-2) !important; }
+.cb-total-row:hover td { background-color: var(--line-2) !important; }
 
 /* Sticky columns keep an explicit background so scrolled-under content
    doesn't show through — same technique View Budget uses
@@ -357,11 +357,11 @@
     z-index: 2;
     background-color: #ffffff;
 }
-.cb-table tbody tr:nth-child(even) .sticky-col { background-color: var(--wb-teal-tint-2); }
-.cb-table tbody tr:hover .sticky-col { background-color: var(--wb-teal-tint-1) !important; }
-.cb-total-row .sticky-col { background-color: var(--wb-line-2) !important; }
+.cb-table tbody tr:nth-child(even) .sticky-col { background-color: var(--teal-soft); }
+.cb-table tbody tr:hover .sticky-col { background-color: var(--teal-3) !important; }
+.cb-total-row .sticky-col { background-color: var(--line-2) !important; }
 
-.sticky-col-3 { border-right: 2px solid var(--wb-line); }
+.sticky-col-3 { border-right: 2px solid var(--line); }
 
 /* ---- Name cell: avatar + name ---- */
 .cb-name-cell { display: flex; align-items: center; gap: 8px; }
@@ -376,7 +376,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--wb-teal);
+    background: var(--teal);
     color: #fff;
     font-size: 11px;
     font-weight: 700;
@@ -385,9 +385,9 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    border: 1px dashed var(--wb-faint);
+    border: 1px dashed var(--faint);
     background: transparent;
-    color: var(--wb-faint);
+    color: var(--faint);
     font-size: 12px;
 }
 
@@ -401,12 +401,12 @@
 .cb-status-filled { background: var(--wb-increase-bg); color: var(--wb-increase); }
 .cb-status-vacant { background: var(--wb-vacant-bg); color: var(--wb-vacant); }
 
-.cb-zero-dash { color: var(--wb-faint); font-weight: 400; }
+.cb-zero-dash { color: var(--faint); font-weight: 400; }
 
 /* Custom scrollbar */
 .cb-table-wrapper::-webkit-scrollbar { height: 8px; width: 8px; }
-.cb-table-wrapper::-webkit-scrollbar-track { background: var(--wb-line-2); }
-.cb-table-wrapper::-webkit-scrollbar-thumb { background: var(--wb-faint); border-radius: 4px; }
+.cb-table-wrapper::-webkit-scrollbar-track { background: var(--line-2); }
+.cb-table-wrapper::-webkit-scrollbar-thumb { background: var(--faint); border-radius: 4px; }
 
 .cb-table tbody td { white-space: nowrap; }
 

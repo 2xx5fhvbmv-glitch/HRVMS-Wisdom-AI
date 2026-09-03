@@ -8,10 +8,16 @@
 @endif
 
 @section('content')
+<style>
+    #disciplinary-action-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #disciplinary-action-hero { padding-bottom: 0; }
+    }
+</style>
 
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="disciplinary-action-hero">
             <div class="row justify-content-between g-3">
                 <div class="col-auto">
                     <div class="page-title">
@@ -26,28 +32,25 @@
         <div>
             <div class="row g-30">
                 <div class="col-xxl-12 col-xl-12 col-lg-12">
-                <!-- <div class="col-xxl-6 col-xl-6 col-lg-6"> -->
-                    <div class="card">
-                        <div class="card-title">
-                            <div class="row g-3 align-items-center justify-content-between">
-                                <div class="col-auto">
-                                    <div class="d-flex justify-content-start align-items-center">
-                                        <h3>{{ $page_title }}</h3>
-                                    </div>
-                                </div>
+                    <div class="card ac-card">
+                        <div class="ac-toolbar">
+                            <div class="input-group ac-search">
+                                <input type="search" class="form-control" id="action-search" placeholder="Search actions…" />
+                                <i class="fa-solid fa-search"></i>
                             </div>
                         </div>
-
+                        <div class="ac-thwrap">
                         <table id="IndexAction" class="table  w-100">
                             <thead>
                                 <tr>
-                                    <th class="text-nowrap">Action Name</th>
+                                    <th class="text-nowrap ac-th-name">Action Name</th>
                                     <th>Description</th>
-                                    <th class="text-nowrap">Action</th>
+                                    <th class="text-nowrap ac-th-act">Action</th>
                                 </tr>
                             </thead>
 
                         </table>
+                        </div>
                     </div>
                 </div>
 
@@ -59,15 +62,15 @@
 @endsection
 
 @section('import-css')
+@include('resorts.GrievanceAndDisciplinery.configuration.disciplinery._action_config_styles')
 @endsection
 
 @section('import-scripts')
 
 <script>
         var DisciplineryCategory = $('#IndexAction').DataTable({
-            "searching": false,
+            "dom": "rtip", // no default search box — the custom #action-search input drives .search() instead
             "bLengthChange": false,
-            "bFilter": true,
             "bInfo": true,
             "bAutoWidth": false,
             "scrollX": true,
@@ -77,11 +80,16 @@
             order:[[3, 'desc']],
             ajax: '{{ route("GrievanceAndDisciplinery.config.IndexAction") }}',
             columns: [
-                { data: 'ActionName', name: 'ActionName', className: 'text-nowrap' },
-                { data: 'description', name: 'description', className: 'text-nowrap' },
-                { data: 'action', name: 'action', orderable: false, searchable: false },
+                { data: 'ActionName', name: 'ActionName', className: 'text-nowrap ac-td-name' },
+                { data: 'description', name: 'description', className: 'ac-td-desc',
+                    render: function (data) { return '<div class="ac-desc">' + (data == null ? '' : data) + '</div>'; } },
+                { data: 'action', name: 'action', orderable: false, searchable: false, className: 'ac-actcell' },
                  {data:'created_at',visible:false,searchable:false},
             ]
+        });
+
+        $('#action-search').on('keyup search input', function () {
+            DisciplineryCategory.search(this.value).draw();
         });
 
 
@@ -127,37 +135,58 @@
             });
         });
 
+        function restoreRow($row) {
+            var original = $row.data('original-html');
+            if (original !== undefined) {
+                $row.removeClass('editing').html(original);
+            }
+        }
+
         $(document).on("click", "#IndexAction .edit-row-btn", function (event) {
             event.preventDefault(); // Prevent default action
+
+            // Only one row editable at a time.
+            $('#IndexAction tbody tr.editing').each(function () { restoreRow($(this)); });
 
             // Find the parent row
             var $row = $(this).closest("tr");
 
             var Main_id = $(this).attr('data-cat-id');
-        
 
             var Action = $row.find("td:nth-child(1)").text().trim();
             var Description = $row.find("td:nth-child(2)").text().trim();
+
+            $row.data('original-html', $row.html());
+
             var editRowHtml = `
-              
                     <td class="py-1">
-                        <div class="form-group">
-                            <input type="text" class="form-control DisciplinaryCategoryName" value="${Action}" />
+                        <div class="ac-ef">
+                            <span class="ac-lbl">Action name</span>
+                            <input type="text" class="form-control ac-inp DisciplinaryCategoryName" value="${Action}" />
                         </div>
                     </td>
                     <td class="py-1">
-                        <div class="form-group">
-                            <textarea type="text" class="form-control DisciplinaryCategoryName" >${Description}</textarea>
+                        <div class="ac-ef">
+                            <span class="ac-lbl">Description</span>
+                            <textarea class="form-control ac-inp DisciplinaryCategoryName">${Description}</textarea>
                         </div>
                     </td>
-                    <td class="py-1">
-                        <a href="javascript:void(0)" class="btn eb-btn-primary update-row-btn_cat" data-cat-id="${Main_id}">Submit</a>
+                    <td class="py-1 ac-actcell">
+                        <div class="ac-rowbtns">
+                            <a href="javascript:void(0)" class="btn ac-rowbtn ac-cancel cancel-row-btn">Cancel</a>
+                            <a href="javascript:void(0)" class="btn ac-rowbtn ac-save update-row-btn_cat" data-cat-id="${Main_id}">Save</a>
+                        </div>
                     </td>
                 `;
 
-            // // Replace row content with editable form
-            $row.html(editRowHtml);
-       
+            // Replace row content with editable form
+            $row.addClass('editing').html(editRowHtml);
+
+        });
+
+        $(document).on("click", "#IndexAction .cancel-row-btn", function (event) {
+            event.preventDefault();
+            restoreRow($(this).closest("tr"));
         });
 
         $(document).on("click", "#IndexAction .update-row-btn_cat", function (event) {

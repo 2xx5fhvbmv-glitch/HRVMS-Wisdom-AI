@@ -2,9 +2,15 @@
 @section('page_tab_title', $page_title)
 
 @section('content')
+<style>
+    #monthly-checkin-history-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #monthly-checkin-history-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="monthly-checkin-history-hero">
             <div class="row justify-content-between g-3">
                 <div class="col-auto">
                     <div class="page-title">
