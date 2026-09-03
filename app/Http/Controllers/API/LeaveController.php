@@ -168,101 +168,35 @@ class LeaveController extends Controller
                 }
             }
 
-            // Define leave attachment path
-            $leave_attachment                           =   config('settings.leave_attachments');
-            $dynamic_path                               =   $leave_attachment . '/' . $emp_id;
-
-            // Create the directory if it doesn't exist
-            if (!Storage::exists($dynamic_path)) {
-                Storage::makeDirectory($dynamic_path);
-            }
-
-            // Handle file upload if any attachments are provided
+            // Was: unconditional raw Storage::exists()/makeDirectory() on
+            // EVERY leave submission (even with no attachment at all), then
+            // a config('filesystems.default')==='s3' branch that picked the
+            // real upload path (Common::AWSEmployeeFileUpload, StorageHelper-
+            // backed) — but that reads the WRONG env var. STORAGE_DRIVER
+            // (what AWSEmployeeFileUpload/downloads actually key off) and
+            // FILESYSTEM_DRIVER (what this branch checked) can and do
+            // diverge on this server, so this always fell into the 'else'
+            // local-fallback: a raw $file->move(public_path(...)) after a
+            // raw Storage::makeDirectory() that isn't guaranteed to
+            // succeed/be writable — exactly the "Unable to create the
+            // .../leave_attachments/{emp_id} directory" crash reported here
+            // (500, employee 170). AWSEmployeeFileUpload() already handles
+            // the employee-folder + LeaveAttachments-subfolder bookkeeping
+            // internally (firstOrCreate on filemangement_systems) - the
+            // manual DB inserts that used to duplicate that here are gone.
             $filePath                                   =   null;
             if ($request->hasFile('attachments')) {
                 $file = $request->file('attachments');
 
-                // Check storage driver configuration
-                $storageDriver = config('filesystems.default');
+                $status = Common::AWSEmployeeFileUpload($resortId, $file, $employee->Emp_id, 'LeaveAttachments', true);
 
-                if ($storageDriver === 's3') {
-                    // AWS S3 Storage - Ensure folder structure exists in database
-                    $employeeFolderName                     =   $employee->Emp_id;
-                    $SubFolder                              =   "LeaveAttachments";
-
-                    // Check if the employee's main folder exists
-                    $employeeFolder                         =   DB::table('filemangement_systems')
-                                                                    ->where('resort_id', $resortId)
-                                                                    ->where('Folder_Name', $employeeFolderName)
-                                                                    ->where('Folder_Type', 'categorized')
-                                                                    ->first();
-
-                    // If the employee folder doesn't exist, create it
-                    if (!$employeeFolder) {
-                        $employeeFolderId                   =   DB::table('filemangement_systems')->insertGetId([
-                            'resort_id'                     =>  $resortId,
-                            'Folder_unique_id'              =>  \Illuminate\Support\Str::random(10),
-                            'UnderON'                       =>  0,
-                            'Folder_Name'                   =>  $employeeFolderName,
-                            'Folder_Type'                   =>  'categorized',
-                            'created_by'                    =>  null,
-                            'modified_by'                   =>  null,
-                            'created_at'                    =>  now(),
-                            'updated_at'                    =>  now(),
-                        ]);
-
-                        // Retrieve the created folder
-                        $employeeFolder                     =   DB::table('filemangement_systems')
-                                                                    ->where('id', $employeeFolderId)
-                                                                    ->first();
-                    }
-
-                    // Check if the LeaveAttachments subfolder exists
-                    $leaveAttachmentsFolder                 =   DB::table('filemangement_systems')
-                                                                    ->where('resort_id', $resortId)
-                                                                    ->where('UnderON', $employeeFolder->id)
-                                                                    ->where('Folder_Name', $SubFolder)
-                                                                    ->first();
-
-                    // If the LeaveAttachments subfolder doesn't exist, create it
-                    if (!$leaveAttachmentsFolder) {
-                        DB::table('filemangement_systems')->insert([
-                            'resort_id'                     =>  $resortId,
-                            'Folder_unique_id'              =>  \Illuminate\Support\Str::random(10),
-                            'UnderON'                       =>  $employeeFolder->id,
-                            'Folder_Name'                   =>  $SubFolder,
-                            'Folder_Type'                   =>  'categorized',
-                            'created_by'                    =>  null,
-                            'modified_by'                   =>  null,
-                            'created_at'                    =>  now(),
-                            'updated_at'                    =>  now(),
-                        ]);
-                    }
-
-                    $status =   Common::AWSEmployeeFileUpload($resortId,$file, $employee->Emp_id,$SubFolder,true);
-
-                    if ($status['status'] == false) {
-                            return response()->json([
-                            'success' => false,
-                            'message' => 'File upload failed: ' . ($status['msg'] ?? 'Unknown error')
-                        ], 400);
-                    } else {
-                        if($status['status'] == true && isset($status['Chil_file_id']) && !empty($status['Chil_file_id'])) {
-                            $filename = $file->getClientOriginalName();
-                            $filePath = ['Filename' => $filename, 'Child_id' => $status['Chil_file_id']];
-                        }
-                    }
-                } else {
-                    // Local Storage — must land under public/ (like
-                    // leaveUpdate() already does); Storage::storeAs() put it
-                    // in storage/app which the web server can't serve, so
-                    // every attachment URL 404'd.
-                    $leave_attachment                       =   config('settings.leave_attachments');
-                    $dynamic_path                           =   $leave_attachment . '/' . $emp_id;
-
-                    $filename                               =   time() . '_' . $file->getClientOriginalName();
-                    $file->move(public_path($dynamic_path), $filename);
-                    $filePath                               =   $dynamic_path . '/' . $filename;
+                if ($status['status'] == false) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'File upload failed: ' . ($status['msg'] ?? 'Unknown error')
+                    ], 400);
+                } elseif (isset($status['Chil_file_id']) && !empty($status['Chil_file_id'])) {
+                    $filePath = ['Filename' => $file->getClientOriginalName(), 'Child_id' => $status['Chil_file_id']];
                 }
             }
 
@@ -2280,22 +2214,23 @@ class LeaveController extends Controller
                 }
             }
 
-            // Define leave attachment path
-            $leave_attachment                           =   config('settings.leave_attachments');
-            $dynamic_path                               =   $leave_attachment . '/' . $emp_id;
-
-            // Create the directory if it doesn't exist
-            if (!Storage::exists($dynamic_path)) {
-                Storage::makeDirectory($dynamic_path);
-            }
-
-            // Handle file upload if any attachments are provided
+            // Same raw Storage::/public_path() bug as leaveAdd() (see the
+            // comment there) — a directory-creation failure here 500s an
+            // edit the same way it did a create. Routed through the same
+            // StorageHelper-backed helper.
             $filePath                                   =   null;
 
             if ($request->hasFile('attachments')) {
-                $fileName                               =   uniqid('attachment_', true) . '.' . $request->attachments->getClientOriginalExtension();
-                $filePath                               =   $dynamic_path . '/' . $fileName;
-                $request->attachments->move(public_path($dynamic_path), $fileName);
+                $status = Common::AWSEmployeeFileUpload($user->resort_id, $request->attachments, $employee->Emp_id, 'LeaveAttachments', true);
+
+                if ($status['status'] == false) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'File upload failed: ' . ($status['msg'] ?? 'Unknown error')
+                    ], 400);
+                } elseif (isset($status['Chil_file_id']) && !empty($status['Chil_file_id'])) {
+                    $filePath = ['Filename' => $request->attachments->getClientOriginalName(), 'Child_id' => $status['Chil_file_id']];
+                }
             }
 
             // Process each leave category and create leave records
@@ -2406,7 +2341,13 @@ class LeaveController extends Controller
                 $leaveUpdate->total_days                =   $totalDays;
                 $leaveUpdate->reason                    =   $request->reason;
                 $leaveUpdate->task_delegation           =   $request->task_delegation;
-                $leaveUpdate->attachments               =   $filePath;
+                // attachments is a plain string column (no array cast) —
+                // $filePath is now an array when a new file was uploaded
+                // (see fix above), so it must be encoded same as
+                // leaveAdd() does, or Eloquent would try to save a raw PHP
+                // array into a string column. Same null-when-no-new-file
+                // behavior as before this fix — not changing that here.
+                $leaveUpdate->attachments               =   $filePath ? (is_array($filePath) ? json_encode($filePath) : $filePath) : null;
 
                 // Only update 'destination' if status is not 'Approved'
                 if ($leaveUpdate->status !== "Approved") {
@@ -3279,6 +3220,7 @@ class LeaveController extends Controller
                                                 'els.approver_rank',
                                                 'els.approver_id',
                                                 // Main employee details
+                                                'ra.id as admin_parent_id',
                                                 'ra.first_name as employee_first_name',
                                                 'ra.last_name as employee_last_name',
                                                 'ra.profile_picture as employee_profile_picture',
@@ -3323,7 +3265,11 @@ class LeaveController extends Controller
 
                     // Add approve_data to the base record
                     $base->approve_data                 = $approveData;
-                    $base->employee_profile_picture     = Common::getResortUserPicture($base->employee_id);
+                    // getResortUserPicture() needs the resort_admins.id
+                    // (Admin_Parent_id) — employee_id here is e.Emp_id, the
+                    // display CODE (e.g. "DR-20"), never a real id, so this
+                    // always missed and fell back to the default picture.
+                    $base->employee_profile_picture     = Common::getResortUserPicture($base->admin_parent_id);
                     $base->attachments                  = self::resolveLeaveAttachmentUrl($base->attachments);
                     // Clear duplicate fields in the base record
                     unset($base->approver_rank, $base->approver_id);
@@ -3419,6 +3365,7 @@ class LeaveController extends Controller
                     'e.rank',
                     'e.benefit_grid_level',
                     // Main employee details
+                    'ra.id as admin_parent_id',
                     'ra.first_name as employee_first_name',
                     'ra.last_name as employee_last_name',
                     'ra.profile_picture as employee_profile_picture',
@@ -3499,8 +3446,14 @@ class LeaveController extends Controller
                     $currentYearStart   = Carbon::now()->startOfYear()->format('Y-m-d');
                     $currentYearEnd     = Carbon::now()->endOfYear()->format('Y-m-d');
 
+                    // employees_leaves.emp_id is the numeric employees.id —
+                    // $leaveDetail->employee_id is e.Emp_id, the display CODE
+                    // (e.g. "DR-20"), never a real id, so this matched zero
+                    // rows and leaves_taken silently reported 0 regardless
+                    // of actual usage. el.emp_id (from el.* above) is the
+                    // same numeric column already on this exact leave row.
                     $leavesTaken    = DB::table('employees_leaves')
-                        ->where('emp_id', $leaveDetail->employee_id)
+                        ->where('emp_id', $leaveDetail->emp_id)
                         ->where('status', 'Approved')
                         ->where(function ($query) use ($currentYearStart, $currentYearEnd) {
                             $query->whereBetween('from_date', [$currentYearStart, $currentYearEnd])
@@ -3515,8 +3468,10 @@ class LeaveController extends Controller
                     $leaveDetail->total_leave_allocation    = $totalAllocation;
                     $leaveDetail->leaves_taken              = $leavesTaken;
 
-                    // Update profile picture dynamically
-                    $leaveDetail->employee_profile_picture  = Common::getResortUserPicture($leaveDetail->employee_id);
+                    // Update profile picture dynamically — getResortUserPicture()
+                    // needs the resort_admins.id (Admin_Parent_id), not the
+                    // employee display code.
+                    $leaveDetail->employee_profile_picture  = Common::getResortUserPicture($leaveDetail->admin_parent_id);
                     // JSON_ARRAYAGG over the LEFT JOIN to employee_travel_passes
                     // still produces one array entry even when there's no
                     // matching travel pass (e.g. a plain Sick Leave with no
