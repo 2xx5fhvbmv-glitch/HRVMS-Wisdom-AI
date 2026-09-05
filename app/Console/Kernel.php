@@ -30,6 +30,10 @@ class Kernel extends ConsoleKernel
         $schedule->command('Daily:CheckExtraHours')->daily();
         $schedule->command('Monthly:CheckEveryVisaModule')->monthly();
         $schedule->command('Daily:CheckVisaExpiryReminders')->dailyAt('09:00');
+        // Guardrail #2 from docs/notification-guardrails.md — surfaces push
+        // failures (bad FCM creds, JWT/OAuth errors, silently-dropped
+        // wrong-id-domain recipients) that otherwise just sit in the log.
+        $schedule->command('notifications:failure-digest')->dailyAt('08:00');
         $schedule->command('Daily:CheckDepositRefundReminders')->dailyAt('09:15');
         // Command is named CheckHourly — was wired to everyMinute(), spawning
         // 60 extra cron PHP processes (each a new DB connection) per hour to

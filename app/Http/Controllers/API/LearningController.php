@@ -442,6 +442,7 @@ class LearningController extends Controller
 
             }
          
+            $absentEmployeeIds = [];
             foreach ($request->employees as $employeeData) {
                 TrainingAttendance::updateOrCreate(
                     [
@@ -452,8 +453,13 @@ class LearningController extends Controller
                     [
                         'status'                    =>  $employeeData['status'],
                     ]
-                );      
+                );
+                if ($employeeData['status'] === 'Absent') {
+                    $absentEmployeeIds[] = $employeeData['employee_id'];
+                }
             }
+
+            $this->notifyTrainingAbsence($resort_id, $trainingSchedule->id, $absentEmployeeIds);
 
             return response()->json([
                 'success'                           =>  true,
@@ -1109,6 +1115,49 @@ class LearningController extends Controller
     }
 
     /**
+     * Alerts HR (Common::getResortHrEmployeeIds) and L&D Manager
+     * (Common::getResortLdManagerEmployeeIds) whenever an employee is marked
+     * Absent from a training session — same recipient-resolution as
+     * notifyFormSubmitted() above. Shared by both markAttendance()
+     * (trainer-facing) and ldManagerMarkAttendanceStore() (L&D-manager-facing).
+     */
+    private function notifyTrainingAbsence($resortId, $trainingScheduleId, array $absentEmployeeIds)
+    {
+        if (empty($absentEmployeeIds)) {
+            return;
+        }
+
+        $notifyIds = array_values(array_unique(array_merge(
+            Common::getResortHrEmployeeIds($resortId),
+            Common::getResortLdManagerEmployeeIds($resortId)
+        )));
+
+        if (empty($notifyIds)) {
+            return;
+        }
+
+        $trainingName = optional(optional(TrainingSchedule::with('learningProgram')->where('resort_id', $resortId)->find($trainingScheduleId))->learningProgram)->name;
+
+        $absentNames = Employee::with('resortAdmin')->whereIn('id', $absentEmployeeIds)->where('resort_id', $resortId)->get()
+            ->map(fn($e) => optional($e->resortAdmin) ? trim($e->resortAdmin->first_name . ' ' . $e->resortAdmin->last_name) : null)
+            ->filter()->implode(', ');
+
+        Common::sendMobileNotification(
+            $resortId,
+            2,
+            null,
+            $trainingScheduleId,
+            'Training Absence',
+            ($absentNames ?: 'An employee') . ' marked Absent' . ($trainingName ? " for {$trainingName}" : '') . '.',
+            'Learning',
+            $notifyIds,
+            null,
+            false,
+            'training-attendance-absence'
+        );
+    }
+
+    /**
      * L&D Manager identity check — mirrors the exact pattern established in
      * Resorts\Learning\LearningController (web) and Common::hasFullDataAccess's
      * L&D branch: position title match OR L&D department membership.
@@ -1489,6 +1538,7 @@ class LearningController extends Controller
             DB::beginTransaction();
 
             $today = Carbon::today()->format('Y-m-d');
+            $absentEmployeeIds = [];
             foreach ($request->employees as $row) {
                 TrainingAttendance::updateOrCreate(
                     [
@@ -1500,7 +1550,12 @@ class LearningController extends Controller
                         'status' => $row['status'],
                     ]
                 );
+                if ($row['status'] === 'Absent') {
+                    $absentEmployeeIds[] = $row['employee_id'];
+                }
             }
+
+            $this->notifyTrainingAbsence($resort_id, $request->training_schedule_id, $absentEmployeeIds);
 
             DB::commit();
 

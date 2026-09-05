@@ -4398,6 +4398,21 @@ class Common
         $empIds = array_values(array_unique(array_filter($empIds)));
         if (empty($empIds)) return;
 
+        // Same guard as sendMobileNotification() — $empIds must be
+        // employees.id. A wrong id-domain here silently drops the
+        // notification with no error anywhere.
+        $validIds = Employee::whereIn('id', $empIds)->pluck('id')->all();
+        $invalidIds = array_diff($empIds, $validIds);
+        if (!empty($invalidIds)) {
+            \Log::error('notifyEmployees: $empIds contains id(s) not present in employees table — likely a resort_admins.id or other wrong id-domain', [
+                'module' => $module,
+                'invalid_ids' => array_values($invalidIds),
+                'resort_id' => $resortId,
+            ]);
+        }
+        $empIds = $validIds;
+        if (empty($empIds)) return;
+
         foreach ($empIds as $empId) {
             try {
                 event(new \App\Events\ResortNotificationEvent(
@@ -7358,6 +7373,24 @@ class Common
 
     public static function sendMobileNotification($resortId,$type,$feedbackFormId,$trainingId,$title,$message,$module,$sendto,$request_id = null, $skipDbInsert = false, $pageId = null)
     {
+        // $sendto must be employees.id. Passing a resort_admins.id (or any
+        // other id-domain) here fails completely silently downstream — no
+        // exception, nothing delivered — which is exactly how the chat
+        // wrong-recipient bug went unnoticed for weeks. Strip and log
+        // anything that doesn't resolve to a real employee instead of
+        // dropping the whole batch.
+        $validIds = Employee::whereIn('id', (array) $sendto)->pluck('id')->all();
+        $invalidIds = array_diff((array) $sendto, $validIds);
+        if (!empty($invalidIds)) {
+            \Log::error('sendMobileNotification: $sendto contains id(s) not present in employees table — likely a resort_admins.id or other wrong id-domain', [
+                'module' => $module,
+                'invalid_ids' => array_values($invalidIds),
+                'resort_id' => $resortId,
+            ]);
+        }
+        $sendto = $validIds;
+        if (empty($sendto)) return [];
+
         // Initialised up-front so an unrecognised $type can't leave $payload
         // undefined and fatal-error at the Http::post() call below.
         $payload = [];
@@ -9255,6 +9288,61 @@ class Common
             ->pluck('id')
             ->map(fn($v) => (int) $v)
             ->all();
+    }
+
+    /**
+     * The active Security Manager for a resort, resolved by position title
+     * (not rank — no Security Manager record actually carries a dedicated
+     * rank, the real seeded example is rank 2/HOD, same gotcha SOSController
+     * already worked around once). Used by every SOS notification path that
+     * needs to reach "the" SM: panic-button trigger, unsafe self-report,
+     * SOS chat replies.
+     */
+    public static function findActiveSecurityManager($resort_id)
+    {
+        $sm = Employee::join('resort_positions as rp', 'employees.Position_id', '=', 'rp.id')
+            ->where('employees.resort_id', $resort_id)
+            ->where('employees.status', 'Active')
+            ->where('rp.position_title', 'Security Manager')
+            ->select('employees.id', 'employees.Admin_Parent_id', 'employees.Emp_id', 'employees.Position_id', 'employees.device_token')
+            ->first();
+
+        return $sm ? $sm->toArray() : null;
+    }
+
+    /**
+     * Notify every approver in a boarding-pass approval flow that a request
+     * is awaiting them — same flow/notify logic BoardingPassController's own
+     * boardingPassAdd() uses, extracted so LeaveController's identical
+     * "boarding pass created alongside a leave request" path (which built
+     * the same $passApprovalFlow but never notified anyone) can call it too
+     * instead of duplicating the notify block a second time.
+     */
+    public static function notifyBoardingPassApprovalFlow($resort_id, $passApprovalFlow, $boardingPass, $employee, $submitterName)
+    {
+        foreach ($passApprovalFlow as $approver) {
+            $sendto = [$approver->id];
+            if (($approver->approver_role ?? null) === 'HOD') {
+                $sendto = array_unique(array_merge(
+                    $sendto,
+                    self::getDepartmentApproverIds($resort_id, $employee->Dept_id)
+                ));
+            }
+
+            self::sendMobileNotification(
+                $resort_id,
+                2,
+                null,
+                null,
+                'Boarding Pass Request',
+                'A boarding pass request has been submitted by ' . $submitterName . '.',
+                'Boarding Pass',
+                $sendto,
+                $boardingPass->id,
+                false,
+                'boarding-pass-request'
+            );
+        }
     }
 
 

@@ -354,6 +354,26 @@ class ResignationController extends Controller
             $resignation->save();
             // Commit the transaction
             DB::commit();
+
+            // HOD/HR were tracking this resignation (same recipients
+            // notified on submit in resignationStore) — tell them it's
+            // been withdrawn so a stale item doesn't linger in either
+            // queue. notifyEmployees() writes the DB row and pushes exactly
+            // once per recipient (pairing sendMobileNotification with a
+            // separate nofitication(type 10) call here would double both).
+            $empName = trim(($this->user->first_name ?? '') . ' ' . ($this->user->last_name ?? '')) ?: 'an employee';
+            $withdrawRecipients = array_values(array_filter([$resignation->hod_id, $resignation->hr_id]));
+            if (!empty($withdrawRecipients)) {
+                Common::notifyEmployees(
+                    $this->resort_id,
+                    $withdrawRecipients,
+                    'Resignation Withdrawn',
+                    "{$empName} has withdrawn their resignation request.",
+                    'Resignation',
+                    $resignation->id
+                );
+            }
+
             return response()->json([
                 'success'                               =>  true,
                 'message'                               =>  'Resignation withdrawn successfully.',
@@ -501,6 +521,27 @@ class ResignationController extends Controller
 
             // Commit the transaction
             DB::commit();
+
+            // Tell whichever party (HR or HOD) whose meeting this was that
+            // the employee has confirmed — same "employee confirms a
+            // scheduled meeting" notify pattern as
+            // MonthlyCheckInController::employeeConfirmMeeting().
+            // notifyEmployees() writes the DB row and pushes exactly once —
+            // pairing sendMobileNotification with a separate
+            // nofitication(type 10) call here would double both.
+            $recipientId = $request->input('type') == 'HR' ? $EmployeeResignation->hr_id : $EmployeeResignation->hod_id;
+            if ($recipientId) {
+                $empName = trim(($this->user->first_name ?? '') . ' ' . ($this->user->last_name ?? '')) ?: 'The employee';
+                Common::notifyEmployees(
+                    $this->resort_id,
+                    [$recipientId],
+                    'Exit Meeting Confirmed',
+                    "{$empName} has confirmed the scheduled exit meeting.",
+                    'Resignation',
+                    $EmployeeResignation->id
+                );
+            }
+
             return response()->json([
                 'success'                               =>  true,
                 'message'                               =>  'Meeting scheduled Confirm successfully.',

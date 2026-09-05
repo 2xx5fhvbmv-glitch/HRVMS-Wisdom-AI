@@ -1683,6 +1683,20 @@ class TimeAndAttendanceController extends Controller
             $timeAttendance['child_attendance_data']    =   $childAttendace;
             DB::commit(); // Commit transaction
 
+            // Only the target employee's own self-check-in skips this —
+            // notify them when someone else (HR/HOD/EXCOM) recorded it.
+            if ((int) $targetEmployee->id !== (int) $employee->id) {
+                Common::notifyEmployees(
+                    $user->resort_id,
+                    [$targetEmployee->id],
+                    'Attendance Check-In Recorded',
+                    'Your check-in for ' . $date . ' was recorded on your behalf by ' . (trim(($employee->first_name ?? '') . ' ' . ($employee->last_name ?? '')) ?: 'HR/your manager') . '.',
+                    'Attendance',
+                    $ParentAttendance->id,
+                    'manual-check-in'
+                );
+            }
+
             $response['status']                             =   true;
             $response['message']                            =   'Added the Check-In Attendance Entry';
             $response['attendance_data']                    =   $timeAttendance;
@@ -2070,6 +2084,20 @@ class TimeAndAttendanceController extends Controller
 
             DB::commit(); // Commit transaction
 
+            // Only the target employee's own self-check-out skips this —
+            // notify them when someone else (HR/HOD/EXCOM) recorded it.
+            if ((int) $targetEmployee->id !== (int) $employee->id) {
+                Common::notifyEmployees(
+                    $user->resort_id,
+                    [$targetEmployee->id],
+                    'Attendance Check-Out Recorded',
+                    'Your check-out for ' . $date . ' was recorded on your behalf by ' . (trim(($employee->first_name ?? '') . ' ' . ($employee->last_name ?? '')) ?: 'HR/your manager') . '.',
+                    'Attendance',
+                    $ParentAttendance->id,
+                    'manual-check-out'
+                );
+            }
+
             $response['status']                             =   true;
             $response['message']                            =   'Added the Check-Out Attendance Entry';
             $response['attendance_data']                    =   $timeAttendance;
@@ -2187,6 +2215,28 @@ class TimeAndAttendanceController extends Controller
             // punched in yet (or already punched out) isn't an error,
             // just nothing for this event to do.
             return response()->json(['success' => true, 'message' => 'No active check-in to close out.']);
+        }
+
+        // Reaching here means the employee physically left their assigned
+        // geofence zone while still checked in — notify their reporting
+        // manager (or, absent one, their department HOD) that attendance is
+        // being auto-closed as a result.
+        $managerId = !empty($employee->reporting_to) ? $employee->reporting_to : null;
+        if (!$managerId) {
+            $hod = Common::FindResortHODDepartment($user->resort_id, $employee->Dept_id);
+            $managerId = $hod->id ?? null;
+        }
+        if ($managerId && (int) $managerId !== (int) $employee->id) {
+            $empName = trim(($employee->first_name ?? '') . ' ' . ($employee->last_name ?? '')) ?: 'An employee';
+            Common::notifyEmployees(
+                $user->resort_id,
+                [$managerId],
+                'Employee Left Geofence Zone',
+                $empName . ' left their assigned geofence zone mid-shift; their attendance has been auto checked-out.',
+                'Attendance',
+                $parentAttendance->id,
+                'geofence-exit'
+            );
         }
 
         $syntheticRequest = Request::create('', 'POST', [
@@ -3205,6 +3255,25 @@ class TimeAndAttendanceController extends Controller
             }
 
             DB::commit();
+
+            // Notify each employee whose attendance the HOD/HR just marked
+            // present — but not the actor themselves, if they happened to
+            // be in their own marked batch.
+            $actorEmpId                                     =   optional($user->GetEmployee)->id;
+            $markedEmpIds                                   =   array_values(array_unique(array_filter(array_column($timeAttendance, 'emp_id'))));
+            $notifyEmpIds                                   =   $actorEmpId ? array_diff($markedEmpIds, [$actorEmpId]) : $markedEmpIds;
+            if (!empty($notifyEmpIds)) {
+                Common::notifyEmployees(
+                    $resort_id,
+                    $notifyEmpIds,
+                    'Attendance Marked Present',
+                    'Your attendance for ' . $currentDate . ' was marked Present by your HOD/HR.',
+                    'Attendance',
+                    null,
+                    'hod-mark-present'
+                );
+            }
+
             $response['status']                             =   true;
             $response['message']                            =   'Attendance marked successfully.';
             return response()->json($response);
@@ -3279,6 +3348,19 @@ class TimeAndAttendanceController extends Controller
             }
 
             DB::commit(); // Commit transaction
+
+            // Overtime approve/reject never told the employee anywhere in
+            // this file — a money-affecting decision with no notice. Only
+            // fire when the status actually changed to what was requested
+            // (the Approved branch above can no-op if the hours don't
+            // qualify, without saving anything).
+            if ($parentAttendance && $parentAttendance->OTStatus === $request->ot_status) {
+                $title                                       =   'Overtime ' . $request->ot_status;
+                $message                                     =   'Your overtime request has been ' . strtolower($request->ot_status) . '.'
+                                                                    . ($request->ot_status === 'Rejected' && $request->note ? ' Note: ' . $request->note : '');
+                Common::notifyEmployees($resort_id, [$parentAttendance->Emp_id], $title, $message, 'Attendance', $parentAttendance->id, 'overtime-' . strtolower($request->ot_status));
+            }
+
             $response['status']                             =   true;
             $response['message']                            =   'Over time is ' . $request->ot_status;
             $response['attendance_data']                    =   $parentAttendance;
