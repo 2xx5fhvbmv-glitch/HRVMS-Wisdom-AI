@@ -867,15 +867,16 @@ class IncidentController extends Controller
             if (!$admin || !filter_var($admin->email ?? '', FILTER_VALIDATE_EMAIL)) return;
             $recipientName = trim(($admin->first_name ?? '') . ' ' . ($admin->last_name ?? '')) ?: 'there';
 
-            Mail::send('emails.incident-notification', [
-                'recipientName' => $recipientName,
-                'body'          => $body,
-                'details'       => $details,
-                'ctaUrl'        => $ctaUrl,
-                'ctaLabel'      => $ctaLabel ?: 'View in HRVMS',
-            ], function ($m) use ($admin, $recipientName, $subject) {
-                $m->to($admin->email, $recipientName)->subject($subject);
-            });
+            // Was Mail::send() — a blocking SMTP round-trip per recipient,
+            // called in a loop from assign()/statement-request (one send per
+            // committee member / involved employee / witness). QUEUE_CONNECTION
+            // is 'database' here (a real worker, not sync); Mailer::queue()
+            // only accepts Mailable instances (not the raw view+closure form
+            // Mail::send() takes), hence the small IncidentNotificationMail
+            // class instead of a one-line send->queue rename.
+            Mail::to($admin->email, $recipientName)->queue(
+                new \App\Mail\IncidentNotificationMail($recipientName, $subject, $body, $details, $ctaUrl, $ctaLabel)
+            );
         } catch (\Throwable $e) {
             \Log::warning('Incident email failed for employee ' . $employeeId . ': ' . $e->getMessage());
         }

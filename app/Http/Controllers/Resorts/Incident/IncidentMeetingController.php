@@ -312,21 +312,26 @@ class IncidentMeetingController extends Controller
                         if ($partAdmin && filter_var($partAdmin->email ?? '', FILTER_VALIDATE_EMAIL)) {
                             $name = trim(($partAdmin->first_name ?? '') . ' ' . ($partAdmin->last_name ?? '')) ?: 'there';
                             $bodyHtml = "You have been invited to a meeting in the Incident module.";
-                            Mail::send('emails.incident-notification', [
-                                'recipientName' => $name,
-                                'body'          => $bodyHtml,
-                                'details'       => [
-                                    'Meeting'  => $request->meeting_subject,
-                                    'Date'     => $request->meeting_date,
-                                    'Time'     => $request->meeting_time,
-                                    'Location' => $request->location ?? '—',
-                                ],
-                                'ctaUrl'   => route('incident.meeting'),
-                                'ctaLabel' => 'View meetings',
-                            ], function ($m) use ($partAdmin, $name, $request) {
-                                $m->to($partAdmin->email, $name)
-                                  ->subject('Meeting scheduled: ' . $request->meeting_subject);
-                            });
+                            // Was Mail::send() — blocking SMTP round-trip per
+                            // participant in a loop. Mailer::queue() only
+                            // accepts Mailable instances, not the raw
+                            // view+closure form, hence IncidentNotificationMail
+                            // (same class IncidentController::notifyByEmail() uses).
+                            Mail::to($partAdmin->email, $name)->queue(
+                                new \App\Mail\IncidentNotificationMail(
+                                    $name,
+                                    'Meeting scheduled: ' . $request->meeting_subject,
+                                    $bodyHtml,
+                                    [
+                                        'Meeting'  => $request->meeting_subject,
+                                        'Date'     => $request->meeting_date,
+                                        'Time'     => $request->meeting_time,
+                                        'Location' => $request->location ?? '—',
+                                    ],
+                                    route('incident.meeting'),
+                                    'View meetings'
+                                )
+                            );
                         }
                     } catch (\Throwable $e) {
                         \Log::warning('Incident meeting email failed for participant ' . $participant_id . ': ' . $e->getMessage());
