@@ -8,9 +8,15 @@
     @endif
 
     @section('content')
+    <style>
+        #ta-shortlisted-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #ta-shortlisted-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="ta-shortlisted-hero">
                 <div class="row justify-content-between g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -191,12 +197,27 @@
                 <form id='EmailTemplateForm'>
                     @csrf
                     <div class="modal-body">
-                    <select class="form-control EmailTemplate" name="EmailTemplate-popup" id="EmailTemplate-popup" required>
+                    <select class="form-control dd-native-select EmailTemplate" name="EmailTemplate-popup" id="EmailTemplate-popup" required>
                         <option selected disabled value="">Select Email Template</option>
                         @foreach ($EmailTamplete as $e)
                             <option value="{{ $e->id }}">{{ $e->TempleteName }}</option>
                         @endforeach
                     </select>
+                    <div class="dd" data-target="#EmailTemplate-popup">
+                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                            <span class="dd-lbl">Select Email Template</span>
+                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                        </button>
+                        <div class="dd-panel" role="listbox" aria-label="Email Template">
+                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a template…"></div>
+                            <div class="dd-scroll">
+                                <div class="dd-item active" role="option" data-value="" aria-disabled="true"><span class="dd-nm">Select Email Template</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                @foreach ($EmailTamplete as $e)
+                                <div class="dd-item" role="option" data-value="{{ $e->id }}"><span class="dd-nm">{{ $e->TempleteName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                @endforeach
+                            </div>
+                        </div>
+                    </div>
                     </div>
                     <div class="modal-footer">
                         <a href="#" data-bs-dismiss="modal" class="btn ta-btn-secondary ms-auto">Cancel</a>
@@ -212,6 +233,7 @@
     @endsection
 
 @section('import-css')
+@include('resorts._dropdown_styles')
 @include('resorts.talentacquisition._ta_buttons_v2_styles')
 
 @endsection
@@ -1010,5 +1032,6 @@ $(document).on("change", '[name="MalidivanManualTime"]', function () {
             });
         });
 </script>
+@include('resorts._dropdown_script')
 @endsection
 

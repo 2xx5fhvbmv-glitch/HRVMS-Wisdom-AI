@@ -8,10 +8,16 @@
 @endif
 
 @section('content')
+<style>
+    #grievance-escalation-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #grievance-escalation-hero { padding-bottom: 0; }
+    }
+</style>
 
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="grievance-escalation-hero">
             <div class="row justify-content-between g-3">
                 <div class="col-auto">
                     <div class="page-title">
@@ -56,6 +62,8 @@
     </div>
 </div>
 @include('resorts._emotional_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -135,32 +143,51 @@
                 var Grievance_Cat_id = $(this).attr('data-Grievance_Cat_id');
                 var resolved_duration =$(this).attr('data-resolved_duration');
 
-                let optionsHtml = ''; // Initialize
-                let optionsHtml1 = ''; // Initialize
+                var tickSvg = '<svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg>';
 
                 // Grievance Categories (Pass as JSON from Blade)
                 let grievanceCategories = @json($GrievanceCategory);
-                grievanceCategories.forEach(item => {
-                    optionsHtml += `<option value="${item.id}" ${Grievance_Cat_id == item.id ? 'selected' : ''}>${item.Category_Name}</option>`;
-                });
-                for (let i = 1; i <= 10; i++) 
-                {
-                    optionsHtml1 += `<option value="${i}" ${resolved_duration == i ? 'selected' : ''}>${i} business days</option>`;
-                }
+                let optionsHtml = grievanceCategories.map(item => `<option value="${item.id}" ${Grievance_Cat_id == item.id ? 'selected' : ''}>${item.Category_Name}</option>`).join('');
+                let catItemsHtml = grievanceCategories.map(item => `<div class="dd-item${item.id == Grievance_Cat_id ? ' active' : ''}" role="option" data-value="${item.id}"><span class="dd-nm">${item.Category_Name}</span>${tickSvg}</div>`).join('');
+                let selectedCat = grievanceCategories.find(item => item.id == Grievance_Cat_id);
+
+                let durations = Array.from({length: 10}, (_, i) => i + 1);
+                let optionsHtml1 = durations.map(i => `<option value="${i}" ${resolved_duration == i ? 'selected' : ''}>${i} business days</option>`).join('');
+                let durationItemsHtml = durations.map(i => `<div class="dd-item${resolved_duration == i ? ' active' : ''}" role="option" data-value="${i}"><span class="dd-nm">${i} business days</span>${tickSvg}</div>`).join('');
+                let selectedDuration = durations.find(i => resolved_duration == i);
 
                 var editRowHtml = `
                     <td class="py-1">
                         <div class="form-group">
-                            <select class="form-select select2t-none" name="Grievance_Cat_id" class="Grievance_Cat_id">
+                            <select class="form-select dd-native-select" name="Grievance_Cat_id" id="Grievance_Cat_id_esc">
                             ${optionsHtml}
                             </select>
+                            <div class="dd" data-target="#Grievance_Cat_id_esc">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">${selectedCat ? selectedCat.Category_Name : 'Select category'}</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Grievance category">
+                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a category…"></div>
+                                    <div class="dd-scroll">${catItemsHtml}</div>
+                                </div>
+                            </div>
                         </div>
                     </td>
                     <td class="py-1">
                         <div class="form-group">
-                            <select class="form-select select2t-none resolved_duration" name="resolved_duration" required data-parsley-errors-container="#resolved_duration_error" data-parsley-error-message="Please select a resolved duration">
+                            <select class="form-select dd-native-select resolved_duration" name="resolved_duration" id="resolved_duration_esc" required data-parsley-errors-container="#resolved_duration_error" data-parsley-error-message="Please select a resolved duration">
                                 ${optionsHtml1}
                             </select>
+                            <div class="dd" data-target="#resolved_duration_esc">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">${selectedDuration ? selectedDuration + ' business days' : 'Select duration'}</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Resolved duration">
+                                    <div class="dd-scroll">${durationItemsHtml}</div>
+                                </div>
+                            </div>
                         </div>
                     </td>
                     <td class="py-1">
@@ -169,14 +196,6 @@
 
                 // Replace row content
                 $row.html(editRowHtml);
-
-                // Initialize Select2 for the newly added dropdowns
-                $row.find(".select2t-none").select2({
-                    placeholder: "Select an option",
-                    allowClear: true,
-                    width: '100%'        
-                });
-                
             });
 
 

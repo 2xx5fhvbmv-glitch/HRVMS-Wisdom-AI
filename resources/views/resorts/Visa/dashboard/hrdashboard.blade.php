@@ -8,9 +8,26 @@
 @endif
 
 @section('content')
+<style>
+    /* Same requested push as the other module dashboards/pages (Payroll /
+       Talent Acquisition / People / Time and Attendance / Leave /
+       Performance / Learning / Accommodation / Incident / Survey /
+       Reports / Support) — extra breathing room between the hero and the
+       KPI row below it, scoped to this page (.page-hedding's own
+       margin-bottom is shared by every page's hero). padding-bottom, not
+       margin: adjacent sibling margins collapse to the larger of the two
+       rather than summing. Below Bootstrap's sm breakpoint the extra
+       padding pushes the KPI row's first card into the teal hero curve's
+       rounded bottom-left corner (body::before, border-radius 0 0 50px
+       50px) — same collision found on Payroll — neutralized below 576px. */
+    #visa-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #visa-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="visa-hero">
                 <div class="row  g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -330,27 +347,57 @@
                                 <div class="row g-md-4 g-3">
                                     <div class="col-sm-6">
                                         <label for="from-wallet" class="form-label">FROM WALLET</label>
-                                        <select class="form-select select2t-none" id="from-wallet" name="from_wallet" required data-parsley-errors-container="#from-wallet-error" aria-label="Default select example">
+                                        <select class="form-select dd-native-select" id="from-wallet" name="from_wallet" required data-parsley-errors-container="#from-wallet-error" aria-label="Default select example">
                                             <option value=""></option>
                                             @if($VisaWallets->isNotEmpty())
                                                 @foreach($VisaWallets as $VisaWallet)
                                                     <option value="{{ base64_encode($VisaWallet->id) }}">{{ $VisaWallet->WalletName }}</option>
-                                                @endforeach 
+                                                @endforeach
                                             @endif
                                         </select>
+                                        <div class="dd" data-target="#from-wallet">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">Select From Wallet</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="From Wallet">
+                                                <div class="dd-scroll">
+                                                    @if($VisaWallets->isNotEmpty())
+                                                        @foreach($VisaWallets as $VisaWallet)
+                                                            <div class="dd-item" role="option" data-value="{{ base64_encode($VisaWallet->id) }}"><span class="dd-nm">{{ $VisaWallet->WalletName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @endforeach
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </div>
                                         <div id="from-wallet-error" class="text-danger mt-1"></div>
                                     </div>
 
                                     <div class="col-sm-6">
                                         <label for="to-wallet" class="form-label">TO WALLET</label>
-                                        <select class="form-select select2t-none" id="to-wallet" name="to_wallet" required data-parsley-notequal="#from-wallet" data-parsley-errors-container="#to-wallet-error" aria-label="Default select example">
+                                        <select class="form-select dd-native-select" id="to-wallet" name="to_wallet" required data-parsley-notequal="#from-wallet" data-parsley-errors-container="#to-wallet-error" aria-label="Default select example">
                                             <option value=""></option>
                                             @if($VisaWallets->isNotEmpty())
                                                 @foreach($VisaWallets as $VisaWallet)
                                                     <option value="{{ base64_encode($VisaWallet->id) }}">{{ $VisaWallet->WalletName }}</option>
-                                                @endforeach 
+                                                @endforeach
                                             @endif
                                         </select>
+                                        <div class="dd" data-target="#to-wallet">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">Select To Wallet</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="To Wallet">
+                                                <div class="dd-scroll">
+                                                    @if($VisaWallets->isNotEmpty())
+                                                        @foreach($VisaWallets as $VisaWallet)
+                                                            <div class="dd-item" role="option" data-value="{{ base64_encode($VisaWallet->id) }}"><span class="dd-nm">{{ $VisaWallet->WalletName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @endforeach
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </div>
                                         <div id="to-wallet-error" class="text-danger mt-1"></div>
                                     </div>
 
@@ -601,6 +648,8 @@
 @includeWhen(isset($visaInsights), 'resorts.Visa.dashboard._insight_modals')
 @includeWhen(isset($visaInsights), 'partials._wai_insight_modals')
 @include('resorts._emotional_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -627,26 +676,26 @@
     .wai-narrative .wai-head { position: relative; overflow: hidden; padding: 17px 18px; flex-shrink: 0; }
     .wai-narrative .wai-head::before {
         content: ""; position: absolute; inset: 0; pointer-events: none;
-        background: linear-gradient(110deg, #014653 0%, #0e8a9e 40%, #7fa61e 70%, #e0ff02 100%);
+        background: linear-gradient(110deg, var(--teal) 0%, #0e8a9e 40%, #7fa61e 70%, var(--lime) 100%);
     }
     .wai-narrative .wai-head::after {
         content: ""; position: absolute; inset: 0; pointer-events: none;
         background: linear-gradient(110deg, rgba(1,40,48,.35), transparent 55%);
     }
-    .wai-narrative .wai-head h2 { position: relative; color: #fff; font-size: 15px; font-weight: 800; margin: 0; }
-    .wai-narrative .wai-head-meta { position: relative; margin-top: 4px; font-size: 11.5px; color: rgba(255,255,255,.75); display: flex; gap: 6px; }
+    .wai-narrative .wai-head h2 { position: relative; color: #fff; font-size: 18px; font-weight: 600; margin: 0; }
+    .wai-narrative .wai-head-meta { position: relative; margin-top: 4px; font-size: 10.5px; font-weight: 500; color: rgba(255,255,255,.75); display: flex; gap: 6px; }
     .wai-narrative .wai-head-meta a { color: #fff; font-weight: 600; text-decoration: underline; }
 
     .wai-narrative-body { padding: 16px; }
     .wai-narrative .wai-row { display: flex; align-items: flex-start; gap: 12px; padding: 12px 2px; border-bottom: 1px solid #F2F6F6; }
     .wai-narrative .wai-row:last-child { border-bottom: none; }
     .wai-narrative .wai-row-icon { width: 32px; height: 32px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; margin-top: 2px; }
-    .wai-narrative .wai-row-icon.is-ok { background: #E9F7F0; color: #1F9D6B; }
-    .wai-narrative .wai-row-icon.is-flagged { background: #FBF0DC; color: #D98A00; }
+    .wai-narrative .wai-row-icon.is-ok { background: var(--positive-bg); color: var(--positive); }
+    .wai-narrative .wai-row-icon.is-flagged { background: var(--warning-bg); color: var(--warning); }
     .wai-narrative .wai-row-body { flex: 1 1 auto; min-width: 0; }
-    .wai-narrative .wai-row-body h6 { margin: 0 0 4px; font-size: 13.5px; font-weight: 700; color: #14232A; }
-    .wai-narrative .wai-row-text { margin: 0 0 4px; font-size: 12.5px; color: #5D6F75; line-height: 1.5; }
-    .wai-narrative .wai-row-link { display: inline-block; margin-top: 2px; font-size: 12px; font-weight: 600; color: #014653; }
+    .wai-narrative .wai-row-body h6 { margin: 0 0 4px; font-size: 14px; font-weight: 600; color: var(--ink); }
+    .wai-narrative .wai-row-text { margin: 0 0 4px; font-size: 14px; color: var(--muted); line-height: 1.5; }
+    .wai-narrative .wai-row-link { display: inline-block; margin-top: 2px; font-size: 14px; font-weight: 600; color: var(--teal); }
 </style>
 @endsection
 
@@ -798,14 +847,6 @@ $(document).ready(function ()
     // Initialize Parsley on the form
     $('#TransferAmountform').parsley();
 
-    $("#from-wallet").select2({
-        placeholder: "Select From Wallet",
-        allowClear: true,
-    });
-     $("#to-wallet").select2({
-        placeholder: "Select To Wallet",
-        allowClear: true,
-    });
    $("#position").select2({
         placeholder: "Select To Wallet",
         allowClear: true,
@@ -1455,6 +1496,9 @@ $(document).ready(function ()
                         // the old code stacked rows on each call).
                         $('.myDoughnutChartLabel').empty();
 
+                        // colorPalette: only 2 of 14 entries match SSOT tokens
+                        // (index 0/#014653, index 6/#2EACB3) — left literal as
+                        // a whole set (deliberate dark/light paired design).
                         window.myDoughnutChart = new Chart(document.getElementById('myDoughnutChart').getContext('2d'), {
                             type: 'doughnut',
                             data: {
@@ -1485,6 +1529,7 @@ $(document).ready(function ()
                             },
                             plugins: [doughnutLabelsInside] // Your custom plugin for inside labels
                         });
+                        if (window.WaiChart) window.WaiChart.registerForTheme(window.myDoughnutChart);
 
                         // Hand the workforce-share percentages to the in-slice
                         // label plugin so the slice labels and the legend below
@@ -1517,6 +1562,7 @@ $(document).ready(function ()
 
 
         var ctz = document.getElementById('myStackedBarChart').getContext('2d');
+        var _pVisa1 = window.WaiChart ? window.WaiChart.palette() : { teal: '#014653', aqua: '#2EACB3', card: '#fff' };
 
             var myStackedBarChart = new Chart(ctz, {
                 type: 'bar',
@@ -1526,16 +1572,16 @@ $(document).ready(function ()
                         {
                             label: 'Workpermit',
                             data: [],
-                            backgroundColor: '#014653',
-                            borderColor: '#fff',
+                            backgroundColor: _pVisa1.teal,
+                            borderColor: _pVisa1.card,
                             borderWidth: 2,
                             borderRadius: 10,
                         },
                         {
                             label: 'Slot Fee',
                             data: [],
-                            backgroundColor: '#2EACB3',
-                            borderColor: '#fff',
+                            backgroundColor: _pVisa1.aqua,
+                            borderColor: _pVisa1.card,
                             borderWidth: 2,
                             borderRadius: 10,
                         },
@@ -1543,7 +1589,7 @@ $(document).ready(function ()
                             label: 'Insurance',
                             data: [],
                             backgroundColor: '#FED049',
-                            borderColor: '#fff',
+                            borderColor: _pVisa1.card,
                             borderWidth: 2,
                             borderRadius: 10,
                         },
@@ -1551,7 +1597,7 @@ $(document).ready(function ()
                             label: 'Work Permit Medical',
                             data: [],
                             backgroundColor: '#8DC9C9',
-                            borderColor: '#fff',
+                            borderColor: _pVisa1.card,
                             borderWidth: 2,
                             borderRadius: 10,
                         }
@@ -1588,8 +1634,13 @@ $(document).ready(function ()
                     }
                 }
             });
+            if (window.WaiChart) window.WaiChart.registerForTheme(myStackedBarChart, function (c, p) {
+                c.data.datasets[0].backgroundColor = p.teal;
+                c.data.datasets[1].backgroundColor = p.aqua;
+                c.data.datasets.forEach(function (ds) { ds.borderColor = p.card; });
+            });
 
-           
+
 // Function to load data via AJAX and update chart
     
     </script>

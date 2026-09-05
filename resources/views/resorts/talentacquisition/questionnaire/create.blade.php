@@ -8,9 +8,15 @@
     @endif
 
 @section('content')
+    <style>
+        #ta-add-questionnaire-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #ta-add-questionnaire-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="ta-add-questionnaire-hero">
                 <div class="row justify-content-between g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -36,7 +42,7 @@
                                 <div class="row g-md-4 g-3">
 
                                     <div class="col-lg-4 col-sm-6">
-                                        <select class="form-select ResortDivision   ResortDivision" required data-id="1" name="ResortDivision" id="ResortDivision" aria-label="Default select example">
+                                        <select class="form-select dd-native-select ResortDivision   ResortDivision" required data-id="1" name="ResortDivision" id="ResortDivision" aria-label="Default select example">
                                             <option></option>
                                             @if($ResortDivision->isNotEmpty())
 
@@ -46,18 +52,59 @@
                                             @endif
 
                                         </select>
+                                        <div class="dd" data-target="#ResortDivision">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">Select Division</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Division">
+                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a division…"></div>
+                                                <div class="dd-scroll">
+                                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Division</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @if($ResortDivision->isNotEmpty())
+                                                        @foreach ($ResortDivision as $d)
+                                                        <div class="dd-item" role="option" data-value="{{ $d->id }}"><span class="dd-nm">{{ $d->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @endforeach
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div class="col-lg-4 col-sm-6">
-                                        <select class="form-select Department Department" required  data-id="1" name="Department" id="Department"  aria-label="Default select example">
+                                        <select class="form-select dd-native-select Department Department" required  data-id="1" name="Department" id="Department"  aria-label="Default select example">
                                             <option selected>Select Department</option>
 
                                         </select>
+                                        <div class="dd" data-target="#Department">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">Select Department</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Department">
+                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a department…"></div>
+                                                <div class="dd-scroll">
+                                                    <div class="dd-item active" role="option" data-value="Select Department"><span class="dd-nm">Select Department</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div class="col-lg-4 col-sm-6">
-                                        <select class="form-select Position" data-id="1" required name="Position"  id="Position" aria-label="Default select example">
+                                        <select class="form-select dd-native-select Position" data-id="1" required name="Position"  id="Position" aria-label="Default select example">
                                             <option selected>Select Position</option>
 
                                         </select>
+                                        <div class="dd" data-target="#Position">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">Select Position</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Position">
+                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a position…"></div>
+                                                <div class="dd-scroll">
+                                                    <div class="dd-item active" role="option" data-value="Select Position"><span class="dd-nm">Select Position</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
 
                                 </div>
@@ -65,12 +112,26 @@
                             </div>
                             <div class="row g-md-4 g-3 ">
                                 <div class="col-lg-3 col-sm-6 align-items-left">
-                                        <select class="form-select que_type" name="que_type"  data-id="1" aria-label="Default select example">
+                                        <select class="form-select dd-native-select que_type" name="que_type" id="que_type" data-id="1" aria-label="Default select example">
                                             <option selected></option>
                                             <option value="text">Text</option>
                                             <option value="multiple">Check Box Button</option>
                                             <option value="Radio">Radio Button</option>
                                         </select>
+                                        <div class="dd" data-target="#que_type">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">Select Question Type</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Question Type">
+                                                <div class="dd-scroll">
+                                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Question Type</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    <div class="dd-item" role="option" data-value="text"><span class="dd-nm">Text</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    <div class="dd-item" role="option" data-value="multiple"><span class="dd-nm">Check Box Button</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    <div class="dd-item" role="option" data-value="Radio"><span class="dd-nm">Radio Button</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div class="col-lg-3 col-sm-6 align-items-left">
                                         <button  type="button" class="btn ta-btn-secondary btn-sm add-btn AddMore">Add More</button>
@@ -93,7 +154,7 @@
                             </div>
                             <div class="row  AppendVideoHerer g-md-4 g-3">
                                 <div class=" col-sm-6">
-                                    <select class="form-select" name="language[]" id="Language_1" aria-label="Default select example">
+                                    <select class="form-select dd-native-select" name="language[]" id="Language_1" aria-label="Default select example">
                                         <option > </option>
                                         @if($ResortLanguages->isNotEmpty())
                                             <optgroup label="Resort Languages">
@@ -110,6 +171,28 @@
                                             </optgroup>
                                         @endif
                                     </select>
+                                    <div class="dd" data-target="#Language_1">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Select Language</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Language">
+                                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a language…"></div>
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Language</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @if($ResortLanguages->isNotEmpty())
+                                                    @foreach ($ResortLanguages as $l)
+                                                    <div class="dd-item" role="option" data-value="{{ $l->id }}"><span class="dd-nm">{{ $l->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @endforeach
+                                                @endif
+                                                @if(!empty($foreignLanguages))
+                                                    @foreach ($foreignLanguages as $flKey => $flLabel)
+                                                    <div class="dd-item" role="option" data-value="foreign_{{ $flKey }}"><span class="dd-nm">{{ $flLabel }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @endforeach
+                                                @endif
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class=" col-sm-6">
                                     <input type="text" class="form-control" placeholder="Question" name="VideoQuestion[]">
@@ -130,6 +213,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts._dropdown_styles')
 @include('resorts.talentacquisition._ta_buttons_v2_styles')
     <style>
         .talentAc-block .title h5{
@@ -143,19 +227,6 @@
 
 <script>
         $(document).ready(function() {
-            $(".que_type").select2({
-                "placeholder":'Select Question Type'
-            });
-            $(".ResortDivision").select2({
-                "placeholder":'Select Division Type'
-            });
-            $(".Department").select2({
-                "placeholder":'Select Department'
-            });
-            $(".Position").select2({
-                "placeholder":'Select Position'
-            });
-
             $(document).on('change', '.ResortDivision', function() {
                 let l_id = $(this).attr('data-id');
 
@@ -171,6 +242,7 @@
 
                                 // Clear the dropdown and add a placeholder option
                                 $("#Department").html('<option value="">Select Department</option>');
+                                window.wisdomDD.rebuild('#Department');
                                 if(data.success == true) {
                                     let string='<option></option>';
                                     // Append new options
@@ -180,6 +252,7 @@
                                     });
 
                                     $("#Department").html(string);
+                                    window.wisdomDD.rebuild('#Department');
 
                                 } else {
                                     let string='<option></option>';
@@ -198,6 +271,7 @@
 
                 let string='<option></option>';
                 $("#Position").html(string);
+                window.wisdomDD.rebuild('#Position');
                     $.ajax({
                         url: "{{ route('resort.get.position') }}",
                         type: "post",
@@ -215,6 +289,7 @@
                                     string+='<option value="'+value.id+'">'+value.position_title+'</option>';
                                 });
                                 $("#Position").html(string);
+                                window.wisdomDD.rebuild('#Position');
 
                             }
                         },
@@ -324,10 +399,6 @@
                 }
             });
 
-            $("#Language_1").select2({
-                        'placeholder':'Select Language',
-            });
-
             $(document).on('click', '.addVideo-btn', function (e) {
                 e.preventDefault();
 
@@ -340,7 +411,7 @@
                                                     <button type="button" class="btn ta-btn-critical removeVideo-btn btn-sm " data-id="${nos1}" >Remove</button>                                                </div>
                                                 <div class="row   g-md-4 g-3">
                                                     <div class=" col-sm-6">
-                                                        <select class="form-select" name="language[]" id="Language_${nos1}" aria-label="Default select example">
+                                                        <select class="form-select dd-native-select" name="language[]" id="Language_${nos1}" aria-label="Default select example">
                                                             <option > </option>
                                                             @if($ResortLanguages->isNotEmpty())
                                                                 <optgroup label="Resort Languages">
@@ -357,6 +428,28 @@
                                                                 </optgroup>
                                                             @endif
                                                         </select>
+                                                        <div class="dd" data-target="#Language_${nos1}">
+                                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                                <span class="dd-lbl">Select Language</span>
+                                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                            </button>
+                                                            <div class="dd-panel" role="listbox" aria-label="Language">
+                                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a language…"></div>
+                                                                <div class="dd-scroll">
+                                                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Language</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                    @if($ResortLanguages->isNotEmpty())
+                                                                        @foreach ($ResortLanguages as $l)
+                                                                        <div class="dd-item" role="option" data-value="{{ $l->id }}"><span class="dd-nm">{{ $l->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                        @endforeach
+                                                                    @endif
+                                                                    @if(!empty($foreignLanguages))
+                                                                        @foreach ($foreignLanguages as $flKey => $flLabel)
+                                                                        <div class="dd-item" role="option" data-value="foreign_{{ $flKey }}"><span class="dd-nm">{{ $flLabel }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                        @endforeach
+                                                                    @endif
+                                                                </div>
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                     <div class=" col-sm-6">
                                                         <input type="text" class="form-control" placeholder="Question" name="VideoQuestion[]">
@@ -367,9 +460,6 @@
 
 
                 $('.videoQuestions-main').append(AppendVideoHerer);
-                    $("#Language_"+nos1).select2({
-                    'placeholder':'Select Language',
-                    });
                 nos1++
 
 
@@ -531,5 +621,6 @@ if (!isNaN(totalOptions) && totalOptions > 0) {
             });
 
 </script>
+@include('resorts._dropdown_script')
 @endsection
 

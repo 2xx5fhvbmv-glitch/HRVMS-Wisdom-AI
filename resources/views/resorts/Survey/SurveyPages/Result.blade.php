@@ -86,7 +86,7 @@
                             @csrf
                             <input type="hidden" name="id"  value="{{$id}}"
                             <div class="col-lg-4 col-md-6">
-                                <select class="form-select select2t-none" name="respondent"  id="respondent">
+                                <select class="form-select dd-native-select" name="respondent"  id="respondent">
                                     <option value="{{ base64_encode('All') }}">All Respondents</option>
                                     @if($ResponedEmp->isNotEmpty())
                                         @foreach ($ResponedEmp as $item)
@@ -94,6 +94,23 @@
                                         @endforeach
                                     @endif
                                 </select>
+                                <div class="dd" data-target="#respondent">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">All Respondents</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Respondent">
+                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a respondent…"></div>
+                                        <div class="dd-scroll">
+                                            <div class="dd-item active" role="option" data-value="{{ base64_encode('All') }}"><span class="dd-nm">All Respondents</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @if($ResponedEmp->isNotEmpty())
+                                                @foreach ($ResponedEmp as $item)
+                                                <div class="dd-item" role="option" data-value="{{ $item->emp_id }}"><span class="dd-nm">{{ $item->EmployeeName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @endforeach
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
                                 @if(!$showRespondentIdentity)
                                     <small class="text-muted">Respondent names are masked for {{ $privacy }} surveys — any selection exports all responses combined, to avoid identifying an individual by elimination.</small>
                                 @endif
@@ -170,6 +187,7 @@
 @endsection
 
     @section('import-css')
+    @include('resorts._dropdown_styles')
     @endsection
 
     @section('import-scripts')
@@ -198,7 +216,8 @@
     <script type="module">
         const barCanvas = document.getElementById('barchart');
         if (barCanvas) {
-            new Chart(barCanvas.getContext('2d'), {
+            var _pSurv1 = window.WaiChart ? window.WaiChart.palette().teal : '#014653';
+            var _surveyBarChart = new Chart(barCanvas.getContext('2d'), {
                 type: 'bar',
                 data: {
                     labels: @json($ratingChartLabels ?? []),
@@ -206,8 +225,8 @@
                         {
                             label: 'Average rating',
                             data: @json($ratingChartData ?? []),
-                            backgroundColor: '#014653',
-                            borderColor: '#014653',
+                            backgroundColor: _pSurv1,
+                            borderColor: _pSurv1,
                             borderWidth: 1,
                             borderRadius: 5,
                             barThickness: 36
@@ -232,11 +251,16 @@
                     }
                 }
             });
+            if (window.WaiChart) window.WaiChart.registerForTheme(_surveyBarChart, function (c, p) {
+                c.data.datasets[0].backgroundColor = c.data.datasets[0].borderColor = p.teal;
+            });
         }
 
         const doughnutCanvas = document.getElementById('doughnutchart');
         if (doughnutCanvas) {
-            new Chart(doughnutCanvas.getContext('2d'), {
+            // backgroundColor: only 1 of 6 matches an SSOT token — left
+            // literal as a whole categorical set.
+            var _surveyDoughnutChart = new Chart(doughnutCanvas.getContext('2d'), {
                 type: 'doughnut',
                 data: {
                     labels: @json($optionChartLabels ?? []),
@@ -261,6 +285,8 @@
                     }
                 }
             });
+            if (window.WaiChart) window.WaiChart.registerForTheme(_surveyDoughnutChart);
         }
     </script>
+    @include('resorts._dropdown_script')
     @endsection

@@ -8,9 +8,15 @@
 @endif
 
 @section('content')
+    <style>
+        #promotion-dashboard-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #promotion-dashboard-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="promotion-dashboard-hero">
                 <div class="row  g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -96,11 +102,24 @@
                                      fetchData() JS reads its value via $('#basicSalaryFilter'). --}}
                                 <div class="col-auto" style="display:none;">
                                     <div class="form-group">
-                                        <select class="form-select" id="basicSalaryFilter">
+                                        <select class="form-select dd-native-select" id="basicSalaryFilter">
                                             <option value="month">Month-Wise</option>
                                             <option value="quarter">Quarter-Wise</option>
                                             <option value="year" selected>Year-Wise</option>
                                         </select>
+                                        <div class="dd" data-target="#basicSalaryFilter">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">Year-Wise</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Basic Salary Range">
+                                                <div class="dd-scroll">
+                                                    <div class="dd-item" role="option" data-value="month"><span class="dd-nm">Month-Wise</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    <div class="dd-item" role="option" data-value="quarter"><span class="dd-nm">Quarter-Wise</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    <div class="dd-item active" role="option" data-value="year"><span class="dd-nm">Year-Wise</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -129,7 +148,7 @@
                                 </div>
                                 <div class="col-xl-2 col-auto">
                                     <div class="form-group">
-                                        <select class="form-select form-select-large select2t-none" id="empFilter"
+                                        <select class="form-select form-select-large dd-native-select" id="empFilter"
                                             aria-label="Default select example">
                                             <option value="">Select Employee</option>
                                             @if($employees)
@@ -140,11 +159,28 @@
                                                 @endforeach
                                             @endif
                                         </select>
+                                        <div class="dd" data-target="#empFilter">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">Select Employee</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Employee">
+                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an employee…"></div>
+                                                <div class="dd-scroll">
+                                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Employee</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @if($employees)
+                                                        @foreach($employees as $employee)
+                                                            <div class="dd-item" role="option" data-value="{{ $employee->id }}"><span class="dd-nm">{{ $employee->Emp_id }} - {{ $employee->resortAdmin->full_name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @endforeach
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="col-lg-2 col-auto">
                                     <div class="form-group">
-                                    <select class="form-select select2t-none" name="deptFilter" id="deptFilter" aria-label="Default select example">
+                                    <select class="form-select dd-native-select" name="deptFilter" id="deptFilter" aria-label="Default select example">
                                         <option value="">Department</option>
                                         @if($departments)
                                             @foreach($departments as $dept)
@@ -152,11 +188,28 @@
                                             @endforeach
                                         @endif
                                     </select>
+                                    <div class="dd" data-target="#deptFilter">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Department</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Department">
+                                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a department…"></div>
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Department</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @if($departments)
+                                                    @foreach($departments as $dept)
+                                                        <div class="dd-item" role="option" data-value="{{$dept->id}}"><span class="dd-nm">{{$dept->name}}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @endforeach
+                                                @endif
+                                            </div>
+                                        </div>
+                                    </div>
                                     </div>
                                 </div>
                                 <div class="col-lg-2 col-auto">
                                     <div class="form-group">
-                                        <select class="form-select form-select-large select2t-none"
+                                        <select class="form-select form-select-large dd-native-select"
                                             aria-label="Default select example" id="statusFilter">
                                             <option value="">Status</option>
                                             <option value="Pending">Pending</option>
@@ -164,6 +217,21 @@
                                             <option value="Rejected">Rejected</option>
                                             <option value="On Hold">On Hold</option>
                                         </select>
+                                        <div class="dd" data-target="#statusFilter">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">Status</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Status">
+                                                <div class="dd-scroll">
+                                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Status</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    <div class="dd-item" role="option" data-value="Pending"><span class="dd-nm">Pending</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    <div class="dd-item" role="option" data-value="Approved"><span class="dd-nm">Approved</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    <div class="dd-item" role="option" data-value="Rejected"><span class="dd-nm">Rejected</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    <div class="dd-item" role="option" data-value="On Hold"><span class="dd-nm">On Hold</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                                 {{-- Date picker filter hidden by request. The hidden input
@@ -203,6 +271,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts._dropdown_styles')
 @endsection
 
 @section('import-scripts')
@@ -210,7 +279,6 @@
     let barChart;
 
     $(document).ready(function(){
-        $('.select2t-none').select2();
         flatpickr(".datepicker", {
             dateFormat: 'd/m/Y',
             allowInput: true,
@@ -284,6 +352,7 @@
         const ctx = document.getElementById('barChart').getContext('2d');
         if (barChart) barChart.destroy(); // Destroy previous instance if exists
 
+        var _pPromo = window.WaiChart ? window.WaiChart.palette() : { teal: '#014653', aqua: '#2EACB3' };
         barChart = new Chart(ctx, {
             type: 'bar',
             data: {
@@ -292,8 +361,8 @@
                     {
                         label: 'Current Basic',
                         data: currentBasic,
-                        backgroundColor: '#014653',
-                        borderColor: '#014653',
+                        backgroundColor: _pPromo.teal,
+                        borderColor: _pPromo.teal,
                         borderWidth: 1,
                         borderRadius: 3,
                         barThickness: 14
@@ -301,8 +370,8 @@
                     {
                         label: 'New Basic',
                         data: newBasic,
-                        backgroundColor: '#2EACB3',
-                        borderColor: '#2EACB3',
+                        backgroundColor: _pPromo.aqua,
+                        borderColor: _pPromo.aqua,
                         borderWidth: 1,
                         borderRadius: 3,
                         barThickness: 14
@@ -335,6 +404,10 @@
                     }
                 }
             }
+        });
+        if (window.WaiChart) window.WaiChart.registerForTheme(barChart, function (c, p) {
+            c.data.datasets[0].backgroundColor = c.data.datasets[0].borderColor = p.teal;
+            c.data.datasets[1].backgroundColor = c.data.datasets[1].borderColor = p.aqua;
         });
     }
 
@@ -385,7 +458,18 @@
             </select>
         `);
 
-        // Initialize Select2
+        // Initialize Select2. NOT converted to the shared .dd component like
+        // every other select on this page — this one lives inside
+        // #promotionTable, which sits in a .table-responsive wrapper
+        // (overflow:auto both axes). .dd-panel is position:absolute and
+        // opens below the trigger, same structural conflict as the
+        // SweetAlert2-modal case (see docs/dropdown-unification-backend-
+        // findings.md #17): confirmed live that the panel's own geometry
+        // extends well past the wrapper's bottom edge and gets clipped
+        // invisible, even though .dd.open / opacity all report correctly.
+        // select2's dropdownParent option exists specifically to solve
+        // this (renders the dropdown outside the clipping ancestor), which
+        // the .dd component has no equivalent for yet.
         $('#' + positionSelectId).select2({
             placeholder: 'Select Position',
             dropdownParent: $('#promotionTable'),
@@ -508,6 +592,7 @@
     const lastYearCounts = @json(array_values($lastYearCounts));
 
     const ctx = document.getElementById('myLineChart').getContext('2d');
+    var _pPromoLine = window.WaiChart ? window.WaiChart.palette() : { teal: '#014653', aqua: '#2EACB3' };
     const myLineChart = new Chart(ctx, {
         type: 'line',
         data: {
@@ -516,8 +601,8 @@
                 {
                     label: '{{ $currentYear }}',
                     data: thisYearCounts,
-                    borderColor: '#014653',
-                    backgroundColor: '#014653',
+                    borderColor: _pPromoLine.teal,
+                    backgroundColor: _pPromoLine.teal,
                     borderWidth: 1,
                     fill: false,
                     tension: 0.4,
@@ -526,8 +611,8 @@
                 {
                     label: '{{ $lastYear }}',
                     data: lastYearCounts,
-                    borderColor: '#2EACB3',
-                    backgroundColor: '#2EACB3',
+                    borderColor: _pPromoLine.aqua,
+                    backgroundColor: _pPromoLine.aqua,
                     borderWidth: 1,
                     fill: false,
                     tension: 0.4,
@@ -567,5 +652,10 @@
             }
         }
     });
+    if (window.WaiChart) window.WaiChart.registerForTheme(myLineChart, function (c, p) {
+        c.data.datasets[0].borderColor = c.data.datasets[0].backgroundColor = p.teal;
+        c.data.datasets[1].borderColor = c.data.datasets[1].backgroundColor = p.aqua;
+    });
 </script>
+@include('resorts._dropdown_script')
 @endsection

@@ -87,7 +87,7 @@
                             </div>
                             <div class="col-auto">
                                 <div class="form-group">
-                                    <select class="form-select YearWiseDateattandance" aria-label="Default select example">
+                                    <select class="form-select YearWiseDateattandance dd-native-select" aria-label="Default select example" id="hodYearWiseDateattandance">
                                         @for ($i = -1; $i < 2; $i++) <!-- Start from one year before the current year -->
                                         @php
                                             $year = date('Y') + $i;
@@ -98,6 +98,26 @@
                                             </option>
                                         @endfor
                                     </select>
+                                    <div class="dd" data-target="#hodYearWiseDateattandance">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Jan {{ date('Y') }} - Dec {{ date('Y') }}</span>
+                                            <svg class="dd-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Attendance year">
+                                            <div class="dd-scroll">
+                                                @for ($i = -1; $i < 2; $i++)
+                                                @php
+                                                    $year = date('Y') + $i;
+                                                    $current = date("Y");
+                                                @endphp
+                                                <div class="dd-item @if($year == $current) active @endif" role="option" data-value="{{ $year }}">
+                                                    <span class="dd-nm">Jan {{ $year }} - Dec {{ $year }}</span>
+                                                    <svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg>
+                                                </div>
+                                                @endfor
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -235,7 +255,7 @@
                             </div>
                             <div class="col-auto">
                                 <div class="form-group">
-                                    <select class="form-select" aria-label="Default select example" id="ResortPosition">
+                                    <select class="form-select dd-native-select" aria-label="Default select example" id="ResortPosition">
                                         <option selected="">All Positions</option>
                                         @if($ResortPosition->isNotEmpty())
                                             @foreach($ResortPosition as $position)
@@ -243,6 +263,29 @@
                                             @endforeach
                                         @endif
                                     </select>
+                                    <div class="dd" data-target="#ResortPosition">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">All Positions</span>
+                                            <svg class="dd-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Position">
+                                            <input type="text" class="dd-search" placeholder="Search…">
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value="">
+                                                    <span class="dd-nm">All Positions</span>
+                                                    <svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg>
+                                                </div>
+                                                @if($ResortPosition->isNotEmpty())
+                                                    @foreach($ResortPosition as $position)
+                                                    <div class="dd-item" role="option" data-value="{{ $position->id }}">
+                                                        <span class="dd-nm">{{ $position->position_title }}</span>
+                                                        <svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg>
+                                                    </div>
+                                                    @endforeach
+                                                @endif
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                             <div class="col-auto">
@@ -355,6 +398,8 @@
     </div>
 </div>
 @include('resorts.Performance._performance_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -428,6 +473,9 @@
             }
         }
     });
+    // datasets are populated entirely by the AJAX response below (server-
+    // supplied colours, out of scope) — only axes/legend/tooltip retheme.
+    if (window.WaiChart) window.WaiChart.registerForTheme(myAttendance);
     GetAttandance();
     $(".YearWiseDateattandance").on('change', function () {
         GetAttandance();
@@ -535,6 +583,7 @@
             }
         }
     });
+    if (window.WaiChart) window.WaiChart.registerForTheme(myOTHours);
     GetmyOTHours()
     function GetmyOTHours()
     {
@@ -568,12 +617,6 @@
     window.onresize = equalizeHeights;
 
     $(document).ready(function () {
-        $('#ResortPosition').select2({
-            placeholder: "Select a Position", // Placeholder text
-            allowClear: true // Adds a clear (X) button to reset the dropdown
-        });
-
-
         DutyRosterList();
 
         $('#ResortPosition').on('change', function () {

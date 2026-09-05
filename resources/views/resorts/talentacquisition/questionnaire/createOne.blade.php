@@ -35,7 +35,7 @@
                                 </div>
                                 <div class="row g-md-4 g-3">
                                     <div class="col-lg-3 col-sm-6">
-                                        <select class="form-select ResortDivision   ResortDivision_1" required data-id="1" name="ResortDivision[]" id="ResortDivision_1" aria-label="Default select example">
+                                        <select class="form-select dd-native-select ResortDivision   ResortDivision_1" required data-id="1" name="ResortDivision[]" id="ResortDivision_1" aria-label="Default select example">
                                             <option></option>
                                             @if($ResortDivision->isNotEmpty())
 
@@ -45,25 +45,79 @@
                                             @endif
 
                                         </select>
+                                        <div class="dd" data-target="#ResortDivision_1">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">Select Division</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Division">
+                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a division…"></div>
+                                                <div class="dd-scroll">
+                                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Division</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @if($ResortDivision->isNotEmpty())
+                                                        @foreach ($ResortDivision as $d)
+                                                        <div class="dd-item" role="option" data-value="{{ $d->id }}"><span class="dd-nm">{{ $d->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @endforeach
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div class="col-lg-3 col-sm-6">
-                                        <select class="form-select Department Department_1" required  data-id="1" name="Department[]" id="Department_1"  aria-label="Default select example">
+                                        <select class="form-select dd-native-select Department Department_1" required  data-id="1" name="Department[]" id="Department_1"  aria-label="Default select example">
                                             <option selected>Select Department</option>
 
                                         </select>
+                                        <div class="dd" data-target="#Department_1">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">Select Department</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Department">
+                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a department…"></div>
+                                                <div class="dd-scroll">
+                                                    <div class="dd-item active" role="option" data-value="Select Department"><span class="dd-nm">Select Department</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div class="col-lg-3 col-sm-6">
-                                        <select class="form-select Position" data-id="1" required name="Position[]"  id="Position_1" aria-label="Default select example">
+                                        <select class="form-select dd-native-select Position" data-id="1" required name="Position[]"  id="Position_1" aria-label="Default select example">
                                             <option selected>Select Position</option>
 
                                         </select>
+                                        <div class="dd" data-target="#Position_1">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">Select Position</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Position">
+                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a position…"></div>
+                                                <div class="dd-scroll">
+                                                    <div class="dd-item active" role="option" data-value="Select Position"><span class="dd-nm">Select Position</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div class="col-lg-3 col-sm-6">
-                                        <select class="form-select que_type" name="que_type[]"  data-id="1" aria-label="Default select example">
+                                        <select class="form-select dd-native-select que_type" name="que_type[]" id="que_type_1" data-id="1" aria-label="Default select example">
                                             <option selected>Question Type</option>
                                             <option value="text">Text</option>
                                             <option value="multiple">Multiple choice questions</option>
                                         </select>
+                                        <div class="dd" data-target="#que_type_1">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">Question Type</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Question Type">
+                                                <div class="dd-scroll">
+                                                    <div class="dd-item active" role="option" data-value="Question Type"><span class="dd-nm">Question Type</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    <div class="dd-item" role="option" data-value="text"><span class="dd-nm">Text</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    <div class="dd-item" role="option" data-value="multiple"><span class="dd-nm">Multiple choice questions</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div class="col-12 select_option select_text_1" style="display:none">
                                         <input type="text"  name="AddQuestion[]" required class="form-control" placeholder="Add Question">
@@ -106,6 +160,7 @@
 @endsection
 
 @section('import-css')
+    @include('resorts._dropdown_styles')
     <style>
         .talentAc-block .title h5{
             font-size: 14px;
@@ -157,15 +212,6 @@
             $(document).on("click",".AddMore",function(){
 
                 var nos  =$("#increment").val();
-                $(".ResortDivision_"+nos).select2({
-                'placeholder':'Select ResortDivision',
-                });
-                $(".Department_"+nos).select2({
-                'placeholder':'Select Department',
-                });
-                $("#Position_"+nos).select2({
-                'placeholder':'Select Position',
-                });
             $(".AppendHerer").append(` <div class="talentAc-block" id="remove_id_${nos}">
                                 <div class="title mb-2">
                                     <h5>QUESTION ${nos}</h5>
@@ -173,7 +219,7 @@
                                 </div>
                                 <div class="row g-md-4 g-3">
                                     <div class="col-lg-3 col-sm-6">
-                                        <select class="form-select ResortDivision   ResortDivision_${nos}" required data-id="${nos}" name="ResortDivision[]" id="ResortDivision_${nos}" aria-label="Default select example">
+                                        <select class="form-select dd-native-select ResortDivision   ResortDivision_${nos}" required data-id="${nos}" name="ResortDivision[]" id="ResortDivision_${nos}" aria-label="Default select example">
                                             <option></option>
                                             @if($ResortDivision->isNotEmpty())
 
@@ -183,25 +229,79 @@
                                             @endif
 
                                         </select>
+                                        <div class="dd" data-target="#ResortDivision_${nos}">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">Select Division</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Division">
+                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a division…"></div>
+                                                <div class="dd-scroll">
+                                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Division</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @if($ResortDivision->isNotEmpty())
+                                                        @foreach ($ResortDivision as $d)
+                                                        <div class="dd-item" role="option" data-value="{{ $d->id }}"><span class="dd-nm">{{ $d->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @endforeach
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div class="col-lg-3 col-sm-6">
-                                        <select class="form-select Department Department_${nos}" required  data-id="${nos}" name="Department[]" id="Department_${nos}"  aria-label="Default select example">
+                                        <select class="form-select dd-native-select Department Department_${nos}" required  data-id="${nos}" name="Department[]" id="Department_${nos}"  aria-label="Default select example">
                                             <option selected>Select Department</option>
 
                                         </select>
+                                        <div class="dd" data-target="#Department_${nos}">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">Select Department</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Department">
+                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a department…"></div>
+                                                <div class="dd-scroll">
+                                                    <div class="dd-item active" role="option" data-value="Select Department"><span class="dd-nm">Select Department</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div class="col-lg-3 col-sm-6">
-                                        <select class="form-select Position" data-id="${nos}" required name="Position[]"  id="Position_${nos}" aria-label="Default select example">
+                                        <select class="form-select dd-native-select Position" data-id="${nos}" required name="Position[]"  id="Position_${nos}" aria-label="Default select example">
                                             <option selected>Select Position</option>
 
                                         </select>
+                                        <div class="dd" data-target="#Position_${nos}">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">Select Position</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Position">
+                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a position…"></div>
+                                                <div class="dd-scroll">
+                                                    <div class="dd-item active" role="option" data-value="Select Position"><span class="dd-nm">Select Position</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div class="col-lg-3 col-sm-6">
-                                        <select class="form-select que_type" name="que_type[]" data-id="${nos}" aria-label="Default select example">
+                                        <select class="form-select dd-native-select que_type" name="que_type[]" id="que_type_${nos}" data-id="${nos}" aria-label="Default select example">
                                             <option selected>Question Type</option>
                                             <option value="text">Text</option>
                                             <option value="multiple">Multiple choice questions</option>
                                         </select>
+                                        <div class="dd" data-target="#que_type_${nos}">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">Question Type</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Question Type">
+                                                <div class="dd-scroll">
+                                                    <div class="dd-item active" role="option" data-value="Question Type"><span class="dd-nm">Question Type</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    <div class="dd-item" role="option" data-value="text"><span class="dd-nm">Text</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    <div class="dd-item" role="option" data-value="multiple"><span class="dd-nm">Multiple choice questions</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div class="col-12 select_option select_text_${nos}" style="display:none">
                                         <input type="text"  name="AddQuestion[]" required class="form-control" placeholder="Add Question">
@@ -225,27 +325,9 @@
                                 </div>
                             </div>`);
 
-                    $("#ResortDivision_"+nos).select2({
-                    'placeholder':'Select ResortDivision',
-                    });
-                    $("#Department_"+nos).select2({
-                    'placeholder':'Select Department',
-                    });
-                    $("#Position_"+nos).select2({
-                    'placeholder':'Select Position',
-                    });
                     nos++
                     $("#increment").val(nos);
         });
-            $(".ResortDivision_1").select2({
-            'placeholder':'Select ResortDivision',
-            });
-            $("#Department_1").select2({
-            'placeholder':'Select Department',
-            });
-            $("#Position_1").select2({
-            'placeholder':'Select Position',
-            });
 
             $(document).on('change', '.ResortDivision', function() {
                 let l_id = $(this).attr('data-id');
@@ -262,6 +344,7 @@
 
                                 // Clear the dropdown and add a placeholder option
                                 $("#Department_"+l_id).html('<option value="">Select Department</option>');
+                                window.wisdomDD.rebuild('#Department_'+l_id);
                                 console.log(data,".Department_"+l_id);
                                 if(data.success == true) {
                                     let string='<option></option>';
@@ -272,6 +355,7 @@
                                     });
 
                                     $("#Department_"+l_id).html(string);
+                                    window.wisdomDD.rebuild('#Department_'+l_id);
 
                                 } else {
                                     let string='<option></option>';
@@ -291,6 +375,7 @@
 
                 let string='<option></option>';
                 $("#Position_"+l_id).html(string);
+                window.wisdomDD.rebuild('#Position_'+l_id);
                     $.ajax({
                         url: "{{ route('resort.get.position') }}",
                         type: "post",
@@ -308,6 +393,7 @@
                                     string+='<option value="'+value.id+'">'+value.position_title+'</option>';
                                 });
                                 $("#Position_"+l_id).html(string);
+                                window.wisdomDD.rebuild('#Position_'+l_id);
 
                             }
                         },
@@ -418,4 +504,5 @@
         });
 
     </script>
+    @include('resorts._dropdown_script')
 @endsection

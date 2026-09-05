@@ -561,11 +561,14 @@ surveyData.forEach(s => {
 });
 
 // Create datasets dynamically
+var _pSurvA1 = window.WaiChart ? window.WaiChart.palette().card : '#fff';
+// backgroundColor (surveyColors) is server-supplied per survey type — out
+// of scope; borderColor is the card-background gap between stacked bars.
 var datasets = Object.keys(groupedData).map(type => ({
     label: type, // Use the survey title
     data: groupedData[type],
     backgroundColor: surveyColors[type], // Use the assigned color
-    borderColor: '#fff',
+    borderColor: _pSurvA1,
     borderWidth: 2,
     borderRadius: 10,
 }));
@@ -605,6 +608,9 @@ var myStackedBarChart = new Chart(ctx, {
             }
         }
     }
+});
+if (window.WaiChart) window.WaiChart.registerForTheme(myStackedBarChart, function (c, p) {
+    c.data.datasets.forEach(function (ds) { ds.borderColor = p.card; });
 });
 
 
@@ -678,12 +684,15 @@ var myStackedBarChart = new Chart(ctx, {
         },
         plugins: [doughnutLabelsInsideN] // Attach custom plugin
     });
+    // backgroundColor (departmentColors) is server-supplied — out of scope.
+    if (window.WaiChart) window.WaiChart.registerForTheme(myDoughnutChart);
 
     var surveyLabels = {!! json_encode($SurveyWiseParticipationRates->pluck('title')) !!}; // Survey titles
     var completedData = {!! json_encode($SurveyWiseParticipationRates->pluck('completed_count')) !!}; // Completed count
 
 
     const ctp = document.getElementById('myAttendance').getContext('2d');
+    var _pSurvA2 = window.WaiChart ? window.WaiChart.palette().teal : '#014653';
     const myAttendance = new Chart(ctp, {
         type: 'bar',
         data: {
@@ -692,8 +701,8 @@ var myStackedBarChart = new Chart(ctx, {
                 {
                     label: surveyLabels,
                     data: completedData,
-                    backgroundColor: '#014653',
-                    borderColor: '#014653',
+                    backgroundColor: _pSurvA2,
+                    borderColor: _pSurvA2,
                     borderWidth: 1,
                     borderRadius: 6,
                     barThickness: 25
@@ -748,8 +757,11 @@ var myStackedBarChart = new Chart(ctx, {
             }
         }
     });
+    if (window.WaiChart) window.WaiChart.registerForTheme(myAttendance, function (c, p) {
+        c.data.datasets[0].backgroundColor = c.data.datasets[0].borderColor = p.teal;
+    });
 
-    
+
     var participationRate = {!! json_encode($ParticipationRate->pluck('participation_rate')) !!}; // Participation rate %
     document.addEventListener("DOMContentLoaded", function() {
         var progressContainer = document.querySelector(".progress-container");

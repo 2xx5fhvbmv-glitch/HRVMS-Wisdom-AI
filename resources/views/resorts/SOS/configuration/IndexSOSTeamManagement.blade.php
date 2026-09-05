@@ -8,10 +8,16 @@
 @endif
 
 @section('content')
+<style>
+    #sos-team-management-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #sos-team-management-hero { padding-bottom: 0; }
+    }
+</style>
 
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="sos-team-management-hero">
             <div class="row justify-content-between g-3">
                 <div class="col-auto">
                     <div class="page-title">
@@ -106,6 +112,8 @@
     </div>
 </div>
 @include('resorts._emotional_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -221,6 +229,12 @@
                             let selected = role.id == roleId ? 'selected' : '';
                             return `<option value="${role.id}" ${selected}>${role.name}</option>`;
                         }).join('');
+                        let tickSvg = '<svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg>';
+                        let roleItems = window.allRoles.map(role => {
+                            let active = role.id == roleId ? ' active' : '';
+                            return `<div class="dd-item${active}" role="option" data-value="${role.id}"><span class="dd-nm">${role.name}</span>${tickSvg}</div>`;
+                        }).join('');
+                        let selectedRole = window.allRoles.find(role => role.id == roleId);
 
                         const html = `
                         <div class="row g-3 TeamMember_${index}">
@@ -231,22 +245,32 @@
                                 </select>
                             </div>
                             <div class="col-md-5 team-member-group">
-                                <label for="member_role" class="form-label fw-bold">Role</label>
-                                <select class="form-select select2t-none" name="employee[${index}][member_role]">
+                                <label for="member_role_${index}" class="form-label fw-bold">Role</label>
+                                <select class="form-select dd-native-select" id="member_role_${index}" name="employee[${index}][member_role]">
                                     ${roleOptions}
                                 </select>
+                                <div class="dd" data-target="#member_role_${index}">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">${selectedRole ? selectedRole.name : 'Select Role'}</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Role">
+                                        <div class="dd-scroll">${roleItems}</div>
+                                    </div>
+                                </div>
                             </div>
                             <div class="col-md-2 team-member-group">
                                 <label for="member_role" class="form-label fw-bold d-md-block d-none">&nbsp;</label>
                                 <button type="button" class="btn eb-btn-critical btn-sm TeamMemberRemove mt-md-1" data-id="${index}">
-                                    <i class="fa fa-trash"></i> 
+                                    <i class="fa fa-trash"></i>
                                 </button>
                             </div>
                         </div>
                         `;
                         $('.AppendTeamMember').append(html);
-                        // Initialize select2 for both selects
-                        $('.AppendTeamMember .TeamMember_' + index + ' .select2t-none').select2({
+                        // Initialize select2 for the genuine multi-select only
+                        // (team member picker) — role is now the shared dropdown component.
+                        $('.AppendTeamMember .TeamMember_' + index + ' select[multiple]').select2({
                             width: '100%'
                         });
                         index++;
@@ -283,7 +307,7 @@
                     <!-- Role -->
                     <div class="col-md-6 team-member-group">
                         <label for="member_role" class="form-label fw-bold">Role</label>
-                        <select class="form-select select2t-none"
+                        <select class="form-select dd-native-select"
                             name="employee[${TeamMemberCount}][member_role]"
                             id="RoleMain_${TeamMemberCount}"
                             data-id="${TeamMemberCount}"
@@ -293,6 +317,18 @@
                             <option value=""></option>
                             ${window.allRoles.map(role => `<option value="${role.id}">${role.name}</option>`).join('')}
                         </select>
+                        <div class="dd" data-target="#RoleMain_${TeamMemberCount}">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">Select Role</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Role">
+                                <div class="dd-scroll">
+                                    <div class="dd-item" role="option" data-value=""><span class="dd-nm">Select Role</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    ${window.allRoles.map(role => `<div class="dd-item" role="option" data-value="${role.id}"><span class="dd-nm">${role.name}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>`).join('')}
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Remove Button -->
@@ -309,14 +345,10 @@
             $("#TeamMemberMain_"+TeamMemberCount).select2({
                 placeholder: "Select Employee",
                 allowClear: true,
-                width: '100%'        
+                width: '100%'
             });
-            $("#RoleMain_"+TeamMemberCount).select2({
-                placeholder: "Select Role",
-                allowClear: true,
-                width: '100%'        
-            });
-        }); 
+            wisdomDD.sync('#RoleMain_'+TeamMemberCount);
+        });
         $(document).on('click','.TeamMemberRemove',function()
         {
             var loction =$(this).data('id');

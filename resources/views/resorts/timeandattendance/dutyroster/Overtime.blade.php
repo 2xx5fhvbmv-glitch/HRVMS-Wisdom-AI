@@ -8,9 +8,15 @@
     @endif
 
     @section('content')
+    <style>
+        #overtime-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #overtime-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="overtime-hero">
                 <div class="row justify-content-between g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -28,7 +34,7 @@
                         <div class="row g-2 mb-3 align-items-end flex-nowrap overflow-auto">
                             <div class="col col-xl-2 col-lg-2 col-md-3 col-sm-4">
                                 <label for="select-emp" class="form-label">SELECT EMPLOYEE</label>
-                                <select class="form-select" name="Emp_id" id="Employee" >
+                                <select class="form-select dd-native-select" name="Emp_id" id="Employee" >
                                     <option></option>
                                     @if($employees->isNotEmpty())
                                         @foreach ($employees as $e)
@@ -36,17 +42,37 @@
                                         @endforeach
                                     @endif
                                 </select>
+                                <div class="dd" data-target="#Employee">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">Select an Employee</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Employee">
+                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an employee…"></div>
+                                        <div class="dd-scroll">
+                                            <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select an Employee</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @if($employees->isNotEmpty())
+                                                @foreach ($employees as $e)
+                                                <div class="dd-item" role="option" data-value="{{ $e->id }}"><span class="dd-nm">{{ ucfirst($e->first_name . ' ' . $e->last_name) }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @endforeach
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             <div class="col col-xl-2 col-lg-2 col-md-2 col-sm-3">
                                 <label for="month" class="form-label">SELECT MONTH</label>
-                                <select class="form-select month" name="month" id="month">
-                                    <option value="">Select Month</option>
-                                    @foreach ([
+                                @php
+                                    $monthsList = [
                                         1 => 'January', 2 => 'February', 3 => 'March',
                                         4 => 'April', 5 => 'May', 6 => 'June',
                                         7 => 'July', 8 => 'August', 9 => 'September',
                                         10 => 'October', 11 => 'November', 12 => 'December'
-                                    ] as $key => $monthName)
+                                    ];
+                                @endphp
+                                <select class="form-select month dd-native-select" name="month" id="month">
+                                    <option value="">Select Month</option>
+                                    @foreach ($monthsList as $key => $monthName)
                                         {{-- Was never pre-selected from the current request at
                                              all — navigating directly to a pagination link (which
                                              now correctly carries month/year/overtime_type, see
@@ -57,22 +83,63 @@
                                         <option value="{{ $key }}" @if((int) request('month') === $key) selected @endif>{{ $monthName }}</option>
                                     @endforeach
                                 </select>
+                                <div class="dd" data-target="#month">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">{{ $monthsList[(int) request('month')] ?? 'Select Month' }}</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Month">
+                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a month…"></div>
+                                        <div class="dd-scroll">
+                                            <div class="dd-item{{ !request('month') ? ' active' : '' }}" role="option" data-value=""><span class="dd-nm">Select Month</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @foreach ($monthsList as $key => $monthName)
+                                            <div class="dd-item{{ (int) request('month') === $key ? ' active' : '' }}" role="option" data-value="{{ $key }}"><span class="dd-nm">{{ $monthName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             <div class="col col-xl-2 col-lg-2 col-md-2 col-sm-3">
                                 <label for="year" class="form-label">SELECT YEAR</label>
-                                <select class="form-select year" name="year" id="year">
+                                <select class="form-select year dd-native-select" name="year" id="year">
                                     <option value="">Select Year</option>
                                     @for ($y = now()->year; $y >= now()->year - 5; $y--)
                                         <option value="{{ $y }}" @if((int) request('year') === $y) selected @endif>{{ $y }}</option>
                                     @endfor
                                 </select>
+                                <div class="dd" data-target="#year">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">Select Year</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Year">
+                                        <div class="dd-scroll">
+                                            <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Year</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @for ($y = now()->year; $y >= now()->year - 5; $y--)
+                                            <div class="dd-item" role="option" data-value="{{ $y }}"><span class="dd-nm">{{ $y }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @endfor
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             <div class="col col-xl-2 col-lg-2 col-md-2 col-sm-3">
                                 <label for="overtime_type" class="form-label">OVERTIME TYPE</label>
-                                <select class="form-select overtime_type" name="overtime_type" id="overtime_type">
+                                <select class="form-select overtime_type dd-native-select" name="overtime_type" id="overtime_type">
                                     <option value="actual" @if(request('overtime_type', 'actual') === 'actual') selected @endif>Actual Overtime</option>
                                     <option value="preplanned" @if(request('overtime_type') === 'preplanned') selected @endif>Pre-Planned Overtime</option>
                                 </select>
+                                <div class="dd" data-target="#overtime_type">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">{{ request('overtime_type') === 'preplanned' ? 'Pre-Planned Overtime' : 'Actual Overtime' }}</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Overtime type">
+                                        <div class="dd-scroll">
+                                            <div class="dd-item{{ request('overtime_type') !== 'preplanned' ? ' active' : '' }}" role="option" data-value="actual"><span class="dd-nm">Actual Overtime</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            <div class="dd-item{{ request('overtime_type') === 'preplanned' ? ' active' : '' }}" role="option" data-value="preplanned"><span class="dd-nm">Pre-Planned Overtime</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             <!-- <div class="col col-xl-2 col-lg-2 col-md-2 col-sm-3">
                                 <label for="overtime" class="form-label">ADD HOURS</label>
@@ -181,6 +248,7 @@
 @endsection
 @section('import-css')
 @include('resorts.timeandattendance._taa_buttons_v2_styles')
+@include('resorts._dropdown_styles')
 <style>
     .overtime-cell {
         text-align: center;
@@ -348,10 +416,6 @@
     <script type="text/javascript">
 
         $(document).ready(function() {
-            $('#Employee').select2({
-                placeholder: "Select an Employee", // Placeholder text
-                allowClear: true // Adds a clear (X) button to reset the dropdown
-            });
             $('#Shift').select2({
                 placeholder: "Select a Shift", // Placeholder text
                 allowClear: true // Adds a clear (X) button to reset the dropdown
@@ -822,11 +886,13 @@
         }
 
         // Add overtime entry row
+        var overtimeEntryUidCounter = 0; // always-incrementing, never reused — safe as a .dd data-target id even after rows are removed/re-added out of order
         function addOvertimeEntry(entry = null, entryNumber = null) {
             // Get current entry count if not provided
             if (entryNumber === null) {
                 entryNumber = $('#overtimeEntriesContainer .overtime-entry-row').length + 1;
             }
+            var statusUid = 'overtimeStatus_' + (++overtimeEntryUidCounter);
 
             let entryHtml = '<div class="overtime-entry-row mb-3 p-3 border rounded">';
             if (entry && entry.id) {
@@ -847,20 +913,42 @@
             entryHtml += '</div>';
             entryHtml += '<div class="col-md-4">';
             entryHtml += '<label class="form-label">Status</label>';
+            var statusLabels = { pending: 'Pending', approved: 'Approved', rejected: 'Rejected' };
             if (entry) {
                 // Reviewing/editing an entry that already exists — full control.
-                entryHtml += '<select class="form-select overtime-status">';
+                var statusVal = entry.status || 'pending';
+                entryHtml += '<select class="form-select overtime-status dd-native-select" id="' + statusUid + '">';
                 entryHtml += '<option value="pending"' + (entry.status === 'pending' ? ' selected' : '') + '>Pending</option>';
                 entryHtml += '<option value="approved"' + (entry.status === 'approved' ? ' selected' : '') + '>Approved</option>';
                 entryHtml += '<option value="rejected"' + (entry.status === 'rejected' ? ' selected' : '') + '>Rejected</option>';
                 entryHtml += '</select>';
+                entryHtml += '<div class="dd" data-target="#' + statusUid + '">';
+                entryHtml += '<button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">';
+                entryHtml += '<span class="dd-lbl">' + statusLabels[statusVal] + '</span>';
+                entryHtml += '<svg class="dd-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>';
+                entryHtml += '</button>';
+                entryHtml += '<div class="dd-panel" role="listbox" aria-label="Overtime status"><div class="dd-scroll">';
+                ['pending', 'approved', 'rejected'].forEach(function (val) {
+                    entryHtml += '<div class="dd-item' + (val === statusVal ? ' active' : '') + '" role="option" data-value="' + val + '"><span class="dd-nm">' + statusLabels[val] + '</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>';
+                });
+                entryHtml += '</div></div>';
+                entryHtml += '</div>';
             } else {
                 // Brand-new pre-planned OT can't be Approved before the
                 // work happens — the backend forces this to Pending
                 // regardless, so don't offer a choice that won't stick.
-                entryHtml += '<select class="form-select overtime-status" disabled>';
+                entryHtml += '<select class="form-select overtime-status dd-native-select" id="' + statusUid + '" disabled>';
                 entryHtml += '<option value="pending" selected>Pending</option>';
                 entryHtml += '</select>';
+                entryHtml += '<div class="dd" data-target="#' + statusUid + '">';
+                entryHtml += '<button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false" disabled>';
+                entryHtml += '<span class="dd-lbl">Pending</span>';
+                entryHtml += '<svg class="dd-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>';
+                entryHtml += '</button>';
+                entryHtml += '<div class="dd-panel" role="listbox" aria-label="Overtime status"><div class="dd-scroll">';
+                entryHtml += '<div class="dd-item active" role="option" data-value="pending"><span class="dd-nm">Pending</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>';
+                entryHtml += '</div></div>';
+                entryHtml += '</div>';
             }
             entryHtml += '</div>';
             entryHtml += '</div>';
@@ -994,5 +1082,6 @@
             initOvertimeClickHandlers();
         });
     </script>
+@include('resorts._dropdown_script')
 @endsection
 

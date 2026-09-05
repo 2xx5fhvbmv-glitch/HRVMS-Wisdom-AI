@@ -60,7 +60,7 @@
                                                             if (!$p['is_paid']) $latestUnpaidIndex = $idx;
                                                         }
                                                     @endphp
-                                                    <select id="payrollPeriodSelect" class="form-select">
+                                                    <select id="payrollPeriodSelect" class="form-select dd-native-select">
                                                         @foreach($availablePeriods as $index => $period)
                                                             <option value="{{ $period['start_date'] }}|{{ $period['end_date'] }}"
                                                                 {{ $period['is_paid'] ? 'disabled' : '' }}
@@ -71,6 +71,28 @@
                                                             </option>
                                                         @endforeach
                                                     </select>
+                                                    @php
+                                                        $selectedPeriodIdx = ($latestUnpaidIndex !== null) ? $latestUnpaidIndex : null;
+                                                        $selectedPeriodLabel = null;
+                                                        foreach ($availablePeriods as $idx => $p) {
+                                                            if ($idx === $selectedPeriodIdx && !$p['is_pending_approval']) {
+                                                                $selectedPeriodLabel = $p['label'] . ' ' . $p['status_label'];
+                                                            }
+                                                        }
+                                                    @endphp
+                                                    <div class="dd" data-target="#payrollPeriodSelect">
+                                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                            <span class="dd-lbl">{{ $selectedPeriodLabel ?? 'Select Payroll Period' }}</span>
+                                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                        </button>
+                                                        <div class="dd-panel" role="listbox" aria-label="Payroll period">
+                                                            <div class="dd-scroll">
+                                                                @foreach($availablePeriods as $index => $period)
+                                                                <div class="dd-item{{ ($index === $latestUnpaidIndex && !$period['is_pending_approval']) ? ' active' : '' }}" role="option" data-value="{{ $period['start_date'] }}|{{ $period['end_date'] }}"{{ $period['is_paid'] ? ' aria-disabled="true"' : '' }}><span class="dd-nm">{{ $period['label'] }} {{ $period['status_label'] }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                @endforeach
+                                                            </div>
+                                                        </div>
+                                                    </div>
                                                 </div>
 
                                                 @if(isset($pendingApprovalPayrolls) && $pendingApprovalPayrolls->isNotEmpty())
@@ -125,29 +147,73 @@
                                             </div>
                                         </div>
                                         <div class="col-auto">
-                                            <select id="departmentFilter" class="form-select select2t-none">
+                                            <select id="departmentFilter" class="form-select dd-native-select">
                                                 <option value="">All Departments</option>
                                                 @foreach($departments as $department)
                                                     <option value="{{ $department->id }}">{{ $department->name }}</option>
                                                 @endforeach
                                             </select>
+                                            <div class="dd" data-target="#departmentFilter">
+                                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                    <span class="dd-lbl">All Departments</span>
+                                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                </button>
+                                                <div class="dd-panel" role="listbox" aria-label="Department">
+                                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a department…"></div>
+                                                    <div class="dd-scroll">
+                                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">All Departments</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @foreach($departments as $department)
+                                                        <div class="dd-item" role="option" data-value="{{ $department->id }}"><span class="dd-nm">{{ $department->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @endforeach
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                         <div class="col-auto">
-                                            <select id="sectionFilter" class="form-select select2t-none">
+                                            <select id="sectionFilter" class="form-select dd-native-select">
                                                 <option value="">All Sections</option>
                                                 @foreach($sections as $section)
                                                     <option value="{{ $section->id }}">{{ $section->name }}</option>
                                                 @endforeach
                                             </select>
+                                            <div class="dd" data-target="#sectionFilter">
+                                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                    <span class="dd-lbl">All Sections</span>
+                                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                </button>
+                                                <div class="dd-panel" role="listbox" aria-label="Section">
+                                                    <div class="dd-scroll">
+                                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">All Sections</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @foreach($sections as $section)
+                                                        <div class="dd-item" role="option" data-value="{{ $section->id }}"><span class="dd-nm">{{ $section->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @endforeach
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                         <div class="col-auto">
-                                            <select  id="positionFilter" class="form-select select2t-none">
+                                            <select  id="positionFilter" class="form-select dd-native-select">
                                                 <option value="">All Positions</option>
                                                 <!-- Example: populate dynamically or statically -->
                                                 @foreach($positions as $position)
                                                     <option value="{{ $position->id }}">{{ $position->position_title }}</option>
                                                 @endforeach
                                             </select>
+                                            <div class="dd" data-target="#positionFilter">
+                                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                    <span class="dd-lbl">All Positions</span>
+                                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                </button>
+                                                <div class="dd-panel" role="listbox" aria-label="Position">
+                                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a position…"></div>
+                                                    <div class="dd-scroll">
+                                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">All Positions</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @foreach($positions as $position)
+                                                        <div class="dd-item" role="option" data-value="{{ $position->id }}"><span class="dd-nm">{{ $position->position_title }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @endforeach
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -576,23 +642,53 @@
                         <!-- Select Employee (Auto-filled from data-emp-id) -->
                         <div class="mb-3">
                             <label for="select_emp" class="form-label">SELECT EMPLOYEE</label>
-                            <select class="form-select select2t-none" id="select_emp" aria-label="Default select example">
+                            <select class="form-select dd-native-select" id="select_emp" aria-label="Default select example">
                                 <option selected>Select</option>
                                 @foreach($employees as $employee)
                                     <option value="{{ $employee->Emp_id }}">{{ $employee->resortAdmin->first_name}} {{ $employee->resortAdmin->last_name}}</option>
                                 @endforeach
                             </select>
+                            <div class="dd" data-target="#select_emp">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Select</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Employee">
+                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an employee…"></div>
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value="Select"><span class="dd-nm">Select</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @foreach($employees as $employee)
+                                        <div class="dd-item" role="option" data-value="{{ $employee->Emp_id }}"><span class="dd-nm">{{ $employee->resortAdmin->first_name }} {{ $employee->resortAdmin->last_name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Deduction Type -->
                         <div class="mb-3">
                             <label for="deductionFor" class="form-label">DEDUCTION FOR?</label>
-                            <select class="form-select select2t-none" id="deductionFor" name="deductionFor">
+                            <select class="form-select dd-native-select" id="deductionFor" name="deductionFor">
                                 <option value="">Select Deduction For</option>
                                 @foreach($deductions as $deduction)
                                     <option value="{{ $deduction->id }}" data-unit="{{ $deduction->currency }}">{{ $deduction->deduction_name }}</option>
                                 @endforeach
                             </select>
+                            <div class="dd" data-target="#deductionFor">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Select Deduction For</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Deduction">
+                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a deduction…"></div>
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Deduction For</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @foreach($deductions as $deduction)
+                                        <div class="dd-item" role="option" data-value="{{ $deduction->id }}"><span class="dd-nm">{{ $deduction->deduction_name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <!-- Amount & Deduction Unit (Auto-filled) -->
@@ -649,6 +745,7 @@
 
 @section('import-css')
 @include('resorts.payroll._payroll_buttons_v2_styles')
+@include('resorts._dropdown_styles')
 <style>
     .leave-tooltip{position:fixed;background:#2C2C2C;color:#fff;padding:12px 16px;border-radius:10px;font-size:13px;z-index:9999;min-width:180px;max-width:280px;box-shadow:0 4px 20px rgba(0,0,0,.3);display:none;pointer-events:none}
     .leave-tooltip.show{display:block!important}
@@ -851,9 +948,6 @@
             initDateRangePicker(newStart, newEnd);
             // dates stored in hidden input; no visible output needed
         });
-
-        // dates are tracked via hiddenInput value only
-        $(".select2t-none").select2();
 
         // ── Restore step on page refresh ──
         var savedStep = parseInt(localStorage.getItem("currentStep")) || 0;
@@ -1909,6 +2003,8 @@
         $('#addDeduction-modal').on('hidden.bs.modal', function () {
             $(this).removeAttr('aria-hidden'); // Ensure the modal isn't hidden from screen readers
             $('#addDeductionForm')[0].reset(); // Reset form fields properly
+            window.wisdomDD.sync('#select_emp');
+            window.wisdomDD.sync('#deductionFor');
             $('.add-deduction-btn:first').focus(); // Move focus to a valid element
         });
 
@@ -4012,6 +4108,7 @@
     {
         let empId = $(this).data('emp-id'); // Get employee ID from button
         $('#select_emp').val(empId).trigger('change.select2'); // Set employee in select
+        window.wisdomDD.sync('#select_emp');
         $("#addDeduction-modal").modal("show");
     });
 
@@ -4060,4 +4157,5 @@
     }, '.leave-type-badge');
 
 </script>
+@include('resorts._dropdown_script')
 @endsection

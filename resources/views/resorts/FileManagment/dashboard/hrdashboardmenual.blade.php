@@ -445,13 +445,29 @@
                 <div class="modal-body">
                     <div class="row">
                         <div class="col-lg-12">
-                            <select class="form-select select2t-none" name="FolderName" id="FolderName" required data-parsley-required-message="Please select a folder.">
+                            <select class="form-select dd-native-select" name="FolderName" id="FolderName" required data-parsley-required-message="Please select a folder.">
                                 @if($FolderList->isNotEmpty())
                                     @foreach ($FolderList as $f)
                                         <option value="{{ base64_encode($f->id) }}">{{$f->Folder_Name}}</option>
                                     @endforeach
                                 @endif
                             </select>
+                            <div class="dd" data-target="#FolderName">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">{{ $FolderList->isNotEmpty() ? $FolderList->first()->Folder_Name : 'Select Folder' }}</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Folder">
+                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a folder…"></div>
+                                    <div class="dd-scroll">
+                                        @if($FolderList->isNotEmpty())
+                                            @foreach ($FolderList as $f)
+                                                <div class="dd-item{{ $loop->first ? ' active' : '' }}" role="option" data-value="{{ base64_encode($f->id) }}"><span class="dd-nm">{{ $f->Folder_Name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @endforeach
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="col-lg-12 mt-3">
                             <div class="bg-themeGrayLight mb-md-4 mb-3">
@@ -528,6 +544,8 @@
         </div>
     </div>
 @include('resorts._emotional_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -742,10 +760,6 @@ document.getElementById('file').addEventListener('change', function (e) {
     });
 });
     $(document).ready(function () {
-        $("#FolderName").select2({
-            placeholder: "Select Folder",
-            allowClear: true
-        });
         AuditLogsList();
         UncategorizeDoc();
         FileVersionDashboardList();

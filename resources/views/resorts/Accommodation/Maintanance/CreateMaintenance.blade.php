@@ -9,9 +9,15 @@
 @endif
 
 @section('content')
+<style>
+    #maintenance-request-create-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #maintenance-request-create-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="maintenance-request-create-hero">
             <div class="row justify-content-between g-3">
                 <div class="col-auto">
                     <div class="page-title">
@@ -30,7 +36,7 @@
             <div class="row gx-4 g-3 mb-3">
                 <div class="col-lg-6">
                     <label for="raised_by" class="form-label">RAISED BY (EMPLOYEE)<span class="red-mark">*</span></label>
-                    <select class="form-select select2t-none" name="raised_by" id="raised_by"
+                    <select class="form-select dd-native-select" name="raised_by" id="raised_by"
                         required
                         data-parsley-trigger="submit"
                         data-parsley-required-message="Please select an employee."
@@ -41,6 +47,7 @@
                                 ->where('resort_id', Auth::guard('resort-admin')->user()->resort_id)
                                 ->where('status', 'Active')
                                 ->get();
+                            $selectedEmp = $employees->first(fn($emp) => $emp->Admin_Parent_id == Auth::guard('resort-admin')->user()->id);
                         @endphp
                         @foreach($employees as $emp)
                             <option value="{{ $emp->id }}"
@@ -49,12 +56,27 @@
                             </option>
                         @endforeach
                     </select>
+                    <div class="dd" data-target="#raised_by">
+                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                            <span class="dd-lbl">{{ $selectedEmp ? $selectedEmp->resortAdmin->first_name.' '.$selectedEmp->resortAdmin->last_name.' ('.$selectedEmp->Emp_id.')' : 'Select Employee' }}</span>
+                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                        </button>
+                        <div class="dd-panel" role="listbox" aria-label="Employee">
+                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an employee…"></div>
+                            <div class="dd-scroll">
+                                <div class="dd-item{{ $selectedEmp ? '' : ' active' }}" role="option" data-value=""><span class="dd-nm">Select Employee</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                @foreach($employees as $emp)
+                                <div class="dd-item{{ ($selectedEmp && $selectedEmp->id === $emp->id) ? ' active' : '' }}" role="option" data-value="{{ $emp->id }}"><span class="dd-nm">{{ $emp->resortAdmin->first_name }} {{ $emp->resortAdmin->last_name }} ({{ $emp->Emp_id }})</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                @endforeach
+                            </div>
+                        </div>
+                    </div>
                     <div id="raised_by_error"></div>
                 </div>
 
                 <div class="col-lg-6">
                     <label for="amenity" class="form-label">AFFECTED AMENITY <small class="text-muted">(Optional)</small></label>
-                    <select class="form-select select2t-none" name="item_id" id="amenity"
+                    <select class="form-select dd-native-select" name="item_id" id="amenity"
                         data-parsley-errors-container="#affected_amenity">
                         <option></option>
                         @if($InventoryItems->isNotEmpty())
@@ -63,6 +85,23 @@
                             @endforeach
                         @endif
                     </select>
+                    <div class="dd" data-target="#amenity">
+                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                            <span class="dd-lbl">Select Amenity</span>
+                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                        </button>
+                        <div class="dd-panel" role="listbox" aria-label="Amenity">
+                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an amenity…"></div>
+                            <div class="dd-scroll">
+                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Amenity</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                @if($InventoryItems->isNotEmpty())
+                                    @foreach ($InventoryItems as $i)
+                                    <div class="dd-item" role="option" data-value="{{ $i->id }}"><span class="dd-nm">{{ $i->ItemName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    @endforeach
+                                @endif
+                            </div>
+                        </div>
+                    </div>
                     <div id="affected_amenity"></div>
                 </div>
 
@@ -100,7 +139,7 @@
 
                 <div class="col-md-6">
                     <label for="building" class="form-label">BUILDING<span class="red-mark">*</span></label>
-                    <select class="form-select select2t-none buildingAvailable" name="building_id" id="building_1"
+                    <select class="form-select dd-native-select buildingAvailable" name="building_id" id="building_1"
                         required
                            data-parsley-trigger="submit"
                         data-parsley-required-message="Please select building."
@@ -112,28 +151,65 @@
                             @endforeach
                         @endif
                     </select>
+                    <div class="dd" data-target="#building_1">
+                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                            <span class="dd-lbl">Select Building</span>
+                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                        </button>
+                        <div class="dd-panel" role="listbox" aria-label="Building">
+                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a building…"></div>
+                            <div class="dd-scroll">
+                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Building</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                @if($Building->isNotEmpty())
+                                    @foreach ($Building as $b)
+                                    <div class="dd-item" role="option" data-value="{{ $b->id }}"><span class="dd-nm">{{ $b->BuildingName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    @endforeach
+                                @endif
+                            </div>
+                        </div>
+                    </div>
                     <div id="Building"></div>
                 </div>
 
                 <div class="col-sm-6">
                     <label for="floor" class="form-label">FLOOR <span class="red-mark">*</span></label>
-                    <select class="form-select select2t-none AvailableFloor" id="AvailableFloor_1" data-id="1"
+                    <select class="form-select dd-native-select AvailableFloor" id="AvailableFloor_1" data-id="1"
                         name="FloorNo" required
                         data-parsley-trigger="submit"
                         data-parsley-required-message="Please select floor."
                         data-parsley-errors-container="#AvailableFloor">
                     </select>
+                    <div class="dd" data-target="#AvailableFloor_1">
+                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                            <span class="dd-lbl">Select Floor</span>
+                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                        </button>
+                        <div class="dd-panel" role="listbox" aria-label="Floor">
+                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a floor…"></div>
+                            <div class="dd-scroll"></div>
+                        </div>
+                    </div>
                     <div id="AvailableFloor"></div>
                 </div>
 
                 <div class="col-sm-6">
                     <label for="roomNo" class="form-label">ROOM NO.<span class="red-mark">*</span></label>
-                    <select class="form-select select2t-none RoomNo" data-id="1" id="RoomNo_1"
+                    <select class="form-select dd-native-select RoomNo" data-id="1" id="RoomNo_1"
                         name="RoomNo" required
                         data-parsley-trigger="submit"
                         data-parsley-required-message="Please select room."
                         data-parsley-errors-container="#RoomNo">
                     </select>
+                    <div class="dd" data-target="#RoomNo_1">
+                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                            <span class="dd-lbl">Select Room</span>
+                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                        </button>
+                        <div class="dd-panel" role="listbox" aria-label="Room">
+                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a room…"></div>
+                            <div class="dd-scroll"></div>
+                        </div>
+                    </div>
                     <div id="RoomNo"></div>
                 </div>
 
@@ -147,7 +223,7 @@
 
                 <div class="col-md-6">
                     <label for="priority" class="form-label">PRIORITY<span class="red-mark">*</span></label>
-                    <select class="form-select select2t-none" id="priority" name="priority"
+                    <select class="form-select dd-native-select" id="priority" name="priority"
                         required
                         data-parsley-required-message="Please select priority."
                         data-parsley-errors-container="#priority_error">
@@ -156,6 +232,20 @@
                         <option value="Low">Low</option>
                         <option value="Medium">Medium</option>
                     </select>
+                    <div class="dd" data-target="#priority">
+                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                            <span class="dd-lbl">Select Priority</span>
+                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                        </button>
+                        <div class="dd-panel" role="listbox" aria-label="Priority">
+                            <div class="dd-scroll">
+                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Priority</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                <div class="dd-item" role="option" data-value="High"><span class="dd-nm">High</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                <div class="dd-item" role="option" data-value="Low"><span class="dd-nm">Low</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                <div class="dd-item" role="option" data-value="Medium"><span class="dd-nm">Medium</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                            </div>
+                        </div>
+                    </div>
                     <div id="priority_error"></div>
                 </div>
             </div>
@@ -176,6 +266,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts._dropdown_styles')
 @endsection
 
 @section('import-scripts')
@@ -192,35 +283,7 @@ $(document).ready(function() {
                 const fileName = this.files[0]?.name || '';
                 $('#video_filename').text(fileName);
             });
-    $("#raised_by").select2({
-        placeholder: "Select Employee",
-        allowClear: true
-    });
-    $("#amenity").select2({
-        placeholder: "Select Amenity",
-        allowClear: true
-    });
-    $("#building").select2({
-        placeholder: "Select Building",
-        allowClear: true
-    });
-
-
-    $("#priority").select2({
-       placeholder:'Select Priority',
-    });
-    $(".buildingAvailable").select2({
-       placeholder:'Select Building',
-    });
-    $(".AvailableFloor").select2({
-       placeholder:'Select Floor',
-    });
-    $(".RoomNo").select2({
-       placeholder:'Select RoomNo',
-    });
-
-    
-    $('.select2t-none').on('change', function () {
+    $('.dd-native-select').on('change', function () {
         $(this).parsley().validate();
     });
 
@@ -230,8 +293,13 @@ $(document).ready(function() {
         if (!empId) {
             // Reset fields to editable
             $('#building_1').prop('disabled', false).val('').trigger('change');
-            $('#AvailableFloor_1').prop('disabled', false).html('<option></option>');
-            $('#RoomNo_1').prop('disabled', false).html('<option></option>');
+            $('#building_1').siblings('.dd').find('.dd-trigger').prop('disabled', false);
+            $('#AvailableFloor_1').prop('disabled', false).html('<option value="">Select Floor</option>');
+            $('#AvailableFloor_1').siblings('.dd').find('.dd-trigger').prop('disabled', false);
+            window.wisdomDD.rebuild('#AvailableFloor_1');
+            $('#RoomNo_1').prop('disabled', false).html('<option value="">Select Room</option>');
+            $('#RoomNo_1').siblings('.dd').find('.dd-trigger').prop('disabled', false);
+            window.wisdomDD.rebuild('#RoomNo_1');
             $('.auto-filled-badge').remove();
             return;
         }
@@ -248,17 +316,20 @@ $(document).ready(function() {
 
                     // Set building without triggering the AJAX floor fetch
                     $('#building_1').val(autoBuildingId);
-                    if ($('#building_1').data('select2')) {
-                        $('#building_1').trigger('change.select2');
-                    }
+                    window.wisdomDD.sync('#building_1');
                     $('#building_1').prop('disabled', true);
+                    $('#building_1').siblings('.dd').find('.dd-trigger').prop('disabled', true);
 
                     // Set floor and room directly
                     $('#AvailableFloor_1').html('<option value="' + autoFloor + '" selected>' + autoFloor + '</option>');
+                    window.wisdomDD.rebuild('#AvailableFloor_1');
                     $('#AvailableFloor_1').prop('disabled', true);
+                    $('#AvailableFloor_1').siblings('.dd').find('.dd-trigger').prop('disabled', true);
 
                     $('#RoomNo_1').html('<option value="' + autoRoom + '" selected>' + autoRoom + '</option>');
+                    window.wisdomDD.rebuild('#RoomNo_1');
                     $('#RoomNo_1').prop('disabled', true);
+                    $('#RoomNo_1').siblings('.dd').find('.dd-trigger').prop('disabled', true);
 
                     // Add hidden inputs so disabled fields still submit
                     $('.auto-filled-hidden').remove();
@@ -274,8 +345,13 @@ $(document).ready(function() {
                 } else {
                     // No accommodation - reset to editable
                     $('#building_1').prop('disabled', false).val('').trigger('change');
-                    $('#AvailableFloor_1').prop('disabled', false).html('<option></option>');
-                    $('#RoomNo_1').prop('disabled', false).html('<option></option>');
+                    $('#building_1').siblings('.dd').find('.dd-trigger').prop('disabled', false);
+                    $('#AvailableFloor_1').prop('disabled', false).html('<option value="">Select Floor</option>');
+                    $('#AvailableFloor_1').siblings('.dd').find('.dd-trigger').prop('disabled', false);
+                    window.wisdomDD.rebuild('#AvailableFloor_1');
+                    $('#RoomNo_1').prop('disabled', false).html('<option value="">Select Room</option>');
+                    $('#RoomNo_1').siblings('.dd').find('.dd-trigger').prop('disabled', false);
+                    window.wisdomDD.rebuild('#RoomNo_1');
                     $('.auto-filled-badge').remove();
                     $('.auto-filled-hidden').remove();
                 }
@@ -342,15 +418,13 @@ $(document).ready(function() {
                 success: function(response) {
                     if (response.success)
                     {
-                        var floor='<option></option>';
+                        var floor='<option value="">Select Floor</option>';
                         $.each(response.data, function(i, v) {
                             console.log('Creating option:', v);
                             floor += `<option value="${v}">${v}</option>`;
                         });
-                        $("#AvailableFloor_1").html(floor).select2({
-                                                                        placeholder: 'Select Floor',
-                                                                        allowClear: true,
-                                                                    });
+                        $("#AvailableFloor_1").html(floor);
+                        window.wisdomDD.rebuild('#AvailableFloor_1');
 
                     } else {
                         toastr.error(response.message, "Error", {
@@ -381,15 +455,13 @@ $(document).ready(function() {
                 success: function(response) {
                     if (response.success)
                     {
-                        var floor='<option></option>';
+                        var floor='<option value="">Select Room</option>';
                         $.each(response.data, function(i, v) {
                             console.log('Creating option:', v);
                             floor += `<option value="${v}">${v}</option>`;
                         });
-                        $("#RoomNo_1").html(floor) .select2({
-                                                              placeholder: 'Select Room',
-                                                              allowClear: true,
-                                                            });
+                        $("#RoomNo_1").html(floor);
+                        window.wisdomDD.rebuild('#RoomNo_1');
                     }
                     else
                     {
@@ -447,4 +519,5 @@ $(document).ready(function() {
         });
     }
 </script>
+@include('resorts._dropdown_script')
 @endsection

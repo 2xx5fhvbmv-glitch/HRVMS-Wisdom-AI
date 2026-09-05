@@ -77,6 +77,8 @@
     </div>
 </div>
 @include('resorts.Performance._performance_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -87,7 +89,7 @@
     .form-render-field .rating-stars span { font-size: 28px; cursor: pointer; color: #ccc; }
     .form-render-field .rating-stars span.active { color: #EFB408; }
     .form-render-field .table-field table { width: 100%; }
-    .form-render-field .table-field th { background: #014653; color: #fff; padding: 8px 12px; }
+    .form-render-field .table-field th { background: var(--teal); color: #fff; padding: 8px 12px; }
     .form-render-field .table-field td { padding: 8px 12px; border: 1px solid #dee2e6; }
     .form-render-section { margin: 20px 0 12px; padding: 8px 0; border-bottom: 1px solid #e9ecef; }
     .form-render-section h2, .form-render-section h3, .form-render-section h4 { margin: 0; }
@@ -192,12 +194,29 @@
                     html += '<input type="date" name="' + fieldName + '" value="' + value + '" ' + disabled + '>'; break;
                 case 'select':
                 case 'radio-group':
-                    html += '<select name="' + fieldName + '" ' + disabled + '><option value="">Select</option>';
+                    var tickSvg = '<svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg>';
+                    var selectId = 'dd-field-' + fieldName;
+                    var selectedLabel = 'Select';
+                    var ddItems = '<div class="dd-item' + (value === '' ? ' active' : '') + '" role="option" data-value=""><span class="dd-nm">Select</span>' + tickSvg + '</div>';
+                    if (field.values) field.values.forEach(function(opt) {
+                        var isSel = (value == opt.value);
+                        if (isSel) selectedLabel = opt.label;
+                        ddItems += '<div class="dd-item' + (isSel ? ' active' : '') + '" role="option" data-value="' + opt.value + '"><span class="dd-nm">' + opt.label + '</span>' + tickSvg + '</div>';
+                    });
+                    html += '<select class="dd-native-select" name="' + fieldName + '" id="' + selectId + '" ' + disabled + '><option value="">Select</option>';
                     if (field.values) field.values.forEach(function(opt) {
                         var sel = (value == opt.value) ? 'selected' : '';
                         html += '<option value="' + opt.value + '" ' + sel + '>' + opt.label + '</option>';
                     });
-                    html += '</select>'; break;
+                    html += '</select>';
+                    html += '<div class="dd" data-target="#' + selectId + '">';
+                    html += '<button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false"' + (disabled ? ' disabled' : '') + '>';
+                    html += '<span class="dd-lbl">' + selectedLabel + '</span>';
+                    html += '<svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>';
+                    html += '</button>';
+                    html += '<div class="dd-panel" role="listbox" aria-label="' + label + '"><div class="dd-scroll">' + ddItems + '</div></div>';
+                    html += '</div>';
+                    break;
                 case 'checkbox-group':
                     if (field.values) field.values.forEach(function(opt) {
                         var checked = (Array.isArray(value) && value.includes(opt.value)) ? 'checked' : '';

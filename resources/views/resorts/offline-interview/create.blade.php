@@ -19,9 +19,15 @@
     $departmentLabel = $oi ? optional($oi->department)->name : null;
 @endphp
 
+<style>
+    #offline-interview-create-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #offline-interview-create-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding page-appHedding">
+        <div class="page-hedding page-appHedding" id="offline-interview-create-hero">
             <div class="row justify-content-between g-md-2 g-1">
                 <div class="col-auto">
                     <div class="page-title">

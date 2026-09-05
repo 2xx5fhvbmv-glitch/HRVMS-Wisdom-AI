@@ -8,10 +8,16 @@
 @endif
 
 @section('content')
+<style>
+    #grievance-subcategory-index-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #grievance-subcategory-index-hero { padding-bottom: 0; }
+    }
+</style>
 
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="grievance-subcategory-index-hero">
             <div class="row justify-content-between g-3">
                 <div class="col-auto">
                     <div class="page-title">
@@ -56,6 +62,8 @@
     </div>
 </div>
 @include('resorts._emotional_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -139,17 +147,34 @@
              var DiscriplineryName = $row.find("td:nth-child(1)").text().trim();
              var Description = $row.find("td:nth-child(2)").text().trim();
 
-             var optionsHtml = `<option value=""></option>`;
-            @foreach($GrievanceCategory as $item)
-                optionsHtml += `<option value="{{ $item->id }}" ${Grievance_Cat_id == "{{ $item->id }}" ? 'selected' : ''}>{{ $item->Category_Name }}</option>`;
-            @endforeach
+            var GrievanceCategory = @json($GrievanceCategory);
+            var tickSvg = '<svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg>';
+            var selectedCat = GrievanceCategory.find(item => item.id == Grievance_Cat_id);
 
             var editRowHtml = `
                        <td class="py-1">
                            <div class="form-group">
-                            <select class="form-select select2t-none" name="Grievance_Cat_id" id="Grievance_Cat_id">
-                               ${optionsHtml}
+                            <select class="form-select dd-native-select" name="Grievance_Cat_id" id="Grievance_Cat_id">
+                                <option value="">Select Grievance Category</option>
+                                ${GrievanceCategory.map(item => `
+                                <option value="${item.id}" ${item.id == Grievance_Cat_id ? 'selected' : ''}>${item.Category_Name}</option>
+                            `).join('')}
                             </select>
+                            <div class="dd" data-target="#Grievance_Cat_id">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">${selectedCat ? selectedCat.Category_Name : 'Select Grievance Category'}</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Grievance category">
+                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a category…"></div>
+                                    <div class="dd-scroll">
+                                        <div class="dd-item${Grievance_Cat_id ? '' : ' active'}" role="option" data-value=""><span class="dd-nm">Select Grievance Category</span>${tickSvg}</div>
+                                        ${GrievanceCategory.map(item => `
+                                        <div class="dd-item${item.id == Grievance_Cat_id ? ' active' : ''}" role="option" data-value="${item.id}"><span class="dd-nm">${item.Category_Name}</span>${tickSvg}</div>
+                                    `).join('')}
+                                    </div>
+                                </div>
+                            </div>
                           </div>
                         </td>
                         <td class="py-1">
@@ -162,13 +187,6 @@
                          <a href="javascript:void(0)" class="btn eb-btn-primary update-row-btn_cat" data-cat-id="${Main_id}">Submit</a>
                     </td>`;
             $row.html(editRowHtml);
-
-           $("#Grievance_Cat_id").select2({
-                placeholder: "Select Grievance Category",
-                allowClear: true,
-                width: '100%'        
-            });
-        
         });
 
         $(document).on("click", "#IndexGrievanceSubCategory .update-row-btn_cat", function (event) {

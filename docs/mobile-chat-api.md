@@ -78,6 +78,40 @@ Member-scope is enforced server-side on both group creation and add-member — h
 }
 ```
 
+## Known bug in `chat/list` — `last_seen` is not the last-message time
+
+`ChatController::index()` labels a field `last_seen` on every row (individual
+at `app/Http/Controllers/API/ChatBoat/ChatController.php:78`, group at
+`:116`), but it's actually `$ResortAdmin->updated_at` / `$group->updated_at`
+— the other person/group record's own last-edited timestamp (profile edit,
+rename, etc.), not when the last message in that thread was sent. A
+colleague you haven't messaged in weeks but who recently touched their
+profile shows as "recent"; a colleague you just messaged can show as
+"15 days" if their record hasn't otherwise changed.
+
+The real value is already being fetched and just not exposed: both branches
+already query the actual last message into `$lastMessage` (used today only
+for `$lastMessage->message`) — its `created_at` is sitting right there.
+One added line per branch:
+
+```php
+'last_msg_time' => $lastMessage->created_at ?? null,
+```
+
+— right next to the existing `'last_msg' => $lastMessage->message ?? null,`
+line in both the individual (`:78` area) and group (`:116` area) mappers.
+Additive only — doesn't remove/rename `last_seen`, so nothing currently
+reading that field breaks; it just also gets the field it should have had.
+
+Once `last_msg_time` exists in the response, the web portal's floating chat
+widget (`resources/views/resorts/partials/wisdom-chat.blade.php`,
+`renderConversations()`) needs one matching change: swap
+`timeAgo(c.last_seen)` for `timeAgo(c.last_msg_time)` for the row's
+timestamp. I haven't made that change yet — flagging it here first since it
+depends on this backend field existing. Mobile should do the equivalent
+swap in whatever renders the `chat/list` row's timestamp today (currently
+`last_seen`, per the same bug).
+
 ## Realtime — Pusher (replaces the Socket.io connection to Node)
 
 Public client key (safe to ship in the app): `PUSHER_APP_KEY=4390520d21ccdfb45a8f`,

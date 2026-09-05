@@ -2,9 +2,15 @@
 @section('page_tab_title', $page_title)
 
 @section('content')
+<style>
+    #survey-view-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #survey-view-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding page-appHedding">
+        <div class="page-hedding page-appHedding" id="survey-view-hero">
             <div class="row align-items-center g-3">
                 <div class="col">
                     <div class="page-title">
@@ -144,13 +150,29 @@
                                 <input type="hidden" name="id" value="{{ base64_encode($parent->id) }}">
                                 <div class="col-auto">
                                     <label for="changeStatus" class="form-label small text-muted mb-0">Status</label>
-                                    <select name="status" class="form-select form-select-sm changeStatus" id="changeStatus" style="min-width: 140px;" data-parsley-required="true" data-parsley-errors-container="#statusError">
+                                    <select name="status" class="form-select form-select-sm dd-native-select changeStatus" id="changeStatus" style="min-width: 140px;" data-parsley-required="true" data-parsley-errors-container="#statusError">
                                         <option value="">Select Status</option>
                                         <option value="Publish" {{ $parent->Status == "Publish" ? 'selected' : '' }}>Publish</option>
                                         @if($parent->Status != "SaveAsDraft")
                                             <option value="SaveAsDraft" {{ $parent->Status == "SaveAsDraft" ? 'selected' : '' }}>Save As Draft</option>
                                         @endif
                                     </select>
+                                    @php $statusSelected = $parent->Status == 'Publish' ? 'Publish' : ($parent->Status == 'SaveAsDraft' ? 'Save As Draft' : 'Select Status'); @endphp
+                                    <div class="dd" data-target="#changeStatus">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">{{ $statusSelected }}</span>
+                                            <svg class="dd-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Status">
+                                            <div class="dd-scroll">
+                                                <div class="dd-item{{ $parent->Status != 'Publish' && $parent->Status != 'SaveAsDraft' ? ' active' : '' }}" role="option" data-value=""><span class="dd-nm">Select Status</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item{{ $parent->Status == 'Publish' ? ' active' : '' }}" role="option" data-value="Publish"><span class="dd-nm">Publish</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @if($parent->Status != "SaveAsDraft")
+                                                <div class="dd-item" role="option" data-value="SaveAsDraft"><span class="dd-nm">Save As Draft</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    </div>
                                     <span id="statusError" class="text-danger small"></span>
                                 </div>
                                 <div class="col-auto">
@@ -189,16 +211,13 @@
 @endsection
 
 @section('import-css')
+@include('resorts._dropdown_styles')
 @endsection
 
 @section('import-scripts')
 <script type="text/javascript">
    
    $(document).ready(function () {
-        $("#changeStatus").select2({
-            placeholder: "Select Status",
-            allowClear: true // Enables clear button
-        });
         $('#changeStatusForm').parsley();
 
         // Handle form submission
@@ -256,4 +275,5 @@
 
 
 </script>
+@include('resorts._dropdown_script')
 @endsection

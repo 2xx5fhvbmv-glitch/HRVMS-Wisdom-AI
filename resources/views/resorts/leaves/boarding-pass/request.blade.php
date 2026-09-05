@@ -8,9 +8,15 @@
 @endif
 
 @section('content')
+    <style>
+        #boarding-pass-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #boarding-pass-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding page-appHedding">
+            <div class="page-hedding page-appHedding" id="boarding-pass-hero">
                 <div class="row justify-content-between g-md-2 g-1">
                     <div class="col-auto">
                         <div class="page-title">

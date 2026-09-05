@@ -7,10 +7,16 @@
 </div>
 @endif
 
-@section('content')  
+@section('content')
+    <style>
+        #incident-meeting-create-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #incident-meeting-create-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="incident-meeting-create-hero">
                 <div class="row  g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -22,44 +28,44 @@
                 </div>
             </div>
 
+            <div class="imc-wrap">
             <form id="investigationMeeting" enctype="multipart/form-data">
                 @csrf
-                <div class="card">
-                    {{-- Row 1: Incident ID · Meeting Subject · Scheduled Date --}}
-                    <div class="row g-lg-4 g-3 mb-3">
-                        <div class="col-md-4 col-sm-6">
-                            <label for="incident_id" class="form-label">INCIDENT ID <span class="red-mark">*</span></label>
-                            <input type="hidden" class="form-control" name="incidentId" id="incidentId" value="{{ $incident->id }}" readonly />
-                            <input type="text" class="form-control" name="incident_id" id="incident_id" value="{{ $incident->incident_id }}" readonly required/>
+
+                {{-- Meeting details --}}
+                <div class="imc-card">
+                    <div class="imc-sec-h">Meeting details</div>
+                    <div class="imc-grid3">
+                        <div class="imc-fld">
+                            <label for="incident_id">Incident ID <span class="req">*</span></label>
+                            <input type="hidden" name="incidentId" id="incidentId" value="{{ $incident->id }}" readonly />
+                            <input type="text" class="form-control ctrl ro" name="incident_id" id="incident_id" value="{{ $incident->incident_id }}" readonly required/>
                         </div>
-                        <div class="col-md-4 col-sm-6">
-                            <label class="form-label">MEETING SUBJECT <span class="red-mark">*</span></label>
-                            <input type="text" class="form-control" name="meeting_subject" placeholder="Meeting Subject" required
+                        <div class="imc-fld">
+                            <label>Meeting subject <span class="req">*</span></label>
+                            <input type="text" class="form-control ctrl" name="meeting_subject" placeholder="Meeting subject" required
                                 data-parsley-required-message="Please enter meeting subject"
                                 data-parsley-script-tag="true"
                                 data-parsley-html="true"/>
                         </div>
-                        <div class="col-md-4 col-sm-6">
-                            <label class="form-label">SCHEDULED DATE <span class="red-mark">*</span></label>
-                            <input type="text" class="form-control datepicker" id="schedule_date" name="meeting_date" placeholder="Select Date" required
+                        <div class="imc-fld">
+                            <label>Scheduled date <span class="req">*</span></label>
+                            <input type="text" class="form-control ctrl datepicker" id="schedule_date" name="meeting_date" placeholder="Select date" required
                                 data-parsley-required-message="Please select scheduled date"
                                 data-parsley-script-tag="true"
                                 data-parsley-html="true"/>
                         </div>
-                    </div>
-
-                    {{-- Row 2: Scheduled Time · Meeting Location · Meeting Type --}}
-                    <div class="row g-lg-4 g-3 mb-3">
-                        <div class="col-md-4 col-sm-6">
-                            <label class="form-label">SCHEDULED TIME <span class="red-mark">*</span></label>
-                            <input type="time" class="form-control" name="meeting_time" placeholder="Select Time" required/>
+                        <div class="imc-fld">
+                            <label>Scheduled time <span class="req">*</span></label>
+                            <input type="text" class="form-control ctrl timePicker" id="schedule_time" name="meeting_time" placeholder="Select time" required
+                                data-parsley-required-message="Please select scheduled time"/>
                         </div>
-                        <div class="col-md-4 col-sm-6">
-                            <label class="form-label">MEETING LOCATION <span class="red-mark">*</span></label>
-                            <select class="form-select select2t-none" id="meeting_location" name="location" required
+                        <div class="imc-fld">
+                            <label>Meeting location <span class="req">*</span></label>
+                            <select class="form-select dd-native-select ctrl" id="meeting_location" name="location" required
                                 data-parsley-required-message="Please select meeting location"
                                 data-parsley-errors-container="#meeting_location-error">
-                                <option value="">Select Location</option>
+                                <option value="">Select location</option>
                                 <option value="HR Office">HR Office</option>
                                 <option value="Conference Room">Conference Room</option>
                                 <option value="Manager's Office">Manager's Office</option>
@@ -67,126 +73,199 @@
                                 <option value="Site / Department Floor">Site / Department Floor</option>
                                 <option value="__custom__">Other / Virtual link…</option>
                             </select>
-                            <input type="text" class="form-control mt-2 d-none" id="meeting_location_custom" name="location_custom" placeholder="Enter location or virtual meeting link" />
+                            <div class="dd" data-target="#meeting_location">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Select location</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Meeting Location">
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select location</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="HR Office"><span class="dd-nm">HR Office</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="Conference Room"><span class="dd-nm">Conference Room</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="Manager's Office"><span class="dd-nm">Manager's Office</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="Training Room"><span class="dd-nm">Training Room</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="Site / Department Floor"><span class="dd-nm">Site / Department Floor</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="__custom__"><span class="dd-nm">Other / Virtual link…</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    </div>
+                                </div>
+                            </div>
+                            <input type="text" class="form-control ctrl mt-2 d-none" id="meeting_location_custom" name="location_custom" placeholder="Enter location or virtual meeting link" />
                             <div id="meeting_location-error"></div>
                         </div>
-                        <div class="col-md-4 col-sm-6">
-                            <label class="form-label">MEETING TYPE <span class="red-mark">*</span></label>
-                            <select class="form-select select2t-none" name="meeting_type" required
+                        <div class="imc-fld">
+                            <label>Meeting type <span class="req">*</span></label>
+                            <select class="form-select dd-native-select ctrl" id="meeting_type" name="meeting_type" required
                                 data-parsley-required-message="Please select meeting type"
                                 data-parsley-errors-container="#meeting_type-error">
-                                <option value="">Select Type</option>
+                                <option value="">Select type</option>
                                 <option value="Physical">Physical</option>
                                 <option value="Online">Virtual</option>
                             </select>
+                            <div class="dd" data-target="#meeting_type">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Select type</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Meeting Type">
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select type</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="Physical"><span class="dd-nm">Physical</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="Online"><span class="dd-nm">Virtual</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    </div>
+                                </div>
+                            </div>
                             <div id="meeting_type-error"></div>
                         </div>
                     </div>
+                </div>
 
-                    {{-- Row 3+: Participants · Roles (repeatable rows) --}}
-                    <div id="participants-div">
-                        <div class="row g-lg-4 g-3 mb-3 participant-row">
-                            <div class="col-md-4 col-sm-6">
-                                <label class="form-label">PARTICIPANTS <span class="red-mark">*</span></label>
-                                <select class="form-select select2t-none" name="participants[]" required
-                                    data-parsley-required-message="Please select participants"
-                                    data-parsley-errors-container="#participants-error">
-                                    <option value="">Select Employee</option>
-                                    @foreach ($participants as $participant)
-                                        <option value="{{ $participant->id }}">{{ $participant->Emp_id . ' : ' . $participant->resortAdmin->full_name }}</option>
-                                    @endforeach
-                                </select>
-                                <div id="participants-error"></div>
-                            </div>
-                            <div class="col-md-4 col-sm-6">
-                                <label class="form-label">ROLES <span class="red-mark">*</span></label>
-                                <select class="form-select select2t-none" name="roles[]" required
-                                    data-parsley-required-message="Please select role">
-                                    <option value="">Select Role</option>
-                                    <option value="Victim">Victim</option>
-                                    <option value="Witness">Witness</option>
-                                    <option value="Accused">Accused</option>
-                                    <option value="Investigator">Investigator</option>
-                                    <option value="Observer">Observer</option>
-                                    <option value="Other">Other</option>
-                                </select>
-                            </div>
-                            <div class="col-md-4 col-sm-6 d-flex align-items-end">
-                                <a href="#" class="btn eb-btn-accent btn-sm" id="addMoreParticipants">+ Add Participant</a>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <a href="#" class="btn eb-btn-accent btn-sm" id="add-external-participants">Add External Participants</a>
-                    </div>
-
-                    <div class="row g-3 mb-3" id="external-participants"></div>
-
-                    {{-- Meeting Agenda --}}
-                    <div class="row g-3 mb-3">
-                        <div class="col-12">
-                            <label class="form-label">MEETING AGENDA <span class="red-mark">*</span></label>
-                            <textarea class="form-control" name="meeting_agenda" rows="5" placeholder="Meeting Agenda" required
-                                data-parsley-required-message="Please enter meeting agenda"
-                                data-parsley-script-tag="true"
-                                data-parsley-html="true"></textarea>
-                        </div>
-                    </div>
-
-                    {{-- Attachments --}}
-                    <div class="row g-3 mb-3">
-                        <div class="col-12">
-                            <label class="form-label">ATTACHMENTS</label>
-                            <div class="uploadFile-block">
-                                <div class="uploadFile-btn mb-2">
-                                    <a href="#" class="btn eb-btn-accent btn-sm" onclick="event.preventDefault(); document.getElementById('uploadFile').click();">Upload Files</a>
-                                    <input type="file" name="attachments[]" id="uploadFile" multiple style="display:none;">
-                                </div>
-                                <div class="uploadFile-text mb-2 text-muted small">Photos, Documents, or Videos</div>
-                            </div>
-                            <ul id="file-list" class="mt-2"></ul>
-                        </div>
-                    </div>
-
-                    {{-- Previous Notes / Findings — read-only summary of past
-                         meeting agendas on this incident, so the user has
-                         context before scheduling the next one. --}}
-                    <div class="row g-3 mb-3">
-                        <div class="col-12">
-                            <label class="form-label">PREVIOUS NOTES / FINDINGS</label>
-                            @if($previousMeetings->isEmpty())
-                                <p class="text-muted mb-0">No previous meetings have been recorded for this incident.</p>
-                            @else
-                                <div class="previous-notes-block">
-                                    @foreach($previousMeetings as $pm)
-                                        <div class="previous-note-item mb-3 pb-3 border-bottom">
-                                            <div class="d-flex justify-content-between align-items-center mb-1">
-                                                <strong>{{ $pm->meeting_subject }}</strong>
-                                                <span class="text-muted small">
-                                                    {{ \Carbon\Carbon::parse($pm->meeting_date)->format('d M Y') }}
-                                                    @if($pm->meeting_time)
-                                                        · {{ \Carbon\Carbon::parse($pm->meeting_time)->format('h:i A') }}
-                                                    @endif
-                                                </span>
+                {{-- Participants --}}
+                <div class="imc-card">
+                    <div class="imc-sec-h">Participants</div>
+                    <div class="imc-pcols">
+                        <div class="imc-pcol">
+                            <div class="imc-pcol-h">Internal</div>
+                            <div id="participants-div">
+                                <div class="imc-prow participant-row">
+                                    <div class="imc-pfields">
+                                        <div class="imc-fld">
+                                            <label>Participant <span class="req">*</span></label>
+                                            <select class="form-select dd-native-select ctrl imc-participant-select" id="participant_static" name="participants[]" required
+                                                data-parsley-required-message="Please select participants"
+                                                data-parsley-errors-container="#participants-error">
+                                                <option value="">Select employee</option>
+                                                @foreach ($participants as $participant)
+                                                    <option value="{{ $participant->id }}">{{ $participant->Emp_id . ' : ' . $participant->resortAdmin->full_name }}</option>
+                                                @endforeach
+                                            </select>
+                                            <div class="dd" data-target="#participant_static">
+                                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                    <span class="dd-lbl">Select employee</span>
+                                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                </button>
+                                                <div class="dd-panel" role="listbox" aria-label="Participant">
+                                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an employee…"></div>
+                                                    <div class="dd-scroll">
+                                                        @foreach ($participants as $participant)
+                                                            <div class="dd-item" role="option" data-value="{{ $participant->id }}"><span class="dd-nm">{{ $participant->Emp_id . ' : ' . $participant->resortAdmin->full_name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @endforeach
+                                                    </div>
+                                                </div>
                                             </div>
-                                            <p class="mb-0 text-body small">{{ $pm->meeting_agenda }}</p>
+                                            <div id="participants-error"></div>
                                         </div>
-                                    @endforeach
+                                        <div class="imc-fld">
+                                            <label>Role <span class="req">*</span></label>
+                                            <select class="form-select dd-native-select ctrl" id="role_static" name="roles[]" required
+                                                data-parsley-required-message="Please select role">
+                                                <option value="">Select role</option>
+                                                <option value="Victim">Victim</option>
+                                                <option value="Witness">Witness</option>
+                                                <option value="Accused">Accused</option>
+                                                <option value="Investigator">Investigator</option>
+                                                <option value="Observer">Observer</option>
+                                                <option value="Other">Other</option>
+                                            </select>
+                                            <div class="dd" data-target="#role_static">
+                                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                    <span class="dd-lbl">Select role</span>
+                                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                </button>
+                                                <div class="dd-panel" role="listbox" aria-label="Role">
+                                                    <div class="dd-scroll">
+                                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select role</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        <div class="dd-item" role="option" data-value="Victim"><span class="dd-nm">Victim</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        <div class="dd-item" role="option" data-value="Witness"><span class="dd-nm">Witness</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        <div class="dd-item" role="option" data-value="Accused"><span class="dd-nm">Accused</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        <div class="dd-item" role="option" data-value="Investigator"><span class="dd-nm">Investigator</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        <div class="dd-item" role="option" data-value="Observer"><span class="dd-nm">Observer</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        <div class="dd-item" role="option" data-value="Other"><span class="dd-nm">Other</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
-                            @endif
+                            </div>
+                            <a href="#" class="btn eb-btn-accent btn-sm mt-2" id="addMoreParticipants"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" style="margin-right:5px;vertical-align:-2px"><path d="M12 5v14M5 12h14"/></svg>Add participant</a>
                         </div>
-                    </div>
 
-                    <div class="card-footer text-end">
-                        <button type="submit" class="btn eb-btn-primary">Submit</button>
+                        <div class="imc-pcol">
+                            <div class="imc-pcol-h">External</div>
+                            <a href="#" class="btn eb-btn-accent btn-sm" id="add-external-participants"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:5px;vertical-align:-2px"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM19 8v6M22 11h-6"/></svg>Add external participant</a>
+                            <div class="imc-ext-block" id="external-participants"></div>
+                        </div>
                     </div>
                 </div>
+
+                {{-- Agenda & attachments --}}
+                <div class="imc-card">
+                    <div class="imc-sec-h">Agenda &amp; attachments</div>
+                    <div class="imc-fld mb-3">
+                        <label>Meeting agenda <span class="req">*</span></label>
+                        <textarea class="form-control ctrl" name="meeting_agenda" rows="5" placeholder="Meeting agenda — points to cover, order of discussion, expected outcomes" required
+                            data-parsley-required-message="Please enter meeting agenda"
+                            data-parsley-script-tag="true"
+                            data-parsley-html="true"></textarea>
+                    </div>
+                    <div class="imc-fld">
+                        <label>Attachments</label>
+                        <div class="uploadFile-block imc-upload">
+                            <div class="uploadFile-btn">
+                                <a href="#" class="btn eb-btn-accent btn-sm" onclick="event.preventDefault(); document.getElementById('uploadFile').click();"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:5px;vertical-align:-2px"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>Upload files</a>
+                                <input type="file" name="attachments[]" id="uploadFile" multiple style="display:none;">
+                            </div>
+                            <span class="hint">Photos, documents, or videos</span>
+                        </div>
+                        <ul id="file-list" class="imc-files"></ul>
+                    </div>
+                </div>
+
+                {{-- Previous Notes / Findings — read-only summary of past
+                     meeting agendas on this incident, so the user has
+                     context before scheduling the next one. --}}
+                <div class="imc-card">
+                    <div class="imc-sec-h">Previous notes / findings</div>
+                    @if($previousMeetings->isEmpty())
+                        <div class="imc-empty">
+                            <div class="g"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h4"/></svg></div>
+                            <div class="t">No previous meetings recorded</div>
+                            <div class="s">Once meetings are held for this incident, their notes and findings will appear here.</div>
+                        </div>
+                    @else
+                        <div class="imc-notes">
+                            @foreach($previousMeetings as $pm)
+                                <div class="imc-note">
+                                    <div>
+                                        <div class="imc-note-t">{{ $pm->meeting_subject }}</div>
+                                        <div class="imc-note-d">{{ $pm->meeting_agenda }}</div>
+                                    </div>
+                                    <div class="imc-note-time">
+                                        {{ \Carbon\Carbon::parse($pm->meeting_date)->format('d M Y') }}
+                                        @if($pm->meeting_time)
+                                            &middot; {{ \Carbon\Carbon::parse($pm->meeting_time)->format('h:i A') }}
+                                        @endif
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
+
+                <div class="imc-footer-bar">
+                    <a href="{{ route('incident.meeting') }}" class="btn eb-btn-secondary">Cancel</a>
+                    <button type="submit" class="btn eb-btn-primary">Submit</button>
+                </div>
             </form>
+            </div>
 
         </div>
     </div>
+@include('resorts.incident.meeting._meeting_create_styles')
 @include('resorts._emotional_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -195,7 +274,6 @@
 @section('import-scripts')
 <script>
 $(document).ready(function () {
-    $('.select2t-none').select2();
 
     $('#investigationMeeting').parsley({
         trigger: 'change',
@@ -212,13 +290,37 @@ $(document).ready(function () {
         appendTo: document.body
     });
 
+    // Brand-styled time picker (matches the site-wide clock-icon input.timePicker
+    // CSS already defined in default.css) instead of the native browser time
+    // widget. 24-hour output — matches what the native <input type="time"> this
+    // replaces already submitted, so already-stored meeting_time values and the
+    // Carbon::parse()/strtotime() reads elsewhere keep working unchanged.
+    flatpickr('.timePicker', {
+        enableTime: true,
+        noCalendar: true,
+        dateFormat: 'H:i',
+        time_24hr: true,
+        allowInput: true,
+        appendTo: document.body
+    });
+
+    function imcFormatBytes(bytes) {
+        if (!bytes) return '0 B';
+        var units = ['B', 'KB', 'MB', 'GB'];
+        var i = Math.floor(Math.log(bytes) / Math.log(1024));
+        return (bytes / Math.pow(1024, i)).toFixed(i ? 1 : 0) + ' ' + units[i];
+    }
+
     document.getElementById('uploadFile').addEventListener('change', function (e) {
         let fileList = document.getElementById('file-list');
         fileList.innerHTML = '';
         Array.from(this.files).forEach(function(file) {
-            
             let li = document.createElement('li');
-            li.textContent = file.name;
+            li.className = 'imc-filerow';
+            li.title = file.name;
+            li.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>'
+                + '<span class="fn"></span><span class="fsz">' + imcFormatBytes(file.size) + '</span>';
+            li.querySelector('.fn').textContent = file.name;
             fileList.appendChild(li);
         });
     });
@@ -238,36 +340,65 @@ $(document).ready(function () {
     });
 
     let number = 0;
+    var tickSvg = '<svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg>';
+    var participantItems = `
+        @foreach($participants as $participant)
+            <div class="dd-item" role="option" data-value="{{ $participant->id }}"><span class="dd-nm">{{ $participant->Emp_id . ' : ' . $participant->resortAdmin->full_name }}</span>${tickSvg}</div>
+        @endforeach
+    `;
+    var roleItems = ['Victim', 'Witness', 'Accused', 'Investigator', 'Observer', 'Other'].map(function (r) {
+        return `<div class="dd-item" role="option" data-value="${r}"><span class="dd-nm">${r}</span>${tickSvg}</div>`;
+    }).join('');
     $('#addMoreParticipants').click(function (e) {
         e.preventDefault();
         let row = `
-            <div class="row g-lg-4 g-3 mb-3 participant-row">
-                <div class="col-md-4 col-sm-6">
-                    <select class="form-select select2t-none" name="participants[]" required data-parsley-required-message="Please select participants" data-parsley-errors-container="#participants-error-${number}">
-                        <option value="">Select Employee</option>
-                        @foreach($participants as $participant)
-                            <option value="{{ $participant->id }}">{{ $participant->Emp_id . ' : ' . $participant->resortAdmin->full_name }}</option>
-                        @endforeach
-                    </select>
-                    <div id="participants-error-${number}"></div>
+            <div class="imc-prow participant-row">
+                <div class="imc-pfields">
+                    <div class="imc-fld">
+                        <label>Participant <span class="req">*</span></label>
+                        <select class="form-select dd-native-select ctrl" id="participant_${number}" name="participants[]" required data-parsley-required-message="Please select participants" data-parsley-errors-container="#participants-error-${number}">
+                            <option value="">Select employee</option>
+                            @foreach($participants as $participant)
+                                <option value="{{ $participant->id }}">{{ $participant->Emp_id . ' : ' . $participant->resortAdmin->full_name }}</option>
+                            @endforeach
+                        </select>
+                        <div class="dd" data-target="#participant_${number}">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">Select employee</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Participant">
+                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an employee…"></div>
+                                <div class="dd-scroll">${participantItems}</div>
+                            </div>
+                        </div>
+                        <div id="participants-error-${number}"></div>
+                    </div>
+                    <div class="imc-fld">
+                        <label>Role <span class="req">*</span></label>
+                        <select class="form-select dd-native-select ctrl" id="role_${number}" name="roles[]" required data-parsley-required-message="Please select role">
+                            <option value="">Select role</option>
+                            <option value="Victim">Victim</option>
+                            <option value="Witness">Witness</option>
+                            <option value="Accused">Accused</option>
+                            <option value="Investigator">Investigator</option>
+                            <option value="Observer">Observer</option>
+                            <option value="Other">Other</option>
+                        </select>
+                        <div class="dd" data-target="#role_${number}">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">Select role</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Role">
+                                <div class="dd-scroll">${roleItems}</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="col-md-4 col-sm-6">
-                    <select class="form-select select2t-none" name="roles[]" required data-parsley-required-message="Please select role">
-                        <option value="">Select Role</option>
-                        <option value="Victim">Victim</option>
-                        <option value="Witness">Witness</option>
-                        <option value="Accused">Accused</option>
-                        <option value="Investigator">Investigator</option>
-                        <option value="Observer">Observer</option>
-                        <option value="Other">Other</option>
-                    </select>
-                </div>
-                <div class="col-md-4 col-sm-6 d-flex align-items-end">
-                    <a href="#" class="btn eb-btn-critical btn-sm removeParticipant">Remove</a>
-                </div>
+                <a href="#" class="btn eb-btn-critical btn-sm removeParticipant">Remove</a>
             </div>`;
         $('#participants-div').append(row);
-        $('.select2t-none').select2();
         number++;
     });
 
@@ -279,13 +410,9 @@ $(document).ready(function () {
     $('#add-external-participants').click(function (e) {
         e.preventDefault();
         let extRow = `
-            <div class="row g-3 mb-3 external-row">
-                <div class="col-md-4 col-sm-6">
-                    <input type="text" class="form-control" name="ext_participants[]" placeholder="External Participant Name" />
-                </div>
-                <div class="col-md-4 col-sm-6 d-flex align-items-end">
-                    <a href="#" class="btn eb-btn-critical btn-sm removeExternal">Remove</a>
-                </div>
+            <div class="imc-extrow external-row">
+                <input type="text" class="form-control ctrl" name="ext_participants[]" placeholder="External participant name" />
+                <a href="#" class="btn eb-btn-critical btn-sm removeExternal">Remove</a>
             </div>`;
         $('#external-participants').append(extRow);
     });

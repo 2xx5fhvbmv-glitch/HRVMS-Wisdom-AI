@@ -8,10 +8,24 @@
 @endif
 
 @section('content')
-
+<style>
+    /* Same requested push as the other module dashboards/pages — extra
+       breathing room between the hero and the content below it, scoped to
+       this page (.page-hedding's own margin-bottom is shared by every
+       page's hero). padding-bottom, not margin: adjacent sibling margins
+       collapse to the larger of the two rather than summing. Below
+       Bootstrap's sm breakpoint the extra padding pushes content into the
+       teal hero curve's rounded bottom-left corner (body::before,
+       border-radius 0 0 50px 50px) — same collision found on Payroll —
+       neutralized below 576px. */
+    #manning-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #manning-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="manning-hero">
             <div class="row justify-content-between g-3">
                 <div class="col-auto">
                     <div class="page-title">
@@ -27,149 +41,136 @@
             </div>
         </div>
 
-        <div>
-            <div class="row g-30">
-                <div class="col-xxl-12 col-xl-12 col-lg-12">
-                    <!-- <div class="col-xxl-6 col-xl-6 col-lg-6"> -->
-                    <div class="card" id="Division">
-                        <div class="card-title">
-                            <div class="row g-3 align-items-center justify-content-between">
-                                <div class="col-auto">
-                                    <div class="d-flex justify-content-start align-items-center">
-                                        <h3>Divisions</h3>
-                                    </div>
-                                </div>
-                                <div class="col-auto">
-                                    <div class="d-flex justify-content-sm-end align-items-center">
-                                        <a href="#" class="btn btn-sm wfp-btn-primary @if(App\Helpers\Common::checkRouteWisePermission('resort.budget.manning',config('settings.resort_permissions.create')) == false) d-none @endif " data-bs-toggle="modal"
-                                            data-bs-target="#add-divisionmodal">
-                                            <i class="fa-solid fa-plus me-2"></i>Add New
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
+        <div class="card manning-card">
+            <ul class="nav nav-tabs manning-tabs" id="manningTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="tab-btn-div" data-bs-toggle="tab" data-bs-target="#tab-div" type="button" role="tab" aria-controls="tab-div" aria-selected="true">
+                        Divisions <span class="manning-count">{{ $resort_divisions->count() }}</span>
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="tab-btn-dep" data-bs-toggle="tab" data-bs-target="#tab-dep" type="button" role="tab" aria-controls="tab-dep" aria-selected="false">
+                        Departments <span class="manning-count">{{ $resort_departments->count() }}</span>
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="tab-btn-sec" data-bs-toggle="tab" data-bs-target="#tab-sec" type="button" role="tab" aria-controls="tab-sec" aria-selected="false">
+                        Sections <span class="manning-count">{{ $resort_sections->count() }}</span>
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="tab-btn-pos" data-bs-toggle="tab" data-bs-target="#tab-pos" type="button" role="tab" aria-controls="tab-pos" aria-selected="false">
+                        Positions <span class="manning-count">{{ $resort_positions->count() }}</span>
+                    </button>
+                </li>
+            </ul>
+
+            <div class="tab-content" id="manningTabContent">
+
+                <div class="tab-pane fade show active" id="tab-div" role="tabpanel" aria-labelledby="tab-btn-div">
+                    <div class="manning-toolbar">
+                        <div class="input-group manning-search">
+                            <input type="search" class="form-control" id="divisions-search" placeholder="Search divisions…" />
+                            <i class="fa-solid fa-search"></i>
                         </div>
+                        <a href="#" class="btn btn-sm wfp-btn-primary @if(App\Helpers\Common::checkRouteWisePermission('resort.budget.manning',config('settings.resort_permissions.create')) == false) d-none @endif " data-bs-toggle="modal"
+                            data-bs-target="#add-divisionmodal">
+                            <i class="fa-solid fa-plus me-2"></i>New Division
+                        </a>
+                    </div>
+                    <div class="manning-thwrap">
+                    <table id="divisions-table" class="table  w-100">
+                        <thead>
+                            <tr>
+                                <th class="text-nowrap">Name</th>
+                                <th class="text-nowrap">Status</th>
+                                <th class="text-nowrap">Action</th>
+                            </tr>
+                        </thead>
 
-                        <table id="divisions-table" class="table  w-100">
-                            <thead>
-                                <tr>
-                                    <th class="text-nowrap">Name</th>
-                                    <th class="text-nowrap">Status</th>
-                                    <th class="text-nowrap">Action</th>
-                                </tr>
-                            </thead>
-
-                        </table>
+                    </table>
                     </div>
                 </div>
 
-                <div class="col-xxl-12 col-xl-12 col-lg-12">
-                    <!-- <div class="col-xxl-6 col-xl-6 col-lg-6"> -->
-                    <div class="card" id="Department">
-                        <div class="card-title">
-                            <div class="row g-3 align-items-center justify-content-between">
-                                <div class="col-auto">
-                                    <div class="d-flex justify-content-start align-items-center">
-                                        <h3>Departments</h3>
-                                    </div>
-                                </div>
-                                <div class="col-auto">
-                                    <div class="d-flex justify-content-sm-end align-items-center">
-                                        <a href="#departments-modal" class="btn btn-sm wfp-btn-primary @if(App\Helpers\Common::checkRouteWisePermission('resort.budget.manning',config('settings.resort_permissions.create')) == false) d-none @endif"
-                                            data-bs-toggle="modal" data-bs-target="#departments-modal">
-                                            <i class="fa-solid fa-plus me-2"></i>Add New
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
+                <div class="tab-pane fade" id="tab-dep" role="tabpanel" aria-labelledby="tab-btn-dep">
+                    <div class="manning-toolbar">
+                        <div class="input-group manning-search">
+                            <input type="search" class="form-control" id="departments-search" placeholder="Search departments…" />
+                            <i class="fa-solid fa-search"></i>
                         </div>
-                        <table id="departments-table" class="table  w-100">
-                            <thead>
-                                <tr>
-                                    <th class="text-nowrap">Name</th>
-                                    <th class="text-nowrap">Division</th>
-                                    <th class="text-nowrap">Status</th>
-                                    <th class="text-nowrap">Action</th>
-                                </tr>
-                            </thead>
-                        </table>
+                        <a href="#departments-modal" class="btn btn-sm wfp-btn-primary @if(App\Helpers\Common::checkRouteWisePermission('resort.budget.manning',config('settings.resort_permissions.create')) == false) d-none @endif"
+                            data-bs-toggle="modal" data-bs-target="#departments-modal">
+                            <i class="fa-solid fa-plus me-2"></i>New Department
+                        </a>
+                    </div>
+                    <div class="manning-thwrap">
+                    <table id="departments-table" class="table  w-100">
+                        <thead>
+                            <tr>
+                                <th class="text-nowrap">Name</th>
+                                <th class="text-nowrap">Division</th>
+                                <th class="text-nowrap">Status</th>
+                                <th class="text-nowrap">Action</th>
+                            </tr>
+                        </thead>
+                    </table>
                     </div>
                 </div>
 
-                <div class="col-12">
-                    <div class="card" >
-                        <div class="card-title">
-                            <div class="row g-3 align-items-center justify-content-between">
-                                <div class="col-auto">
-                                    <div class="d-flex justify-content-start align-items-center">
-                                        <h3>Sections</h3>
-                                    </div>
-                                </div>
-                                <div class="col-auto">
-                                    <div class="d-flex justify-content-sm-end align-items-center">
-                                        <a href="#" class="btn btn-sm wfp-btn-primary @if(App\Helpers\Common::checkRouteWisePermission('resort.budget.manning',config('settings.resort_permissions.create')) == false) d-none @endif" data-bs-toggle="modal"
-                                            data-bs-target="#sections-modal">
-                                            <i class="fa-solid fa-plus me-2"></i>Add New
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
+                <div class="tab-pane fade" id="tab-sec" role="tabpanel" aria-labelledby="tab-btn-sec">
+                    <div class="manning-toolbar">
+                        <div class="input-group manning-search">
+                            <input type="search" class="form-control" id="sections-search" placeholder="Search sections…" />
+                            <i class="fa-solid fa-search"></i>
                         </div>
-                        <table id="sections-table" class="table  w-100">
-                            <thead>
-                                <tr>
-                                    <th class="text-nowrap">Name</th>
-                                    <th class="text-nowrap">Division</th>
-                                    <th class="text-nowrap">Departments</th>
-                                    <th class="text-nowrap">Status</th>
-                                    <th class="text-nowrap">Action</th>
-                                </tr>
-                            </thead>
+                        <a href="#" class="btn btn-sm wfp-btn-primary @if(App\Helpers\Common::checkRouteWisePermission('resort.budget.manning',config('settings.resort_permissions.create')) == false) d-none @endif" data-bs-toggle="modal"
+                            data-bs-target="#sections-modal">
+                            <i class="fa-solid fa-plus me-2"></i>New Section
+                        </a>
+                    </div>
+                    <div class="manning-thwrap">
+                    <table id="sections-table" class="table  w-100">
+                        <thead>
+                            <tr>
+                                <th class="text-nowrap">Name</th>
+                                <th class="text-nowrap">Division</th>
+                                <th class="text-nowrap">Department</th>
+                                <th class="text-nowrap">Status</th>
+                                <th class="text-nowrap">Action</th>
+                            </tr>
+                        </thead>
 
-                        </table>
+                    </table>
                     </div>
                 </div>
 
-                <div class="col-12">
-                    <div class="card" id="Positions">
-                        <div class="card-title">
-                            <div class="row g-3 align-items-center justify-content-between">
-                                <div class="col-auto">
-                                    <div class="d-flex justify-content-start align-items-center">
-                                        <h3>Positions</h3>
-                                    </div>
-                                </div>
-                                <div class="col-auto">
-                                    <div class="d-flex justify-content-sm-end align-items-center">
-                                        {{-- <div class="form-group table-search">
-                                            <input type="text" class="img-fluid search" placeholder="Search" />
-                                            <a href="javascript:void(0);">
-                                                <img src="{{ URL::asset('resorts_assets/images/search-green.svg')}}" alt="" class="img-fluid" />
-                                            </a>
-                                        </div> --}}
-                                        <a href="#" class="btn btn-sm wfp-btn-primary @if(App\Helpers\Common::checkRouteWisePermission('resort.budget.manning',config('settings.resort_permissions.create')) == false) d-none @endif" data-bs-toggle="modal"
-                                            data-bs-target="#positions-modal">
-                                            <i class="fa-solid fa-plus me-2"></i>Add New
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
+                <div class="tab-pane fade" id="tab-pos" role="tabpanel" aria-labelledby="tab-btn-pos">
+                    <div class="manning-toolbar">
+                        <div class="input-group manning-search">
+                            <input type="search" class="form-control" id="positions-search" placeholder="Search positions…" />
+                            <i class="fa-solid fa-search"></i>
                         </div>
-                        <table id="positions-table" class="table  w-100">
-                            <thead>
-                                <tr>
-                                    <th class="text-nowrap">Name</th>
-                                    <th class="text-nowrap">No of positions</th>
-                                    <th class="text-nowrap">Departments</th>
-                                    <th class="text-nowrap">Section</th>
-                                    <th class="text-nowrap">Division</th>
-                                    <th class="text-nowrap">Rank</th>
-                                    <th class="text-nowrap">Status</th>
-                                    <th class="text-nowrap">Action</th>
-                                </tr>
-                            </thead>
+                        <a href="#" class="btn btn-sm wfp-btn-primary @if(App\Helpers\Common::checkRouteWisePermission('resort.budget.manning',config('settings.resort_permissions.create')) == false) d-none @endif" data-bs-toggle="modal"
+                            data-bs-target="#positions-modal">
+                            <i class="fa-solid fa-plus me-2"></i>New Position
+                        </a>
+                    </div>
+                    <div class="manning-thwrap">
+                    <table id="positions-table" class="table  w-100">
+                        <thead>
+                            <tr>
+                                <th class="text-nowrap">Name</th>
+                                <th class="text-nowrap">No. of Positions</th>
+                                <th class="text-nowrap">Department</th>
+                                <th class="text-nowrap">Section</th>
+                                <th class="text-nowrap">Division</th>
+                                <th class="text-nowrap">Rank</th>
+                                <th class="text-nowrap">Status</th>
+                                <th class="text-nowrap">Action</th>
+                            </tr>
+                        </thead>
 
-                        </table>
+                    </table>
                     </div>
                 </div>
 
@@ -480,6 +481,17 @@
 
 @section('import-css')
 @include('resorts.workforce_planning._wfp_buttons_v2_styles')
+@include('resorts.manning._manning_styles')
+<style>
+    /* The People > Employees search box gets its pill shape + teal icon from
+       default.css's `.card-header .form-control` / `.card-header .input-group>i`
+       rules — this page's search boxes sit in `.card-title`, not `.card-header`,
+       so they fell back to the plain generic .form-control look. Same values,
+       scoped to this page's search boxes specifically rather than editing the
+       shared stylesheet or restructuring these cards' markup. */
+    .manning-search .form-control { padding: 10px 18px; border-radius: 13px !important; }
+    .manning-search>i { top: 20px; color: var(--teal); }
+</style>
 @endsection
 
 @section('import-scripts')
@@ -1018,6 +1030,7 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
         "bAutoWidth": false,
         "scrollX": true,
         "iDisplayLength": 6,
+        "dom": "rtip", // no default search box — the custom #divisions-search input drives .search() instead
         processing: true,
         serverSide: true,
         order: [[3, 'desc']], // Sort by created_at DESC
@@ -1028,6 +1041,10 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
             { data: 'action', name: 'action', orderable: false, searchable: false },
             { data: 'created_at', name: 'created_at', visible: false, searchable: false },
         ]
+    });
+
+    $('#divisions-search').on('keyup', function () {
+        divisionTable.search(this.value).draw();
     });
 
 
@@ -1245,6 +1262,7 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
         "bAutoWidth": false,
         "scrollX": true,
         "iDisplayLength": 6,
+        "dom": "rtip", // no default search box — the custom #departments-search input drives .search() instead
         processing: true,
         serverSide: true,
         order:[[4,'desc']],
@@ -1256,6 +1274,10 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
             { data: 'action', name: 'action', orderable: false, searchable: false },
             {data:'created_at',visible:false,searchable:false},
         ]
+    });
+
+    $('#departments-search').on('keyup', function () {
+        $('#departments-table').DataTable().search(this.value).draw();
     });
 
     $('#addDepartmentForm').submit(function(e) {
@@ -1504,6 +1526,7 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
         "bAutoWidth": false,
         "scrollX": true,
         "iDisplayLength": 6,
+        "dom": "rtip", // no default search box — the custom #sections-search input drives .search() instead
         processing: true,
         serverSide: true,
         order:[[5,'desc']],
@@ -1516,6 +1539,10 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
             { data: 'action', name: 'action', orderable: false, searchable: false },
             {data:'created_at',visible:false,searchable:false},
         ]
+    });
+
+    $('#sections-search').on('keyup', function () {
+        $('#sections-table').DataTable().search(this.value).draw();
     });
 
     $('#addSectionForm').submit(function(e) {
@@ -1788,19 +1815,11 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
         "bAutoWidth": false,
         "scrollX": true,
         "iDisplayLength": 6,
+        "dom": "rtip", // no default search box — the custom #positions-search input drives .search() instead
         processing: true,
         serverSide: true,
         order:[[8,'desc']],
-        ajax: {
-                url: '{{ route("manning.positions.data") }}',
-                type: 'GET',
-                data: function(d) {
-
-                var searchTerm = $('.search').val();
-                d.searchTerm = searchTerm;
-            }
-            },
-
+        ajax: '{{ route("manning.positions.data") }}',
         columns: [
             { data: 'position_title', name: 'position_title' },
             { data: 'no_of_positions', name: 'no_of_positions'},
@@ -1814,8 +1833,8 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
         ]
     });
 
-    $(".search").on("keyup",function(){
-        $('#positions-table').DataTable().ajax.reload();
+    $('#positions-search').on('keyup', function () {
+        $('#positions-table').DataTable().search(this.value).draw();
     });
 
     $('#addPositionForm').submit(function(e) {
@@ -2093,12 +2112,33 @@ $('.SelectionModel-name-class, .NameofSection-class').on('change keyup', Section
     });
 
         handleHashNavigation();
-    
+
     // Also handle if the hash changes during the session
     $(window).on('hashchange', function() {
         handleHashNavigation();
     });
 
+    // DataTables sizes columns against the container's width at init time.
+    // Departments/Sections/Positions sit inside Bootstrap tab-panes that
+    // start hidden (display:none), so their headers get calculated against
+    // a zero-width container while the body rows (rendered later once the
+    // tab is actually shown) size themselves normally — header and body
+    // cells end up on different grids. Re-adjust the just-shown table's
+    // column widths against its now-visible container each time a tab
+    // becomes active (covers both a manual tab click and a hash-triggered
+    // switch from handleHashNavigation(), since both fire shown.bs.tab).
+    var manningTabTableMap = {
+        '#tab-div': '#divisions-table',
+        '#tab-dep': '#departments-table',
+        '#tab-sec': '#sections-table',
+        '#tab-pos': '#positions-table',
+    };
+    $('#manningTabs button[data-bs-toggle="tab"]').on('shown.bs.tab', function (e) {
+        var tableId = manningTabTableMap[$(e.target).attr('data-bs-target')];
+        if (tableId && $.fn.DataTable.isDataTable(tableId)) {
+            $(tableId).DataTable().columns.adjust().draw(false);
+        }
+    });
 
 });
 
@@ -2110,27 +2150,42 @@ function getHashFragment()
 
 function handleHashNavigation() {
     const fragment = getHashFragment();
-    
-    if (fragment) 
-    {
-        const sectionElement = document.getElementById(fragment);
-        
+
+    if (fragment) {
+        // Divisions/Departments/Sections/Positions now live behind tabs
+        // instead of stacked cards — map the historical hash fragment to
+        // its tab first, then scroll/highlight the now-visible pane.
+        const tabMap = {
+            division: 'tab-btn-div', divisions: 'tab-btn-div',
+            department: 'tab-btn-dep', departments: 'tab-btn-dep',
+            section: 'tab-btn-sec', sections: 'tab-btn-sec',
+            position: 'tab-btn-pos', positions: 'tab-btn-pos',
+        };
+        const tabBtnId = tabMap[fragment.toLowerCase()];
+        const tabBtnEl = tabBtnId && document.getElementById(tabBtnId);
+
+        if (tabBtnEl) {
+            bootstrap.Tab.getOrCreateInstance(tabBtnEl).show();
+        }
+
+        const sectionElement = tabBtnEl ? document.getElementById('manningTabs').closest('.manning-card') : document.getElementById(fragment);
+
         if (sectionElement) {
             // Scroll to the section
             setTimeout(() => {
                 sectionElement.scrollIntoView({ behavior: 'smooth' });
-                
+
                 // Highlight the section
                 sectionElement.classList.add('highlight-section');
                 setTimeout(() => {
                     sectionElement.classList.remove('highlight-section');
                 }, 3000);
             }, 300); // Small delay to ensure the page is ready
-            
+
             // If it has a table, you can handle it here
             const tableId = `${fragment.toLowerCase()}-table`;
             const tableElement = document.getElementById(tableId);
-            
+
             if (tableElement && $.fn.DataTable.isDataTable(`#${tableId}`)) {
                 const table = $(`#${tableId}`).DataTable();
                 // Handle the table as needed

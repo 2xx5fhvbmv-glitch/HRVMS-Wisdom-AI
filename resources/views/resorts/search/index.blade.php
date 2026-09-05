@@ -16,7 +16,7 @@
     };
 
     // Deterministic initials + color for a "no photo" avatar fallback.
-    $srPalette = ['#6B4FA0', '#0E8A9E', '#1F9D6B', '#D98A00', '#4A5F8A', '#A0527A'];
+    $srPalette = ['#6B4FA0', '#0E8A9E', 'var(--positive)', 'var(--warning)', '#4A5F8A', '#A0527A'];
     $srInitials = function ($name) {
         $parts = preg_split('/\s+/', trim((string) $name));
         $initials = '';

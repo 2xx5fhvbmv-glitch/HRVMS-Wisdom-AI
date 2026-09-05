@@ -83,10 +83,22 @@
                                     </div>
                                     <div class="col-auto">
                                         <div class="form-group" style="width: 110px;">
-                                            <select class="form-select filter-leave" aria-label="Default select example" data-url="{{ route('getEmployeesOnLeave') }}">
+                                            <select class="form-select dd-native-select filter-leave" id="filterLeaveFilter" aria-label="Default select example" data-url="{{ route('getEmployeesOnLeave') }}">
                                                 <option value="Today" selected>Today</option>
                                                 <option value="Tomorrow">Tomorrow</option>
                                             </select>
+                                            <div class="dd" data-target="#filterLeaveFilter">
+                                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                    <span class="dd-lbl">Today</span>
+                                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                </button>
+                                                <div class="dd-panel" role="listbox" aria-label="Leave Filter">
+                                                    <div class="dd-scroll">
+                                                        <div class="dd-item active" role="option" data-value="Today"><span class="dd-nm">Today</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        <div class="dd-item" role="option" data-value="Tomorrow"><span class="dd-nm">Tomorrow</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -106,10 +118,22 @@
                                     </div>
                                     <div class="col-auto">
                                         <div class="form-group">
-                                            <select class="form-select" id="upcomingLeaveFilter" aria-label="Filter Upcoming Leaves">
+                                            <select class="form-select dd-native-select" id="upcomingLeaveFilter" aria-label="Filter Upcoming Leaves">
                                                 <option value="week" selected>This Week</option>
                                                 <option value="month">This Month</option>
                                             </select>
+                                            <div class="dd" data-target="#upcomingLeaveFilter">
+                                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                    <span class="dd-lbl">This Week</span>
+                                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                </button>
+                                                <div class="dd-panel" role="listbox" aria-label="Upcoming Leaves">
+                                                    <div class="dd-scroll">
+                                                        <div class="dd-item active" role="option" data-value="week"><span class="dd-nm">This Week</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        <div class="dd-item" role="option" data-value="month"><span class="dd-nm">This Month</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -129,7 +153,7 @@
                                     </div>
                                     <div class="col-auto">
                                         <div class="form-group">
-                                            <select class="form-select YearWiseLeaveHistory" aria-label="Default select example">
+                                            <select class="form-select dd-native-select YearWiseLeaveHistory" id="yearWiseLeaveHistory" aria-label="Default select example">
                                                 <?php
                                                 $currentYear = date('Y');
 
@@ -148,6 +172,23 @@
                                                 }
                                                 ?>
                                             </select>
+                                            <div class="dd" data-target="#yearWiseLeaveHistory">
+                                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                    <span class="dd-lbl">Jan <?php echo $currentYear; ?> - Dec <?php echo $currentYear; ?></span>
+                                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                </button>
+                                                <div class="dd-panel" role="listbox" aria-label="Year">
+                                                    <div class="dd-scroll">
+                                                        <?php
+                                                        for ($i = 0; $i < 3; $i++) {
+                                                            $startYear = $currentYear - $i;
+                                                            $activeCls = $i == 0 ? ' active' : '';
+                                                            echo "<div class=\"dd-item{$activeCls}\" role=\"option\" data-value=\"{$startYear}\"><span class=\"dd-nm\">Jan {$startYear} - Dec {$startYear}</span><svg class=\"dd-tick\" width=\"15\" height=\"15\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.4\"><path d=\"M20 6L9 17l-5-5\"/></svg></div>";
+                                                        }
+                                                        ?>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -166,7 +207,7 @@
                                     <div class="col-auto">
                                         @if($show_department_filter ?? false)
                                         <div class="form-group">
-                                            <select id="department-filter" class="form-select select2t-none" aria-label="Default select example">
+                                            <select id="department-filter" class="form-select dd-native-select" aria-label="Default select example">
                                                 <option value="">All Departments</option>
                                                 @if($resort_departments)
                                                     @foreach($resort_departments as $dept)
@@ -174,6 +215,22 @@
                                                     @endforeach
                                                 @endif
                                             </select>
+                                            <div class="dd" data-target="#department-filter">
+                                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                    <span class="dd-lbl">All Departments</span>
+                                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                </button>
+                                                <div class="dd-panel" role="listbox" aria-label="Department">
+                                                    <div class="dd-scroll">
+                                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">All Departments</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @if($resort_departments)
+                                                            @foreach($resort_departments as $dept)
+                                                                <div class="dd-item" role="option" data-value="{{ $dept->id }}"><span class="dd-nm">{{ $dept->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                            @endforeach
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                         @endif
                                     </div>
@@ -387,6 +444,8 @@
     </div>
 </div>
 @include('resorts.leaves._leave_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -718,6 +777,9 @@
             }
         }
     });
+    // datasets are populated entirely by the AJAX response below (server-
+    // supplied colours, out of scope) — only axes/legend retheme.
+    if (window.WaiChart) window.WaiChart.registerForTheme(myStackedBarChart);
 
     // Function to fetch and update the chart
     function GetLeaveHistory() {

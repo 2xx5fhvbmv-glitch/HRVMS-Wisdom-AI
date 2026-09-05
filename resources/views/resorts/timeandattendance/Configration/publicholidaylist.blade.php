@@ -8,9 +8,15 @@
     @endif
 
     @section('content')
+    <style>
+        #public-holiday-list-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #public-holiday-list-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="public-holiday-list-hero">
                 <div class="row justify-content-between g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -52,12 +58,27 @@
                             <!-- Latitude Input -->
                             <input type="hidden" name="resort_id" value="{{ $resort_id }}">
                             <div class="col-md-12">
-                                <select name="PublicHoliday" id="PublicHoliday" class="form-select">
+                                <select name="PublicHoliday" id="PublicHoliday" class="form-select dd-native-select">
                                     <option value=""  data-id="0">Select Holiday</option>
                                     @foreach ($PublicHoliday as $p )
                                         <option value="{{ $p->id }}"  data-id="{{ $p->id }}" data-date='{{$p->holiday_date}}'>{{ $p->name }}</option>
                                     @endforeach
                                 </select>
+                                <div class="dd" data-target="#PublicHoliday">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">Select Holiday</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Public Holiday">
+                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a holiday…"></div>
+                                        <div class="dd-scroll">
+                                            <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Holiday</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @foreach ($PublicHoliday as $p )
+                                                <div class="dd-item" role="option" data-value="{{ $p->id }}"><span class="dd-nm">{{ $p->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             <div class="col-md-12">
                                 <input type="text" name="ResortPublicHolidayDate"
@@ -90,6 +111,7 @@
 
 @section('import-css')
 @include('resorts.timeandattendance._taa_buttons_v2_styles')
+@include('resorts._dropdown_styles')
 @endsection
 
 @section('import-scripts')
@@ -211,7 +233,6 @@ $(document).ready(function() {
 
 $(document).on("click", ".AddPublicHolidays", function () {
     $("#PublicHoliday-modal").modal('show');
-    $("#PublicHoliday").select2();
     let id = $(this).data('id');
     $("#PublicHolidaydate").val($(this).data('publicholidaydate'));
     $("#PublicHolidayName").val($(this).data('publicholidayname'));
@@ -221,6 +242,7 @@ $(document).on("click", ".AddPublicHolidays", function () {
 
 
         $("#PublicHoliday").attr("disabled",true);
+        $("#PublicHoliday").siblings('.dd').find('.dd-trigger').prop('disabled', true);
 
 
 });
@@ -271,6 +293,7 @@ $(document).on("keyup", "#PublicHolidaydate , #PublicHolidayName", function () {
     {
         $("#PublicHoliday").attr('disabled', false);
     }
+    $("#PublicHoliday").siblings('.dd').find('.dd-trigger').prop('disabled', $("#PublicHoliday").is(':disabled'));
 
 });
 $(document).on("click", ".delete-row-btn", function () {
@@ -327,5 +350,6 @@ $(document).on("click", ".delete-row-btn", function () {
 
 
 </script>
+@include('resorts._dropdown_script')
 @endsection
 

@@ -8,10 +8,15 @@
     @endif
 
     @section('content')
-
+    <style>
+        #attendance-register-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #attendance-register-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding page-appHedding">
+            <div class="page-hedding page-appHedding" id="attendance-register-hero">
                 <div class="row justify-content-between g-md-2 g-1">
                     <div class="col-auto">
                         <div class="page-title">
@@ -35,39 +40,89 @@
                        @if (\App\Helpers\Common::isHrAdmin()) 
 
                         <div class="col-xl-2 col-md-5 col-sm-4 col-6">
-                            <select class="form-select Department" id="department" name="department">
+                            <select class="form-select Department dd-native-select" id="department" name="department">
                                 <option ></option>
                                 @foreach ($ResortDepartment as $r)
                                     <option value="{{$r->id}}" {{ request('department') != '' && (string)$r->id === (string)request('department') ? 'selected' : '' }}>{{$r->name}}</option>
                                 @endforeach
                             </select>
+                            @php $selectedDept = $ResortDepartment->first(function($r) { return (string)$r->id === (string)request('department'); }); @endphp
+                            <div class="dd" data-target="#department">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">{{ $selectedDept ? $selectedDept->name : 'Select Department' }}</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Department">
+                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a department…"></div>
+                                    <div class="dd-scroll">
+                                        <div class="dd-item{{ !$selectedDept ? ' active' : '' }}" role="option" data-value=""><span class="dd-nm">Select Department</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @foreach ($ResortDepartment as $r)
+                                        <div class="dd-item{{ request('department') != '' && (string)$r->id === (string)request('department') ? ' active' : '' }}" role="option" data-value="{{ $r->id }}"><span class="dd-nm">{{ $r->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         @endif
                         
                         <div class="col-xl-2 col-md-5 col-sm-4 col-6">
-                            <select class="form-select month" name="month" id="month">
-                                <option value="">Select Month</option>
-                                @foreach ([
+                            @php
+                                $monthsList = [
                                     1 => 'January', 2 => 'February', 3 => 'March',
                                     4 => 'April', 5 => 'May', 6 => 'June',
                                     7 => 'July', 8 => 'August', 9 => 'September',
                                     10 => 'October', 11 => 'November', 12 => 'December'
-                                ] as $key => $month)
+                                ];
+                                $selectedMonthKey = (request('month') !== null && request('month') !== '') ? (int) request('month') : (int) now()->month;
+                            @endphp
+                            <select class="form-select month dd-native-select" name="month" id="month">
+                                <option value="">Select Month</option>
+                                @foreach ($monthsList as $key => $month)
                                     @php $monthSelected = (request('month') !== null && request('month') !== '' && (int)request('month') === (int)$key) || ((request('month') === null || request('month') === '') && (int)$key === (int)now()->month); @endphp
                                     <option value="{{ $key }}" {{ $monthSelected ? 'selected' : '' }}>{{ $month }}</option>
                                 @endforeach
                             </select>
+                            <div class="dd" data-target="#month">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">{{ $monthsList[$selectedMonthKey] }}</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Month">
+                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a month…"></div>
+                                    <div class="dd-scroll">
+                                        <div class="dd-item" role="option" data-value=""><span class="dd-nm">Select Month</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @foreach ($monthsList as $key => $month)
+                                        <div class="dd-item{{ (int)$key === $selectedMonthKey ? ' active' : '' }}" role="option" data-value="{{ $key }}"><span class="dd-nm">{{ $month }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="col-xl-2 col-md-5 col-sm-4 col-6">
-                            <select class="form-select year" name="year" id="year">
+                            @php $selectedYear = (request('year') !== null && request('year') !== '') ? (int) request('year') : (int) now()->year; @endphp
+                            <select class="form-select year dd-native-select" name="year" id="year">
                                 <option value="">Select Year</option>
                                 @for ($y = now()->year; $y >= now()->year - 5; $y--)
                                     @php $yearSelected = (request('year') !== null && request('year') !== '' && (int)request('year') === (int)$y) || ((request('year') === null || request('year') === '') && (int)$y === (int)now()->year); @endphp
                                     <option value="{{ $y }}" {{ $yearSelected ? 'selected' : '' }}>{{ $y }}</option>
                                 @endfor
                             </select>
+                            <div class="dd" data-target="#year">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">{{ $selectedYear }}</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Year">
+                                    <div class="dd-scroll">
+                                        <div class="dd-item" role="option" data-value=""><span class="dd-nm">Select Year</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @for ($y = now()->year; $y >= now()->year - 5; $y--)
+                                        <div class="dd-item{{ $y === $selectedYear ? ' active' : '' }}" role="option" data-value="{{ $y }}"><span class="dd-nm">{{ $y }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @endfor
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         
 
@@ -193,6 +248,7 @@
     @endsection
     @section('import-css')
     @include('resorts.timeandattendance._taa_buttons_v2_styles')
+    @include('resorts._dropdown_styles')
     <style>
         .view-toggle-group {
             display: inline-flex;
@@ -224,7 +280,7 @@
         }
 
         .btn-icon-toggle.active {
-            background: #014653;
+            background: var(--teal);
             color: #ffffff;
             box-shadow: 0 2px 4px rgba(0, 123, 255, 0.3);
         }
@@ -315,7 +371,7 @@
         }
 
         .attendance-grid-table th {
-            background: #F5F8F8;
+            background: var(--teal-soft);
             font-weight: 600;
             text-align: center;
             padding: 12px 8px;
@@ -354,7 +410,7 @@
             min-width: 50px;
             text-align: center;
             padding: 8px 4px;
-            background: #F5F8F8;
+            background: var(--teal-soft);
         }
 
         .leave-stat-cell {
@@ -519,7 +575,7 @@
 
         /* Statistics Section */
         .attendance-statistics {
-            background: #F5F8F8;
+            background: var(--teal-soft);
             padding: 20px;
             border-radius: 8px;
         }
@@ -766,10 +822,6 @@
             appendTo: document.body
         });
 
-
-            $(".Department").select2({
-                placeholder: "Select Department"
-            });
 
             // Always load data via AJAX on page load
             updateRegisterFilterWiseTable();
@@ -1198,8 +1250,11 @@
         $("#department").val('').trigger('change');
         // Reset month/year to current
         $("#month").val('{{ now()->month }}');
+        window.wisdomDD.sync('#month');
         $("#year").val('{{ now()->year }}');
+        window.wisdomDD.sync('#year');
         updateRegisterFilterWiseTable();
     });
     </script>
+    @include('resorts._dropdown_script')
     @endsection

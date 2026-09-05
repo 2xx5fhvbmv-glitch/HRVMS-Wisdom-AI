@@ -8,9 +8,15 @@
 @endif
 
 @section('content')
+    <style>
+        #leave-details-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #leave-details-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding page-appHedding">
+            <div class="page-hedding page-appHedding" id="leave-details-hero">
                 <div class="row justify-content-between g-md-2 g-1">
                     <div class="col-auto">
                         <div class="page-title">
@@ -371,14 +377,31 @@
                         </div>
                         <div class="col-auto ms-auto">
                             <div class="form-group">
-                                <select class="form-select select2t-none" id="category-filter" name="category" aria-label="Default select example">
+                                <select class="form-select dd-native-select" id="category-filter" name="category" aria-label="Default select example">
                                     <option selected="" value="">All Category</option>
                                     @if($leave_categories)
                                         @foreach($leave_categories as $category)
                                             <option value="{{$category->id}}">{{$category->leave_type}}</option>
                                         @endforeach
-                                    @endif                                    
+                                    @endif
                                 </select>
+                                <div class="dd" data-target="#category-filter">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">All Category</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Category">
+                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a category…"></div>
+                                        <div class="dd-scroll">
+                                            <div class="dd-item active" role="option" data-value=""><span class="dd-nm">All Category</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @if($leave_categories)
+                                                @foreach($leave_categories as $category)
+                                                    <div class="dd-item" role="option" data-value="{{ $category->id }}"><span class="dd-nm">{{ $category->leave_type }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @endforeach
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -508,6 +531,8 @@
         </div>
     </div>
 @include('resorts.leaves._leave_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')

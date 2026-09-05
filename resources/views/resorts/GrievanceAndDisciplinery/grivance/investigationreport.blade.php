@@ -8,9 +8,15 @@
 @endif
 
 @section('content')
+<style>
+    #grievance-investigation-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #grievance-investigation-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="grievance-investigation-hero">
             <div class="row  g-3">
                 <div class="col-auto">
                     <div class="page-title">
@@ -28,400 +34,591 @@
             </div>
         </div>
 
+        <div class="gvi-wrap">
+        @php
+            // Priority dot-pill color — Low=positive, Medium=warning, High=error.
+            $gviPriority = $Grivance_Parent->Priority ?? 'Low';
+            $gviPriorityColor = $gviPriority == 'High' ? 'var(--error)' : ($gviPriority == 'Medium' ? 'var(--warning)' : 'var(--positive)');
 
-        <div class="card grieInv-card">
-            <div class="bg-themeGrayLight mb-md-4 mb-3">
-                <div class="row g-lg-5 g-sm-4 g-3">
-                    <div class="col-lg-6">
-                        <div class="table-responsive  mb-2">
-                            <table class="table-lableSmallLabel">
-                                <tr>
-                                    <th>Grievance ID:</th>
-                                    <td>{{ $Grivance_Parent->Grivance_id}}</td>
-                                </tr>
-                                <tr>
-                                    <th>Grievance Category:</th>
-                                    <td>{{ $Grivance_Parent->CatName }}</td>
-                                </tr><tr>
-                                    <th>Grievance Subcategory:</th>
-                                    <td>{{ $Grivance_Parent->SubCatName }}</td>
-                                </tr>
-                                <tr>
-                                    <th>Confidentiality Status:</th>
-                                    <td>
-                                        @if($Grivance_Parent->Grivance_Submission_Type =="Yes")
-                                        <span class="text-themeGreen text-nowrap">
-                                            <img src="{{ asset('resorts_assets/images/check-circle-themeGreen.svg') }}" alt="">Confidentiality
-                                        </span>
-                                        @elseif($Grivance_Parent->Grivance_Submission_Type =="No")
-                                            <span class="text-themeprimary text-nowrap" style="color: red;">
-                                                 Not a Confidentiality
-                                            </span>
-                                        @else
-                                            <span class="text-themeprimary text-nowrap" style="color: rgb(157, 47, 82);">
-                                                Not Applicable
-                                            </span>
-                                        @endif
+            // Confidentiality is data-driven off Grivance_Submission_Type, not
+            // hardcoded — this fact pill just states whether the CASE is
+            // confidential; it's independent of $canViewIdentity (which is
+            // whether THIS viewer specifically has been granted identity
+            // disclosure on an already-confidential case).
+            $gviConfType = $Grivance_Parent->Grivance_Submission_Type ?? 'NotApplicable';
+            $gviIsConfidential = $gviConfType == 'Yes';
 
-                                    </td>
-                                </tr>
-                              
-                                <tr>
-                                    <th>Priority Level:</th>
-                                    <td>
-                                        @if($Grivance_Parent->Priority =="High")
-                                            <span class="text-danger fw-600">High</span>
-                                        @elseif($Grivance_Parent->Priority =="Medium")
-                                            <span class="text-success fw-600">Medium</span>
-                                        @else
-                                            <span class="text-primary fw-600">Low</span>
-                                        @endif
-                                    
-                                    </td>
-                                </tr>
-                            </table>
-                        </div>
-                        <h6>Description:</h6>
-                        <p>
-                            {!!  $Grivance_Parent->Grivance_description !!}
-                        </p>
+            // Attachments — resolved ONCE (this helper does AWS/Storage
+            // lookups per file, so calling it repeatedly in a loop would be
+            // wasteful) into a plain array, matching the existing Disciplinary
+            // Investigation page's non-mutating attachment-list pattern.
+            // Kept exactly where it already lived — inside the identity-gated
+            // block — since these are the reporter's own uploaded files, not
+            // case-level evidence.
+            $gviAttachments = $canViewIdentity
+                ? \App\Helpers\Common::resolveGrievanceAttachments($Grivance_Parent->Attachements, $path."/".$Grivance_Parent->Grivance_id, $Grivance_Parent->resort_id)
+                : [];
+
+            // Initials fallback for the employee avatar, matching the pattern
+            // already established on the Disciplinary Investigation page.
+            $gviInitials = strtoupper(substr($Grivance_Parent->first_name ?? '', 0, 1) . substr($Grivance_Parent->last_name ?? '', 0, 1)) ?: '?';
+
+            // Follow-up action / investigation stage — humanise the raw
+            // camel-case enum values for display only; unmapped values fall
+            // back to the raw string rather than guessing.
+            $gviActionLabels = [
+                'GatherWitnessStatements' => 'Gather witness statements',
+                'InspectSite' => 'Inspect site',
+                'ReviewDocuments' => 'Review documents',
+                'CCTVFootageReview' => 'CCTV footage review',
+                'CheckAccessLogs' => 'Check access logs',
+                'GatherPhysicalEvidence' => 'Gather physical evidence',
+            ];
+            $gviStageLabels = [
+                'InitialReview' => ['Initial review', 'stage-init'],
+                'Delegated' => ['Delegated', 'stage-ongoing'],
+                'Ongoing' => ['Ongoing', 'stage-ongoing'],
+                'Compiled' => ['Report compiled', 'stage-done'],
+            ];
+            $gviStatusLabels = [
+                'pending' => 'Pending',
+                'in_review' => 'In review',
+                'resolved' => 'Resolved',
+                'rejected' => 'Rejected',
+            ];
+
+            // Most-recent-first — a pure view-layer reorder of the same
+            // already-fetched collection (the query itself has no orderBy),
+            // no new query.
+            $gviHistory = ($GrivanceSubmissionHistory ?? collect())->reverse()->values();
+
+            // Threshold for collapsing a long/structured explanation behind
+            // the native <details> disclosure instead of rendering inline —
+            // measured on stripped text so HTML markup doesn't skew the
+            // count. Real data ranges from ~50 to ~2600 chars; 300 cleanly
+            // separates the short one-liners from genuine multi-section
+            // reports.
+            $gviDetailsThreshold = 300;
+        @endphp
+
+        {{-- ===== hero ===== --}}
+        <div class="row g-3 g-xxl-4 gvi-hero">
+            <div class="col-lg-8">
+                <div class="gvi-card gvi-summary">
+                    <div class="gvi-title">{{ $Grivance_Parent->SubCatName ?? '—' }}</div>
+                    <div class="gvi-class">
+                        <span class="cat">{{ $Grivance_Parent->CatName }}</span>
+                        <span class="chev">&rsaquo;</span>
+                        <span class="sub">{{ $Grivance_Parent->SubCatName ?? '—' }}</span>
                     </div>
-                    <div class="col-lg-6">
-                        <h6 class="mb-md-3 mb-2">Employee Details: @if($Grivance_Parent->Grivance_Submission_Type =="Yes")
-                                        <span class="text-themeGreen text-nowrap">
-                                            <img src="{{ asset('resorts_assets/images/check-circle-themeGreen.svg') }}" alt="">Confidentiality
-                                        </span>
-                                        @elseif($Grivance_Parent->Grivance_Submission_Type =="No")
-                                            <span class="text-themeprimary text-nowrap" style="color: red;">
-                                                 Not a Confidentiality
-                                            </span>
-                                        @else
-                                            <span class="text-themeprimary text-nowrap" style="color: rgb(157, 47, 82);">
-                                                Not Applicable
-                                            </span>
-                                        @endif</h6>
-                                  @if($canViewIdentity)                            <div class="d-flex align-items-center mb-md-2 mb-1">
-                                <div class="img-circle me-2">
-
-                                    <img src="{{  Common::getResortUserPicture( $Grivance_Parent->Parentid)}}" alt="image">
-                                </div>
-                                <h6 class="mb-0">{{ $Grivance_Parent->first_name }} {{ $Grivance_Parent->last_name }}</h6>
-                            </div>
-                            <div class="table-responsive">
-                                <table class="table-lableSmallLabel">
-                                    <tr>
-                                        <th>Department:</th>
-                                        <td>{{ $Grivance_Parent->DepartmentName }}</td>
-                                    </tr>
-                                    <tr>
-                                        <th>Position:</th>
-                                        <td>{{ $Grivance_Parent->PositiontName }}</td>
-                                    </tr>
-                                    <tr>
-                                        <th>Contact Details:</th>
-                                        <td>{{ $Grivance_Parent->personal_phone }}</td>
-                                    </tr>
-                                    <tr>
-                                        <th>Attachments:</th>
-                                        <td>
-                                            @foreach(\App\Helpers\Common::resolveGrievanceAttachments($Grivance_Parent->Attachements, $path."/".$Grivance_Parent->Grivance_id, $Grivance_Parent->resort_id) as $att)
-                                                <a target="_blank" href="{{ $att['url'] }}">{{ $att['filename'] }}</a></br>
-                                            @endforeach
-                                        </td>
-                                    </tr>
-                                </table>
+                    <div class="gvi-desc">
+                        <div class="dk">Description</div>
+                        <div class="dv">{!! $Grivance_Parent->Grivance_description !!}</div>
+                    </div>
+                    <div class="gvi-facts">
+                        <div class="gvi-fact"><span class="k">Grievance ID</span><span class="pill ref-pill">{{ $Grivance_Parent->Grivance_id }}</span></div>
+                        <div class="gvi-fact"><span class="k">Priority</span><span class="pill"><span class="gvi-dot" style="background:{{ $gviPriorityColor }}"></span>{{ $gviPriority }}</span></div>
+                        <div class="gvi-fact">
+                            <span class="k">Confidentiality</span>
+                            @if($gviIsConfidential)
+                                <span class="pill lock"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg>Confidential</span>
+                            @elseif($gviConfType == 'No')
+                                <span class="pill">Not confidential</span>
+                            @else
+                                <span class="pill">Not applicable</span>
+                            @endif
+                        </div>
+                        @if($Grivance_Parent->created_at)
+                            <div class="gvi-fact"><span class="k">Created</span><span class="fv">{{ \Carbon\Carbon::parse($Grivance_Parent->created_at)->format('d-M-Y') }}</span></div>
+                        @endif
+                        @if($canViewIdentity)
+                            <div class="gvi-fact">
+                                <span class="k">Attachments</span>
+                                @if(count($gviAttachments))
+                                    <a class="gvi-filefact" href="{{ $gviAttachments[0]['url'] }}" target="_blank" title="{{ $gviAttachments[0]['filename'] }}">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a5 5 0 01-7.07-7.07l9.19-9.19a3 3 0 014.24 4.24l-9.2 9.19a1 1 0 01-1.41-1.41l8.49-8.49"/></svg>
+                                        <span class="fn">{{ $gviAttachments[0]['filename'] }}</span>
+                                    </a>
+                                    @if(count($gviAttachments) > 1)
+                                        <span class="gvi-filemore" title="{{ collect($gviAttachments)->pluck('filename')->slice(1)->implode(', ') }}">+{{ count($gviAttachments) - 1 }}</span>
+                                    @endif
+                                @else
+                                    <span class="gvi-filenone">None</span>
+                                @endif
                             </div>
                         @endif
                     </div>
                 </div>
-                @if(!empty($GrivanceSubmissionHistory) &&  $GrivanceSubmissionHistory->isNotEmpty())
-                    <hr>
-                    <h3>History</h3>
-                    <div class="table-responsive mb-4">
+            </div>
+
+            <div class="col-lg-4">
+                @if($canViewIdentity)
+                    <div class="gvi-card gvi-rail">
+                        <div class="rh">Employee</div>
+                        <div class="who">
+                            <img class="gvi-av" src="{{ Common::getResortUserPicture($Grivance_Parent->Parentid) }}" alt=""
+                                onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'gvi-av',textContent:'{{ $gviInitials }}'}))">
+                            <div class="nm">{{ $Grivance_Parent->first_name }} {{ $Grivance_Parent->last_name }}</div>
+                        </div>
+                        <div class="klist">
+                            <div class="krow"><span class="kk">Department</span><span class="kv">{{ $Grivance_Parent->DepartmentName }}</span></div>
+                            <div class="krow"><span class="kk">Position</span><span class="kv">{{ $Grivance_Parent->PositiontName }}</span></div>
+                            <div class="krow"><span class="kk">Contact</span><span class="kv">{{ $Grivance_Parent->personal_phone ?: '-' }}</span></div>
+                        </div>
+                    </div>
+                @else
+                    <div class="gvi-card gvi-rail locked">
+                        <div class="rh">Employee</div>
+                        <div class="gvi-lockg"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 018 0v4"/></svg></div>
+                        <div class="gvi-lockt">Confidential</div>
+                        <div class="gvi-locks">Employee identity is withheld on this grievance. Visible only to the assigned committee.</div>
+                    </div>
+                @endif
+            </div>
+        </div>
+
+        {{-- ===== history — vertical timeline ===== --}}
+        @if(!empty($GrivanceSubmissionHistory) && $GrivanceSubmissionHistory->isNotEmpty())
+            <div class="gvi-card gvi-hist">
+                <div class="gvi-sec-h">Investigation history</div>
+                <div class="gvi-timeline">
+                    @foreach($gviHistory as $key => $value)
+                        @php
+                            $gviStageInfo = $gviStageLabels[$value->investigation_stage] ?? [$value->investigation_stage, 'stage-init'];
+                            $gviActionLabel = $gviActionLabels[$value->follow_up_action] ?? $value->follow_up_action;
+                            $gviInitialsHist = strtoupper(substr($value->first_name ?? '', 0, 1) . substr($value->last_name ?? '', 0, 1)) ?: '?';
+                            $gviExplanationLen = strlen(strip_tags($value->inves_find_recommendations ?? ''));
+                        @endphp
+                        <div class="gvi-hentry @if($key === 0) latest @endif">
+                            <span class="gvi-hdot"></span>
+                            <div class="gvi-hcard">
+                                <div class="gvi-hhead">
+                                    <div class="gvi-hav">{{ $gviInitialsHist }}</div>
+                                    <div class="gvi-hwho"><div class="hn">{{ $value->first_name }} {{ $value->last_name }}</div><div class="hr">Committee member</div></div>
+                                    @if(!empty($value->investigation_stage))
+                                        <span class="gvi-hpill {{ $gviStageInfo[1] }}">{{ $gviStageInfo[0] }}</span>
+                                    @endif
+                                    @if(!empty($value->follow_up_action))
+                                        <span class="gvi-hpill action">{{ $gviActionLabel }}</span>
+                                    @endif
+                                </div>
+                                <div class="gvi-hbody">
+                                    @if(!empty($value->follow_up_description))
+                                        <div class="gvi-hrow"><div class="hk">Follow-up description</div><div class="hv">{!! $value->follow_up_description !!}</div></div>
+                                    @endif
+                                    @if(!empty($value->inves_find_recommendations))
+                                        <div class="gvi-hrow">
+                                            <div class="hk">Grievance explanation</div>
+                                            @if($gviExplanationLen > $gviDetailsThreshold)
+                                                <details class="gvi-report">
+                                                    <summary><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6"/></svg>View full investigation report<svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></summary>
+                                                    <div class="gvi-report-body">{!! $value->inves_find_recommendations !!}</div>
+                                                </details>
+                                            @else
+                                                <div class="hv">{!! $value->inves_find_recommendations !!}</div>
+                                            @endif
+                                        </div>
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+
+            @if($GrivanceInvestigationModel && !empty($GrivanceInvestigationModel->investigation_files))
+                <div class="gvi-card gvi-hist">
+                    <div class="gvi-sec-h">Attachments</div>
+                    <div class="table-responsive" style="max-width:400px;">
                         <table class="table gr-history-table">
                             <thead>
                                 <tr>
-                                    <th style="min-width:130px;">Follow-Up Action</th>
-                                    <th style="min-width:220px;">Follow-Up Description</th>
-                                    <th style="min-width:130px;">Investigation Stage</th>
-                                    <th style="min-width:320px;">Grievance Explanation Description</th>
-                                    <th style="min-width:150px;">Committee Member Name</th>
+                                    <th>File Name</th>
+                                    <th>Attachments</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                @foreach ($GrivanceSubmissionHistory as $key => $value)
+                                @foreach (explode(',', $GrivanceInvestigationModel->investigation_files) as $f)
                                     <tr>
-                                        <td>{{ $value->follow_up_action }}</td>
-                                        <td>{!! $value->follow_up_description !!}</td>
-                                        <td>{{ $value->investigation_stage }}</td>
-                                        <td>{!! $value->inves_find_recommendations !!}</td>
-                                        <td>{{ $value->first_name }} {{ $value->last_name }} </td>
+                                        <td>{{ $f }}</td>
+                                        <td><a target="_blank" href="{{ \App\Helpers\StorageHelper::temporaryUrl($EveidanceFilePath.'/'. $f) }}">View</a></td>
                                     </tr>
                                 @endforeach
                             </tbody>
                         </table>
                     </div>
+                </div>
+            @endif
+        @endif
 
-                    @if($GrivanceInvestigationModel && !empty($GrivanceInvestigationModel->investigation_files))
-                        <h6>Attachments</h6>
-                        <div class="table-responsive mb-4" style="max-width:400px;">
-                            <table class="table gr-history-table">
-                                <thead>
-                                    <tr>
-                                        <th>File Name</th>
-                                        <th>Attachments</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach (explode(',', $GrivanceInvestigationModel->investigation_files) as $f)
-                                        <tr>
-                                            <td>{{ $f }}</td>
-                                            <td><a target="_blank" href="{{ \App\Helpers\StorageHelper::temporaryUrl($EveidanceFilePath.'/'. $f) }}">View</a></td>
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-                    @endif
-                @endif
+        @if(isset($Grivance_Parent->Gm_Decision) && !empty($Grivance_Parent->Gm_Decision))
+            <div class="gvi-card gvi-hist">
+                <div class="gvi-sec-h">GM Response</div>
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Outcome Type</th>
+                                <th>Action Type</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>{{ $Grivance_Parent->Gm_Decision }}</td>
+                                <td>{!!  $Grivance_Parent->Gm_Resoan  !!}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
             </div>
-                @if(isset($Grivance_Parent->Gm_Decision) && !empty($Grivance_Parent->Gm_Decision))
-                    <div class="bg-themeGrayLight mb-md-4 mb-3">
-                        <div class="row">
-                                <h3> GM Response</h3>
-                                <div class="table">
-                                    <table class="table ">
-                                        <thead>
-                                            <tr>
-                                                <th>Outcome Type</th>
-                                                <th>Action Type </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            <tr>
-                                                <td>{{ $Grivance_Parent->Gm_Decision }}</td>
-                                                <td>{!!  $Grivance_Parent->Gm_Resoan  !!}</td>
-                                            </tr>
-                                        </tbody>
-                                    </table>
-                                </div>
-                        </div>
-                    </div>
-                @endif
-                <form id="investigationReportSubmit" data-parsley-validate>
-                    @csrf
-                    @if($isCommitteeMember)
-                    <div class="grieInvAssign-main">
-                        <div class="grieInvAssign-block">
-                            <div class="row align-items-end g-xl-4 g-3 mb-md-4 mb-3">
-                                <div class="col-lg-4 col-md-5 col-sm-6">
-                                    <label for="assign_to" class="form-label">ASSIGN TO</label>
-                                    <select class="form-select select2t-none" id="assign_to" name="assign_to"
-                                    @if($Grivance_Parent->Assigned == "Yes" || $Grivance_Parent->Assigned =='DeliverToHr') disabled @else required data-parsley-required-message="Please assign at least one committee member" @endif>
-                                        <option value=""></option>
-                                        @if($GrievanceCommitteeMemberParent)
-                                            @foreach ($GrievanceCommitteeMemberParent as $c)
-                                                <option value="{{ $c->id }}" {{ $c->id == $Grivance_Parent->Committee_id ? 'selected' : '' }}>{{ $c->Grivance_CommitteeName }}</option>
-                                            @endforeach
-                                        @endif
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    @else
-                    <div class="alert alert-warning">You are not part of the assigned investigation committee for this grievance.</div>
-                    @endif
+        @endif
 
-                    <input type="hidden" name="Grievant_form_id" value="{{ $Grivance_Parent->id}}">
-                    <input type="hidden" value="{{ ($Grivance_Parent->Assigned =='No') ? 'AssignToComittee':'EditModeForCommittee' }}" name="flag">
+        {{-- ===== outcome / status — read-only summary of the current
+             persisted values, complementing (not replacing) the editable
+             Outcome Type / Status controls further down in the form. ===== --}}
+        <div class="gvi-card gvi-foot">
+            <div class="fleft">
+                <div class="fitem"><span class="fk">Outcome type</span>
+                    @if(!empty($Grivance_Parent->outcome_type))
+                        <span class="fv">{{ $Grivance_Parent->outcome_type }}</span>
+                    @else
+                        <span class="fv none">Not set</span>
+                    @endif
+                </div>
+                <div class="fitem"><span class="fk">Status</span>
+                    @if(!empty($Grivance_Parent->status))
+                        <span class="fv">{{ $gviStatusLabels[$Grivance_Parent->status] ?? $Grivance_Parent->status }}</span>
+                    @else
+                        <span class="fv none">Not set</span>
+                    @endif
+                </div>
+            </div>
+            @if(!empty($Grivance_Parent->status))
+                <span class="gvi-status-pill {{ $Grivance_Parent->status }}"><span class="gvi-dot" style="background:currentColor"></span>{{ $gviStatusLabels[$Grivance_Parent->status] ?? $Grivance_Parent->status }}</span>
+            @endif
+        </div>
+
+        <div class="gvi-card" style="padding:24px 26px; margin-top:16px;">
+        <form id="investigationReportSubmit" data-parsley-validate>
+            @csrf
+            @if($isCommitteeMember)
+            <div class="gvi-card gvi-block">
+                <div class="gvi-block-head">@if($Grivance_Parent->Assigned != "No")<span class="gvi-step">1</span>@endif<span class="gvi-sec-h" style="margin-bottom:0">Investigation setup</span></div>
+                <div class="row align-items-end g-xl-4 g-3">
+                    <div class="col-lg-4 col-md-5 col-sm-6">
+                        <label for="assign_to" class="form-label">ASSIGN TO</label>
+                        @php $assignToDisabled = $Grivance_Parent->Assigned == "Yes" || $Grivance_Parent->Assigned =='DeliverToHr'; @endphp
+                        <select class="form-select dd-native-select" id="assign_to" name="assign_to"
+                        @if($assignToDisabled) disabled @else required data-parsley-required-message="Please assign at least one committee member" @endif>
+                            <option value=""></option>
+                            @if($GrievanceCommitteeMemberParent)
+                                @foreach ($GrievanceCommitteeMemberParent as $c)
+                                    <option value="{{ $c->id }}" {{ $c->id == $Grivance_Parent->Committee_id ? 'selected' : '' }}>{{ $c->Grivance_CommitteeName }}</option>
+                                @endforeach
+                            @endif
+                        </select>
+                        <div class="dd" data-target="#assign_to">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false" @if($assignToDisabled) disabled aria-disabled="true" @endif>
+                                <span class="dd-lbl">Select Committee</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Committee">
+                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a committee…"></div>
+                                <div class="dd-scroll">
+                                    @if($GrievanceCommitteeMemberParent)
+                                        @foreach ($GrievanceCommitteeMemberParent as $c)
+                                            <div class="dd-item{{ $c->id == $Grivance_Parent->Committee_id ? ' active' : '' }}" role="option" data-value="{{ $c->id }}"><span class="dd-nm">{{ $c->Grivance_CommitteeName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @endforeach
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                     @if($Grivance_Parent->Assigned !="DeliverToHr" ||  $Grivance_Parent->status !="resolved")
-                        @if($isCommitteeMember)
-                        <div class="row g-xl-4 g-3 mb-md-4 mb-3">
-                            <div class="col-lg-4 col-sm-6">
-                                <label for="inves_date" class="form-label">INVESTIGATION START DATE</label>
-                                <input type="text" value="{{ isset($GrivanceInvestigationModel->inves_start_date) ? $GrivanceInvestigationModel->inves_start_date :'' }}"
-                                @if($Grivance_Parent->Assigned=="No" || isset($GrivanceInvestigationModel->inves_start_date )) readonly @else required data-parsley-required-message="Investigation start date is required" @endif class="form-control datepicker" id="inves_date" name="invesigation_date" placeholder="Choose Date">
-                            </div>
-                            <div class="col-lg-4 col-sm-4">
-                                <label for="exp_date" class="form-label">Anticipated Resolution Date</label>
-                                <input type="text" value="{{ isset($GrivanceInvestigationModel->resolution_date) ? $GrivanceInvestigationModel->resolution_date :'' }} " @if($Grivance_Parent->Assigned=="No" || isset($GrivanceInvestigationModel->resolution_date)) readonly @else required data-parsley-required-message="Anticipated resolution date is required" data-parsley-greaterThan="#inves_date" data-parsley-greaterThan-message="Resolution date must be after the investigation start date" @endif class="form-control datepicker" id="exp_date" name="resolution_date" placeholder="Choose Date">
-                            </div>
-                            <div class="col-lg-4 col-sm-4">
-                                <a href="javascript:void(0)" class="btn eb-btn-accent AddMoreGrivance">Add More</a>
-                            </div>
-                        <div class="row g-xl-4 g-3 mb-md-4 mb-3 appendHere">
-                            <input type="hidden" name="counts" value="1" id="counts">
-                            <div class="col-12">
-                                <label for="inves_find" class="form-label">INVESTIGATION FINDINGS AND RECOMMENDATIONS</label>
+                        <div class="col-lg-4 col-sm-6">
+                            <label for="inves_date" class="form-label">INVESTIGATION START DATE</label>
+                            <input type="text" value="{{ isset($GrivanceInvestigationModel->inves_start_date) ? $GrivanceInvestigationModel->inves_start_date :'' }}"
+                            @if($Grivance_Parent->Assigned=="No" || isset($GrivanceInvestigationModel->inves_start_date )) readonly @else required data-parsley-required-message="Investigation start date is required" @endif class="form-control datepicker" id="inves_date" name="invesigation_date" placeholder="Choose Date">
+                        </div>
+                        <div class="col-lg-4 col-sm-4">
+                            <label for="exp_date" class="form-label">Anticipated Resolution Date</label>
+                            <input type="text" value="{{ isset($GrivanceInvestigationModel->resolution_date) ? $GrivanceInvestigationModel->resolution_date : '' }}" @if($Grivance_Parent->Assigned=="No" || isset($GrivanceInvestigationModel->resolution_date)) readonly @else required data-parsley-required-message="Anticipated resolution date is required" data-parsley-greaterThan="#inves_date" data-parsley-greaterThan-message="Resolution date must be after the investigation start date" @endif class="form-control datepicker" id="exp_date" name="resolution_date" placeholder="Choose Date">
+                        </div>
+                    @endif
+                </div>
+            </div>
+            @else
+            <div class="alert alert-warning">You are not part of the assigned investigation committee for this grievance.</div>
+            @endif
+
+            <input type="hidden" name="Grievant_form_id" value="{{ $Grivance_Parent->id}}">
+            <input type="hidden" value="{{ ($Grivance_Parent->Assigned =='No') ? 'AssignToComittee':'EditModeForCommittee' }}" name="flag">
+            @if($Grivance_Parent->Assigned !="DeliverToHr" ||  $Grivance_Parent->status !="resolved")
+                @if($Grivance_Parent->Assigned == "No")
+                    {{-- No committee assigned yet — nothing to log an entry against, so this step stays hidden until Step 1's Assign To is submitted. --}}
+                @elseif($isCommitteeMember)
+                <div class="gvi-card gvi-block">
+                    <div class="gvi-block-head"><span class="gvi-step">2</span><span class="gvi-sec-h" style="margin-bottom:0">Investigation entries</span></div>
+                    <div class="gvi-entries-hint">Log each stage of the investigation as a separate entry. Add as many as you need.</div>
+
+                <div class="appendHere">
+                    <input type="hidden" name="counts" value="1" id="counts">
+                    <div class="gvi-entry">
+                        <div class="gvi-entry-h">
+                            <span class="enum"><span class="ndot">1</span>Investigation entry</span>
+                            <span class="gvi-stagechip">Stage not set</span>
+                            <button type="button" class="gvi-rm btn eb-btn-critical delete-row-btn" data-id="1" hidden><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m2 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg>Remove</button>
+                            <svg class="caret" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                        </div>
+                        <div class="gvi-entry-b">
+                            <div class="field">
+                                <label for="inves_find" class="flabel">INVESTIGATION FINDINGS AND RECOMMENDATIONS</label>
                                 <textarea class="form-control gr-investigation-editor" @if($Grivance_Parent->Assigned=="No") readonly @else required data-parsley-required-message="Investigation findings are required" data-parsley-minlength="20" data-parsley-minlength-message="Please provide at least 20 characters of detailed findings" @endif id="inves_find" name="inves_find_recommendations[]" placeholder="Add detailed notes, observations, or findings as the investigation progresses" rows="4"></textarea>
                             </div>
-                            <div class="col-lg-4 col-sm-6 mt-1">
-                                <label for="followup_actions" class="form-label">FOLLOW-UP ACTIONS</label>
-                                <select class="form-select select2t-none follow_up_action_id" id="follow_up_action" name="follow_up_action[]" @if($Grivance_Parent->Assigned=="No") disabled @else required data-parsley-required-message="Please select a follow-up action" @endif aria-label="Default select example">
-                                    <option value=""> Select Follow-Up Action</option>
-                                    @if($Grivance_Parent->RequestforStatment !="Yes")
-                                        <option value="GatherWitnessStatements">Gather Witness Statements</option>
-                                    @endif
-                                    <option value="InspectSite">Inspect Site</option>
-                                    <option value="ReviewDocuments">Review Documents</option>
-                                    <option value="CCTVFootageReview">CCTV Footage Review</option>
-                                    <option value="CheckAccessLogs">Check Access Logs</option>
-                                    <option value="GatherPhysicalEvidence">Gather Physical Evidence</option>
-                                </select>
-                            </div>
-                            <div class="col-lg-6 col-sm-6 mt-1">
-                                <label for="follow_up_description" class="form-label">&nbsp;</label>
-                                <input type="text" class="form-control" placeholder="Type Here" name="follow_up_description[]" id="follow_up_description" @if($Grivance_Parent->Assigned=="No") disabled @else required data-parsley-required-message="Additional follow-up information is required" @endif>
+                            <div class="grid2">
+                                <div class="field">
+                                    <label for="followup_actions" class="flabel">FOLLOW-UP ACTIONS</label>
+                                    @php $followUpDisabled = $Grivance_Parent->Assigned=="No"; @endphp
+                                    <select class="form-select dd-native-select follow_up_action_id" id="follow_up_action" name="follow_up_action[]" @if($followUpDisabled) disabled @else required data-parsley-required-message="Please select a follow-up action" @endif aria-label="Follow-up actions">
+                                        <option value="">Select Follow-Up Action</option>
+                                        @if($Grivance_Parent->RequestforStatment !="Yes")
+                                            <option value="GatherWitnessStatements">Gather Witness Statements</option>
+                                        @endif
+                                        <option value="InspectSite">Inspect Site</option>
+                                        <option value="ReviewDocuments">Review Documents</option>
+                                        <option value="CCTVFootageReview">CCTV Footage Review</option>
+                                        <option value="CheckAccessLogs">Check Access Logs</option>
+                                        <option value="GatherPhysicalEvidence">Gather Physical Evidence</option>
+                                    </select>
+                                    <div class="dd" data-target="#follow_up_action">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false" @if($followUpDisabled) disabled aria-disabled="true" @endif>
+                                            <span class="dd-lbl">Select Follow-Up Action</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Follow-up action">
+                                            <div class="dd-scroll">
+                                                @if($Grivance_Parent->RequestforStatment !="Yes")
+                                                    <div class="dd-item" role="option" data-value="GatherWitnessStatements"><span class="dd-nm">Gather Witness Statements</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @endif
+                                                <div class="dd-item" role="option" data-value="InspectSite"><span class="dd-nm">Inspect Site</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="ReviewDocuments"><span class="dd-nm">Review Documents</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="CCTVFootageReview"><span class="dd-nm">CCTV Footage Review</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="CheckAccessLogs"><span class="dd-nm">Check Access Logs</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="GatherPhysicalEvidence"><span class="dd-nm">Gather Physical Evidence</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="field">
+                                    <label for="follow_up_description" class="flabel">Follow-up detail</label>
+                                    <input type="text" class="form-control" placeholder="Type Here" name="follow_up_description[]" id="follow_up_description" @if($Grivance_Parent->Assigned=="No") disabled @else required data-parsley-required-message="Additional follow-up information is required" @endif>
+                                </div>
                             </div>
                             @if($Grivance_Parent->RequestforStatment !="Yes")
-                                <div class="col-lg-2 col-sm-6 mt-1  d-none" id="RequestForStatement">
+                                <div class="field d-none" id="RequestForStatement">
                                     <a href="javascript:void(0)" class="btn eb-btn-accent RequestForStatement" data-id="{{$Grivance_Parent->Grivance_id}}">Request For Statement</a>
                                 </div>
                             @endif
-                            <div class="col-lg-4 col-sm-6">
-                                <label for="inves_stage" class="form-label">INVESTIGATION STAGE</label>
-                                <select class="form-select select2t-none" id="investigation_stage" name="investigation_stage[]" aria-label="Default select example" @if($Grivance_Parent->Assigned=="No") disabled @else required data-parsley-required-message="Please select an investigation stage" @endif>
+                            <div class="field" style="max-width:50%">
+                                <label for="inves_stage" class="flabel">INVESTIGATION STAGE</label>
+                                @php $stageDisabled = $Grivance_Parent->Assigned=="No"; @endphp
+                                <select class="form-select dd-native-select gvi-stage-select" id="investigation_stage" name="investigation_stage[]" aria-label="Investigation stage" @if($stageDisabled) disabled @else required data-parsley-required-message="Please select an investigation stage" @endif>
                                     <option value="">Select a stage</option>
                                     <option value="InitialReview">Initial Review</option>
                                     <option value="Delegated">Delegated</option>
                                     <option value="Ongoing">Ongoing</option>
                                     <option value="Compiled">Report Compiled</option>
                                 </select>
+                                <div class="dd" data-target="#investigation_stage">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false" @if($stageDisabled) disabled aria-disabled="true" @endif>
+                                        <span class="dd-lbl">Select a stage</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Investigation stage">
+                                        <div class="dd-scroll">
+                                            <div class="dd-item" role="option" data-value="InitialReview"><span class="dd-nm">Initial Review</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            <div class="dd-item" role="option" data-value="Delegated"><span class="dd-nm">Delegated</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            <div class="dd-item" role="option" data-value="Ongoing"><span class="dd-nm">Ongoing</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            <div class="dd-item" role="option" data-value="Compiled"><span class="dd-nm">Report Compiled</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
-                            <div class="col-12">
-                                <label for="resol_notes" class="form-label">RESOLUTION NOTES</label>
+                            <div class="field">
+                                <label for="resol_notes" class="flabel">RESOLUTION NOTES</label>
                                 <textarea class="form-control" id="resol_notes" name="resolution_note[]" @if($Grivance_Parent->Assigned=="No") readonly @endif placeholder="Type Here..." rows="4"></textarea>
                             </div>
                         </div>
-                        @else
-                        <div class="alert alert-warning">You are not part of the assigned investigation committee for this grievance.</div>
-                        @endif
+                    </div>
+                </div>
+                <button type="button" class="gvi-add-entry AddMoreGrivance"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 5v14M5 12h14"/></svg>Add another entry</button>
+                </div>
+                @else
+                <div class="alert alert-warning">You are not part of the assigned investigation committee for this grievance.</div>
+                @endif
 
-                        {{-- Outcome Type / Action Taken / Status / Approval / File Upload
-                             are all investigation-decision fields — same restriction as the
-                             Assign To and investigation-dates/findings sections above, which
-                             already correctly hide behind $isCommitteeMember. These four were
-                             left unguarded, so a non-committee viewer (any HR/GM/EXCOM opening
-                             the page) saw the "not part of the assigned investigation
-                             committee" notice right above a fully live outcome/upload/submit
-                             form for the exact same investigation. Request Identity Disclosure
-                             below stays outside this gate on purpose — it's a Key Personnel
-                             permission, a separate role from committee membership. --}}
-                        @if($isCommitteeMember)
-                            @if($Grivance_Parent->Assigned == "Yes")
-                                <div class="col-lg-4 col-sm-6">
-                                    <label for="outcome_type" class="form-label">OUTCOME TYPE</label>
-                                    <select class="form-select select2t-none" id="outcome_type" name="outcome_type"
-                                    
-                                        aria-label="Default select example">
-                                        <option value="">Select Outcome</option>
-                                        @if($Grivance_Parent->Assigned == "Yes") 
-                                            <option value="DeliverToHr">Resolved — Send To HR</option>
-                                            <option value="Unresolved"  {{ ($Grivance_Parent->outcome_type == "Unresolved")  ?'selected':'' }}>Unresolved</option>
-
-                                        @else
-                                        <option value="Resolved" {{ ($Grivance_Parent->outcome_type == "resolved")  ?'selected':'' }}>Resolved </option>
-                                        <option value="Unresolved"  {{ ($Grivance_Parent->outcome_type == "Unresolved")  ?'selected':'' }}>Unresolved</option>
-                                        <option value="Dismissed"  {{ ($Grivance_Parent->outcome_type == "Dismissed")  ?'selected':'' }}>Dismissed</option>
-                                        <option value="OnHold"  {{ ($Grivance_Parent->outcome_type == "OnHold")  ?'selected':'' }}>On Hold</option>
-                                        <option value="WithdrawalbyComplainant"  {{ ($Grivance_Parent->outcome_type == "WithdrawalbyComplainant")  ?'selected':'' }}>Withdrawal by Complainant</option>
-                                        <option value="EscalatedforFurtherInvestigation"  {{ ($Grivance_Parent->outcome_type == "EscalatedforFurtherInvestigation")  ?'selected':'' }}>Escalated for Further Investigation</option>
-                                        <option value="PolicyImprovementSuggested"  {{ ($Grivance_Parent->outcome_type == "PolicyImprovementSuggested")  ?'selected':'' }}>Policy Improvement Suggested</option>
-                                        @endif
-                                    
-                                    </select>
-                                </div>
-                            @endif
-                        
-                            @if($Grivance_Parent->Assigned == "DeliverToHr") 
-        
-                            
-                            
-                                <div class="col-lg-4 col-sm-6">
-                                    <label for="action_taken" class="form-label">ACTION TAKEN</label>
-
-                                    <select class="form-select select2t-none" id="action_taken" name="action_taken"
-                                    
-                                        aria-label="Default select example">
-                                        <option value="">Select Action</option>
-                                        @if($ActionStore->isNotEmpty())
-                                            @foreach($ActionStore as $item)
-                                                <option value="{{ base64_encode($item->id) }}" {{ ($Grivance_Parent->action_taken == $item->id)  ?'selected':'' }}>{{ $item->ActionName }}</option>
-                                            @endforeach
-                                        @endif
-                                    </select>
-                                </div>
-                                <div class="col-lg-4 col-sm-6">
-                                    <label for="action_taken" class="form-label">STATUS</label>
-
-                                    <select class="form-select select2t-none" id="Status" name="STATUS"
-                                    
-                                        aria-label="Default select example">
-                                        <option value="">Select Status</option>
-                                        <option value="pending" {{$Grivance_Parent->status =="pending"  ?'selected':''}}>Pending</option>
-                                        <option value="in_review" {{$Grivance_Parent->status =="in_review"  ?'selected':''}}>In Review</option>
-                                        <option value="resolved" {{$Grivance_Parent->status =="resolved"  ?'selected':''}}>Resolved</option>
-                                        <option value="rejected" {{$Grivance_Parent->status =="rejected"  ?'selected':''}}>Rejected</option>
-                                    </select>
-                                </div>
-                                @if(!isset($Grivance_Parent->SentToGM ) ||$Grivance_Parent->SentToGM != "Yes" && !isset($Grivance_Parent->Gm_Decision)) 
-                                <div class="col-lg-4 hideApprovalRequest">
-                                    <label for="" class="form-label">APPROVAL</label>
-                                    <div class="mt-lg-2">
-                                        <div class="form-check form-check-inline">
-                                            <input class="form-check-input" type="checkbox" name="approval_request"
-                                                @if($Grivance_Parent->Assigned != "DeliverToHr") 
-                                                    disabled 
-                                                @endif 
-                                                id="inlineCheckbox1" >
-                                            <label class="form-check-label" for="inlineCheckbox1">
-                                                Forward the investigation report to relevant approvers
-                                            </label>
-                                        </div>
+                {{-- Outcome Type / Action Taken / Status / Approval / File Upload
+                     are all investigation-decision fields — same restriction as the
+                     Assign To and investigation-dates/findings sections above, which
+                     already correctly hide behind $isCommitteeMember. These four were
+                     left unguarded, so a non-committee viewer (any HR/GM/EXCOM opening
+                     the page) saw the "not part of the assigned investigation
+                     committee" notice right above a fully live outcome/upload/submit
+                     form for the exact same investigation. Request Identity Disclosure
+                     below stays outside this gate on purpose — it's a Key Personnel
+                     permission, a separate role from committee membership. --}}
+                @if($isCommitteeMember)
+                    @if($Grivance_Parent->Assigned == "Yes")
+                        <div class="col-lg-4 col-sm-6">
+                            <label for="outcome_type" class="form-label">OUTCOME TYPE</label>
+                            @php
+                                $outcomeOptions = $Grivance_Parent->Assigned == "Yes"
+                                    ? [['DeliverToHr', 'Resolved — Send To HR'], ['Unresolved', 'Unresolved']]
+                                    : [
+                                        ['Resolved', 'Resolved'], ['Unresolved', 'Unresolved'], ['Dismissed', 'Dismissed'],
+                                        ['OnHold', 'On Hold'], ['WithdrawalbyComplainant', 'Withdrawal by Complainant'],
+                                        ['EscalatedforFurtherInvestigation', 'Escalated for Further Investigation'],
+                                        ['PolicyImprovementSuggested', 'Policy Improvement Suggested'],
+                                    ];
+                                $outcomeCompareVal = $Grivance_Parent->Assigned == "Yes" ? null : 'resolved';
+                            @endphp
+                            <select class="form-select dd-native-select" id="outcome_type" name="outcome_type" aria-label="Outcome type">
+                                <option value="">Select Outcome</option>
+                                @foreach($outcomeOptions as [$val, $label])
+                                    <option value="{{ $val }}" {{ $Grivance_Parent->outcome_type == $val || ($val === 'Resolved' && $Grivance_Parent->outcome_type == 'resolved') ? 'selected' : '' }}>{{ $label }}</option>
+                                @endforeach
+                            </select>
+                            <div class="dd" data-target="#outcome_type">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Select Outcome</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Outcome type">
+                                    <div class="dd-scroll">
+                                        @foreach($outcomeOptions as [$val, $label])
+                                            <div class="dd-item{{ ($Grivance_Parent->outcome_type == $val || ($val === 'Resolved' && $Grivance_Parent->outcome_type == 'resolved')) ? ' active' : '' }}" role="option" data-value="{{ $val }}"><span class="dd-nm">{{ $label }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @endforeach
                                     </div>
                                 </div>
-                                @endif
-                            @endif
-                            @if($Grivance_Parent->Assigned == "Yes")
-                                <div class="col-lg-4 col-sm-6">
-                                    <label class="form-label">FILE UPLOAD</label>
-                                    <div class="uploadFile-block">
-                                        <div class="uploadFile-btn">
-                                            <a href="#" class="btn eb-btn-accent btn-sm">Upload File</a>
-                                            <input type="file" 
-                                            id="uploadFile" 
-                                            multiple 
-                                            name="investigation_file[]" 
-                                            accept=".pdf, image/*" 
-                                            @if($Grivance_Parent->Assigned=="No") disabled @else data-parsley-max-file-size="5" data-parsley-fileextension="pdf,png,jpg,jpeg,gif,svg,webp,heic,heif" data-parsley-fileextension-message="Only PDF and image files are allowed" @endif>
-                                        </div>
-                                        <div class="uploadFile-text">PNG, JPEG, PDF</div>
-                                        <div class="uploadFile-selected small text-muted mt-1"></div>
-                                    </div>
-                                </div>
-                            @endif
-                        @endif
-                            @if($Grivance_Parent->Grivance_Submission_Type == "Yes" && !$canViewIdentity && in_array($auth_id, $GrivanceKeys) && !isset($Grivance_Parent->Gm_Decision))
-                                <div class="col-lg-4 col-sm-6 align-self-end">
-                                    @if($Grivance_Parent->Request_Identity_Disclosure == 'Requested')
-                                        <span class="text-muted">Identity disclosure requested — awaiting response</span>
-                                    @else
-                                        <a href="javascript:void(0)" @if($Grivance_Parent->Assigned=="No") disabled @endif class="btn eb-btn-accent RequestIdentity" data-id="{{ $Grivance_Parent->id}}">Request Identity Disclosure</a>
-                                    @endif
-                                </div>
-                            @endif
-
+                            </div>
                         </div>
                     @endif
-                
-                    @if($isCommitteeMember)
-                    <div class="card-footer text-end">
-                        <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
-                    </div>
+
+                    @if($Grivance_Parent->Assigned == "DeliverToHr")
+
+
+
+                        <div class="col-lg-4 col-sm-6">
+                            <label for="action_taken" class="form-label">ACTION TAKEN</label>
+
+                            <select class="form-select dd-native-select" id="action_taken" name="action_taken" aria-label="Action taken">
+                                <option value="">Select Action</option>
+                                @if($ActionStore->isNotEmpty())
+                                    @foreach($ActionStore as $item)
+                                        <option value="{{ base64_encode($item->id) }}" {{ ($Grivance_Parent->action_taken == $item->id)  ?'selected':'' }}>{{ $item->ActionName }}</option>
+                                    @endforeach
+                                @endif
+                            </select>
+                            <div class="dd" data-target="#action_taken">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Select Action</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Action taken">
+                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an action…"></div>
+                                    <div class="dd-scroll">
+                                        @if($ActionStore->isNotEmpty())
+                                            @foreach($ActionStore as $item)
+                                                <div class="dd-item{{ $Grivance_Parent->action_taken == $item->id ? ' active' : '' }}" role="option" data-value="{{ base64_encode($item->id) }}"><span class="dd-nm">{{ $item->ActionName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @endforeach
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-lg-4 col-sm-6">
+                            <label for="action_taken" class="form-label">STATUS</label>
+
+                            <select class="form-select dd-native-select" id="Status" name="STATUS" aria-label="Status">
+                                <option value="">Select Status</option>
+                                <option value="pending" {{$Grivance_Parent->status =="pending"  ?'selected':''}}>Pending</option>
+                                <option value="in_review" {{$Grivance_Parent->status =="in_review"  ?'selected':''}}>In Review</option>
+                                <option value="resolved" {{$Grivance_Parent->status =="resolved"  ?'selected':''}}>Resolved</option>
+                                <option value="rejected" {{$Grivance_Parent->status =="rejected"  ?'selected':''}}>Rejected</option>
+                            </select>
+                            <div class="dd" data-target="#Status">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Select Status</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Status">
+                                    <div class="dd-scroll">
+                                        <div class="dd-item{{ $Grivance_Parent->status == 'pending' ? ' active' : '' }}" role="option" data-value="pending"><span class="dd-nm">Pending</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item{{ $Grivance_Parent->status == 'in_review' ? ' active' : '' }}" role="option" data-value="in_review"><span class="dd-nm">In Review</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item{{ $Grivance_Parent->status == 'resolved' ? ' active' : '' }}" role="option" data-value="resolved"><span class="dd-nm">Resolved</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item{{ $Grivance_Parent->status == 'rejected' ? ' active' : '' }}" role="option" data-value="rejected"><span class="dd-nm">Rejected</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        @if(!isset($Grivance_Parent->SentToGM ) ||$Grivance_Parent->SentToGM != "Yes" && !isset($Grivance_Parent->Gm_Decision))
+                        <div class="col-lg-4 hideApprovalRequest">
+                            <label for="" class="form-label">APPROVAL</label>
+                            <div class="mt-lg-2">
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" name="approval_request"
+                                        @if($Grivance_Parent->Assigned != "DeliverToHr")
+                                            disabled
+                                        @endif
+                                        id="inlineCheckbox1" >
+                                    <label class="form-check-label" for="inlineCheckbox1">
+                                        Forward the investigation report to relevant approvers
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                        @endif
                     @endif
-                </form>
+                    @if($Grivance_Parent->Assigned == "Yes")
+                        <div class="col-lg-4 col-sm-6">
+                            <label class="form-label">FILE UPLOAD</label>
+                            <div class="uploadFile-block">
+                                <div class="uploadFile-btn">
+                                    <a href="#" class="btn eb-btn-accent btn-sm">Upload File</a>
+                                    <input type="file"
+                                    id="uploadFile"
+                                    multiple
+                                    name="investigation_file[]"
+                                    accept=".pdf, image/*"
+                                    @if($Grivance_Parent->Assigned=="No") disabled @else data-parsley-max-file-size="5" data-parsley-fileextension="pdf,png,jpg,jpeg,gif,svg,webp,heic,heif" data-parsley-fileextension-message="Only PDF and image files are allowed" @endif>
+                                </div>
+                                <div class="uploadFile-text">PNG, JPEG, PDF</div>
+                                <div class="uploadFile-selected small text-muted mt-1"></div>
+                            </div>
+                        </div>
+                    @endif
+                @endif
+                    @if($Grivance_Parent->Grivance_Submission_Type == "Yes" && !$canViewIdentity && in_array($auth_id, $GrivanceKeys) && !isset($Grivance_Parent->Gm_Decision))
+                        <div class="col-lg-4 col-sm-6 align-self-end">
+                            @if($Grivance_Parent->Request_Identity_Disclosure == 'Requested')
+                                <span class="text-muted">Identity disclosure requested — awaiting response</span>
+                            @else
+                                <a href="javascript:void(0)" @if($Grivance_Parent->Assigned=="No") disabled @endif class="btn eb-btn-accent RequestIdentity" data-id="{{ $Grivance_Parent->id}}">Request Identity Disclosure</a>
+                            @endif
+                        </div>
+                    @endif
+
+                </div>
+            @endif
+
+            @if($isCommitteeMember)
+            <div class="card-footer text-end">
+                <button type="submit" class="btn eb-btn-primary btn-sm">Submit</button>
+            </div>
+            @endif
+        </form>
+        </div>
 
         </div>
     </div>
@@ -508,7 +705,10 @@
 </div>
 @endif
 @endif
+@include('resorts.GrievanceAndDisciplinery.grivance._investigation_report_styles')
 @include('resorts._emotional_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -554,47 +754,6 @@ $(document).ready(function() {
         allowInput: true,
         appendTo: document.body
     });
-    $('#Employee_id').select2({
-        placeholder: 'Select Employee',
-        minimumResultsForSearch: -1,
-        width: '100%'
-    });
-    $('#Grivance_offence_id').select2({
-        placeholder: 'Select Grievance Offence',
-        minimumResultsForSearch: -1,
-        width: '100%'
-    });
-    $('#Grivance_Cat_id').select2({
-        placeholder: 'Select Grievance Category',
-        minimumResultsForSearch: -1,
-        width: '100%'
-    });
-    $('#witness_id').select2({
-        placeholder: 'Select Witness',
-        minimumResultsForSearch: -1,
-        width: '100%'
-    });
-    $('#assign_to').select2({
-        placeholder: 'Select Committee ',
-        minimumResultsForSearch: -1,
-        width: '100%'
-    });
-    $('#action_taken').select2({
-        placeholder: 'Select Action ',
-        minimumResultsForSearch: -1,
-        width: '100%'
-    });
-    $('#follow_up_action').select2({
-        placeholder: 'Select Follow-Up Action',
-        minimumResultsForSearch: -1,
-        width: '100%'
-    });
-    $('#assign_to').select2({
-        placeholder: 'Select Committee ',
-        minimumResultsForSearch: -1,
-        width: '100%'
-    });
-
     $("#investigationReportSubmit").parsley();
 
     $(".gr-investigation-editor").each(function() {
@@ -619,7 +778,7 @@ $(document).ready(function() {
                 {
                     let formData = new FormData(this);
                     $.ajax({
-                        url: "{{ route('GrievanceAndDisciplinery.grivance.InvestigationReportStore') }}", 
+                        url: "{{ route('GrievanceAndDisciplinery.grivance.InvestigationReportStore') }}",
                         type: 'POST',
                         data: formData,
                         processData: false,
@@ -640,20 +799,20 @@ $(document).ready(function() {
                                     });
                             }
                         },
-                        error: function(response) 
+                        error: function(response)
                         {
                             var errors = response.responseJSON;
-                            if (errors.error) 
-                            { 
-                                toastr.error(errors.error, "Error", 
+                            if (errors.error)
+                            {
+                                toastr.error(errors.error, "Error",
                                 {
                                     positionClass: 'toast-bottom-right'
                                 });
                             }
-                            else 
+                            else
                             {
                                 var errs = '';
-                                $.each(errors.errors, function(key, error) 
+                                $.each(errors.errors, function(key, error)
                                 {
                                     errs += error + '<br>';
                                 });
@@ -667,16 +826,16 @@ $(document).ready(function() {
                     return false;
                 }
             });
-            
-    
-    
+
+
+
 });
 $(document).on("change",".follow_up_action_id",function() {
 
     var action = $(this).val();
     if(action =="GatherWitnessStatements")
     {
-        $("#RequestForStatement").removeClass('d-none');   
+        $("#RequestForStatement").removeClass('d-none');
     }
     else
     {
@@ -687,7 +846,7 @@ $(document).on("click",".RequestForStatement",function() {
 
     var id = $(this).data('id');
     $.ajax({
-                url: "{{ route('GrievanceAndDisciplinery.grivance.RequestForStatement') }}", 
+                url: "{{ route('GrievanceAndDisciplinery.grivance.RequestForStatement') }}",
                 type: 'POST',
                 data: {"id":id,"_token":"{{ csrf_token() }}"},
                 success: function(response) {
@@ -703,20 +862,20 @@ $(document).on("click",".RequestForStatement",function() {
                             });
                     }
                 },
-                error: function(response) 
+                error: function(response)
                 {
                     var errors = response.responseJSON;
-                    if (errors.error) 
-                    { 
-                        toastr.error(errors.error, "Error", 
+                    if (errors.error)
+                    {
+                        toastr.error(errors.error, "Error",
                         {
                             positionClass: 'toast-bottom-right'
                         });
                     }
-                    else 
+                    else
                     {
                         var errs = '';
-                        $.each(errors.errors, function(key, error) 
+                        $.each(errors.errors, function(key, error)
                         {
                             errs += error + '<br>';
                         });
@@ -732,18 +891,18 @@ $(document).on("click",".RequestForStatement",function() {
 
 
     $(document).on("change","#Employee_id",function() {
-    
+
         var emp =  $(this).val();
 
         $.ajax({
-        url: "{{ route('GrievanceAndDisciplinery.grivance.GetEmployeeDetails') }}", 
+        url: "{{ route('GrievanceAndDisciplinery.grivance.GetEmployeeDetails') }}",
         type: "get",
         data: {"_token":"{{ csrf_token() }}","emp":emp},
         success: function(response) {
             console.log(response);
             if (response.success) {
-            
-             $("#supervisor").val(response.data.Superviser.Main_Name);  
+
+             $("#supervisor").val(response.data.Superviser.Main_Name);
               $("#employee_main_id").val(response.data.Employee.Emp_id);
               $("#Department").val(response.data.Employee.DepartmentName);
               $("#job_title").val(response.data.Employee.PositionName);
@@ -768,88 +927,145 @@ $(document).on("click",".RequestForStatement",function() {
         }
     });
     });
+    // Numbers the visible ".ndot" badges 1..N in DOM order and hides the
+    // Remove button whenever exactly one entry remains (min 1) — same rule
+    // for the static first entry and every JS-added one, since they now
+    // share the identical .gvi-entry markup shape.
+    function gviRenumberEntries() {
+        var $entries = $(".appendHere .gvi-entry");
+        $entries.each(function (i) {
+            $(this).find(".ndot").first().text(i + 1);
+        });
+        $entries.find(".gvi-rm").prop("hidden", $entries.length <= 1);
+    }
+
     $(document).on("click",".AddMoreGrivance",function(){
         var counts = parseInt( $("#counts").val());
         counts = counts+1;
-        var string=`<hr class="mt-2 Remove_c_${counts}">
-                    <div class="col-12  Remove_c_${counts}">
-                        <label for="inves_find_${counts}" class="form-label">INVESTIGATION FINDINGS AND RECOMMENDATIONS</label>
+        // Collapse existing entries so the newly-added one is the only one
+        // open — keeps focus on the row being filled instead of a wall of
+        // identical open blocks.
+        $(".appendHere .gvi-entry").addClass("collapsed");
+        var tickSvg = '<svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg>';
+        var string=`
+            <div class="gvi-entry Remove_c_${counts}">
+                <div class="gvi-entry-h">
+                    <span class="enum"><span class="ndot">${counts}</span>Investigation entry</span>
+                    <span class="gvi-stagechip">Stage not set</span>
+                    <button type="button" class="gvi-rm btn eb-btn-critical delete-row-btn" data-id="${counts}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2m2 0v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/></svg>Remove</button>
+                    <svg class="caret" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                </div>
+                <div class="gvi-entry-b">
+                    <div class="field">
+                        <label for="inves_find_${counts}" class="flabel">INVESTIGATION FINDINGS AND RECOMMENDATIONS</label>
                         <textarea class="form-control gr-investigation-editor" @if($Grivance_Parent->Assigned=="No") readonly @else required data-parsley-required-message="Investigation findings are required" data-parsley-minlength="20" data-parsley-minlength-message="Please provide at least 20 characters of detailed findings" @endif id="inves_find_${counts}" name="inves_find_recommendations[]" placeholder="Add detailed notes, observations, or findings as the investigation progresses" rows="4"></textarea>
                     </div>
-                    <div class="col-lg-4 col-sm-6  Remove_c_${counts}">
-                        <label for="followup_actions" class="form-label">FOLLOW-UP ACTIONS</label>
-                        <select class="form-select select2t-none" id="follow_up_action_${counts}" name="follow_up_action[]" @if($Grivance_Parent->Assigned=="No") disabled @else required data-parsley-required-message="Please select a follow-up action" @endif aria-label="Default select example">
-                            <option value=""></option>
-                            <option value="InspectSite">Inspect Site</option>
-                            <option value="ReviewDocuments">Review Documents</option>
-                            <option value="CCTVFootageReview">CCTV Footage Review</option>
-                            <option value="CheckAccessLogs">Check Access Logs</option>
-                            <option value="GatherPhysicalEvidence">Gather Physical Evidence</option>
-                        </select>
+                    <div class="grid2">
+                        <div class="field">
+                            <label for="followup_actions" class="flabel">FOLLOW-UP ACTIONS</label>
+                            <select class="form-select dd-native-select follow_up_action_id" id="follow_up_action_${counts}" name="follow_up_action[]" @if($Grivance_Parent->Assigned=="No") disabled @else required data-parsley-required-message="Please select a follow-up action" @endif aria-label="Follow-up actions">
+                                <option value=""></option>
+                                <option value="InspectSite">Inspect Site</option>
+                                <option value="ReviewDocuments">Review Documents</option>
+                                <option value="CCTVFootageReview">CCTV Footage Review</option>
+                                <option value="CheckAccessLogs">Check Access Logs</option>
+                                <option value="GatherPhysicalEvidence">Gather Physical Evidence</option>
+                            </select>
+                            <div class="dd" data-target="#follow_up_action_${counts}">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Select Follow-Up Action</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Follow-up action">
+                                    <div class="dd-scroll">
+                                        <div class="dd-item" role="option" data-value="InspectSite"><span class="dd-nm">Inspect Site</span>${tickSvg}</div>
+                                        <div class="dd-item" role="option" data-value="ReviewDocuments"><span class="dd-nm">Review Documents</span>${tickSvg}</div>
+                                        <div class="dd-item" role="option" data-value="CCTVFootageReview"><span class="dd-nm">CCTV Footage Review</span>${tickSvg}</div>
+                                        <div class="dd-item" role="option" data-value="CheckAccessLogs"><span class="dd-nm">Check Access Logs</span>${tickSvg}</div>
+                                        <div class="dd-item" role="option" data-value="GatherPhysicalEvidence"><span class="dd-nm">Gather Physical Evidence</span>${tickSvg}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="field">
+                            <label for="follow_up_description" class="flabel">Follow-up detail</label>
+                            <input type="text" class="form-control" placeholder="Type Here" name="follow_up_description[]" id="follow_up_description" @if($Grivance_Parent->Assigned=="No") disabled @else required data-parsley-required-message="Additional follow-up information is required" @endif>
+                        </div>
                     </div>
-                    <div class="col-lg-8 col-sm-6 mt-3 Remove_c_${counts}">
-                        <input type="text" class="form-control" placeholder="Type Here" name="follow_up_description[]" id="follow_up_description" @if($Grivance_Parent->Assigned=="No") disabled @else required data-parsley-required-message="Additional follow-up information is required" @endif>
-                    </div>
-                    <div class="col-lg-4 col-sm-6 Remove_c_${counts}">
-                        <label for="inves_stage" class="form-label">INVESTIGATION STAGE</label>
-                        <select class="form-select select2t-none" id="investigation_stage_${counts}" name="investigation_stage[]" aria-label="Default select example" @if($Grivance_Parent->Assigned=="No") disabled @else required data-parsley-required-message="Please select an investigation stage" @endif>
+                    <div class="field" style="max-width:50%">
+                        <label for="inves_stage" class="flabel">INVESTIGATION STAGE</label>
+                        <select class="form-select dd-native-select gvi-stage-select" id="investigation_stage_${counts}" name="investigation_stage[]" aria-label="Investigation stage" @if($Grivance_Parent->Assigned=="No") disabled @else required data-parsley-required-message="Please select an investigation stage" @endif>
                             <option value="">Select a stage</option>
                             <option value="InitialReview">Initial Review</option>
                             <option value="Delegated">Delegated</option>
                             <option value="Ongoing">Ongoing</option>
                             <option value="Compiled">Report Compiled</option>
                         </select>
+                        <div class="dd" data-target="#investigation_stage_${counts}">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">Select a stage</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Investigation stage">
+                                <div class="dd-scroll">
+                                    <div class="dd-item" role="option" data-value="InitialReview"><span class="dd-nm">Initial Review</span>${tickSvg}</div>
+                                    <div class="dd-item" role="option" data-value="Delegated"><span class="dd-nm">Delegated</span>${tickSvg}</div>
+                                    <div class="dd-item" role="option" data-value="Ongoing"><span class="dd-nm">Ongoing</span>${tickSvg}</div>
+                                    <div class="dd-item" role="option" data-value="Compiled"><span class="dd-nm">Report Compiled</span>${tickSvg}</div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="col-11 Remove_c_${counts}">
-                        <label for="resol_notes" class="form-label">RESOLUTION NOTES</label>
+                    <div class="field">
+                        <label for="resol_notes" class="flabel">RESOLUTION NOTES</label>
                         <textarea class="form-control" id="resol_notes" name="resolution_note[]" @if($Grivance_Parent->Assigned=="No") readonly @endif placeholder="Type Here..." rows="4"></textarea>
                     </div>
-                    <div class="col-1 mt-3 Remove_c_${counts}">
-                        <a href="javascript:void(0)" class="btn-tableIcon eb-icon-critical delete-row-btn" data-id="${counts}" >
-                            <i class="fa-regular fa-trash-can"></i>
-                        </a>
-                    </div>`;
-                   
+                </div>
+            </div>`;
+
             $(".appendHere").append(string);
             $("#counts").val(counts)
             CKEDITOR.replace('inves_find_'+counts);
-            $('#action_taken_'+counts).select2({
-                placeholder: 'Select Action ',
-                minimumResultsForSearch: -1,
-                width: '100%'
-            });
-            $('#investigation_stage_'+counts).select2({
-                placeholder: 'Select Investigation Stage',
-                minimumResultsForSearch: -1,
-                width: '100%'
-            })
-            $('#follow_up_action_'+counts).select2({
-                placeholder: 'Select Follow-Up Action',
-                minimumResultsForSearch: -1,
-                width: '100%'
-            });
-            $('#assign_to_'+counts).select2({
-                placeholder: 'Select Committee ',
-                minimumResultsForSearch: -1,
-                width: '100%'
-            });
-
-
+            gviRenumberEntries();
     });
     $(document).on("change","#uploadFile",function(){
         var names = Array.from(this.files).map(f => f.name);
         $(".uploadFile-selected").text(names.length ? 'Selected: ' + names.join(', ') : '');
     });
 
-    $(document).on("click",".delete-row-btn",function(){
+    $(document).on("click",".delete-row-btn",function(e){
+        e.stopPropagation(); // don't let the click also toggle the entry open/closed
+        if ($(".appendHere .gvi-entry").length <= 1) return; // min 1 entry
 
         var location = $(this).data("id");
         if (CKEDITOR.instances['inves_find_'+location]) {
             CKEDITOR.instances['inves_find_'+location].destroy(true);
         }
-        $(".Remove_c_"+location).remove();
+        $(this).closest(".gvi-entry").remove();
         $("#counts").val(parseInt( $("#counts").val())-1);
+        gviRenumberEntries();
     });
+
+    // Header click expands/collapses its own entry (Remove already stops
+    // its own click above, so this never double-fires on that button).
+    $(document).on("click",".gvi-entry-h",function(){
+        $(this).closest(".gvi-entry").toggleClass("collapsed");
+    });
+
+    // Live stage chip in the entry header — purely a display reflection of
+    // the real investigation_stage[] select already driving the actual
+    // submission, not a separate field.
+    $(document).on("change",".gvi-stage-select",function(){
+        var $chip = $(this).closest(".gvi-entry").find(".gvi-stagechip");
+        var label = $(this).find("option:selected").text();
+        if ($(this).val()) {
+            $chip.text(label).addClass("set");
+        } else {
+            $chip.text("Stage not set").removeClass("set");
+        }
+    });
+
+    gviRenumberEntries(); // initial state — Remove hidden while only entry 1 exists
     $(document).on("change","#outcome_type",function(){
 
         if($(this).val() == "Resolved")
@@ -860,10 +1076,10 @@ $(document).on("click",".RequestForStatement",function() {
             $(".hideApprovalRequest").show();
         }
 
-      
-        
+
+
     });
-    
+
     $(document).on("click",".RequestIdentity",function(){
         var $requestBtn = $(this);
 
@@ -895,20 +1111,20 @@ $(document).on("click",".RequestForStatement",function() {
                         });
                 }
             },
-            error: function(response) 
+            error: function(response)
             {
                 var errors = response.responseJSON;
-                if (errors.error) 
-                { 
-                    toastr.error(errors.error, "Error", 
+                if (errors.error)
+                {
+                    toastr.error(errors.error, "Error",
                     {
                         positionClass: 'toast-bottom-right'
                     });
                 }
-                else 
+                else
                 {
                     var errs = '';
-                    $.each(errors.errors, function(key, error) 
+                    $.each(errors.errors, function(key, error)
                     {
                         errs += error + '<br>';
                     });
@@ -920,30 +1136,30 @@ $(document).on("click",".RequestForStatement",function() {
 
         });
     });
-    
+
          window.Parsley.addValidator('greaterThan', {
         validateString: function(value, requirement) {
             // Get the dates
             var startDateStr = $(requirement).val();
             var endDateStr = value;
-            
+
             if (!startDateStr || !endDateStr) return true;
-            
+
             // Parse dates (assuming format dd-mm-yyyy)
             var startParts = startDateStr.split('-');
             var endParts = endDateStr.split('-');
-            
+
             if (startParts.length !== 3 || endParts.length !== 3) return true;
-            
+
             var startDate = new Date(startParts[2], startParts[1] - 1, startParts[0]);
             var endDate = new Date(endParts[2], endParts[1] - 1, endParts[0]);
-            
+
             // Return true if end date is greater than start date
             return endDate > startDate;
         },
         priority: 33
     });
-    
+
     // Custom validator for file size
     window.Parsley.addValidator('maxFileSize', {
         validateString: function(_value, maxSize, parsleyInstance) {
@@ -951,7 +1167,7 @@ $(document).on("click",".RequestForStatement",function() {
             if (files.length === 0) {
                 return true;
             }
-            
+
             for (var i = 0; i < files.length; i++) {
                 if (files[i].size > maxSize * 1024 * 1024) {
                     return false;
@@ -964,6 +1180,6 @@ $(document).on("click",".RequestForStatement",function() {
             en: 'File size must not exceed %sMB'
         }
     });
-    
+
 </script>
 @endsection

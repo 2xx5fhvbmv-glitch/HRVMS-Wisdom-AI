@@ -48,22 +48,25 @@
     padding: 0;
 }
 
+/* --teal/--darkblack/--black/--success/--danger now come from the shared
+   :root palette (resorts/layouts/_design_tokens.blade.php, loaded before
+   this file) — removed here rather than redeclared, since a same-named
+   var() pointing at its own name would be a self-reference cycle (invalid
+   at compute time), not an alias. --teal-bright/--teal-dark keep their
+   name (~90 existing var() call sites in this file alone) but now point
+   at the shared palette's --aqua/--teal-deep (new tokens, same hex).
+   --white -> shared --card (new name, same #fff, safe to alias). */
 :root {
-    --teal: #014653;
-    --teal-bright: #2EACB3;
-    --teal-dark: #013842;
-    --white: #ffffff;
-    --darkblack: #222222;
-    --black: #000000;
-    --success: #0CAF00;
-    --danger: #C80000
+    --teal-bright: var(--aqua);
+    --teal-dark: var(--teal-deep);
+    --white: var(--card);
 }
 
 body {
     font-family: 'Poppins', sans-serif;
     font-size: 14px;
     color: var(--darkblack);
-    background: hsla(190, 98%, 16%, 0.05);
+    background: var(--page);
     overflow-x: hidden;
     scroll-behavior: smooth;
     position: relative;
@@ -134,7 +137,7 @@ ul {
 }
 
 hr {
-    background-color: #DDDDDD;
+    background-color: var(--neutral-bg);
     opacity: 1;
 }
 
@@ -322,7 +325,7 @@ header .nav-item:hover .nav-link {
 }
 
 .text-lightblue {
-    color: #2EACB3;
+    color: var(--aqua);
 }
 
 .text-success {
@@ -338,7 +341,7 @@ header .nav-item:hover .nav-link {
 }
 
 .text-themeDanger {
-    color: #BE0000;
+    color: var(--danger);
 }
 
 .text-themeRedLight {
@@ -456,7 +459,7 @@ header .nav-item:hover .nav-link {
     font-size: 16px;
     /* font-weight: 500; */
     line-height: 30px;
-    border: 1px solid #DDDDDD;
+    border: 1px solid var(--neutral-bg);
 }
 
 .form-select-sm {
@@ -494,8 +497,8 @@ header .nav-item:hover .nav-link {
 
 .form-control {
     border-radius: 10px;
-    border: 1px solid #DDDDDD;
-    color: #222222;
+    border: 1px solid var(--neutral-bg);
+    color: var(--darkblack);
     padding: 14px 18px 15px;
     font-size: 14px;
     font-weight: 400;
@@ -649,8 +652,10 @@ header nav {
        let the white nav-item text directly underneath show through
        enough to blend with the white icon on top — visually correct in
        isolation but nearly invisible in place. Solid fill fully occludes
-       whatever's behind it so the icon always has real contrast. */
-    background-color: var(--darkblack);
+       whatever's behind it so the icon always has real contrast. Fixed
+       #222222, not var(--darkblack) — this wants a solid dark circle
+       regardless of theme, unlike --darkblack's now-themed text role. */
+    background-color: #222222;
 }
 
 .navcarosel-box .slick-prev:before,
@@ -951,7 +956,7 @@ strong {
 
 .card-title {
     padding-bottom: 8px;
-    border-bottom: 1px solid #E7E7E7;
+    border-bottom: 1px solid var(--line);
     margin-bottom: 12px;
 }
 
@@ -995,14 +1000,14 @@ strong {
 }
 
 .icon-bg-skyblue {
-    color: #2EACB3;
+    color: var(--aqua);
     background-color: rgb(46 172 179 / 9%);
 }
 
 
 .icon-bg-skyblue:hover {
     color: #fff;
-    background-color: #2EACB3;
+    background-color: var(--aqua);
 }
 
 .icon-bg-yellow {
@@ -1133,19 +1138,19 @@ strong {
 }
 
 .badge-danger {
-    color: #A90000;
+    color: var(--danger-strong);
     background: #a900001f;
 }
 
 .badge-dangerNew {
     color: #FFFFFF;
-    background: #C80000;
+    background: var(--danger);
 }
 
 .badge-themeDangerNew {
-    color: #C80000;
+    color: var(--danger);
     background: #C8000012;
-    border: 1px solid #C80000;
+    border: 1px solid var(--danger);
 }
 
 .badge-themeRedLight {
@@ -1154,14 +1159,14 @@ strong {
 }
 
 .badge-info {
-    color: #2EACB3;
+    color: var(--aqua);
     background: #2eacb33b;
 }
 
 .badge-infoBorder {
-    color: #2EACB3;
+    color: var(--aqua);
     background: #2EACB30F;
-    border: 1px solid #2EACB3;
+    border: 1px solid var(--aqua);
 }
 
 .badge-success {
@@ -1192,15 +1197,15 @@ strong {
 
 .badge-themeNew1 {
     font-weight: normal;
-    color: #222222;
-    background: #F5F8F8;
-    border: 1px solid #DEDEDE;
+    color: var(--darkblack);
+    background: var(--teal-soft);
+    border: 1px solid var(--neutral-bg);
 }
 
 .badge-blue {
-    color: #014653;
+    color: var(--teal);
     background: #01465312;
-    border: 1px solid #014653;
+    border: 1px solid var(--teal);
 }
 
 
@@ -1266,7 +1271,7 @@ strong {
 
 .progress-employee-type .progress-bar {
     border-radius: 100px;
-    background-color: #2EACB3;
+    background-color: var(--aqua);
 }
 
 .progress-employee-type {
@@ -1280,7 +1285,7 @@ strong {
 
 .card-fotter {
     margin-top: 12px;
-    border-top: 1px solid #E7E7E7;
+    border-top: 1px solid var(--line);
     padding-top: 8px;
 }
 
@@ -1625,7 +1630,7 @@ strong {
     right: -110%;
     left: auto;
     overflow: hidden;
-    box-shadow: -24px 0 70px rgba(1, 70, 83, .16), 0 2px 8px rgba(1, 70, 83, .06);
+    box-shadow: -24px 0 70px rgba(var(--teal-rgb),.16), 0 2px 8px rgba(var(--teal-rgb),.06);
     width: 385px;
     color: var(--ink);
 }
@@ -1793,7 +1798,7 @@ strong {
     height: 84px;
     border-radius: 50%;
     overflow: hidden;
-    box-shadow: 0 6px 20px rgba(1, 70, 83, .14);
+    box-shadow: 0 6px 20px rgba(var(--teal-rgb),.14);
     position: relative;
 }
 
@@ -1933,11 +1938,11 @@ table.data-Table>thead>tr>th,
 table.data-Table>thead>tr>td,
 .table th,
 .table td {
-    border-bottom: 1px solid #E7E7E7 !important;
+    border-bottom: 1px solid var(--line) !important;
 }
 
 div.dt-container.dt-empty-footer .dt-scroll-body {
-    border-bottom: 1px solid #E7E7E7;
+    border-bottom: 1px solid var(--line);
 }
 
 .dt-scroll-headInner table {
@@ -2106,6 +2111,59 @@ div.dt-container .dt-paging .dt-paging-button:hover {
     border-color: transparent;
 }
 
+/* Info + pager share one row app-wide: minimal, info left / pager right,
+   instead of stacked lines. Pages that set dom:"rtip" (Manning, Action
+   config, etc) render .dt-info immediately followed by .dt-paging as
+   DIRECT, whitespace-free children of .dt-container, so a plain 50/50
+   inline-block split works there. Pages that leave dom at its default
+   (Reports and most others) get DataTables' own Bootstrap5 template
+   instead, which already wraps info/paging in a `.row.mt-2
+   .col-md-auto`-style grid that lays them out left/right on its own —
+   forcing width:50% on the (already width-constrained) inner .dt-info
+   there fights the surrounding auto-width column and wraps the text
+   into a squashed 2-3 line stack. The `>` keeps this rule scoped to only
+   the direct-child (rtip) shape; the shared button/spacing rules below
+   have no such assumption and stay as plain descendant selectors so they
+   still restyle the pager consistently on every page either way. */
+.dt-container > .dt-info,
+.dt-container > .dt-paging {
+    display: inline-block;
+    width: 50%;
+    vertical-align: middle;
+    margin-top: 14px;
+}
+
+.dt-container .dt-info {
+    color: var(--muted);
+    font-size: 12.5px;
+}
+
+.dt-container .dt-paging .pagination {
+    justify-content: flex-end;
+    margin-bottom: 0;
+}
+
+.dt-container .dt-paging .page-link.first,
+.dt-container .dt-paging .page-link.last {
+    display: none;
+}
+
+.dt-container .dt-paging .page-link {
+    min-width: 30px;
+    height: 30px;
+    padding: 0 8px !important;
+    border: 1px solid var(--line);
+    border-radius: 9px !important;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.dt-container .dt-paging .page-link.active,
+.dt-container .dt-paging .page-link:hover {
+    border-color: var(--teal);
+}
+
 table.dataTable thead>tr>th.dt-orderable-asc span.dt-column-order,
 table.dataTable thead>tr>th.dt-orderable-desc span.dt-column-order,
 table.dataTable thead>tr>th.dt-ordering-asc span.dt-column-order,
@@ -2143,7 +2201,7 @@ table.dataTable td.dt-type-date {
 
 table.dataTable>tfoot>tr>th,
 table.dataTable>tfoot>tr>td {
-    border-top: 1px solid #E7E7E7;
+    border-top: 1px solid var(--line);
 }
 
 
@@ -2341,7 +2399,7 @@ table.dataTable td table thead {
     font-size: 14px;
     font-weight: 400;
     border-radius: 10px;
-    border: 1px solid #DDDDDD;
+    border: 1px solid var(--neutral-bg);
     width: 100%;
 }
 
@@ -2357,7 +2415,7 @@ table.dataTable td table thead {
 /* sefalimam css start */
 
 /* .btn-themeGray {
-    background: #DEDEDE
+    background: var(--neutral-bg)
 } */
 
 
@@ -2382,12 +2440,12 @@ table.dataTable td table thead {
     line-height: 53px;
     padding-left: 20px;
     padding-right: 40px;
-    color: #222222;
+    color: var(--darkblack);
     font-size: 14px;
 }
 
 .select2-container--default .select2-selection--single {
-    border: 1px solid #DDDDDD;
+    border: 1px solid var(--neutral-bg);
     border-radius: 10px;
 }
 
@@ -2639,7 +2697,7 @@ table tbody tr td .update-row-btn {
 }
 
 .table-collapse .table-icon {
-    color: #014653;
+    color: var(--teal);
     font-size: 16px;
     line-height: 0;
     border: 0;
@@ -2656,14 +2714,14 @@ table tbody tr td .update-row-btn {
 }
 
 .table-collapse tr:hover td {
-    background: #F5F8F8;
+    background: var(--teal-soft);
     border-bottom-color: transparent !important;
 }
 
 .table-collapse tr.in td,
 .table-collapse .collapsing td,
 .table-collapse .collapse td {
-    background: #F5F8F8;
+    background: var(--teal-soft);
     border-bottom-color: transparent !important;
 }
 
@@ -2704,7 +2762,7 @@ table tbody tr td .update-row-btn {
 .inputCounter-group {
     padding: 5px;
     background: #FFFFFF;
-    border: 1px solid #DDDDDD;
+    border: 1px solid var(--neutral-bg);
     border-radius: 10px;
     width: 113px;
     flex-wrap: nowrap;
@@ -2777,8 +2835,8 @@ table tbody tr td .update-row-btn {
 }
 
 .form-check-input:checked {
-    background-color: #014653;
-    border-color: #014653;
+    background-color: var(--teal);
+    border-color: var(--teal);
 }
 
 .form-check.no-label {
@@ -2795,7 +2853,7 @@ table tbody tr td .update-row-btn {
 
 .btn-themeBlue {
     color: #FFFFFF;
-    background: #014653
+    background: var(--teal)
 }
 
 .btn-themeBlue:hover {
@@ -2804,26 +2862,26 @@ table tbody tr td .update-row-btn {
 }
 
 .btn-themeBlueBr {
-    color: #014653;
+    color: var(--teal);
     background: #fff;
-    border-color: #014653;
+    border-color: var(--teal);
 }
 
 .btn-themeBlueBr:hover {
     color: #FFFFFF;
-    background: #014653;
+    background: var(--teal);
 }
 
 
 .btn-themeSkyblueLight {
-    color: #2EACB3;
+    color: var(--aqua);
     background: #2EACB338
 }
 
 .btn-themeSkyblueLight:hover,
 .btn-themeSkyblue {
     color: #FFFFFF;
-    background: #2EACB3
+    background: var(--aqua)
 }
 
 
@@ -2897,36 +2955,36 @@ table tbody tr td .update-row-btn {
 }
 
 .btn-danger {
-    color: #A90000;
+    color: var(--danger-strong);
     background: #fae8e8;
 }
 
 .btn-danger:hover {
     color: #fff;
-    background: #A90000;
+    background: var(--danger-strong);
 }
 
 .btn-themeDanger {
-    color: #C80000;
+    color: var(--danger);
     background: #FAE8E8;
 }
 
 .btn-themeDanger:hover {
     color: #fff;
-    background: #C80000;
+    background: var(--danger);
 }
 
 .btn-themeGray {
-    background: #DEDEDE
+    background: var(--neutral-bg)
 }
 
 .btn-themeGray:hover,
 .btn-themeGrayLight {
-    background: #F5F8F8
+    background: var(--teal-soft)
 }
 
 .btn-themeGrayLight:hover {
-    background: #DEDEDE
+    background: var(--neutral-bg)
 }
 
 
@@ -2950,7 +3008,7 @@ table tbody tr td .update-row-btn {
     display: block;
     padding: 10px 22px;
     background: #FFFFFF;
-    border: 1px solid #DDDDDD;
+    border: 1px solid var(--neutral-bg);
     border-radius: 10px;
 }
 
@@ -2992,7 +3050,7 @@ ul.manning-timeline {
 }
 
 ul.manning-timeline li {
-    color: #222222;
+    color: var(--darkblack);
     font-size: 14px;
     /* border-left: 1px solid #D5D5D5; */
     padding-left: 23px;
@@ -3029,7 +3087,7 @@ ul.manning-timeline li::before {
     justify-content: center;
     color: #fff;
     background: #FFFFFF;
-    border: 1px solid #D5D5D5;
+    border: 1px solid var(--neutral-bg);
     border-radius: 50%;
     z-index: 1;
 }
@@ -3040,7 +3098,7 @@ ul.manning-timeline li:first-child::before {
 }
 
 ul.manning-timeline li.active {
-    border-color: #014653;
+    border-color: var(--teal);
 }
 
 ul.manning-timeline li.active span {
@@ -3049,12 +3107,12 @@ ul.manning-timeline li.active span {
 
 ul.manning-timeline li.active span>span {
     display: block;
-    color: #014653;
+    color: var(--teal);
     font-weight: 500;
 }
 
 ul.manning-timeline li.active::before {
-    background: #014653
+    background: var(--teal)
 }
 
 ul.manning-timeline li::after {
@@ -3065,11 +3123,11 @@ ul.manning-timeline li::after {
     left: 0;
     bottom: 50%;
     transform: translateX(-50%);
-    background: #D5D5D5;
+    background: var(--neutral-bg);
 }
 
 ul.manning-timeline li.active::after {
-    background: #014653;
+    background: var(--teal);
 }
 
 /* 16-09-2024 end  */
@@ -3118,7 +3176,7 @@ ul.manning-timeline li.active::after {
 }
 
 label.form-label {
-    color: #222222;
+    color: var(--darkblack);
     font-size: 14px;
     line-height: 1.43;
     font-weight: 600;
@@ -3143,15 +3201,15 @@ label.form-label {
 }
 
 .a-link {
-    --link-color: #014653;
+    --link-color: var(--teal);
 }
 
 .a-linkTheme {
-    --link-color: #2EACB3;
+    --link-color: var(--aqua);
 }
 
 .a-linkDanger {
-    --link-color: #C80000;
+    --link-color: var(--danger);
 }
 
 .eye-btn,
@@ -3219,7 +3277,7 @@ border-color: #ddd; */
 }
 
 .form-switchTheme.switch-blue .form-check-input:checked {
-    background-color: #014653;
+    background-color: var(--teal);
     background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23fff'/%3e%3c/svg%3e");
 }
 
@@ -3343,11 +3401,11 @@ border-color: #ddd; */
 
 
 .bg-themeLightBlue {
-    background: #2EACB3
+    background: var(--aqua)
 }
 
 .bg-themeSkyblue {
-    background: #2EACB3
+    background: var(--aqua)
 }
 
 .bg-themeSkyblueLight {
@@ -3371,7 +3429,7 @@ border-color: #ddd; */
 }
 
 .bg-themeGrayLight {
-    background: #F5F8F8;
+    background: var(--teal-soft);
 }
 
 .bg-brown {
@@ -3384,24 +3442,24 @@ border-color: #ddd; */
 
 .badge-themeLight {
     background: #F1F1F1;
-    color: #222222;
+    color: var(--darkblack);
 }
 
 .badge-theme {
-    color: #222222;
+    color: var(--darkblack);
     color: #202020;
-    background: #D6E1E3
+    background: var(--neutral-bg)
 }
 
 .badge-themeNew {
-    color: #222222;
+    color: var(--darkblack);
     background: #F5F5F5
 }
 
 .badge-themeSkyblue {
-    color: #2EACB3;
+    color: var(--aqua);
     background: #2EACB31F;
-    border: 1px solid #2EACB3;
+    border: 1px solid var(--aqua);
 }
 
 .badge-themeYellow {
@@ -3416,9 +3474,9 @@ border-color: #ddd; */
 }
 
 .badge-themeBlue {
-    color: #014653;
+    color: var(--teal);
     background: #01465312;
-    border: 1px solid #014653;
+    border: 1px solid var(--teal);
 }
 
 .badge-themeSuccess {
@@ -3440,9 +3498,9 @@ border-color: #ddd; */
 }
 
 .badge-themeDanger {
-    color: #A90000;
+    color: var(--danger-strong);
     background: #A9000014;
-    border: 1px solid #A90000;
+    border: 1px solid var(--danger-strong);
 }
 
 .badge-themePink {
@@ -3489,7 +3547,7 @@ border-color: #ddd; */
     display: flex;
     padding-bottom: 12px;
     margin-bottom: 12px;
-    border-bottom: 1px solid #E7E7E7;
+    border-bottom: 1px solid var(--line);
 }
 
 .todoList-block:last-child,
@@ -3577,21 +3635,21 @@ border-color: #ddd; */
     width: 25px;
     height: 25px;
     font-size: 16px;
-    color: #A90000;
+    color: var(--danger-strong);
     background: rgb(200 0 0 / 9%);
     border-radius: 7px;
 }
 
 .delete-icon:hover {
     color: #fff;
-    background: #A90000;
+    background: var(--danger-strong);
 }
 
 .upInterviews-block {
     display: flex;
     flex-wrap: wrap;
     padding: 16px 20px 20px 10px;
-    background: #F5F8F8;
+    background: var(--teal-soft);
     border-radius: 15px;
     margin-bottom: 8px;
 }
@@ -3741,7 +3799,7 @@ border-color: #ddd; */
 
 .modalCalendar-block {
     padding: 20px 0 10px;
-    background: #F5F8F8;
+    background: var(--teal-soft);
     border-radius: 7px;
     overflow: hidden;
 }
@@ -3769,7 +3827,7 @@ border-color: #ddd; */
     display: flex;
     align-items: center;
     background: #FFFFFF;
-    border: 1px solid #DDDDDD;
+    border: 1px solid var(--neutral-bg);
     border-radius: 10px;
     margin-bottom: 10px;
     cursor: pointer;
@@ -3847,13 +3905,13 @@ border-color: #ddd; */
 
 
 .dots-link {
-    color: #222;
+    color: var(--darkblack);
     line-height: 1;
     font-size: 19px;
 }
 
 .dotsV-link {
-    color: #222;
+    color: var(--darkblack);
     line-height: 1;
     font-size: 19px;
 }
@@ -3871,7 +3929,7 @@ border-color: #ddd; */
     padding: 0 0 20px;
     margin-bottom: 30px;
     background: transparent;
-    border-bottom: 1px solid #E7E7E7;
+    border-bottom: 1px solid var(--line);
 }
 
 .card-header .form-control {
@@ -3882,7 +3940,7 @@ border-color: #ddd; */
 .card-header .input-group>i {
     /* top: 13px;  */
     top: 20px;
-    color: #014653;
+    color: var(--teal);
 }
 
 .btn-grid,
@@ -3907,7 +3965,7 @@ border-color: #ddd; */
 
 .btn-grid.active,
 .btn-list.active {
-    background: #014653;
+    background: var(--teal);
 }
 
 .btn-grid.active img,
@@ -3918,7 +3976,7 @@ border-color: #ddd; */
 .vacanciesGrid-block {
     padding: 21px 20px;
     background: #FFFFFF;
-    border: 1px solid #DDDDDD;
+    border: 1px solid var(--neutral-bg);
     border-radius: 25px;
     height: 100%;
 }
@@ -3926,7 +3984,7 @@ border-color: #ddd; */
 .vacanciesGrid-block .heading {
     padding-bottom: 8px;
     margin-bottom: 14px;
-    border-bottom: 1px solid #DDDDDD;
+    border-bottom: 1px solid var(--neutral-bg);
 }
 
 .vacanciesGrid-block .heading h6 {
@@ -3944,7 +4002,7 @@ border-color: #ddd; */
     display: flex;
     text-align: center;
 
-    background: #F5F8F8;
+    background: var(--teal-soft);
     border-radius: 15px;
 }
 
@@ -3962,7 +4020,7 @@ border-color: #ddd; */
     transform: translateY(-50%);
     width: 1px;
     height: 28px;
-    background: #DDDDDD;
+    background: var(--neutral-bg);
 }
 
 .vacanciesGrid-block .bg p {
@@ -4035,7 +4093,7 @@ border-color: #ddd; */
 }
 
 .table-collapseNew .bg {
-    background: #F5F8F8;
+    background: var(--teal-soft);
     border-radius: 7px;
 }
 
@@ -4082,7 +4140,7 @@ border-color: #ddd; */
 }
 
 .progress-container.skyblue {
-    --progressStroke: #2EACB3;
+    --progressStroke: var(--aqua);
 }
 
 .progress-container.skyblueLight {
@@ -4098,7 +4156,7 @@ border-color: #ddd; */
 }
 
 .progress-container.blue {
-    --progressStroke: #014653;
+    --progressStroke: var(--teal);
 }
 
 .progress-container.blueNew {
@@ -4192,7 +4250,7 @@ border-color: #ddd; */
     left: 50%;
     transform: translate(-50%, -50%);
     font-size: 14px;
-    color: #222222;
+    color: var(--darkblack);
     font-weight: 600;
     letter-spacing: 0.07px;
 }
@@ -4220,7 +4278,7 @@ border-color: #ddd; */
 .applicantsGrid-block {
     text-align: center;
     background: #FFFFFF;
-    border: 1px solid #DDDDDD;
+    border: 1px solid var(--neutral-bg);
     border-radius: 25px;
     padding: 12px 20px 20px;
     position: relative;
@@ -4257,7 +4315,7 @@ border-color: #ddd; */
 .applicantsGrid-block .bg {
     text-align: left;
     padding: 10px 20px;
-    background: #F5F8F8;
+    background: var(--teal-soft);
     border-radius: 15px;
     margin-bottom: 5px;
 }
@@ -4331,7 +4389,7 @@ border-color: #ddd; */
     flex-wrap: wrap;
     align-items: center;
     padding-bottom: 15px;
-    border-bottom: 1px solid #DDDDDD;
+    border-bottom: 1px solid var(--neutral-bg);
 }
 
 .userReviewTasks-title .d-flex {
@@ -4388,12 +4446,12 @@ border-color: #ddd; */
 
 .tab-userApplicants .nav-tabs,
 .tab-prReview .nav-tabs {
-    border-bottom: 1px solid #DDDDDD;
+    border-bottom: 1px solid var(--neutral-bg);
 }
 
 .tab-userApplicants .nav-tabs .nav-link,
 .tab-prReview .nav-tabs .nav-link {
-    color: #222222;
+    color: var(--darkblack);
     font-size: 18px;
     font-weight: 500;
     text-transform: uppercase;
@@ -4414,7 +4472,7 @@ border-color: #ddd; */
     width: 100%;
     height: 5px;
     transform: translateY(-50%);
-    background: #2EACB3;
+    background: var(--aqua);
     border-radius: 10px;
     opacity: 0;
     transition: all .15s ease-in-out;
@@ -4422,7 +4480,7 @@ border-color: #ddd; */
 
 .tab-userApplicants .nav-tabs .nav-link.active,
 .tab-prReview .nav-tabs .nav-link.active {
-    color: #2EACB3;
+    color: var(--aqua);
 }
 
 .tab-userApplicants .nav-tabs .nav-link.active::after,
@@ -4476,7 +4534,7 @@ border-color: #ddd; */
     justify-content: center;
     color: #fff;
     background: #FFFFFF;
-    border: 1px solid #D5D5D5;
+    border: 1px solid var(--neutral-bg);
     border-radius: 50%;
     z-index: 1;
 }
@@ -4486,7 +4544,7 @@ border-color: #ddd; */
 }
 
 .userApplicants-accordion .accordion-item.active {
-    border-color: #014653;
+    border-color: var(--teal);
 }
 
 .userApplicants-accordion .accordion-item.active span {
@@ -4494,8 +4552,8 @@ border-color: #ddd; */
 }
 
 .userApplicants-accordion .accordion-item.active::before {
-    background: #014653;
-    border-color: #014653;
+    background: var(--teal);
+    border-color: var(--teal);
 }
 
 .userApplicants-accordion .accordion-item::after {
@@ -4507,7 +4565,7 @@ border-color: #ddd; */
     left: 0;
     bottom: -20px;
     /* transform: translateX(-50%); */
-    background: #D5D5D5;
+    background: var(--neutral-bg);
 }
 
 .userApplicants-accordion .accordion-item:last-child:after {
@@ -4515,7 +4573,7 @@ border-color: #ddd; */
 }
 
 .userApplicants-accordion .accordion-item.active::after {
-    background: #014653;
+    background: var(--teal);
 }
 
 .userApplicants-accordion .accordion-item.rejected {
@@ -4542,25 +4600,25 @@ border-color: #ddd; */
 
 .userApplicants-accordion .accordion-button {
     font-size: 14px;
-    color: #222222;
+    color: var(--darkblack);
     padding: 12px 15px;
-    border: 1px solid #DDDDDD;
+    border: 1px solid var(--neutral-bg);
     border-radius: 7px !important;
 
 }
 
 .userApplicants-accordion .accordion-button:not(.collapsed) {
-    color: #014653;
+    color: var(--teal);
     font-weight: 600;
     background: transparent;
     box-shadow: none;
-    border-color: #014653;
+    border-color: var(--teal);
     border-bottom: 0 !important;
     border-radius: 7px 7px 0 0 !important;
 }
 
 .userApplicants-accordion .accordion-collapse {
-    border: 1px solid #014653;
+    border: 1px solid var(--teal);
     border-radius: 0 0 7px 7px !important;
     border-top: 0;
 
@@ -4571,7 +4629,7 @@ border-color: #ddd; */
 
 /* .userApplicants-accordion .accordion-collapse.collapsing,
 .userApplicants-accordion .accordion-collapse.show {
-    border-color: #014653;
+    border-color: var(--teal);
 }
 
 */
@@ -4622,7 +4680,7 @@ border-color: #ddd; */
 
 .card.bg {
     border: 0;
-    background: #F5F8F8;
+    background: var(--teal-soft);
     box-shadow: none;
 }
 
@@ -4645,7 +4703,7 @@ border-color: #ddd; */
 
 .intUserApp-block {
     padding: 20px;
-    background: #F5F8F8;
+    background: var(--teal-soft);
     border-radius: 10px;
 }
 
@@ -4708,7 +4766,7 @@ border-color: #ddd; */
     position: absolute;
     top: 0;
     left: 0;
-    color: #014653;
+    color: var(--teal);
     font-weight: 600;
 }
 
@@ -4719,7 +4777,7 @@ border-color: #ddd; */
     justify-content: center;
     /* height: 344px; */
     min-height: 210px;
-    border: 1px dashed #D9D9D9;
+    border: 1px dashed var(--neutral-bg);
     border-radius: 25px;
     position: relative;
     cursor: pointer;
@@ -4826,7 +4884,7 @@ border-color: #ddd; */
 }
 
 .table-dropdown .dropdown-menu li {
-    border-bottom: 1px solid #DDDDDD;
+    border-bottom: 1px solid var(--neutral-bg);
 }
 
 .table-dropdown .dropdown-menu li:last-child {
@@ -4838,8 +4896,8 @@ border-color: #ddd; */
 }
 
 .table-dropdown .dropdown-menu .dropdown-item:hover {
-    color: #2eacb3;
-    color: #014653;
+    color: var(--aqua);
+    color: var(--teal);
 }
 
 .btn-tableIcon {
@@ -4882,13 +4940,13 @@ border-color: #ddd; */
 }
 
 .btnIcon-skyblue {
-    color: #2EACB3;
+    color: var(--aqua);
     background: rgb(46 172 179 / 15%);
 }
 
 .btnIcon-skyblue:hover {
     color: #fff;
-    background: #2EACB3;
+    background: var(--aqua);
 }
 
 .btnIcon-teal {
@@ -4913,13 +4971,13 @@ border-color: #ddd; */
 
 
 .btnIcon-danger {
-    color: #A90000;
+    color: var(--danger-strong);
     background: rgb(169 0 0 / 9%);
 }
 
 .btnIcon-danger:hover {
     color: #fff;
-    background: #A90000;
+    background: var(--danger-strong);
 }
 
 .table tbody td.p-table {
@@ -5067,7 +5125,7 @@ table ol li:last-child {
 .upArrivalGrid-block {
     text-align: center;
     background: #FFFFFF;
-    border: 1px solid #DDDDDD;
+    border: 1px solid var(--neutral-bg);
     border-radius: 25px;
     padding: 20px 20px;
     position: relative;
@@ -5147,7 +5205,7 @@ table ol li:last-child {
 }
 
 .empAccomGrid-block .position {
-    color: #014653;
+    color: var(--teal);
     font-weight: 500;
     margin-bottom: 10px;
 }
@@ -5156,7 +5214,7 @@ table ol li:last-child {
     display: flex;
     text-align: center;
 
-    background: #F5F8F8;
+    background: var(--teal-soft);
     border-radius: 15px;
     margin-bottom: 12px;
 }
@@ -5175,7 +5233,7 @@ table ol li:last-child {
     transform: translateY(-50%);
     width: 1px;
     height: 28px;
-    background: #DDDDDD;
+    background: var(--neutral-bg);
 }
 
 .talentPoolGrid-block .bg p {
@@ -5189,7 +5247,7 @@ table ol li:last-child {
 
 .empAccomGrid-block .bg {
     padding: 10px 10px;
-    background: #F5F8F8;
+    background: var(--teal-soft);
     border-radius: 7px;
     margin-bottom: 5px;
 }
@@ -5197,7 +5255,7 @@ table ol li:last-child {
 .empPerforGrid-block .bg,
 .salaryIncrementManag-block .bg {
     padding: 11px 12px;
-    background: #F5F8F8;
+    background: var(--teal-soft);
     border-radius: 15px;
     margin-bottom: 9px;
 }
@@ -5235,8 +5293,8 @@ table ol li:last-child {
 
 .upArrivalGrid-block .table-block {
     padding: 7px 0;
-    border-top: 1px solid #DDDDDD;
-    border-bottom: 1px solid #DDDDDD;
+    border-top: 1px solid var(--neutral-bg);
+    border-bottom: 1px solid var(--neutral-bg);
     margin-bottom: 13px;
 }
 
@@ -5335,7 +5393,7 @@ table ol li:last-child {
 }
 
 .form-radio input:checked~label::before {
-    border: 8px solid #014653;
+    border: 8px solid var(--teal);
 }
 
 .form-check:not(:last-of-type) {
@@ -5394,7 +5452,7 @@ table ol li:last-child {
     border-radius: 50%;
     position: relative;
     z-index: 2;
-    background-color: #D6E1E3;
+    background-color: var(--neutral-bg);
     color: #FFFFFF;
     font-size: 18px;
     font-weight: 500;
@@ -5405,7 +5463,7 @@ table ol li:last-child {
     height: 2px;
     content: '';
     position: absolute;
-    background-color: #D6E1E3;
+    background-color: var(--neutral-bg);
     top: 23px;
     left: -50%;
     z-index: 0;
@@ -5422,17 +5480,17 @@ table ol li:last-child {
 
 .progressbar-tab li.active:before {
     /* outline-color: #014653; */
-    background: #014653;
+    background: var(--teal);
     border: 3px solid white;
     box-sizing: content-box;
 }
 
 .progressbar-tab li.current:before {
-    outline-color: #014653;
+    outline-color: var(--teal);
 }
 
 .progressbar-tab li.active:after {
-    background-color: #014653;
+    background-color: var(--teal);
 }
 
 /* .progressbar-tab li.active:before {
@@ -5471,7 +5529,7 @@ table ol li:last-child {
 }
 
 hr.hr-footer {
-    background-color: #DDDDDD;
+    background-color: var(--neutral-bg);
     margin: 0 0 22px;
     opacity: 1;
     border: 0;
@@ -5577,7 +5635,7 @@ html,
 
 .login-left .img-obj::after {
     content: '';
-    background: #014653;
+    background: var(--teal);
     opacity: 0.8;
 }
 
@@ -5699,7 +5757,9 @@ html,
 
 .login-form .btn-themeNeon:hover {
     color: #dfff00;
-    background-color: var(--darkblack);
+    /* Fixed #222222, not var(--darkblack) — a dark-invert hover fill
+       regardless of theme, unlike --darkblack's now-themed text role. */
+    background-color: #222222;
 }
 
 .login-slider {
@@ -5784,7 +5844,7 @@ html,
 .employeesGrid-block {
     text-align: center;
     background: #FFFFFF;
-    border: 1px solid #DDDDDD;
+    border: 1px solid var(--neutral-bg);
     border-radius: 25px;
     padding: 20px 20px;
     position: relative;
@@ -5819,7 +5879,7 @@ html,
     display: flex;
     text-align: center;
 
-    background: #F5F8F8;
+    background: var(--teal-soft);
     border-radius: 15px;
     margin-bottom: 17px;
 }
@@ -5838,7 +5898,7 @@ html,
     transform: translateY(-50%);
     width: 1px;
     height: 28px;
-    background: #DDDDDD;
+    background: var(--neutral-bg);
 }
 
 .employeesGrid-block .bg div:last-child::after {
@@ -5872,7 +5932,7 @@ html,
 
 
 .progress-themeBlue {
-    --proBG: #014653;
+    --proBG: var(--teal);
 }
 
 .progress-themeskyblueNew {
@@ -5880,15 +5940,15 @@ html,
 }
 
 .progress-themeskyblue {
-    --proBG: #2EACB3;
+    --proBG: var(--aqua);
 }
 
 .progress-themeDanger {
-    --proBG: #A90000;
+    --proBG: var(--danger-strong);
 }
 
 .progress-themeRed {
-    --proBG: #C80000;
+    --proBG: var(--danger);
 }
 
 .progress-themeGreen {
@@ -5972,7 +6032,7 @@ html,
     align-items: center;
     justify-content: space-between;
     padding: 15px 17px;
-    background: #F5F8F8;
+    background: var(--teal-soft);
     border-radius: 15px;
     height: 100%;
 }
@@ -5985,7 +6045,7 @@ html,
     font-size: 26px;
     font-weight: 600;
     letter-spacing: 0.13px;
-    color: #222222;
+    color: var(--darkblack);
 }
 
 .empDetail-block.empDetailPro-block {
@@ -6017,13 +6077,13 @@ html,
 
 .empDetails-leave {
     background: #FFFFFF;
-    border: 1px solid #DDDDDD;
+    border: 1px solid var(--neutral-bg);
     border-radius: 25px;
     padding: 27px 21px;
 }
 
 .empDetails-leave>.row>* {
-    border-right: 1px solid #DDDDDD;
+    border-right: 1px solid var(--neutral-bg);
 }
 
 .empDetails-leave>.row>*:last-child {
@@ -6054,7 +6114,7 @@ html,
 
 .empDetailsGrid-block {
     background: #FFFFFF;
-    border: 1px solid #DDDDDD;
+    border: 1px solid var(--neutral-bg);
     border-radius: 25px;
     padding: 20px 20px;
     position: relative;
@@ -6067,7 +6127,7 @@ html,
     justify-content: space-between;
     padding-bottom: 7px;
     margin-bottom: 10px;
-    border-bottom: 1px solid #E7E7E7;
+    border-bottom: 1px solid var(--line);
 }
 
 .empDetailsGrid-block .header p {
@@ -6086,7 +6146,7 @@ html,
     margin: -3px;
     padding-bottom: 7px;
     margin-bottom: 10px;
-    border-bottom: 1px solid #E7E7E7;
+    border-bottom: 1px solid var(--line);
 }
 
 .empDetailsGrid-block .time>div {
@@ -6120,7 +6180,7 @@ html,
 
 .attendance-bg {
     padding: 5px 12px;
-    background: #F5F8F8;
+    background: var(--teal-soft);
     margin-bottom: 40px;
 }
 
@@ -6133,7 +6193,7 @@ html,
 }
 
 .bg-themeDanger {
-    background-color: #A90000;
+    background-color: var(--danger-strong);
 }
 
 .bg-themeRed {
@@ -6215,7 +6275,7 @@ html,
     position: sticky;
     right: 0;
     z-index: 2;
-    background: #F5F8F8;
+    background: var(--teal-soft);
     text-align: left;
 }
 
@@ -6256,7 +6316,7 @@ html,
 
 
 .text-skyblue {
-    color: #2EACB3;
+    color: var(--aqua);
 }
 
 .tt-hover {
@@ -6287,7 +6347,7 @@ html,
 .tt-main .tt-inner {
     display: block;
     width: 100%;
-    color: #222222;
+    color: var(--darkblack);
     font-size: 12px;
     line-height: 1.5;
     padding: 10px 10px;
@@ -6419,7 +6479,7 @@ html,
 .btn.btn-weekly,
 .btn.btn-monthly,
 .btn.btn-yearly {
-    color: #222222;
+    color: var(--darkblack);
     font-size: 14px;
     line-height: 1.458;
     font-weight: normal;
@@ -6433,15 +6493,15 @@ html,
 .btn.btn-monthly.active,
 .btn.btn-yearly.active {
     color: #fff;
-    background: #014653;
-    border: 1px solid #014653;
+    background: var(--teal);
+    border: 1px solid var(--teal);
 }
 
 .inputCustom-color {
     border-radius: 10px;
     background: #fff;
-    border: 1px solid #DDDDDD;
-    color: #222222;
+    border: 1px solid var(--neutral-bg);
+    color: var(--darkblack);
     padding: 14px 18px 15px;
     font-size: 14px;
     font-weight: 400;
@@ -6457,7 +6517,7 @@ html,
     top: 50%;
     right: 20px;
     transform: translateY(-50%);
-    border: 2px solid #E7E7E7;
+    border: 2px solid var(--line);
     border-radius: 50%;
 }
 
@@ -6553,7 +6613,7 @@ html,
 }
 
 .card-themeSkyblue {
-    background: #F5F8F8;
+    background: var(--teal-soft);
     border-radius: 7px;
     padding: 12px 15px;
 }
@@ -6576,7 +6636,7 @@ html,
 }
 
 .date-block.bg {
-    background: #F5F8F8;
+    background: var(--teal-soft);
 }
 
 .date-block h5,
@@ -6599,7 +6659,7 @@ html,
 }
 
 .createDuty-tableBlock.createDuty-blue {
-    --createDuty: #014653;
+    --createDuty: var(--teal);
 }
 
 .createDuty-tableBlock.createDuty-yellow {
@@ -6607,7 +6667,7 @@ html,
 }
 
 .createDuty-tableBlock.createDuty-skyBlue {
-    --createDuty: #2EACB3;
+    --createDuty: var(--aqua);
 }
 
 .createDuty-tableBlock.createDuty-purple {
@@ -6635,7 +6695,7 @@ html,
     justify-content: space-between;
     padding-bottom: 5px;
     margin-bottom: 5px;
-    border-bottom: 1px solid #DDDDDD;
+    border-bottom: 1px solid var(--neutral-bg);
 }
 
 .createDuty-tableBlock .d-flex:last-child {
@@ -6693,7 +6753,7 @@ html,
 .table-overtimemonthly td:last-child {
     position: sticky;
     text-align: left;
-    background: #F5F8F8;
+    background: var(--teal-soft);
     z-index: 1;
 }
 
@@ -6716,7 +6776,7 @@ html,
     right: 0;
     text-align: center;
     font-weight: bold;
-    background: #F5F8F8;
+    background: var(--teal-soft);
 }
 
 .table-createDutyWeekly td:last-child,
@@ -6744,7 +6804,7 @@ html,
 
 .table-createDutymonthly,
 .table-overtimemonthly {
-    border-color: #E7E7E7;
+    border-color: var(--line);
 }
 
 .table-createDutymonthly th:first-child,
@@ -6788,7 +6848,7 @@ html,
 
 .table-createDutymonthly th>.badge.badge-p,
 .table-createDutymonthly td>.badge.badge-p {
-    color: #222;
+    color: var(--darkblack);
 }
 
 .tooltip-inner {
@@ -6880,7 +6940,7 @@ html,
 }
 
 .daterangepicker .calendar-table td {
-    color: #222222;
+    color: var(--darkblack);
     font-size: 13px;
     line-height: 1.477;
     padding: 13px 5px;
@@ -6889,7 +6949,7 @@ html,
 
 .daterangepicker .calendar-table td.off {
     font-size: 12px;
-    color: #222222;
+    color: var(--darkblack);
     opacity: 0.35;
     background: transparent;
 }
@@ -6942,7 +7002,7 @@ html,
     gap: 6px;
     padding-bottom: 12px;
     margin-bottom: 12px;
-    border-bottom: 1px solid #E7E7E7;
+    border-bottom: 1px solid var(--line);
 }
 
 .leaveUser-block:last-child {
@@ -7028,14 +7088,14 @@ html,
     align-items: center;
     justify-content: space-between;
     gap: 10px;
-    background: #F5F8F8;
+    background: var(--teal-soft);
     border-radius: 5px;
     padding: 4px 7px;
     margin-bottom: 14px;
 }
 
 .leaveUser-bgBlock.skyblue {
-    color: #2EACB3;
+    color: var(--aqua);
     background: #E9F7F7
 }
 
@@ -7050,7 +7110,7 @@ html,
 }
 
 .leaveUser-bgBlock.blue {
-    color: #014653;
+    color: var(--teal);
     background: #01465321;
 }
 
@@ -7095,7 +7155,7 @@ html,
 .leaveReqGrid-block {
     text-align: center;
     background: #FFFFFF;
-    border: 1px solid #DDDDDD;
+    border: 1px solid var(--neutral-bg);
     border-radius: 25px;
     padding: 20px 15px;
     position: relative;
@@ -7140,7 +7200,7 @@ html,
 
 
 .leaveReqGrid-block .position {
-    color: #014653;
+    color: var(--teal);
     font-weight: 500;
     display: block;
     margin-bottom: 10px;
@@ -7148,7 +7208,7 @@ html,
 
 
 .leaveReqGrid-block .bg {
-    background: #F5F8F8;
+    background: var(--teal-soft);
     border-radius: 15px;
     margin-bottom: 10px;
     padding: 9px 10px 12px;
@@ -7222,7 +7282,7 @@ html,
 
 .employee-bg {
     padding: 12px 14px;
-    background: #F5F8F8;
+    background: var(--teal-soft);
     border-radius: 15px;
 }
 
@@ -7302,7 +7362,7 @@ html,
 .table-lableNew th,
 .table-lableNew td {
     padding: 9px 5px;
-    border-bottom: 1px solid #DDDDDD;
+    border-bottom: 1px solid var(--neutral-bg);
 }
 
 
@@ -7332,7 +7392,7 @@ html,
     border-radius: 15px;
     overflow: hidden;
     color: #fff;
-    background: #014653
+    background: var(--teal)
 }
 
 
@@ -7421,7 +7481,7 @@ html,
 }
 
 .leaveReqTicket-name .badge {
-    color: #014653;
+    color: var(--teal);
     padding: 8px 16px;
     border-radius: 20px;
 }
@@ -7487,7 +7547,7 @@ html,
 
 .route-main .header {
     padding: 3px 11px;
-    background: #DDDDDD;
+    background: var(--neutral-bg);
 }
 
 .route-main .header span {
@@ -7501,7 +7561,7 @@ html,
 .route-inner {
     padding-bottom: 10px;
     margin-bottom: 10px;
-    border-bottom: 1px solid #DDDDDD;
+    border-bottom: 1px solid var(--neutral-bg);
 }
 
 .route-inner:last-child {
@@ -7549,7 +7609,7 @@ html,
 .route-main .body tbody tr:last-child th,
 .route-main .body tbody tr:last-child td {
     padding-bottom: 10px;
-    border-bottom: 1px solid #DDDDDD;
+    border-bottom: 1px solid var(--neutral-bg);
 }
 
 .route-main .body tbody td span {
@@ -7732,7 +7792,7 @@ html,
 
 .calendar-card .leaveUser-main {
     padding: 10px 10px;
-    border: 1px solid #DDDDDD;
+    border: 1px solid var(--neutral-bg);
     border-radius: 15px;
 }
 
@@ -7742,7 +7802,7 @@ html,
 
 .calendar-event .fc-toolbar .fc-state-default {
     color: #fff;
-    background: #014653;
+    background: var(--teal);
     text-transform: capitalize;
     padding: 12px 13px;
     height: auto;
@@ -7788,7 +7848,7 @@ html,
 
 .fc.calendar-event td,
 .fc.calendar-event th {
-    border-color: #DDDDDD;
+    border-color: var(--neutral-bg);
 }
 
 .fc.calendar-event th {
@@ -7865,7 +7925,7 @@ html,
 }
 
 .card-boardingPass>.row>.col-lg-6:first-child {
-    border-right: 1px solid #DDDDDD;
+    border-right: 1px solid var(--neutral-bg);
 }
 
 .leaveDashHod-main .card-wiINsight,
@@ -7875,7 +7935,7 @@ html,
 
 .permissions-accordion .accordion-item {
     background: transparent;
-    border-bottom: 1px solid #E7E7E7;
+    border-bottom: 1px solid var(--line);
     border-radius: 0 !important;
 }
 
@@ -7888,8 +7948,8 @@ html,
 
 .permissions-accordion .accordion-button,
 .permissions-accordion .accordion-button:not(.collapsed) {
-    color: #222;
-    background: #F5F8F8;
+    color: var(--darkblack);
+    background: var(--teal-soft);
     box-shadow: none;
 }
 
@@ -8032,7 +8092,7 @@ html,
     width: 50%;
     padding: 0 12px;
     padding-bottom: 15px;
-    border-right: 1px solid #DDDDDD;
+    border-right: 1px solid var(--neutral-bg);
     border-bottom: 0;
 }
 
@@ -8125,7 +8185,7 @@ html,
     font-size: 18px;
     line-height: 1;
     font-weight: 400;
-    color: #C80000;
+    color: var(--danger);
     position: absolute;
     top: 18px;
     left: 8px;
@@ -8207,7 +8267,7 @@ html,
 }
 
 .accordion-gary .accordion-button:not(.collapsed) {
-    color: #222222;
+    color: var(--darkblack);
     background: transparent;
     box-shadow: none;
     border-radius: 0 !important;
@@ -8221,7 +8281,7 @@ html,
     padding: 10px 12px;
     margin-left: auto;
     background: #F6F6F6;
-    border: 1px solid #DDDDDD;
+    border: 1px solid var(--neutral-bg);
     border-radius: 10px;
 }
 
@@ -8232,7 +8292,7 @@ html,
 .accordion-gary .accordion-collapse {
     margin: 0 22px;
     padding: 17px 0;
-    border-top: 1px solid #DDDDDD;
+    border-top: 1px solid var(--neutral-bg);
 }
 
 .accordion-gary .bg-white {
@@ -8265,7 +8325,7 @@ html,
 }
 
 .rating i.disable {
-    color: #DEDEDE;
+    color: var(--neutral-bg);
 }
 
 .table-empAccom th {
@@ -8273,7 +8333,7 @@ html,
 }
 
 .calendarAccom-card .leaveUser-main .d-flex {
-    border-bottom: 1px solid #DDDDDD;
+    border-bottom: 1px solid var(--neutral-bg);
     padding-bottom: 20px;
     margin-bottom: 20px;
 }
@@ -8383,7 +8443,7 @@ html,
 }
 
 .bed-block.active {
-    background: #014653;
+    background: var(--teal);
 }
 
 .bed-block.active .icon {
@@ -8404,7 +8464,7 @@ html,
 
 .card-reviewDetails .empDetails-user {
     padding-bottom: 12px;
-    border-bottom: 1px solid #E7E7E7;
+    border-bottom: 1px solid var(--line);
 }
 
 .table-assignTask td:nth-child(2),
@@ -8429,7 +8489,7 @@ html,
 
 .form-control:disabled,
 .form-control[readonly] {
-    background-color: #F5F8F8;
+    background-color: var(--teal-soft);
     opacity: 1;
 }
 
@@ -8462,15 +8522,15 @@ html,
 .viewBudget-accordion .accordion-button {
     /* background: transparent;
     padding: 0 0 8px; */
-    background: #F5F8F8;
+    background: var(--teal-soft);
     padding: 8px 10px;
     /* border-bottom: 1px solid #E7E7E7; */
     flex-wrap: wrap;
 }
 
 .viewBudget-accordion .accordion-button:not(.collapsed) {
-    color: #222222;
-    background: #F5F8F8;
+    color: var(--darkblack);
+    background: var(--teal-soft);
     box-shadow: none;
 }
 
@@ -8509,7 +8569,7 @@ html,
     font-size: 16px;
     border-radius: 7px;
     color: #fff;
-    background: #014653;
+    background: var(--teal);
 }
 
 .increment-btn img {
@@ -8562,7 +8622,7 @@ html,
 }
 
 .border-right {
-    border-right: 1px solid #DDDDDD;
+    border-right: 1px solid var(--neutral-bg);
 }
 
 /* .card-wiINsightPayroll,
@@ -8631,7 +8691,7 @@ html,
     font-size: 18px;
     font-weight: 600;
     padding: 11px 20px;
-    background: #F5F8F8;
+    background: var(--teal-soft);
 }
 
 .paySlipBorder-table {
@@ -8643,14 +8703,14 @@ html,
     font-weight: 500;
     padding: 12px;
     padding-top: 0;
-    border-bottom: 1px solid #E7E7E7;
+    border-bottom: 1px solid var(--line);
 }
 
 .paySlipBorder-table tbody td {
     font-size: 14px;
     font-weight: normal;
     padding: 12px;
-    border-bottom: 1px solid #E7E7E7;
+    border-bottom: 1px solid var(--line);
 }
 
 .paySlipBorder-table tbody td .form-control {
@@ -8832,7 +8892,7 @@ html,
 }
 
 .table-review thead tr:first-child th:nth-child(4) {
-    background: #D6E1E3
+    background: var(--neutral-bg)
 }
 
 .table-review thead tr:last-child th {
@@ -8908,7 +8968,7 @@ ul.listing-wrapper li::before {
 }
 
 .table-pension i.fa-circle-exclamation {
-    color: #BE0000;
+    color: var(--danger);
     font-size: 18px;
 }
 
@@ -8918,7 +8978,7 @@ ul.listing-wrapper li::before {
 }
 
 .ttb-resigned .ttb-main .ttb-inner {
-    color: #222222;
+    color: var(--darkblack);
     padding: 6px 12px 10px;
     background: #FFFFFF;
     box-shadow: 0px 5px 6px #00000029;
@@ -8932,12 +8992,12 @@ ul.listing-wrapper li::before {
     font-size: 14px;
     font-style: italic;
     padding-bottom: 5px;
-    border-bottom: 1px solid #DDDDDD;
+    border-bottom: 1px solid var(--neutral-bg);
     margin-bottom: 4px;
 }
 
 .ttb-resigned .ttb-main .ttb-inner h6 span {
-    color: #BE0000;
+    color: var(--danger);
 }
 
 .ttb-resigned .ttb-main .ttb-inner p {
@@ -8965,7 +9025,7 @@ ul.listing-wrapper li::before {
 }
 
 .card-payrollMain .bg-themeGrayLight {
-    background: #F5F8F8;
+    background: var(--teal-soft);
     border-radius: 10px;
     padding: 13px 21px;
 }
@@ -9128,7 +9188,7 @@ ol.listingNo-wrapper li:last-child {
 .fullFinal-main {
     padding: 20px 20px;
     border-radius: 15px;
-    background: #F5F8F8;
+    background: var(--teal-soft);
 }
 
 .fullFinal-head {
@@ -9136,7 +9196,7 @@ ol.listingNo-wrapper li:last-child {
     font-weight: 600;
     padding: 0 0 10px;
     margin-bottom: 20px;
-    border-bottom: 1px solid #E7E7E7;
+    border-bottom: 1px solid var(--line);
 }
 
 .fullFinal-block {
@@ -9209,7 +9269,7 @@ ol.listingNo-wrapper li:last-child {
 }
 
 .alert-custom.alert-themeDanger i {
-    color: #C80000;
+    color: var(--danger);
 }
 
 .alert-custom.alert-themeSuccess {
@@ -9265,7 +9325,7 @@ ol.listingNo-wrapper li:last-child {
     gap: 10px;
     padding-bottom: 10px;
     margin-bottom: 20px;
-    border-bottom: 1px solid #E7E7E7;
+    border-bottom: 1px solid var(--line);
 }
 
 .PerformanceCyc-block .PerformanceCyc-head h5 {
@@ -9318,7 +9378,7 @@ ol.listingNo-wrapper li:last-child {
     gap: 5px;
     padding-bottom: 16px;
     margin-bottom: 16px;
-    border-bottom: 1px solid #E7E7E7;
+    border-bottom: 1px solid var(--line);
 }
 
 .kpiList-block:last-child {
@@ -9336,7 +9396,7 @@ ol.listingNo-wrapper li:last-child {
     align-items: flex-start;
     padding-bottom: 16px;
     margin-bottom: 16px;
-    border-bottom: 1px solid #E7E7E7;
+    border-bottom: 1px solid var(--line);
 }
 
 .monthlyCheck-block:last-child {
@@ -9392,7 +9452,7 @@ ol.listingNo-wrapper li:last-child {
 .participants-block .d-flex {
     /* align-items: flex-start; */
     padding: 20px 9px;
-    border-bottom: 1px solid #DDDDDD;
+    border-bottom: 1px solid var(--neutral-bg);
 }
 
 
@@ -9494,7 +9554,7 @@ ol.listingNo-wrapper li:last-child {
 
 .selectReviewTypes-block {
     padding: 10px 18px;
-    background: #F5F8F8;
+    background: var(--teal-soft);
     border-radius: 10px;
 }
 
@@ -9523,7 +9583,7 @@ ol.listingNo-wrapper li:last-child {
 }
 
 .perCycleSum-block .row>*:first-child {
-    border-right: 1px solid #D9D9D9;
+    border-right: 1px solid var(--neutral-bg);
 }
 
 .table-lableSmallLabel th,
@@ -9725,7 +9785,7 @@ ol.listingNo-wrapper li:last-child {
 }
 
 .perforCycleAnaly-block>.row>*:first-child {
-    border-right: 1px solid #DDDDDD;
+    border-right: 1px solid var(--neutral-bg);
 }
 
 
@@ -9758,7 +9818,7 @@ ol.listingNo-wrapper li:last-child {
     text-align: right;
     border-right: 1px solid #ECECEC;
     padding-left: 0;
-    background: #F5F8F8;
+    background: var(--teal-soft);
 }
 
 .perforCycleMatrix-table tr:last-child th {
@@ -9899,7 +9959,7 @@ ol.listingNo-wrapper li:last-child {
 .card-resolutionRate .d-flex,
 .card-reportsResolved .d-flex,
 .card-feedbackEvaluation .d-flex {
-    border-top: 1px solid #E7E7E7;
+    border-top: 1px solid var(--line);
     padding-top: 11px;
     align-items: center;
     justify-content: space-between;
@@ -10020,7 +10080,7 @@ ol.listingNo-wrapper li:last-child {
 .empGrieSubmission-check {
     width: 177px;
     height: 52px;
-    background: #F5F8F8;
+    background: var(--teal-soft);
     border-radius: 7px;
     display: flex;
     align-items: center;
@@ -10063,7 +10123,7 @@ ol.listingNo-wrapper li:last-child {
 }
 
 .context-menu li {
-    border-bottom: 1px solid #DDDDDD;
+    border-bottom: 1px solid var(--neutral-bg);
     cursor: pointer;
 }
 
@@ -10073,7 +10133,7 @@ ol.listingNo-wrapper li:last-child {
 
 .context-menu li a {
     display: block;
-    color: #222;
+    color: var(--darkblack);
     font-weight: 500;
     font-size: 14px;
     padding: 10px 0;
@@ -10081,7 +10141,7 @@ ol.listingNo-wrapper li:last-child {
 }
 
 .context-menu li a:hover {
-    color: #2eacb3;
+    color: var(--aqua);
 }
 
 .grieInv-card .bg-themeGrayLight,
@@ -10092,7 +10152,7 @@ ol.listingNo-wrapper li:last-child {
 
 .grieInv-card .bg-themeGrayLight>.row>*:first-child,
 .appealReviewDecision-card .bg-themeGrayLight>.row>*:first-child {
-    border-right: 1px solid #D9D9D9;
+    border-right: 1px solid var(--neutral-bg);
 }
 
 .grieInv-card .bg-themeGrayLight h6,
@@ -10123,7 +10183,7 @@ ol.listingNo-wrapper li:last-child {
 
 .table-letterTemplates td {
     padding: 9px 5px;
-    border-bottom: 1px solid #DDDDDD;
+    border-bottom: 1px solid var(--neutral-bg);
 }
 
 .table-letterTemplates a {
@@ -10136,8 +10196,8 @@ ol.listingNo-wrapper li:last-child {
 
 .table-letterTemplates td input {
     border-radius: 10px;
-    border: 1px solid #DDDDDD;
-    color: #222222;
+    border: 1px solid var(--neutral-bg);
+    color: var(--darkblack);
     padding: 4px 8px;
     font-size: 14px;
     font-weight: 400;
@@ -10188,7 +10248,7 @@ ol.listingNo-wrapper li:last-child {
 }
 
 .prReview-footer {
-    background: #F5F8F8;
+    background: var(--teal-soft);
     padding: 23px 20px 20px;
 }
 
@@ -10216,14 +10276,14 @@ ol.listingNo-wrapper li:last-child {
     font-weight: bold;
     text-align: center;
     padding: 12px 10px 11px;
-    background: #F5F8F8;
+    background: var(--teal-soft);
     text-transform: uppercase;
 }
 
 .card.card-grievance .body,
 .card.card-disciplinary .body {
     padding: 20px 20px 23px;
-    border-bottom: 1px solid #E7E7E7;
+    border-bottom: 1px solid var(--line);
 }
 
 .card.card-grievance .body:last-child,
@@ -10250,7 +10310,7 @@ ol.listingNo-wrapper li:last-child {
     align-items: center;
     padding-bottom: 10px;
     margin-bottom: 16px;
-    border-bottom: 1px solid #E7E7E7;
+    border-bottom: 1px solid var(--line);
 }
 
 .responseKpi-block>div label.form-label {
@@ -10276,7 +10336,7 @@ ol.listingNo-wrapper li:last-child {
 
 
 .responseKpi-block ul li span {
-    color: #222222;
+    color: var(--darkblack);
     font-size: 14px;
     line-height: 1.43;
     font-weight: 600;
@@ -10419,7 +10479,7 @@ ol.listingNo-wrapper li:last-child {
 
 .calendarLD-card .leaveUser-main .d-flex,
 .calendarIncident-card .leaveUser-main .d-flex {
-    border-bottom: 1px solid #DDDDDD;
+    border-bottom: 1px solid var(--neutral-bg);
     padding-bottom: 14px;
     margin-bottom: 20px;
 }
@@ -10523,7 +10583,7 @@ ol.listingNo-wrapper li:last-child {
     justify-content: space-between;
     padding-bottom: 9px;
     margin-bottom: 8px;
-    border-bottom: 1px solid #DDDDDD;
+    border-bottom: 1px solid var(--neutral-bg);
 }
 
 .surveyStatus-block .head h6 {
@@ -10605,7 +10665,7 @@ ol.listingNo-wrapper li:last-child {
     line-height: 1.548;
     padding: 13px 10px;
     width: 55px;
-    border: 1px solid #DDDDDD;
+    border: 1px solid var(--neutral-bg);
     border-radius: 10px;
     margin: 0 5px;
 }
@@ -10620,7 +10680,7 @@ ol.listingNo-wrapper li:last-child {
 
 .negPosi-block .btn.active {
     color: #fff;
-    background: #014653;
+    background: var(--teal);
 }
 
 .input-group.searchInput-group:not(.has-validation)>:not(:last-child):not(.dropdown-toggle):not(.dropdown-menu) {
@@ -10645,7 +10705,7 @@ ol.listingNo-wrapper li:last-child {
 .filters-block {
     position: relative;
     padding: 16px 20px 23px;
-    background: #F5F8F8;
+    background: var(--teal-soft);
     border-radius: 10px;
 }
 
@@ -10659,13 +10719,13 @@ ol.listingNo-wrapper li:last-child {
     height: 0;
     border-right: 8px solid transparent;
     border-left: 8px solid transparent;
-    border-bottom: 11px solid #F5F8F8;
+    border-bottom: 11px solid var(--teal-soft);
 }
 
 .confiCreateSurvey-switch label.form-label {
     font-size: 18px;
     /* font: normal normal 600 18px/30px Poppins; */
-    color: #222222;
+    color: var(--darkblack);
     text-transform: capitalize;
     width: 545px;
 }
@@ -10882,7 +10942,7 @@ ol.listingNo-wrapper li:last-child {
 .card-incidentListing .nav-tabs .nav-link {
     margin: 0;
     border: 0;
-    color: #222222;
+    color: var(--darkblack);
     font-size: 16px;
     font-weight: 500;
     padding: 7px 10px;
@@ -10890,8 +10950,8 @@ ol.listingNo-wrapper li:last-child {
 }
 
 .card-incidentListing .nav-tabs .nav-link.active {
-    color: #014653;
-    border-bottom-color: #014653;
+    color: var(--teal);
+    border-bottom-color: var(--teal);
 }
 
 .incident-card .bg-themeGrayLight {
@@ -11055,7 +11115,7 @@ ol.listingNo-wrapper li:last-child {
 
 .uploadedFilesProgress-block {
     display: flex;
-    border-bottom: 1px solid #E7E7E7;
+    border-bottom: 1px solid var(--line);
     padding-bottom: 16px;
     margin-bottom: 16px;
 }
@@ -11076,7 +11136,7 @@ ol.listingNo-wrapper li:last-child {
     color: #fff;
     font-size: 20px;
     font-weight: 500;
-    background: #014653;
+    background: var(--teal);
     border-radius: 8px;
     margin-right: 16px;
     text-transform: uppercase;
@@ -11105,6 +11165,8 @@ ol.listingNo-wrapper li:last-child {
     display: inline-block;
     width: 10px;
     height: 10px;
+    /* Fixed #222222, not var(--darkblack) — a solid dark dot regardless
+       of theme, unlike --darkblack's now-themed text role. */
     background: #222222;
     border-radius: 50%;
     margin: 0 12px;
@@ -11115,7 +11177,7 @@ ol.listingNo-wrapper li:last-child {
 }
 
 .text-themeDanger {
-    color: #C80000;
+    color: var(--danger);
 }
 
 .text-themeSuccess {
@@ -11138,7 +11200,7 @@ ol.listingNo-wrapper li:last-child {
     display: flex;
     align-items: center;
     padding: 20px 12px;
-    border-bottom: 1px solid #DDDDDD;
+    border-bottom: 1px solid var(--neutral-bg);
 }
 
 .selectFolderLocation-block:last-child {
@@ -11146,7 +11208,7 @@ ol.listingNo-wrapper li:last-child {
 }
 
 .selectFolderLocation-block.active {
-    background: #F5F8F8;
+    background: var(--teal-soft);
 }
 
 
@@ -11222,7 +11284,7 @@ ol.listingNo-wrapper li:last-child {
 }
 
 .search-document>div>i {
-    color: #DDDDDD;
+    color: var(--neutral-bg);
     font-size: 16px;
 }
 
@@ -11233,7 +11295,7 @@ ol.listingNo-wrapper li:last-child {
     height: 30px;
     font-size: 14px;
     color: rgb(34 34 34 / 30%);
-    background: #F5F8F8;
+    background: var(--teal-soft);
     border-radius: 50%;
     margin-left: 10px;
 }
@@ -11241,7 +11303,7 @@ ol.listingNo-wrapper li:last-child {
 .fileDocument-block .d-flex {
     align-items: center;
     padding: 20px 9px;
-    border-bottom: 1px solid #DDDDDD;
+    border-bottom: 1px solid var(--neutral-bg);
 }
 
 .fileDocument-block .d-flex.active {
@@ -11307,12 +11369,12 @@ ol.listingNo-wrapper li:last-child {
 
 .fileManagEmpWise-accordion .accordion-item {
     background: transparent;
-    border-bottom: 1px solid #DDDDDD;
+    border-bottom: 1px solid var(--neutral-bg);
     border-radius: 0 !important;
 }
 
 .fileManagEmpWise-accordion .accordion-button {
-    color: #222222;
+    color: var(--darkblack);
     padding: 20px 9px;
     background: #fff;
     border-radius: 0 !important;
@@ -11353,7 +11415,7 @@ ol.listingNo-wrapper li:last-child {
     padding-top: 15px;
     padding-bottom: 21px;
     margin-bottom: 23px;
-    border-bottom: 1px solid #E7E7E7;
+    border-bottom: 1px solid var(--line);
 }
 
 .card-billingInvoicePremiumPlan h6 {
@@ -11503,7 +11565,7 @@ ul.listingNew-wrapper li::before {
     font-size: 18px;
     font-weight: 600;
     padding: 16px 10px 0 !important;
-    border-top: 1px solid #E7E7E7;
+    border-top: 1px solid var(--line);
 }
 
 .table-billingInvoiceTotal tfoot th:first-child {
@@ -11520,7 +11582,7 @@ ul.listingNew-wrapper li::before {
 }
 
 .table-billingInvoicePaymentHistory td:first-child span {
-    color: #014653;
+    color: var(--teal);
     font-weight: 500;
 }
 
@@ -11544,7 +11606,7 @@ ul.listingNew-wrapper li::before {
 .billingInvoiceSupport-accordion .accordion-item {
     background: #FFFFFF;
     box-shadow: 0px 0px 24px #00000014;
-    border: 1px solid #E7E7E7;
+    border: 1px solid var(--line);
     border-radius: 12px !important;
     margin-bottom: 12px;
 }
@@ -11588,7 +11650,7 @@ ul.listingNew-wrapper li::before {
 }
 
 .chatStatus-text.offline {
-    --chatStatus: #A90000;
+    --chatStatus: var(--danger-strong);
 }
 
 .chatStatus-text {
@@ -11640,7 +11702,7 @@ ul.listingNew-wrapper li::before {
     display: block;
     width: 100%;
     height: 1px;
-    background: #E7E7E7;
+    background: var(--line);
 }
 
 .chat-msg {
@@ -11659,7 +11721,7 @@ ul.listingNew-wrapper li::before {
 .chat-msg .msg {
     padding: 18px 24px;
     background: #FFFFFF;
-    border: 1px solid #E7E7E7;
+    border: 1px solid var(--line);
     border-radius: 8px;
     max-width: 80%;
 }
@@ -11688,7 +11750,7 @@ ul.listingNew-wrapper li::before {
     right: 72px;
     transform: translateY(-50%);
     font-size: 14px;
-    color: #DDDDDD;
+    color: var(--neutral-bg);
 }
 
 .chatSend-input .btn {
@@ -11806,7 +11868,7 @@ ul.listingNew-wrapper li::before {
 .sosEmpSafetyStatus-emp>.d-flex {
     padding: 15px;
     background: #FFFFFF;
-    border: 1px solid #DDDDDD;
+    border: 1px solid var(--neutral-bg);
     border-radius: 10px;
     margin-bottom: 16px;
     gap: 8px;
@@ -11881,6 +11943,23 @@ ul.listingNew-wrapper li::before {
     margin-right: 10px;
 }
 
+@media (max-width: 575.98px) {
+    .sosteamActivity-emp>.d-flex>div:last-child ul,
+    .sosEmpSafetyStatus-emp>.d-flex>div:last-child ul {
+        white-space: normal;
+        flex-wrap: wrap;
+        justify-content: flex-start;
+        margin: 0 0 13px;
+    }
+
+    .sosteamActivity-emp>.d-flex>div:last-child ul>li,
+    .sosEmpSafetyStatus-emp>.d-flex>div:last-child ul>li {
+        white-space: normal;
+        border-right: none;
+        padding: 0 10px 0 0;
+    }
+}
+
 
 
 /* 24-02-2025 */
@@ -11897,8 +11976,8 @@ ul.listingNew-wrapper li::before {
 }
 
 .card-visa-management .nav-tabs .nav-link.active {
-    color: #014653;
-    border-bottom-color: #014653;
+    color: var(--teal);
+    border-bottom-color: var(--teal);
 }
 
 
@@ -11946,7 +12025,7 @@ ul.listingNew-wrapper li::before {
 }
 
 .block-danger .overdue-text {
-    color: #C80000;
+    color: var(--danger);
 }
 
 .block-danger h6 span {
@@ -11991,7 +12070,7 @@ ul.listingNew-wrapper li::before {
     font-size: 13px;
     font-weight: 500;
     line-height: 1.2;
-    color: #C80000;
+    color: var(--danger);
     color: var(--darkblack);
 }
 
@@ -12001,7 +12080,7 @@ ul.listingNew-wrapper li::before {
 
 .expiry-dates-overview-box {
     padding: 16px 24px;
-    background-color: #F5F8F8;
+    background-color: var(--teal-soft);
     border-radius: 10px;
 
 }
@@ -12038,7 +12117,7 @@ ul.listingNew-wrapper li::before {
 .total-breakdown-visa>div {
     padding: 20px;
     background: #FFFFFF;
-    border: 1px solid #DDDDDD;
+    border: 1px solid var(--neutral-bg);
     border-radius: 10px;
     gap: 8px;
 }
@@ -12093,7 +12172,7 @@ ul.listingNew-wrapper li::before {
 }
 
 .ExpDa-fillterbox>a {
-    background: #F5F8F8;
+    background: var(--teal-soft);
     border-radius: 10px;
     padding: 16px 20px;
     max-width: 265px;
@@ -12104,8 +12183,8 @@ ul.listingNew-wrapper li::before {
 }
 
 .ExpDa-fillterbox>a.active {
-    color: #014653;
-    border-color: #014653;
+    color: var(--teal);
+    border-color: var(--teal);
 }
 
 .card-visa-manDepositRe .form-control-sm {
@@ -12125,7 +12204,7 @@ ul.listingNew-wrapper li::before {
     align-items: center;
     justify-content: space-between; */
     padding: 21px 20px 15px;
-    background: #F5F8F8;
+    background: var(--teal-soft);
     border-radius: 15px;
     height: 100%;
 }
@@ -12159,7 +12238,7 @@ ul.listingNew-wrapper li::before {
 }
 
 .exp-Date-userbox {
-    border: 1px solid #DDDDDD;
+    border: 1px solid var(--neutral-bg);
     border-radius: 12px;
     padding: 10px 20px 10px 10px;
 }
@@ -12240,13 +12319,13 @@ ul.listingNew-wrapper li::before {
 
 .XpatDetail-documents-box {
     background: #FFFFFF;
-    border: 1px solid #DDDDDD;
+    border: 1px solid var(--neutral-bg);
     border-radius: 25px;
     padding: 20px 21px;
 }
 
 .XpatDetail-Documents-block {
-    background: #F5F8F8;
+    background: var(--teal-soft);
     border-radius: 15px;
     padding: 14px 17px 16px;
 }
@@ -12276,8 +12355,8 @@ ul.listingNew-wrapper li::before {
 }
 
 .XpatDet-paySchedule .nav-tabs .nav-link.active {
-    color: #014653;
-    border-bottom-color: #014653;
+    color: var(--teal);
+    border-bottom-color: var(--teal);
 }
 
 .XpatDet-paySchedule .listing-box {
@@ -12287,7 +12366,7 @@ ul.listingNew-wrapper li::before {
 
 .XpatDet-paySchedule .listing-box .nav {
     font: normal normal 600 16px/1 'Poppins';
-    color: #222222;
+    color: var(--darkblack);
 
 }
 
@@ -12296,12 +12375,12 @@ ul.listingNew-wrapper li::before {
 }
 
 .XpatDet-paySchedule .listing-box .nav li:not(:last-of-type) {
-    border-right: 1px solid #222222;
+    border-right: 1px solid var(--darkblack);
 }
 
 .expenses-joining-box {
     padding: 18px 20px 12px;
-    background-color: #F5F8F8;
+    background-color: var(--teal-soft);
     border-radius: 15px;
 }
 
@@ -12319,14 +12398,14 @@ ul.listingNew-wrapper li::before {
 
 .tot-amount {
     font: normal normal 600 14px/30px 'Poppins';
-    color: #222222;
-    border: 1px solid #DDDDDD;
+    color: var(--darkblack);
+    border: 1px solid var(--neutral-bg);
     border-radius: 15px;
     padding: 10px 15px;
 }
 
 .renewal-box {
-    background: #F5F8F8;
+    background: var(--teal-soft);
     border-radius: 15px;
     padding: 20px;
 }
@@ -12368,7 +12447,7 @@ ul.listingNew-wrapper li::before {
 
 .VisaMan-Configuration-box:not(:last-of-type) {
     margin-bottom: 20px;
-    border-bottom: 1px solid #E7E7E7;
+    border-bottom: 1px solid var(--line);
     padding-bottom: 20px;
 }
 
@@ -12379,7 +12458,7 @@ ul.listingNew-wrapper li::before {
 }
 
 .PayReq-Details-box {
-    border: 1px solid #DDDDDD;
+    border: 1px solid var(--neutral-bg);
     border-radius: 12px;
     padding: 16px;
 }
@@ -12402,7 +12481,7 @@ ul.listingNew-wrapper li::before {
 }
 
 .PayReq-Details-box .border-top {
-    border-top-color: #DDDDDD !important;
+    border-top-color: var(--neutral-bg) !important;
     padding-top: 16px;
     margin-top: 16px;
 }
@@ -12422,7 +12501,7 @@ ul.listingNew-wrapper li::before {
 }
 
 .PayReqprice-bar {
-    background: #F5F8F8;
+    background: var(--teal-soft);
     padding: 16px;
     border-radius: 15px;
 
@@ -12437,7 +12516,7 @@ ul.listingNew-wrapper li::before {
 }
 
 .DepRefReq-checkbox {
-    background: #F5F8F8;
+    background: var(--teal-soft);
     border-radius: 15px;
     padding: 23px 34px 25px 26px;
 }
@@ -12469,7 +12548,7 @@ ul.listingNew-wrapper li::before {
 }
 
 .document-box {
-    background: #F5F8F8;
+    background: var(--teal-soft);
     padding: 24px 20px 26px;
     border-radius: 25px;
 }
@@ -12496,7 +12575,7 @@ ul.listingNew-wrapper li::before {
 }
 
 .document-proces-listing li {
-    background: #F5F8F8;
+    background: var(--teal-soft);
     border-radius: 15px;
     padding: 22px 20px 21px 54px !important;
     position: relative;
@@ -12538,15 +12617,15 @@ ul.listing-wrapper.document-proces-listing li::before {
     height: 36px;
     color: #FFF;
     font-size: 17px;
-    background: #014653;
+    background: var(--teal);
     border: 1px solid #FFFFFF;
     border-radius: 50%;
 }
 
 .userImg-edit:hover {
-    color: #014653;
+    color: var(--teal);
     background: #fff;
-    border: 1px solid #014653;
+    border: 1px solid var(--teal);
 }
 
 .modal-drillSOS .modal-body {
@@ -12573,7 +12652,7 @@ ul.listing-wrapper.document-proces-listing li::before {
 }
 
 .iniProSelectEmp-block .bor {
-    border-left: 1px solid #DDDDDD;
+    border-left: 1px solid var(--neutral-bg);
 }
 
 .iniProSelectEmp-block label.form-label {
@@ -12583,7 +12662,7 @@ ul.listing-wrapper.document-proces-listing li::before {
 
 .cardBorder-block {
     padding: 20px;
-    border: 1px solid #DDDDDD;
+    border: 1px solid var(--neutral-bg);
     border-radius: 12px;
 }
 
@@ -12656,7 +12735,7 @@ ul.listing-wrapper.document-proces-listing li::before {
 
 .salaryIncrementManag-block .position {
     display: block;
-    color: #014653;
+    color: var(--teal);
     font-weight: 500;
     margin-bottom: 4px;
 }
@@ -12950,7 +13029,7 @@ ul.listing-wrapper.document-proces-listing li::before {
     justify-content: space-between;
     padding-bottom: 13px;
     margin-bottom: 4px;
-    border-bottom: 1px solid #DDDDDD;
+    border-bottom: 1px solid var(--neutral-bg);
 }
 
 .card-probationPeopleEmp p.fw-500 {
@@ -13018,7 +13097,7 @@ ul.listing-wrapper.document-proces-listing li::before {
     justify-content: space-between;
     color: #66C1C6;
     padding: 11px 18px;
-    background: #F5F8F8;
+    background: var(--teal-soft);
     border-radius: 10px;
 }
 
@@ -13057,7 +13136,7 @@ ul.listing-wrapper.document-proces-listing li::before {
 
 .card-liabilityTrackPeopleEmp .d-flex {
     padding-bottom: 12px;
-    border-bottom: 1px solid #DDDDDD;
+    border-bottom: 1px solid var(--neutral-bg);
 }
 
 .card-liabilityTrackPeopleEmp .progress-custom {
@@ -13090,8 +13169,8 @@ ul.listing-wrapper.document-proces-listing li::before {
 .empListPeopleEmp-block .block {
     padding: 8px 0;
     margin-bottom: 13px;
-    border-top: 1px solid #DDDDDD;
-    border-bottom: 1px solid #DDDDDD;
+    border-top: 1px solid var(--neutral-bg);
+    border-bottom: 1px solid var(--neutral-bg);
 }
 
 .empListPeopleEmp-block table {
@@ -13119,8 +13198,8 @@ ul.listing-wrapper.document-proces-listing li::before {
 
 .empDetailPeopleEmp-sidebar {
     width: 312px;
-    background: #F5F8F8;
-    border: 1px solid #DDDDDD;
+    background: var(--teal-soft);
+    border: 1px solid var(--neutral-bg);
     border-radius: 25px;
     text-align: center;
     position: relative;
@@ -13210,7 +13289,7 @@ ul.listing-wrapper.document-proces-listing li::before {
 }
 
 .empDetailPeopleEmp-sidebar>ul>li>a {
-    color: #222222;
+    color: var(--darkblack);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -13233,7 +13312,7 @@ ul.listing-wrapper.document-proces-listing li::before {
 .tab-theme .nav-tabs,
 .empDetailPeopleEmp-tab .nav-tabs,
 .liabilityOverPeopleEmp-tab .nav-tabs {
-    border-color: #E7E7E7;
+    border-color: var(--line);
 }
 
 .tab-theme .nav-tabs .nav-link,
@@ -13252,8 +13331,8 @@ ul.listing-wrapper.document-proces-listing li::before {
 .tab-theme .nav-tabs .nav-link.active,
 .empDetailPeopleEmp-tab .nav-tabs .nav-link.active,
 .liabilityOverPeopleEmp-tab .nav-tabs .nav-link.active {
-    color: #014653;
-    border-color: #014653
+    color: var(--teal);
+    border-color: var(--teal)
 }
 
 
@@ -13307,7 +13386,7 @@ ul.listing-wrapper.document-proces-listing li::before {
     align-items: flex-start;
     justify-content: space-between;
     padding: 18px 20px;
-    border: 1px solid #DDDDDD;
+    border: 1px solid var(--neutral-bg);
     border-radius: 10px;
     height: 100%;
 }
@@ -13338,7 +13417,7 @@ ul.listing-wrapper.document-proces-listing li::before {
 }
 
 .modal-reqApproval .border {
-    border-bottom-color: #DDDDDD;
+    border-bottom-color: var(--neutral-bg);
 }
 
 .modal-reqApproval .bg-themeGrayLight {
@@ -13515,7 +13594,7 @@ table.table-repaySchedPeopleEmp tbody .form-select {
 
 .queAns-block {
     padding-bottom: 24px;
-    border-bottom: 1px solid #DDDDDD;
+    border-bottom: 1px solid var(--neutral-bg);
 }
 
 .queAns-block h6 {
@@ -13542,7 +13621,7 @@ table.table-repaySchedPeopleEmp tbody .form-select {
 .modal-requestApproval .content {
     margin-top: 16px;
     padding-top: 16px;
-    border-top: 1px solid #DDDDDD;
+    border-top: 1px solid var(--neutral-bg);
 }
 
 .modal-requestApproval .content p {
@@ -13603,7 +13682,7 @@ table.table-repaySchedPeopleEmp tbody .form-select {
 .card-talentAcqCompliances .border-bottom {
     padding-bottom: 12px;
     margin-bottom: 13px;
-    border-bottom-color: #DDDDDD !important;
+    border-bottom-color: var(--neutral-bg) !important;
 }
 
 .card-talentAcqCompliances .border-bottom:last-child {
@@ -13685,7 +13764,7 @@ table.table-repaySchedPeopleEmp tbody .form-select {
 .card-talentAcqRecentActivity .border-bottom {
     padding-bottom: 12px;
     margin-bottom: 14px;
-    border-color: #DDDDDD !important;
+    border-color: var(--neutral-bg) !important;
 }
 
 .card-talentAcqRecentActivity .border-bottom:last-child {
@@ -13721,7 +13800,7 @@ table.table-repaySchedPeopleEmp tbody .form-select {
 .card.card-theme>.card-title {
     color: #fff;
     padding: 21px 20px;
-    background: #014653;
+    background: var(--teal);
     border-radius: 15px;
     border: 0;
     margin: 0;
@@ -13961,7 +14040,7 @@ table.table-repaySchedPeopleEmp tbody .form-select {
 }
 
 .card-talentAcqLeave .card-talentAcqLeaveUpcoming .leaveUser-bgBlock h6 {
-    color: #014653;
+    color: var(--teal);
     font-size: 14px;
 }
 
@@ -13993,7 +14072,7 @@ table.table-repaySchedPeopleEmp tbody .form-select {
 }
 
 .card-talentAcqPeople .bg-themeGrayLight.viewOrgChart p {
-    color: #014653;
+    color: var(--teal);
 }
 
 .card-talentAcqPeople .leaveUser-block {
@@ -14048,7 +14127,7 @@ table.table-repaySchedPeopleEmp tbody .form-select {
     justify-content: space-between;
     padding-bottom: 10px;
     margin-bottom: 10px;
-    border-bottom: 1px solid #DDDDDD;
+    border-bottom: 1px solid var(--neutral-bg);
 }
 
 .card-talentAcqPeople .leaveUser-bgBlock.talentAcqPromPeo-block .d-flex {
@@ -14116,7 +14195,7 @@ table.table-repaySchedPeopleEmp tbody .form-select {
 
 .card-talentAcqPeople .talentAcqLiabilTrackPeo-block .d-flex {
     padding-bottom: 12px;
-    border-bottom: 1px solid #DDDDDD;
+    border-bottom: 1px solid var(--neutral-bg);
 }
 
 /*
@@ -14296,7 +14375,7 @@ table.table-repaySchedPeopleEmp tbody .form-select {
     flex-direction: column;
     padding: 20px 16px;
     background: #FFFFFF;
-    border: 1px solid #DDDDDD;
+    border: 1px solid var(--neutral-bg);
     border-radius: 25px;
     height: 100%;
 }
@@ -14304,7 +14383,7 @@ table.table-repaySchedPeopleEmp tbody .form-select {
 .templateSelect-block>.flex-grow-1 {
     padding-bottom: 20px;
     margin-bottom: 13px;
-    border-bottom: 1px solid #DDDDDD;
+    border-bottom: 1px solid var(--neutral-bg);
 }
 
 .templateSelect-block h6 {
@@ -14360,7 +14439,7 @@ table.table-repaySchedPeopleEmp tbody .form-select {
 .upload-area {
     width: 100%;
     height: 190px;
-    border: 1px dashed #DDDDDD;
+    border: 1px dashed var(--neutral-bg);
     display: flex;
     flex-direction: column;
     justify-content: center;
@@ -14376,7 +14455,7 @@ table.table-repaySchedPeopleEmp tbody .form-select {
 
 .upload-area p {
     font-size: 14px;
-    color: #222222;
+    color: var(--darkblack);
     margin-top: 42px;
     margin-bottom: 0;
 }
@@ -14401,13 +14480,13 @@ table.table-repaySchedPeopleEmp tbody .form-select {
     font-size: 18px;
     font-weight: 600;
     text-transform: capitalize;
-    color: #222222;
+    color: var(--darkblack);
     margin-bottom: 0;
 }
 
 .upload-area span {
     font-size: 13px;
-    color: #222222;
+    color: var(--darkblack);
 }
 
 .profile-img-box {
@@ -14437,18 +14516,18 @@ table.table-repaySchedPeopleEmp tbody .form-select {
 }
 
 .iti--separate-dial-code .iti__selected-flag {
-    background: #D6E1E3;
+    background: var(--neutral-bg);
     border-right: 1px solid #dddd;
     border-radius: 10px 0 0 10px;
 }
 
 .iti--allow-dropdown .iti__flag-container:hover .iti__selected-flag {
-    background-color: #D6E1E3;
+    background-color: var(--neutral-bg);
 }
 
 .address-block {
     padding: 20px;
-    border: 1px solid #DDDDDD;
+    border: 1px solid var(--neutral-bg);
     border-radius: 10px;
 }
 
@@ -14500,5 +14579,46 @@ table.table-repaySchedPeopleEmp tbody .form-select {
 
 .dropdown .dropdown-toggle{
     padding-right: 40px !important;
+}
+
+/* Safari/WebKit paints its own pale-yellow highlight on autofilled inputs
+   (Chrome's own autofill tint is a paler blue that blends in more, which is
+   why this was only obvious in Safari) — .form-control never set a
+   background-color, so nothing here was overriding the browser's default.
+   The box-shadow-inset trick is required because WebKit ignores a plain
+   background-color override on autofilled fields; the long transition-delay
+   stops Safari's own delayed re-application of its tint from flashing back in. */
+input.form-control:-webkit-autofill,
+input.form-control:-webkit-autofill:hover,
+input.form-control:-webkit-autofill:focus,
+input.form-control:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 1000px #fff inset;
+    box-shadow: 0 0 0 1000px #fff inset;
+    -webkit-text-fill-color: var(--darkblack);
+    transition: background-color 5000s ease-in-out 0s;
+}
+
+/* formbuilder.online's field-actions icon strip (delete/edit/copy/
+   reorder — .field-actions, 160px wide) is absolutely positioned at
+   top:0 right:0 of each .form-field <li>, with no reserved space for
+   it. On narrow viewports the field's own label/preview text runs
+   full-width and renders directly underneath the icons. Every form-
+   builder instance in the app (itinerary templates, interview
+   assessments, exit-clearance forms, evaluation/feedback forms,
+   performance templates) shares this exact markup, so the fix lives
+   here once rather than per-page. Padding-top on the <li> (which is
+   position:relative) only pushes IN-FLOW children down — the
+   icons' own top:0/right:0 is unaffected, so nothing about their
+   position, size, or click targets changes; this only clears space
+   for the content below them.
+   Selector + !important are both required: the library injects its
+   own <style> tag at runtime (after page load, so it always wins on
+   source order) with `.form-wrap.form-builder .frmb li.form-field {
+   padding-top: 6px }` — matched here at equal specificity so the
+   !important is what wins the tie, not a specificity hack. */
+@media (max-width: 575.98px) {
+    .form-wrap.form-builder .frmb li.form-field {
+        padding-top: 40px !important;
+    }
 }
 

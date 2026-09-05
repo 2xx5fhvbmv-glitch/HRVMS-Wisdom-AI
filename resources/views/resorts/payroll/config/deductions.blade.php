@@ -2,9 +2,15 @@
 @section('page_tab_title', $page_title)
 
 @section('content')
+<style>
+    #deductions-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #deductions-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="deductions-hero">
             <div class="row justify-content-between g-3">
                 <div class="col-auto">
                     <div class="page-title">
@@ -13,7 +19,7 @@
                     </div>
                 </div>
                 <div class="col-auto">
-                    <a href="{{ route('payroll.configration') }}" class="btn payroll-btn-secondary btn-sm">Back to Configuration</a>
+                    <a href="{{ route('payroll.configration') }}" class="btn payroll-btn-neutral btn-sm">Back to Configuration</a>
                 </div>
             </div>
         </div>
@@ -86,18 +92,42 @@
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Currency</label>
-                        <select class="form-select" id="edit_currency" required>
+                        <select class="form-select dd-native-select" id="edit_currency" required>
                             <option value="Rufiyaa">Rufiyaa</option>
                             <option value="USD">USD</option>
                         </select>
+                        <div class="dd" data-target="#edit_currency">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">Rufiyaa</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Currency">
+                                <div class="dd-scroll">
+                                    <div class="dd-item active" role="option" data-value="Rufiyaa"><span class="dd-nm">Rufiyaa</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    <div class="dd-item" role="option" data-value="USD"><span class="dd-nm">USD</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="row g-3">
                         <div class="col-sm-5">
                             <label class="form-label">Limit Type</label>
-                            <select class="form-select" id="edit_maximum_limit_type" required>
+                            <select class="form-select dd-native-select" id="edit_maximum_limit_type" required>
                                 <option value="percentage">Percentage (%)</option>
                                 <option value="fixed">Fixed Amount</option>
                             </select>
+                            <div class="dd" data-target="#edit_maximum_limit_type">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Percentage (%)</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Limit type">
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value="percentage"><span class="dd-nm">Percentage (%)</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="fixed"><span class="dd-nm">Fixed Amount</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="col-sm-7">
                             <label class="form-label">Maximum Limit</label>
@@ -117,6 +147,7 @@
 
 @section('import-css')
 @include('resorts.payroll._payroll_buttons_v2_styles')
+@include('resorts._dropdown_styles')
 @endsection
 
 @section('import-scripts')
@@ -207,8 +238,10 @@
         $('#edit_deduction_name').val($(this).data('name'));
         $('#edit_deduction_type').val($(this).data('type'));
         $('#edit_currency').val($(this).data('currency'));
+        window.wisdomDD.sync('#edit_currency');
         $('#edit_maximum_limit').val($(this).data('limit'));
         $('#edit_maximum_limit_type').val($(this).data('limit-type'));
+        window.wisdomDD.sync('#edit_maximum_limit_type');
         $('#editDeductionModal').modal('show');
     });
 
@@ -288,4 +321,5 @@
         });
     });
 </script>
+@include('resorts._dropdown_script')
 @endsection

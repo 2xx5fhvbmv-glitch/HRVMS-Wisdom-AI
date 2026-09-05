@@ -7,10 +7,16 @@
 </div>
 @endif
 
-@section('content') 
+@section('content')
+    <style>
+        #salary-increment-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #salary-increment-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="salary-increment-hero">
                 <div class="row  g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -78,23 +84,51 @@
                                      renders it as a placeholder. Without it the field
                                      showed blank/broken because Select2 couldn't latch
                                      onto the selected-disabled option. --}}
-                                <select class="form-select select2t-none" name="increment_type" id="select_build" data-parsley-required-message="Please select increment type" required data-parsley-errors-container="#incrementTypeError">
+                                <select class="form-select dd-native-select" name="increment_type" id="select_build" data-parsley-required-message="Please select increment type" required data-parsley-errors-container="#incrementTypeError">
                                     <option value="">Increment Type</option>
                                     @foreach ($incrementTypes as $increment_type)
                                         <option value="{{$increment_type->name}}">{{$increment_type->name}}</option>
                                     @endforeach
                                 </select>
+                                <div class="dd" data-target="#select_build">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">Increment Type</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Increment Type">
+                                        <div class="dd-scroll">
+                                            <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Increment Type</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @foreach ($incrementTypes as $increment_type)
+                                                <div class="dd-item" role="option" data-value="{{ $increment_type->name }}"><span class="dd-nm">{{ $increment_type->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                </div>
                                 <div id="incrementTypeError"></div>
                             </div>
                             <div class="col-xxl col-xl-3 col-md-4 col-sm-6">
                                 {{-- "Pay Increase Type" placeholder option removed per
                                      request. The select now defaults to Fixed and
                                      lets HR switch to Percentage when needed. --}}
-                                <select class="form-select select2t-none pay-increase-type" name="pay_increase_type" data-parsley-errors-container="#payIncreaseTypeError">
+                                @php $bulkFormSelectedPayIncrease = $payIncreaseTypes['Fixed'] ?? reset($payIncreaseTypes); @endphp
+                                <select class="form-select pay-increase-type dd-native-select" name="pay_increase_type" id="bulk_form_pay_increase_type" data-parsley-errors-container="#payIncreaseTypeError">
                                     @foreach ($payIncreaseTypes as $key => $type)
                                         <option value="{{$key}}" {{ $key === 'Fixed' ? 'selected' : '' }}>{{$type}}</option>
                                     @endforeach
                                 </select>
+                                <div class="dd" data-target="#bulk_form_pay_increase_type">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">{{ $bulkFormSelectedPayIncrease }}</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Pay Increase Type">
+                                        <div class="dd-scroll">
+                                            @foreach ($payIncreaseTypes as $key => $type)
+                                                <div class="dd-item{{ $key === 'Fixed' ? ' active' : '' }}" role="option" data-value="{{ $key }}"><span class="dd-nm">{{ $type }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                </div>
                                 <div id="payIncreaseTypeError"></div>
                             </div>
                             
@@ -137,6 +171,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts._dropdown_styles')
 <style>
     /* Salary Increment cards + bulk-action bar — keep Select2 dropdowns at
        the same font-size and height as the plain form-control inputs in
@@ -288,7 +323,6 @@
     });
 
     $(document).ready(function () {
-        $('.select2t-none').select2();
         // Initialise placeholder on first render for every form on the page.
         $('.pay-increase-type').each(function () { applyValuePlaceholder($(this)); });
 
@@ -357,9 +391,7 @@
                         $('#employeeGird').html(response.html);
                         $('#employeeCount').text(response.employee_count);
                         initializeSalaryIncrementManageDiv();
-                        // Re-init Select2 on newly-injected dropdowns and
-                        // apply the value-input placeholder for each card.
-                        $('#employeeGird .select2t-none').select2();
+                        // Apply the value-input placeholder for each card.
                         $('#employeeGird .pay-increase-type').each(function () { applyValuePlaceholder($(this)); });
                     }
                 },
@@ -561,5 +593,6 @@
     });
 
 </script>
+@include('resorts._dropdown_script')
 @endsection
 

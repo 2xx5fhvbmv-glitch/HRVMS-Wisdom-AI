@@ -46,7 +46,7 @@
                                 </select>
                             </div> --}}
                             <div class="col-xl-2 col-md-4 col-sm-4 col-6">
-                                <select class="form-select ResortPosition" id="ResortPosition">
+                                <select class="form-select ResortPosition dd-native-select" id="ResortPosition">
                                     <option></option>
                                     @if($ResortPosition->isNotEmpty())
                                         @foreach ($ResortPosition as $p)
@@ -55,6 +55,23 @@
                                         @endforeach
                                     @endif
                                 </select>
+                                <div class="dd" data-target="#ResortPosition">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">Select a Position</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Position">
+                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a position…"></div>
+                                        <div class="dd-scroll">
+                                            <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select a Position</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @if($ResortPosition->isNotEmpty())
+                                                @foreach ($ResortPosition as $p)
+                                                <div class="dd-item" role="option" data-value="{{ $p->id }}"><span class="dd-nm">{{ $p->position_title }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @endforeach
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             <div class="col-xl-2 col-md-4 col-sm-4 col-6">
                                 <input type="text" class="form-control datepicker" id="datepicker"  placeholder="Select Duration">
@@ -102,7 +119,7 @@
     </div>
     @endsection
     @section('import-css')
-
+    @include('resorts._dropdown_styles')
     @endsection
 
     @section('import-scripts')
@@ -118,10 +135,6 @@ $(document).ready(function() {
         allowInput: true,
         appendTo: document.body
     })
-    $(".ResortPosition").select2({
-        placeholder: "Select a Position",
-        allowClear: true
-    });
     GetLocationHistory();
 });
 $(document).on("click", ".LocationHistoryData", function()
@@ -207,4 +220,5 @@ function GetLocationHistory()
 
 
     </script>
+    @include('resorts._dropdown_script')
     @endsection

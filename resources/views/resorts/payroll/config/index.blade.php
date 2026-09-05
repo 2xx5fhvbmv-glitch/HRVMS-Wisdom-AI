@@ -8,9 +8,15 @@
 @endif
 
 @section('content')
+<style>
+    #payroll-config-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #payroll-config-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="payroll-config-hero">
             <div class="row justify-content-between g-3">
                 <div class="col-auto">
                     <div class="page-title">
@@ -32,11 +38,26 @@
                             @csrf
                             <div class="mb-3 ">
                                 <label for="cutoff_day" class="form-label">Cutoff Day</label>
-                                <select name="cutoff_day" id="cutoff_day" class="form-select select2t-none">
+                                <select name="cutoff_day" id="cutoff_day" class="form-select dd-native-select">
                                     @for($i=1;$i<=31;$i++)
                                         <option value="{{$i}}" @if(isset($payroll_config) && $payroll_config->cutoff_day == $i) selected @endif>{{$i}}</option>
                                     @endfor
                                 </select>
+                                @php $selectedCutoff = (isset($payroll_config) && $payroll_config->cutoff_day) ? $payroll_config->cutoff_day : 1; @endphp
+                                <div class="dd" data-target="#cutoff_day">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">{{ $selectedCutoff }}</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Cutoff day">
+                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a day…"></div>
+                                        <div class="dd-scroll">
+                                            @for($i=1;$i<=31;$i++)
+                                            <div class="dd-item{{ $i == $selectedCutoff ? ' active' : '' }}" role="option" data-value="{{ $i }}"><span class="dd-nm">{{ $i }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @endfor
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             <div class="card-footer text-end">
                                 <button type="submit" class="btn payroll-btn-primary btn-sm">Submit</button>
@@ -131,10 +152,22 @@
                             <div class="row g-md-4 g-2 mb-3">
                                 <div class="col-sm-4">
                                     <label for="maximum_limit_type" class="form-label">LIMIT TYPE</label>
-                                    <select class="form-select" id="maximum_limit_type" name="maximum_limit_type">
+                                    <select class="form-select dd-native-select" id="maximum_limit_type" name="maximum_limit_type">
                                         <option value="percentage">Percentage (%)</option>
                                         <option value="fixed">Fixed Amount</option>
                                     </select>
+                                    <div class="dd" data-target="#maximum_limit_type">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Percentage (%)</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Limit type">
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value="percentage"><span class="dd-nm">Percentage (%)</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="fixed"><span class="dd-nm">Fixed Amount</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="col-sm-8">
                                     <label for="maximum" class="form-label">MAXIMUM DEDUCTION LIMIT</label>
@@ -185,6 +218,7 @@
 
 @section('import-css')
 @include('resorts.payroll._payroll_buttons_v2_styles')
+@include('resorts._dropdown_styles')
 @endsection
 
 @section('import-scripts')
@@ -252,8 +286,6 @@
     }
 
     $(document).ready(function () {
-        $('.select2t-none').select2();
-
         // Upload Previous Service Charge
         $('#ImportServiceChargeForm').on('submit', function(e) {
             e.preventDefault();
@@ -503,4 +535,5 @@
         document.getElementById('deductionImportFile').innerText = fileName;
     }
 </script>
+@include('resorts._dropdown_script')
 @endsection

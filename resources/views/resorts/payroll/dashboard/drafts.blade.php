@@ -13,7 +13,7 @@
                     </div>
                 </div>
                 <div class="col-auto">
-                    <a href="{{ route('payroll.dashboard') }}" class="btn payroll-btn-secondary btn-sm">Back to Dashboard</a>
+                    <a href="{{ route('payroll.dashboard') }}" class="btn payroll-btn-neutral btn-sm">Back to Dashboard</a>
                 </div>
             </div>
         </div>

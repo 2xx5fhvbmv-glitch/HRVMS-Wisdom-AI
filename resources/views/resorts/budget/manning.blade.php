@@ -8,10 +8,24 @@
 @endif
 
 @section('content')
-
+<style>
+    /* Same requested push as the other module dashboards/pages — extra
+       breathing room between the hero and the content below it, scoped to
+       this page (.page-hedding's own margin-bottom is shared by every
+       page's hero). padding-bottom, not margin: adjacent sibling margins
+       collapse to the larger of the two rather than summing. Below
+       Bootstrap's sm breakpoint the extra padding pushes content into the
+       teal hero curve's rounded bottom-left corner (body::before,
+       border-radius 0 0 50px 50px) — same collision found on Payroll —
+       neutralized below 576px. */
+    #budget-manning-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #budget-manning-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="budget-manning-hero">
             <div class="row justify-content-between g-3">
                 <div class="col-auto">
                     <div class="page-title">
@@ -37,7 +51,7 @@
 
                                 <a href="#revise-budgetmodal" 
                                     class="open-revise-modal btn btn-white ms-3"
-                                    style="background: #F5F8F8;"
+                                    style="background: var(--teal-soft);"
                                     data-budget_id="{{ $deptData->Budget_id }}"
                                     data-dept_id="{{ $deptData->department->id }}"
                                     data-bs-toggle="modal">
@@ -124,7 +138,7 @@
                                 @if($employeeRankPosition['position'] == 'HR' || $employeeRankPosition['position'] == 'Finance')
                                     <a href="#revise-budgetmodal" 
                                         class="open-revise-modal btn btn-white ms-3"
-                                        style="background: #F5F8F8;"
+                                        style="background: var(--teal-soft);"
                                         data-budget_id="{{ $deptData['Budget_id'] }}"
                                         data-dept_id="{{ $deptData['department']->id }}"
                                         data-bs-toggle="modal">

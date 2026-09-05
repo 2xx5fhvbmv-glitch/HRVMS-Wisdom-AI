@@ -8,9 +8,15 @@
 @endif
 
 @section('content')
+    <style>
+        #learning-config-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #learning-config-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="learning-config-hero">
                 <div class="row justify-content-between g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -101,7 +107,7 @@
                                     </button>
                                 </div>
                                 <div class="col-12">
-                                    <select class="form-select select2t-none" name="category" id="category" aria-label="Default select example">
+                                    <select class="form-select dd-native-select" name="category" id="category_select" aria-label="Default select example">
                                         <option selected>Select Category</option>
                                         @if($categories)
                                             @foreach($categories as $cat)
@@ -109,6 +115,21 @@
                                             @endforeach
                                         @endif
                                     </select>
+                                    <div class="dd" data-target="#category_select">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Select Category</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Category">
+                                            <div class="dd-scroll">
+                                                @if($categories)
+                                                    @foreach($categories as $cat)
+                                                        <div class="dd-item" role="option" data-value="{{ $cat->id }}"><span class="dd-nm">{{ $cat->category }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @endforeach
+                                                @endif
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="col-12">
                                     <label for="select-selection" class="form-label">Target Audience TYPE</label>
@@ -188,32 +209,76 @@
                                     <input type="number" name="days" id="days" class="form-control" placeholder="Days"/>
                                 </div>
                                 <div class="col-sm-6">
-                                    <select class="form-select select2t-none" aria-label="Default select example" name="frequency" id="frequency">
+                                    <select class="form-select dd-native-select" aria-label="Default select example" name="frequency" id="frequency">
                                         <option selected value="">Frequency</option>
                                         <option value="one-time">One-time</option>
                                         <option value="monthly">Monthly</option>
                                         <option value="quarterly">Quarterly</option>
                                         <option value="annually">Annually</option>
                                     </select>
+                                    <div class="dd" data-target="#frequency">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Frequency</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Frequency">
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Frequency</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="one-time"><span class="dd-nm">One-time</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="monthly"><span class="dd-nm">Monthly</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="quarterly"><span class="dd-nm">Quarterly</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="annually"><span class="dd-nm">Annually</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="col-sm-6" id="frequencyDayWrap" style="display: none;">
-                                    <select class="form-select" name="frequency_day" id="frequency_day">
+                                    <select class="form-select dd-native-select" name="frequency_day" id="frequency_day">
                                         <option value="">Day of Month</option>
                                         @for($d = 1; $d <= 30; $d++)
                                             <option value="{{ $d }}">{{ $d }}</option>
                                         @endfor
                                     </select>
+                                    <div class="dd" data-target="#frequency_day">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Day of Month</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Day of Month">
+                                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a day…"></div>
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Day of Month</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @for($d = 1; $d <= 30; $d++)
+                                                    <div class="dd-item" role="option" data-value="{{ $d }}"><span class="dd-nm">{{ $d }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @endfor
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="col-sm-6">
-                                    <select class="form-select select2t-none" aria-label="Default select example" name="delivery_mode" id="delivery_mode">
+                                    <select class="form-select dd-native-select" aria-label="Default select example" name="delivery_mode" id="delivery_mode">
                                         <option selected>Delivery Mode</option>
                                         <option value="face-to-face">Face-to-Face</option>
                                         <option value="online">Online</option>
                                         <option value="hybrid">Hybrid</option>
                                     </select>
+                                    <div class="dd" data-target="#delivery_mode">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Delivery Mode</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Delivery Mode">
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value="Delivery Mode"><span class="dd-nm">Delivery Mode</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="face-to-face"><span class="dd-nm">Face-to-Face</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="online"><span class="dd-nm">Online</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="hybrid"><span class="dd-nm">Hybrid</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="col-xxl-6">
-                                    <select class="form-select select2t-none" aria-label="Default select example" name="trainer" id="trainer">
+                                    <select class="form-select dd-native-select" aria-label="Default select example" name="trainer" id="trainer">
                                         <option value="" selected>Select Trainer</option>
                                         @if($trainers)
                                             @foreach($trainers as $v)
@@ -221,6 +286,22 @@
                                             @endforeach
                                         @endif
                                     </select>
+                                    <div class="dd" data-target="#trainer">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Select Trainer</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Trainer">
+                                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a trainer…"></div>
+                                            <div class="dd-scroll">
+                                                @if($trainers)
+                                                    @foreach($trainers as $v)
+                                                        <div class="dd-item" role="option" data-value="{{ $v->id }}"><span class="dd-nm">{{ $v->resortAdmin->full_name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @endforeach
+                                                @endif
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="col-xxl-6">
                                     <input type="text" name="external_training" id="external_training" class="form-control" placeholder="External Training (optional)">
@@ -281,7 +362,7 @@
                                 <div class="mandatoryLearning-block">
                                     <div class="row g-2 mb-md-4 mb-3 program-group">
                                         <div class="col-12">
-                                            <select class="form-select select2t-none mandatory_programs" name="programs[0][mandatory_program]" aria-label="Default select example">
+                                            <select class="form-select dd-native-select mandatory_programs" id="mandatory_program_0" name="programs[0][mandatory_program]" aria-label="Default select example">
                                                 <option value="">Mandatory Learning program</option>
                                                 @if($programs)
                                                     @foreach($programs as $program)
@@ -289,9 +370,25 @@
                                                     @endforeach
                                                 @endif
                                             </select>
+                                            <div class="dd" data-target="#mandatory_program_0">
+                                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                    <span class="dd-lbl">Mandatory Learning program</span>
+                                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                </button>
+                                                <div class="dd-panel" role="listbox" aria-label="Mandatory Learning Program">
+                                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a program…"></div>
+                                                    <div class="dd-scroll">
+                                                        @if($programs)
+                                                            @foreach($programs as $program)
+                                                                <div class="dd-item" role="option" data-value="{{ $program->id }}"><span class="dd-nm">{{ $program->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                            @endforeach
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                         <div class="col-sm-6">
-                                            <select class="form-select select2t-none mandatory_department" name="programs[0][mandatory_department]" aria-label="Default select example">
+                                            <select class="form-select dd-native-select mandatory_department" id="mandatory_department_0" name="programs[0][mandatory_department]" aria-label="Default select example">
                                                 <option value="">Select Department</option>
                                                 @if($departments)
                                                     @foreach($departments as $dept)
@@ -299,9 +396,24 @@
                                                     @endforeach
                                                 @endif
                                             </select>
+                                            <div class="dd" data-target="#mandatory_department_0">
+                                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                    <span class="dd-lbl">Select Department</span>
+                                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                </button>
+                                                <div class="dd-panel" role="listbox" aria-label="Department">
+                                                    <div class="dd-scroll">
+                                                        @if($departments)
+                                                            @foreach($departments as $dept)
+                                                                <div class="dd-item" role="option" data-value="{{ $dept->id }}"><span class="dd-nm">{{ $dept->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                            @endforeach
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                         <div class="col-sm-6">
-                                            <select class="form-select select2t-none mandatory_position" name="programs[0][mandatory_position]" aria-label="Default select example">
+                                            <select class="form-select dd-native-select mandatory_position" id="mandatory_position_0" name="programs[0][mandatory_position]" aria-label="Default select example">
                                                 <option value="">Select Position</option>
                                                 @if($positions)
                                                     @foreach($positions as $pos)
@@ -309,14 +421,43 @@
                                                     @endforeach
                                                 @endif
                                             </select>
+                                            <div class="dd" data-target="#mandatory_position_0">
+                                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                    <span class="dd-lbl">Select Position</span>
+                                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                </button>
+                                                <div class="dd-panel" role="listbox" aria-label="Position">
+                                                    <div class="dd-scroll">
+                                                        @if($positions)
+                                                            @foreach($positions as $pos)
+                                                                <div class="dd-item" role="option" data-value="{{ $pos->id }}"><span class="dd-nm">{{ $pos->position_title }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                            @endforeach
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                         <div class="col-sm-6">
-                                            <select class="form-select select2t-none notify_before_days" aria-label="Default select example" name="programs[0][notify_before_days]">
+                                            <select class="form-select dd-native-select notify_before_days" id="notify_before_days_0" aria-label="Default select example" name="programs[0][notify_before_days]">
                                                 <option value="">Notify Before how many Days</option>
                                                 @for($i=1;$i<=7;$i++)
                                                     <option value="{{$i}}">{{$i}}</option>
                                                 @endfor
                                             </select>
+                                            <div class="dd" data-target="#notify_before_days_0">
+                                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                    <span class="dd-lbl">Notify Before how many Days</span>
+                                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                </button>
+                                                <div class="dd-panel" role="listbox" aria-label="Notify Before Days">
+                                                    <div class="dd-scroll">
+                                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Notify Before how many Days</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @for($i=1;$i<=7;$i++)
+                                                            <div class="dd-item" role="option" data-value="{{ $i }}"><span class="dd-nm">{{ $i }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @endfor
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                         <div class="col-12 text-end">
                                             <button type="button" class="btn lnd-btn-critical btn-sm remove-btn" style="display:none;">Remove</button>
@@ -347,7 +488,7 @@
                         <form id="probationary-programs-form">
                             <div class="row g-2 mb-md-4 mb-3">
                                 <div class="col-12">
-                                    <select class="form-select select2t-none" name="probationary_programs" id="probationary_programs" aria-label="Default select example">
+                                    <select class="form-select dd-native-select" name="probationary_programs" id="probationary_programs" aria-label="Default select example">
                                         <option value="">Learning required during an employee’s probation period</option>
                                         @if($programs)
                                             @foreach($programs as $program)
@@ -355,6 +496,22 @@
                                             @endforeach
                                         @endif
                                     </select>
+                                    <div class="dd" data-target="#probationary_programs">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Learning required during an employee's probation period</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Probationary Program">
+                                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a program…"></div>
+                                            <div class="dd-scroll">
+                                                @if($programs)
+                                                    @foreach($programs as $program)
+                                                        <div class="dd-item" role="option" data-value="{{ $program->id }}"><span class="dd-nm">{{ $program->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @endforeach
+                                                @endif
+                                            </div>
+                                        </div>
+                                    </div>
                                     <div id="div-probationary_programs"></div>
                                 </div>
                                 <div class="col-12">
@@ -456,6 +613,8 @@
         </div>
     </div>
 @include('resorts.learning._learning_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -752,6 +911,7 @@
             // every "this field is required" error right after a successful save.
             $form.find('select').each(function () {
                 $(this).val('').trigger('change.select2');
+                if (this.id) wisdomDD.sync('#' + this.id);
             });
 
             // Step 3 — reset dynamic UI (objectives list, frequency picker,
@@ -788,6 +948,7 @@
             } else {
                 $('#frequencyDayWrap').hide();
                 $('#frequency_day').val('');
+                wisdomDD.sync('#frequency_day');
             }
         }
         $('#frequency').on('change select2:select select2:unselect', syncFrequencyDay);
@@ -1219,39 +1380,85 @@
         document.querySelector('#add-more').addEventListener('click', function () {
             index++; // Increment index for new rows
 
+            let tickSvg = '<svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg>';
+            let programItems = `@foreach($programs as $program)<div class="dd-item" role="option" data-value="{{ $program->id }}"><span class="dd-nm">{{ $program->name }}</span>${tickSvg}</div>@endforeach`;
+            let deptItems = `@foreach($departments as $dept)<div class="dd-item" role="option" data-value="{{ $dept->id }}"><span class="dd-nm">{{ $dept->name }}</span>${tickSvg}</div>@endforeach`;
+            let posItems = `@foreach($positions as $pos)<div class="dd-item" role="option" data-value="{{ $pos->id }}"><span class="dd-nm">{{ $pos->position_title }}</span>${tickSvg}</div>@endforeach`;
+            let dayItems = '';
+            for (let i = 1; i <= 7; i++) {
+                dayItems += `<div class="dd-item" role="option" data-value="${i}"><span class="dd-nm">${i}</span>${tickSvg}</div>`;
+            }
+
             const newRow = `
                 <div class="row g-2 mb-md-4 mb-3 program-group">
                     <div class="col-12">
-                        <select class="form-select select2t-none mandatory_programs" name="programs[${index}][mandatory_program]" aria-label="Default select example">
+                        <select class="form-select dd-native-select mandatory_programs" id="mandatory_program_${index}" name="programs[${index}][mandatory_program]" aria-label="Default select example">
                             <option value="">Mandatory Learning program</option>
                             @foreach($programs as $program)
                                 <option value="{{$program->id}}">{{$program->name}}</option>
                             @endforeach
                         </select>
+                        <div class="dd" data-target="#mandatory_program_${index}">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">Mandatory Learning program</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Mandatory Learning Program">
+                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a program…"></div>
+                                <div class="dd-scroll">${programItems}</div>
+                            </div>
+                        </div>
                     </div>
                     <div class="col-sm-6">
-                        <select class="form-select select2t-none mandatory_department" name="programs[${index}][mandatory_department]" aria-label="Default select example">
+                        <select class="form-select dd-native-select mandatory_department" id="mandatory_department_${index}" name="programs[${index}][mandatory_department]" aria-label="Default select example">
                             <option value="">Select Department</option>
                             @foreach($departments as $dept)
                                 <option value="{{$dept->id}}">{{$dept->name}}</option>
                             @endforeach
                         </select>
+                        <div class="dd" data-target="#mandatory_department_${index}">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">Select Department</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Department">
+                                <div class="dd-scroll">${deptItems}</div>
+                            </div>
+                        </div>
                     </div>
                     <div class="col-sm-6">
-                        <select class="form-select select2t-none mandatory_position" name="programs[${index}][mandatory_position]" aria-label="Default select example">
+                        <select class="form-select dd-native-select mandatory_position" id="mandatory_position_${index}" name="programs[${index}][mandatory_position]" aria-label="Default select example">
                             <option value="">Select Position</option>
                             @foreach($positions as $pos)
                                 <option value="{{$pos->id}}">{{$pos->position_title}}</option>
                             @endforeach
                         </select>
+                        <div class="dd" data-target="#mandatory_position_${index}">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">Select Position</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Position">
+                                <div class="dd-scroll">${posItems}</div>
+                            </div>
+                        </div>
                     </div>
                     <div class="col-sm-6">
-                        <select class="form-select select2t-none notify_before_days" name="programs[${index}][notify_before_days]" aria-label="Default select example">
+                        <select class="form-select dd-native-select notify_before_days" id="notify_before_days_${index}" name="programs[${index}][notify_before_days]" aria-label="Default select example">
                             <option value="">Notify Before how many Days</option>
                             @for($i=1;$i<=7;$i++)
                                 <option value="{{$i}}">{{$i}}</option>
                             @endfor
                         </select>
+                        <div class="dd" data-target="#notify_before_days_${index}">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">Notify Before how many Days</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Notify Before Days">
+                                <div class="dd-scroll">${dayItems}</div>
+                            </div>
+                        </div>
                     </div>
                     <div class="col-12 text-end">
                         <button type="button" class="btn lnd-btn-critical btn-sm remove-btn">Remove</button>
@@ -1259,7 +1466,6 @@
                 </div>`;
 
             programsMain.insertAdjacentHTML('beforeend', newRow);
-            $('.select2t-none').select2(); // Reinitialize select2 for new elements
         });
 
 
@@ -1284,6 +1490,7 @@
                                 positionClass: 'toast-bottom-right'
                             });
                         }
+                        wisdomDD.rebuild('#' + positionDropdown.attr('id'));
                     },
                     error: function () {
                         toastr.error("Failed to fetch positions.", "Error", {
@@ -1293,6 +1500,7 @@
                 });
             } else {
                 positionDropdown.empty().append('<option value="">Select Position</option>');
+                wisdomDD.rebuild('#' + positionDropdown.attr('id'));
             }
         });
 

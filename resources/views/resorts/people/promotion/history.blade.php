@@ -7,10 +7,16 @@
 </div>
 @endif
 
-@section('content') 
+@section('content')
+    <style>
+        #promotion-history-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #promotion-history-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="promotion-history-hero">
                 <div class="row  g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -27,7 +33,7 @@
                     <div class="row g-lg-4 g-3">
                         <div class="col-md-4">
                             <label for="select_employee" class="form-label">SELECT EMPLOYEE</label>
-                            <select class="form-select select2t-none" name="select_employee" id="select_employee"
+                            <select class="form-select dd-native-select" name="select_employee" id="select_employee"
                                 aria-label="Default select example">
                                 <option value="">Select Employee </option>
                                 @if($employees)
@@ -38,6 +44,24 @@
                                     @endforeach
                                 @endif
                             </select>
+                            @php $selectedEmp = $employees ? $employees->firstWhere('id', $decodedId) : null; @endphp
+                            <div class="dd" data-target="#select_employee">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">{{ $selectedEmp ? $selectedEmp->Emp_id.' - '.$selectedEmp->resortAdmin->full_name : 'Select Employee' }}</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Employee">
+                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an employee…"></div>
+                                    <div class="dd-scroll">
+                                        <div class="dd-item{{ $selectedEmp ? '' : ' active' }}" role="option" data-value=""><span class="dd-nm">Select Employee</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @if($employees)
+                                            @foreach($employees as $employee)
+                                            <div class="dd-item{{ ($decodedId == $employee->id) ? ' active' : '' }}" role="option" data-value="{{ $employee->id }}"><span class="dd-nm">{{ $employee->Emp_id }} - {{ $employee->resortAdmin->full_name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @endforeach
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
                         </div>    
                     </div>
                 </div>
@@ -74,6 +98,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts._dropdown_styles')
 @endsection
 
 @section('import-scripts')
@@ -84,7 +109,6 @@
             allowInput: true,
             appendTo: document.body
         });
-        $('.select2t-none').select2();
         getPromotionHistory();
 
         $('#select_employee').on('keyup change', function () {
@@ -132,4 +156,5 @@
         });
     }
 </script>
+@include('resorts._dropdown_script')
 @endsection

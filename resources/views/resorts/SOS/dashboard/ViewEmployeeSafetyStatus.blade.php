@@ -7,10 +7,16 @@
 </div>
 @endif
 
-@section('content')   
+@section('content')
+<style>
+    #sos-employee-safety-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #sos-employee-safety-hero { padding-bottom: 0; }
+    }
+</style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="sos-employee-safety-hero">
                 <div class="row  g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -47,13 +53,27 @@
                     <div class="row align-items-center g-md-3 g-2">
                         <div class="col-xl-2 col-md-4 col-sm-5 col-auto">
                             <div class="form-group">
-                            <select class="form-select" aria-label="Default select example" name="department" id="departmentFilter">
+                            <select class="form-select dd-native-select" aria-label="Default select example" name="department" id="departmentFilter">
                                 <option value="">All Departments</option>
                                 @foreach($getAllDepartments as $department)
                                     <option value="{{ $department->id }}">{{ $department->name }}</option>
                                 @endforeach
                             </select>
-                                
+                            <div class="dd" data-target="#departmentFilter">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">All Departments</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Department">
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">All Departments</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @foreach($getAllDepartments as $department)
+                                            <div class="dd-item" role="option" data-value="{{ $department->id }}"><span class="dd-nm">{{ $department->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            </div>
+
                             </div>
                         </div>
                         <div class="col-auto">
@@ -93,6 +113,8 @@
         </div>
     </div>
 @include('resorts._emotional_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')

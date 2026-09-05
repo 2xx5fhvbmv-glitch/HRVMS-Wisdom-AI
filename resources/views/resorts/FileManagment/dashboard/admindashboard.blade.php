@@ -18,7 +18,8 @@
                         <h1>Dashboard</h1>
                     </div>
                 </div>
-                <div class="col-auto  ms-auto"><a class="btn eb-btn-accent UploadDocumentbutton " href="javascript:void(0)"  >Upload Document</a></div>
+                <div class="col-auto ms-auto"><a class="btn eb-btn-secondary AddFolderButton" href="javascript:void(0)">+ Add Folder</a></div>
+                <div class="col-auto"><a class="btn eb-btn-accent UploadDocumentbutton " href="javascript:void(0)"  >Upload Document</a></div>
             </div>
         </div>
 
@@ -396,38 +397,19 @@
 
     <div class="modal fade" id="selectFolderLocation-modal" tabindex="-1" aria-labelledby="selectFolderLocationLabel"
         aria-hidden="true">
-        <div class="modal-dialog modal-dialog-centered modal-lg ">
+        <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="staticBackdropLabel">Select Uncategorized Folder </h5>
+                    <h5 class="modal-title" id="staticBackdropLabel">Add Folder</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <div class="modal-body ">
-                    <div class="text-end mb-2"><a href="javascript:void(0)" class="btn eb-btn-accent btn-sm AddFolder">+ Add Folder</a>
-                    </div>
-                    <div class="AppendFolder">
-
-                    </div>
-                    <div class="appendAfterSuc AppendaftersucScroll">
-                        @if($FolderList->isNotEmpty())
-                            @foreach ($FolderList as $f)
-                                <div class="selectFolderLocation-block">
-                                    <img src="{{ URL::asset('resorts_assets/images/folder.svg') }}" alt="image">
-                                    <div>
-                                        <input type="text" class="form-control d-none" placeholder="New Folder |" />
-                                        <h5>{{ $f->Folder_Name}}</h5>
-                                    </div>
-                                    <a href="javascript:void(0)" class="btn-tableIcon btnIcon-yellow selFolLoc-edit"   data-name="{{ $f->Folder_Name}}" data-id="{{  base64_encode($f->id)  }}">
-                                        <i class="fa-solid fa-pen-to-square"></i>
-                                    </a>
-                                </div>
-                            @endforeach
-                        @endif
-                    </div>
+                <div class="modal-body">
+                    <label for="NewFolderName" class="form-label">Folder Name</label>
+                    <input type="text" class="form-control" id="NewFolderName" placeholder="Enter folder name">
                 </div>
                 <div class="modal-footer">
                     <a href="javascript:void(0)" data-bs-dismiss="modal" class="btn eb-btn-neutral ms-auto">Cancel</a>
-                    <a class="btn eb-btn-primary FileUploadButton" href="javascript:void(0)">Upload File</a>
+                    <a href="javascript:void(0)" class="btn eb-btn-primary SaveNewFolder">Save</a>
                 </div>
             </div>
         </div>
@@ -445,13 +427,29 @@
                 <div class="modal-body">
                     <div class="row">
                         <div class="col-lg-12">
-                            <select class="form-select select2t-none" name="FolderName" id="FolderName" required data-parsley-required-message="Please select a folder.">
+                            <select class="form-select dd-native-select" name="FolderName" id="FolderName" required data-parsley-required-message="Please select a folder.">
                                 @if($FolderList->isNotEmpty())
                                     @foreach ($FolderList as $f)
                                         <option value="{{ base64_encode($f->id) }}">{{$f->Folder_Name}}</option>
                                     @endforeach
                                 @endif
                             </select>
+                            <div class="dd" data-target="#FolderName">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">{{ $FolderList->isNotEmpty() ? $FolderList->first()->Folder_Name : 'Select Folder' }}</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Folder">
+                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a folder…"></div>
+                                    <div class="dd-scroll">
+                                        @if($FolderList->isNotEmpty())
+                                            @foreach ($FolderList as $f)
+                                                <div class="dd-item{{ $loop->first ? ' active' : '' }}" role="option" data-value="{{ base64_encode($f->id) }}"><span class="dd-nm">{{ $f->Folder_Name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @endforeach
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="col-lg-12 mt-3">
                             <div class="bg-themeGrayLight mb-md-4 mb-3">
@@ -526,6 +524,8 @@
         </div>
     </div>
 @include('resorts._emotional_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -739,23 +739,17 @@ document.getElementById('file').addEventListener('change', function (e) {
     });
 });
     $(document).ready(function () {
-        $("#FolderName").select2({
-            placeholder: "Select Folder",
-            allowClear: true
-        });
         AuditLogsList();
         UncategorizeDoc();
         FileVersionDashboardList();
-        $(document).on("click",".UploadDocumentbutton",function(){
-            $(".AppendFolder").html("");
-
+        $(document).on("click",".AddFolderButton",function(){
+            $("#NewFolderName").val("");
             $("#selectFolderLocation-modal").modal("show");
         });
-        
-        $(document).on("click",".FileUploadButton",function()
-        { 
-            $(".uploadedFilesProgress-block").html("");   
-            $("#selectFolderLocation-modal").modal("hide");
+
+        $(document).on("click",".UploadDocumentbutton",function()
+        {
+            $(".uploadedFilesProgress-block").html("");
             $("#uploadDocument-modal").modal("show");
 
             $.ajax({
@@ -899,86 +893,46 @@ document.getElementById('file').addEventListener('change', function (e) {
             }
         });
     });
-    $(document).on("click",".AddFolder",function(){
-        
-        $(".AppendFolder").append(`  <div class="selectFolderLocation-block">
-                        <img src="{{ URL::asset('resorts_assets/images/folder.svg')}}" alt="image">
-                            <div>
-                                <input type="text" class="form-control d-none" placeholder="New Folder |" />
-                                <h5>New Folder</h5>
-                            </div>
-                            <a href="#" class="btn-tableIcon btnIcon-yellow selFolLoc-edit">
-                                <i class="fa-solid fa-pen-to-square"></i>
-                            </a>
-                    </div>`);
-    });
-    $(document).on("click", ".selFolLoc-edit", function () {
-        const parentDiv = $(this).parent("div");
-        var id = $(this).attr('data-id');
-        var name = $(this).attr('data-name') || "New Folder";
+    $(document).on("click", ".SaveNewFolder", function () {
+        const FolderName = $("#NewFolderName").val().trim();
+        // Windows disallowed characters: \ / : * ? " < > |
+        const invalidChars = /[\\/:*?"<>|]/;
 
-   
-        // Hide the existing text and remove the image
-        parentDiv.find("h5").addClass("d-none");
-        parentDiv.find("img").remove(); 
-        $(this).remove();
-        // Replace with input field and submit button
-        parentDiv.html(`
-        <img src="{{ URL::asset('resorts_assets/images/folder.svg')}}" alt="image">
-                            <div>
-                <input type="text" class="form-control" name="FolderName" value="${name}" placeholder="New Folder " />
-                            </div>
-                                        <a href="javascript:void(0)" class="btn eb-btn-primary update-row-btn SubmitFolder" data-id="${id}">Submit</a>
+        // Windows reserved names (case insensitive)
+        const reservedNames = ["CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+                            "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"];
 
-        `);
-       
-    });
-    $(document).on("click", ".SubmitFolder", function () {
-        const parentDiv = $(this).parent("div");
-        const FolderName = parentDiv.find("input").val().trim();
-        const id = $(this).attr('data-id');
-            // Windows disallowed characters: \ / : * ? " < > |
-            const invalidChars = /[\\/:*?"<>|]/;
+        if (FolderName === "") {
+            toastr.error("Folder name cannot be empty!");
+            return false;
+        }
 
-            // Windows reserved names (case insensitive)
-            const reservedNames = ["CON", "PRN", "AUX", "NUL", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9", 
-                                "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9"];
+        if (invalidChars.test(FolderName)) {
+            toastr.error('Folder name contains invalid characters! Allowed characters: A-Z, a-z, 0-9, _ -');
+            return false;
+        }
 
-            // Check if folder name is empty
-            if (FolderName === "") {
-                toastr.error("Folder name cannot be empty!");
-                return false;
-            }
-
-            // Check for invalid characters
-            if (invalidChars.test(FolderName)) {
-                toastr.error('Folder name contains invalid characters! Allowed characters: A-Z, a-z, 0-9, _ -');
-                return false;
-            }
-
-            // Check for reserved names
-            if (reservedNames.includes(FolderName.toUpperCase())) {
-                toastr.error("This folder name is not allowed in the software!");
-                return false;
-            }
+        if (reservedNames.includes(FolderName.toUpperCase())) {
+            toastr.error("This folder name is not allowed in the software!");
+            return false;
+        }
 
         $.ajax({
-                url: "{{ route('FileManage.CreateFolder') }}", 
+                url: "{{ route('FileManage.CreateFolder') }}",
                 type: 'POST',
-                data: {"_token":"{{ csrf_token() }}","Folder_Name":FolderName,"id":id,"flag":"Main"},
-                success: function(response) 
+                data: {"_token":"{{ csrf_token() }}","Folder_Name":FolderName,"flag":"Main"},
+                success: function(response)
                 {
-                    if (response.success) 
+                    if (response.success)
                     {
                         toastr.success(response.message,"Success",
                         {
                             positionClass: 'toast-bottom-right'
                         });
-                        $(".appendAfterSuc").html("");
-                        $(".appendAfterSuc").html(response.data);
-                        $(".AppendFolder").html("");
-                    } 
-                    else 
+                        $("#selectFolderLocation-modal").modal("hide");
+                        $("#NewFolderName").val("");
+                    }
+                    else
                     {
                         toastr.error(response.message, "Error",
                         {
@@ -986,11 +940,11 @@ document.getElementById('file').addEventListener('change', function (e) {
                         });
                     }
                 },
-                error: function(response) 
+                error: function(response)
                 {
                     var errors = response.responseJSON;
 
-                    if (errors.error) { 
+                    if (errors.error) {
                         // If it's a duplicate entry error
                         toastr.error(errors.error, "Error", {
                             positionClass: 'toast-bottom-right'
@@ -1010,7 +964,7 @@ document.getElementById('file').addEventListener('change', function (e) {
 
             });
     });
-    
+
     async function processFilesToUpload() {
     const canvas = document.createElement("canvas");
     const ctx = canvas.getContext("2d");
@@ -1237,6 +1191,9 @@ function FileVersionDashboardList()
         },
         plugins: [doughnutLabelsInside]
     });
+    // backgroundColor (FoloderColor) is server-supplied per folder — out of
+    // scope; only legend/tooltip retheme.
+    if (window.WaiChart) window.WaiChart.registerForTheme(myDoughnutChart);
 });
 
 

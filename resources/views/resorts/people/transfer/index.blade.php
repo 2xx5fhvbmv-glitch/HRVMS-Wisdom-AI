@@ -7,10 +7,16 @@
 </div>
 @endif
 
-@section('content') 
+@section('content')
+    <style>
+        #transfer-initiate-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #transfer-initiate-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="transfer-initiate-hero">
                 <div class="row  g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -27,8 +33,8 @@
                         <div class="row g-md-4 g-3">
                             <div class="col-md-4 col-sm-6">
                                 <label for="select_employee" class="form-label">SELECT EMPLOYEE <span class="red-mark">*</span></label>
-                                <select class="form-select select2t-none" id="employee_name" name="employee_name"
-                                    onchange="getEmpDetails(this.value)" required 
+                                <select class="form-select dd-native-select" id="employee_name" name="employee_name"
+                                    onchange="getEmpDetails(this.value)" required
                                     data-parsley-required-message="Please select an employee" data-parsley-errors-container="#emp-error">
                                     <option value="">Select Employee</option>
                                     @if($employees)
@@ -39,6 +45,23 @@
                                         @endforeach
                                     @endif
                                 </select>
+                                <div class="dd" data-target="#employee_name">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">Select Employee</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Employee">
+                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an employee…"></div>
+                                        <div class="dd-scroll">
+                                            <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Employee</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @if($employees)
+                                                @foreach($employees as $employee)
+                                                    <div class="dd-item" role="option" data-value="{{ $employee->id }}"><span class="dd-nm">{{ $employee->Emp_id }} - {{ $employee->resortAdmin->full_name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @endforeach
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
                                 <div id="emp-error"></div>
                             </div>
                             <div class="col">
@@ -59,7 +82,7 @@
                         </div>
                         <div class="col-md-6 col-sm-6">
                             <label for="target_dep" class="form-label">TARGET DEPARTMENT/PROPERTY <span class="red-mark">*</span></label>
-                            <select class="form-select select2t-none" name="target_dep" id="target_dep" aria-label="Default select example" required 
+                            <select class="form-select dd-native-select" name="target_dep" id="target_dep" aria-label="Default select example" required
                             data-parsley-required-message="Please select target department" data-parsley-errors-container="#dept-error">
                                 <option value="">Select Department</option>
                                 @if($departments)
@@ -68,6 +91,23 @@
                                     @endforeach
                                 @endif
                             </select>
+                            <div class="dd" data-target="#target_dep">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Select Department</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Department">
+                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a department…"></div>
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Department</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @if($departments)
+                                            @foreach($departments as $dept)
+                                                <div class="dd-item" role="option" data-value="{{$dept->id}}"><span class="dd-nm">{{$dept->name}}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @endforeach
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
                             <div id="dept-error"></div>
                         </div>
                         <div class="col-md-6 col-sm-6">
@@ -77,9 +117,20 @@
                         </div>
                         <div class="col-md-6 col-sm-6">
                             <label for="target_section_id" class="form-label">TARGET SECTION</label>
-                            <select class="form-select select2t-none" name="target_section_id" id="target_section_id">
+                            <select class="form-select dd-native-select" name="target_section_id" id="target_section_id">
                                 <option value="">Select Section</option>
                             </select>
+                            <div class="dd" data-target="#target_section_id">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Select Section</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Section">
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Section</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="col-md-6 col-sm-6">
                             <label for="current_pos" class="form-label">CURRENT POSITION <span class="red-mark">*</span></label>
@@ -88,10 +139,21 @@
                         </div>
                         <div class="col-md-6 col-sm-6">
                             <label for="target_pos" class="form-label">TARGET POSITION <span class="red-mark">*</span></label>
-                            <select class="form-select select2t-none" name="target_pos" id="target_pos" aria-label="Default select example" required
+                            <select class="form-select dd-native-select" name="target_pos" id="target_pos" aria-label="Default select example" required
                             data-parsley-required-message="Please select target position" data-parsley-errors-container="#position-error">
                                 <option value="">Select Position</option>
                             </select>
+                            <div class="dd" data-target="#target_pos">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Select Position</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Position">
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Position</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    </div>
+                                </div>
+                            </div>
                             <div id="position-error"></div>
                             <small id="vacancy_status" class="d-block mt-1"></small>
                         </div>
@@ -107,13 +169,26 @@
                         </div>
                         <div class="col-md-6 col-sm-6">
                             <label for="transfer_status" class="form-label">TRANSFER STATUS <span class="red-mark">*</span></label>
-                            <select class="form-select select2t-none" id="transfer_status" name="transfer_status"
+                            <select class="form-select dd-native-select" id="transfer_status" name="transfer_status"
                                 aria-label="Default select example" required
                                 data-parsley-required-message="Please select transfer status" data-parsley-errors-container="#status-error">
                                 <option value="">Transfer Status</option>
                                 <option value="Permanent">Permanent</option>
                                 <option value="Temporary">Temporary</option>
                             </select>
+                            <div class="dd" data-target="#transfer_status">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Transfer Status</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Transfer Status">
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Transfer Status</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="Permanent"><span class="dd-nm">Permanent</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="Temporary"><span class="dd-nm">Temporary</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    </div>
+                                </div>
+                            </div>
                             <div id="status-error"></div>
                         </div>
                         {{-- Item 3 — Temporary transfer period (shown only when type = Temporary) --}}
@@ -161,10 +236,21 @@
                         </div>
                         <div class="col-md-6 col-sm-6">
                             <label for="reporting_manager" class="form-label">Reporting Manager <span class="red-mark">*</span></label>
-                            <select name="reporting_manager" id="reporting_manager" class="form-select select2t-none" required 
+                            <select name="reporting_manager" id="reporting_manager" class="form-select dd-native-select" required
                             data-parsley-required-message="Please select reporting manager" data-parsley-errors-container="#reporting-manager-error">
                                 <option value="">Reporting manager</option>
                             </select>
+                            <div class="dd" data-target="#reporting_manager">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Reporting manager</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Reporting Manager">
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Reporting manager</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    </div>
+                                </div>
+                            </div>
                             <div id="reporting-manager-error"></div>
                         </div>
                     </div>
@@ -199,6 +285,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts._dropdown_styles')
 @endsection
 
 @section('import-scripts')
@@ -212,8 +299,6 @@
             todayHighlight: true,
             startDate: new Date() // Disables all past dates
         });
-        $('.select2t-none').select2();
-
         $('#submitTransfer').on('click', function (e) {
             e.preventDefault();
         
@@ -302,6 +387,7 @@
                             });
                         }
                         $("#target_pos").html(string); // ✅ update dropdown
+                        window.wisdomDD.rebuild('#target_pos');
                     }
                 });
 
@@ -317,12 +403,15 @@
                                 html += '<option value="' + s.id + '">' + s.name + '</option>';
                             });
                         }
-                        $('#target_section_id').html(html).trigger('change.select2');
+                        $('#target_section_id').html(html);
+                        window.wisdomDD.rebuild('#target_section_id');
                     }
                 });
             } else {
                 $('#target_pos').html('<option value="">Select Position</option>');
-                $('#target_section_id').html('<option value="">Select Section</option>').trigger('change.select2');
+                window.wisdomDD.rebuild('#target_pos');
+                $('#target_section_id').html('<option value="">Select Section</option>');
+                window.wisdomDD.rebuild('#target_section_id');
             }
         });
 
@@ -347,6 +436,7 @@
                             });
                         }
                         $("#reporting_manager").html(string); // ✅ update dropdown
+                        window.wisdomDD.rebuild('#reporting_manager');
                     }
                 });
 
@@ -564,4 +654,5 @@
         });
     }
 </script>
+@include('resorts._dropdown_script')
 @endsection

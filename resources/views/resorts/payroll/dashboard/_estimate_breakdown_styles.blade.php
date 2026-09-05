@@ -5,7 +5,7 @@
     layouts/_design_tokens.blade.php) wherever an equivalent already
     exists — --teal/--teal-2/--teal-3/--teal-soft/--ink/--muted/--faint/
     --line/--line-2/--error/--error-bg. Only the earnings green is new:
-    the app's own --positive (#1F9D6B) is a different, more saturated
+    the app's own --positive (var(--positive)) is a different, more saturated
     green than this design's #4A7C64, so it's added below as its own
     --peb-ok/--peb-ok-bg/--peb-ok-soft trio (same pattern this file used
     before for --peb-ded-bg etc — a token with no shared equivalent yet,
@@ -42,7 +42,7 @@
         position: relative; padding: 24px 24px 20px; color: var(--ink); font-size: 14px; line-height: 1.5;
         background: rgba(255,255,255,.9); backdrop-filter: blur(28px) saturate(160%); -webkit-backdrop-filter: blur(28px) saturate(160%);
         border: 1px solid rgba(255,255,255,.7); border-radius: 22px;
-        box-shadow: 0 24px 70px rgba(1,70,83,.28), 0 2px 8px rgba(1,70,83,.08);
+        box-shadow: 0 24px 70px rgba(var(--teal-rgb),.28), 0 2px 8px rgba(var(--teal-rgb),.08);
         font-family: 'Poppins', sans-serif;
     }
     .pay-pop .money { font-variant-numeric: tabular-nums; }

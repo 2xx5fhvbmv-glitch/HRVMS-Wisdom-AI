@@ -26,6 +26,7 @@
     // Toastr re-theme glue (see toastr-theme.css, shared with the resort-admin
     // and admin portals). One place so every existing toastr call in the
     // shopkeeper portal gets the new frosted look automatically.
+    var WT_DURATION = 5000; // visible-toast duration for the .wt-prog bar
     var wtPendingSticky = false;
     if (window.toastr) {
         toastr.options.closeButton = true;
@@ -33,15 +34,21 @@
         toastr.options.closeOnHover = false;
         toastr.options.showMethod = 'show';
         toastr.options.hideMethod = 'hide';
-        toastr.options.timeOut = toastr.options.timeOut || 4500;
-        toastr.options.extendedTimeOut = toastr.options.timeOut;
+        toastr.options.timeOut = 0; // toastr's own internal auto-hide timer would race our .wt-prog bar's animationend (see WT_DURATION above)
+        toastr.options.extendedTimeOut = 0;
         toastr.options.onShown = function () {
             var $t = $(this);
             if (wtPendingSticky) { wtPendingSticky = false; return; }
             $t.append(
                 $('<span class="wt-prog"></span>')
-                    .css('animation-duration', toastr.options.timeOut + 'ms')
-                    .on('animationend', function () { toastr.clear($t); })
+                    .css('animation-duration', WT_DURATION + 'ms')
+                    .on('animationend', function () {
+                        if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                            toastr.clear($t);
+                            return;
+                        }
+                        $t.addClass('wt-out').one('animationend', function () { toastr.clear($t); });
+                    })
             );
         };
     }
@@ -60,8 +67,8 @@
         }
         wtPendingSticky = sticky;
         var $toast = toastr[type](html, title, {
-            timeOut: sticky ? 0 : toastr.options.timeOut,
-            extendedTimeOut: sticky ? 0 : toastr.options.timeOut,
+            timeOut: 0,
+            extendedTimeOut: 0,
             escapeHtml: false
         });
         return $toast;

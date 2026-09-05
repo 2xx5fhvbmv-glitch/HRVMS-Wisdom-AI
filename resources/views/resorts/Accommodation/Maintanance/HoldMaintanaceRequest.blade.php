@@ -9,9 +9,15 @@
 @endif
 
 @section('content')
+<style>
+    #maintenance-request-hold-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #maintenance-request-hold-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="maintenance-request-hold-hero">
             <div class="row justify-content-between g-3">
                 <div class="col-auto">
                     <div class="page-title">
@@ -73,7 +79,7 @@
 
                     </div>
                     <div><label for="select_emp" class="form-label">SELECT EMPLOYEE</label>
-                        <select class="form-select select2t-none" name="HOD_id" id="select_emp" aria-label="Default select example">
+                        <select class="form-select dd-native-select" name="HOD_id" id="select_emp" aria-label="Default select example">
                             <option> </option>
                             @if($Employee->isNotEmpty())
                                 @foreach ($Employee as $e)
@@ -81,6 +87,23 @@
                                 @endforeach
                             @endif
                         </select>
+                        <div class="dd" data-target="#select_emp">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">Select Employee</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Employee">
+                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an employee…"></div>
+                                <div class="dd-scroll">
+                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Employee</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    @if($Employee->isNotEmpty())
+                                        @foreach ($Employee as $e)
+                                        <div class="dd-item" role="option" data-value="{{ $e->id }}"><span class="dd-nm">{{ $e->resortAdmin->first_name }} {{ $e->resortAdmin->last_name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @endforeach
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <input type="hidden" name="task_id" id="task_id">
                 </div>
@@ -96,6 +119,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts._dropdown_styles')
 @endsection
 
 @section('import-scripts')
@@ -103,10 +127,6 @@
 
     $(document).ready(function()
     {
-        $("#select_emp").select2({
-            placeholder: "Select Employee",
-            allowClear: true,
-        });
         $('#ForwardToHODForm').validate({
             rules: {
                 HOD_id: {
@@ -133,6 +153,7 @@
                                 positionClass: 'toast-bottom-right'
                             });
                             form.reset();
+                            window.wisdomDD.sync('#select_emp');
                             PendingTaskList();
                             $("#ForwardToHOD-Model").modal('hide');
 
@@ -300,4 +321,5 @@
 
 
 </script>
+@include('resorts._dropdown_script')
 @endsection

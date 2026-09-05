@@ -43,21 +43,41 @@
     // called, not after (a .data() flag set on the returned element would be
     // read by onShown before it was ever set).
     var wtPendingSticky = false;
+    // Visible-toast duration for our own .wt-prog bar. Kept off of
+    // toastr.options.timeOut (forced to 0 below) on purpose — toastr.js runs
+    // its own internal auto-hide setTimeout at whatever timeOut is set to,
+    // and if that's ALSO 5000ms it races our bar's animationend: whichever
+    // fires first wins, so the blur-out below would only sometimes play.
+    // Setting toastr's own timeout to 0 disables that timer entirely so the
+    // bar is the only thing that ever dismisses a toast.
+    var WT_DURATION = 5000;
     if (window.toastr) {
         toastr.options.closeButton = true;
         toastr.options.progressBar = false; // replaced by our own CSS-driven .wt-prog bar
         toastr.options.closeOnHover = false; // toastr's native hover-pause snaps the bar to empty; ours pauses in place
         toastr.options.showMethod = 'show';
         toastr.options.hideMethod = 'hide';
-        toastr.options.timeOut = toastr.options.timeOut || 4500;
-        toastr.options.extendedTimeOut = toastr.options.timeOut;
+        toastr.options.timeOut = 0;
+        toastr.options.extendedTimeOut = 0;
         toastr.options.onShown = function () {
             var $t = $(this);
             if (wtPendingSticky) { wtPendingSticky = false; return; } // sticky: no countdown, manual close only
             $t.append(
                 $('<span class="wt-prog"></span>')
-                    .css('animation-duration', toastr.options.timeOut + 'ms')
-                    .on('animationend', function () { toastr.clear($t); })
+                    .css('animation-duration', WT_DURATION + 'ms')
+                    .on('animationend', function () {
+                        // Countdown finished (not paused by hover) — play the
+                        // blur-out (.wt-out, see toastr-theme.css) and remove
+                        // once *that* animation ends, instead of vanishing
+                        // instantly. Reduced-motion never gets .wt-out (see
+                        // the @media block there), so animationend would
+                        // never fire — skip straight to removal in that case.
+                        if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) {
+                            toastr.clear($t);
+                            return;
+                        }
+                        $t.addClass('wt-out').one('animationend', function () { toastr.clear($t); });
+                    })
             );
         };
     }
@@ -84,8 +104,8 @@
         }
         wtPendingSticky = sticky;
         var $toast = toastr[type](html, title, {
-            timeOut: sticky ? 0 : toastr.options.timeOut,
-            extendedTimeOut: sticky ? 0 : toastr.options.timeOut,
+            timeOut: 0,
+            extendedTimeOut: 0,
             escapeHtml: false
         });
         return $toast;
@@ -118,7 +138,6 @@
 </script>
 <script src="{{ URL::asset('resorts_assets/js/jQuery.print.js')}}"></script>
 <script src="{{ URL::asset('resorts_assets/js/chartjs-chart-treemap.js')}}"></script>
-<script src="{{ URL::asset('resorts_assets/js/socket.io.min.js')}}"></script>
 @include('partials.pusher-init')
 {{-- <script type="text/JavaScript" src="https://cdnjs.cloudflare.com/ajax/libs/jQuery.print/1.6.0/jQuery.print.js"></script> --}}
 {{-- <script src="https://cdn.jsdelivr.net/npm/chartjs-chart-treemap"></script> --}}
@@ -163,20 +182,20 @@
         margin: 0 auto 16px !important;
         border: 0 !important;
         border-radius: 50% !important;
-        background: #e6f0f1 !important;
-        color: #014653 !important;
+        background: var(--teal-3) !important;
+        color: var(--teal) !important;
     }
     .logout-swal-popup .logout-swal-icon .swal2-icon-content { padding: 0; }
     .logout-swal-popup .logout-swal-title {
         font-size: 18px !important;
         font-weight: 800 !important;
-        color: #14232a !important;
+        color: var(--ink) !important;
         padding: 0 0 4px !important;
         margin: 0 !important;
     }
     .logout-swal-popup .logout-swal-text {
         font-size: 13px !important;
-        color: #5d6f75 !important;
+        color: var(--muted) !important;
         margin: 0 0 16px !important;
     }
     .logout-swal-popup .logout-swal-actions {
@@ -196,14 +215,14 @@
         box-shadow: none !important;
     }
     .logout-swal-popup .logout-swal-confirm {
-        background: #014653 !important;
+        background: var(--teal) !important;
         color: #fff !important;
         border: none !important;
     }
     .logout-swal-popup .logout-swal-cancel {
         background: #fff !important;
-        color: #5d6f75 !important;
-        border: 1px solid #e2ebec !important;
+        color: var(--muted) !important;
+        border: 1px solid var(--line) !important;
         font-weight: 600;
     }
 </style>
@@ -504,167 +523,13 @@
 
     }
 
-    // const socket = io("{{ env('NOTIFICATION_URL', 'http://localhost:8080') }}",{
-    //     transports: ["websocket"]
-    // });
-
-    // Legacy Node socket.io server (BASE_URL) — wrapped to avoid console
-    // spam when the server isn't running. Real-time delivery is handled by
-    // Pusher/Echo (see partials.pusher-init included in this layout).
-    var socket;
-    try {
-        socket = io("{{env('BASE_URL')}}", {transports: ["websocket"], reconnection: false, timeout: 2000});
-    } catch (e) {
-        socket = { emit: function () {}, on: function () {} };
-    }
-
-
-    // Register user ID
+    // Real-time delivery (notifications + chat) runs entirely on Pusher/Echo
+    // now (see partials.pusher-init included in this layout, and the
+    // Resortevent-channel listener below). The old Node socket.io server
+    // this used to talk to is no longer running.
     const userId = "{{ Auth::guard('resort-admin')->user()->GetEmployee->id ?? 0 }}";
     const userType = "employee";
     const panelType = "resort"; // Detect panel type
-
-
-
-    socket.on("connect", () => {
-        console.log("Connected to socket server. Emitting userId...");
-        socket.emit("register-user", userId);
-
-    });
-
-    // Listen for new notifications
-    // socket.on("new-resort-notification", (data) => {
-    //     console.log("Received WebSocket Notification:", data);
-
-    //     console.log(data.htmlbody);
-    //     const notificationHTML = data.htmlbody;
-
-    //     document.querySelector(".notification-body").innerHTML += notificationHTML;
-    // });
-
-    socket.on('new-notification', (data) => {
-        // console.log(data);
-        let htmlview = data.html;
-        let sendto = parseInt(data.sendto);
-        let ReciverResortId="{{  Auth::guard('resort-admin')->user()->resort_id }}";
-        // Check if GetEmployee exists before trying to access its properties
-        let RankOfResort = "{{ isset(Auth::guard('resort-admin')->user()->GetEmployee) ? Auth::guard('resort-admin')->user()->GetEmployee->rank : '' }}";
-        let User_id = "{{ isset(Auth::guard('resort-admin')->user()->GetEmployee) ? Auth::guard('resort-admin')->user()->GetEmployee->id : '' }}";
-        let Dept_id = parseInt("{{ isset(Auth::guard('resort-admin')->user()->GetEmployee) ? Auth::guard('resort-admin')->user()->GetEmployee->Dept_id : '' }}");
-        let type = data.type;
-        let SenderResortId = data.resortid;
-        let PendingDepartment_id = data.PendingDepartment_id;
-        // alert(type);
-        if(type == 1)
-        {
-            $(".notification-body").html(htmlview);
-        }
-        if(type == 2)
-        {
-            if(SenderResortId == ReciverResortId &&  RankOfResort == "2")
-            {
-                $(".AppendRequestManningRequest").html(htmlview);
-            }
-        }
-        if(type ==3) // Remainder for Department
-        {
-            let PendingDepartment_id = data.html.PendingDepartment_id;
-            if (Array.isArray(PendingDepartment_id) && PendingDepartment_id.includes(Dept_id)) {
-
-                if (SenderResortId == ReciverResortId && RankOfResort == "2") {
-                    $(".AppendRequestManningRequest").html(htmlview);
-                }
-            }
-        }
-        if(type == 4) // HOD will send Mainning request based on maning HR dasbhoard to get a response to pading response Department list
-        {
-            if(SenderResortId == ReciverResortId &&  RankOfResort == "3")
-            {
-                $(".HrRequestViewCard").html(htmlview);
-            }
-        }
-        if(type  == 5  && SenderResortId == ReciverResortId && RankOfResort == "2")
-        {
-            $(".AppendRequestManningRequest").html(htmlview);
-        }
-        if(type == 6 && SenderResortId == ReciverResortId && RankOfResort == "2")
-        {
-            $(".AppendRequestManningRequest").html(htmlview);
-        }
-        if(type == 7 && SenderResortId == ReciverResortId && RankOfResort == "3" )
-        {
-            $("#FreshHiringRequest").html(htmlview);
-        }
-        if(type == 8 && SenderResortId == ReciverResortId &&  RankOfResort == 7 )
-        {
-            $("#FreshHiringRequest").html(htmlview);
-        }
-        if(type == 9  && SenderResortId == ReciverResortId &&  RankOfResort == 8 )
-        {
-            $("#todoList-main").html(htmlview);
-            
-        }
-        if(type == 10 && SenderResortId == ReciverResortId )
-        {
-            // console.log(parseInt(User_id) == sendto,parseInt(User_id) , sendto);
-            if(parseInt(User_id) == sendto)
-            {
-                $(".notification-body").html(htmlview);
-            }
-            else
-            {
-                $(".notification-body").html(htmlview);
-            }
-      
-        }
-    });
-
-    socket.on("receive-message", function (data) {
-        console.log("📨 New message received:", data);
-
-        // Ensure that 'userId' is defined
-        if (typeof userId === "undefined") {
-            console.log("⚠️ Warning: userId is not defined.");
-            return;
-        }
-
-        let attachments = data.attachments;
-        if (typeof attachments === "string") {
-            attachments = JSON.parse(attachments); // Convert to array if it's a string
-        }
-        if (!Array.isArray(attachments)) {
-            attachments = []; // Fallback to empty array if null or invalid
-        }
-        console.log("📨 New message userId:", userId);
-
-        if (data.senderId !== userId) {
-            appendMessage({
-                message: data.message,
-                senderId: data.senderId,
-                receiverId: data.receiverId,
-                senderName: data.senderName,
-                senderImage: data.senderImage,
-                receiverName: data.receiverName,
-                receiverImage: data.receiverImage,
-                attachments: attachments
-            }, false , 'employee');
-        }
-    });
-    // socket.on("receive-message", (data) => {
-    //     console.log("📨 New message received:", data);
-
-    //     // Ensure that 'userId' is defined
-    //     if (typeof userId === "undefined") {
-    //         console.log("⚠️ Warning: userId is not defined.");
-    //         return;
-    //     }
-
-    //     console.log("📨 New message userId:", userId);
-
-    //     if (data.senderId !== userId) {
-    //         appendMessage(data, false, 'employee');
-    //     }
-    // });
 
     function appendMessage(data, isSender) {
         let position = isSender ? "right" : "";
@@ -1671,7 +1536,10 @@
                     type: "POST",
                     data: {"_token":"{{ csrf_token() }}","id":id},
                     success: function(response) {
-                        if (response.success) decrementNotificationBadge();
+                        if (response.success) {
+                            $(".class_remove_me_"+id).remove();
+                            decrementNotificationBadge();
+                        }
                     }
                 });
             }

@@ -8,9 +8,15 @@
 @endif
 
 @section('content')
+    <style>
+        #learning-program-index-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #learning-program-index-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="learning-program-index-hero">
                 <div class="row  g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -32,7 +38,7 @@
                             </div>
                         </div>
                         <div class="col-xl-2 col-lg-4 col-md-5 col-6">
-                            <select id="categoryFilter" class="form-select select2t-none">
+                            <select id="categoryFilter" class="form-select dd-native-select">
                                 <option value=""> All Category</option>
                                 @if($categories)
                                     @foreach($categories as $category)
@@ -40,6 +46,23 @@
                                     @endforeach
                                 @endif
                             </select>
+                            <div class="dd" data-target="#categoryFilter">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">All Category</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Category">
+                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a category…"></div>
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">All Category</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @if($categories)
+                                            @foreach($categories as $category)
+                                                <div class="dd-item" role="option" data-value="{{ $category->id }}"><span class="dd-nm">{{ $category->category }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @endforeach
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -70,6 +93,8 @@
         <div class="k"><span class="dot"></span>Audience</div>
         <div class="list" id="audList"></div>
     </div>
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -103,7 +128,7 @@
        for ordinary table row separators — our table still carries the bare .table
        class, so it wins on the bottom edge only, and never updates on hover since
        it's untouched by our :hover rule. Match it with !important on every side. */
-    table.lp-table tbody tr td.lp-cell { background: #fff; border: 1px solid var(--lp-g4) !important; border-radius: 14px; box-shadow: 0 1px 2px rgba(1,70,83,.05), 0 8px 24px rgba(1,70,83,.05); transition: border-color .15s; }
+    table.lp-table tbody tr td.lp-cell { background: #fff; border: 1px solid var(--lp-g4) !important; border-radius: 14px; box-shadow: 0 1px 2px rgba(var(--teal-rgb),.05), 0 8px 24px rgba(var(--teal-rgb),.05); transition: border-color .15s; }
     table.lp-table tbody tr:hover td.lp-cell { border-color: var(--faint, #C7CDCF) !important; }
     .lp-table tbody td { border: none; padding: 0; }
     /* default.css has an app-wide table convention: first/last <td> in a row
@@ -139,7 +164,7 @@
     /* Frosted-glass audience popover — same material as the WAI recommendation modal */
     .aud-pop { position: fixed; z-index: 1060; width: 230px; border-radius: 22px; padding: 22px 22px 20px;
         background: rgba(255,255,255,.82); backdrop-filter: blur(28px) saturate(160%); -webkit-backdrop-filter: blur(28px) saturate(160%);
-        border: 1px solid rgba(255,255,255,.7); box-shadow: 0 24px 70px rgba(1,70,83,.20), 0 2px 8px rgba(1,70,83,.06);
+        border: 1px solid rgba(255,255,255,.7); box-shadow: 0 24px 70px rgba(var(--teal-rgb),.20), 0 2px 8px rgba(var(--teal-rgb),.06);
         opacity: 0; transform: translateY(8px) scale(.985); pointer-events: none; transition: opacity .28s ease, transform .3s cubic-bezier(.16,1,.3,1); }
     .aud-pop.open { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
     .aud-pop .k { display: flex; align-items: center; gap: 7px; font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .9px; color: var(--lp-g2); margin-bottom: 14px; }

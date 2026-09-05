@@ -8,9 +8,15 @@
 @endif
 
 @section('content')
+<style>
+    #announcements-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #announcements-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="announcements-hero">
                 <div class="row  g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -34,7 +40,7 @@
                             <input type="text" name="dateFilter" id="dateFilter" class="form-control datepicker"/>
                         </div>
                         <div class="col-xl-auto col-md-4 col-sm-4 col-6">
-                            <select class="form-select select2t-none" id="categoryFilter" >
+                            <select class="form-select dd-native-select" id="categoryFilter" >
                                 <option value="">Announcement Type</option>
                                 @if($categories)
                                     @foreach($categories as $category)
@@ -42,9 +48,25 @@
                                     @endforeach
                                 @endif
                             </select>
+                            <div class="dd" data-target="#categoryFilter">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Announcement Type</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Announcement Type">
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Announcement Type</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @if($categories)
+                                            @foreach($categories as $category)
+                                                <div class="dd-item" role="option" data-value="{{$category->id}}"><span class="dd-nm">{{$category->name}}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @endforeach
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="col-xl-2 col-md-4 col-sm-4 col-6">
-                            <select class="form-select select2t-none" id="deptFilter">
+                            <select class="form-select dd-native-select" id="deptFilter">
                                 <option value="">Departments</option>
                                 @if($departments)
                                     @foreach($departments as $dept)
@@ -52,14 +74,45 @@
                                     @endforeach
                                 @endif
                             </select>
+                            <div class="dd" data-target="#deptFilter">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Departments</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Department">
+                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a department…"></div>
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Departments</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @if($departments)
+                                            @foreach($departments as $dept)
+                                                <div class="dd-item" role="option" data-value="{{$dept->id}}"><span class="dd-nm">{{$dept->name}}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @endforeach
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="col-xl-auto col-md-4 col-sm-4 col-6">
-                            <select class="form-select select2t-none" id="statusFilter">
+                            <select class="form-select dd-native-select" id="statusFilter">
                                 <option value="">By Status</option>
                                 <option value="Draft">Draft</option>
                                 <option value="Scheduled">Scheduled</option>
                                 <option value="Published">Published</option>
                             </select>
+                            <div class="dd" data-target="#statusFilter">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">By Status</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Status">
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">By Status</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="Draft"><span class="dd-nm">Draft</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="Scheduled"><span class="dd-nm">Scheduled</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="Published"><span class="dd-nm">Published</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="col-auto ms-auto">
                             <div class="form-check form-switch form-switchTheme switch-blue">
@@ -90,13 +143,13 @@
 @endsection
 
 @section('import-css')
+@include('resorts._dropdown_styles')
 @endsection
 
 @section('import-scripts')
 <script>
     $(document).ready(function(){
        getAnnouncement();
-       $('.select2t-none').select2();
        flatpickr('#dateFilter', {
             dateFormat: 'd/m/Y',
             allowInput: true,
@@ -240,4 +293,5 @@
         });
     }
 </script>
+@include('resorts._dropdown_script')
 @endsection
