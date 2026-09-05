@@ -103,17 +103,45 @@ class EmployeeChatController extends Controller
                     ]);
 
                     $base_url = env('BASE_URL', 'http://localhost:2053');
-                    //sending request to server.js
-                    Http::post($base_url . '/sendChatMessage', [
+                    // BASE_URL is commented out/unset in every env file, so this
+                    // resolves to the localhost fallback — nothing listens there
+                    // in prod. A connection failure here used to propagate to
+                    // the method's outer catch and roll back the whole message
+                    // (including the row just created above), so the endpoint
+                    // could 500 on every send. This relay is legacy/best-effort;
+                    // it must never be able to block message persistence or the
+                    // notification below.
+                    try {
+                        Http::post($base_url . '/sendChatMessage', [
 
-                        'sender_id'         => $sender_id,
-                        'receiver_id'       => $receiver_id,
-                        'conversation_id'   => $conversationId,
-                        'message'           => $message ?? null,
-                        'timestamp'         => now(),
-                    ]);
+                            'sender_id'         => $sender_id,
+                            'receiver_id'       => $receiver_id,
+                            'conversation_id'   => $conversationId,
+                            'message'           => $message ?? null,
+                            'timestamp'         => now(),
+                        ]);
+                    } catch (\Exception $e) {
+                        \Log::warning('EmployeeChatController: legacy sendChatMessage relay failed: ' . $e->getMessage());
+                    }
 
-                   
+                    // This endpoint sent zero notifications by any mechanism —
+                    // the call above only reaches a legacy websocket relay
+                    // (BASE_URL is unset in every env file, so it silently
+                    // fails inside the outer try/catch). Without a push/DB
+                    // row, a receiver whose app wasn't open never learned a
+                    // message arrived. receiver_id here is already
+                    // employees.id (validated via Rule::exists('employees',
+                    // 'id') above), so no id-domain translation is needed.
+                    Common::notifyEmployees(
+                        $this->resort_id,
+                        [$receiver_id],
+                        trim(($senderProfile->first_name ?? '') . ' ' . ($senderProfile->last_name ?? '')),
+                        $message,
+                        'Chat',
+                        $Newmessage->id,
+                        'employee-chat-message'
+                    );
+
                     DB::commit();
                     return response()->json(['message' => 'Message sent successfully', 'message'=>['message_id'=>$Newmessage->id,'profile_picture'=>Common::getResortUserPicture($senderProfile->id),'message'=>$message],'chat history' => $chatHistory]);
                 }else{

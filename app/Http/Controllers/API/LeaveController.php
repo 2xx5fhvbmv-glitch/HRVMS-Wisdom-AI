@@ -494,6 +494,17 @@ class LeaveController extends Controller
                             'status'                    =>  'Pending',
                         ]);
                     }
+
+                    // Same $passApprovalFlow shape BoardingPassController::boardingPassAdd()
+                    // builds for a standalone pass — that endpoint notifies SM/HR/HOD,
+                    // this one never did. Shared helper so both stay in sync.
+                    Common::notifyBoardingPassApprovalFlow(
+                        $user->resort_id,
+                        $passApprovalFlow,
+                        $boardingPass,
+                        $employee,
+                        $user->first_name . ' ' . $user->last_name
+                    );
                 }
                 $approvalFlow                           =   collect(); // Store the approval flow dynamically
 
@@ -1517,6 +1528,7 @@ class LeaveController extends Controller
                 $leaveDetail                            =   $leave_details_query->select(
                                                                 'el.*',
                                                                 'e.Emp_id as employee_id',
+                                                                'ra.id as admin_parent_id',
                                                                 'e.rank',
                                                                 'e.benefit_grid_level',
                                                                 'els.status as leave_status',
@@ -1560,7 +1572,7 @@ class LeaveController extends Controller
                     $currentYearEnd                     =   Carbon::now()->endOfYear()->format('Y-m-d');
 
                     $leavesTaken                        =   DB::table('employees_leaves')
-                                                                ->where('emp_id', $leaveDetail->employee_id)
+                                                                ->where('emp_id', $leaveDetail->emp_id)
                                                                 ->where('status', 'Approved')
                                                                 ->where(function ($query) use ($currentYearStart, $currentYearEnd) {
                                                                     $query->whereBetween('from_date', [$currentYearStart, $currentYearEnd])
@@ -1575,8 +1587,9 @@ class LeaveController extends Controller
                     $leaveDetail->total_leave_allocation    =   $totalAllocation;
                     $leaveDetail->leaves_taken              =   $leavesTaken;
 
-                    // Update profile picture dynamically
-                    $leaveDetail->employee_profile_picture  =   Common::getResortUserPicture($leaveDetail->employee_id);
+                    // Update profile picture dynamically — getResortUserPicture()
+                    // needs resort_admins.id, not the employee display code.
+                    $leaveDetail->employee_profile_picture  =   Common::getResortUserPicture($leaveDetail->admin_parent_id);
                     $leaveDetail->transportation_details    =   json_decode($leaveDetail->transportation_details, true);
 
                     $baseUrl = url('/');
@@ -1835,6 +1848,7 @@ class LeaveController extends Controller
                 $combineLeaveDetails    =   $combineLeaveDetails->select(
                                                 'el.*',
                                                 'e.Emp_id as employee_id',
+                                                'ra.id as admin_parent_id',
                                                 'e.rank',
                                                 'els.status as leave_status',
                                                 'els.approver_rank',
@@ -1909,13 +1923,14 @@ class LeaveController extends Controller
 
                         if ($leaveDetail->leave_data) {
                             foreach ($leaveDetail->leave_data as $leaveData) {
-                                $leaveData->employee_profile_picture    = Common::getResortUserPicture($leaveData->employee_id);
+                                $leaveData->employee_profile_picture    = Common::getResortUserPicture($leaveData->admin_parent_id);
                                 $leaveData->attachments                 = self::resolveLeaveAttachmentUrl($leaveData->attachments);
                             }
                         }
 
-                        // Update profile picture dynamically
-                        $leaveDetail->employee_profile_picture  = Common::getResortUserPicture($leaveDetail->employee_id);
+                        // Update profile picture dynamically — getResortUserPicture()
+                        // needs resort_admins.id, not the employee display code.
+                        $leaveDetail->employee_profile_picture  = Common::getResortUserPicture($leaveDetail->admin_parent_id);
                         $leaveDetail->attachments               = self::resolveLeaveAttachmentUrl($leaveDetail->attachments);
                     }
                 }
@@ -2005,6 +2020,7 @@ class LeaveController extends Controller
                 $combineLeaveDetails = $combineLeaveDetails->select(
                     'el.*',
                     'e.Emp_id as employee_id',
+                    'ra.id as admin_parent_id',
                     'e.rank',
                     'e.benefit_grid_level',
                     'els.status as leave_status',
@@ -2057,8 +2073,9 @@ class LeaveController extends Controller
                         $leaveDetail->total_leave_allocation    = $totalAllocation;
                         $leaveDetail->leaves_taken              = $leavesTaken;
 
-                        // Update profile picture dynamically
-                        $leaveDetail->employee_profile_picture  = Common::getResortUserPicture($leaveDetail->employee_id);
+                        // Update profile picture dynamically — getResortUserPicture()
+                        // needs resort_admins.id, not the employee display code.
+                        $leaveDetail->employee_profile_picture  = Common::getResortUserPicture($leaveDetail->admin_parent_id);
                     }
                 }
                 $totalLeave                         = $combineLeaveDetails->sum('total_days');
@@ -2490,6 +2507,26 @@ class LeaveController extends Controller
                 }
             }
 
+            // Whichever approver stage(s) are still Pending on this leave
+            // were never told the request they're about to review just
+            // changed underneath them.
+            $pendingApproverIds                         =   EmployeeLeaveStatus::where('leave_request_id', $request->leave_id)
+                                                                ->where('status', 'Pending')
+                                                                ->pluck('approver_id')
+                                                                ->unique()
+                                                                ->values()
+                                                                ->all();
+            if (!empty($pendingApproverIds)) {
+                Common::notifyEmployees(
+                    $user->resort_id,
+                    $pendingApproverIds,
+                    'Leave Request Updated',
+                    $user->first_name . ' ' . $user->last_name . ' updated a pending leave request awaiting your review.',
+                    'Leave',
+                    $request->leave_id
+                );
+            }
+
             DB::commit();
             return response()->json(['success' => true, 'message' => 'Leave application updated successfully!'], 200);
         } catch (\Exception $e) {
@@ -2858,7 +2895,10 @@ class LeaveController extends Controller
 
             // Attach approve_data to the main island pass object
             $islandPassQuery->approve_data = $approveData;
-            $islandPassQuery->profile_picture    = Common::getResortUserPicture($islandPassQuery->employee_id);
+            // employee_id here is etp.employee_id (via etp.*) — a real
+            // employees.id, but still the wrong domain: getResortUserPicture()
+            // needs resort_admins.id, which is Admin_Parent_id (already selected).
+            $islandPassQuery->profile_picture    = Common::getResortUserPicture($islandPassQuery->Admin_Parent_id);
         }
 
         return $islandPassQuery;
@@ -3740,7 +3780,10 @@ class LeaveController extends Controller
 
             // Attach approve_data to the main island pass object
             $islandPassQuery->approve_data = $approveData;
-            $islandPassQuery->profile_picture    = Common::getResortUserPicture($islandPassQuery->employee_id);
+            // employee_id here is etp.employee_id (via etp.*) — a real
+            // employees.id, but still the wrong domain: getResortUserPicture()
+            // needs resort_admins.id, which is Admin_Parent_id (already selected).
+            $islandPassQuery->profile_picture    = Common::getResortUserPicture($islandPassQuery->Admin_Parent_id);
         }
 
         return $islandPassQuery;
@@ -4131,6 +4174,31 @@ class LeaveController extends Controller
                         $leave->id,
                         false,
                         'leave-approved',
+                    );
+                }
+
+                // Tell the next approver in the chain their action is now due —
+                // port of BoardingPassController.php's identical
+                // "advance the chain" pattern (its handleTravelPassAction
+                // equivalent), which this method never had: it only ever
+                // notified the applicant, never the next pending approver.
+                $nextPendingStatus                      =   EmployeeLeaveStatus::where('leave_request_id', $leave->id)
+                                                                ->where('status', 'Pending')
+                                                                ->orderBy('id', 'desc')
+                                                                ->first();
+                if ($nextPendingStatus && $nextPendingStatus->approver_id) {
+                    Common::sendMobileNotification(
+                        $user->resort_id,
+                        2,
+                        null,
+                        null,
+                        'Leave Approval Required',
+                        'A leave request is awaiting your approval.',
+                        'Leave',
+                        [$nextPendingStatus->approver_id],
+                        $leave->id,
+                        false,
+                        'leave-approval-required',
                     );
                 }
 

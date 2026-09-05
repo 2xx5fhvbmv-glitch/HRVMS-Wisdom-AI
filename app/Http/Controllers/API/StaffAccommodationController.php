@@ -576,6 +576,10 @@ class StaffAccommodationController extends Controller
                 }
 
             if($maintanaceRequest) {
+                // Captured before the update below overwrites $maintanaceRequest
+                // with the update()'s int return value.
+                $assignedEngineerId                         =   $maintanaceRequest->Assigned_To;
+
                 $maintanaceRequest                          =   MaintanaceRequest::where('id',$requestId)->where('Status','Resolvedawaiting')->update([
                                                                     'Status'     => "Closed",
                                                                 ]);
@@ -587,6 +591,31 @@ class StaffAccommodationController extends Controller
                     'rank'                                      =>  $employee->rank,
                     'date'                                      =>  date('Y-m-d'),
                 ]);
+
+                // Notify HR (all HR, not just one) and the engineering staff
+                // who did the work — neither was told the employee confirmed
+                // the repair complete.
+                $notifyIds                                  =   Common::getResortHrEmployeeIds($this->resort_id);
+                if (!empty($assignedEngineerId)) {
+                    $notifyIds[]                             =   $assignedEngineerId;
+                }
+                $notifyIds                                  =   array_values(array_unique($notifyIds));
+
+                if (!empty($notifyIds)) {
+                    Common::sendMobileNotification(
+                        $this->resort_id,
+                        2,
+                        null,
+                        null,
+                        'Maintenance Request Closed',
+                        "The Maintenance Request for #{$employee->Emp_id} has been Closed by the employee.",
+                        'Maintenance',
+                        $notifyIds,
+                        $requestId,
+                        false,
+                        'maintenance-request-closed',
+                    );
+                }
             }
             
             DB::commit(); // Commit Transaction

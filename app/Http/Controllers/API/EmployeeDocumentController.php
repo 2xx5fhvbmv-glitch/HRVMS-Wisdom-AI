@@ -82,6 +82,22 @@ class EmployeeDocumentController extends Controller
             if (!$employeesDoc) {
                 return response()->json(['success' => false, 'message' => 'File not uploaded'], 200);
             }
+
+            // HR never learned a passport/visa document was uploaded via this
+            // endpoint — FileManagementController's own upload path already
+            // notifies HR on upload, this one didn't.
+            $hrEmployeeIds = array_values(array_diff(Common::getResortHrEmployeeIds($resortId), [$employee->id]));
+            if (!empty($hrEmployeeIds)) {
+                Common::notifyEmployees(
+                    $resortId,
+                    $hrEmployeeIds,
+                    'Document Uploaded',
+                    ($user->first_name ?? $employee->Emp_id) . ' uploaded a document: ' . $request->document_title,
+                    'Employee Document',
+                    $employeesDoc->id
+                );
+            }
+
             return response()->json(['success' => true, 'message' => 'File upload succesfully'],200);
 
         } catch (\Exception $e) {

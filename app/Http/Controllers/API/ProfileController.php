@@ -343,6 +343,12 @@ class ProfileController extends Controller
       $employee->password = $password;
       $employee->save();
 
+      // Security-visibility: let the employee know their password changed,
+      // in case it wasn't them.
+      if ($employee->GetEmployee) {
+        Common::notifyEmployees($this->resort_id, [$employee->GetEmployee->id], 'Password Changed', 'Your password was changed successfully. If this wasn\'t you, please contact HR immediately.', 'Profile');
+      }
+
       $accessToken        = $employee->token();
       $accessToken->revoke();
 
@@ -421,6 +427,9 @@ class ProfileController extends Controller
           }
           $resortAdmin->profile_picture =$path['path'];
           $saveResortAdmin                  = $resortAdmin->save();
+
+          // Self-notify confirmation, same as changePassword() above.
+          Common::notifyEmployees($this->resort_id, [$emp->id], 'Profile Photo Updated', 'Your profile photo was updated successfully.', 'Profile');
 
           $response['status']   = true;
           $response['message']  = 'Profile image uploaded successfully';

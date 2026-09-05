@@ -614,21 +614,17 @@ class MonthlyCheckInController extends Controller
             $msg                                            =   'Meeting Confirm by '.$monthly->first_name.' for Monthly Check-In';
             $title                                          =   'Monthly check-in Meeting Confirm';
             $ModuleName                                     =   'Performance';
-            $sendMobileNotification                         =   Common::sendMobileNotification(
-                                                                    $this->resort_id,
-                                                                    2,
-                                                                    null,
-                                                                    null,
-                                                                    $title,
-                                                                    $msg,
-                                                                    $ModuleName,
-                                                                    [$createdByEmployeeId->id],
-                                                                    $monthly->id,
-                                                                    false,
-                                                                    'monthly-checkin-created',
-                                                                );
-                                                                
-            event(new ResortNotificationEvent(Common::nofitication($this->resort_id, 10,$title,$msg,0,$createdByEmployeeId->id,$ModuleName)));
+            // Was pairing sendMobileNotification with a separate
+            // nofitication(type 10)+event call — double DB row, double
+            // push. notifyEmployees() does both exactly once.
+            Common::notifyEmployees(
+                $this->resort_id,
+                [$createdByEmployeeId->id],
+                $title,
+                $msg,
+                $ModuleName,
+                $monthly->id
+            );
 
             $response['status']                             =   true;
             $response['message']                            =   'Monthly Check-In meeting confirmed successfully';
@@ -669,8 +665,24 @@ class MonthlyCheckInController extends Controller
                 return response()->json(['success' => false, 'message' => 'Meeting not found or not in Conducted status'], 200);
             }
             
-            $monthly->employee_comment                      =   $request->employee_comment;                   
+            $monthly->employee_comment                      =   $request->employee_comment;
             $monthly->save();
+
+            // Manager who created/scheduled this meeting was never told
+            // the employee replied — same "notify the meeting creator"
+            // pattern as employeeConfirmMeeting() above, using
+            // notifyEmployees() (single DB row + single push per recipient).
+            $createdByEmployeeId                            =   Employee::where('Admin_Parent_id',$monthly->created_by)->first();
+            if ($createdByEmployeeId) {
+                Common::notifyEmployees(
+                    $this->resort_id,
+                    [$createdByEmployeeId->id],
+                    'Monthly Check-In Employee Comment',
+                    'Employee comment added by '.$this->user->first_name.' '.$this->user->last_name.' for Monthly Check-In',
+                    'Performance',
+                    $monthly->id
+                );
+            }
 
             $response['status']                             =   true;
             $response['message']                            =   'Employee comment submitted successfully';

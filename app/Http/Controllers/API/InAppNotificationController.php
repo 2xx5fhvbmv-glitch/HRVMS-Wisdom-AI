@@ -231,11 +231,20 @@ class InAppNotificationController extends Controller
         // Send birthday message if request_id and message are provided
         if ($request->has('request_id') && $request->has('message')) {
 
-          // Find the user by request_id (assuming request_id is the employee ID)
-          $user                                         =   Employee::find($request->request_id);
+          // Find the user by request_id (assuming request_id is the employee
+          // ID) — scoped to the caller's own resort, same IDOR fix already
+          // applied to the other lookups in this method above.
+          $user                                         =   Employee::where('id', $request->request_id)
+                                                                ->where('resort_id', $this->resort_id)
+                                                                ->first();
 
-          // Common::sendMobileNotification($user->resort_id,2,null,null,'Birthday Wish',$request->message,'Birthday',[$user->id],null);
-        //   Common::sendMobileNotification($user->resort_id,null,null,'Birthday Wish',$request->message,'Birthday',[$user->id],null);
+          // Was commented out (one of the two variants had the wrong arg
+          // count for the current sendMobileNotification signature) — the
+          // birthday-wish reply never reached the recipient by any
+          // mechanism.
+          if ($user) {
+              Common::sendMobileNotification($user->resort_id, 2, null, null, 'Birthday Wish', $request->message, 'Birthday', [$user->id], null);
+          }
 
           return response()->json([
             'success'                                   =>  true,

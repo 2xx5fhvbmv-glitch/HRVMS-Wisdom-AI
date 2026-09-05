@@ -1653,6 +1653,23 @@ class AccommodationController extends Controller
                 'status'                                =>  'Pending',
             ]);
 
+            // Send In App Notification to the assigned employee — HR->HOD leg
+            // above already notifies the HOD; the HOD->employee leg (the
+            // actual line worker who'll do the task) never did.
+            Common::sendMobileNotification(
+                $this->resort_id,
+                2,
+                null,
+                null,
+                'Housekeeping Task Assigned',
+                'A housekeeping task has been assigned to you by ' . $this->user->first_name . ' ' . $this->user->last_name,
+                'Accommodation',
+                [$request->emp_id],
+                $childHouseKeepingSchedules->id,
+                false,
+                'housekeeping-task-assigned'
+            );
+
             DB::commit();
 
             $response['status']                             =   true;
@@ -1710,6 +1727,32 @@ class AccommodationController extends Controller
                     ->whereIn('id', $housekeepingIds)
                     ->select('hs.id', 'hs.RoomNo', 'hs.status')
                     ->get();
+
+                // Notify the HOD who assigned this task — they never learned
+                // it was picked up otherwise.
+                $hodIds = ChildHouseKeepingSchedules::whereIn('housekeeping_id', $housekeepingIds)
+                    ->where('Status', 'Assigned')
+                    ->pluck('ApprovedBy')
+                    ->filter()
+                    ->unique()
+                    ->values()
+                    ->all();
+
+                if (!empty($hodIds)) {
+                    Common::sendMobileNotification(
+                        $this->resort_id,
+                        2,
+                        null,
+                        null,
+                        'Housekeeping Task Accepted',
+                        $user->first_name . ' ' . $user->last_name . ' has accepted the housekeeping task for Room No- ' . ($updatedHousekeeping->first()->RoomNo ?? ''),
+                        'Accommodation',
+                        $hodIds,
+                        $roomId,
+                        false,
+                        'housekeeping-task-accepted'
+                    );
+                }
 
                 $response['status']                             =   true;
                 $response['message']                            =   'Housekeeping Schedule status changed successfully.';
@@ -1825,6 +1868,29 @@ class AccommodationController extends Controller
                     $imagePaths[] = '';
                 }
             }
+
+            // Notify the HOD who assigned this task — they never learned it
+            // was logged/completed otherwise.
+            $hodId = ChildHouseKeepingSchedules::where('housekeeping_id', $housekeeping_id)
+                ->where('Status', 'Assigned')
+                ->value('ApprovedBy');
+
+            if ($hodId) {
+                Common::sendMobileNotification(
+                    $this->resort_id,
+                    2,
+                    null,
+                    null,
+                    'Housekeeping Task Updated',
+                    $user->first_name . ' ' . $user->last_name . ' has logged the housekeeping task for Room No- ' . $housekeeping->RoomNo . ' as ' . $housekeeping->status . '.',
+                    'Accommodation',
+                    [$hodId],
+                    $housekeeping_id,
+                    false,
+                    'housekeeping-task-updated'
+                );
+            }
+
             $response['status']                             =   true;
             $response['message']                            =   'Housekeeping status change successfully.';
             $response['updated_emp']                  =   ['id' => $housekeeping->id, 'status' => $housekeeping->status, 'img_path' => $imagePaths];
@@ -2384,6 +2450,30 @@ class AccommodationController extends Controller
                 'Status'                                =>  'pending',
                 'date'                                  =>  date('Y-m-d'),
             ]);
+
+            // Notify the Engineering Dept HOD who assigned this request —
+            // every other transition in this chain notifies someone, this
+            // one didn't. Same rank-11 lookup engDepartmentStaffMaintenanceReqComplete()
+            // uses below to find who to notify next.
+            $findEDHODChildRequest                          =   ChildMaintananceRequest::where('maintanance_request_id', $maintanance->id)
+                                                                    ->where('rank', '11')
+                                                                    ->where('resort_id', $this->resort_id)
+                                                                    ->first();
+            if ($findEDHODChildRequest) {
+                Common::sendMobileNotification(
+                    $this->resort_id,
+                    2,
+                    null,
+                    null,
+                    'Maintenance Request Accepted',
+                    "The Maintenance Request for #{$this->user->GetEmployee->Emp_id} has been Accepted by {$employee->first_name} {$employee->last_name}.{$maintanance->descriptionIssues}",
+                    'Maintenance',
+                    [$findEDHODChildRequest->ApprovedBy],
+                    $maintanance->id,
+                    false,
+                    'maintenance-request-accepted',
+                );
+            }
 
             $maintananceReq                                   =   MaintanaceRequest::find($requestId);
             DB::commit(); // Commit Transaction
