@@ -779,6 +779,27 @@ class IncidentController extends Controller
 
         $incident->save();
 
+        try {
+            $recipientIds = collect();
+            if ($incident->reporter_id) {
+                $recipientIds->push($incident->reporter_id);
+            }
+            if (!empty($incident->involved_employees)) {
+                $recipientIds = $recipientIds->merge(explode(',', $incident->involved_employees));
+            }
+            $recipientIds = $recipientIds->filter()->unique()->values()->all();
+            Common::notifyEmployees(
+                $this->resort->resort_id,
+                $recipientIds,
+                'Incident ' . $incident->status,
+                'Incident "' . $incident->incident_name . '" has been ' . strtolower($incident->status) . ' by the GM.',
+                'Incident',
+                $incident->id
+            );
+        } catch (\Exception $e) {
+            \Log::warning('Incident approve/reject notification failed: ' . $e->getMessage());
+        }
+
         return response()->json(['success' => true]);
     }
 

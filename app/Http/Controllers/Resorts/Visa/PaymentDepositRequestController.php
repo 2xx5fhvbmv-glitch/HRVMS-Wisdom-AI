@@ -181,6 +181,38 @@ class PaymentDepositRequestController extends Controller
                 }
 
                 DB::commit();
+
+                // Neither an issued refund nor a deferred ("No") decision told
+                // the affected employee anything — both only updated internal
+                // resignation/wallet rows.
+                foreach ($updates as $update) {
+                    try {
+                        Common::notifyEmployees(
+                            $this->resort->resort_id,
+                            [$update['employee_id']],
+                            'Deposit Refund Issued',
+                            'Your deposit refund of ' . number_format($update['employee_deposit'], 2) . ' MVR has been processed.',
+                            'Visa',
+                            $update['wallet']->id
+                        );
+                    } catch (\Exception $e) {
+                        \Log::warning('Deposit refund issued notification failed: ' . $e->getMessage());
+                    }
+                }
+                if (!empty($no_refund)) {
+                    try {
+                        Common::notifyEmployees(
+                            $this->resort->resort_id,
+                            $no_refund,
+                            'Deposit Refund Deferred',
+                            'Your deposit refund request has been deferred and will be reviewed again shortly.',
+                            'Visa'
+                        );
+                    } catch (\Exception $e) {
+                        \Log::warning('Deposit refund deferred notification failed: ' . $e->getMessage());
+                    }
+                }
+
                 $EmployeeResignation = $this->GetIndex();
                 $VisaWallets  = VisaWallets::orderBy("id","DESC")->where('resort_id', $this->resort->resort_id)->get();
 

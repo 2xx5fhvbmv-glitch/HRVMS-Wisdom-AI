@@ -452,15 +452,18 @@ class LearningController extends Controller
             $moduleName = "Learning";
 
             if ($senderEmployee) {
-                event(new ResortNotificationEvent(Common::nofitication(
-                    $this->resort->resort_id,
-                    10,
-                    $notificationTitle,
-                    $notificationMessage,
-                    'Learning',
-                    $senderEmployee->id,
-                    $moduleName
-                )));
+                try {
+                    Common::notifyEmployees(
+                        $this->resort->resort_id,
+                        [(int) $senderEmployee->id],
+                        $notificationTitle,
+                        $notificationMessage,
+                        $moduleName,
+                        $learningRequest->id
+                    );
+                } catch (\Exception $ne) {
+                    \Log::warning('Learning request status notification failed: ' . $ne->getMessage());
+                }
             }
 
             // ✅ Notify Selected Employees (Only If Approved)
@@ -471,22 +474,23 @@ class LearningController extends Controller
                     ->select('employees.id')
                     ->get();
 
-                foreach ($employees as $emp) {
-                    $notificationTitle = 'New Learning Assignment';
-                    $notificationMessage = "<strong>Congratulations!</strong> "
-                        . "You are selected for <strong>'{$trainingName}'</strong>. "
-                        . "<strong>Training Dates:</strong> {$learningRequest->start_date} - {$learningRequest->end_date}. "
-                        . "<strong>Check your schedule and be prepared.</strong>";
+                $notificationTitle = 'New Learning Assignment';
+                $notificationMessage = "<strong>Congratulations!</strong> "
+                    . "You are selected for <strong>'{$trainingName}'</strong>. "
+                    . "<strong>Training Dates:</strong> {$learningRequest->start_date} - {$learningRequest->end_date}. "
+                    . "<strong>Check your schedule and be prepared.</strong>";
 
-                    event(new ResortNotificationEvent(Common::nofitication(
-                        $this->resort->resort_id, 
-                        10, 
-                        $notificationTitle, 
-                        $notificationMessage, 
-                        'Learning', 
-                        $emp->id, 
-                        $moduleName
-                    )));
+                try {
+                    Common::notifyEmployees(
+                        $this->resort->resort_id,
+                        $employees->pluck('id')->all(),
+                        $notificationTitle,
+                        $notificationMessage,
+                        $moduleName,
+                        $learningRequest->id
+                    );
+                } catch (\Exception $ne) {
+                    \Log::warning('Learning assignment notification failed: ' . $ne->getMessage());
                 }
             }
 

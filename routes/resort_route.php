@@ -679,7 +679,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get('/leaves/boarding-pass-detail', 'Leave\BoardingPassController@getBoardingPassDetail')->name('resort.boardingpass.detail');
     Route::get('/leaves/boarding-pass-application', 'Leave\BoardingPassController@apply')->name('resort.boardingpass.apply');
     Route::post('/leaves/boarding-pass-submit', 'Leave\BoardingPassController@store')->name('resort.boardingpass.store');
-    Route::post('/leaves/handle-pass-action', 'Leave\BoardingPassController@handlePassAction')->name('pass.handleAction');
+    Route::post('/leaves/handle-pass-action', 'Leave\BoardingPassController@BoardingPassStatusUpdate')->name('pass.handleAction');
     Route::get('/leaves/boarding-pass/filter/grid', 'Leave\BoardingPassController@filterPassGridRequests')->name('pass.filter.grid');
     Route::get('/leaves/boarding-pass', 'Leave\BoardingPassController@index')->name('resort.boarding-pass');
     Route::post('/leaves/boarding/status-update', 'Leave\BoardingPassController@BoardingPassStatusUpdate')->name('resort.BoardingStatusUpdate');

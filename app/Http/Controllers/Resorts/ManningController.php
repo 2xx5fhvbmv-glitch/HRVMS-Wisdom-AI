@@ -195,7 +195,7 @@ class ManningController extends Controller
 
         try {
 
-            ResortDivision::create([
+            $division = ResortDivision::create([
                 'resort_id' => $this->resort_id,
                 'name' => $request->name,
                 'code' => $request->code,
@@ -203,7 +203,18 @@ class ManningController extends Controller
                 'status' => $request->status,
             ]);
 
-
+            try {
+                Common::notifyEmployees(
+                    $this->resort_id,
+                    Common::getResortHrEmployeeIds($this->resort_id),
+                    'Division Created',
+                    'Division "' . $division->name . '" was created.',
+                    'WorkForce Planning',
+                    $division->id
+                );
+            } catch (\Exception $ne) {
+                \Log::warning('Division create notification failed: ' . $ne->getMessage());
+            }
 
             return response()->json(['success' => true, 'message' => 'Division added successfully.']);
         } catch (\Exception $e) {
@@ -268,6 +279,19 @@ class ManningController extends Controller
             // Save the changes
             $division->save();
 
+            try {
+                Common::notifyEmployees(
+                    $this->resort_id,
+                    Common::getResortHrEmployeeIds($this->resort_id),
+                    'Division Updated',
+                    'Division "' . $division->name . '" was updated.',
+                    'WorkForce Planning',
+                    $division->id
+                );
+            } catch (\Exception $ne) {
+                \Log::warning('Division update notification failed: ' . $ne->getMessage());
+            }
+
             // Return a JSON response
             return response()->json(['success' => true, 'message' => 'Division updated successfully.']);
         } catch( \Exception $e ) {
@@ -295,7 +319,22 @@ class ManningController extends Controller
             }
 
             // If no departments are associated, delete the division
+            $divisionName = $division->name ?? '';
+            $divisionId = $division->id;
             $division->delete();  // Use forceDelete() if soft deletes are not used
+
+            try {
+                Common::notifyEmployees(
+                    $this->resort_id,
+                    Common::getResortHrEmployeeIds($this->resort_id),
+                    'Division Deleted',
+                    'Division "' . $divisionName . '" was deleted.',
+                    'WorkForce Planning',
+                    $divisionId
+                );
+            } catch (\Exception $ne) {
+                \Log::warning('Division delete notification failed: ' . $ne->getMessage());
+            }
 
             return response()->json(['success' => true, 'message' => 'Division deleted successfully.']);
         } catch (\Exception $e) {
@@ -417,6 +456,18 @@ class ManningController extends Controller
                 $department->status = $request->status;
                 $department->save();
 
+                try {
+                    Common::notifyEmployees(
+                        $this->resort_id,
+                        Common::getResortHrEmployeeIds($this->resort_id),
+                        'Department Created',
+                        'Department "' . $department->name . '" was created.',
+                        'WorkForce Planning',
+                        $department->id
+                    );
+                } catch (\Exception $ne) {
+                    \Log::warning('Department create notification failed: ' . $ne->getMessage());
+                }
 
             return response()->json(['success' => true, 'message' => 'Department added successfully.']);
 
@@ -489,6 +540,19 @@ class ManningController extends Controller
             // Save the changes
             $dept->save();
 
+            try {
+                Common::notifyEmployees(
+                    $this->resort_id,
+                    Common::getResortHrEmployeeIds($this->resort_id),
+                    'Department Updated',
+                    'Department "' . $dept->name . '" was updated.',
+                    'WorkForce Planning',
+                    $dept->id
+                );
+            } catch (\Exception $ne) {
+                \Log::warning('Department update notification failed: ' . $ne->getMessage());
+            }
+
             // Get the updated division name
             $divisionName = ResortDivision::find($request->input('division'))->name;
 
@@ -526,7 +590,22 @@ class ManningController extends Controller
                 return response()->json(['success' => false, 'message' => 'Cannot delete department, sections are associated with it.']);
             }
 
-            $dept->delete(); 
+            $deptName = $dept->name ?? '';
+            $deptId = $dept->id;
+            $dept->delete();
+
+            try {
+                Common::notifyEmployees(
+                    $this->resort_id,
+                    Common::getResortHrEmployeeIds($this->resort_id),
+                    'Department Deleted',
+                    'Department "' . $deptName . '" was deleted.',
+                    'WorkForce Planning',
+                    $deptId
+                );
+            } catch (\Exception $ne) {
+                \Log::warning('Department delete notification failed: ' . $ne->getMessage());
+            }
 
             return response()->json(['success' => true, 'message' => 'Department deleted successfully.']);
         } catch (\Exception $e) {
@@ -656,6 +735,20 @@ class ManningController extends Controller
             $section->short_name = $request->filled('short_name') ? $request->short_name : '';
             $section->status = $request->status;
             $section->save();
+
+            try {
+                Common::notifyEmployees(
+                    $this->resort_id,
+                    Common::getResortHrEmployeeIds($this->resort_id),
+                    'Section Created',
+                    'Section "' . $section->name . '" was created.',
+                    'WorkForce Planning',
+                    $section->id
+                );
+            } catch (\Exception $ne) {
+                \Log::warning('Section create notification failed: ' . $ne->getMessage());
+            }
+
             return response()->json(['success' => true, 'message' => 'Section added successfully.']);
         } catch( \Exception $e ) {
             \Log::emergency( "File: ".$e->getFile() );
@@ -735,6 +828,19 @@ class ManningController extends Controller
                 // Save the changes
                 $section->save();
 
+                try {
+                    Common::notifyEmployees(
+                        $this->resort_id,
+                        Common::getResortHrEmployeeIds($this->resort_id),
+                        'Section Updated',
+                        'Section "' . $section->name . '" was updated.',
+                        'WorkForce Planning',
+                        $section->id
+                    );
+                } catch (\Exception $ne) {
+                    \Log::warning('Section update notification failed: ' . $ne->getMessage());
+                }
+
                 // Get the updated division name
                 $divisionName = ResortDivision::find($request->input('division'))->name;
                 $deptName = ResortDepartment::find($request->input('department'))->name;
@@ -753,7 +859,22 @@ class ManningController extends Controller
             // Scoped to this resort — bare findOrFail($id) let any
             // resort-admin delete another resort's section.
             $section = ResortSection::where('resort_id', $this->resort_id)->findOrFail($id);
+            $sectionName = $section->name ?? '';
+            $sectionId = $section->id;
             $section->delete();  // Soft delete if you're using soft deletes, otherwise use forceDelete()
+
+            try {
+                Common::notifyEmployees(
+                    $this->resort_id,
+                    Common::getResortHrEmployeeIds($this->resort_id),
+                    'Section Deleted',
+                    'Section "' . $sectionName . '" was deleted.',
+                    'WorkForce Planning',
+                    $sectionId
+                );
+            } catch (\Exception $ne) {
+                \Log::warning('Section delete notification failed: ' . $ne->getMessage());
+            }
 
             return response()->json(['success' => true, 'message' => 'Section deleted successfully.']);
         } catch (\Exception $e) {
@@ -904,6 +1025,20 @@ class ManningController extends Controller
             // exactly as before.
             $position->benefit_grid_level = $request->filled('benefit_grid_level') ? $request->benefit_grid_level : null;
             $position->save();
+
+            try {
+                Common::notifyEmployees(
+                    $this->resort_id,
+                    Common::getResortHrEmployeeIds($this->resort_id),
+                    'Position Created',
+                    'Position "' . $position->position_title . '" was created.',
+                    'WorkForce Planning',
+                    $position->id
+                );
+            } catch (\Exception $ne) {
+                \Log::warning('Position create notification failed: ' . $ne->getMessage());
+            }
+
             // Return success message
             return response()->json(['success' => true, 'message' => 'Position added successfully.']);
         } catch (\Exception $e) {
@@ -995,6 +1130,20 @@ class ManningController extends Controller
                 // nothing in $request to read; touching it would silently
                 // wipe out an override set via the create form.
                 $update = $position->save();
+
+                try {
+                    Common::notifyEmployees(
+                        $this->resort_id,
+                        Common::getResortHrEmployeeIds($this->resort_id),
+                        'Position Updated',
+                        'Position "' . $position->position_title . '" was updated.',
+                        'WorkForce Planning',
+                        $position->id
+                    );
+                } catch (\Exception $ne) {
+                    \Log::warning('Position update notification failed: ' . $ne->getMessage());
+                }
+
                 // Get the updated division name
                 $divisionName = ResortDivision::find($request->input('division'))->name;
                 $deptName = ResortDepartment::find($request->input('department'))->name;
@@ -1042,7 +1191,22 @@ class ManningController extends Controller
                 return response()->json(['success' => false, 'message' => 'Cannot delete position, employees are associated with it.']);
             }
 
-            $position->delete();  
+            $positionTitle = $position->position_title ?? '';
+            $positionId = $position->id;
+            $position->delete();
+
+            try {
+                Common::notifyEmployees(
+                    $this->resort_id,
+                    Common::getResortHrEmployeeIds($this->resort_id),
+                    'Position Deleted',
+                    'Position "' . $positionTitle . '" was deleted.',
+                    'WorkForce Planning',
+                    $positionId
+                );
+            } catch (\Exception $ne) {
+                \Log::warning('Position delete notification failed: ' . $ne->getMessage());
+            }
 
             return response()->json(['success' => true, 'message' => 'Position deleted successfully.']);
         } catch (\Exception $e) {

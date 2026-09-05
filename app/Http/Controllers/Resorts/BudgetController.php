@@ -2471,6 +2471,24 @@ class BudgetController extends Controller
                 throw $e;
             }
 
+            try {
+                $notifyIds = Common::getResortHrEmployeeIds($manningResponse->resort_id);
+                $hod = Common::FindResortHODDepartment($manningResponse->resort_id, $departmentId);
+                if ($hod) {
+                    $notifyIds[] = $hod->id;
+                }
+                Common::notifyEmployees(
+                    $manningResponse->resort_id,
+                    $notifyIds,
+                    'Budget Approved',
+                    "Budget for year {$year} has been approved by GM.",
+                    'WorkForce Planning',
+                    $budgetId
+                );
+            } catch (\Exception $e) {
+                \Log::warning('Budget approval notification failed: ' . $e->getMessage());
+            }
+
             return response()->json(['success' => true, 'message' => 'Budget approved successfully!']);
 
         } catch (\Exception $e) {
@@ -3885,6 +3903,19 @@ class BudgetController extends Controller
                 }
             }
 
+            try {
+                Common::notifyEmployees(
+                    $resortId,
+                    Common::getResortHrEmployeeIds($resortId),
+                    'Budget Cell Updated',
+                    "Employee monthly budget for year {$year} was updated.",
+                    'WorkForce Planning',
+                    $employeeId
+                );
+            } catch (\Exception $ne) {
+                \Log::warning('Budget cell edit notification failed: ' . $ne->getMessage());
+            }
+
             return response()->json([
                 'success' => true,
                 'message' => 'Employee monthly budget updated successfully'
@@ -4107,6 +4138,19 @@ class BudgetController extends Controller
                         }
                     }
                 }
+            }
+
+            try {
+                Common::notifyEmployees(
+                    $resortId,
+                    Common::getResortHrEmployeeIds($resortId),
+                    'Budget Cell Updated',
+                    "Vacant position monthly budget for year {$year} was updated.",
+                    'WorkForce Planning',
+                    $vacantBudgetCostId
+                );
+            } catch (\Exception $ne) {
+                \Log::warning('Vacant budget cell edit notification failed: ' . $ne->getMessage());
             }
 
             return response()->json([

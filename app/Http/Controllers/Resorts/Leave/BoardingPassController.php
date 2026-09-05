@@ -15,6 +15,8 @@ use App\Models\LeaveCategory;
 use App\Models\ResortDepartment;
 use App\Models\EmployeeTravelPass;
 use App\Models\EmployeeTravelPassStatus;
+use App\Models\ResortTransportation;
+use App\Models\ResortPosition;
 use Auth;
 use DB;
 use Common;
@@ -219,6 +221,172 @@ class BoardingPassController extends Controller
         }
     }
 
+    /**
+     * Self-service boarding pass application form for the logged-in
+     * resort-admin's own employee record.
+     */
+    public function apply(Request $request)
+    {
+        $resort_id = $this->resort->resort_id;
+        $transportations = ResortTransportation::where('resort_id', $resort_id)
+            ->pluck('transportation_option', 'id')
+            ->toArray();
+        $page_title = "Boarding Pass";
+        return view('resorts.leaves.boarding-pass.apply', compact('page_title', 'transportations'));
+    }
+
+    /**
+     * Submit handler for apply() above. Mirrors the approval-chain
+     * construction in App\Http\Controllers\API\BoardingPassController@boardingPassAdd
+     * (HOD -> HR -> SM, rows inserted SM/HR/HOD so the highest-id pending
+     * row — the HOD's — is actioned first) since this is the same
+     * Island Pass feature, just submitted from the web portal instead
+     * of the mobile app.
+     */
+    public function store(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'dept_date' => 'nullable|date',
+            'dept_time' => 'nullable',
+            'dept_transportation' => 'nullable|string',
+            'arrival_date' => 'nullable|date',
+            'arrival_time' => 'nullable',
+            'arrival_transportation' => 'nullable|string',
+            'reason' => 'nullable|string|max:255',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json(['success' => false, 'errors' => $validator->errors()], 422);
+        }
+        $data = $validator->validated();
+
+        $departureValid = !empty($data['dept_date']) && !empty($data['dept_transportation']);
+        $arrivalValid = !empty($data['arrival_date']) && !empty($data['arrival_transportation']);
+        if (!$departureValid && !$arrivalValid) {
+            return response()->json([
+                'success' => false,
+                'msg' => 'Please provide either departure or arrival details with transportation.',
+            ], 422);
+        }
+
+        $resort_id = $this->resort->resort_id;
+        $employee = $this->resort->GetEmployee;
+        if (!$employee) {
+            return response()->json(['success' => false, 'msg' => 'No employee record found for this account.'], 422);
+        }
+
+        $arrivalDate = $arrivalValid ? Carbon::parse($data['arrival_date'])->format('Y-m-d') : null;
+        $departureDate = $departureValid ? Carbon::parse($data['dept_date'])->format('Y-m-d') : null;
+        $arrivalMode = $data['arrival_transportation'] ?? null;
+        $departureMode = $data['dept_transportation'] ?? null;
+
+        $existingPass = EmployeeTravelPass::where('employee_id', $employee->id)
+            ->where('resort_id', $resort_id)
+            ->whereIn('status', ['Pending', 'Approved'])
+            ->where(function ($q) use ($arrivalDate, $arrivalMode, $departureDate, $departureMode) {
+                $q->where(function ($q1) use ($arrivalDate, $arrivalMode) {
+                    $q1->whereDate('arrival_date', $arrivalDate)->where('arrival_mode', $arrivalMode);
+                })
+                ->orWhere(function ($q2) use ($departureDate, $departureMode) {
+                    $q2->whereDate('departure_date', $departureDate)->where('departure_mode', $departureMode);
+                });
+            })
+            ->first();
+        if ($existingPass) {
+            return response()->json(['success' => false, 'msg' => 'Boarding pass already exists.'], 200);
+        }
+
+        DB::beginTransaction();
+        try {
+            $reason = $data['reason'] ?? null;
+            $boardingPass = EmployeeTravelPass::create([
+                'resort_id' => $resort_id,
+                'employee_id' => $employee->id,
+                'leave_request_id' => null,
+                'arrival_date' => $arrivalDate,
+                'arrival_time' => $data['arrival_time'] ?? null,
+                'arrival_mode' => $arrivalMode,
+                'arrival_reason' => $arrivalValid ? $reason : null,
+                'departure_date' => $departureDate,
+                'departure_time' => $data['dept_time'] ?? null,
+                'departure_mode' => $departureMode,
+                'departure_reason' => $departureValid ? $reason : null,
+                'status' => 'Pending',
+            ]);
+
+            $passApprovalFlow = collect();
+
+            $positionIds = ResortPosition::where('resort_id', $resort_id)
+                ->whereIn('position_title', ['Security Manager', 'SM'])
+                ->pluck('id');
+            $smApprover = Employee::whereIn('Position_id', $positionIds)
+                ->where('resort_id', $resort_id)->where('status', 'Active')
+                ->select('id', 'rank')->orderBy('id')->first();
+            if ($smApprover) {
+                $smApprover->approver_role = 'SM';
+                $passApprovalFlow->push($smApprover);
+            }
+
+            $hrApprover = Employee::select('id', 'rank')
+                ->whereIn('id', Common::getResortHrEmployeeIds($resort_id))
+                ->where('status', 'Active')->orderBy('id')->first();
+            if ($hrApprover) {
+                $hrApprover->approver_role = 'HR';
+                $passApprovalFlow->push($hrApprover);
+            }
+
+            $hodApprover = Common::FindResortHODDepartment($resort_id, $employee->Dept_id);
+            if ($hodApprover && (int) $hodApprover->id === (int) $employee->id) {
+                $hodApprover = $employee->reporting_to
+                    ? Employee::select('id', 'rank')->where('id', $employee->reporting_to)
+                        ->where('resort_id', $resort_id)->where('status', 'Active')->first()
+                    : null;
+            }
+            if ($hodApprover) {
+                $hodApprover->approver_role = 'HOD';
+                $passApprovalFlow->push($hodApprover);
+            }
+
+            $passApprovalFlow->each(function ($approver) use ($boardingPass) {
+                EmployeeTravelPassStatus::create([
+                    'travel_pass_id' => $boardingPass->id,
+                    'approver_id' => $approver->id,
+                    'approver_rank' => $approver->rank,
+                    'approver_role' => $approver->approver_role,
+                    'status' => 'Pending',
+                ]);
+            });
+
+            // Notify whichever stage is actioned first (highest-id row —
+            // HOD when present, else HR, else SM; same "current pending"
+            // lookup BoardingPassStatusUpdate/API use elsewhere), so the
+            // request doesn't sit invisible until someone happens to check.
+            $firstApprover = EmployeeTravelPassStatus::where('travel_pass_id', $boardingPass->id)
+                ->where('status', 'Pending')->orderBy('id', 'desc')->first();
+            if ($firstApprover && $firstApprover->approver_id) {
+                try {
+                    Common::notifyEmployees(
+                        $resort_id,
+                        [$firstApprover->approver_id],
+                        'Boarding Pass Request',
+                        'A boarding pass request has been submitted by ' . trim($employee->resortAdmin->first_name . ' ' . $employee->resortAdmin->last_name) . '.',
+                        'Leave Management',
+                        $boardingPass->id
+                    );
+                } catch (\Exception $e) {
+                    \Log::warning('Boarding pass submit notification failed: ' . $e->getMessage());
+                }
+            }
+
+            DB::commit();
+            return response()->json(['success' => true, 'msg' => 'Pass submitted successfully.']);
+        } catch (\Exception $e) {
+            DB::rollBack();
+            \Log::error('BoardingPassController@store failed: ' . $e->getMessage());
+            return response()->json(['success' => false, 'msg' => 'Server error.'], 500);
+        }
+    }
+
     public function BoardingPassStatusUpdate(Request $request)
     {
         $flag = $request->flag;
@@ -294,9 +462,32 @@ class BoardingPassController extends Controller
             $ModuleName = "Leave Management";
             event(new ResortNotificationEvent(Common::nofitication($this->resort->resort_id, 10,$title,$msg,0,$employeeTravelPasses->employee_id,$ModuleName)));
         }
-        if ($allApproved) 
+        if ($allApproved)
         {
             EmployeeTravelPass::where('id', $employeeTravelPasses->id)->update(['status' => $action]);
+        }
+        elseif ($action == "Approved")
+        {
+            // Mid-chain approval — tell whoever's turn it is next (same
+            // highest-id-pending lookup as API BoardingPassController@
+            // boardingPassApprovedAction) so the chain doesn't stall
+            // silently waiting on someone who was never told.
+            $nextPendingStatus = EmployeeTravelPassStatus::where('travel_pass_id', $employeeTravelPasses->id)
+                ->where('status', 'Pending')->orderBy('id', 'desc')->first();
+            if ($nextPendingStatus && $nextPendingStatus->approver_id) {
+                try {
+                    Common::notifyEmployees(
+                        $this->resort->resort_id,
+                        [$nextPendingStatus->approver_id],
+                        'Boarding Pass Approval Required',
+                        'A boarding pass request is awaiting your approval.',
+                        'Leave Management',
+                        $employeeTravelPasses->id
+                    );
+                } catch (\Exception $e) {
+                    \Log::warning('Boarding pass next-approver notification failed: ' . $e->getMessage());
+                }
+            }
         }
         if($action  == "Approved")
         {

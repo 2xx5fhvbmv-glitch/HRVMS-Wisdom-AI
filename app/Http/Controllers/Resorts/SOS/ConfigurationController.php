@@ -247,6 +247,7 @@ class ConfigurationController extends Controller
                 $insertedId = $insert->id;
             }
             
+            $assignedEmpIds = [];
             if ($insertedId) {
                 foreach($request->employee as $block) {
                     $roleId = $block['member_role'];
@@ -261,11 +262,27 @@ class ConfigurationController extends Controller
                             'emp_id' => $memberId,
                             'role_id' => $roleId
                         ]);
+                        $assignedEmpIds[] = $memberId;
                     }
                 }
             }
-   
+
             DB::commit();
+
+            try {
+                $recipientIds = array_merge($assignedEmpIds, Common::getResortGmEmployeeIds($resort_id));
+                Common::notifyEmployees(
+                    $resort_id,
+                    $recipientIds,
+                    'SOS Team Assignment',
+                    'You have been assigned to the SOS team "' . $request->team_name . '".',
+                    'SOS',
+                    $insertedId
+                );
+            } catch (\Exception $e) {
+                \Log::warning('SOS team assignment notification failed: ' . $e->getMessage());
+            }
+
             return response()->json([
                 'success' => true,
                 'message' => 'SOS Team Create Successfully',
@@ -395,8 +412,27 @@ class ConfigurationController extends Controller
                     'name' => $request->role_name,
                     'permission' => $permission,
                 ]);
-                
+
                 DB::commit();
+
+                try {
+                    $affectedEmpIds = SOSTeamMemeberModel::where('resort_id', $resort_id)
+                        ->where('role_id', $Main_id)
+                        ->pluck('emp_id')
+                        ->all();
+                    $recipientIds = array_merge($affectedEmpIds, Common::getResortGmEmployeeIds($resort_id));
+                    Common::notifyEmployees(
+                        $resort_id,
+                        $recipientIds,
+                        'SOS Role Permissions Updated',
+                        'The permissions for the SOS role "' . $request->role_name . '" have been updated.',
+                        'SOS',
+                        $Main_id
+                    );
+                } catch (\Exception $e) {
+                    \Log::warning('SOS role permission update notification failed: ' . $e->getMessage());
+                }
+
                 return response()->json([
                     'success' => true,
                     'message' => 'Role And Permission Updated Successfully',

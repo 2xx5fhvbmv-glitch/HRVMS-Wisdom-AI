@@ -927,6 +927,23 @@ class PayslipController extends Controller
             ], 500);
         }
 
+        // The employee only ever heard about this via email (dispatchFinalSettlementEmail
+        // above) — no in-app/push notification of any kind.
+        if ($finalSettlement->employee_id) {
+            try {
+                Common::notifyEmployees(
+                    $this->resort->resort_id,
+                    [$finalSettlement->employee_id],
+                    'Final Settlement Finalized',
+                    'Your full and final settlement has been finalized. Reference: ' . ($finalSettlement->reference_no ?? '-'),
+                    'Payroll',
+                    $finalSettlement->id
+                );
+            } catch (\Exception $e) {
+                \Log::warning('F&F finalize notification failed: ' . $e->getMessage());
+            }
+        }
+
         return response()->json(['success' => true, 'message' => 'Final settlement submitted successfully.']);
     }
 

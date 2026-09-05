@@ -596,7 +596,22 @@ class ExitClearanceController extends Controller
             return response()->json(['success' => false, 'message' => 'Nothing to update.'], 422);
         }
 
+        $oldDeadline = $assignment->deadline_date;
         $assignment->update($payload);
+
+        // Only the recipient assigned to complete the form needs to know —
+        // and only when the deadline itself actually moved, not a
+        // reminder-frequency-only edit.
+        if (array_key_exists('deadline_date', $payload) && $payload['deadline_date'] !== $oldDeadline && $assignment->assigned_to_id) {
+            $assignment->loadMissing('employeeResignation.employee.resortAdmin');
+            $empName = optional(optional(optional($assignment->employeeResignation)->employee)->resortAdmin)->full_name ?: 'employee';
+            $this->notifyExit(
+                $assignment->assigned_to_id,
+                'Exit Clearance Deadline Changed',
+                "📋 The deadline for your exit clearance form for {$empName} has changed."
+                . " New deadline: " . Carbon::parse($assignment->deadline_date)->format('d M Y') . "."
+            );
+        }
 
         return response()->json([
             'success' => true,

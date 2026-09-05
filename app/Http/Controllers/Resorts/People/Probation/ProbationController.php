@@ -595,6 +595,20 @@ class ProbationController extends Controller
         $employee->probation_review_date = now();
         $employee->probation_confirmed_by = $this->resort->GetEmployee->id;
         $employee->save();
+
+        try {
+            Common::notifyEmployees(
+                $this->resort->resort_id,
+                array_merge([$employee->id], Common::getResortHrEmployeeIds($this->resort->resort_id)),
+                'Probation Confirmed',
+                "Probation for {$employee->Emp_id} has been confirmed. Employment type: {$employee->employment_type}.",
+                'People Management',
+                $employee->id
+            );
+        } catch (\Exception $e) {
+            \Log::warning('Probation confirmed notification failed: ' . $e->getMessage());
+        }
+
         return response()->json(['message' => 'Employee probation confirmed and employment type updated.']);
     }
 
@@ -618,6 +632,19 @@ class ProbationController extends Controller
         $employee->save();
 
         $this->ensureExitClearanceRecord($employee, $request->input('remarks'));
+
+        try {
+            Common::notifyEmployees(
+                $this->resort->resort_id,
+                array_merge([$employee->id], Common::getResortHrEmployeeIds($this->resort->resort_id)),
+                'Probation Failed',
+                "Probation for {$employee->Emp_id} has failed. Employee moved to Offboarding.",
+                'People Management',
+                $employee->id
+            );
+        } catch (\Exception $e) {
+            \Log::warning('Probation failed notification failed: ' . $e->getMessage());
+        }
 
         return response()->json(['message' => 'Probation failed successfully.']);
     }
@@ -690,6 +717,20 @@ class ProbationController extends Controller
         $employee->probation_end_date = $formattedProbationEndDate;
         $employee->probation_remarks = $request->remarks;
         $employee->save();
+
+        try {
+            Common::notifyEmployees(
+                $this->resort->resort_id,
+                array_merge([$employee->id], Common::getResortHrEmployeeIds($this->resort->resort_id)),
+                'Probation Extended',
+                "Probation for {$employee->Emp_id} has been extended to {$formattedProbationEndDate}.",
+                'People Management',
+                $employee->id
+            );
+        } catch (\Exception $e) {
+            \Log::warning('Probation extended notification failed: ' . $e->getMessage());
+        }
+
         return response()->json(['status' => 'success', 'message' => 'Probation extended successfully.']);
     }
 

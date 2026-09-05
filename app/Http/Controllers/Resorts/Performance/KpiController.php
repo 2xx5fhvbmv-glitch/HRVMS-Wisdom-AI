@@ -182,6 +182,14 @@ class KpiController extends Controller
             'PropertyGoalweightage' => $request->PropertyGoalweightage,
         ]);
 
+        // HOD/XCOM were notified on creation but not when the pending KPI
+        // they're about to respond to changed underneath them.
+        try {
+            $this->notifyHodXcom($kpi, 'KPI Updated', 'The KPI "'.$kpi->property_goal.'" has been updated by GM. Please review before responding.');
+        } catch (\Exception $ne) {
+            \Log::warning('updateKpi notification failed: '.$ne->getMessage());
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'KPI updated successfully.',
@@ -203,11 +211,22 @@ class KpiController extends Controller
             return response()->json(['success' => false, 'message' => 'KPI not found.'], 404);
         }
 
+        $goalName = $kpi->property_goal;
+
         DB::beginTransaction();
         try {
             PerformanceKpiChild::where('kpi_parents_id', $kpi->id)->delete();
             $kpi->delete();
             DB::commit();
+
+            // HOD/XCOM were notified on creation; also let them know a
+            // pending KPI they may still owe a response to was removed.
+            try {
+                $this->notifyHodXcom($kpi, 'KPI Deleted', 'The KPI "'.$goalName.'" has been deleted by GM.');
+            } catch (\Exception $ne) {
+                \Log::warning('destroyKpi notification failed: '.$ne->getMessage());
+            }
+
             return response()->json(['success' => true, 'message' => 'KPI deleted successfully.']);
         } catch (\Exception $e) {
             DB::rollBack();
@@ -579,6 +598,12 @@ class KpiController extends Controller
             ]);
         }
 
+        try {
+            $this->notifyGm($kpi, 'KPI Actuals Logged', 'Actual entries were logged for the KPI "'.$kpi->property_goal.'", awaiting your approval.');
+        } catch (\Exception $ne) {
+            \Log::warning('storeActual GM notification failed: '.$ne->getMessage());
+        }
+
         return response()->json([
             'success' => true,
             'message' => 'Actual entries added successfully.',
@@ -603,7 +628,17 @@ class KpiController extends Controller
             return response()->json(['success' => false, 'message' => 'Entry not found'], 404);
         }
 
+        $kpi = $child->parentKpi;
         $child->delete();
+
+        if ($kpi) {
+            try {
+                $this->notifyGm($kpi, 'KPI Actual Removed', 'An actual entry was removed for the KPI "'.$kpi->property_goal.'" awaiting your approval.');
+            } catch (\Exception $ne) {
+                \Log::warning('destroyActual GM notification failed: '.$ne->getMessage());
+            }
+        }
+
         return response()->json(['success' => true, 'message' => 'Entry removed.']);
     }
 

@@ -775,6 +775,29 @@ class DutyRosterController extends Controller
 
                 DB::commit();
 
+                // Employees previously got no notification when their duty
+                // roster/shift was edited, only on initial creation (see
+                // StoreDutyRoster above) — same shape, "updated" wording.
+                $notifyEmpId = $DutyRosterEntry->Emp_id ?: $editEmpId;
+                if ($notifyEmpId) {
+                    try {
+                        Common::sendMobileNotification(
+                            $this->resort->resort_id,
+                            2,
+                            null,
+                            null,
+                            'Duty Roster Updated',
+                            'Your duty roster has been updated for ' . $shift_Date->format('d M Y') . '.',
+                            'DutyRoster',
+                            [$notifyEmpId],
+                            $DutyRosterEntry->roster_id,
+                            false,
+                            'duty-roster-updated',
+                        );
+                    } catch (\Exception $notificationException) {
+                        \Log::warning('Duty roster update notification failed for employee ' . $notifyEmpId . ': ' . $notificationException->getMessage());
+                    }
+                }
 
                 DutyRoster::where("id",$DutyRosterEntry->roster_id)
                     ->where('resort_id', $this->resort->resort_id)
@@ -1600,6 +1623,34 @@ class DutyRosterController extends Controller
             });
         $DutyRosterEntry->OverTime = sprintf('%02d:%02d', intdiv($totalMinutes, 60), $totalMinutes % 60);
         $DutyRosterEntry->save();
+
+        // Notify the employee when an existing overtime entry was approved/rejected
+        // (new entries are always created 'pending', so any approved/rejected status
+        // here is a reviewer action on an existing entry).
+        $reviewedStatuses = collect($entries)
+            ->filter(function ($entry) use ($existingEntries) {
+                $entryId = $entry['id'] ?? null;
+                return $entryId && $existingEntries->has($entryId)
+                    && in_array($entry['status'] ?? null, ['approved', 'rejected'], true);
+            })
+            ->pluck('status')
+            ->unique();
+
+        if ($reviewedStatuses->isNotEmpty()) {
+            try {
+                $verb = $reviewedStatuses->count() > 1 ? 'updated' : ($reviewedStatuses->first() === 'approved' ? 'approved' : 'rejected');
+                Common::notifyEmployees(
+                    $resort_id,
+                    [(int) $Emp_id],
+                    'Overtime Request ' . ucfirst($verb),
+                    'Your overtime request for ' . $dateCarbon->format('d M Y') . ' has been ' . $verb . '.',
+                    'DutyRoster',
+                    $DutyRosterEntry->id
+                );
+            } catch (\Exception $e) {
+                \Log::warning('Overtime approve/reject notification failed: ' . $e->getMessage());
+            }
+        }
 
         return response()->json(['success' => true, 'message' => 'Overtime saved successfully.']);
     }

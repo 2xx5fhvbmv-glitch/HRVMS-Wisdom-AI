@@ -20,6 +20,7 @@ use App\Models\Employee;
 use App\Models\AuditLogs;
 use App\Models\FileVersion;
 use App\Models\ResortDepartment;
+use App\Models\FileShare;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Log;
 use Aws\S3\Exception\S3Exception;
@@ -783,6 +784,33 @@ class FileManageController extends Controller
                 return response()->json(['success' => true, 'data' => $tr,"breadcrumb"=>$breadcrumb], 200);
 
         }
+        /**
+         * Employees a file/folder has been shared with (via FileShare), so
+         * delete/rename/move can notify them. Mirrors the scope resolution
+         * in FileShareController::destroy().
+         */
+        private function sharedEmployeeIdsFor($shareableType, $shareableId)
+        {
+            $ids = [];
+            $shares = FileShare::where('resort_id', $this->resort->resort_id)
+                ->where('shareable_type', $shareableType)
+                ->where('shareable_id', $shareableId)
+                ->get();
+            foreach ($shares as $share) {
+                if ($share->scope_type === 'employees') {
+                    $ids = array_merge($ids, DB::table('file_share_employees')->where('share_id', $share->id)->pluck('employee_id')->all());
+                } elseif ($share->scope_type === 'departments') {
+                    $deptIds = DB::table('file_share_departments')->where('share_id', $share->id)->pluck('department_id')->all();
+                    if (!empty($deptIds)) {
+                        $ids = array_merge($ids, Employee::where('resort_id', $this->resort->resort_id)->whereIn('Dept_id', $deptIds)->where('status', 'Active')->pluck('id')->all());
+                    }
+                } elseif ($share->scope_type === 'organization') {
+                    $ids = array_merge($ids, Employee::where('resort_id', $this->resort->resort_id)->where('status', 'Active')->pluck('id')->all());
+                }
+            }
+            return array_values(array_unique($ids));
+        }
+
         public function RenameFile(Request $request)
         {
         
@@ -802,11 +830,28 @@ class FileManageController extends Controller
                     "TypeofAction" => "Rename",
                     "file_path" => $File->File_Path,
                     ]);
+
+                $sharedWith = $this->sharedEmployeeIdsFor('file', $File->id);
+                if (!empty($sharedWith)) {
+                    try {
+                        Common::notifyEmployees(
+                            $this->resort->resort_id,
+                            $sharedWith,
+                            'Shared File Renamed',
+                            'A file shared with you was renamed to "' . $renameFile . '".',
+                            'File Management',
+                            $File->id
+                        );
+                    } catch (\Exception $e) {
+                        \Log::warning('File rename notification failed: ' . $e->getMessage());
+                    }
+                }
+
                 return response()->json(['success' => true, 'message' => 'File renamed successfully'], 200);
             }
             else
             {
-                
+
                 $File_structure = FilemangementSystem::where('resort_id', $this->resort->resort_id)
                                                     ->where('Folder_unique_id',  $request->file_id)
                                                     ->first();
@@ -815,7 +860,22 @@ class FileManageController extends Controller
                     $File_structure->Folder_name = $renameFile;
                     $File_structure->save();
 
-                    
+                    $sharedWith = $this->sharedEmployeeIdsFor('folder', $File_structure->id);
+                    if (!empty($sharedWith)) {
+                        try {
+                            Common::notifyEmployees(
+                                $this->resort->resort_id,
+                                $sharedWith,
+                                'Shared Folder Renamed',
+                                'A folder shared with you was renamed to "' . $renameFile . '".',
+                                'File Management',
+                                $File_structure->id
+                            );
+                        } catch (\Exception $e) {
+                            \Log::warning('Folder rename notification failed: ' . $e->getMessage());
+                        }
+                    }
+
                     return response()->json(['success' => true, 'message' => 'File renamed successfully'], 200);
 
                 }
@@ -843,6 +903,9 @@ class FileManageController extends Controller
                 return response()->json(['success' => false, 'message' => 'File not found.'], 404);
             }
             try {
+                $sharedWith = $this->sharedEmployeeIdsFor('file', $File->id);
+                $fileName = $File->File_Name;
+
                 if ($File->File_Path && StorageHelper::disk()->exists($File->File_Path)) {
                     StorageHelper::disk()->delete($File->File_Path);
                 }
@@ -852,7 +915,24 @@ class FileManageController extends Controller
                     'TypeofAction' => 'Delete',
                     'file_path'    => $File->File_Path,
                 ]);
+                $fileId = $File->id;
                 $File->delete();
+
+                if (!empty($sharedWith)) {
+                    try {
+                        Common::notifyEmployees(
+                            $this->resort->resort_id,
+                            $sharedWith,
+                            'Shared File Deleted',
+                            'A file shared with you ("' . $fileName . '") has been deleted.',
+                            'File Management',
+                            $fileId
+                        );
+                    } catch (\Exception $e) {
+                        \Log::warning('File delete notification failed: ' . $e->getMessage());
+                    }
+                }
+
                 return response()->json(['success' => true, 'message' => 'File deleted successfully.'], 200);
             } catch (\Throwable $e) {
                 \Log::error('DeleteFile failed: ' . $e->getMessage());

@@ -668,6 +668,24 @@ class DisciplinaryController extends Controller
                 disciplinarySubmit::where("resort_id", $this->resort->resort_id)
                     ->where("Disciplinary_id", $id)
                     ->update(["status" => "resolved"]);
+
+                try {
+                    $accusedEmpId = disciplinarySubmit::where('resort_id', $this->resort->resort_id)
+                        ->where('Disciplinary_id', $id)
+                        ->value('Employee_id');
+                    if ($accusedEmpId) {
+                        Common::notifyEmployees(
+                            $this->resort->resort_id,
+                            [$accusedEmpId],
+                            'Disciplinary Case Resolved',
+                            'Your disciplinary case has been resolved.',
+                            'Disciplinary',
+                            $id
+                        );
+                    }
+                } catch (\Exception $e) {
+                    \Log::warning('Disciplinary resolved notification failed: ' . $e->getMessage());
+                }
             }
             
             // Make sure the parent ID exists before creating child records

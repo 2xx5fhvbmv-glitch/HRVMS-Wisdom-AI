@@ -1332,6 +1332,11 @@ class ApplicantsController extends Controller
             }
 
             $interviewerId = $this->resort->id;
+            // interviewer_id column stores a resort_admins id (compared against
+            // ResortAdmin elsewhere in this method) — track the matching
+            // employees.id alongside it separately, since notifyEmployees()
+            // needs the employee id space, not the resort_admins one.
+            $interviewerEmployeeId = $this->resort->GetEmployee->id ?? null;
             $resortTime = $request->ResortInterviewtime ?? $request->MalidivanManualTime1;
             $applicantTime = $request->ApplicantInterviewtime ?? $request->ApplicantManualTime1;
             $interviewDate = Carbon::createFromFormat('Y-m-d', $request->TimeSlotsFormdate)->format('Y-m-d');
@@ -1401,6 +1406,7 @@ class ApplicantsController extends Controller
                             ->first();
                         if ($roundEmployee) {
                             $interviewerId = $roundEmployee->Admin_Parent_id;
+                            $interviewerEmployeeId = $roundEmployee->id;
                         }
                     }
                 }
@@ -1429,6 +1435,21 @@ class ApplicantsController extends Controller
             $Applicant_form_data = Applicant_form_data::find($ApplicantID);
             if (!$Applicant_form_data) {
                 return response()->json(['error' => 'Applicant data not found'], 404);
+            }
+
+            if ($interviewerEmployeeId) {
+                try {
+                    Common::notifyEmployees(
+                        $Resort_id,
+                        [$interviewerEmployeeId],
+                        'Interview Scheduled',
+                        'You have been scheduled to interview ' . trim($Applicant_form_data->first_name . ' ' . $Applicant_form_data->last_name) . ' on ' . $interviewDate . '.',
+                        'Talent Acquisition',
+                        $ApplicantInterViewDetails->id
+                    );
+                } catch (\Exception $e) {
+                    \Log::warning('Interview scheduling notification failed: ' . $e->getMessage());
+                }
             }
 
             DB::commit();
@@ -1714,6 +1735,37 @@ class ApplicantsController extends Controller
             $statusRecord = ApplicantWiseStatus::updateOrCreate(['id'=>$applicantstatusid], $updateData);
             $applicantstatusid = $statusRecord->id;
             DB::Commit();
+
+            // Round marked Complete → the applicant is now ready for the
+            // NEXT round, but nobody told that round's interviewer. Resolve
+            // them the same way InterviewRequest() does (rank + vacancy's
+            // department) and notify, ahead of any slot actually being booked.
+            if ($Rank == "Complete" && $vacancyRank) {
+                try {
+                    $roundKeys = array_keys($positionRounds);
+                    $currentIdx = array_search((int) $Approved_By, $roundKeys);
+                    if ($currentIdx !== false && $currentIdx < count($roundKeys) - 1 && $vacancy) {
+                        $nextRoundRank = $roundKeys[$currentIdx + 1];
+                        $nextRoundEmployee = Employee::where('rank', $nextRoundRank)
+                            ->where('Dept_id', $vacancy->department)
+                            ->where('resort_id', $Resort_id)
+                            ->where('status', 'Active')
+                            ->first();
+                        if ($nextRoundEmployee) {
+                            Common::notifyEmployees(
+                                $Resort_id,
+                                [$nextRoundEmployee->id],
+                                'Applicant Ready For Your Round',
+                                trim(($applicant->first_name ?? '') . ' ' . ($applicant->last_name ?? '')) . ' has completed the previous interview round and is ready for your round.',
+                                'Talent Acquisition',
+                                $applicantstatusid
+                            );
+                        }
+                    }
+                } catch (\Exception $e) {
+                    \Log::warning('Next-round interviewer notification failed: ' . $e->getMessage());
+                }
+            }
 
             if($Rank =="Complete" || $Rank =="Rejected" || $Rank == "Selected")
             {
