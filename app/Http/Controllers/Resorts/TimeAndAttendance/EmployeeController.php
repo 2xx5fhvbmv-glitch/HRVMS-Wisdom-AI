@@ -1065,6 +1065,19 @@ class EmployeeController extends Controller
 
             DB::commit();
 
+            try {
+                Common::notifyEmployees(
+                    $this->resort->resort_id,
+                    [(int) $ParentAttendace->Emp_id],
+                    'Attendance Record Updated',
+                    'Your attendance record for ' . ($ParentAttendace->date ? Carbon::parse($ParentAttendace->date)->format('d M Y') : 'a shift') . ' was edited by HR.',
+                    'DutyRoster',
+                    $ParentAttendace->id
+                );
+            } catch (\Exception $ne) {
+                \Log::warning('Attendance edit notification failed: ' . $ne->getMessage());
+            }
+
             return response()->json(['success'=>true,'message' => 'History updated successfully.']);
 
         }
@@ -1128,6 +1141,20 @@ class EmployeeController extends Controller
                 $ParentAttendace->update(["OTApproved_By"=>$Approved_id,'OTStatus' => $action]);
             }
             DB::commit();
+
+            try {
+                Common::notifyEmployees(
+                    $this->resort->resort_id,
+                    [(int) $ParentAttendace->Emp_id],
+                    'Overtime Request ' . $action,
+                    'Your overtime request has been ' . strtolower($action) . '.',
+                    'DutyRoster',
+                    $ParentAttendace->id
+                );
+            } catch (\Exception $ne) {
+                \Log::warning('Overtime approve/reject notification failed: ' . $ne->getMessage());
+            }
+
             return response()->json(['success'=>true,'message' => 'OT '.$action.' successfully.']);
         }
         catch(Exception $e)

@@ -940,6 +940,11 @@ class SalaryIncrementController extends Controller
         // Default to Fixed when the form no longer sends the field.
         $payIncreaseType = $request->pay_increase_type ?: PeopleSalaryIncrement::PAY_INCREASE_TYPE_FIXED;
 
+        // Same Finance pool the single-item update() re-notifies with —
+        // built once for the whole batch rather than per row.
+        $resortId = (int) $this->resort->resort_id;
+        $financePool = $this->buildApprovalPools($resortId)['finance'];
+
         foreach ($ids as $id) {
             // Was ->find($id) with no resort filter — unscoped write let
             // client-posted ids from another resort be mutated in bulk.
@@ -957,11 +962,28 @@ class SalaryIncrementController extends Controller
                 'increment_type' => $request->increment_type,
                 'pay_increase_type' => $payIncreaseType,
                 'value' => $request->value,
-                'new_salary' => $peopleSalaryIncrement->previous_salary + $value, 
+                'new_salary' => $peopleSalaryIncrement->previous_salary + $value,
                 'increment_amount' => $value,
                 'effective_date' => $effectiveDate,
                 'remark'=> $request->remark,
             ]);
+
+            // Was silent — bulk edits reached Finance the same way
+            // single-item update() does (mirrored below), just missing here.
+            $subject = $peopleSalaryIncrement->employee;
+            if ($subject) {
+                $employeeName = optional($subject->resortAdmin)->full_name ?: '';
+                $msg = "📢 Salary Increment Updated by HR"
+                     . "\n👤 Employee: " . $employeeName
+                     . "\n💰 New Salary: " . number_format((float) $peopleSalaryIncrement->new_salary, 2)
+                     . "\n📅 Effective Date: " . Carbon::parse($effectiveDate)->format('d M Y');
+                $recipientIds = $financePool->pluck('id')->reject(fn($mid) => (int) $mid === (int) $subject->id)->values()->all();
+                try {
+                    Common::notifyEmployees($resortId, $recipientIds, 'Salary Increment Updated', $msg, 'People Management', $peopleSalaryIncrement->id);
+                } catch (\Exception $e) {
+                    \Log::warning('SalaryIncrement bulkUpdate notification failed: ' . $e->getMessage());
+                }
+            }
         }
         return response()->json([
             'success' => true,
@@ -972,7 +994,12 @@ class SalaryIncrementController extends Controller
 
     public function bulkUpdateStatus(Request $request){
         $ids = $request->ids;
-        
+        $resortId = (int) $this->resort->resort_id;
+        // Same Finance pool the single-item update() re-notifies with when
+        // a Change-Request row is bounced back to Pending — mirrored here
+        // since this bulk action does exactly that (in bulk).
+        $financePool = $this->buildApprovalPools($resortId)['finance'];
+
         foreach ($ids as $id) {
             // Was ->find($id) with no resort filter — unscoped write let
             // client-posted ids from another resort be mutated in bulk.
@@ -989,6 +1016,23 @@ class SalaryIncrementController extends Controller
                 $peopleSalaryIncrementStatus->update([
                     'status'=> 'Pending'
                 ]);
+            }
+
+            // Was silent — same "Re-Submitted" re-notify update() sends
+            // Finance when it reopens a stalled row, just missing here.
+            $subject = $peopleSalaryIncrement->employee;
+            if ($subject) {
+                $employeeName = optional($subject->resortAdmin)->full_name ?: '';
+                $msg = "📢 Salary Increment Re-Submitted by HR"
+                     . "\n👤 Employee: " . $employeeName
+                     . "\n💰 New Salary: " . number_format((float) $peopleSalaryIncrement->new_salary, 2)
+                     . "\n📝 Status: Pending Approval (resubmitted)";
+                $recipientIds = $financePool->pluck('id')->reject(fn($mid) => (int) $mid === (int) $subject->id)->values()->all();
+                try {
+                    Common::notifyEmployees($resortId, $recipientIds, 'Salary Increment Re-Submitted', $msg, 'People Management', $peopleSalaryIncrement->id);
+                } catch (\Exception $e) {
+                    \Log::warning('SalaryIncrement bulkUpdateStatus notification failed: ' . $e->getMessage());
+                }
             }
         }
         return response()->json([

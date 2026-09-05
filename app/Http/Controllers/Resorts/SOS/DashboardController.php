@@ -207,6 +207,25 @@ class DashboardController extends Controller
             $sos->status = $status;
             $sos->save();
 
+            if ($status === 'Real-Active') {
+                try {
+                    $recipientIds = array_merge(
+                        Common::getResortSecurityEmployeeIds($this->resort->resort_id),
+                        Common::getResortGmEmployeeIds($this->resort->resort_id)
+                    );
+                    Common::notifyEmployees(
+                        $this->resort->resort_id,
+                        $recipientIds,
+                        'SOS Alert Escalated',
+                        'An SOS alert has been escalated to Real-Active status and requires immediate attention.',
+                        'SOS',
+                        $sos->id
+                    );
+                } catch (\Exception $e) {
+                    \Log::warning('SOS escalation notification failed: ' . $e->getMessage());
+                }
+            }
+
             return response()->json([
                 'success' => true,
                 'message' => 'SOS status updated to '. $request->type,

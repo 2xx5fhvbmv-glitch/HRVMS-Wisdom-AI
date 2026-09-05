@@ -214,7 +214,45 @@ class FileShareController extends Controller
         if (!$share) {
             return response()->json(['success' => false, 'message' => 'Share not found or not yours'], 404);
         }
+
+        // Resolve affected recipients BEFORE delete cascades the junctions away.
+        $affectedEmployeeIds = [];
+        if ($share->scope_type === 'employees') {
+            $affectedEmployeeIds = DB::table('file_share_employees')
+                ->where('share_id', $share->id)->pluck('employee_id')->all();
+        } elseif ($share->scope_type === 'departments') {
+            $deptIds = DB::table('file_share_departments')
+                ->where('share_id', $share->id)->pluck('department_id')->all();
+            if (!empty($deptIds)) {
+                $affectedEmployeeIds = Employee::where('resort_id', $this->resort->resort_id)
+                    ->whereIn('Dept_id', $deptIds)->where('status', 'Active')->pluck('id')->all();
+            }
+        } elseif ($share->scope_type === 'organization') {
+            $affectedEmployeeIds = Employee::where('resort_id', $this->resort->resort_id)
+                ->where('status', 'Active')->pluck('id')->all();
+        }
+        $itemName = $share->shareable_type === 'file'
+            ? (ChildFileManagement::where('id', $share->shareable_id)->value('NewFileName')
+                ?: ChildFileManagement::where('id', $share->shareable_id)->value('File_Name'))
+            : FilemangementSystem::where('id', $share->shareable_id)->value('Folder_Name');
+
         $share->delete(); // cascade kills both junctions
+
+        if (!empty($affectedEmployeeIds)) {
+            try {
+                Common::notifyEmployees(
+                    $this->resort->resort_id,
+                    $affectedEmployeeIds,
+                    'Share Revoked',
+                    trim($this->resort->first_name . ' ' . $this->resort->last_name) . ' revoked your access to "' . $itemName . '".',
+                    'File Management',
+                    $id
+                );
+            } catch (\Exception $e) {
+                \Log::warning('File share revoke notification failed: ' . $e->getMessage());
+            }
+        }
+
         return response()->json(['success' => true, 'message' => 'Share revoked']);
     }
 

@@ -331,23 +331,25 @@ class TrainingScheduleController extends Controller
                 'employee_id' => $employee_id,
                 'status' => 'Pending'
             ]);
+        }
 
-           
-            $notificationTitle = 'Training Sceduled';
-            $notificationMessage = "Training '{$learningProgram->name}' has been scheduled from "
-                . Common::formatDate($request->start_date) . " to " . Common::formatDate($request->end_date)
-                . ", between " . Common::formatDisplayTime($request->start_time) . " - " . Common::formatDisplayTime($request->end_time) . ".";
-            $moduleName = "Learning";
+        $notificationTitle = 'Training Sceduled';
+        $notificationMessage = "Training '{$learningProgram->name}' has been scheduled from "
+            . Common::formatDate($request->start_date) . " to " . Common::formatDate($request->end_date)
+            . ", between " . Common::formatDisplayTime($request->start_time) . " - " . Common::formatDisplayTime($request->end_time) . ".";
+        $moduleName = "Learning";
 
-            event(new ResortNotificationEvent(Common::nofitication(
-                $this->resort->resort_id, 
-                10, 
-                $notificationTitle, 
-                $notificationMessage, 
-                'Learning', 
-                $employee_id, 
-                $moduleName
-            )));
+        try {
+            Common::notifyEmployees(
+                $this->resort->resort_id,
+                $employeeIds,
+                $notificationTitle,
+                $notificationMessage,
+                $moduleName,
+                $training->id
+            );
+        } catch (\Exception $ne) {
+            \Log::warning('Training scheduled notification failed: ' . $ne->getMessage());
         }
     
         return response()->json([
@@ -565,17 +567,17 @@ class TrainingScheduleController extends Controller
 
                 $moduleName = "Learning";
 
-                // Send notification to all attendees
-                foreach ($attendees as $employee_id) {
-                    event(new ResortNotificationEvent(Common::nofitication(
+                try {
+                    Common::notifyEmployees(
                         $this->resort->resort_id,
-                        10,
+                        $attendees->all(),
                         $notificationTitle,
                         $notificationMessage,
-                        'Learning',
-                        $employee_id,
-                        $moduleName
-                    )));
+                        $moduleName,
+                        $schedule->id
+                    );
+                } catch (\Exception $ne) {
+                    \Log::warning('Training schedule update notification failed: ' . $ne->getMessage());
                 }
             }
 

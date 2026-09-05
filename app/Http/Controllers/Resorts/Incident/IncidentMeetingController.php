@@ -484,10 +484,33 @@ class IncidentMeetingController extends Controller
             ], 403);
         }
 
+        // Grab participants + meeting details before the row (and its
+        // participant rows) are deleted below, so there's still something
+        // to notify with — same content shape as the "scheduled" message
+        // in store(), just worded as cancelled.
+        $participantIds = IncidentsMeetingParticipants::where('meeting_id', $meeting->id)
+            ->pluck('participant_id')->filter()->unique()->values()->all();
+        $cancelMsg = "Meeting Cancelled: {$meeting->meeting_subject}\n📅 " . Common::formatDate($meeting->meeting_date)
+            . "\n⏰ " . Common::formatDisplayTime($meeting->meeting_time) . "\n📍 {$meeting->location}";
+        $incidentId = $meeting->incident_id;
+
         $meeting->delete();
 
         IncidentsMeetingParticipants::where('meeting_id', $id)->delete();
         IncidentsMeetingExternalParticipants::where('meeting_id', $id)->delete();
+
+        try {
+            Common::notifyEmployees(
+                $this->resort->resort_id,
+                $participantIds,
+                'Meeting Cancelled',
+                $cancelMsg,
+                'Incident',
+                $incidentId
+            );
+        } catch (\Exception $e) {
+            \Log::warning('Incident meeting cancel notification failed: ' . $e->getMessage());
+        }
 
         return response()->json([
             'success' => true,

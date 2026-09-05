@@ -185,6 +185,19 @@ class AdvanceSalaryRepaymentTrackerController extends Controller
                 $recovery_schedule->repayment_date = $month_date;
                 $recovery_schedule->amount = $request->amount;
                 $recovery_schedule->save();
+
+                try {
+                    Common::notifyEmployees(
+                        $this->resort->resort_id,
+                        [$recovery_schedule->employee_id],
+                        'Loan Repayment Installment Updated',
+                        "Your loan/salary advance repayment installment for {$request->repayment_date} has been updated.",
+                        'People Management',
+                        $recovery_schedule->payroll_advance_id
+                    );
+                } catch (\Exception $e) {
+                    \Log::warning('Repayment installment notification failed: ' . $e->getMessage());
+                }
             }else{
 
                 return response()->json([
@@ -220,6 +233,19 @@ class AdvanceSalaryRepaymentTrackerController extends Controller
         if ($recovery_schedule) {
             $recovery_schedule->remark = $request->remark;
             $recovery_schedule->save();
+
+            try {
+                Common::notifyEmployees(
+                    $this->resort->resort_id,
+                    [$recovery_schedule->employee_id],
+                    'Loan Repayment Note Added',
+                    "A note was added to your loan/salary advance repayment schedule.",
+                    'People Management',
+                    $recovery_schedule->payroll_advance_id
+                );
+            } catch (\Exception $e) {
+                \Log::warning('Repayment note notification failed: ' . $e->getMessage());
+            }
         }else{
             return response()->json([
                 'success' => false,
@@ -243,6 +269,19 @@ class AdvanceSalaryRepaymentTrackerController extends Controller
             $payrollAdvance->recovery_status = 'Completed';
             $payrollAdvance->action_date = Carbon::now();
             $payrollAdvance->save();
+
+            try {
+                Common::notifyEmployees(
+                    $this->resort->resort_id,
+                    [$payrollAdvance->employee_id],
+                    'Loan Fully Repaid',
+                    "Your {$payrollAdvance->request_type} of {$payrollAdvance->request_amount} has been marked as fully repaid.",
+                    'People Management',
+                    $payrollAdvance->id
+                );
+            } catch (\Exception $e) {
+                \Log::warning('Loan repaid notification failed: ' . $e->getMessage());
+            }
 
             return redirect()->route('people.advance-salary-repayment-tracker.show', base64_encode($payrollAdvance->id))
                 ->with('success', 'Salary advance marked as completed successfully.');

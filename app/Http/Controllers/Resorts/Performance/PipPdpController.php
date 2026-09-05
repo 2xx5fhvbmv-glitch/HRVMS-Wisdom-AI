@@ -94,6 +94,7 @@ class PipPdpController extends Controller
             return response()->json(['success' => false, 'message' => 'Plan not found'], 404);
         }
         $plan->update(['status' => 'archived']);
+        $this->notifyPlanStatusChange('pip', $plan, 'archived');
         return response()->json(['success' => true, 'message' => 'PIP plan archived']);
     }
 
@@ -104,6 +105,7 @@ class PipPdpController extends Controller
             return response()->json(['success' => false, 'message' => 'Plan not found'], 404);
         }
         $plan->update(['status' => 'active']);
+        $this->notifyPlanStatusChange('pip', $plan, 'restored');
         return response()->json(['success' => true, 'message' => 'PIP plan restored']);
     }
 
@@ -193,6 +195,7 @@ class PipPdpController extends Controller
             return response()->json(['success' => false, 'message' => 'Plan not found'], 404);
         }
         $plan->update(['status' => 'archived']);
+        $this->notifyPlanStatusChange('pdp', $plan, 'archived');
         return response()->json(['success' => true, 'message' => 'PDP plan archived']);
     }
 
@@ -203,6 +206,7 @@ class PipPdpController extends Controller
             return response()->json(['success' => false, 'message' => 'Plan not found'], 404);
         }
         $plan->update(['status' => 'active']);
+        $this->notifyPlanStatusChange('pdp', $plan, 'restored');
         return response()->json(['success' => true, 'message' => 'PDP plan restored']);
     }
 
@@ -475,6 +479,28 @@ class PipPdpController extends Controller
             );
         } catch (\Exception $ne) {
             \Log::warning(strtoupper($kind) . ' assign notification failed: ' . $ne->getMessage());
+        }
+    }
+
+    private function notifyPlanStatusChange($kind, $plan, $status)
+    {
+        try {
+            $employee = Employee::find($plan->employee_id);
+            $recipients = [(int) $plan->employee_id];
+            if ($employee && $employee->reporting_to) {
+                $recipients[] = (int) $employee->reporting_to;
+            }
+            Common::notifyEmployees(
+                $this->resort->resort_id,
+                $recipients,
+                strtoupper($kind) . ' Plan ' . ucfirst($status),
+                'Your ' . strtoupper($kind) . ' plan has been ' . $status . '.',
+                'Performance',
+                $plan->id,
+                'pip-pdp-' . $status
+            );
+        } catch (\Exception $ne) {
+            \Log::warning(strtoupper($kind) . ' ' . $status . ' notification failed: ' . $ne->getMessage());
         }
     }
 }

@@ -1180,6 +1180,21 @@ class PayrollController extends Controller
         
             DB::commit(); // ✅ Commit transaction
 
+            // payroll table has no created_by/creator column, so notify HR
+            // (the role that locks/audits payroll) that this run is finalized.
+            try {
+                Common::notifyEmployees(
+                    $this->resort->resort_id,
+                    Common::getResortHrEmployeeIds($this->resort->resort_id),
+                    'Payroll Locked',
+                    "Payroll for period {$payroll->start_date} to {$payroll->end_date} has been locked/finalized.",
+                    'Payroll',
+                    $payrollId
+                );
+            } catch (\Exception $e) {
+                \Log::warning('Payroll lock notification failed: ' . $e->getMessage());
+            }
+
             return response()->json([
                 'success' => true,
                 'message' => 'Payroll Locked Successfully.',

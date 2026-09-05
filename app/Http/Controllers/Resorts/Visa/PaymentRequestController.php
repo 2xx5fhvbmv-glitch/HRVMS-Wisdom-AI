@@ -859,6 +859,25 @@ class PaymentRequestController extends Controller
             $PaymentRequest->Reason = $reason;
             $PaymentRequest->save();
 
+            // payment_requests has no populated created_by (never set on
+            // Create()), so — mirroring how Create() notifies Finance, the
+            // role that acts on these requests — notify HR, the role that
+            // raises them, that this one was rejected.
+            $hrIds = Common::getResortHrEmployeeIds($this->resort->resort_id);
+            if (!empty($hrIds)) {
+                $title   = 'Visa Payment Request Rejected';
+                $message = 'Payment request ' . $PaymentRequest->Requestd_id . ' has been rejected. Reason: ' . $reason;
+                foreach ($hrIds as $hrId) {
+                    try {
+                        event(new \App\Events\ResortNotificationEvent(Common::nofitication(
+                            $this->resort->resort_id, 10, $title, $message, $PaymentRequest->id, $hrId, 'Visa'
+                        )));
+                    } catch (\Throwable $e) {
+                        \Log::warning('HR payment-request-rejected notify failed (resort ' . $this->resort->resort_id . ', emp ' . $hrId . '): ' . $e->getMessage());
+                    }
+                }
+            }
+
             return response()->json(['success' => true, 'msg' => 'Payment Request Rejected Successfully'], 200);
         }
     }

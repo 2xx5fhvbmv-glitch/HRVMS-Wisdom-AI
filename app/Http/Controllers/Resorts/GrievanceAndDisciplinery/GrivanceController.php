@@ -610,7 +610,23 @@ class GrivanceController extends Controller
                     'action_taken' => base64_decode($request->action_taken),
                     'outcome_type' => $request->outcome_type
                 ]);
-            } else {  
+
+                try {
+                    $complainantId = GrivanceSubmissionModel::where('id', $request->Grievant_form_id)->value('Employee_id');
+                    if ($complainantId) {
+                        Common::notifyEmployees(
+                            $this->resort->resort_id,
+                            [$complainantId],
+                            'Grievance Resolved',
+                            'Your grievance has been resolved.',
+                            'Grievance And Disciplinery ',
+                            $request->Grievant_form_id
+                        );
+                    }
+                } catch (\Exception $e) {
+                    \Log::warning('Grievance resolved notification failed: ' . $e->getMessage());
+                }
+            } else {
                 $SentToGm = ($request->approval_request == "on") ? "Yes" : "No";
                 GrivanceSubmissionModel::where('id', $request->Grievant_form_id)->update([
                     'status' => $request->STATUS,
@@ -696,7 +712,22 @@ class GrivanceController extends Controller
                 $GrivanceSubmissionModel->Gm_Resoan=$request->Gm_Resoan;
                 $GrivanceSubmissionModel->save();
 
-                                
+                try {
+                    if ($GrivanceSubmissionModel->Employee_id) {
+                        Common::notifyEmployees(
+                            $this->resort->resort_id,
+                            [$GrivanceSubmissionModel->Employee_id],
+                            'Grievance GM Decision',
+                            'The GM has made a decision (' . $request->Gm_Decision . ') on your escalated grievance.',
+                            'Grievance And Disciplinery ',
+                            $GrivanceSubmissionModel->id
+                        );
+                    }
+                } catch (\Exception $e) {
+                    \Log::warning('Grievance GM decision notification failed: ' . $e->getMessage());
+                }
+
+
                     DB::commit();
                     return response()->json([
                     'success' => true,

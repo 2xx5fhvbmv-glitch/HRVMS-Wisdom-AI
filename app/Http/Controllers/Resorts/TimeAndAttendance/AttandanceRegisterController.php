@@ -212,6 +212,19 @@ class AttandanceRegisterController extends Controller
                         }
                 }
                 $ParentAttendace->save();
+
+                try {
+                    Common::notifyEmployees(
+                        $this->resort->resort_id,
+                        [(int) $ParentAttendace->Emp_id],
+                        'Overtime Request ' . $ParentAttendace->OTStatus,
+                        'Your overtime request for ' . $ParentAttendace->CheckingTime . ' has been ' . strtolower($ParentAttendace->OTStatus) . '.',
+                        'DutyRoster',
+                        $ParentAttendace->id
+                    );
+                } catch (\Exception $ne) {
+                    \Log::warning('Overtime approve/reject notification failed: ' . $ne->getMessage());
+                }
             }
              return response()->json(['success'=>true,'message' => 'OT '.$action.' successfully.']);
         }

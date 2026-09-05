@@ -746,9 +746,23 @@ class SurveyController extends Controller
                 DB::rollBack();
                 return response()->json(['error' => 'Survey not found.'], 404);
             }
+            $participantIds = SurveyEmployee::where("Parent_survey_id",$id)->pluck('Emp_id')->all();
             $survey->delete();
             SurveyQuestion::where("Parent_survey_id",$id)->delete();
             SurveyEmployee::where("Parent_survey_id",$id)->delete();
+
+            try {
+                Common::notifyEmployees(
+                    $this->resort->resort_id,
+                    $participantIds,
+                    'Survey Removed',
+                    "The survey '{$survey->Surevey_title}' has been removed. No further participation is needed.",
+                    'Survey',
+                    $survey->id
+                );
+            } catch (\Exception $ne) {
+                \Log::warning('Survey delete notification failed: ' . $ne->getMessage());
+            }
 
             DB::commit();
             return response()->json([
@@ -774,13 +788,30 @@ class SurveyController extends Controller
         DB::beginTransaction();
         try
         {
-               $updated = ParentSurvey::where('id', $id)
+               $survey = ParentSurvey::where('id', $id)
                    ->where('resort_id', $this->resort->resort_id)
-                   ->update(['status' => $status]);
-               if (!$updated) {
+                   ->first();
+               if (!$survey) {
                    DB::rollBack();
                    return response()->json(['success' => false, 'message' => 'Survey not found.'], 404);
                }
+               $survey->Status = $status;
+               $survey->save();
+
+               $participantIds = SurveyEmployee::where("Parent_survey_id",$id)->pluck('Emp_id')->all();
+               try {
+                   Common::notifyEmployees(
+                       $this->resort->resort_id,
+                       $participantIds,
+                       'Survey Status Updated',
+                       "The status of survey '{$survey->Surevey_title}' has been changed to '{$status}'.",
+                       'Survey',
+                       $survey->id
+                   );
+               } catch (\Exception $ne) {
+                   \Log::warning('Survey status-change notification failed: ' . $ne->getMessage());
+               }
+
                DB::commit();
                return response()->json([
                    'success' => true,

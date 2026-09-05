@@ -397,6 +397,21 @@ class OnboardingController extends Controller
             // the new employee's folder (idempotent; never throws).
             \App\Helpers\EmployeeDocumentFiler::fileApplicantOnboardingDocs($employee, $applicant->id);
 
+            // Was silent — HR had no signal that a new employee record now
+            // exists and onboarding (itinerary, activation, etc.) is ready to proceed.
+            try {
+                Common::notifyEmployees(
+                    $resort_id,
+                    Common::getResortHrEmployeeIds($resort_id),
+                    'New Employee Onboarding',
+                    $applicantName . ' has been converted to an employee record (' . $emp_id . ') and is ready for onboarding.',
+                    'People Management',
+                    $employee->id
+                );
+            } catch (\Exception $e) {
+                \Log::warning('convertApplicant notification failed: ' . $e->getMessage());
+            }
+
             return response()->json([
                 'success'     => true,
                 'employee_id' => $employee->id,
@@ -1509,13 +1524,15 @@ class OnboardingController extends Controller
         return $path['status'] ? $path['Chil_file_id'] : null;
     }
 
-    private function sendOnboardingNotifications($onboardingItinerary)
+    private function sendOnboardingNotifications($onboardingItinerary, $isUpdate = false)
     {
         try {
+            $verb = $isUpdate ? 'updated' : 'created';
+
             // Notify the main onboarded employee
             $employee = $onboardingItinerary->employee;
             if ($employee && $employee->resortAdmin) {
-                $msg = "📢 Your onboarding itinerary has been created.\n" .
+                $msg = "📢 Your onboarding itinerary has been {$verb}.\n" .
                     "👤 Name: {$employee->resortAdmin->full_name}\n" .
                     "📅 Arrival Date: " . Common::formatDate($onboardingItinerary->arrival_date) . "\n" .
                     "🕒 Arrival Time: " . Common::formatDisplayTime($onboardingItinerary->arrival_time) . "\n";
@@ -1523,7 +1540,7 @@ class OnboardingController extends Controller
                 event(new ResortNotificationEvent(Common::nofitication(
                     $this->resort->resort_id,
                     10,
-                    'Your Onboarding Itinerary is Ready',
+                    $isUpdate ? 'Your Onboarding Itinerary was Updated' : 'Your Onboarding Itinerary is Ready',
                     $msg,
                     0,
                     $employee->id,
@@ -1534,7 +1551,7 @@ class OnboardingController extends Controller
             // Notify pickup assigned employee
             $pickupEmployee = Employee::find($onboardingItinerary->pickup_employee_id);
             if ($pickupEmployee && $pickupEmployee->resortAdmin) {
-                $msg = "🚐 You have been assigned to pick up a new employee.\n" .
+                $msg = "🚐 The onboarding itinerary for your pickup assignment has been {$verb}.\n" .
                     "👤 Employee: {$employee->resortAdmin->full_name}\n" .
                     "📅 Arrival Date: " . Common::formatDate($onboardingItinerary->arrival_date) . "\n" .
                     "🕒 Arrival Time: " . Common::formatDisplayTime($onboardingItinerary->arrival_time) . "\n";
@@ -1542,7 +1559,7 @@ class OnboardingController extends Controller
                 event(new ResortNotificationEvent(Common::nofitication(
                     $this->resort->resort_id,
                     10,
-                    'Pickup Assignment Notification',
+                    $isUpdate ? 'Pickup Assignment Updated' : 'Pickup Assignment Notification',
                     $msg,
                     0,
                     $pickupEmployee->id,
@@ -1553,7 +1570,7 @@ class OnboardingController extends Controller
             // Notify medical accompany employee
             $medicalEmployee = Employee::find($onboardingItinerary->accompany_medical_employee_id);
             if ($medicalEmployee && $medicalEmployee->resortAdmin) {
-                $msg = "🏥 You have been assigned to medically accompany a new employee.\n" .
+                $msg = "🏥 The onboarding itinerary for your medical accompaniment assignment has been {$verb}.\n" .
                     "👤 Employee: {$employee->resortAdmin->full_name}\n" .
                     "📅 Arrival Date: " . Common::formatDate($onboardingItinerary->arrival_date) . "\n" .
                     "🕒 Arrival Time: " . Common::formatDisplayTime($onboardingItinerary->arrival_time) . "\n";
@@ -1561,7 +1578,7 @@ class OnboardingController extends Controller
                 event(new ResortNotificationEvent(Common::nofitication(
                     $this->resort->resort_id,
                     10,
-                    'Medical Accompaniment Assignment',
+                    $isUpdate ? 'Medical Accompaniment Assignment Updated' : 'Medical Accompaniment Assignment',
                     $msg,
                     0,
                     $medicalEmployee->id,
@@ -1577,7 +1594,7 @@ class OnboardingController extends Controller
                 foreach ($participantIds as $participantId) {
                     $participant = Employee::find($participantId);
                     if ($participant && $participant->resortAdmin) {
-                        $msg = "📅 You are invited to a meeting.\n" .
+                        $msg = ($isUpdate ? "📅 A meeting you are invited to has been updated.\n" : "📅 You are invited to a meeting.\n") .
                             "📝 Title: {$meeting->meeting_title}\n" .
                             "📆 Date: " . Common::formatDate($meeting->meeting_date) . "\n" .
                             "⏰ Time: " . Common::formatDisplayTime($meeting->meeting_time) . "\n" .
@@ -1586,7 +1603,7 @@ class OnboardingController extends Controller
                         event(new ResortNotificationEvent(Common::nofitication(
                             $this->resort->resort_id,
                             10,
-                            'Onboarding Meeting Invitation',
+                            $isUpdate ? 'Onboarding Meeting Updated' : 'Onboarding Meeting Invitation',
                             $msg,
                             0,
                             $participant->id,
@@ -2053,6 +2070,10 @@ class OnboardingController extends Controller
             $this->handleMeetings($request, $itinerary);
 
             DB::commit();
+
+            // Send notifications — publishing already notifies via
+            // sendOnboardingNotifications(); editing after publication didn't.
+            $this->sendOnboardingNotifications($itinerary, true);
 
             return response()->json([
                 'success' => true,

@@ -435,6 +435,9 @@ class ConfigurationController extends Controller
                             'commitee_id' => $committee->id,
                             'member_id' => $memberId,
                         ]);
+
+                        $msg = 'You have been assigned to the "'.$name.'" incident committee.';
+                        event(new ResortNotificationEvent(Common::nofitication($this->resort->resort_id, 10, 'Incident Committee', $msg, 0, $memberId, 'Incident')));
                     }
                 }
             }
@@ -562,6 +565,11 @@ class ConfigurationController extends Controller
 
             // Update Committee Members
             if (!empty($request->committee_members)) {
+                // Only notify members newly assigned by this edit — same
+                // guard as the Grievance/Disciplinary committee edits, so a
+                // full-roster replace doesn't re-notify existing members.
+                $previousMemberIds = IncidentCommitteeMember::where('commitee_id', $id)->pluck('member_id')->toArray();
+
                 // Remove old members and insert new ones
                 IncidentCommitteeMember::where('commitee_id', $id)->delete();
 
@@ -570,6 +578,11 @@ class ConfigurationController extends Controller
                         'commitee_id' => $id,
                         'member_id' => $member_id
                     ]);
+                }
+
+                foreach (array_diff($request->committee_members, $previousMemberIds) as $member_id) {
+                    $msg = 'You have been assigned to the "'.$request->committee_name.'" incident committee.';
+                    event(new ResortNotificationEvent(Common::nofitication($this->resort->resort_id, 10, 'Incident Committee', $msg, 0, $member_id, 'Incident')));
                 }
             }
 

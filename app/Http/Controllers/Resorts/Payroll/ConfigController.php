@@ -14,6 +14,7 @@ use App\Jobs\ImportDeductionJob;
 use App\Models\Earnings;
 use App\Models\Deduction;
 use App\Models\PayrollConfig;
+use App\Helpers\Common;
 use Illuminate\Support\Facades\Validator;
 use Auth;
 use Config;
@@ -183,6 +184,8 @@ class ConfigController extends Controller
             ]);
         }
 
+        $this->notifyHrOfConfigChange('New deduction rule(s) added: ' . implode(', ', array_column($validatedData['deductions'], 'deduction_name')) . '.');
+
         return response()->json([
             'success' => true,
             'message' => 'Deductions and limit saved successfully.',
@@ -211,6 +214,8 @@ class ConfigController extends Controller
 
         $deduction->update($validatedData);
 
+        $this->notifyHrOfConfigChange('Deduction rule "' . $deduction->deduction_name . '" was updated.');
+
         return response()->json(['success' => true, 'message' => 'Deduction updated successfully.']);
     }
 
@@ -218,7 +223,10 @@ class ConfigController extends Controller
     {
         $resort_id = $this->resort->resort_id;
         $deduction = Deduction::where('id', $id)->where('resort_id', $resort_id)->firstOrFail();
+        $deductionName = $deduction->deduction_name;
         $deduction->delete();
+
+        $this->notifyHrOfConfigChange('Deduction rule "' . $deductionName . '" was deleted.');
 
         return response()->json(['success' => true, 'message' => 'Deduction deleted successfully.']);
     }
@@ -241,9 +249,30 @@ class ConfigController extends Controller
             ]
         );
 
+        $this->notifyHrOfConfigChange('Payroll cutoff day updated to the ' . $request['cutoff_day'] . ($request['cutoff_day'] == 1 ? 'st' : ($request['cutoff_day'] == 2 ? 'nd' : ($request['cutoff_day'] == 3 ? 'rd' : 'th'))) . ' of the month.');
+
         return response()->json([
             'success' => true,
             'message' => 'Cutoff Day saved successfully.',
         ]);
+    }
+
+    /**
+     * Notify HR (not every employee — excessive for a config change) when
+     * a payroll-wide setting affecting everyone's pay changes.
+     */
+    private function notifyHrOfConfigChange(string $message): void
+    {
+        try {
+            Common::notifyEmployees(
+                $this->resort->resort_id,
+                Common::getResortHrEmployeeIds($this->resort->resort_id),
+                'Payroll Configuration Updated',
+                $message,
+                'Payroll'
+            );
+        } catch (\Exception $e) {
+            \Log::warning('Payroll config change notification failed: ' . $e->getMessage());
+        }
     }
 }
