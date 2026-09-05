@@ -8,8 +8,14 @@
     Survey, timeandattendance all render .hireReq-block too).
 --}}
 <style>
-    /* --- New Hire Requests --- */
-    .hireReq-card-v2 { border: 1px solid #E2EBEC; }
+    /* --- New Hire Requests ---
+       Phase 2a tokenisation: exact-hex matches now point at the SSOT
+       (--line/--muted/--ink/--faint/--teal/--teal-3). #fff on
+       .hireReq-initials stays literal — contrast-on-a-colored-avatar
+       text, not a surface. #F1F7F7 (row hover tint) has no exact token
+       match (nearest is --teal-soft #F5F8F8, off by 4 in R — outside the
+       ≤2-per-channel near-duplicate bar) — left literal. */
+    .hireReq-card-v2 { border: 1px solid var(--line); }
     .hireReq-card-v2 .hireReq-initials {
         width: 100%;
         height: 100%;
@@ -26,9 +32,9 @@
         padding: 2px 8px;
         vertical-align: 1px;
     }
-    .hireReq-card-v2 .hireReq-block p { color: #5D6F75; }
-    .hireReq-card-v2 .hireReq-block h6 { color: #14232A; }
-    .hireReq-card-v2 .hireReq-empty { color: #5D6F75; margin: 0; }
+    .hireReq-card-v2 .hireReq-block p { color: var(--muted); }
+    .hireReq-card-v2 .hireReq-block h6 { color: var(--ink); }
+    .hireReq-card-v2 .hireReq-empty { color: var(--muted); margin: 0; }
 
     /* --- Open Vacancies ---
        Header font-size is intentionally NOT overridden here — it inherits
@@ -36,8 +42,8 @@
        row text (position names use the site-wide .table tbody td 14px)
        instead of looking undersized next to it. */
     .vac-table-v2 thead th {
-        background: #E6F0F1 !important;
-        color: #014653;
+        background: var(--teal-3) !important;
+        color: var(--teal);
         border-bottom: 0 !important;
         /* The site-wide .table thead th rule sets padding: 0 10px 12px
            !important — zero top padding — which left header text sitting
@@ -50,7 +56,7 @@
         transition: background .15s ease;
     }
     .vac-table-v2 tbody tr:hover {
-        background: #F1F7F7;
+        background: var(--line-2);
     }
     .vac-table-v2 .vac-col-num,
     .vac-table-v2 th.vac-col-action {
@@ -61,10 +67,10 @@
     .vac-table-v2 .vac-col-num {
         font-variant-numeric: tabular-nums;
         font-weight: 600;
-        color: #14232A;
+        color: var(--ink);
     }
     .vac-table-v2 .vac-col-num.vac-col-muted {
-        color: #93A4A9;
+        color: var(--faint);
         font-weight: 500;
     }
     .vac-table-v2 td.vac-col-action {
@@ -80,26 +86,26 @@
         justify-content: center;
         text-align: center;
         padding: 48px 20px;
-        color: #93A4A9;
+        color: var(--faint);
         min-height: 260px;
     }
     .ta-chart-empty i {
         font-size: 28px;
-        color: #93A4A9;
+        color: var(--faint);
         margin-bottom: 12px;
     }
     .ta-chart-empty p {
         margin: 0;
-        font-size: 13px;
+        font-size: 14px;
         line-height: 1.6;
-        color: #5D6F75;
+        color: var(--muted);
     }
 
     /* --- Approval History --- */
-    .appr-history-v2 { border: 1px solid #E2EBEC; }
+    .appr-history-v2 { border: 1px solid var(--line); }
     .appr-history-v2 .appr-subtitle {
-        font-size: 12px;
-        color: #5D6F75;
+        font-size: 14px;
+        color: var(--muted);
         font-weight: 500;
     }
     /* Caps the list to roughly 3-4 visible rows (same max-height convention
@@ -127,13 +133,13 @@
         column-gap: 16px;
         row-gap: 6px;
         padding: 14px 0;
-        border-bottom: 1px solid #E7E7E7;
+        border-bottom: 1px solid var(--line);
     }
     .appr-row:last-child { border-bottom: 0; padding-bottom: 0; }
     .appr-row:first-child { padding-top: 0; }
     .appr-row-heading { grid-column: 1; padding-top: 2px; min-width: 0; }
-    .appr-row-heading h6 { margin-bottom: 2px; color: #14232A; font-weight: 600; }
-    .appr-row-heading span { font-size: 12px; color: #5D6F75; }
+    .appr-row-heading h6 { margin-bottom: 2px; color: var(--ink); font-weight: 600; }
+    .appr-row-heading span { font-size: 14px; color: var(--muted); }
     /* display: contents removes .appr-chain from the box model entirely —
        its 3 .appr-chain-item children become direct grid items of
        .appr-row above (columns 2/3/4), without needing to change the
@@ -154,32 +160,40 @@
         display: inline-flex;
         align-items: center;
         gap: 5px;
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 600;
         padding: 4px 10px;
         border-radius: 20px;
         white-space: nowrap;
     }
+    /* Approved/Hold/Pending are exact-hex matches for --positive/--warning/
+       --muted, now pointing there too — their rgba(…) tints stay literal
+       (no --positive-rgb/--warning-rgb/--muted-rgb primitive exists; this
+       phase adds no new tokens). Rejected/Missing's #C23A3A is now
+       --rejected (Phase 2b addition — distinct from --critical/--error).
+       --rejected-bg's Light value is exactly Rejected's rgba(194,58,58,.1)
+       background; Missing's OTHER two alphas (.08 background, .45 border)
+       are genuinely different values, not the same token — left literal. */
     .appr-chain-pill i { font-size: 10px; }
-    .appr-chain-pill-approved { color: #1F9D6B; background: rgba(31, 157, 107, .1); }
-    .appr-chain-pill-rejected { color: #C23A3A; background: rgba(194, 58, 58, .1); }
-    .appr-chain-pill-hold { color: #D98A00; background: rgba(217, 138, 0, .1); }
+    .appr-chain-pill-approved { color: var(--positive); background: rgba(31, 157, 107, .1); }
+    .appr-chain-pill-rejected { color: var(--rejected); background: var(--rejected-bg); }
+    .appr-chain-pill-hold { color: var(--warning); background: rgba(217, 138, 0, .1); }
     /* Pending stage — muted/neutral so it reads as "not decided yet" rather
        than competing with the green (approved) / red (rejected) / amber
        (hold) states that represent an actual completed action. */
-    .appr-chain-pill-pending { color: #5D6F75; background: rgba(93, 111, 117, .1); }
+    .appr-chain-pill-pending { color: var(--muted); background: rgba(93, 111, 117, .1); }
     /* A stage with no approval record at all (a data gap, not a normal
        queued/pending step) — a distinct red variation, dashed border so
        it doesn't read as "Rejected" (which uses a solid fill). */
     .appr-chain-pill-missing {
-        color: #C23A3A;
+        color: var(--rejected);
         background: rgba(194, 58, 58, .08);
         border: 1px dashed rgba(194, 58, 58, .45);
     }
-    .appr-chain-date-missing { color: #C23A3A; }
+    .appr-chain-date-missing { color: var(--rejected); }
     .appr-chain-date {
         font-size: 11px;
-        color: #93A4A9;
+        color: var(--faint);
         padding-left: 2px;
     }
 

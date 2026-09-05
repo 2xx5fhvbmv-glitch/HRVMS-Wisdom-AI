@@ -10,18 +10,35 @@
 @section('content')
 
 <style>
+    /* Same requested push as the other module dashboards/pages — extra
+       breathing room between the hero and the content below it, scoped to
+       this page (.page-hedding's own margin-bottom is shared by every
+       page's hero). padding-bottom, not margin: adjacent sibling margins
+       collapse to the larger of the two rather than summing. Below
+       Bootstrap's sm breakpoint the extra padding pushes content into the
+       teal hero curve's rounded bottom-left corner (body::before,
+       border-radius 0 0 50px 50px) — same collision found on Payroll —
+       neutralized below 576px. */
+    #consolidated-budget-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #consolidated-budget-hero { padding-bottom: 0; }
+    }
+
     /* Neutral/geometry tokens (--teal/--teal-2/--teal-3/--teal-soft/--lime/
        --ink/--muted/--faint/--line/--line-2/--card) now come from the
        shared :root palette (resorts/layouts/_design_tokens.blade.php),
        same as view_budget_hierarchical.blade.php — this block previously
        duplicated them (see old comment above) rather than sharing, which
-       is exactly what the shared palette now replaces. --wb-bg and the
-       semantic tokens below stay local. */
+       is exactly what the shared palette now replaces. --wb-vacant/
+       --wb-increase are exact-hex matches for the shared --warning/
+       --positive, now pointing there too. --wb-bg/--wb-vacant-bg/
+       --wb-increase-bg have no shared equivalent (their -bg values don't
+       match --warning-bg/--positive-bg) and stay local. */
     :root {
         --wb-bg: #F2F6F6;
-        --wb-vacant: #D98A00;
+        --wb-vacant: var(--warning);
         --wb-vacant-bg: #FFF6E5;
-        --wb-increase: #1F9D6B;
+        --wb-increase: var(--positive);
         --wb-increase-bg: #EAF7F0;
     }
 
@@ -93,7 +110,7 @@
 
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="consolidated-budget-hero">
             <div class="row justify-content-between g-3">
                 <div class="col-auto">
                     <div class="page-title">

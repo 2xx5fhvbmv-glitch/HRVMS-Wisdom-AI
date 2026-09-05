@@ -2,9 +2,15 @@
 @section('page_tab_title', $page_title)
 
 @section('content')
+<style>
+    #available-accommodation-list-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #available-accommodation-list-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="available-accommodation-list-hero">
             <div class="row justify-content-between g-3">
                 <div class="col-auto">
                     <div class="page-title">
@@ -77,13 +83,28 @@
                 <div class="row g-2 mb-2">
                     <div class="col-6">
                         <label class="form-label fw-500">Accommodation Type</label>
-                        <select class="form-select" id="editAccommodationType">
+                        <select class="form-select dd-native-select" id="editAccommodationType">
                             <option value="">Select</option>
                             @php $accTypes = \App\Models\AccommodationType::where('resort_id', Auth::guard('resort-admin')->user()->resort_id)->get(); @endphp
                             @foreach($accTypes as $at)
                                 <option value="{{ $at->id }}">{{ $at->AccommodationName }}</option>
                             @endforeach
                         </select>
+                        <div class="dd" data-target="#editAccommodationType">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">Select</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Accommodation Type">
+                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a type…"></div>
+                                <div class="dd-scroll">
+                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    @foreach($accTypes as $at)
+                                    <div class="dd-item" role="option" data-value="{{ $at->id }}"><span class="dd-nm">{{ $at->AccommodationName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="col-6">
                         <label class="form-label fw-500">Capacity</label>
@@ -93,7 +114,7 @@
                 <div class="row g-2 mb-2">
                     <div class="col-6">
                         <label class="form-label fw-500">Room Type</label>
-                        <select class="form-select" id="editRoomType">
+                        <select class="form-select dd-native-select" id="editRoomType">
                             @php $ranks = config('settings.eligibilty'); @endphp
                             @if($ranks)
                                 @foreach($ranks as $k => $v)
@@ -101,19 +122,47 @@
                                 @endforeach
                             @endif
                         </select>
+                        @php $firstRank = $ranks ? reset($ranks) : null; @endphp
+                        <div class="dd" data-target="#editRoomType">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">{{ $firstRank ?? 'Select' }}</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Room Type">
+                                <div class="dd-scroll">
+                                    @if($ranks)
+                                        @foreach($ranks as $k => $v)
+                                        <div class="dd-item{{ $loop->first ? ' active' : '' }}" role="option" data-value="{{ $k }}"><span class="dd-nm">{{ $v }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @endforeach
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="col-6">
                         <label class="form-label fw-500">Block For</label>
-                        <select class="form-select" id="editBlockFor">
+                        <select class="form-select dd-native-select" id="editBlockFor">
                             <option value="Male">Male</option>
                             <option value="Female">Female</option>
                         </select>
+                        <div class="dd" data-target="#editBlockFor">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">Male</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Block For">
+                                <div class="dd-scroll">
+                                    <div class="dd-item active" role="option" data-value="Male"><span class="dd-nm">Male</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    <div class="dd-item" role="option" data-value="Female"><span class="dd-nm">Female</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="row g-2 mb-2">
                     <div class="col-6">
                         <label class="form-label fw-500">Cleaning Schedule</label>
-                        <select class="form-select" id="editCleaning">
+                        <select class="form-select dd-native-select" id="editCleaning">
                             @php $schedule = config('settings.CleaningSchedule'); @endphp
                             @if($schedule)
                                 @foreach($schedule as $s)
@@ -121,10 +170,25 @@
                                 @endforeach
                             @endif
                         </select>
+                        <div class="dd" data-target="#editCleaning">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">{{ $schedule[0] ?? 'Select' }}</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Cleaning Schedule">
+                                <div class="dd-scroll">
+                                    @if($schedule)
+                                        @foreach($schedule as $s)
+                                        <div class="dd-item{{ $loop->first ? ' active' : '' }}" role="option" data-value="{{ $s }}"><span class="dd-nm">{{ $s }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @endforeach
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="col-6">
                         <label class="form-label fw-500">Room Status</label>
-                        <select class="form-select" id="editRoomStatus">
+                        <select class="form-select dd-native-select" id="editRoomStatus">
                             @php $statuses = config('settings.RoomStatus'); @endphp
                             @if($statuses)
                                 @foreach($statuses as $s)
@@ -132,6 +196,21 @@
                                 @endforeach
                             @endif
                         </select>
+                        <div class="dd" data-target="#editRoomStatus">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">{{ $statuses[0] ?? 'Select' }}</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Room Status">
+                                <div class="dd-scroll">
+                                    @if($statuses)
+                                        @foreach($statuses as $s)
+                                        <div class="dd-item{{ $loop->first ? ' active' : '' }}" role="option" data-value="{{ $s }}"><span class="dd-nm">{{ $s }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @endforeach
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
                 <div class="mb-2">
@@ -158,6 +237,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts._dropdown_styles')
 @endsection
 
 @section('import-scripts')
@@ -212,6 +292,11 @@ $(document).ready(function() {
         $('#editCleaning').val($btn.data('cleaning'));
         $('#editRoomStatus').val($btn.data('roomstatus'));
         $('#editThreshold').val($btn.data('threshold'));
+        window.wisdomDD.sync('#editAccommodationType');
+        window.wisdomDD.sync('#editRoomType');
+        window.wisdomDD.sync('#editBlockFor');
+        window.wisdomDD.sync('#editCleaning');
+        window.wisdomDD.sync('#editRoomStatus');
         // Fetch beds for this room
         $('#editBedNames').html('<div class="col-auto"><small class="text-muted">Loading...</small></div>');
         window._editBeds = [];
@@ -358,4 +443,5 @@ $(document).ready(function() {
     });
 });
 </script>
+@include('resorts._dropdown_script')
 @endsection

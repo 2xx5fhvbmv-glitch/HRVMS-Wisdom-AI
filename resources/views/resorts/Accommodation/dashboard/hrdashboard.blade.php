@@ -8,9 +8,25 @@
 @endif
 
 @section('content')
+<style>
+    /* Same requested push as the other module dashboards (Payroll / Talent
+       Acquisition / People / Time and Attendance / Leave / Performance /
+       Learning) — extra breathing room between the hero and the KPI row
+       below it, scoped to this page (.page-hedding's own margin-bottom is
+       shared by every page's hero). padding-bottom, not margin: adjacent
+       sibling margins collapse to the larger of the two rather than
+       summing. Below Bootstrap's sm breakpoint the extra padding pushes
+       the KPI row's first card into the teal hero curve's rounded
+       bottom-left corner (body::before, border-radius 0 0 50px 50px) —
+       same collision found on Payroll — neutralized below 576px. */
+    #accommodation-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #accommodation-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="accommodation-hero">
             <div class="row justify-content-between g-3">
                 <div class="col-auto">
                     <div class="page-title">
@@ -86,12 +102,27 @@
                             </div>
                             <div class="col-auto">
                                 <div class="form-group">
-                                    <select class="form-select ResortDepartment" aria-label="Default select example">
+                                    <select class="form-select dd-native-select ResortDepartment" id="hrDashResortDepartment" aria-label="Default select example">
                                         <option ></option>
                                         @foreach ($ResortDepartment as $d)
                                             <option value="{{ $d->id }}">{{ $d->name }}</option>
                                         @endforeach
                                     </select>
+                                    <div class="dd" data-target="#hrDashResortDepartment">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Select Department</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Department">
+                                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a department…"></div>
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Department</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @foreach ($ResortDepartment as $d)
+                                                <div class="dd-item" role="option" data-value="{{ $d->id }}"><span class="dd-nm">{{ $d->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                             <div class="col-auto"><a href="{{ route('resort.accommodation.MaintanaceRequestlist') }}" class="a-link">View All</a>
@@ -353,7 +384,7 @@
                             </div>
                             <div class="col-auto">
                                 <div class="form-group">
-                                    <select class="form-select InventoryCategory"  aria-label="Default select example">
+                                    <select class="form-select dd-native-select InventoryCategory" id="hrDashInventoryCategory" aria-label="Default select example">
                                         <option ></option>
                                         @if($InventoryCategory->isNotEmpty())
                                             @foreach ($InventoryCategory as $s)
@@ -361,6 +392,23 @@
                                             @endforeach
                                         @endif
                                     </select>
+                                    <div class="dd" data-target="#hrDashInventoryCategory">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Select Category</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Category">
+                                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a category…"></div>
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Category</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @if($InventoryCategory->isNotEmpty())
+                                                    @foreach ($InventoryCategory as $s)
+                                                    <div class="dd-item" role="option" data-value="{{ $s->id }}"><span class="dd-nm">{{ $s->CategoryName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @endforeach
+                                                @endif
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                             <div class="col-auto"><a href="{{ route('resort.accommodation.InventoryManagement')}}" class="a-link">View All</a>
@@ -635,9 +683,21 @@
                 <div class="row g-3 mb-3">
                     <div class="col-sm-8">
                         <label class="form-label fw-500">SELECT EMPLOYEE</label>
-                        <select class="form-select" name="emp_id" id="EmployeeList">
+                        <select class="form-select dd-native-select" name="emp_id" id="EmployeeList">
                             <option value="">Select Employee</option>
                         </select>
+                        <div class="dd" data-target="#EmployeeList">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">Select Employee</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Employee">
+                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an employee…"></div>
+                                <div class="dd-scroll">
+                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Employee</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="col-sm-4">
                         <label class="form-label fw-500">QUANTITY</label>
@@ -665,6 +725,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts._dropdown_styles')
 <style>
     /* WAI Insights — same gradient-header treatment as the other modules'
        WAI Insights cards. Narrative (title + body + optional recommendation),
@@ -688,26 +749,26 @@
     .wai-narrative .wai-head { position: relative; overflow: hidden; padding: 17px 18px; flex-shrink: 0; }
     .wai-narrative .wai-head::before {
         content: ""; position: absolute; inset: 0; pointer-events: none;
-        background: linear-gradient(110deg, #014653 0%, #0e8a9e 40%, #7fa61e 70%, #e0ff02 100%);
+        background: linear-gradient(110deg, var(--teal) 0%, #0e8a9e 40%, #7fa61e 70%, var(--lime) 100%);
     }
     .wai-narrative .wai-head::after {
         content: ""; position: absolute; inset: 0; pointer-events: none;
         background: linear-gradient(110deg, rgba(1,40,48,.35), transparent 55%);
     }
-    .wai-narrative .wai-head h2 { position: relative; color: #fff; font-size: 15px; font-weight: 800; margin: 0; }
-    .wai-narrative .wai-head-meta { position: relative; margin-top: 4px; font-size: 11.5px; color: rgba(255,255,255,.75); display: flex; gap: 6px; }
+    .wai-narrative .wai-head h2 { position: relative; color: #fff; font-size: 18px; font-weight: 600; margin: 0; }
+    .wai-narrative .wai-head-meta { position: relative; margin-top: 4px; font-size: 10.5px; font-weight: 500; color: rgba(255,255,255,.75); display: flex; gap: 6px; }
     .wai-narrative .wai-head-meta a { color: #fff; font-weight: 600; text-decoration: underline; }
 
     .wai-narrative-body { padding: 16px; }
     .wai-narrative .wai-row { display: flex; align-items: flex-start; gap: 12px; padding: 12px 2px; border-bottom: 1px solid #F2F6F6; }
     .wai-narrative .wai-row:last-child { border-bottom: none; }
     .wai-narrative .wai-row-icon { width: 32px; height: 32px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; margin-top: 2px; }
-    .wai-narrative .wai-row-icon.is-ok { background: #E9F7F0; color: #1F9D6B; }
-    .wai-narrative .wai-row-icon.is-flagged { background: #FBF0DC; color: #D98A00; }
+    .wai-narrative .wai-row-icon.is-ok { background: var(--positive-bg); color: var(--positive); }
+    .wai-narrative .wai-row-icon.is-flagged { background: var(--warning-bg); color: var(--warning); }
     .wai-narrative .wai-row-body { flex: 1 1 auto; min-width: 0; }
-    .wai-narrative .wai-row-body h6 { margin: 0 0 4px; font-size: 13.5px; font-weight: 700; color: #14232A; }
-    .wai-narrative .wai-row-text { margin: 0 0 4px; font-size: 12.5px; color: #5D6F75; line-height: 1.5; }
-    .wai-narrative .wai-row-link { display: inline-block; margin-top: 2px; font-size: 12px; font-weight: 600; color: #014653; }
+    .wai-narrative .wai-row-body h6 { margin: 0 0 4px; font-size: 14px; font-weight: 600; color: var(--ink); }
+    .wai-narrative .wai-row-text { margin: 0 0 4px; font-size: 14px; color: var(--muted); line-height: 1.5; }
+    .wai-narrative .wai-row-link { display: inline-block; margin-top: 2px; font-size: 14px; font-weight: 600; color: var(--teal); }
 
     #selectBed-modal .table-sm th,
     #selectBed-modal .table-sm td {
@@ -737,10 +798,10 @@
         display: block;
     }
     #selectBed-modal .bed-block.occupied p {
-        color: #014653;
+        color: var(--teal);
     }
     #selectBed-modal .bed-block.active {
-        border: 2px solid #014653;
+        border: 2px solid var(--teal);
     }
     #selectBed-modal .bed-block p {
         margin-bottom: 0;
@@ -756,10 +817,6 @@
 @section('import-scripts')
 <script type="text/javascript">
     $(document).ready(function () {
-        $("#EmployeeList").select2({
-            placeholder: "Select Employee",
-            allowClear: true,
-        })
         // $('.data-Table').dataTable({
         //     "searching": false,
         //     "bLengthChange": false,
@@ -771,16 +828,6 @@
         // });
         $("#select_emp").select2({
             placeholder: "Select Employee",
-            allowClear: true
-        });
-        $(".InventoryCategory").select2({
-            placeholder: "Select Category",
-            allowClear: true
-        });
-
-
-        $(".ResortDepartment").select2({
-            placeholder: "Select Department",
             allowClear: true
         });
 
@@ -1392,15 +1439,7 @@
                         option += `<option value='${v.EmployeeId}'>${v.first_name} ${v.last_name} (${v.Emp_id})</option>`;
                     });
                     $("#EmployeeList").html(option);
-
-                    if ($('#EmployeeList').data('select2')) {
-                        $('#EmployeeList').select2('destroy');
-                    }
-                    $('#EmployeeList').select2({
-                        placeholder: 'Select Employee',
-                        allowClear: true,
-                        dropdownParent: $('#selectBed-modal')
-                    });
+                    window.wisdomDD.rebuild('#EmployeeList');
 
                     // Reset fields
                     $('#bedQuantity').val(1);
@@ -1494,6 +1533,7 @@
         });
     });
 </script>
+@include('resorts._dropdown_script')
 <!-- <script type="module">
     var ctx = document.getElementById('myLineChart').getContext('2d');
     var myLineChart = new Chart(ctx, {

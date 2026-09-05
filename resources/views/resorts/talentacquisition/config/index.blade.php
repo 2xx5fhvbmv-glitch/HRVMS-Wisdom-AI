@@ -8,10 +8,15 @@
     @endif
 
     @section('content')
-
+    <style>
+        #ta-config-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #ta-config-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="ta-config-hero">
                 <div class="row justify-content-between g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -48,7 +53,7 @@
                             </div>
 
                                 <div class="mb-2">
-                                    <select class="form-select  ResortDivision" id="ResortDivision" name='ResortDivision' aria-label="Default select example">
+                                    <select class="form-select dd-native-select ResortDivision" id="ResortDivision" name='ResortDivision' aria-label="Default select example">
                                         <option  > </option>
                                         @if($resort_divisions->isNotEmpty())
                                             @foreach($resort_divisions as $resort_division)
@@ -56,24 +61,71 @@
                                             @endforeach
                                         @endif
                                     </select>
+                                    <div class="dd" data-target="#ResortDivision">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Select Division</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Division">
+                                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a division…"></div>
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Division</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @if($resort_divisions->isNotEmpty())
+                                                    @foreach($resort_divisions as $resort_division)
+                                                    <div class="dd-item" role="option" data-value="{{ $resort_division->id }}"><span class="dd-nm">{{ $resort_division->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @endforeach
+                                                @endif
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="mb-2">
-                                    <select class="form-select select2 Department" aria-label="Default select example">
+                                    <select class="form-select dd-native-select Department" id="taConfigDepartment" aria-label="Default select example">
                                         <option ></option>
 
                                     </select>
+                                    <div class="dd" data-target="#taConfigDepartment">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Select Department</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Department">
+                                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a department…"></div>
+                                            <div class="dd-scroll"></div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="mb-2">
-                                    <select class="form-select  Section" aria-label="Default select example">
+                                    <select class="form-select dd-native-select Section" id="taConfigSection" aria-label="Default select example">
                                         <option ></option>
 
                                     </select>
+                                    <div class="dd" data-target="#taConfigSection">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Select Section</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Section">
+                                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a section…"></div>
+                                            <div class="dd-scroll"></div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="mb-3">
-                                    <select class="form-select select2 Position" aria-label="Default select example">
+                                    <select class="form-select dd-native-select Position" id="taConfigPosition" aria-label="Default select example">
                                         <option ></option>
 
                                     </select>
+                                    <div class="dd" data-target="#taConfigPosition">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Select Position</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Position">
+                                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a position…"></div>
+                                            <div class="dd-scroll"></div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="row g-3 align-items-center mb-3">
                                     <div class="col-auto">
@@ -140,7 +192,7 @@
                                     <div class="row g-3 align-items-center  ">
                                         <div class="col-xl-9 col-lg-8 col-sm-9">
                                             <?php $position_rank = config('settings.final_rank'); ?>
-                                            <select class="form-control" id="FinalApproval" name="FinalApproval">
+                                            <select class="form-control dd-native-select" id="FinalApproval" name="FinalApproval">
                                                 <option  ></option>
                                                 @if(!empty($position_rank))
                                                     @foreach ($position_rank as  $key=>$position)
@@ -149,6 +201,23 @@
                                                     @endforeach
                                                 @endif
                                             </select>
+                                            @php $selectedFinalApproval = (!empty($position_rank) && isset($configset->FinalApproval) && isset($position_rank[$configset->FinalApproval])) ? $position_rank[$configset->FinalApproval] : null; @endphp
+                                            <div class="dd" data-target="#FinalApproval">
+                                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                    <span class="dd-lbl">{{ $selectedFinalApproval ?? 'Select' }}</span>
+                                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                </button>
+                                                <div class="dd-panel" role="listbox" aria-label="Final Approval Rank">
+                                                    <div class="dd-scroll">
+                                                        <div class="dd-item{{ $selectedFinalApproval ? '' : ' active' }}" role="option" data-value=""><span class="dd-nm">Select</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @if(!empty($position_rank))
+                                                            @foreach ($position_rank as  $key=>$position)
+                                                            <div class="dd-item{{ (isset($configset->FinalApproval) && $configset->FinalApproval == $key) ? ' active' : '' }}" role="option" data-value="{{ $key }}"><span class="dd-nm">{{ $position }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                            @endforeach
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                         <div class="col-sm-auto">
                                             <button type="submit" class="btn ta-btn-primary btn-sm">Submit</button>
@@ -597,6 +666,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts._dropdown_styles')
 @include('resorts.talentacquisition._ta_buttons_v2_styles')
 @endsection
 
@@ -701,11 +771,6 @@ $(document).ready(function()
             }
         });
 
-        $("#ResortDivision").select2({placeholder: "Select Division"});
-        $(".Department").select2({placeholder: "Select Department"});
-        $(".Section").select2({placeholder: "Select Section"});
-        $(".Position").select2({placeholder: "Select Position"});
-
         $(document).on('click', '.delete-row-btn', function (e) {
             e.preventDefault();
             var $button = $(this);
@@ -804,6 +869,7 @@ $(document).ready(function()
 
                     // Clear the dropdown and add a placeholder option
                     $(".Department").html('<option value="">Select Department</option>');
+                    window.wisdomDD.rebuild('#taConfigDepartment');
                     if(data.success == true) {
                         let string='<option></option>';
                         // Append new options
@@ -813,6 +879,7 @@ $(document).ready(function()
                         });
 
                         $(".Department").html(string);
+                        window.wisdomDD.rebuild('#taConfigDepartment');
 
                     } else {
                         let string='<option></option>';
@@ -844,12 +911,14 @@ $(document).ready(function()
                             string+='<option value="'+value.id+'">'+value.position_title+'</option>';
                         });
                         $(".Position").html(string);
+                        window.wisdomDD.rebuild('#taConfigPosition');
 
                         let string1='<option></option>';
                         $.each(d.data.ResortSection, function(key, value) {
                             string1+='<option value="'+value.id+'">'+value.name+'</option>';
                         });
                         $(".Section").html(string1);
+                        window.wisdomDD.rebuild('#taConfigSection');
 
                     }
                 },
@@ -1493,4 +1562,5 @@ $('#AdTemplete').on('submit', function(e) {
 });
 </script>
 
+@include('resorts._dropdown_script')
 @endsection

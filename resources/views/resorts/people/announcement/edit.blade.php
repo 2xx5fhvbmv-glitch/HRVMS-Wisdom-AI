@@ -26,8 +26,8 @@
                         <div class="row g-md-4 g-3 mb-md-4 mb-3">
                             <div class="col-lg-4 col-sm-6">
                                 <label for="announcement_title" class="form-label">ANNOUNCEMENT TITLE</label>
-                                <select class="form-select select2t-none" id="announcement_title" name="announcement_title"
-                                    required data-parsley-required-message="Please select a title" data-parsley-errors-container="#category-error"> 
+                                <select class="form-select dd-native-select" id="announcement_title" name="announcement_title"
+                                    required data-parsley-required-message="Please select a title" data-parsley-errors-container="#category-error">
                                     <option value="">Select Title</option>
                                     @if($categories)
                                         @foreach($categories as $category)
@@ -35,13 +35,30 @@
                                         @endforeach
                                     @endif
                                 </select>
+                                @php $selectedCategory = $categories ? collect($categories)->firstWhere('id', $announcement->title) : null; @endphp
+                                <div class="dd" data-target="#announcement_title">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">{{ $selectedCategory ? $selectedCategory->name : 'Select Title' }}</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Title">
+                                        <div class="dd-scroll">
+                                            <div class="dd-item{{ $selectedCategory ? '' : ' active' }}" role="option" data-value=""><span class="dd-nm">Select Title</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @if($categories)
+                                                @foreach($categories as $category)
+                                                    <div class="dd-item{{ $category->id == $announcement->title ? ' active' : '' }}" role="option" data-value="{{ $category->id }}"><span class="dd-nm">{{ $category->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @endforeach
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
                                 <div id="category-error"></div>
                             </div>
 
                             <div class="col-lg-4 col-sm-6">
                                 <label for="employee_name" class="form-label">EMPLOYEE NAME</label>
-                                <select class="form-select select2t-none" id="employee_name" name="employee_name"
-                                    onchange="getEmpDetails(this.value)" required 
+                                <select class="form-select dd-native-select" id="employee_name" name="employee_name"
+                                    onchange="getEmpDetails(this.value)" required
                                     data-parsley-required-message="Please select an employee" data-parsley-errors-container="#emp-error">
                                     <option value="">Select Employee</option>
                                     @if($employees)
@@ -52,6 +69,24 @@
                                         @endforeach
                                     @endif
                                 </select>
+                                @php $selectedEmployee = $employees ? collect($employees)->firstWhere('id', $announcement->employee_id) : null; @endphp
+                                <div class="dd" data-target="#employee_name">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">{{ $selectedEmployee ? $selectedEmployee->Emp_id.' - '.$selectedEmployee->resortAdmin->full_name : 'Select Employee' }}</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Employee">
+                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an employee…"></div>
+                                        <div class="dd-scroll">
+                                            <div class="dd-item{{ $selectedEmployee ? '' : ' active' }}" role="option" data-value=""><span class="dd-nm">Select Employee</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @if($employees)
+                                                @foreach($employees as $employee)
+                                                    <div class="dd-item{{ $employee->id == $announcement->employee_id ? ' active' : '' }}" role="option" data-value="{{ $employee->id }}"><span class="dd-nm">{{ $employee->Emp_id }} - {{ $employee->resortAdmin->full_name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @endforeach
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
                                 <div id="emp-error"></div>
                             </div>
 
@@ -112,6 +147,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts._dropdown_styles')
 @endsection
 
 @section('import-scripts')
@@ -119,7 +155,6 @@
     let form;
 
     $(document).ready(function () {
-        $('.select2t-none').select2();
         flatpickr('#scheduled_date', {
             dateFormat: 'm/d/Y',
             allowInput: true,
@@ -233,5 +268,5 @@
     }
 
 </script>
-
+@include('resorts._dropdown_script')
 @endsection

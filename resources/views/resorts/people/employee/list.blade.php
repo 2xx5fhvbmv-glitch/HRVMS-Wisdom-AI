@@ -7,10 +7,16 @@
 </div>
 @endif
 
-@section('content') 
+@section('content')
+    <style>
+        #people-employees-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #people-employees-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="people-employees-hero">
                 <div class="row  g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -33,7 +39,7 @@
                             </div>
                         </div>
                         <div class="col-xl-2 col-md-3 col-sm-4 col-6">
-                            <select class="form-select select2t-none" id="deptFilter">
+                            <select class="form-select dd-native-select" id="deptFilter">
                                 <option value="">Departments</option>
                                 @if($departments)
                                     @foreach($departments as $dept)
@@ -41,9 +47,26 @@
                                     @endforeach
                                 @endif
                             </select>
+                            <div class="dd" data-target="#deptFilter">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Departments</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Department">
+                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a department…"></div>
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Departments</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @if($departments)
+                                            @foreach($departments as $dept)
+                                                <div class="dd-item" role="option" data-value="{{$dept->id}}"><span class="dd-nm">{{$dept->name}}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @endforeach
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="col-xl-2 col-md-3 col-sm-4 col-6">
-                            <select class="form-select select2t-none" id="positionFilter">
+                            <select class="form-select dd-native-select" id="positionFilter">
                                 <option value="">Positions</option>
                                 @if($positions)
                                     @foreach($positions as $pos)
@@ -51,9 +74,26 @@
                                     @endforeach
                                 @endif
                             </select>
+                            <div class="dd" data-target="#positionFilter">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Positions</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Position">
+                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a position…"></div>
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Positions</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @if($positions)
+                                            @foreach($positions as $pos)
+                                                <div class="dd-item" role="option" data-value="{{$pos->id}}"><span class="dd-nm">{{$pos->position_title}}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @endforeach
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="col-xl-2 col-md-3 col-sm-4 col-6">
-                            <select class="form-select select2t-none" id="statusFilter">
+                            <select class="form-select dd-native-select" id="statusFilter">
                                 <option value="">Status</option>
                                 <option value="Onboarding">Onboarding</option>
                                 <option value="Active">Active</option>
@@ -63,13 +103,44 @@
                                 <option value="On Leave">On Leave</option>
                                 <option value="Suspended">Suspended</option>
                             </select>
+                            <div class="dd" data-target="#statusFilter">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Status</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Status">
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Status</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="Onboarding"><span class="dd-nm">Onboarding</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="Active"><span class="dd-nm">Active</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="Inactive"><span class="dd-nm">Inactive</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="Terminated"><span class="dd-nm">Terminated</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="Resigned"><span class="dd-nm">Resigned</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="On Leave"><span class="dd-nm">On Leave</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="Suspended"><span class="dd-nm">Suspended</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="col-xl-2 col-md-3 col-sm-4 col-6">
-                            <select class="form-select select2t-none" id="locationFilter">
+                            <select class="form-select dd-native-select" id="locationFilter">
                                 <option value="">Location</option>
                                 <option value="Malé">Malé</option>
                                 <option value="Resorts">Resorts</option>
                             </select>
+                            <div class="dd" data-target="#locationFilter">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Location</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Location">
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Location</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="Malé"><span class="dd-nm">Malé</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="Resorts"><span class="dd-nm">Resorts</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="col-xl-1 col-md-2 col-sm-3 col-6">
                             <button class="btn btn-themeBlue btn-sm" id="clearFilter">Clear Filter</button>
@@ -118,12 +189,26 @@
                         <div>
                             <label>
                                 Show 
-                                <select id="gridPageSize" class="form-select form-select-sm" style="width: auto; display: inline-block;">
+                                <select id="gridPageSize" class="form-select form-select-sm dd-native-select" style="width: auto; display: inline-block;">
                                     <option value="10" selected>10</option>
                                     <option value="25">25</option>
                                     <option value="50">50</option>
                                     <option value="100">100</option>
                                 </select>
+                                <div class="dd" data-target="#gridPageSize" style="width:auto; display:inline-block; min-width:70px;">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">10</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Page Size">
+                                        <div class="dd-scroll">
+                                            <div class="dd-item active" role="option" data-value="10"><span class="dd-nm">10</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            <div class="dd-item" role="option" data-value="25"><span class="dd-nm">25</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            <div class="dd-item" role="option" data-value="50"><span class="dd-nm">50</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            <div class="dd-item" role="option" data-value="100"><span class="dd-nm">100</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        </div>
+                                    </div>
+                                </div>
                                 entries
                             </label>
                         </div>
@@ -157,21 +242,49 @@
                     <div class="modal-body">
                         <div class="mb-3">
                             <label for="team_id">Select Team <span class="req_span">*</span></label>
-                            <select name="team_id" class="form-select select2t-none" required>
+                            <select name="team_id" id="assign_team_id" class="form-select dd-native-select" required>
                                 <option value="">Select Team</option>
                                 @foreach($teams as $team)
                                     <option value="{{ $team->id }}">{{ $team->name }}</option>
                                 @endforeach
                             </select>
+                            <div class="dd" data-target="#assign_team_id">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Select Team</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Team">
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Team</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @foreach($teams as $team)
+                                            <div class="dd-item" role="option" data-value="{{ $team->id }}"><span class="dd-nm">{{ $team->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="mb-3">
                             <label for="role_id">Select Role <span class="req_span">*</span></label>
-                            <select name="role_id" class="form-select select2t-none" required>
+                            <select name="role_id" id="assign_role_id" class="form-select dd-native-select" required>
                                 <option value="">Select Role</option>
                                 @foreach($roles as $role)
                                     <option value="{{ $role->id }}">{{ $role->name }}</option>
                                 @endforeach
                             </select>
+                            <div class="dd" data-target="#assign_role_id">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Select Role</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Role">
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Role</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @foreach($roles as $role)
+                                            <div class="dd-item" role="option" data-value="{{ $role->id }}"><span class="dd-nm">{{ $role->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div class="modal-footer">
@@ -193,7 +306,7 @@
                 <div class="modal-body">
                 <input type="hidden" name="emp_id" id="modal-emp-id">
 
-                <select name="status" id="modal-status" class="form-select select2-modal" required>
+                <select name="status" id="modal-status" class="form-select dd-native-select" required>
                     <option value="">Status</option>
                     <option value="Active">Active</option>
                     <option value="Inactive">Inactive</option>
@@ -202,6 +315,23 @@
                     <option value="On Leave">On Leave</option>
                     <option value="Suspended">Suspended</option>
                 </select>
+                <div class="dd" data-target="#modal-status">
+                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                        <span class="dd-lbl">Status</span>
+                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                    </button>
+                    <div class="dd-panel" role="listbox" aria-label="Status">
+                        <div class="dd-scroll">
+                            <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Status</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                            <div class="dd-item" role="option" data-value="Active"><span class="dd-nm">Active</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                            <div class="dd-item" role="option" data-value="Inactive"><span class="dd-nm">Inactive</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                            <div class="dd-item" role="option" data-value="Terminated"><span class="dd-nm">Terminated</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                            <div class="dd-item" role="option" data-value="Resigned"><span class="dd-nm">Resigned</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                            <div class="dd-item" role="option" data-value="On Leave"><span class="dd-nm">On Leave</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                            <div class="dd-item" role="option" data-value="Suspended"><span class="dd-nm">Suspended</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                        </div>
+                    </div>
+                </div>
                 </div>
                 <div class="modal-footer">
                 <button type="submit" class="btn eb-btn-primary">Update</button>
@@ -214,6 +344,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts._dropdown_styles')
 <style>
     /* Pin the 3-dot kebab to the top-right corner of every employee card.
        default.css line ~4800 already absolutely-positions
@@ -247,7 +378,6 @@
 
     $(document).ready(function () {
         loadGridView();
-        $('.select2t-none').select2();
 
         // Toggle View
         $(".btn-grid").addClass("active");
@@ -623,4 +753,5 @@
         });
     }
 </script>
+@include('resorts._dropdown_script')
 @endsection

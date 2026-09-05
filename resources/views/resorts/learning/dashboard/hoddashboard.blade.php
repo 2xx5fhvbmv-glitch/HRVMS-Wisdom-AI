@@ -312,7 +312,7 @@
         transform: translateX(-50%);
         width: 8px;
         height: 8px;
-        background: #2EACB3;
+        background: var(--aqua);
         border-radius: 50%;
     }
 </style>
@@ -626,6 +626,8 @@
                 },
                 plugins: [doughnutLabelsInsideN]
             });
+            // backgroundColor (chartData.colors) is server-supplied — out of scope.
+            if (window.WaiChart) window.WaiChart.registerForTheme(window.myDoughnutChart);
 
             // ✅ Update the legend after the chart is created
             updateLegend(chartData.labels, chartData.colors);

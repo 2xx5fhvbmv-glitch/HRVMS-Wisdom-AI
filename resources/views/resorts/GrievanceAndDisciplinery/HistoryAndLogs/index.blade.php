@@ -39,7 +39,7 @@
                 </div>
             </div>
             <div class="col-xl-2 col-md-3 col-sm-4 col-7">
-                <select class="form-select" name="emp" id="emp">
+                <select class="form-select dd-native-select" name="emp" id="emp">
                     <option value="">Select Employee</option>
                     @if($Employee->isNotEmpty())
                         @foreach($Employee as $e)
@@ -47,6 +47,21 @@
                         @endforeach
                     @endif
                 </select>
+                <div class="dd" data-target="#emp">
+                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                        <span class="dd-lbl">Select Employee</span>
+                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                    </button>
+                    <div class="dd-panel" role="listbox" aria-label="Select employee">
+                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an employee…"></div>
+                        <div class="dd-scroll">
+                            <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Employee</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                            @foreach($Employee as $e)
+                                <div class="dd-item" role="option" data-value="{{ $e->id }}"><span class="dd-nm">{{ $e->resortAdmin->first_name }} {{ $e->resortAdmin->last_name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                            @endforeach
+                        </div>
+                    </div>
+                </div>
             </div>
 
         </div>
@@ -77,6 +92,8 @@
         </div>
     </div>
 </div>
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -87,10 +104,6 @@
 <script>
 
     $(document).ready(function () {
-
-        $("#emp").select2({
-            placeholder:"Select Employee"
-        })
         IndexGrievancehistorylogs();
     });
 

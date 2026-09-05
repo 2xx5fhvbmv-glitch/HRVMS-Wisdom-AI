@@ -9,9 +9,15 @@
 @endif
 
 @section('content')
+<style>
+    #assign-accommodation-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #assign-accommodation-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="assign-accommodation-hero">
             <div class="row justify-content-between g-3">
                 <div class="col-auto">
                     <div class="page-title">
@@ -32,7 +38,7 @@
                 <div class="row g-md-4 g-3  mb-3">
                     <div class="col-xxl-4 col-xl-5 col-md-6">
                         <label for="select_emp" class="form-label">SELECT    EMPLOYEE</label>
-                        <select class="form-select select2t-none" id="EmployeeList">
+                        <select class="form-select dd-native-select" id="EmployeeList">
 
                                 @if($Employeelist->isNotEmpty())
                                     @foreach ($Employeelist as $e)
@@ -45,6 +51,23 @@
 
                                 @endif
                         </select>
+                        @php $firstEmp = $Employeelist->first(); @endphp
+                        <div class="dd" data-target="#EmployeeList">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">{{ $firstEmp ? $firstEmp->first_name . ' ' . $firstEmp->last_name : 'Select Employee' }}</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Employee">
+                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an employee…"></div>
+                                <div class="dd-scroll">
+                                    @if($Employeelist->isNotEmpty())
+                                        @foreach ($Employeelist as $e)
+                                        <div class="dd-item{{ $loop->first ? ' active' : '' }}" role="option" data-value="{{ $e->new_emp_id }}"><span class="dd-nm">{{ $e->first_name }} {{ $e->last_name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @endforeach
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="col-xxl-8 col-xl-7 col-md-6">
                         <div class="empDetails-user">
@@ -59,7 +82,7 @@
                     <div class="col-xxl-4 col-xl-5 col-md-6">
                         <label for="select_build" class="form-label">SELECT
                             BUILDINGS</label>
-                        <select class="form-select select2t-none" id="select_build">
+                        <select class="form-select dd-native-select" id="select_build">
                             <option ></option>
 
                                 @if($AvailableAccommodationModel->isNotEmpty())
@@ -69,6 +92,23 @@
 
                                 @endif
                         </select>
+                        <div class="dd" data-target="#select_build">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">Select Building</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Building">
+                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a building…"></div>
+                                <div class="dd-scroll">
+                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Building</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    @if($AvailableAccommodationModel->isNotEmpty())
+                                        @foreach ($AvailableAccommodationModel as $a)
+                                        <div class="dd-item" role="option" data-value="{{ $a->BuildingName }}"><span class="dd-nm">{{ $a->BName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @endforeach
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="col-12"> <label class="form-label mb-2">AVAILABLE ACCOMMODATION</label>
                         <div class="card card-small bg">
@@ -156,6 +196,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts._dropdown_styles')
 @endsection
 
 @section('import-scripts')
@@ -186,14 +227,6 @@
 <script>
 $(document).ready(function()
 {
-    $("#EmployeeList").select2({
-        placeholder:'Select Employee',
-        allowClear: true
-    });
-    $("#select_build").select2({
-        placeholder:'Select Building',
-        allowClear: true
-    });
     $('#AssignBedForm').validate({
         rules: {
             assignId: {
@@ -464,5 +497,6 @@ $(document).ready(function()
         });
     }
 </script>
+@include('resorts._dropdown_script')
 @endsection
 

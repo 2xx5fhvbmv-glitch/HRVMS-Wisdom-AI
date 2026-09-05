@@ -8,9 +8,15 @@
 @endif
 
 @section('content')
+    <style>
+        #people-config-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #people-config-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="people-config-hero">
                 <div class="row  g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -245,12 +251,26 @@
                                         <div class="row g-2 mb-md-3 mb-2">
                                             <div class="col-xxl-4 col-lg-6 col-md-4">
                                                 <label class="form-label">TITLE<span class="red-mark">*</span></label>
-                                                <select class="form-select select2" name="notice_periods[0][title]" required>
+                                                <select class="form-select dd-native-select" id="notice-title-0" name="notice_periods[0][title]" required>
                                                     <option value="">Select Title</option>
                                                 @foreach($emp_grade as $key => $value)
                                                         <option value="{{$value}}">{{$value}}</option>
                                                 @endforeach
                                                 </select>
+                                                <div class="dd" data-target="#notice-title-0">
+                                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                        <span class="dd-lbl">Select Title</span>
+                                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                    </button>
+                                                    <div class="dd-panel" role="listbox" aria-label="Title">
+                                                        <div class="dd-scroll">
+                                                            <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Title</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                            @foreach($emp_grade as $key => $value)
+                                                                <div class="dd-item" role="option" data-value="{{$value}}"><span class="dd-nm">{{$value}}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                            @endforeach
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
                                             <div class="col-xxl-3 col-lg-6 col-md-3">
                                                 <label class="form-label">NOTICE PERIOD (DAYS)</label>
@@ -361,7 +381,7 @@
                             <!-- Email Template Name -->
                             <div class="col-md-12">
                                 <label for="type" class="form-label">Select Type</label>
-                                <select class="form-select select2t-modal" aria-label="Default select example" required name="type" id="type">
+                                <select class="form-select dd-native-select" aria-label="Default select example" required name="type" id="type">
                                     <option value="">Select Type</option>
                                     <option value="success">Probation Successful Letter</option>
                                     <option value="fail">Probation Unsuccessful Letter</option>
@@ -369,6 +389,22 @@
                                     <option value="offer">Offer Letter</option>
                                     <option value="experience">Experience\Employment Letter</option>
                                 </select>
+                                <div class="dd" data-target="#type">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">Select Type</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Type">
+                                        <div class="dd-scroll">
+                                            <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Type</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            <div class="dd-item" role="option" data-value="success"><span class="dd-nm">Probation Successful Letter</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            <div class="dd-item" role="option" data-value="fail"><span class="dd-nm">Probation Unsuccessful Letter</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            <div class="dd-item" role="option" data-value="promotion"><span class="dd-nm">Promotion Letter</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            <div class="dd-item" role="option" data-value="offer"><span class="dd-nm">Offer Letter</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            <div class="dd-item" role="option" data-value="experience"><span class="dd-nm">Experience\Employment Letter</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             <div id="div-type"></div>
                         </div>
@@ -466,6 +502,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts._dropdown_styles')
 <style>
     @media (max-width:1600px) and (min-width:1400px){
         label.form-label{
@@ -983,6 +1020,7 @@
                 }
 
 
+                var noticeTitleRowCount = 1;
                 $('#addNotice').on('click', function (e) {
                     e.preventDefault();
 
@@ -991,21 +1029,27 @@
 
                     $clone.find('input[type="number"]').val('').prop('disabled', false);
                     $clone.find('input[type="checkbox"]').prop('checked', false).prop('disabled', false);
-                    
-                    $clone.find('select.select2').each(function () {
+
+                    // clone() copies the select's id (and its paired .dd's
+                    // data-target) verbatim — every row after the first would
+                    // otherwise share one id, so data-target's querySelector
+                    // lookup would always resolve to the FIRST row's select.
+                    // Mint a fresh id per cloned row and repoint its .dd.
+                    $clone.find('select.dd-native-select').each(function () {
                         const $select = $(this);
-
-                        $select.val('').removeAttr('data-select2-id').removeAttr('aria-hidden').removeAttr('tabindex');
-                        $select.next('.select2-container').remove(); 
-
-                        $select.select2();
-                        $select.val('').trigger('change');
+                        const newId = 'notice-title-' + noticeTitleRowCount++;
+                        $select.next('.dd').attr('data-target', '#' + newId);
+                        $select.attr('id', newId).val('');
                     });
 
                     $('#noticePeriod-block-wrapper').append($clone);
 
-                    $clone.find('.select2').select2();
-                    $clone.find('select.select2').val('').trigger('change');
+                    // Reset the cloned .dd's visual state (it still shows
+                    // whatever the last row's label/active item was) back to
+                    // the placeholder now that the underlying select is reset.
+                    $clone.find('select.dd-native-select').each(function () {
+                        window.wisdomDD.sync('#' + $(this).attr('id'));
+                    });
                     $clone.find('.removeNotice').removeClass('d-none');
                     updateNoticeIndexes();
                     bindToggleEvents($clone);
@@ -1234,6 +1278,7 @@
         }
 
 
-    
+
     </script>
+@include('resorts._dropdown_script')
 @endsection

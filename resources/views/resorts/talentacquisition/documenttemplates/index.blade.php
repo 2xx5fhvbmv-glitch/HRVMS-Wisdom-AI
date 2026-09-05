@@ -14,7 +14,7 @@
                 </div>
                 <div class="col-auto">
                     <div class="d-flex justify-content-end">
-                        <a href="{{ route('resort.ta.configration') }}" class="btn ta-btn-secondary">Back to Configuration</a>
+                        <a href="{{ route('resort.ta.configration') }}" class="btn ta-btn-neutral">Back to Configuration</a>
                     </div>
                 </div>
             </div>

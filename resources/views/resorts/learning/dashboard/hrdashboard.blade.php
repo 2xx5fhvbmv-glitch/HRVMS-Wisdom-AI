@@ -18,9 +18,25 @@
 @endphp
 
 @section('content')
+<style>
+    /* Same requested push as the Payroll / Talent Acquisition / People /
+       Time and Attendance / Leave / Performance dashboards — extra
+       breathing room between the hero and the stat-card grid below it,
+       scoped to this page (.page-hedding's own margin-bottom is shared by
+       every page's hero). padding-bottom, not margin: adjacent sibling
+       margins collapse to the larger of the two rather than summing.
+       Below Bootstrap's sm breakpoint the extra padding pushes the first
+       stat card into the teal hero curve's rounded bottom-left corner
+       (body::before, border-radius 0 0 50px 50px) — same collision found
+       on Payroll — neutralized below 576px. */
+    #learning-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #learning-hero { padding-bottom: 0; }
+    }
+</style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="learning-hero">
                 <div class="row  g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -307,14 +323,14 @@
     .ld-grid { display: grid; gap: 16px; margin-bottom: 16px; }
     .ld-stats { grid-template-columns: repeat(4, 1fr); }
     .ld-stat { display: block; padding: 18px 20px; text-decoration: none; color: inherit; border-radius: 16px; }
-    .ld-stat-label { font-size: 12px; font-weight: 600; color: var(--muted); display: flex; align-items: center; justify-content: space-between; }
+    .ld-stat-label { font-size: 14px; font-weight: 600; color: var(--muted); display: flex; align-items: center; justify-content: space-between; }
     .ld-chev { width: 26px; height: 26px; border-radius: 50%; background: var(--line-2); display: grid; place-items: center; color: var(--muted); }
     .ld-chev svg { width: 13px; height: 13px; }
-    .ld-stat-val { font-size: 34px; font-weight: 700; letter-spacing: -.5px; margin-top: 14px; line-height: 1; color: var(--ink); font-variant-numeric: tabular-nums; }
-    .ld-stat-val span { font-size: 20px; color: var(--muted); }
-    .ld-stat-sub { font-size: 11.5px; color: var(--faint); margin-top: 6px; }
+    .ld-stat-val { font-size: 32px; font-weight: 600; letter-spacing: -.5px; margin-top: 14px; line-height: 1; color: var(--ink); font-variant-numeric: tabular-nums; }
+    .ld-stat-val span { font-size: 14px; color: var(--muted); }
+    .ld-stat-sub { font-size: 11px; color: var(--faint); margin-top: 6px; }
     .ld-stat-hero { position: relative; }
-    .ld-stat-badge { position: absolute; top: 16px; right: 18px; font-size: 10px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase; color: var(--teal); background: var(--teal-3); padding: 3px 8px; border-radius: 20px; }
+    .ld-stat-badge { position: absolute; top: 16px; right: 18px; font-size: 10px; font-weight: 600; letter-spacing: .5px; text-transform: uppercase; color: var(--teal); background: var(--teal-3); padding: 3px 8px; border-radius: 20px; }
     .ld-stat-track { height: 5px; border-radius: 5px; background: var(--line-2); margin-top: 14px; overflow: hidden; }
     .ld-stat-track > i { display: block; height: 100%; border-radius: 5px; background: linear-gradient(90deg, var(--teal), var(--lime)); }
 
@@ -335,10 +351,10 @@
 
     .ld-card { padding: 20px 22px; }
     .ld-card-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-    .ld-card-title { font-size: 11.5px; font-weight: 600; letter-spacing: .8px; text-transform: uppercase; color: var(--muted); }
-    .ld-viewall { font-size: 12px; font-weight: 600; color: var(--teal); text-decoration: none; }
+    .ld-card-title { font-size: 18px; font-weight: 600; color: var(--ink); }
+    .ld-viewall { font-size: 14px; font-weight: 600; color: var(--teal); text-decoration: none; }
     .ld-viewall:hover { text-decoration: underline; }
-    .ld-lnk { font-size: 12px; font-weight: 600; color: var(--teal); text-decoration: none; }
+    .ld-lnk { font-size: 14px; font-weight: 600; color: var(--teal); text-decoration: none; }
     .ld-lnk:hover { text-decoration: underline; }
 
     /* Pending Actions */
@@ -346,20 +362,20 @@
     .ld-pa:last-child { border-bottom: none; }
     .ld-pa-ic { flex: none; width: 30px; height: 30px; border-radius: 9px; background: var(--warning-bg); color: var(--warning); display: grid; place-items: center; }
     .ld-pa-ic svg { width: 15px; height: 15px; }
-    .ld-pa-t { font-weight: 600; font-size: 13.5px; color: var(--ink); }
-    .ld-pa-d { font-size: 12.5px; color: var(--muted); line-height: 1.5; margin-top: 3px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .ld-pa-t { font-weight: 600; font-size: 14px; color: var(--ink); }
+    .ld-pa-d { font-size: 14px; color: var(--muted); line-height: 1.5; margin-top: 3px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
     .ld-pa-body .ld-lnk { display: inline-block; margin-top: 8px; }
     .ld-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: var(--faint); padding: 40px 10px; }
     .ld-empty-ring { width: 52px; height: 52px; border-radius: 50%; border: 2px dashed var(--line); display: grid; place-items: center; margin-bottom: 14px; color: var(--faint); }
-    .ld-empty-t { font-weight: 600; color: var(--muted); font-size: 13px; }
-    .ld-empty-s { font-size: 12px; margin-top: 4px; }
-    .ld-loading-text { color: var(--faint); font-size: 12.5px; padding: 8px 0; margin: 0; }
+    .ld-empty-t { font-weight: 600; color: var(--muted); font-size: 14px; }
+    .ld-empty-s { font-size: 11px; margin-top: 4px; }
+    .ld-loading-text { color: var(--faint); font-size: 14px; padding: 8px 0; margin: 0; }
 
     /* WAI Insights — gradient shell kept, rows restructured */
     .ld-wai { padding: 0; overflow: hidden; height: 100%; display: flex; flex-direction: column; border-radius: 25px; }
     .ld-wai-head { position: relative; overflow: hidden; padding: 20px 22px 17px; flex-shrink: 0; background: linear-gradient(110deg, var(--teal) 0%, #0e8a9e 40%, #7fa61e 70%, var(--lime) 100%); }
-    .ld-wai-h { position: relative; color: #fff; font-size: 11.5px; font-weight: 600; letter-spacing: .8px; text-transform: uppercase; display: flex; align-items: center; gap: 7px; margin-bottom: 4px; }
-    .ld-wai-meta { position: relative; font-size: 11.5px; color: rgba(255,255,255,.8); }
+    .ld-wai-h { position: relative; color: #fff; font-size: 18px; font-weight: 600; display: flex; align-items: center; gap: 7px; margin-bottom: 4px; }
+    .ld-wai-meta { position: relative; font-size: 10.5px; font-weight: 500; color: rgba(255,255,255,.8); }
     .ld-wai-meta a, .ld-wai-meta span { color: #fff; }
     .ld-wai-body { padding: 6px 20px 18px; flex: 1 1 auto; min-height: 0; overflow-y: auto; }
     .ld-ins { display: flex; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--line-2); }
@@ -368,8 +384,8 @@
     .ld-ins-ic svg { width: 14px; height: 14px; }
     .ld-ins-ic.is-ok { background: var(--positive-bg); color: var(--positive); }
     .ld-ins-ic.is-flagged { background: var(--warning-bg); color: var(--warning); }
-    .ld-ins-tt { font-weight: 600; font-size: 13px; color: var(--ink); }
-    .ld-ins-issue { font-size: 12.5px; color: var(--muted); margin-top: 3px; line-height: 1.5; }
+    .ld-ins-tt { font-weight: 600; font-size: 14px; color: var(--ink); }
+    .ld-ins-issue { font-size: 14px; color: var(--muted); margin-top: 3px; line-height: 1.5; }
 
     /* Calendar (FullCalendar v3 reskin — plugin/AJAX logic untouched) + sessions
        list. .ld-combo's grid-row:1/span 2 plus align-items:stretch (native CSS
@@ -380,11 +396,11 @@
     .ld-sess-list { flex: 1; overflow-y: auto; }
     .ld-cal-card .fc-toolbar { margin-bottom: 12px; }
     .ld-cal-card .fc-toolbar h2 { font-size: 14px; font-weight: 600; color: var(--ink); }
-    .ld-cal-card .fc-day-header { font-weight: 500; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .3px; }
+    .ld-cal-card .fc-day-header { font-weight: 600; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .3px; }
     .ld-cal-card .fc-button { background: #fff; border: 1px solid var(--line); color: var(--muted); box-shadow: none; text-shadow: none; border-radius: 8px; }
     .ld-cal-card .fc-button:hover { background: var(--line-2); }
     .ld-cal-card .fc-state-active, .ld-cal-card .fc-button:active { background: var(--teal-3); }
-    .ld-cal-card .fc-basic-view .fc-day-top .fc-day-number { font-size: 12px; color: var(--ink); padding: 6px 0; }
+    .ld-cal-card .fc-basic-view .fc-day-top .fc-day-number { font-size: 14px; color: var(--ink); padding: 6px 0; }
     /* today's own dark-teal pill (default.css) needs white text, not --ink —
        same specificity as the rule above so it has to win explicitly */
     .ld-cal-card .fc-today .fc-day-number { color: #fff !important; }
@@ -396,8 +412,8 @@
     .ld-sessions-head { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); margin-bottom: 4px; }
     .ld-sess { display: flex; gap: 12px; padding: 14px 0; border-bottom: 1px solid var(--line); }
     .ld-sess:last-child { border-bottom: none; }
-    .ld-sess-list .date-block { flex: none; width: 46px; text-align: center; background: var(--line-2); border-radius: 10px; padding: 6px 0; align-self: flex-start; font-size: 9.5px; font-weight: 600; letter-spacing: .5px; color: var(--faint); text-transform: uppercase; }
-    .ld-sess-list .date-block h5 { font-size: 18px; font-weight: 700; color: var(--teal); margin: 2px 0; }
+    .ld-sess-list .date-block { flex: none; width: 46px; text-align: center; background: var(--line-2); border-radius: 10px; padding: 6px 0; align-self: flex-start; font-size: 10.5px; font-weight: 600; letter-spacing: .5px; color: var(--faint); text-transform: uppercase; }
+    .ld-sess-list .date-block h5 { font-size: 22px; font-weight: 600; color: var(--teal); margin: 2px 0; }
     /* Root cause of the recurring avatar-clipping bug: default.css has a bare,
        unscoped `.leaveUser-block { display:flex; flex-wrap:wrap; gap:6px }`
        rule (a leftover from some other feature reusing this class name). That
@@ -408,8 +424,8 @@
        here restores plain block stacking. */
     .ld-sess-list .leaveUser-block { display: block; }
     .ld-sess-list .leaveUser-bgBlock { background: var(--line-2); border-radius: 8px; padding: 6px 10px; display: inline-block; margin-bottom: 4px; }
-    .ld-sess-list .leaveUser-bgBlock h6 { font-size: 13px; font-weight: 600; color: var(--ink); margin: 0; }
-    .ld-sess-list .leaveUser-block p { font-size: 12px; color: var(--muted); margin: 0 0 6px; line-height: 1.45; }
+    .ld-sess-list .leaveUser-bgBlock h6 { font-size: 14px; font-weight: 600; color: var(--ink); margin: 0; }
+    .ld-sess-list .leaveUser-block p { font-size: 14px; color: var(--muted); margin: 0 0 6px; line-height: 1.45; }
     /* Time (icon glued to the text, never wraps) sits on its own line right
        below the description; avatars get their own line below that — two
        stacked left-aligned rows, not squeezed into one shared row. */
@@ -432,22 +448,22 @@
     .ld-gauge-wrap { display: flex; flex-direction: column; align-items: center; text-align: center; padding: 6px 0; }
     .ld-gauge-canvas { position: relative; width: 160px; height: 160px; }
     .ld-gauge-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
-    .ld-gauge-big { font-size: 28px; font-weight: 700; letter-spacing: -.5px; color: var(--ink); font-variant-numeric: tabular-nums; }
+    .ld-gauge-big { font-size: 22px; font-weight: 600; letter-spacing: -.5px; color: var(--ink); font-variant-numeric: tabular-nums; }
     .ld-gauge-lbl { font-size: 10.5px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; max-width: 120px; margin-top: 4px; line-height: 1.3; }
-    .ld-gauge-foot { display: flex; justify-content: space-between; width: 100%; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 11.5px; }
+    .ld-gauge-foot { display: flex; justify-content: space-between; width: 100%; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 11px; }
     .ld-gauge-foot span:first-child { color: var(--faint); }
     .ld-gauge-foot span:last-child { color: var(--ink); font-weight: 600; }
 
     /* Learning Attendance — mini radial dials */
-    .ld-late-text { font-size: 11.5px; color: var(--muted); margin: -6px 0 12px; }
+    .ld-late-text { font-size: 11px; color: var(--muted); margin: -6px 0 12px; }
     .ld-dial-list { display: flex; flex-direction: column; gap: 16px; }
     .ld-dial-item { display: flex; align-items: center; gap: 14px; }
     .ld-dial { position: relative; width: 52px; height: 52px; flex: none; }
-    .ld-dial-num { position: absolute; inset: 0; display: grid; place-items: center; font-size: 12.5px; font-weight: 400; font-variant-numeric: tabular-nums; }
+    .ld-dial-num { position: absolute; inset: 0; display: grid; place-items: center; font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums; }
     .ld-dial-meta { flex: 1; min-width: 0; }
-    .ld-dial-nm { font-size: 13px; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .ld-dial-s { font-size: 11.5px; color: var(--faint); margin-top: 2px; }
-    .ld-others { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); }
+    .ld-dial-nm { font-size: 14px; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ld-dial-s { font-size: 11px; color: var(--faint); margin-top: 2px; }
+    .ld-others { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; align-items: center; font-size: 14px; color: var(--muted); }
     .ld-others b { color: var(--ink); }
 
     /* Learning Hours */
@@ -457,8 +473,8 @@
     /* Learning Completion Rates — segmented tracks */
     .ld-track-list { display: flex; flex-direction: column; gap: 18px; }
     .ld-track-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-    .ld-track-nm { font-size: 12.5px; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 10px; }
-    .ld-track-val { font-size: 12.5px; font-weight: 700; font-variant-numeric: tabular-nums; flex: none; }
+    .ld-track-nm { font-size: 14px; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 10px; }
+    .ld-track-val { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; flex: none; }
     .ld-track-val small { color: var(--faint); font-weight: 600; }
     .ld-pips { display: flex; gap: 3px; }
     .ld-pips i { flex: 1; height: 10px; border-radius: 3px; display: block; }
@@ -473,13 +489,13 @@
     @media (max-width: 1100px) { .ld-history { grid-template-columns: 1fr; } }
     .ld-hist { border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; background: #fff; height: 100%; }
     .ld-hist-range { font-size: 11px; font-weight: 600; color: var(--faint); letter-spacing: .3px; }
-    .ld-hist-t { font-weight: 600; font-size: 13.5px; color: var(--ink); }
-    .ld-hist-d { font-size: 12px; color: var(--muted); line-height: 1.45; flex: 1; }
+    .ld-hist-t { font-weight: 600; font-size: 14px; color: var(--ink); }
+    .ld-hist-d { font-size: 14px; color: var(--muted); line-height: 1.45; flex: 1; }
     /* No divider line above the attendance pill — the card's own border is enough. */
     .ld-hist-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 2px; }
-    .ld-hist-att { font-size: 11.5px; color: var(--muted); }
+    .ld-hist-att { font-size: 11px; color: var(--muted); }
     .ld-hist-att b.ok { color: var(--positive); font-weight: 600; }
-    .ld-status-pill { font-size: 10px; font-weight: 700; letter-spacing: .4px; padding: 3px 9px; border-radius: 20px; background: var(--line-2); color: var(--muted); }
+    .ld-status-pill { font-size: 10px; font-weight: 600; letter-spacing: .4px; padding: 3px 9px; border-radius: 20px; background: var(--line-2); color: var(--muted); }
     .ld-status-pill.warn { background: var(--warning-bg); color: var(--warning); }
 
     /* WAI Insight trigger-link row + frosted modal chrome (including the
@@ -660,10 +676,17 @@
                     '<div class="ld-dial-num" style="color:' + LD_RAMP[i % LD_RAMP.length] + '">' + Math.round(r.value) + '%</div></div>' +
                     '<div class="ld-dial-meta"><div class="ld-dial-nm">' + r.name + '</div><div class="ld-dial-s">Attendance rate</div></div>';
                 el.appendChild(item);
-                new Chart(document.getElementById(cid), {
+                // LD_RAMP itself is left literal (only 2 of 5 entries match
+                // SSOT tokens); the track colour (2nd slot) is an exact
+                // --line-2 match, migrated.
+                var _pDial = window.WaiChart ? window.WaiChart.palette().lineSoft : '#EEF4F4';
+                var _dialChart = new Chart(document.getElementById(cid), {
                     type: 'doughnut',
-                    data: { datasets: [{ data: [r.value, Math.max(0, 100 - r.value)], backgroundColor: [LD_RAMP[i % LD_RAMP.length], '#EEF4F4'], borderWidth: 0 }] },
+                    data: { datasets: [{ data: [r.value, Math.max(0, 100 - r.value)], backgroundColor: [LD_RAMP[i % LD_RAMP.length], _pDial], borderWidth: 0 }] },
                     options: { cutout: '74%', rotation: -90, circumference: 360, responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { enabled: false } } }
+                });
+                if (window.WaiChart) window.WaiChart.registerForTheme(_dialChart, function (c, p) {
+                    c.data.datasets[0].backgroundColor[1] = p.lineSoft;
                 });
             });
 
@@ -677,17 +700,25 @@
             }
         }
 
-        function gauge(id, value, color) {
+        // colorRole: optional palette key ('teal', etc.) so the value slice
+        // re-resolves on theme switch too; omit for a literal with no token match.
+        function gauge(id, value, color, colorRole) {
             var canvas = document.getElementById(id);
             if (!canvas) return;
-            new Chart(canvas, {
+            var _pGaugeTrack = window.WaiChart ? window.WaiChart.palette().lineSoft : '#EEF4F4';
+            var _gaugeChart = new Chart(canvas, {
                 type: 'doughnut',
-                data: { datasets: [{ data: [value, Math.max(0, 100 - value)], backgroundColor: [color, '#EEF4F4'], borderWidth: 0 }] },
+                data: { datasets: [{ data: [value, Math.max(0, 100 - value)], backgroundColor: [color, _pGaugeTrack], borderWidth: 0 }] },
                 options: { cutout: '78%', rotation: -90, circumference: 360, responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false }, tooltip: { enabled: false } } }
             });
+            if (window.WaiChart) window.WaiChart.registerForTheme(_gaugeChart, function (c, p) {
+                if (colorRole) c.data.datasets[0].backgroundColor[0] = p[colorRole];
+                c.data.datasets[0].backgroundColor[1] = p.lineSoft;
+            });
         }
+        // '#C7CDCF' has no exact SSOT token match — left literal.
         gauge('gaugeFeedback', {{ $feedbackAvgScore ?? 0 }}, '#C7CDCF');
-        gauge('gaugeOnboard', {{ $onboardingProgress ?? 0 }}, '#014653');
+        gauge('gaugeOnboard', {{ $onboardingProgress ?? 0 }}, window.WaiChart ? window.WaiChart.palette().teal : '#014653', 'teal');
     </script>
     <script type="module">
         // Learning Hours — horizontal bar per program, on-brand ramp (was blue/pink/yellow).
@@ -700,7 +731,9 @@
             var colors = learningHoursRows.map(function (_r, i) { return LD_RAMP[i % LD_RAMP.length]; });
             var meta   = learningHoursRows.map(function (r) { return { sessions: r.session_count || 0 }; });
 
-            new Chart(learningHoursCanvas.getContext('2d'), {
+            // colors (from LD_RAMP) left literal — see LD_RAMP note above.
+            var _pLearnHoursGrid = window.WaiChart ? window.WaiChart.palette().lineSoft : '#EEF4F4';
+            var _learningHoursChart = new Chart(learningHoursCanvas.getContext('2d'), {
                 type: 'bar',
                 data: { labels: labels, datasets: [{ label: 'Hours', data: values, backgroundColor: colors, borderRadius: 6 }] },
                 options: {
@@ -713,11 +746,12 @@
                         } }
                     },
                     scales: {
-                        x: { beginAtZero: true, grid: { color: '#EEF4F4' }, ticks: { precision: 0 }, title: { display: true, text: 'Hours' } },
+                        x: { beginAtZero: true, grid: { color: _pLearnHoursGrid }, ticks: { precision: 0 }, title: { display: true, text: 'Hours' } },
                         y: { grid: { display: false }, ticks: { callback: function (value) { var l = this.getLabelForValue(value); return l && l.length > 18 ? l.slice(0, 18) + '…' : l; } } }
                     }
                 }
             });
+            if (window.WaiChart) window.WaiChart.registerForTheme(_learningHoursChart);
         }
     </script>
 @endsection

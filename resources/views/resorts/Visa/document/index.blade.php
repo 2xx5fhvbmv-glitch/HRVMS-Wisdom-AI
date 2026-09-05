@@ -8,9 +8,15 @@
 @endif
 
 @section('content')
+<style>
+    #visa-document-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #visa-document-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="visa-document-hero">
             <div class="row justify-content-between g-3">
                 <div class="col-auto">
                     <div class="page-title">
@@ -1136,6 +1142,8 @@
     </div>
 </div>
 @include('resorts._emotional_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -1154,7 +1162,11 @@
     const documentTypes = {!! json_encode($documentTypes) !!};
     let selectFiles = [];
 
-    $(document).ready(function() 
+    $(document).on('change', 'select[id^="docType_"]', function () {
+        $(this).parsley().validate();
+    });
+
+    $(document).ready(function()
     {
         initSelect2AndValidation();
         var current_fs, next_fs, previous_fs; //fieldsets
@@ -1911,11 +1923,12 @@
                         $.each(sections, function(_, section) {
                             html += `<option value="${section.id}">${section.name}</option>`;
                         });
-                        $('#section').html(html).trigger('change');
-                    } else {
-                        // No sections under this department — load positions directly off it.
-                        loadPositions({ department_id: departmentId });
+                        $('#section').html(html);
                     }
+                    // No section chosen yet — show the department's
+                    // section-less positions until the user picks a section,
+                    // same fallback the Section change handler uses below.
+                    loadPositions({ department_id: departmentId });
                 },
                 error: function(xhr) {
                     console.error('getSectionByDepartment failed', xhr.status, xhr.responseText);
@@ -1929,7 +1942,12 @@
         $(document).on('change', '#section', function() {
             let sectionId = $(this).val();
             $('#position').html('<option></option>').trigger('change');
-            if (!sectionId) return;
+            if (!sectionId) {
+                // Section cleared — fall back to the department's own positions.
+                let departmentId = $('#department').val();
+                if (departmentId) loadPositions({ department_id: departmentId });
+                return;
+            }
             loadPositions({ section_id: sectionId });
         });
 
@@ -2117,12 +2135,23 @@
                         <p class="text-truncate mb-2" title="${fileName}" style="font-size: 14px; max-width: 100%;">${fileName}</p>
                         <div class="border-top pt-2" style="max-width: 100%;">
                             <label for="docType_${index}" class="form-label">DOCUMENT TYPE</label>
-                            <select class="form-select select2t-none" id="docType_${index}" name="docType[${index}]" data-parsley-required="true"
+                            <select class="form-select dd-native-select" id="docType_${index}" name="docType[${index}]" data-parsley-required="true"
                             data-parsley-required-message="Please select a document type for this file"
                             data-parsley-errors-container="#docTypeError_${index}">
                                 <option value="">Select document type</option>
                                 ${documentTypes.map(type => `<option value="${type.id}">${type.documentname}</option>`).join('')}
                             </select>
+                            <div class="dd" data-target="#docType_${index}">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Select document type</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Document Type">
+                                    <div class="dd-scroll">
+                                        ${documentTypes.map(type => `<div class="dd-item" role="option" data-value="${type.id}"><span class="dd-nm">${type.documentname}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>`).join('')}
+                                    </div>
+                                </div>
+                            </div>
                             <div id="docTypeError_${index}" class="parsley-errors-list error"></div>
                         </div>
                     </div>
@@ -2130,14 +2159,6 @@
             `;
             documentContainer.append(documentBox);
         });
-
-        if (typeof $.fn.select2 !== 'undefined') {
-            $('.select2t-none').select2({
-                width: '100%'
-            }).on('select2:close', function () {
-                $(this).parsley().validate();
-            });
-        }
     }
     
     async function processPdfWithPdfLib(file)

@@ -10,10 +10,15 @@
 @endif
 
 @section('content')
-
+<style>
+    #accommodation-employee-details-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #accommodation-employee-details-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding page-appHedding">
+        <div class="page-hedding page-appHedding" id="accommodation-employee-details-hero">
             <div class="row justify-content-between g-md-2 g-1">
                 <div class="col-auto">
                     <div class="page-title">
@@ -203,7 +208,7 @@
                         <div class="col-md-6">
                             <label >Select Building</label>
 
-                            <select name="Building_id" id="Building_id">
+                            <select name="Building_id" id="Building_id" class="dd-native-select">
                                 <option ></option>
                                 @if($BuildingModel->isNotEmpty())
                                     @foreach ($BuildingModel as $b)
@@ -211,6 +216,23 @@
                                     @endforeach
                                 @endif
                             </select>
+                            <div class="dd" data-target="#Building_id">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Select Building</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Building">
+                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a building…"></div>
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Building</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @if($BuildingModel->isNotEmpty())
+                                            @foreach ($BuildingModel as $b)
+                                            <div class="dd-item" role="option" data-value="{{ $b->building_id }}"><span class="dd-nm">{{ $b->BuildingName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @endforeach
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <hr class="mt-2">
                         <div class="col-md-12 mt-1">
@@ -315,6 +337,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts._dropdown_styles')
 @endsection
 
 @section('import-scripts')
@@ -330,11 +353,6 @@
             placeholder: "Department",
             allowClear: true
         });
-        $("#Building_id").select2({
-            placeholder: "Building",
-            allowClear: true
-        });
-        
             $('#AddMoreItems').validate({
                 rules: {
                     InventoryModule: {
@@ -682,4 +700,5 @@
         });
     }
 </script>
+@include('resorts._dropdown_script')
 @endsection

@@ -26,6 +26,7 @@ $(document).ready(function () {
     for (var y = currentYear; y >= currentYear - 5; y--) {
         $yearSelect.append('<option value="' + y + '"' + (y === currentYear ? ' selected' : '') + '>' + y + '</option>');
     }
+    wisdomDD.rebuild('#dbiTrendYear');
     dbiLoadTrends(currentYear);
     $yearSelect.on('change', function () { dbiLoadTrends($(this).val()); });
 });

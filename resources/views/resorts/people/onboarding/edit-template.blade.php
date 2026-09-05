@@ -8,9 +8,15 @@
 @endif
 
 @section('content')
+    <style>
+        #onboarding-template-edit-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #onboarding-template-edit-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="onboarding-template-edit-hero">
                 <div class="row justify-content-between g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -30,12 +36,29 @@
                                 <div class="row g-4">
                                     <div class="col-6">
                                         <label for="template_type" class="form-label">TEMPLATE TYPE <span class="red-mark">*</span></label>
-                                        <select class="form-select select2t-none" id="template_type"
+                                        <select class="form-select dd-native-select" id="template_type"
                                             aria-label="Default select example" required name="template_type" data-parsley-required-message="Please select template type" data-parsley-errors-container="#type-error">
                                             <option value="">Select Template Type</option>
                                             <option {{$templates->template_type == "supervisor_line" ? "Selected" : ""}} value="supervisor_line">Template For Supervisor and Below</option>
                                             <option {{$templates->template_type == "manager_above" ? "Selected" : ""}} value="manager_above">Template For Manager and Above</option>
                                         </select>
+                                        @php
+                                            $templateTypeLabels = ['supervisor_line' => 'Template For Supervisor and Below', 'manager_above' => 'Template For Manager and Above'];
+                                            $selectedTemplateType = $templateTypeLabels[$templates->template_type] ?? null;
+                                        @endphp
+                                        <div class="dd" data-target="#template_type">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">{{ $selectedTemplateType ?? 'Select Template Type' }}</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Template Type">
+                                                <div class="dd-scroll">
+                                                    <div class="dd-item{{ $selectedTemplateType ? '' : ' active' }}" role="option" data-value=""><span class="dd-nm">Select Template Type</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    <div class="dd-item{{ $templates->template_type == 'supervisor_line' ? ' active' : '' }}" role="option" data-value="supervisor_line"><span class="dd-nm">Template For Supervisor and Below</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    <div class="dd-item{{ $templates->template_type == 'manager_above' ? ' active' : '' }}" role="option" data-value="manager_above"><span class="dd-nm">Template For Manager and Above</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                </div>
+                                            </div>
+                                        </div>
                                         <div id="type-error"></div>
                                     </div>
                                     <div class="col-6">
@@ -67,6 +90,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts._dropdown_styles')
 <style>
     #ui-datepicker-div{
         display:none!important;
@@ -80,8 +104,6 @@
     <script src="https://formbuilder.online/assets/js/form-render.min.js"></script>
     <script>
         $(document).ready(function () {
-            $(".select2t-none").select2();
-
             // Load the existing form structure
             let existingFormStructure = @json($templates->fields);
 
@@ -172,4 +194,5 @@
             });
         });
     </script>
+@include('resorts._dropdown_script')
 @endsection

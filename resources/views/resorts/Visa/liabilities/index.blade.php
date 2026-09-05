@@ -8,10 +8,15 @@
 @endif
 
 @section('content')
-
+<style>
+    #visa-liabilities-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #visa-liabilities-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding page-appHedding">
+            <div class="page-hedding page-appHedding" id="visa-liabilities-hero">
                 <div class="row justify-content-between g-md-2 g-1">
                     <div class="col-auto">
                         <div class="page-title">

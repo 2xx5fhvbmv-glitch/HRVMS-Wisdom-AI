@@ -39,13 +39,28 @@
                     </div>
                     <div class="col-xl-3 col-lg-5 col-md-7 col-sm-8">
                         <div class="form-group">
-                            <select class="form-select" id="month-filter">
+                            <select class="form-select dd-native-select" id="month-filter">
                                 <option value="">All Months ({{ date('Y') }})</option>
                                 @php $months = ['01'=>'January','02'=>'February','03'=>'March','04'=>'April','05'=>'May','06'=>'June','07'=>'July','08'=>'August','09'=>'September','10'=>'October','11'=>'November','12'=>'December']; @endphp
                                 @foreach ($months as $value => $label)
                                     <option value="{{ $value }}">{{ $label }}</option>
                                 @endforeach
                             </select>
+                            <div class="dd" data-target="#month-filter">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">All Months ({{ date('Y') }})</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Month">
+                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a month…"></div>
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">All Months ({{ date('Y') }})</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @foreach ($months as $value => $label)
+                                        <div class="dd-item" role="option" data-value="{{ $value }}"><span class="dd-nm">{{ $label }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <div class="col-auto">
@@ -92,6 +107,7 @@
 
 @section('import-css')
 @include('resorts.payroll._payroll_buttons_v2_styles')
+@include('resorts._dropdown_styles')
 <style>
     /* Prevent search icon and browser clear (X) from overlapping */
     .card-header .input-group .form-control.search {
@@ -244,4 +260,5 @@
     });
     @endif
 </script>
+@include('resorts._dropdown_script')
 @endsection

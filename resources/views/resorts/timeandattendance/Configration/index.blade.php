@@ -8,10 +8,15 @@
 @endif
 
 @section('content')
-
+    <style>
+        #ta-config-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #ta-config-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="ta-config-hero">
                 <div class="row justify-content-between g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -572,12 +577,26 @@
                                     </div>
                                     <div class="col-5">
                                         <label class="form-label small mb-0">Grace (min)</label>
-                                        <select id="gf-grace-period" class="form-select form-select-sm">
+                                        <select id="gf-grace-period" class="form-select form-select-sm dd-native-select">
                                             <option value="5">5 min</option>
                                             <option value="10" selected>10 min</option>
                                             <option value="15">15 min</option>
                                             <option value="30">30 min</option>
                                         </select>
+                                        <div class="dd" data-target="#gf-grace-period">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">10 min</span>
+                                                <svg class="dd-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Grace period">
+                                                <div class="dd-scroll">
+                                                    <div class="dd-item" role="option" data-value="5"><span class="dd-nm">5 min</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    <div class="dd-item active" role="option" data-value="10"><span class="dd-nm">10 min</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    <div class="dd-item" role="option" data-value="15"><span class="dd-nm">15 min</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    <div class="dd-item" role="option" data-value="30"><span class="dd-nm">30 min</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="d-flex gap-2">
@@ -634,13 +653,28 @@
                             <input type="hidden" name="resort_id" value="{{ $resort_id }}">
 
                             <div class="col-md-12">
-                                <select name="PublicHoliday" id="PublicHoliday" class="form-select">
+                                <select name="PublicHoliday" id="PublicHoliday" class="form-select dd-native-select">
                                     <option value="" data-id="0">Select Holiday</option>
                                     @foreach ($PublicHoliday as $p)
                                         <option value="{{ $p->id }}" data-id="{{ $p->id }}"
                                             data-date='{{ $p->holiday_date }}'>{{ $p->name }}</option>
                                     @endforeach
                                 </select>
+                                <div class="dd" data-target="#PublicHoliday">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">Select Holiday</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Public Holiday">
+                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a holiday…"></div>
+                                        <div class="dd-scroll">
+                                            <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Holiday</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @foreach ($PublicHoliday as $p)
+                                                <div class="dd-item" role="option" data-value="{{ $p->id }}"><span class="dd-nm">{{ $p->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                </div>
 
                             </div>
                             <div class="col-md-12">
@@ -674,6 +708,7 @@
 
 @section('import-css')
 @include('resorts.timeandattendance._taa_buttons_v2_styles')
+@include('resorts._dropdown_styles')
 @endsection
 
 @section('import-scripts')
@@ -1901,6 +1936,7 @@
                 $('#gf-edit-id').val(zone.id);
                 $('#gf-zone-name').val(zone.name);
                 $('#gf-grace-period').val(zone.grace_period);
+                window.wisdomDD.sync('#gf-grace-period');
                 $('#gf-form-title').text('Edit Zone');
                 $('#gf-cancel-edit').show();
 
@@ -1973,6 +2009,7 @@
                 $('#gf-edit-id').val('');
                 $('#gf-zone-name').val('');
                 $('#gf-grace-period').val('10');
+                window.wisdomDD.sync('#gf-grace-period');
                 $('#gf-form-title').text('Add New Zone');
                 $('#gf-cancel-edit').hide();
                 $('#gf-save-zone').prop('disabled', true);
@@ -1999,6 +2036,7 @@
                     $('#gf-edit-id').val(zone.id);
                     $('#gf-zone-name').val(zone.name);
                     $('#gf-grace-period').val(zone.grace_period);
+                    window.wisdomDD.sync('#gf-grace-period');
                     $('#gf-form-title').text('Edit Zone');
                     $('#gf-cancel-edit').show();
 
@@ -2067,7 +2105,6 @@
             $(document).on("click", ".AddPublicHolidays", function() {
 
                 $("#PublicHoliday-modal").modal('show');
-                $("#PublicHoliday").select2();
             });
 
             $(document).on("change", "#PublicHoliday", function() {
@@ -2117,6 +2154,7 @@
                 } else {
                     $("#PublicHoliday").attr('disabled', false);
                 }
+                $("#PublicHoliday").siblings('.dd').find('.dd-trigger').prop('disabled', $("#PublicHoliday").is(':disabled'));
 
             });
 
@@ -2376,4 +2414,5 @@
 
 
     </script>
+@include('resorts._dropdown_script')
 @endsection

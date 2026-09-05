@@ -7,10 +7,16 @@
 </div>
 @endif
 
-@section('content')   
+@section('content')
+<style>
+    #sos-live-location-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #sos-live-location-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="sos-live-location-hero">
                 <div class="row  g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -40,34 +46,73 @@
                             <form id="employeeFilterForm">
                             @csrf
                                 <div class="row g-2">
-                                    <div class="col-sm-6"> 
-                                        <select class="form-select select2t-none" id="roleFilter" name="roleId" aria-label="Default select example">
+                                    <div class="col-sm-6">
+                                        <select class="form-select dd-native-select" id="roleFilter" name="roleId" aria-label="Default select example">
                                             <option  value="">Select role</option>
-                                            {{-- @foreach($Roles as $role)
-                                                <option value="{{ $role->id }}">{{ $role->name }}</option>
-                                            @endforeach --}}
-
                                             @foreach(config('settings.Position_Rank') as $key => $rank)
                                                 <option value="{{ $key }}">{{ $rank }}</option>
                                             @endforeach
 
                                         </select>
+                                        <div class="dd" data-target="#roleFilter">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">Select role</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Role">
+                                                <div class="dd-scroll">
+                                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select role</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @foreach(config('settings.Position_Rank') as $key => $rank)
+                                                        <div class="dd-item" role="option" data-value="{{ $key }}"><span class="dd-nm">{{ $rank }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @endforeach
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div class="col-sm-6"> 
-                                        <select class="form-select select2t-none" id="teamFilter" name="teamId" aria-label="Default select example">
+                                    <div class="col-sm-6">
+                                        <select class="form-select dd-native-select" id="teamFilter" name="teamId" aria-label="Default select example">
                                             <option value="">Select Team</option>
                                             @foreach($getAllTeams as $team)
                                                 <option value="{{ $team->team->id }}">{{ $team->team->name }}</option>
                                             @endforeach
                                         </select>
+                                        <div class="dd" data-target="#teamFilter">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">Select Team</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Team">
+                                                <div class="dd-scroll">
+                                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Team</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @foreach($getAllTeams as $team)
+                                                        <div class="dd-item" role="option" data-value="{{ $team->team->id }}"><span class="dd-nm">{{ $team->team->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @endforeach
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
-                                    <div class="col-sm-6"> 
-                                        <select class="form-select select2t-none" id="statusFilter" name="safety_status" aria-label="Default select example">
+                                    <div class="col-sm-6">
+                                        <select class="form-select dd-native-select" id="statusFilter" name="safety_status" aria-label="Default select example">
                                             <option value="">Safety Status</option>
                                             <option value="safe">Safe</option>
                                             <option value="Unsafe">Unsafe</option>
                                             <option value="Unknown">Unknown</option>
-                                        </select></div>
+                                        </select>
+                                        <div class="dd" data-target="#statusFilter">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">Safety Status</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Safety Status">
+                                                <div class="dd-scroll">
+                                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Safety Status</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    <div class="dd-item" role="option" data-value="safe"><span class="dd-nm">Safe</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    <div class="dd-item" role="option" data-value="Unsafe"><span class="dd-nm">Unsafe</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    <div class="dd-item" role="option" data-value="Unknown"><span class="dd-nm">Unknown</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
                                     <div class="col-sm-6 d-flex">
                                         <button type="submit" class="btn eb-btn-primary btn-sm mx-1">Submit</button>
                                         <button type="button" id="resetFilterBtn" class="btn eb-btn-neutral btn-sm">Reset</button>
@@ -87,6 +132,8 @@
         </div>
     </div>
 @include('resorts._emotional_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')

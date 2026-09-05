@@ -8,13 +8,13 @@
     <style>
         body { background: #f4f6f9; font-family: 'Segoe UI', Arial, sans-serif; }
         .response-card { max-width: 550px; margin: 60px auto; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.1); }
-        .response-header { background: #014653; color: #fff; padding: 24px; text-align: center; }
+        .response-header { background: var(--teal); color: #fff; padding: 24px; text-align: center; }
         .response-body { background: #fff; padding: 30px; }
         .meeting-detail { display: flex; padding: 10px 0; border-bottom: 1px solid #f0f0f0; }
         .meeting-detail:last-child { border-bottom: none; }
         .meeting-detail .label { font-weight: 600; color: #555; width: 120px; flex-shrink: 0; }
         .meeting-detail .value { color: #333; }
-        .btn-accept { background: #014653; border: none; padding: 10px 30px; font-weight: 500; }
+        .btn-accept { background: var(--teal); border: none; padding: 10px 30px; font-weight: 500; }
         .btn-accept:hover { background: #026b7a; }
         .btn-decline { background: #dc3545; border: none; padding: 10px 30px; font-weight: 500; }
         .btn-decline:hover { background: #c82333; }

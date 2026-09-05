@@ -14,9 +14,15 @@
 @endphp
 
 @section('content')
+    <style>
+        #learning-schedule-list-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #learning-schedule-list-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="learning-schedule-list-hero">
                 <div class="row  g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -37,12 +43,31 @@
                             </div>
                         </div>
                         <div class="col-xl-2 col-lg-4 col-md-5 col-6">
-                            <select id="typeFilter" class="form-select select2t-none">
-                                <option value=""> By Learning Type</option>
+                            {{-- dropped .select2t-none: despite the name it's the global
+                                 auto-init hook (resorts.layouts.js) that turns a <select>
+                                 into select2 — the .dd component below is now this
+                                 select's entire visual layer, so select2 would just render
+                                 a second, unstyled trigger on top of it. --}}
+                            <select id="typeFilter" class="form-select dd-native-select">
+                                <option value="">By Learning Type</option>
                                 <option value="face-to-face">Face-to-Face</option>
                                 <option value="hybrid">Hybrid</option>
                                 <option value="online">Online</option>
                             </select>
+                            <div class="dd" id="typeFilterDd" data-target="#typeFilter">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">By Learning Type</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="By Learning Type">
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">By Learning Type</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="face-to-face"><span class="dd-nm">Face-to-Face</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="hybrid"><span class="dd-nm">Hybrid</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="online"><span class="dd-nm">Online</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="col-xl-3 col-lg-5 col-md-6 col-6">
                             <div class="ts-jump" id="tsJump">
@@ -139,6 +164,8 @@
         </div>
     </div>
 @include('resorts.learning._learning_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -155,11 +182,11 @@
        Still needs its own class: a native <button> carries browser chrome
        that a shared .form-select class (meant for <select>) doesn't reset. */
     .ts-jump { position: relative; }
-    .ts-jump-btn { appearance: none; -webkit-appearance: none; display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 18px; border: 1px solid #DDDDDD; border-radius: 13px; background: #fff; cursor: pointer; font-family: inherit; font-size: 16px; line-height: 30px; color: var(--ink); }
-    .ts-jump-btn:focus { outline: none; border-color: var(--teal); box-shadow: 0 0 0 3px rgba(1,70,83,.10); }
+    .ts-jump-btn { appearance: none; -webkit-appearance: none; display: flex; align-items: center; gap: 8px; width: 100%; padding: 7px 18px; border: 1px solid var(--neutral-bg); border-radius: 13px; background: #fff; cursor: pointer; font-family: inherit; font-size: 16px; line-height: 30px; color: var(--ink); }
+    .ts-jump-btn:focus { outline: none; border-color: var(--teal); box-shadow: 0 0 0 3px rgba(var(--teal-rgb),.10); }
     .ts-jump-btn i:first-child { color: var(--ts-g3); font-size: 14px; }
     .ts-jump-caret { margin-left: auto; font-size: 11px; color: var(--ts-g3); }
-    .ts-jump-menu { position: absolute; top: 52px; right: 0; z-index: 40; width: 220px; max-height: 280px; overflow-y: auto; background: #fff; border: 1px solid var(--ts-g4); border-radius: 14px; box-shadow: 0 16px 40px rgba(1,70,83,.16); padding: 6px; display: none; }
+    .ts-jump-menu { position: absolute; top: 52px; right: 0; z-index: 40; width: 220px; max-height: 280px; overflow-y: auto; background: #fff; border: 1px solid var(--ts-g4); border-radius: 14px; box-shadow: 0 16px 40px rgba(var(--teal-rgb),.16); padding: 6px; display: none; }
     .ts-jump-menu.open { display: block; }
     .ts-jump-menu button { display: flex; justify-content: space-between; width: 100%; border: none; background: none; font-family: inherit; font-size: 12.5px; color: var(--ink); padding: 9px 10px; border-radius: 9px; cursor: pointer; text-align: left; }
     .ts-jump-menu button:hover { background: var(--teal-soft); color: var(--teal); }
@@ -200,7 +227,7 @@
     .tl-divider .mo { font-size: 12px; font-weight: 600; color: var(--ink); letter-spacing: .2px; }
     .tl-divider .ct { font-size: 11px; color: var(--ts-g3); font-weight: 400; }
     .tl-divider .ln { flex: 1; height: 1px; background: var(--ts-g4); }
-    .tl { background: #fff; border: 1px solid var(--ts-g4); border-radius: 14px; box-shadow: 0 1px 2px rgba(1,70,83,.05), 0 8px 24px rgba(1,70,83,.05); overflow: hidden; }
+    .tl { background: #fff; border: 1px solid var(--ts-g4); border-radius: 14px; box-shadow: 0 1px 2px rgba(var(--teal-rgb),.05), 0 8px 24px rgba(var(--teal-rgb),.05); overflow: hidden; }
     .tlr { display: flex; align-items: center; gap: 18px; padding: 15px 20px; border-bottom: 1px solid var(--line-2, #EEF4F4); }
     .tlr:last-child { border-bottom: none; }
     .tlr:hover { background: var(--teal-soft); }
@@ -225,7 +252,7 @@
     .ef { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
     .ef span { font-size: 9.5px; font-weight: 600; letter-spacing: .5px; text-transform: uppercase; color: var(--ts-g3); }
     .ef input { height: 38px; width: 100%; border: 1px solid var(--ts-g4); border-radius: 10px; padding: 0 11px; font-family: inherit; font-size: 12.5px; color: var(--ink); background: #fff; outline: none; }
-    .ef input:focus { border-color: var(--teal); box-shadow: 0 0 0 3px rgba(1,70,83,.10); }
+    .ef input:focus { border-color: var(--teal); box-shadow: 0 0 0 3px rgba(var(--teal-rgb),.10); }
     .edit-actions { flex: none; display: flex; gap: 8px; align-self: flex-end; padding-bottom: 1px; }
     .edit-actions .btn-primary { height: 38px; padding: 0 18px; border: none; border-radius: 10px; background: var(--teal); color: #fff; font-family: inherit; font-size: 13px; font-weight: 500; cursor: pointer; appearance: none; -webkit-appearance: none; }
     .edit-actions .btn-primary:hover { background: var(--teal-2); }
@@ -252,7 +279,7 @@
     /* frosted attendee popover — same material as the WAI recommendation modal */
     .att-pop { position: fixed; z-index: 1060; width: 250px; border-radius: 22px; padding: 20px 20px 12px;
         background: rgba(255,255,255,.82); backdrop-filter: blur(28px) saturate(160%); -webkit-backdrop-filter: blur(28px) saturate(160%);
-        border: 1px solid rgba(255,255,255,.7); box-shadow: 0 24px 70px rgba(1,70,83,.20), 0 2px 8px rgba(1,70,83,.06);
+        border: 1px solid rgba(255,255,255,.7); box-shadow: 0 24px 70px rgba(var(--teal-rgb),.20), 0 2px 8px rgba(var(--teal-rgb),.06);
         opacity: 0; transform: translateY(8px) scale(.985); pointer-events: none; transition: opacity .28s ease, transform .3s cubic-bezier(.16,1,.3,1); }
     .att-pop.open { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
     .att-pop .k { display: flex; align-items: center; gap: 7px; font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .9px; color: var(--ts-g2); margin-bottom: 14px; }

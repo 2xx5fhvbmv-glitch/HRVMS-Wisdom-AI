@@ -8,9 +8,26 @@
 @endif
 
 @section('content')
+<style>
+    /* Same requested push as the other module dashboards (Payroll / Talent
+       Acquisition / People / Time and Attendance / Leave / Performance /
+       Learning / Accommodation / Incident) — extra breathing room between
+       the hero and the KPI row below it, scoped to this page
+       (.page-hedding's own margin-bottom is shared by every page's hero).
+       padding-bottom, not margin: adjacent sibling margins collapse to the
+       larger of the two rather than summing. Below Bootstrap's sm
+       breakpoint the extra padding pushes the KPI row's first card into
+       the teal hero curve's rounded bottom-left corner (body::before,
+       border-radius 0 0 50px 50px) — same collision found on Payroll —
+       neutralized below 576px. */
+    #survey-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #survey-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="survey-hero">
             <div class="row g-3 align-items-center justify-content-between">
                 <div class="col-auto">
                     <div class="page-title">
@@ -513,26 +530,26 @@
     .wai-narrative .wai-head { position: relative; overflow: hidden; padding: 17px 18px; flex-shrink: 0; }
     .wai-narrative .wai-head::before {
         content: ""; position: absolute; inset: 0; pointer-events: none;
-        background: linear-gradient(110deg, #014653 0%, #0e8a9e 40%, #7fa61e 70%, #e0ff02 100%);
+        background: linear-gradient(110deg, var(--teal) 0%, #0e8a9e 40%, #7fa61e 70%, var(--lime) 100%);
     }
     .wai-narrative .wai-head::after {
         content: ""; position: absolute; inset: 0; pointer-events: none;
         background: linear-gradient(110deg, rgba(1,40,48,.35), transparent 55%);
     }
-    .wai-narrative .wai-head h2 { position: relative; color: #fff; font-size: 15px; font-weight: 800; margin: 0; }
-    .wai-narrative .wai-head-meta { position: relative; margin-top: 4px; font-size: 11.5px; color: rgba(255,255,255,.75); display: flex; gap: 6px; }
+    .wai-narrative .wai-head h2 { position: relative; color: #fff; font-size: 18px; font-weight: 600; margin: 0; }
+    .wai-narrative .wai-head-meta { position: relative; margin-top: 4px; font-size: 10.5px; font-weight: 500; color: rgba(255,255,255,.75); display: flex; gap: 6px; }
     .wai-narrative .wai-head-meta a { color: #fff; font-weight: 600; text-decoration: underline; }
 
     .wai-narrative-body { padding: 16px; }
     .wai-narrative .wai-row { display: flex; align-items: flex-start; gap: 12px; padding: 12px 2px; border-bottom: 1px solid #F2F6F6; }
     .wai-narrative .wai-row:last-child { border-bottom: none; }
     .wai-narrative .wai-row-icon { width: 32px; height: 32px; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; margin-top: 2px; }
-    .wai-narrative .wai-row-icon.is-ok { background: #E9F7F0; color: #1F9D6B; }
-    .wai-narrative .wai-row-icon.is-flagged { background: #FBF0DC; color: #D98A00; }
+    .wai-narrative .wai-row-icon.is-ok { background: var(--positive-bg); color: var(--positive); }
+    .wai-narrative .wai-row-icon.is-flagged { background: var(--warning-bg); color: var(--warning); }
     .wai-narrative .wai-row-body { flex: 1 1 auto; min-width: 0; }
-    .wai-narrative .wai-row-body h6 { margin: 0 0 4px; font-size: 13.5px; font-weight: 700; color: #14232A; }
-    .wai-narrative .wai-row-text { margin: 0 0 4px; font-size: 12.5px; color: #5D6F75; line-height: 1.5; }
-    .wai-narrative .wai-row-link { display: inline-block; margin-top: 2px; font-size: 12px; font-weight: 600; color: #014653; }
+    .wai-narrative .wai-row-body h6 { margin: 0 0 4px; font-size: 14px; font-weight: 600; color: var(--ink); }
+    .wai-narrative .wai-row-text { margin: 0 0 4px; font-size: 14px; color: var(--muted); line-height: 1.5; }
+    .wai-narrative .wai-row-link { display: inline-block; margin-top: 2px; font-size: 14px; font-weight: 600; color: var(--teal); }
 
     /* Truncate long department / survey names in the chart legend pills.
        Full text remains in the title attribute so hover shows it. */
@@ -730,12 +747,15 @@ surveyData.forEach(s => {
 
 // Create datasets dynamically. Keep the FULL title in `fullLabel` so the
 // tooltip can show it even though the legend uses the truncated form.
+var _pSurvH1 = window.WaiChart ? window.WaiChart.palette().card : '#fff';
+// backgroundColor (surveyColors) is server-supplied per survey — out of
+// scope; borderColor is the card-background gap between stacked bars.
 var datasets = Object.keys(groupedData).map(key => ({
     label: truncateLabel(surveyTitles[key], 22),
     fullLabel: surveyTitles[key],
     data: groupedData[key],
     backgroundColor: surveyColors[key],
-    borderColor: '#fff',
+    borderColor: _pSurvH1,
     borderWidth: 2,
     borderRadius: 10,
 }));
@@ -781,6 +801,9 @@ myStackedBarChart = new Chart(ctx, {
             }
         }
     }
+});
+if (window.WaiChart) window.WaiChart.registerForTheme(myStackedBarChart, function (c, p) {
+    c.data.datasets.forEach(function (ds) { ds.borderColor = p.card; });
 });
 }
 
@@ -856,6 +879,8 @@ myStackedBarChart = new Chart(ctx, {
         },
         plugins: [doughnutLabelsInsideN] // Attach custom plugin
     });
+    // backgroundColor (departmentColors) is server-supplied — out of scope.
+    if (window.WaiChart) window.WaiChart.registerForTheme(myDoughnutChart);
     }
 
     var surveyLabels = {!! json_encode($SurveyWiseParticipationRates->pluck('title')) !!}; // Full survey titles (kept for tooltip)
@@ -867,6 +892,7 @@ myStackedBarChart = new Chart(ctx, {
     var myAttendance = null;
     if (attendanceEl) {
     var ctp = attendanceEl.getContext('2d');
+    var _pSurvH2 = window.WaiChart ? window.WaiChart.palette().teal : '#014653';
     myAttendance = new Chart(ctp, {
         type: 'bar',
         data: {
@@ -875,8 +901,8 @@ myStackedBarChart = new Chart(ctx, {
                 {
                     label: 'Completed',
                     data: completedData,
-                    backgroundColor: '#014653',
-                    borderColor: '#014653',
+                    backgroundColor: _pSurvH2,
+                    borderColor: _pSurvH2,
                     borderWidth: 1,
                     borderRadius: 6,
                     barThickness: 25
@@ -926,6 +952,9 @@ myStackedBarChart = new Chart(ctx, {
                 }
             }
         }
+    });
+    if (window.WaiChart) window.WaiChart.registerForTheme(myAttendance, function (c, p) {
+        c.data.datasets[0].backgroundColor = c.data.datasets[0].borderColor = p.teal;
     });
     }
 

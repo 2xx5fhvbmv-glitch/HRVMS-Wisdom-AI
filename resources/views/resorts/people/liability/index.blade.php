@@ -8,9 +8,15 @@
 @endif
 
 @section('content')
+    <style>
+        #liability-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #liability-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="liability-hero">
                 <div class="row  g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -328,7 +334,7 @@
                                         </div>
                                     </div>
                                     <div class="col-xxl-2 col-lg-3 col-md-4 col-sm-4 col-6">
-                                        <select id="liabilityEmpDeptFilter" class="form-select select2t-none" data-placeholder="By Department">
+                                        <select id="liabilityEmpDeptFilter" class="form-select dd-native-select" data-placeholder="By Department">
                                             <option value="">By Department</option>
                                             @if($resort_departments && count($resort_departments) > 0)
                                                 @foreach($resort_departments as $department)
@@ -336,6 +342,23 @@
                                                 @endforeach
                                             @endif
                                         </select>
+                                        <div class="dd" data-target="#liabilityEmpDeptFilter">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">By Department</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Department">
+                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a department…"></div>
+                                                <div class="dd-scroll">
+                                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">By Department</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @if($resort_departments && count($resort_departments) > 0)
+                                                        @foreach($resort_departments as $department)
+                                                        <div class="dd-item" role="option" data-value="{{$department->id}}"><span class="dd-nm">{{$department->name}}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @endforeach
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -477,6 +500,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts._dropdown_styles')
 <style>
     /* Liability "Employees" tab — the table has ~22 columns of currency
        cells. Default Bootstrap spacing made every $ value wrap (e.g. "$"
@@ -705,7 +729,9 @@
         }
     };
 
-    new Chart(ctx, {
+    // baseColors: only 2 of 15 match SSOT tokens (plus random HSL fill
+    // beyond that) — left literal as a whole set.
+    var _liabilityDoughnut = new Chart(ctx, {
         type: 'doughnut',
         data: {
             labels: chartLabels,
@@ -726,6 +752,7 @@
         },
         plugins: [doughnutLabelsInside]
     });
+    if (window.WaiChart) window.WaiChart.registerForTheme(_liabilityDoughnut);
 
     // reductionDataDisplay = monthly remaining-liability values in the
     // resort's display currency. $reductionData stays USD for downstream
@@ -736,15 +763,16 @@
 
     const trendCtx = document.getElementById('liabilityTrendChart').getContext('2d');
 
-    new Chart(trendCtx, {
+    var _pLiabTrend = window.WaiChart ? window.WaiChart.palette().teal : '#014653';
+    var _liabilityTrendChart = new Chart(trendCtx, {
         type: 'line',
         data: {
             labels: {!! json_encode($labels) !!},
             datasets: [{
                 label: 'Remaining Liability',
                 data: {!! json_encode($reductionDataDisplay ?? $reductionData) !!},
-                borderColor: '#014653',
-                backgroundColor: '#014653',
+                borderColor: _pLiabTrend,
+                backgroundColor: _pLiabTrend,
                 fill: false,
                 tension: 0.4,
                 // Make points visible at a small size so the hover tooltip has
@@ -753,7 +781,7 @@
                 // tooltip mode (intersect:true) the hover never fired.
                 pointRadius: 3,
                 pointHoverRadius: 6,
-                pointBackgroundColor: '#014653',
+                pointBackgroundColor: _pLiabTrend,
             }]
         },
         options: {
@@ -813,6 +841,9 @@
                 }
             }
         }
+    });
+    if (window.WaiChart) window.WaiChart.registerForTheme(_liabilityTrendChart, function (c, p) {
+        c.data.datasets[0].borderColor = c.data.datasets[0].backgroundColor = c.data.datasets[0].pointBackgroundColor = p.teal;
     });
 
 
@@ -893,4 +924,5 @@
     });
     */
 </script>
+@include('resorts._dropdown_script')
 @endsection

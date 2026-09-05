@@ -8,9 +8,15 @@
     @endif
 
     @section('content')
+    <style>
+        #ta-talentpool-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #ta-talentpool-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding page-appHedding">
+            <div class="page-hedding page-appHedding" id="ta-talentpool-hero">
                 <div class="row justify-content-between g-md-2 g-1">
                     <div class="col-auto">
                         <div class="page-title">
@@ -32,7 +38,7 @@
                         </div>
                         @if(!in_array($rank, [2, 7]))
                         <div class="col-xl-2 col-md-3 col-sm-4 col-6">
-                            <select class="form-select" name="Department" id="ResortDepartment">
+                            <select class="form-select dd-native-select" name="Department" id="ResortDepartment">
                                 <option selected disabled>Select Department</option>
                                 @if($ResortDepartment->isNotEmpty())
                                     @foreach ($ResortDepartment as $item)
@@ -42,14 +48,43 @@
 
                                 @endif
                             </select>
+                            <div class="dd" data-target="#ResortDepartment">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Select Department</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Department">
+                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a department…"></div>
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value="" aria-disabled="true"><span class="dd-nm">Select Department</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @if($ResortDepartment->isNotEmpty())
+                                            @foreach ($ResortDepartment as $item)
+                                            <div class="dd-item" role="option" data-value="{{ $item->id }}"><span class="dd-nm">{{ $item->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @endforeach
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         @elseif($rank == 2)
                         <input type="hidden" id="ResortDepartment" value="{{ $employeeDeptId }}">
                         @endif
                         <div class="col-xl-2 col-md-3 col-sm-4 col-6">
-                            <select class="form-select  Positions" name="Positions">
+                            <select class="form-select dd-native-select Positions" name="Positions" id="talentPoolPositions">
                                 <option selected disabled>Select Positions</option>
                            </select>
+                           <div class="dd" data-target="#talentPoolPositions">
+                               <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                   <span class="dd-lbl">Select Positions</span>
+                                   <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                               </button>
+                               <div class="dd-panel" role="listbox" aria-label="Position">
+                                   <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a position…"></div>
+                                   <div class="dd-scroll">
+                                       <div class="dd-item active" role="option" data-value="" aria-disabled="true"><span class="dd-nm">Select Positions</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                   </div>
+                               </div>
+                           </div>
                         </div>
                         {{-- <div class="col-xl-2 col-md-3 col-sm-4 col-6">
                             <input type="text" class="form-control" placeholder="18/10/2024">
@@ -168,7 +203,7 @@
                     <div class="modal-body">
                         <div class="mb-3">
                             <label class="form-label">Select Email Template</label>
-                            <select class="form-control" name="email_template_id" required>
+                            <select class="form-control dd-native-select" name="email_template_id" id="checkAvailEmailTemplate" required>
                                 <option selected disabled value="">Select Email Template</option>
                                 @if(isset($EmailTamplete))
                                 @foreach ($EmailTamplete as $e)
@@ -176,6 +211,23 @@
                                 @endforeach
                                 @endif
                             </select>
+                            <div class="dd" data-target="#checkAvailEmailTemplate">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Select Email Template</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Email Template">
+                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a template…"></div>
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value="" aria-disabled="true"><span class="dd-nm">Select Email Template</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @if(isset($EmailTamplete))
+                                        @foreach ($EmailTamplete as $e)
+                                        <div class="dd-item" role="option" data-value="{{ $e->id }}"><span class="dd-nm">{{ $e->TempleteName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @endforeach
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                         <div class="mb-3">
                             <label class="form-label">Meeting Link (Optional)</label>
@@ -202,6 +254,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts._dropdown_styles')
 @include('resorts.talentacquisition._ta_buttons_v2_styles')
 @endsection
 
@@ -239,11 +292,6 @@
                 }
             }, 350);
         });
-        if($("#ResortDepartment").is("select")) {
-            $("#ResortDepartment").select2({"Placeholder":"Select Department"});
-        }
-        $(".Positions").select2({"Placeholder":"Select Positions"});
-
         @if($rank == 2 && $employeeDeptId)
         // Auto-load positions for HOD's department
         $.ajax({
@@ -257,6 +305,7 @@
                         string += '<option value="'+value.id+'">'+value.position_title+'</option>';
                     });
                     $(".Positions").html(string);
+                    window.wisdomDD.rebuild('#talentPoolPositions');
                 }
             }
         });
@@ -283,6 +332,7 @@
 
                 let string='<option selected disabled>Select Positions</option>';
                 $(".Positions").html(string);
+                window.wisdomDD.rebuild('#talentPoolPositions');
                     $.ajax({
                         url: "{{ route('resort.get.position') }}",
                         type: "post",
@@ -298,6 +348,7 @@
                                     string+='<option value="'+value.id+'">'+value.position_title+'</option>';
                                 });
                                 $(".Positions").html(string);
+                                window.wisdomDD.rebuild('#talentPoolPositions');
                             }
                         },
                         error: function(response) {
@@ -843,6 +894,7 @@
                     toastr.success(response.message, "Success", { positionClass: 'toast-bottom-right' });
                     $("#checkAvailability-modal").modal("hide");
                     $('#checkAvailabilityForm')[0].reset();
+                    window.wisdomDD.sync('#checkAvailEmailTemplate');
                 } else {
                     toastr.error(response.message || "Something went wrong.", "Error", { positionClass: 'toast-bottom-right' });
                 }
@@ -859,5 +911,6 @@
     });
 
 </script>
+@include('resorts._dropdown_script')
 @endsection
 

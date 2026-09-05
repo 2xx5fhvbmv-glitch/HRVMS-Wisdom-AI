@@ -2,9 +2,15 @@
 @section('page_tab_title' ,$page_title)
 
 @section('content')
+    <style>
+        #ta-questionnaire-show-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #ta-questionnaire-show-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="ta-questionnaire-show-hero">
                 <div class="row justify-content-between g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -14,7 +20,7 @@
                     </div>
                     <div class="col-auto">
                         <div class="d-flex justify-content-end">
-                            <a href="{{ route('resort.ta.Questionnaire') }}" class="btn ta-btn-secondary">Back to List</a>
+                            <a href="{{ route('resort.ta.Questionnaire') }}" class="btn ta-btn-neutral">Back to List</a>
                         </div>
                     </div>
                 </div>

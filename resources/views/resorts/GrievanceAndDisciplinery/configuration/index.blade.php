@@ -9,9 +9,15 @@
 @endif
 
 @section('content')
+<style>
+    #grievance-config-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #grievance-config-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="grievance-config-hero">
             <div class="row justify-content-between g-3">
                 <div class="col-auto">
                     <div class="page-title">
@@ -78,8 +84,8 @@
                             <div class="row align-items-end g-md-4 g-3 mb-md-4 mb-3">
                                 <div class="col-sm-6">
                                     <label for="gri_cate" class="form-label">SELECT GRIEVANCE CATEGORY <span class="red-mark">*</span></label>
-                                    <select class="form-select select2t-none" 
-                                        name="Grievance_Cat_id" id="Grievance_Cat_id" aria-label="Default select example"
+                                    <select class="form-select dd-native-select"
+                                        name="Grievance_Cat_id" id="Grievance_Cat_id" aria-label="Grievance category"
                                         data-parsley-required="true"
                                         data-parsley-error-message="Please select a grievance category"
                                         data-parsley-errors-container="#error-Grievance_Cat_id"
@@ -91,6 +97,22 @@
                                             @endforeach
                                         @endif
                                     </select>
+                                    <div class="dd" data-target="#Grievance_Cat_id">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Select category</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Grievance category">
+                                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a category…"></div>
+                                            <div class="dd-scroll">
+                                                @if($GrievanceCategory->isNotEmpty())
+                                                    @foreach($GrievanceCategory as $item)
+                                                        <div class="dd-item" role="option" data-value="{{ $item->id }}"><span class="dd-nm">{{ $item->Category_Name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @endforeach
+                                                @endif
+                                            </div>
+                                        </div>
+                                    </div>
                                     <div id="error-Grievance_Cat_id" class="text-danger small"></div>
 
                                 </div>
@@ -125,11 +147,11 @@
                         <div class="row align-items-end g-md-4 g-3 mb-md-4 mb-3 AppendGrievanceCatandSubCat">
                             <div class="col-sm-6">
                                 <label for="gri_cate" class="form-label">GRIEVANCE CATEGORY <span class="red-mark">*</span></label>
-                                <select class="form-select select2t-none  Grievance_Cat_idMain"
+                                <select class="form-select dd-native-select Grievance_Cat_idMain"
                                     data-parsley-required="true"
                                     data-flag="Grievance_cat_subcat_part_one"
                                     data-parsley-error-message="Please select a grievance category"
-                                    name="Grievance_Cat_id[]" id="Grievance_Cat_idMain_1" data-id="1" aria-label="Default select example">
+                                    name="Grievance_Cat_id[]" id="Grievance_Cat_idMain_1" data-id="1" aria-label="Grievance category">
                                     <option value="" ></option>
                                     @if($GrievanceCategory->isNotEmpty())
                                         @foreach($GrievanceCategory as $item)
@@ -137,34 +159,73 @@
                                         @endforeach
                                     @endif
                                 </select>
+                                <div class="dd" data-target="#Grievance_Cat_idMain_1">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">Select category</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Grievance category">
+                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a category…"></div>
+                                        <div class="dd-scroll">
+                                            @if($GrievanceCategory->isNotEmpty())
+                                                @foreach($GrievanceCategory as $item)
+                                                    <div class="dd-item" role="option" data-value="{{ $item->id }}"><span class="dd-nm">{{ $item->Category_Name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @endforeach
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             <div class="col-sm-6">
                                 <label for="subcategories" class="form-label">SUBCATEGORIES <span class="red-mark">*</span></label>
 
-                                <select class="form-select select2t-none"  aria-label="Select Subcategory" 
+                                <select class="form-select dd-native-select"  aria-label="Subcategory"
                                         required
                                         data-parsley-required="true"
                                         data-parsley-error-message="Please select a subcategory"
-                                        name="Gri_Sub_cat_id[]" id="GrievanceSubcategories_1"  data-id="1" aria-label="Default select example">
+                                        name="Gri_Sub_cat_id[]" id="GrievanceSubcategories_1"  data-id="1">
                                     <option value="" ></option>
                                 </select>
+                                <div class="dd" data-target="#GrievanceSubcategories_1">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">Select subcategory</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Subcategory">
+                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a subcategory…"></div>
+                                        <div class="dd-scroll"></div>
+                                    </div>
+                                </div>
                             </div>
-                     
+
                             <div class="priorityLevel-main">
                                 <div class="priorityLevel-block">
                                     <div class="row align-items-end g-md-4 g-3 mb-md-4 mb-3">
                                         <div class="col-sm-6">
                                             <label for="priority_level" class="form-label">PRIORITY LEVEL <span class="red-mark">*</span></label>
-                                            <select class="form-select select2t-none" name="priority_level[]" id="priority_level_1" data-id="1"     aria-label="Select Priority Level"
+                                            <select class="form-select dd-native-select" name="priority_level[]" id="priority_level_1" data-id="1" aria-label="Priority level"
                                             required
                                             data-parsley-required="true"
-                                            data-parsley-error-message="Please select a priority level" aria-label="Default select example">
+                                            data-parsley-error-message="Please select a priority level">
                                                 <option value="High">High </option>
                                                 <option value="Medium" selected>Medium </option>
                                                 <option value="Low">Low</option>
                                             </select>
+                                            <div class="dd" data-target="#priority_level_1">
+                                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                    <span class="dd-lbl">Medium</span>
+                                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                </button>
+                                                <div class="dd-panel" role="listbox" aria-label="Priority level">
+                                                    <div class="dd-scroll">
+                                                        <div class="dd-item" role="option" data-value="High"><span class="dd-nm">High</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        <div class="dd-item active" role="option" data-value="Medium"><span class="dd-nm">Medium</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        <div class="dd-item" role="option" data-value="Low"><span class="dd-nm">Low</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
-                                        
+
                                     </div>
                                 </div>
                             </div>
@@ -463,42 +524,84 @@
                              <div class="row align-items-end gx-md-4 g-3 mb-md-4 mb-3">
                                 <div class="col-sm-12">
                                     <label for="high_priority" class="form-label">HIGH PRIORITY <span class="red-mark">*</span></label>
-                                    <select class="form-select select2t-none" id="high_priority"  
+                                    @php $highPriorityVal = isset($GrivanceResoultionTimeLineModel) ? $GrivanceResoultionTimeLineModel->HighPriority : null; @endphp
+                                    <select class="form-select dd-native-select" id="high_priority"
                                     required
                                     data-parsley-required="true"
                                     data-parsley-error-message="Please select a grievance category"
-                                     name ="Grivance_high_priority"    aria-label="Default select example">
+                                     name ="Grivance_high_priority"    aria-label="High priority resolution time">
                                         <option ></option>
                                         @for($i=1; $i< 11 ; $i++)
-                                            <option value="{{ $i }}" {{isset($GrivanceResoultionTimeLineModel) && $GrivanceResoultionTimeLineModel->HighPriority == $i ? 'selected':''}}> {{ $i }} business days</option>
+                                            <option value="{{ $i }}" {{$highPriorityVal == $i ? 'selected':''}}> {{ $i }} business days</option>
                                         @endfor
                                     </select>
+                                    <div class="dd" data-target="#high_priority">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">{{ $highPriorityVal ? $highPriorityVal.' business days' : 'Select duration' }}</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="High priority resolution time">
+                                            <div class="dd-scroll">
+                                                @for($i=1; $i< 11 ; $i++)
+                                                    <div class="dd-item{{ $highPriorityVal == $i ? ' active' : '' }}" role="option" data-value="{{ $i }}"><span class="dd-nm">{{ $i }} business days</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @endfor
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="col-sm-12">
                                     <label for="medium_priority" class="form-label">MEDIUM PRIORITY <span class="red-mark">*</span></label>
-                                    <select    
+                                    @php $mediumPriorityVal = isset($GrivanceResoultionTimeLineModel) ? $GrivanceResoultionTimeLineModel->MediumPriority : null; @endphp
+                                    <select
                                     required
                                     data-parsley-required="true"
                                     data-parsley-error-message="Please select a grievance category"
-                                    class="form-select select2t-none" id="medium_priority"    name ="Grivance_medium_priority" aria-label="Default select example">
+                                    class="form-select dd-native-select" id="medium_priority"    name ="Grivance_medium_priority" aria-label="Medium priority resolution time">
                                         <option ></option>
                                         @for($i=1; $i< 11 ; $i++)
-                                            <option value="{{ $i }}" {{isset($GrivanceResoultionTimeLineModel) && $GrivanceResoultionTimeLineModel->MediumPriority == $i ? 'selected':''}}>{{ $i }} business days</option>
+                                            <option value="{{ $i }}" {{$mediumPriorityVal == $i ? 'selected':''}}>{{ $i }} business days</option>
                                         @endfor
                                     </select>
+                                    <div class="dd" data-target="#medium_priority">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">{{ $mediumPriorityVal ? $mediumPriorityVal.' business days' : 'Select duration' }}</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Medium priority resolution time">
+                                            <div class="dd-scroll">
+                                                @for($i=1; $i< 11 ; $i++)
+                                                    <div class="dd-item{{ $mediumPriorityVal == $i ? ' active' : '' }}" role="option" data-value="{{ $i }}"><span class="dd-nm">{{ $i }} business days</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @endfor
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="col-sm-12">
                                     <label for="low_priority" class="form-label">LOW PRIORITY  <span class="red-mark">*</span></label>
-                                    <select 
+                                    @php $lowPriorityVal = isset($GrivanceResoultionTimeLineModel) ? $GrivanceResoultionTimeLineModel->LowPriority : null; @endphp
+                                    <select
                                     required
                                     data-parsley-required="true"
                                     data-parsley-error-message="Please select a grievance category"
-                                    class="form-select select2t-none" id="low_priority"  name ="Grivance_low_priority"  aria-label="Default select example">
+                                    class="form-select dd-native-select" id="low_priority"  name ="Grivance_low_priority"  aria-label="Low priority resolution time">
                                         <option ></option>
                                         @for($i=1; $i< 11 ; $i++)
-                                            <option value="{{ $i }}" {{ isset($GrivanceResoultionTimeLineModel) && $GrivanceResoultionTimeLineModel->LowPriority == $i ? 'selected':''}}>{{ $i }} business days</option>
+                                            <option value="{{ $i }}" {{ $lowPriorityVal == $i ? 'selected':''}}>{{ $i }} business days</option>
                                         @endfor
                                     </select>
+                                    <div class="dd" data-target="#low_priority">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">{{ $lowPriorityVal ? $lowPriorityVal.' business days' : 'Select duration' }}</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Low priority resolution time">
+                                            <div class="dd-scroll">
+                                                @for($i=1; $i< 11 ; $i++)
+                                                    <div class="dd-item{{ $lowPriorityVal == $i ? ' active' : '' }}" role="option" data-value="{{ $i }}"><span class="dd-nm">{{ $i }} business days</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @endfor
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                             <div class="card-footer text-end">
@@ -524,11 +627,11 @@
                                     <div class="row align-items-end gx-md-4 g-3 mb-md-4 mb-3 AppendGrievanecEscalation">
                                         <div class="col-sm-6">
                                             <label for="grievance_type" class="form-label">GRIEVANCE TYPE <span class="red-mark">*</span></label>
-                                            <select class="form-select select2t-none Grievance_Cat_idMain"
+                                            <select class="form-select dd-native-select Grievance_Cat_idMain"
                                                                 data-parsley-required="true"
                                                                 required data-parsley-errors-container="#error_Grievance_Invest_Cat_idMain_1"
                                                                 data-parsley-error-message="Please select a grievance category"
-                                                                name="Grievance_Cat_id[]" id="Grievance_Invest_Cat_idMain_1" data-id="1" aria-label="Default select example">
+                                                                name="Grievance_Cat_id[]" id="Grievance_Invest_Cat_idMain_1" data-id="1" aria-label="Grievance category">
                                                             <option value="" ></option>
                                                         @if($GrievanceCategory->isNotEmpty())
                                                             @foreach($GrievanceCategory as $item)
@@ -536,22 +639,51 @@
                                                             @endforeach
                                                         @endif
                                                 </select>
+                                                <div class="dd" data-target="#Grievance_Invest_Cat_idMain_1">
+                                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                        <span class="dd-lbl">Select category</span>
+                                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                    </button>
+                                                    <div class="dd-panel" role="listbox" aria-label="Grievance category">
+                                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a category…"></div>
+                                                        <div class="dd-scroll">
+                                                            @if($GrievanceCategory->isNotEmpty())
+                                                                @foreach($GrievanceCategory as $item)
+                                                                    <div class="dd-item" role="option" data-value="{{ $item->id }}"><span class="dd-nm">{{ $item->Category_Name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                @endforeach
+                                                            @endif
+                                                        </div>
+                                                    </div>
+                                                </div>
                                                <div id="error_Grievance_Invest_Cat_idMain_1" class="text-danger"></div>
 
                                         </div>
                                         <div class="col-sm-6">
                                             <label for="resolved_duration" class="form-label">RESOLVED DURATION <span class="red-mark">*</span></label>
-                                            <select class="form-select select2t-none" id="resolved_duration"
+                                            <select class="form-select dd-native-select" id="resolved_duration"
                                                 name="resolved_duration[]"
-                                                aria-label="Default select example"
+                                                aria-label="Resolved duration"
                                                 required data-parsley-errors-container="#resolved_duration_error_1"
                                                 data-parsley-error-message="Please select a resolved duration">
                                                 <option selected disabled>2 Business days</option>
                                                 @for($i=1; $i< 11 ; $i++)
                                                     <option value="{{ $i }}" >{{ $i }} business days</option>
                                                 @endfor
-                                
+
                                             </select>
+                                            <div class="dd" data-target="#resolved_duration">
+                                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                    <span class="dd-lbl">2 Business days</span>
+                                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                </button>
+                                                <div class="dd-panel" role="listbox" aria-label="Resolved duration">
+                                                    <div class="dd-scroll">
+                                                        @for($i=1; $i< 11 ; $i++)
+                                                            <div class="dd-item" role="option" data-value="{{ $i }}"><span class="dd-nm">{{ $i }} business days</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @endfor
+                                                    </div>
+                                                </div>
+                                            </div>
                                             <div id="resolved_duration_error_1" class="text-danger"></div>
 
                                         </div>
@@ -713,10 +845,10 @@
                                         
                                         <div class="col-md-4">
                                             <label for="disciplinary_cate" class="form-label">DISCIPLINARY CATEGORY <span class="red-mark">*</span></label>
-                                                <select class="form-select select2t-none" 
-                                                    name="disciplinary_cat_id" 
+                                                <select class="form-select dd-native-select"
+                                                    name="disciplinary_cat_id"
                                                     id="disciplinary_cate"
-                                                    aria-label="Default select example"
+                                                    aria-label="Disciplinary category"
                                                     required
                                                     data-parsley-required="true"
                                                         data-parsley-error-message="Please select a disciplinary category"
@@ -729,6 +861,22 @@
                                                     @endforeach
                                                     @endif
                                                 </select>
+                                                <div class="dd" data-target="#disciplinary_cate">
+                                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                        <span class="dd-lbl">Select Disciplinary Category</span>
+                                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                    </button>
+                                                    <div class="dd-panel" role="listbox" aria-label="Disciplinary category">
+                                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a category…"></div>
+                                                        <div class="dd-scroll">
+                                                            @if($DisciplinaryCategories->isNotEmpty())
+                                                                @foreach($DisciplinaryCategories as $item)
+                                                                    <div class="dd-item" role="option" data-value="{{ $item->id }}"><span class="dd-nm">{{ $item->DisciplinaryCategoryName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                                @endforeach
+                                                            @endif
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             <div id="error-disciplinary_cate_error_one" class="text-danger small"></div>
                                             </div>
                                         <div class="col-sm-4">
@@ -753,21 +901,47 @@
                                     <div class="row align-items-end gx-md-4 g-3 mb-md-4 mb-3">
                                         <div class="col-md-6">
                                             <label class="form-label">DEFAULT SEVERITY <small class="text-muted">(auto-fills on disciplinary)</small></label>
-                                            <select name="default_severity_id" class="form-select select2t-none">
+                                            <select name="default_severity_id" id="default_severity_id" class="form-select dd-native-select" aria-label="Default severity">
                                                 <option value="">— optional —</option>
                                                 @foreach($SeverityStore ?? [] as $sev)
                                                     <option value="{{ $sev->id }}">{{ $sev->SeverityName }}</option>
                                                 @endforeach
                                             </select>
+                                            <div class="dd" data-target="#default_severity_id">
+                                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                    <span class="dd-lbl">— optional —</span>
+                                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                </button>
+                                                <div class="dd-panel" role="listbox" aria-label="Default severity">
+                                                    <div class="dd-scroll">
+                                                        @foreach($SeverityStore ?? [] as $sev)
+                                                            <div class="dd-item" role="option" data-value="{{ $sev->id }}"><span class="dd-nm">{{ $sev->SeverityName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @endforeach
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                         <div class="col-md-6">
                                             <label class="form-label">DEFAULT ACTION <small class="text-muted">(auto-fills on disciplinary)</small></label>
-                                            <select name="default_action_id" class="form-select select2t-none">
+                                            <select name="default_action_id" id="default_action_id" class="form-select dd-native-select" aria-label="Default action">
                                                 <option value="">— optional —</option>
                                                 @foreach($ActionStore ?? [] as $act)
                                                     <option value="{{ $act->id }}">{{ $act->ActionName }}</option>
                                                 @endforeach
                                             </select>
+                                            <div class="dd" data-target="#default_action_id">
+                                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                    <span class="dd-lbl">— optional —</span>
+                                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                </button>
+                                                <div class="dd-panel" role="listbox" aria-label="Default action">
+                                                    <div class="dd-scroll">
+                                                        @foreach($ActionStore ?? [] as $act)
+                                                            <div class="dd-item" role="option" data-value="{{ $act->id }}"><span class="dd-nm">{{ $act->ActionName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @endforeach
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -917,9 +1091,9 @@
                                         {{-- Disciplinary Category --}}
                                         <div class="col-sm-6">
                                             <label class="form-label">DISCIPLINARY CATEGORIES <span class="red-mark">*</span></label>
-                                            <select class="form-select select2t-none Code_of_disciplinary_cate" 
-                                                    id="Code_of_disciplinary_cate_1" 
-                                                    name="Deciplinery_cat_id[]" 
+                                            <select class="form-select dd-native-select Code_of_disciplinary_cate"
+                                                    id="Code_of_disciplinary_cate_1"
+                                                    name="Deciplinery_cat_id[]"
                                                     required
                                                     data-id="1"
                                                     data-parsley-errors-container="#disciplinary_error_1"
@@ -929,29 +1103,53 @@
                                                     <option value="{{ base64_encode($item->id) }}">{{ $item->DisciplinaryCategoryName }}</option>
                                                 @endforeach
                                             </select>
+                                            <div class="dd" data-target="#Code_of_disciplinary_cate_1">
+                                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                    <span class="dd-lbl">Select Disciplinary Category</span>
+                                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                </button>
+                                                <div class="dd-panel" role="listbox" aria-label="Disciplinary category">
+                                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a category…"></div>
+                                                    <div class="dd-scroll">
+                                                        @foreach($DisciplinaryCategories as $item)
+                                                            <div class="dd-item" role="option" data-value="{{ base64_encode($item->id) }}"><span class="dd-nm">{{ $item->DisciplinaryCategoryName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @endforeach
+                                                    </div>
+                                                </div>
+                                            </div>
                                             <div id="disciplinary_error_1" class="text-danger"></div>
                                         </div>
 
                                         {{-- Offenses --}}
                                         <div class="col-sm-6">
                                             <label class="form-label">OFFENSES <span class="red-mark">*</span></label>
-                                            <select class="form-select select2t-none" 
-                                                    id="offenses_1" 
-                                                    name="Offenses_id[]" 
+                                            <select class="form-select dd-native-select"
+                                                    id="offenses_1"
+                                                    name="Offenses_id[]"
                                                     required
                                                     data-parsley-errors-container="#offenses_error_1"
                                                     data-parsley-required-message="Please select an offense">
                                                 <option value="">Select Offense</option>
                                             </select>
+                                            <div class="dd" data-target="#offenses_1">
+                                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                    <span class="dd-lbl">Select Offense</span>
+                                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                </button>
+                                                <div class="dd-panel" role="listbox" aria-label="Offense">
+                                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an offense…"></div>
+                                                    <div class="dd-scroll"></div>
+                                                </div>
+                                            </div>
                                             <div id="offenses_error_1" class="text-danger"></div>
                                         </div>
 
                                         {{-- Actions --}}
                                         <div class="col-sm-6">
                                             <label class="form-label">ACTIONS <span class="red-mark">*</span></label>
-                                            <select class="form-select select2t-none" 
-                                                    id="actions_1" 
-                                                    name="Action_id[]" 
+                                            <select class="form-select dd-native-select"
+                                                    id="actions_1"
+                                                    name="Action_id[]"
                                                     required
                                                     data-parsley-errors-container="#actions_error_1"
                                                     data-parsley-required-message="Please select an action">
@@ -960,15 +1158,29 @@
                                                     <option value="{{ base64_encode($item->id) }}">{{ $item->ActionName }}</option>
                                                 @endforeach
                                             </select>
+                                            <div class="dd" data-target="#actions_1">
+                                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                    <span class="dd-lbl">Select Action</span>
+                                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                </button>
+                                                <div class="dd-panel" role="listbox" aria-label="Action">
+                                                    <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an action…"></div>
+                                                    <div class="dd-scroll">
+                                                        @foreach($ActionStore as $item)
+                                                            <div class="dd-item" role="option" data-value="{{ base64_encode($item->id) }}"><span class="dd-nm">{{ $item->ActionName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @endforeach
+                                                    </div>
+                                                </div>
+                                            </div>
                                             <div id="actions_error_1" class="text-danger"></div>
                                         </div>
 
                                         {{-- Severity --}}
                                         <div class="col-sm-6">
                                             <label class="form-label">SEVERITY <span class="red-mark">*</span></label>
-                                            <select class="form-select select2t-none" 
-                                                    id="severity_1" 
-                                                    name="Severity_id[]" 
+                                            <select class="form-select dd-native-select"
+                                                    id="severity_1"
+                                                    name="Severity_id[]"
                                                     required
                                                     data-parsley-errors-container="#severity_error_1"
                                                     data-parsley-required-message="Please select a severity level">
@@ -977,6 +1189,19 @@
                                                     <option value="{{ base64_encode($item->id) }}">{{ $item->SeverityName }}</option>
                                                 @endforeach
                                             </select>
+                                            <div class="dd" data-target="#severity_1">
+                                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                    <span class="dd-lbl">Select Severity</span>
+                                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                </button>
+                                                <div class="dd-panel" role="listbox" aria-label="Severity">
+                                                    <div class="dd-scroll">
+                                                        @foreach($SeverityStore as $item)
+                                                            <div class="dd-item" role="option" data-value="{{ base64_encode($item->id) }}"><span class="dd-nm">{{ $item->SeverityName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @endforeach
+                                                    </div>
+                                                </div>
+                                            </div>
                                             <div id="severity_error_1" class="text-danger"></div>
                                         </div>
 
@@ -1361,14 +1586,31 @@
                     <div class="row mt-2">
                              <div class="col-sm-6 Grievance_Cat_idTemplete" style="display: none;">
                                 <label for="set_rule" class="form-label"> Grievance Category Name <span class="red-mark">*</span></label>
-                                <select class="form-select select2t-none" name="Grievance_Cat_id" id="Grievance_Cat_idTemplete" aria-label="Default select example">
+                                <select class="form-select dd-native-select" name="Grievance_Cat_id" id="Grievance_Cat_idTemplete" aria-label="Grievance category">
                                     <option value="" ></option>
                                     @if($GrievanceCategory->isNotEmpty())
                                         @foreach($GrievanceCategory as $item)
                                             <option value="{{$item->id}}">{{$item->Category_Name}}</option>
                                         @endforeach
                                     @endif
-                                </select>                            </div>
+                                </select>
+                                <div class="dd" data-target="#Grievance_Cat_idTemplete">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">Select category</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Grievance category">
+                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a category…"></div>
+                                        <div class="dd-scroll">
+                                            @if($GrievanceCategory->isNotEmpty())
+                                                @foreach($GrievanceCategory as $item)
+                                                    <div class="dd-item" role="option" data-value="{{ $item->id }}"><span class="dd-nm">{{ $item->Category_Name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @endforeach
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                             <div class="col-sm-6">
                                 <label for="set_rule" class="form-label"> Template Name <span class="red-mark">*</span></label>
                                 <input type="text" class="form-control" id="Grievance_Temp_name" placeholder="Hearing Template Name" name="Latter_Temp_name">
@@ -1405,7 +1647,7 @@
                         <!-- Email Template Name -->
                         <div class="col-md-12">
                         <label for="set_rule" class="form-label">Select Action <span class="red-mark">*</span></label>
-                                <select class="form-select select2t-none" aria-label="Default select example" required name="Action_id" id="Action_id">
+                                <select class="form-select dd-native-select" aria-label="Action" required name="Action_id" id="Action_id">
                                     <option value=""selected disabled>Select Action</option>
                                         @if($ActionStore->isNotEmpty())
                                             @foreach($ActionStore as $item)
@@ -1413,6 +1655,22 @@
                                             @endforeach
                                         @endif
                                 </select>
+                                <div class="dd" data-target="#Action_id">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">Select Action</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Action">
+                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an action…"></div>
+                                        <div class="dd-scroll">
+                                            @if($ActionStore->isNotEmpty())
+                                                @foreach($ActionStore as $item)
+                                                    <div class="dd-item" role="option" data-value="{{ base64_encode($item->id) }}"><span class="dd-nm">{{ $item->ActionName }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @endforeach
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
                         </div>
                     </div>
                     <br>
@@ -1469,6 +1727,8 @@
         </div>
     </div>
 @include('resorts._emotional_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -1729,99 +1989,53 @@
                     }
                 });
             
-                //  developer functionality  
-                $("#disciplinary_cate").select2({
-                    placeholder: "Select Category",
-                    allowClear: true,
-                    width: '100%'        
-                });
             $("#KeyPersonnel").select2({
                 placeholder: "Select Key Personnel",
                 allowClear: true,
-                width: '100%'        
+                width: '100%'
             });
-            
-            $("#Code_of_disciplinary_cate_1").select2({
-                placeholder: "Select Category",
-                allowClear: true,
-                width: '100%'        
-            });
-            $("#offenses_1").select2({
-                placeholder: "Select Offense",
-                allowClear: true,
-                width: '100%'        
-            });
-            $("#actions_1").select2({
-                placeholder: "Select Action",
-                allowClear: true,
-                width: '100%'        
-            });
+
             $("#actions").select2({
                 placeholder: "Select Action",
                 allowClear: true,
-                width: '100%'        
+                width: '100%'
             });
-            
-            $("#severity_1").select2({
-                placeholder: "Select Severity",
-                allowClear: true,
-                width: '100%'        
-            });
+
             $("#Approval_role_id").select2({
                 placeholder: "Select Approval Role",
                 allowClear: true,
-                width: '100%'        
+                width: '100%'
             });
-            
+
             $("#assign_members_1").select2({
                 placeholder: "Select Assign Members",
                 allowClear: true,
-                width: '100%'        
+                width: '100%'
             });
             $("#DelegationRuleCategory_1").select2({
                 placeholder: "Select category",
                 allowClear: true,
-                width: '100%'        
+                width: '100%'
             });
             $("#Appeal_type_1").select2({
                 placeholder: "Select Appeal Type",
                 allowClear: true,
-                width: '100%'        
-            });   
+                width: '100%'
+            });
             $("#Appeal_type_2").select2({
                 placeholder: "Select Appeal Type",
                 allowClear: true,
-                width: '100%'        
-            });   
+                width: '100%'
+            });
             $(".Grievance_Cat_idMain_main").select2({
                 placeholder: "Select Grievance Category",
                 allowClear: true,
-                width: '100%'        
-            });   
+                width: '100%'
+            });
             $("#MemberId_or_CommitteeId_1").select2({
                 placeholder: "Select Member or Committee",
                 allowClear: true,
-                width: '100%'        
-            });   
-            $("#Grievance_Cat_idTemplete").select2({
-                placeholder: "Select Grievance Category Name",
-                allowClear: true,
-                width: '100%'        
-            });
-            $("#high_priority").select2({
-                placeholder: "Select High Priority",
-                allowClear: true,
-                width: '100%'        
-            });
-            $("#medium_priority").select2({
-                placeholder: "Select Medium Priority",
-                allowClear: true,
-                width: '100%'        
-            });
-            $("#low_priority").select2({
-                placeholder: "Select Low Priority",
-                allowClear: true,
-                width: '100%'        
+                width: '100%'
             });
             $("#GrieanceCommitteeMembers").select2({
                 placeholder: "Select Committee Members",
@@ -2607,14 +2821,15 @@
             $(document).on("click",".CodeofConductAdd_More",function(){
                 let count  = $("#codeOfConductCount").val();
                 count =  parseInt(count)+1;
+                var tickSvg = '<svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg>';
                 var string='';
                     string=` <div class="col-sm-6 codeOfConduct_remove_${count}">
                                 <label for="disciplinary_cate" class="form-label">DISCIPLINARY CATEGORIES <span class="red-mark">*</span></label>
-                                <select class="form-select select2t-none Code_of_disciplinary_cate" 
-                                        id="Code_of_disciplinary_cate_${count}" 
-                                        data-id="${count}" 
-                                        name="Deciplinery_cat_id[]" 
-                                        aria-label="Default select example"
+                                <select class="form-select dd-native-select Code_of_disciplinary_cate"
+                                        id="Code_of_disciplinary_cate_${count}"
+                                        data-id="${count}"
+                                        name="Deciplinery_cat_id[]"
+                                        aria-label="Disciplinary category"
                                         required
                                         data-parsley-required-message="Please select a disciplinary category">
                                     <option value="">Select Disciplinary Category</option>
@@ -2625,28 +2840,52 @@
                                         @endforeach
                                     @endif
                                 </select>
+                                <div class="dd" data-target="#Code_of_disciplinary_cate_${count}">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">Select Disciplinary Category</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Disciplinary category">
+                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a category…"></div>
+                                        <div class="dd-scroll">
+                                            @foreach($DisciplinaryCategories as $item)
+                                                <div class="dd-item" role="option" data-value="{{ base64_encode($item->id) }}"><span class="dd-nm">{{ $item->DisciplinaryCategoryName }}</span>${tickSvg}</div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-            
+
                             <div class="col-sm-6 codeOfConduct_remove_${count}">
                                 <label for="offenses" class="form-label">OFFENSES <span class="red-mark">*</span></label>
-                                <select class="form-select select2t-none" 
-                                        name="Offenses_id[]" 
-                                        data-id="${count}" 
-                                        id="offenses_${count}" 
-                                        aria-label="Default select example"
+                                <select class="form-select dd-native-select"
+                                        name="Offenses_id[]"
+                                        data-id="${count}"
+                                        id="offenses_${count}"
+                                        aria-label="Offense"
                                         required
                                         data-parsley-required-message="Please select an offense">
                                     <option value="">Select Offense</option>
                                 </select>
+                                <div class="dd" data-target="#offenses_${count}">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">Select Offense</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Offense">
+                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an offense…"></div>
+                                        <div class="dd-scroll"></div>
+                                    </div>
+                                </div>
                             </div>
-            
+
                             <div class="col-sm-6 codeOfConduct_remove_${count}">
                                 <label for="actions" class="form-label">ACTIONS <span class="red-mark">*</span></label>
-                                <select class="form-select select2t-none" 
-                                        id="actions_${count}"  
-                                        data-id="${count}" 
-                                        name="Action_id[]" 
-                                        aria-label="Default select example"
+                                <select class="form-select dd-native-select"
+                                        id="actions_${count}"
+                                        data-id="${count}"
+                                        name="Action_id[]"
+                                        aria-label="Action"
                                         required
                                         data-parsley-required-message="Please select an action">
                                     <option value="">Select Action</option>
@@ -2656,15 +2895,31 @@
                                         @endforeach
                                     @endif
                                 </select>
+                                <div class="dd" data-target="#actions_${count}">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">Select Action</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Action">
+                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an action…"></div>
+                                        <div class="dd-scroll">
+                                            @if($ActionStore->isNotEmpty())
+                                                @foreach($ActionStore as $item)
+                                                    <div class="dd-item" role="option" data-value="{{ base64_encode($item->id) }}"><span class="dd-nm">{{ $item->ActionName }}</span>${tickSvg}</div>
+                                                @endforeach
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-            
+
                             <div class="col-sm-4 codeOfConduct_remove_${count}">
                                 <label for="severity" class="form-label">SEVERITY <span class="red-mark">*</span></label>
-                                <select class="form-select select2t-none" 
-                                        name="Severity_id[]" 
-                                        data-id="${count}" 
-                                        id="severity_${count}" 
-                                        aria-label="Default select example"
+                                <select class="form-select dd-native-select"
+                                        name="Severity_id[]"
+                                        data-id="${count}"
+                                        id="severity_${count}"
+                                        aria-label="Severity"
                                         required
                                         data-parsley-required-message="Please select a severity level">
                                     <option value="">Select Severity</option>
@@ -2674,33 +2929,27 @@
                                         @endforeach
                                     @endif
                                 </select>
+                                <div class="dd" data-target="#severity_${count}">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">Select Severity</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Severity">
+                                        <div class="dd-scroll">
+                                            @if($SeverityStore->isNotEmpty())
+                                                @foreach($SeverityStore as $item)
+                                                    <div class="dd-item" role="option" data-value="{{ base64_encode($item->id) }}"><span class="dd-nm">{{ $item->SeverityName }}</span>${tickSvg}</div>
+                                                @endforeach
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                             <div class="col-sm-2 codeOfConduct_remove_${count}">
                                 <label for="committee" class="form-label"> </label>
                                 <button type="button" class="btn eb-btn-critical btn-sm CodeOfCounductRemove" data-id="${count}"><i class="fa fa-trash"></i></button>
                             </div>`;
                         $(".CodeOfConductappend").append(string);
-                
-                        $("#Code_of_disciplinary_cate_"+count).select2({
-                            placeholder: "Select Category",
-                            allowClear: true,
-                            width: '100%'        
-                        });
-                        $("#offenses_"+count).select2({
-                            placeholder: "Select Offense",
-                            allowClear: true,
-                            width: '100%'        
-                        });
-                        $("#actions_"+count).select2({
-                            placeholder: "Select Action",
-                            allowClear: true,
-                            width: '100%'        
-                        });
-                        $("#severity_"+count).select2({
-                            placeholder: "Select Severity",
-                            allowClear: true,
-                            width: '100%'        
-                        });
                         $("#codeOfConductCount").val(count);
             });
             $(document).on('change', '.Code_of_disciplinary_cate', function() {
@@ -2719,6 +2968,7 @@
                                 option += '<option value="' + v.id + '">' + v.OffensesName + '</option>';
                             });
                             $("#offenses_"+Location).html(option);
+                            wisdomDD.rebuild('#offenses_'+Location);
                         }
                         else
                         {
@@ -3281,15 +3531,16 @@
             {
                 var Grievance_CatCount = $("#AppendGrievanceCatAndSubCatCount").val();
                 Grievance_CatCount = parseInt(Grievance_CatCount)+1;
+                var tickSvg = '<svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg>';
                 var row=`    <div class="row g-md-4 g-3 mb-md-4 mb-3 CateandSubCat_${Grievance_CatCount}">
                             <!-- Grievance Category -->
                             <div class="col-md-6">
                                 <label for="gri_cate" class="form-label fw-bold">GRIEVANCE CATEGORY <span class="red-mark">*</span></label>
-                                <select class="form-select select2t-none Grievance_Cat_idMain" 
-                                        name="Grievance_Cat_id[]" 
+                                <select class="form-select dd-native-select Grievance_Cat_idMain"
+                                        name="Grievance_Cat_id[]"
                                         data-flag="Grievance_cat_subcat_part_one"
-                                        id="Grievance_Cat_idMain_${Grievance_CatCount}" 
-                                        data-id="${Grievance_CatCount}" 
+                                        id="Grievance_Cat_idMain_${Grievance_CatCount}"
+                                        data-id="${Grievance_CatCount}"
                                         aria-label="Select Grievance Category"
                                         required
                                         data-parsley-required="true"
@@ -3301,27 +3552,53 @@
                                         @endforeach
                                     @endif
                                 </select>
+                                <div class="dd" data-target="#Grievance_Cat_idMain_${Grievance_CatCount}">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">-- Select Category --</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Grievance category">
+                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a category…"></div>
+                                        <div class="dd-scroll">
+                                            @if($GrievanceCategory->isNotEmpty())
+                                                @foreach($GrievanceCategory as $item)
+                                                    <div class="dd-item" role="option" data-value="{{ $item->id }}"><span class="dd-nm">{{ $item->Category_Name }}</span>${tickSvg}</div>
+                                                @endforeach
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
                             <!-- Subcategories -->
                             <div class="col-md-6">
                                 <label for="subcategories" class="form-label fw-bold">SUBCATEGORIES <span class="red-mark">*</span></label>
-                                <select class="form-select select2t-none" 
-                                        name="Gri_Sub_cat_id[]" 
-                                        id="GrievanceSubcategories_${Grievance_CatCount}" 
-                                        data-id="${Grievance_CatCount}" 
+                                <select class="form-select dd-native-select"
+                                        name="Gri_Sub_cat_id[]"
+                                        id="GrievanceSubcategories_${Grievance_CatCount}"
+                                        data-id="${Grievance_CatCount}"
                                         aria-label="Select Subcategory"
                                          required
                                         data-parsley-required="true"
                                         data-parsley-error-message="Please select a subcategory">
                                     <option value="" selected disabled>-- Select Subcategory --</option>
                                 </select>
+                                <div class="dd" data-target="#GrievanceSubcategories_${Grievance_CatCount}">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">-- Select Subcategory --</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Subcategory">
+                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a subcategory…"></div>
+                                        <div class="dd-scroll"></div>
+                                    </div>
+                                </div>
                             </div>
 
                             <!-- Priority Level -->
                             <div class="col-md-6">
                                 <label for="priority_level" class="form-label fw-bold">PRIORITY LEVEL <span class="red-mark">*</span></label>
-                                <select class="form-select select2t-none"  required
+                                <select class="form-select dd-native-select"  required
                                             data-parsley-required="true"
                                             name="priority_level[]"
                                             data-parsley-error-message="Please select a priority level"
@@ -3330,35 +3607,33 @@
                                     <option value="Medium" selected>Medium</option>
                                     <option value="Low">Low</option>
                                 </select>
+                                <div class="dd" data-target="#priority_level_${Grievance_CatCount}">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">Medium</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Priority level">
+                                        <div class="dd-scroll">
+                                            <div class="dd-item" role="option" data-value="High"><span class="dd-nm">High</span>${tickSvg}</div>
+                                            <div class="dd-item active" role="option" data-value="Medium"><span class="dd-nm">Medium</span>${tickSvg}</div>
+                                            <div class="dd-item" role="option" data-value="Low"><span class="dd-nm">Low</span>${tickSvg}</div>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
 
                             <!-- Remove Button -->
                             <div class="col-md-6 d-flex align-items-end">
-                                <button type="button" class="btn eb-btn-critical btn-sm CatAndSubCatRemove" 
+                                <button type="button" class="btn eb-btn-critical btn-sm CatAndSubCatRemove"
                                         data-id="${Grievance_CatCount}">
-                                    <i class="fa fa-trash"></i> 
+                                    <i class="fa fa-trash"></i>
                                 </button>
                             </div>
                         </div>
                         `;
                 $(".AppendGrievanceCatandSubCat").append(row);
                 $("#AppendGrievanceCatAndSubCatCount").val(Grievance_CatCount);
-                $("#Grievance_Cat_idMain_"+Grievance_CatCount).select2({
-                    placeholder: "Select Grievance Category",
-                    allowClear: true,
-                    width: '100%'        
-                });
-                $("#GrievanceSubcategories_"+Grievance_CatCount).select2({
-                    placeholder: `Select Grievance Sub Category `,
-                    allowClear: true,
-                    width: '100%'        
-                });
-                $("#priority_level_"+Grievance_CatCount).select2({
-                    placeholder: `Select Priority Level `,
-                    allowClear: true,
-                    width: '100%'        
-                });
-            });      
+            });
             $(document).on('click','.CatAndSubCatRemove',function()
             {
                 var loction =$(this).data('id');
@@ -3870,13 +4145,14 @@
                 {
                     var count = parseInt($("#grivance_escaltion_count").val());
                     count = count+1;
+                    var tickSvg = '<svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg>';
                     var row=` <div class="col-sm-6 Grivance_Escaltion_r_${count}">
                                         <label for="grievance_type" class="form-label">GRIEVANCE TYPE <span class="red-mark">*</span></label>
-                                        <select class="form-select select2t-none Grievance_Cat_idMain"
+                                        <select class="form-select dd-native-select Grievance_Cat_idMain"
                                                             data-parsley-required="true"
                                                             data-parsley-error-message="Please select a grievance category"
                                                              required data-parsley-errors-container="#griveance_error_type_${count}"
-                                                            name="Grievance_Cat_id[]" id="Grievance_Invest_Cat_idMain_${count}" data-id="1" aria-label="Default select example">
+                                                            name="Grievance_Cat_id[]" id="Grievance_Invest_Cat_idMain_${count}" data-id="1" aria-label="Grievance category">
                                                         <option value="" ></option>
                                                 @if($GrievanceCategory->isNotEmpty())
                                                     @foreach($GrievanceCategory as $item)
@@ -3884,22 +4160,51 @@
                                                     @endforeach
                                                 @endif
                                         </select>
+                                        <div class="dd" data-target="#Grievance_Invest_Cat_idMain_${count}">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">Select category</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Grievance category">
+                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a category…"></div>
+                                                <div class="dd-scroll">
+                                                    @if($GrievanceCategory->isNotEmpty())
+                                                        @foreach($GrievanceCategory as $item)
+                                                            <div class="dd-item" role="option" data-value="{{ $item->id }}"><span class="dd-nm">{{ $item->Category_Name }}</span>${tickSvg}</div>
+                                                        @endforeach
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </div>
                                         <div id="griveance_error_type_${count}" class="text-danger"></div>
 
                                     </div>
                                       <div class="col-sm-4  Grivance_Escaltion_r_${count}">
                                             <label for="resolved_duration" class="form-label">RESOLVED DURATION <span class="red-mark">*</span></label>
-                                            <select class="form-select select2t-none" id="resolved_duration"
+                                            <select class="form-select dd-native-select" id="resolved_duration_${count}"
                                                 name="resolved_duration[]"
-                                                aria-label="Default select example"
+                                                aria-label="Resolved duration"
                                                 required data-parsley-errors-container="#resolved_duration_error_${count}"
                                                 data-parsley-error-message="Please select a resolved duration">
                                                 <option selected disabled>2 Business days</option>
                                                 @for($i=1; $i< 11 ; $i++)
                                                     <option value="{{ $i }}" >{{ $i }} business days</option>
                                                 @endfor
-                                
+
                                             </select>
+                                            <div class="dd" data-target="#resolved_duration_${count}">
+                                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                    <span class="dd-lbl">2 Business days</span>
+                                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                </button>
+                                                <div class="dd-panel" role="listbox" aria-label="Resolved duration">
+                                                    <div class="dd-scroll">
+                                                        @for($i=1; $i< 11 ; $i++)
+                                                            <div class="dd-item" role="option" data-value="{{ $i }}"><span class="dd-nm">{{ $i }} business days</span>${tickSvg}</div>
+                                                        @endfor
+                                                    </div>
+                                                </div>
+                                            </div>
                                             <div id="resolved_duration_error_${count}" class="text-danger"></div>
 
                                         </div>
@@ -3910,11 +4215,6 @@
 
                     $(".AppendGrievanecEscalation").append(row);
                     $("#grivance_escaltion_count").val(count);
-                    $("#Grievance_Invest_Cat_idMain_"+count).select2({
-                        placeholder: "Select Grievance Category",
-                        allowClear: true,
-                        width: '100%'        
-                    })
                 });
                 $(document).on('click','.remove_grivance_escaltion',function(e)
                 {
@@ -4124,6 +4424,7 @@
                     if(flag =="Grievance_cat_subcat_part_one")
                     {
                         $("#GrievanceSubcategories_" + location).html(option);
+                        wisdomDD.rebuild('#GrievanceSubcategories_' + location);
                     }
 
                     

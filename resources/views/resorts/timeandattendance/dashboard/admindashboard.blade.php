@@ -338,12 +338,25 @@
                                     </div>
                                     <div class="col-auto">
                                         <div class="form-group">
-                                            <select class="form-select" aria-label="Default select example">
+                                            <select class="form-select dd-native-select" aria-label="Default select example" id="hiringSourceYear">
                                                 <option selected="">Jan 2024 - Dec 2024</option>
                                                 <option value="1">Jan 2025 - Dec 2025</option>
                                                 <option value="2">Jan 2026 - Dec 2026</option>
 
                                             </select>
+                                            <div class="dd" data-target="#hiringSourceYear">
+                                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                    <span class="dd-lbl">Jan 2024 - Dec 2024</span>
+                                                    <svg class="dd-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                </button>
+                                                <div class="dd-panel" role="listbox" aria-label="Hiring source year">
+                                                    <div class="dd-scroll">
+                                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Jan 2024 - Dec 2024</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        <div class="dd-item" role="option" data-value="1"><span class="dd-nm">Jan 2025 - Dec 2025</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        <div class="dd-item" role="option" data-value="2"><span class="dd-nm">Jan 2026 - Dec 2026</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
 
@@ -833,6 +846,8 @@
         </div>
     </div>
 </div>
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -922,6 +937,9 @@
 
 
         var ctx = document.getElementById('myStackedBarChart').getContext('2d');
+        var _pTaaA1 = window.WaiChart ? window.WaiChart.palette().card : '#fff';
+        // backgroundColor per series: only 2 of 5 (#014653/#2EACB3) match
+        // SSOT tokens — left literal as a whole set.
         var myStackedBarChart = new Chart(ctx, {
             type: 'bar',
             data: {
@@ -931,7 +949,7 @@
                         label: 'Loremipsum.Com',
                         data: [8, 20, 25, 10, 10, 20, 10],
                         backgroundColor: '#014653',
-                        borderColor: '#fff',
+                        borderColor: _pTaaA1,
                         borderWidth: 2,
                         borderRadius: 10,
                     },
@@ -939,7 +957,7 @@
                         label: 'Lorem Ipsum',
                         data: [5, 10, 4, 20, 2, 5, 10],
                         backgroundColor: '#2EACB3',
-                        borderColor: '#fff',
+                        borderColor: _pTaaA1,
                         borderWidth: 2,
                         borderRadius: 10,
                     },
@@ -947,7 +965,7 @@
                         label: 'Direct',
                         data: [20, 5, 20, 40, 42, 5, 20],
                         backgroundColor: '#FED049',
-                        borderColor: '#fff',
+                        borderColor: _pTaaA1,
                         borderWidth: 2,
                         borderRadius: 10,
                     },
@@ -955,7 +973,7 @@
                         label: 'Another Source',
                         data: [5, 20, 15, 5, 5, 5, 10],
                         backgroundColor: '#8DC9C9',
-                        borderColor: '#fff',
+                        borderColor: _pTaaA1,
                         borderWidth: 2,
                         borderRadius: 10,
                     },
@@ -963,7 +981,7 @@
                         label: 'Lorem Ipsum',
                         data: [5, 20, 4, 20, 2, 5, 5],
                         backgroundColor: '#333333',
-                        borderColor: '#fff',
+                        borderColor: _pTaaA1,
                         borderWidth: 2,
                         borderRadius: 10,
                     },
@@ -1003,6 +1021,9 @@
                     }
                 }
             }
+        });
+        if (window.WaiChart) window.WaiChart.registerForTheme(myStackedBarChart, function (c, p) {
+            c.data.datasets.forEach(function (ds) { ds.borderColor = p.card; });
         });
 
         //    equal heigth js

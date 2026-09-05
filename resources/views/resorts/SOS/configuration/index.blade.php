@@ -8,9 +8,15 @@
 @endif
 
 @section('content')
+<style>
+    #sos-config-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #sos-config-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="sos-config-hero">
             <div class="row justify-content-between g-3">
                 <div class="col-auto">
                     <div class="page-title">
@@ -59,7 +65,7 @@
                                     </div>
                                     <div class="col-sm-6">
                                         <label for="member_role" class="form-label">ROLE</label>
-                                        <select class="form-select select2t-none" name="employee[0][member_role]" id="member_role"
+                                        <select class="form-select dd-native-select" name="employee[0][member_role]" id="member_role"
                                             aria-label="Default select example" data-parsley-required="true"
                                         data-parsley-error-message="Please Select Role">
                                             <option value="" ></option>
@@ -69,6 +75,22 @@
                                                 @endforeach
                                             @endif
                                         </select>
+                                        <div class="dd" data-target="#member_role">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">Select Role</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Role">
+                                                <div class="dd-scroll">
+                                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Role</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @if($Roles->isNotEmpty())
+                                                        @foreach($Roles as $role)
+                                                            <div class="dd-item" role="option" data-value="{{ $role->id }}"><span class="dd-nm">{{ $role->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        @endforeach
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div class="col-12">
                                         <a href="javascript:void(0);" class="btn eb-btn-accent btn-sm AddAppendTeamMember blockAdd-btn">Add More</a>
@@ -246,6 +268,8 @@
     </div>
 </div>
 @include('resorts._emotional_buttons_v2_styles')
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')
@@ -302,10 +326,10 @@
                 <!-- Role -->
                 <div class="col-md-6">
                     <label for="member_role" class="form-label fw-bold">Role</label>
-                    <select class="form-select select2t-none"
-                            name="employee[${TeamMemberCount}][member_role]" 
-                            id="RoleMain_${TeamMemberCount}" 
-                            data-id="${TeamMemberCount}" 
+                    <select class="form-select dd-native-select"
+                            name="employee[${TeamMemberCount}][member_role]"
+                            id="RoleMain_${TeamMemberCount}"
+                            data-id="${TeamMemberCount}"
                             required
                             data-parsley-required="true"
                             data-parsley-error-message="Please select a role">
@@ -316,6 +340,22 @@
                                 @endforeach
                             @endif
                     </select>
+                    <div class="dd" data-target="#RoleMain_${TeamMemberCount}">
+                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                            <span class="dd-lbl">Select Role</span>
+                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                        </button>
+                        <div class="dd-panel" role="listbox" aria-label="Role">
+                            <div class="dd-scroll">
+                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Role</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                @if($Roles->isNotEmpty())
+                                    @foreach($Roles as $role)
+                                        <div class="dd-item" role="option" data-value="{{ $role->id }}"><span class="dd-nm">{{ $role->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    @endforeach
+                                @endif
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Remove Button -->
@@ -334,14 +374,10 @@
             $("#TeamMemberMain_"+TeamMemberCount).select2({
                 placeholder: "Select Employee",
                 allowClear: true,
-                width: '100%'        
+                width: '100%'
             });
-            $("#RoleMain_"+TeamMemberCount).select2({
-                placeholder: "Select Role",
-                allowClear: true,
-                width: '100%'        
-            });
-        }); 
+            wisdomDD.sync('#RoleMain_'+TeamMemberCount);
+        });
         $(document).on('click','.TeamMemberRemove',function()
         {
             var loction =$(this).data('id');
@@ -422,11 +458,6 @@
             closeOnSelect: false
         });
 
-        $("#member_role").select2({
-            placeholder: "Select Role",
-            allowClear: true,
-            width: '100%'        
-        });
         $("#team_member").select2({
             placeholder: "Select Employee",
             allowClear: true,

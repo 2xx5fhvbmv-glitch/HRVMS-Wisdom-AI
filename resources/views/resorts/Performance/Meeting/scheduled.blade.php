@@ -3,9 +3,15 @@
 @section('page_tab_title', $page_title)
 
 @section('content')
+<style>
+    #performance-scheduled-meetings-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #performance-scheduled-meetings-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="performance-scheduled-meetings-hero">
             <div class="row justify-content-between g-3">
                 <div class="col-auto">
                     <div class="page-title">
@@ -46,7 +52,7 @@
                 <span class="badge" style="background:#dc3545;color:#fff;">&#9679;</span> Has Declines
             </div>
             <div class="col-auto">
-                <span class="badge" style="background:#014653;color:#fff;">&#9679;</span> No Participants
+                <span class="badge" style="background:var(--teal);color:#fff;">&#9679;</span> No Participants
             </div>
         </div>
     </div>
@@ -56,7 +62,7 @@
 <div class="modal fade" id="meetingDetail-modal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
-            <div class="modal-header" style="background:#014653;color:#fff;">
+            <div class="modal-header" style="background:var(--teal);color:#fff;">
                 <h5 class="modal-title" id="meetingDetailTitle">Meeting Details</h5>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
@@ -75,11 +81,11 @@
 <style>
     #meetingDetail-modal .modal-body { font-size: 14px; color: #333; }
     .meet-info .meet-row { display: flex; align-items: baseline; gap: 6px; padding: 4px 0; font-size: 14px; line-height: 1.5; }
-    .meet-info .meet-ico { color: #014653; width: 14px; }
+    .meet-info .meet-ico { color: var(--teal); width: 14px; }
     .meet-info .meet-label { font-weight: 600; color: #555; min-width: 100px; }
-    .meet-info .meet-value { color: #222; word-break: break-word; }
+    .meet-info .meet-value { color: var(--darkblack); word-break: break-word; }
 
-    .meet-participants-head { font-size: 15px; font-weight: 600; color: #014653; }
+    .meet-participants-head { font-size: 15px; font-weight: 600; color: var(--teal); }
     .meet-group { margin-bottom: 16px; }
     .meet-group-head { margin-bottom: 8px; }
     .meet-plist { list-style: none; padding-left: 0; margin: 0; }
@@ -87,20 +93,20 @@
     .meet-plist-item:last-child { border-bottom: none; }
     .meet-avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; flex-shrink: 0; background: #e9ecef; }
     .meet-pinfo { flex: 1; min-width: 0; }
-    .meet-pname { font-size: 14px; font-weight: 600; color: #222; }
+    .meet-pname { font-size: 14px; font-weight: 600; color: var(--darkblack); }
     .meet-ppos { font-size: 12px; color: #777; }
     .meet-preason { font-size: 12px; color: #a94442; margin-top: 2px; }
 
     /* Right sidebar meeting cards */
     .mtg-card { display: flex; gap: 12px; padding: 12px; border: 1px solid #e9ecef; border-radius: 10px; background: #fff; margin-bottom: 12px; }
     .mtg-date { width: 54px; text-align: center; background: #f1f5f9; border-radius: 8px; padding: 8px 4px; flex-shrink: 0; }
-    .mtg-date .mtg-day { font-size: 20px; font-weight: 700; color: #014653; line-height: 1; }
+    .mtg-date .mtg-day { font-size: 20px; font-weight: 700; color: var(--teal); line-height: 1; }
     .mtg-date .mtg-month { font-size: 12px; font-weight: 600; color: #555; text-transform: uppercase; margin-top: 2px; }
     .mtg-date .mtg-weekday { font-size: 11px; color: #888; margin-top: 2px; }
     .mtg-body { flex: 1; min-width: 0; }
-    .mtg-title { font-size: 14px; font-weight: 600; color: #222; margin: 0 0 4px; line-height: 1.3; word-break: break-word; }
+    .mtg-title { font-size: 14px; font-weight: 600; color: var(--darkblack); margin: 0 0 4px; line-height: 1.3; word-break: break-word; }
     .mtg-meta { font-size: 12px; color: #666; margin-bottom: 2px; }
-    .mtg-meta i { color: #014653; margin-right: 4px; }
+    .mtg-meta i { color: var(--teal); margin-right: 4px; }
     .mtg-badges { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0; }
     .mtg-badge { display: inline-block; font-size: 11px; padding: 3px 8px; border-radius: 10px; font-weight: 600; line-height: 1.2; }
     .mtg-badge-green  { background: #e6f4ea; color: #1f8a3a; }

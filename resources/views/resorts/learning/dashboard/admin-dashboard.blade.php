@@ -295,7 +295,7 @@
         transform: translateX(-50%);
         width: 8px;
         height: 8px;
-        background: #2EACB3;
+        background: var(--aqua);
         border-radius: 50%;
     }
 </style>
@@ -591,6 +591,8 @@
                 },
                 plugins: [doughnutLabelsInsideN]
             });
+            // backgroundColor (chartData.colors) is server-supplied — out of scope.
+            if (window.WaiChart) window.WaiChart.registerForTheme(window.myDoughnutChart);
 
             // ✅ Update the legend after the chart is created
             updateLegend(chartData.labels, chartData.colors);
@@ -729,6 +731,7 @@
     <script type="module">
 
         var ctx = document.getElementById('myStackedBarChart').getContext('2d');
+        var _pLearnA1 = window.WaiChart ? window.WaiChart.palette() : { teal: '#014653', aqua: '#2EACB3', card: '#fff' };
         var myStackedBarChart = new Chart(ctx, {
             type: 'bar',
             data: {
@@ -737,16 +740,16 @@
                     {
                         label: 'Learning 1',
                         data: [8, 20, 25, 10, 10, 20, 10],
-                        backgroundColor: '#014653',
-                        borderColor: '#fff',
+                        backgroundColor: _pLearnA1.teal,
+                        borderColor: _pLearnA1.card,
                         borderWidth: 2,
                         borderRadius: 10,
                     },
                     {
                         label: 'Learning 1',
                         data: [5, 10, 4, 20, 2, 5, 10],
-                        backgroundColor: '#2EACB3',
-                        borderColor: '#fff',
+                        backgroundColor: _pLearnA1.aqua,
+                        borderColor: _pLearnA1.card,
                         borderWidth: 2,
                         borderRadius: 10,
                     },
@@ -754,7 +757,7 @@
                         label: 'Learning 1',
                         data: [20, 5, 20, 40, 22, 5, 20],
                         backgroundColor: '#FED049',
-                        borderColor: '#fff',
+                        borderColor: _pLearnA1.card,
                         borderWidth: 2,
                         borderRadius: 10,
                     },
@@ -762,7 +765,7 @@
                         label: 'Learning 1',
                         data: [5, 20, 15, 5, 5, 5, 10],
                         backgroundColor: '#8DC9C9',
-                        borderColor: '#fff',
+                        borderColor: _pLearnA1.card,
                         borderWidth: 2,
                         borderRadius: 10,
                     },
@@ -770,7 +773,7 @@
                         label: 'Learning 1',
                         data: [5, 7, 4, 4, 2, 5, 5],
                         backgroundColor: '#333333',
-                        borderColor: '#fff',
+                        borderColor: _pLearnA1.card,
                         borderWidth: 2,
                         borderRadius: 10,
                     },
@@ -778,7 +781,7 @@
                         label: 'Learning 1',
                         data: [5, 7, 4, 4, 2, 5, 5],
                         backgroundColor: '#7AD45A',
-                        borderColor: '#fff',
+                        borderColor: _pLearnA1.card,
                         borderWidth: 2,
                         borderRadius: 10,
                     },
@@ -786,7 +789,7 @@
                         label: 'Learning 1',
                         data: [5, 7, 4, 4, 2, 5, 5],
                         backgroundColor: '#FF4B4B',
-                        borderColor: '#fff',
+                        borderColor: _pLearnA1.card,
                         borderWidth: 2,
                         borderRadius: 10,
                     },
@@ -794,7 +797,7 @@
                         label: 'Learning 1',
                         data: [5, 7, 4, 4, 2, 5, 5],
                         backgroundColor: '#F5738D',
-                        borderColor: '#fff',
+                        borderColor: _pLearnA1.card,
                         borderWidth: 2,
                         borderRadius: 10,
                     },
@@ -802,7 +805,7 @@
                         label: 'Learning 1',
                         data: [5, 7, 4, 4, 2, 5, 5],
                         backgroundColor: '#53CAFF',
-                        borderColor: '#fff',
+                        borderColor: _pLearnA1.card,
                         borderWidth: 2,
                         borderRadius: 10,
                     },
@@ -843,10 +846,16 @@
                 }
             }
         });
+        if (window.WaiChart) window.WaiChart.registerForTheme(myStackedBarChart, function (c, p) {
+            c.data.datasets[0].backgroundColor = p.teal;
+            c.data.datasets[1].backgroundColor = p.aqua;
+            c.data.datasets.forEach(function (ds) { ds.borderColor = p.card; });
+        });
 
-      
+
 
         var cty = document.getElementById('onboardingChart').getContext('2d');
+        var _pLearnA2 = window.WaiChart ? window.WaiChart.palette() : { teal: '#014653', aqua: '#2EACB3', card: '#fff' };
         var onboardingChart = new Chart(cty, {
             type: 'bar',
             data: {
@@ -855,16 +864,16 @@
                     {
                         label: 'Department  1',
                         data: [8, 20, 25, 10, 10, 20, 10],
-                        backgroundColor: '#014653',
-                        borderColor: '#fff',
+                        backgroundColor: _pLearnA2.teal,
+                        borderColor: _pLearnA2.card,
                         borderWidth: 2,
                         borderRadius: 10,
                     },
                     {
                         label: 'Department  2',
                         data: [5, 10, 4, 20, 2, 5, 10],
-                        backgroundColor: '#2EACB3',
-                        borderColor: '#fff',
+                        backgroundColor: _pLearnA2.aqua,
+                        borderColor: _pLearnA2.card,
                         borderWidth: 2,
                         borderRadius: 10,
                     },
@@ -872,7 +881,7 @@
                         label: 'Department  3',
                         data: [20, 5, 20, 40, 22, 5, 20],
                         backgroundColor: '#FED049',
-                        borderColor: '#fff',
+                        borderColor: _pLearnA2.card,
                         borderWidth: 2,
                         borderRadius: 10,
                     },
@@ -880,7 +889,7 @@
                         label: 'Department  4',
                         data: [5, 20, 15, 5, 5, 5, 10],
                         backgroundColor: '#8DC9C9',
-                        borderColor: '#fff',
+                        borderColor: _pLearnA2.card,
                         borderWidth: 2,
                         borderRadius: 10,
                     },
@@ -888,7 +897,7 @@
                         label: 'Department  5',
                         data: [5, 7, 4, 4, 2, 5, 5],
                         backgroundColor: '#333333',
-                        borderColor: '#fff',
+                        borderColor: _pLearnA2.card,
                         borderWidth: 2,
                         borderRadius: 10,
                     }
@@ -928,6 +937,11 @@
                     }
                 }
             }
+        });
+        if (window.WaiChart) window.WaiChart.registerForTheme(onboardingChart, function (c, p) {
+            c.data.datasets[0].backgroundColor = p.teal;
+            c.data.datasets[1].backgroundColor = p.aqua;
+            c.data.datasets.forEach(function (ds) { ds.borderColor = p.card; });
         });
 
     </script>

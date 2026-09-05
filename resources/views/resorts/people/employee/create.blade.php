@@ -264,7 +264,7 @@
                                 <div class="col-lg-4 col-sm-6 emp_createion_sel">
                                     <label for="gender" class="form-label">Gender <span
                                             class="req_span">*</span></label>
-                                    <select class="form-select select2t-none" id="gender" name="gender" required>
+                                    <select class="form-select dd-native-select" id="gender" name="gender" required>
                                         <option value="">Select Gender</option>
                                         <option value="male">Male</option>
                                         <option value="female">Female</option>
@@ -272,11 +272,24 @@
                                              collected only for legal/visa records where
                                              Male / Female are the only accepted values. --}}
                                     </select>
+                                    <div class="dd" data-target="#gender">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Select Gender</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Gender">
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Gender</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="male"><span class="dd-nm">Male</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="female"><span class="dd-nm">Female</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="col-lg-4 col-sm-6 emp_createion_sel">
                                     <label for="marital_status" class="form-label">Marital Status <span
                                             class="req_span">*</span></label>
-                                    <select class="form-select select2t-none" id="marital_status" required
+                                    <select class="form-select dd-native-select" id="marital_status" required
                                         name="marital_status" data-placeholder="Marital Status">
                                         <option></option>
                                         <option value="Single">Single</option>
@@ -284,33 +297,76 @@
                                         <option value="Divorced">Divorced</option>
                                         <option value="Widowed">Widowed</option>
                                     </select>
+                                    <div class="dd" data-target="#marital_status">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Marital Status</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Marital Status">
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Marital Status</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="Single"><span class="dd-nm">Single</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="Married"><span class="dd-nm">Married</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="Divorced"><span class="dd-nm">Divorced</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="Widowed"><span class="dd-nm">Widowed</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div class="col-lg-4 col-sm-6 emp_createion_sel">
                                     <label for="nationality" class="form-label" required>Nationality <span
                                             class="req_span">*</span></label>
-                                    <select class="form-select select2t-none" id="nationality" required
+                                    <select class="form-select dd-native-select" id="nationality" required
                                         name="nationality" data-placeholder="Nationality">
                                         <option></option>
                                         @foreach ($nationalitys as $nationality)
                                             <option value="{{ $nationality }}">{{ $nationality }}</option>
                                         @endforeach
                                     </select>
+                                    <div class="dd" data-target="#nationality">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Nationality</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Nationality">
+                                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a nationality…"></div>
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Nationality</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @foreach ($nationalitys as $nationality)
+                                                    <div class="dd-item" role="option" data-value="{{ $nationality }}"><span class="dd-nm">{{ $nationality }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="col-lg-4 col-sm-6 emp_createion_sel">
                                     <label for="religion" class="form-label">Religion <span
                                             class="req_span">*</span></label>
-                                    <select class="form-select select2t-none" id="religion" name="religion" required
+                                    <select class="form-select dd-native-select" id="religion" name="religion" required
                                         data-placeholder="Religion">
                                         <option></option>
                                         <option value="0">Non-Muslim</option>
                                         <option value="1">Muslim</option>
                                     </select>
+                                    <div class="dd" data-target="#religion">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Religion</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Religion">
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Religion</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="0"><span class="dd-nm">Non-Muslim</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="1"><span class="dd-nm">Muslim</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="col-lg-4 col-sm-6 emp_createion_sel">
                                     <label for="blood_group" class="form-label">Blood Group <span
                                             class="req_span">*</span></label>
-                                    <select class="form-select select2t-none" id="blood_group" name="blood_group"
+                                    <select class="form-select dd-native-select" id="blood_group" name="blood_group"
                                         required data-placeholder="Blood Group">
                                         <option></option>
                                         <option value="A+">A+</option>
@@ -322,6 +378,25 @@
                                         <option value="O+">O+</option>
                                         <option value="O-">O-</option>
                                     </select>
+                                    <div class="dd" data-target="#blood_group">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Blood Group</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Blood Group">
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Blood Group</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="A+"><span class="dd-nm">A+</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="A-"><span class="dd-nm">A-</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="B+"><span class="dd-nm">B+</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="B-"><span class="dd-nm">B-</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="AB+"><span class="dd-nm">AB+</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="AB-"><span class="dd-nm">AB-</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="O+"><span class="dd-nm">O+</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="O-"><span class="dd-nm">O-</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 {{-- Passport Number and NID are mutually-exclusive
                                      identification documents. The form requires AT
@@ -402,13 +477,28 @@
                                                     data-parsley-pattern-message="Postal code must be exactly 5 digits.">
                                             </div>
                                             <div class="col-lg-4 col-sm-6 emp_createion_sel">
-                                                <select class="form-select select2t-none" data-placeholder="Country"
+                                                <select class="form-select dd-native-select" id="present_country" data-placeholder="Country"
                                                     name="present_country" required>
                                                     <option></option>
                                                     @foreach ($countries as $country)
                                                         <option value="{{ $country }}">{{ $country }}</option>
                                                     @endforeach
                                                 </select>
+                                                <div class="dd" data-target="#present_country">
+                                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                        <span class="dd-lbl">Country</span>
+                                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                    </button>
+                                                    <div class="dd-panel" role="listbox" aria-label="Country">
+                                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a country…"></div>
+                                                        <div class="dd-scroll">
+                                                            <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Country</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                            @foreach ($countries as $country)
+                                                                <div class="dd-item" role="option" data-value="{{ $country }}"><span class="dd-nm">{{ $country }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                            @endforeach
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -456,13 +546,28 @@
                                                     data-parsley-pattern-message="Postal code must be exactly 5 digits.">
                                             </div>
                                             <div class="col-lg-4 col-sm-6 emp_createion_sel">
-                                                <select class="form-select select2t-none" data-placeholder="Country"
+                                                <select class="form-select dd-native-select" id="parmanent_country" data-placeholder="Country"
                                                     name="parmanent_country" required>
                                                     <option></option>
                                                     @foreach ($countries as $country)
                                                         <option value="{{ $country }}">{{ $country }}</option>
                                                     @endforeach
                                                 </select>
+                                                <div class="dd" data-target="#parmanent_country">
+                                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                        <span class="dd-lbl">Country</span>
+                                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                    </button>
+                                                    <div class="dd-panel" role="listbox" aria-label="Country">
+                                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a country…"></div>
+                                                        <div class="dd-scroll">
+                                                            <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Country</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                            @foreach ($countries as $country)
+                                                                <div class="dd-item" role="option" data-value="{{ $country }}"><span class="dd-nm">{{ $country }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                            @endforeach
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -513,7 +618,7 @@
                                 <div class="col-lg-4 col-sm-6 emp_createion_sel">
                                     <label for="emg_relation" class="form-label">Relation <span
                                             class="req_span">*</span></label>
-                                    <select class="form-select select2t-none" id="emg_relation"
+                                    <select class="form-select dd-native-select" id="emg_relation"
                                         name="emg_contact_relation" required aria-label="Default select example">
                                         <option value="" selected disabled>Select Relation</option>
                                         <option value="father">Father</option>
@@ -524,17 +629,50 @@
                                         <option value="relative">Relative</option>
                                         <option value="other">Other</option>
                                     </select>
+                                    <div class="dd" data-target="#emg_relation">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Select Relation</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Relation">
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value="" aria-disabled="true"><span class="dd-nm">Select Relation</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="father"><span class="dd-nm">Father</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="mother"><span class="dd-nm">Mother</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="spouse"><span class="dd-nm">Spouse</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="sibling"><span class="dd-nm">Sibling</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="friend"><span class="dd-nm">Friend</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="relative"><span class="dd-nm">Relative</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="other"><span class="dd-nm">Other</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="col-lg-4 col-sm-6 emp_createion_sel">
                                     <label for="emg_contact_nationality" class="form-label">Nationality <span
                                             class="req_span">*</span></label>
-                                    <select class="form-select select2t-none" id="emg_contact_nationality"
+                                    <select class="form-select dd-native-select" id="emg_contact_nationality"
                                         name="emg_contact_nationality" required aria-label="Default select">
                                         <option value="" selected disabled>Select Nationality</option>
                                         @foreach ($nationalitys as $nationality)
                                             <option value="{{ $nationality }}">{{ $nationality }}</option>
                                         @endforeach
                                     </select>
+                                    <div class="dd" data-target="#emg_contact_nationality">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Select Nationality</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Nationality">
+                                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a nationality…"></div>
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value="" aria-disabled="true"><span class="dd-nm">Select Nationality</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @foreach ($nationalitys as $nationality)
+                                                    <div class="dd-item" role="option" data-value="{{ $nationality }}"><span class="dd-nm">{{ $nationality }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div class="col-12">
@@ -568,13 +706,28 @@
                                                     data-parsley-pattern-message="Postal code must be exactly 5 digits.">
                                             </div>
                                             <div class="col-lg-4 col-sm-6 emp_createion_sel">
-                                                <select class="form-select select2t-none" name="emg_cont_country"
+                                                <select class="form-select dd-native-select" id="emg_cont_country" name="emg_cont_country"
                                                     data-placeholder="Country" required>
                                                     <option></option>
                                                     @foreach ($countries as $country)
                                                         <option value="{{ $country }}">{{ $country }}</option>
                                                     @endforeach
                                                 </select>
+                                                <div class="dd" data-target="#emg_cont_country">
+                                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                        <span class="dd-lbl">Country</span>
+                                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                    </button>
+                                                    <div class="dd-panel" role="listbox" aria-label="Country">
+                                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a country…"></div>
+                                                        <div class="dd-scroll">
+                                                            <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Country</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                            @foreach ($countries as $country)
+                                                                <div class="dd-item" role="option" data-value="{{ $country }}"><span class="dd-nm">{{ $country }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                            @endforeach
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -593,7 +746,7 @@
                                         </div>
                                         <div class="col-lg-5 col-sm-6 emp_createion_sel">
                                             <label class="form-label">Proficiency Level </label>
-                                            <select class="form-select select2t-none proficiency-level-select">
+                                            <select class="form-select dd-native-select proficiency-level-select" id="proficiency-level-0">
                                                 <option value="" selected disabled readonly>Select Level</option>
                                                 <option value="Beginner">Beginner</option>
                                                 <option value="Intermediate">Intermediate</option>
@@ -601,6 +754,22 @@
                                                 <option value="Fluent">Fluent</option>
                                                 <option value="Native">Native</option>
                                             </select>
+                                            <div class="dd" data-target="#proficiency-level-0">
+                                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                    <span class="dd-lbl">Select Level</span>
+                                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                </button>
+                                                <div class="dd-panel" role="listbox" aria-label="Proficiency Level">
+                                                    <div class="dd-scroll">
+                                                        <div class="dd-item active" role="option" data-value="" aria-disabled="true"><span class="dd-nm">Select Level</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        <div class="dd-item" role="option" data-value="Beginner"><span class="dd-nm">Beginner</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        <div class="dd-item" role="option" data-value="Intermediate"><span class="dd-nm">Intermediate</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        <div class="dd-item" role="option" data-value="Advanced"><span class="dd-nm">Advanced</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        <div class="dd-item" role="option" data-value="Fluent"><span class="dd-nm">Fluent</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        <div class="dd-item" role="option" data-value="Native"><span class="dd-nm">Native</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                         <div class="col-lg-1 col-sm-12 d-flex align-items-end">
                                             <div class="d-flex gap-2 w-100">
@@ -646,23 +815,50 @@
                                 <div class="col-lg-4 col-sm-6 emp_createion_sel">
                                     <label for="division" class="form-label">Division <span
                                             class="req_span">*</span></label>
-                                    <select class="form-select select2t-none" id="division" name="division"
+                                    <select class="form-select dd-native-select" id="division" name="division"
                                         data-placeholder="Select Division" required>
                                         <option></option>
                                         @foreach ($resort_divisions as $devision)
                                             <option value="{{ $devision->id }}">{{ $devision->name }}</option>
                                         @endforeach
                                     </select>
+                                    <div class="dd" data-target="#division">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Select Division</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Division">
+                                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a division…"></div>
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Division</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @foreach ($resort_divisions as $devision)
+                                                    <div class="dd-item" role="option" data-value="{{ $devision->id }}"><span class="dd-nm">{{ $devision->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div class="col-lg-4 col-sm-6 emp_createion_sel">
                                     <label for="department" class="form-label">Department <span
                                             class="req_span">*</span></label>
-                                    <select class="form-select select2t-none" id="department" name="department"
+                                    <select class="form-select dd-native-select" id="department" name="department"
                                         data-placeholder="Department" required>
                                         <option></option>
                                         {{-- Options loaded by AJAX --}}
                                     </select>
+                                    <div class="dd" data-target="#department">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Department</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Department">
+                                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a department…"></div>
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Department</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div class="col-lg-4 col-sm-6 emp_createion_sel">
@@ -670,40 +866,86 @@
                                     {{-- Starts disabled — Section is gated on Department
                                          (and on the chosen department actually HAVING sections).
                                          The cascade JS toggles this back on when there are options. --}}
-                                    <select class="form-select select2t-none" id="section" name="section"
+                                    <select class="form-select dd-native-select" id="section" name="section"
                                         data-placeholder="Section" disabled>
                                         <option></option>
                                         {{-- Options loaded by AJAX --}}
                                     </select>
+                                    <div class="dd" data-target="#section">
+                                        <button type="button" class="dd-trigger" disabled aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Section</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Section">
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Section</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div class="col-lg-4 col-sm-6 emp_createion_sel">
                                     <label for="position" class="form-label">Position <span
                                             class="req_span">*</span></label>
-                                    <select class="form-select select2t-none" id="position" name="position"
+                                    <select class="form-select dd-native-select" id="position" name="position"
                                         data-placeholder="Position" required>
                                         <option></option>
                                         {{-- Options loaded by AJAX --}}
                                     </select>
+                                    <div class="dd" data-target="#position">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Position</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Position">
+                                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a position…"></div>
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Position</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div class="col-lg-4 col-sm-6 emp_createion_sel">
                                     <label for="benefit_grid_level" class="form-label">Benefit Grid Level<span
                                             class="req_span">*</span></label>
-                                    <select class="form-select select2t-none" id="benefit_grid_level"
+                                    <select class="form-select dd-native-select" id="benefit_grid_level"
                                         name="benefit_grid_level" data-placeholder="Benefit Grid Level">
                                         <option></option>
                                     </select>
+                                    <div class="dd" data-target="#benefit_grid_level">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Benefit Grid Level</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Benefit Grid Level">
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Benefit Grid Level</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div class="col-lg-4 col-sm-6 emp_createion_sel">
                                     <label for="reporting_person" class="form-label">Reporting Person <span
                                             class="req_span">*</span></label>
-                                    <select class="form-select select2t-none" id="reporting_person"
+                                    <select class="form-select dd-native-select" id="reporting_person"
                                         name="reporting_person" data-placeholder="Reporting Person" required>
                                         <option></option>
                                         {{-- Options loaded by AJAX --}}
                                     </select>
+                                    <div class="dd" data-target="#reporting_person">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Reporting Person</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Reporting Person">
+                                            <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an employee…"></div>
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Reporting Person</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <input type="hidden" name="position_rank" id="position_rank" value="">
@@ -721,7 +963,7 @@
                                 <div class="col-lg-4 col-sm-6 emp_createion_sel">
                                     <label for="employment_status" class="form-label">EMPLOYMENT STATUS<span
                                             class="req_span">*</span></label>
-                                    <select class="form-select select2t-none" id="employment_status"
+                                    <select class="form-select dd-native-select" id="employment_status"
                                         name="employment_status" data-placeholder="Employment Status" required>
                                         <option></option>
                                         <option value="Full-Time">Full-Time</option>
@@ -732,6 +974,24 @@
                                         <option value="Internship">Internship</option>
                                         <option value="Temporary">Temporary</option>
                                     </select>
+                                    <div class="dd" data-target="#employment_status">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Employment Status</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Employment Status">
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Employment Status</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="Full-Time"><span class="dd-nm">Full-Time</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="Part-Time"><span class="dd-nm">Part-Time</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="Contract"><span class="dd-nm">Contract</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="Casual"><span class="dd-nm">Casual</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="Probationary"><span class="dd-nm">Probationary</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="Internship"><span class="dd-nm">Internship</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="Temporary"><span class="dd-nm">Temporary</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
 
 
@@ -788,21 +1048,45 @@
                                 <div class="col-lg-4 col-sm-6 emp_createion_sel">
                                     <label for="currency_type" class="form-label">Currency Type <span
                                             class="req_span">*</span></label>
-                                    <select class="form-select select2t-none" id="currency_type"
+                                    <select class="form-select dd-native-select" id="currency_type"
                                         name="basic_salary_currency" required aria-label="Default select example">
                                         <option value="MVR">MVR</option>
                                         <option value="USD">USD</option>
                                     </select>
+                                    <div class="dd" data-target="#currency_type">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">MVR</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Currency Type">
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value="MVR"><span class="dd-nm">MVR</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="USD"><span class="dd-nm">USD</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div class="col-lg-4 col-sm-6 emp_createion_sel">
                                     <label for="payment_mode" class="form-label">PAYMENT MODE <span
                                             class="req_span">*</span></label>
-                                    <select class="form-select select2t-none" id="payment_mode" name="payment_mode"
+                                    <select class="form-select dd-native-select" id="payment_mode" name="payment_mode"
                                         required aria-label="Default select example">
                                         <option value="Cash">Cash</option>
                                         <option value="Bank">Bank</option>
                                     </select>
+                                    <div class="dd" data-target="#payment_mode">
+                                        <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                            <span class="dd-lbl">Cash</span>
+                                            <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                        </button>
+                                        <div class="dd-panel" role="listbox" aria-label="Payment Mode">
+                                            <div class="dd-scroll">
+                                                <div class="dd-item active" role="option" data-value="Cash"><span class="dd-nm">Cash</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                <div class="dd-item" role="option" data-value="Bank"><span class="dd-nm">Bank</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div class="row g-md-3 g-2 mb-md-4 mb-3">
@@ -874,7 +1158,7 @@
                                             <div class="col-4 emp_createion_sel">
                                                 <label class="form-label">Allowance Type <span
                                                         class="req_span">*</span></label>
-                                                <select class="form-select select2t-none allowance-type-select"
+                                                <select class="form-select dd-native-select allowance-type-select" id="allowance-type-0"
                                                     name="allowance[0][type]" required
                                                     data-parsley-required-message="Allowance type is required.">
                                                     <option value="">Select Allowance</option>
@@ -883,6 +1167,20 @@
                                                             {{ $allowance->particulars }}</option>
                                                     @endforeach
                                                 </select>
+                                                <div class="dd" data-target="#allowance-type-0">
+                                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                        <span class="dd-lbl">Select Allowance</span>
+                                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                    </button>
+                                                    <div class="dd-panel" role="listbox" aria-label="Allowance Type">
+                                                        <div class="dd-scroll">
+                                                            <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Allowance</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                            @foreach ($payrollAllowance as $allowance)
+                                                                <div class="dd-item" role="option" data-value="{{ $allowance->id }}"><span class="dd-nm">{{ $allowance->particulars }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                            @endforeach
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
                                             <div class="col-4">
                                                 <label class="form-label">Amount <span class="req_span">*</span></label>
@@ -896,13 +1194,26 @@
                                             </div>
                                             <div class="col-3 emp_createion_sel">
                                                 <label class="form-label">Currency <span class="req_span">*</span></label>
-                                                <select class="form-select select2t-none allowance-currency-select"
+                                                <select class="form-select dd-native-select allowance-currency-select" id="allowance-currency-0"
                                                     name="allowance[0][currency]" required
                                                     data-parsley-required-message="Currency is required.">
                                                     <option value="">Select Currency</option>
                                                     <option value="MVR">MVR</option>
                                                     <option value="USD">USD</option>
                                                 </select>
+                                                <div class="dd" data-target="#allowance-currency-0">
+                                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                        <span class="dd-lbl">Select Currency</span>
+                                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                                    </button>
+                                                    <div class="dd-panel" role="listbox" aria-label="Currency">
+                                                        <div class="dd-scroll">
+                                                            <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Currency</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                            <div class="dd-item" role="option" data-value="MVR"><span class="dd-nm">MVR</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                            <div class="dd-item" role="option" data-value="USD"><span class="dd-nm">USD</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                        </div>
+                                                    </div>
+                                                </div>
                                             </div>
                                             <div class="col-1 d-flex align-items-end">
                                                 <a href="javascript:void(0);"
@@ -983,12 +1294,25 @@
                                     </div>
                                     <div class="col-lg-4 col-sm-6 emp_createion_sel">
                                         <label class="form-label">Currency <span class="req_span">*</span></label>
-                                        <select class="form-select select2t-none currency" name="bank[0][currency]"
+                                        <select class="form-select dd-native-select currency" id="bank-currency-0" name="bank[0][currency]"
                                             required data-parsley-required-message="Currency is required.">
                                             <option value="">Select Currency</option>
                                             <option value="MVR">MVR</option>
                                             <option value="USD">USD</option>
                                         </select>
+                                        <div class="dd" data-target="#bank-currency-0">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">Select Currency</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Currency">
+                                                <div class="dd-scroll">
+                                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Currency</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    <div class="dd-item" role="option" data-value="MVR"><span class="dd-nm">MVR</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    <div class="dd-item" role="option" data-value="USD"><span class="dd-nm">USD</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div class="col-lg-4 col-sm-6">
                                         <label class="form-label">IBAN</label>
@@ -1285,6 +1609,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts._dropdown_styles')
     <style>
         .invalid-feedback {
             order: 2;
@@ -1433,7 +1758,6 @@
         }
 
         $(document).ready(function() {
-            initSelect2AndValidation();
             initParsleyValidation();
             initDatePicker();
 
@@ -1505,16 +1829,13 @@
                 valueId = String(valueId);
                 if ($field.find('option[value="' + valueId + '"]').length === 0) {
                     $field.append(new Option(valueLabel || valueId, valueId, true, true));
+                    if ($field.attr('id')) window.wisdomDD.rebuild('#' + $field.attr('id'));
                 }
                 $field.val(valueId);
-                // Re-render the Select2 widget so the new option shows
-                // without forcing a `change` event.
-                if ($field.data('select2')) {
-                    try { $field.trigger('change.select2'); } catch (e) {}
-                }
+                if ($field.attr('id')) window.wisdomDD.sync('#' + $field.attr('id'));
                 $field.prop('disabled', true).addClass('vacancy-locked');
-                if ($field.data('select2')) {
-                    try { $field.select2({ disabled: true }); } catch (e) {}
+                if ($field.attr('id')) {
+                    $('.dd[data-target="#' + $field.attr('id') + '"] .dd-trigger').prop('disabled', true);
                 }
                 $field.attr('data-vacancy-locked-value', valueId);
                 $field.attr('data-vacancy-locked-label', valueLabel || '');
@@ -1522,8 +1843,8 @@
             function unlockStep2Field($field) {
                 if (!$field.length) return;
                 $field.prop('disabled', false).removeClass('vacancy-locked');
-                if ($field.data('select2')) {
-                    try { $field.select2({ disabled: false }); } catch (e) {}
+                if ($field.attr('id')) {
+                    $('.dd[data-target="#' + $field.attr('id') + '"] .dd-trigger').prop('disabled', false);
                 }
                 $field.removeAttr('data-vacancy-locked-value');
                 $field.removeAttr('data-vacancy-locked-label');
@@ -1565,7 +1886,7 @@
                         data: { department_id: deptId },
                         success: function (res) {
                             var $rp = $('#reporting_person');
-                            var html = '<option></option>';
+                            var html = '<option value="">' + ($rp.data('placeholder') || '') + '</option>';
                             $.each((res && res.data) || [], function (_, person) {
                                 var name = '';
                                 if (person.first_name || person.last_name) {
@@ -1576,11 +1897,11 @@
                                 html += '<option value="' + person.id + '">' + name + '</option>';
                             });
                             $rp.html(html);
-                            // Re-render select2 without firing change so
-                            // we don't accidentally clear sibling fields.
-                            if ($rp.data('select2')) {
-                                try { $rp.trigger('change.select2'); } catch (e) {}
-                            }
+                            // Rebuild the .dd's item list without firing a
+                            // real `change` so we don't accidentally clear
+                            // sibling fields (rebuild re-syncs the label from
+                            // the select's current value on its own).
+                            window.wisdomDD.rebuild('#reporting_person');
                         }
                     });
 
@@ -1596,23 +1917,19 @@
                         success: function (res) {
                             var $sec = $('#section');
                             var sections = (res && res.sections) || [];
-                            var html = '<option></option>';
+                            var html = '<option value="">' + ($sec.data('placeholder') || '') + '</option>';
                             $.each(sections, function (_, section) {
                                 html += '<option value="' + section.id + '">' + section.name + '</option>';
                             });
                             $sec.html(html);
-                            if ($sec.data('select2')) {
-                                try { $sec.trigger('change.select2'); } catch (e) {}
-                            }
+                            window.wisdomDD.rebuild('#section');
                             // Disable when the dept has no sections; never
                             // override a vacancy-locked Section (the vacancy
                             // owns it). Mirrors the manual-cascade behaviour.
                             var sectionDisabled = sections.length === 0;
                             if (!$sec.hasClass('vacancy-locked')) {
                                 $sec.prop('disabled', sectionDisabled);
-                                if ($sec.data('select2')) {
-                                    try { $sec.select2({ disabled: sectionDisabled }); } catch (e) {}
-                                }
+                                $('.dd[data-target="#section"] .dd-trigger').prop('disabled', sectionDisabled);
                             }
                         }
                     });
@@ -1708,7 +2025,8 @@
                                 opts.forEach(function (o) {
                                     html += `<option value="${o.emp_grade}">${o.name}</option>`;
                                 });
-                                $('#benefit_grid_level').html(html).trigger('change.select2');
+                                $('#benefit_grid_level').html(html);
+                                window.wisdomDD.rebuild('#benefit_grid_level');
                             }
                         }
                     });
@@ -1803,23 +2121,6 @@
                     autoclose: true
                 }).on('changeDate', function() {
                     $(this).parsley().validate(); // Trigger validation on date change
-                });
-            }
-        }
-
-        function initSelect2AndValidation() {
-            if ($.fn.select2 && $.fn.parsley) {
-                // Initialize Select2
-                $(".select2t-none").select2();
-
-                // Add Parsley validation specifically for Select2
-                $(".select2t-none").on('change', function() {
-                    $(this).parsley().validate();
-                });
-
-                // Ensure Select2 trigger changes in Parsley
-                $(".select2t-none").on('select2:select', function() {
-                    $(this).trigger('change');
                 });
             }
         }
@@ -2361,39 +2662,39 @@
             }
 
             // Add new block
+            var languageRowCount = 1;
             $(document).on('click', '.employeeLanguageRepeater-main .blockAdd-btn', function(e) {
                 e.preventDefault();
                 const $main = $('.employeeLanguageRepeater-main');
                 const $firstBlock = $main.find('.employeeLanguageRepeater-block').first();
 
-                $firstBlock.find('select.select2t-none').each(function() {
-                    if ($(this).data('select2')) {
-                        $(this).select2('destroy');
-                    }
-                });
-
                 const $newBlock = $firstBlock.clone();
-                $newBlock.find('.select2-container').remove();
-                $newBlock.find('select.select2t-none').removeAttr('data-select2-id').removeAttr(
-                    'aria-hidden').show();
 
                 // Reset inputs
                 $newBlock.find('input[type="text"]').val('');
                 $newBlock.find('select').prop('selectedIndex', 0);
+
+                // clone() copies the select's id (and its paired .dd's
+                // data-target) verbatim — every row after the first would
+                // otherwise share one id, so data-target's querySelector
+                // lookup would always resolve to the FIRST row's select.
+                // Mint a fresh id per cloned row and repoint its .dd.
+                $newBlock.find('select.proficiency-level-select').each(function () {
+                    const $select = $(this);
+                    const newId = 'proficiency-level-' + languageRowCount++;
+                    $select.next('.dd').attr('data-target', '#' + newId);
+                    $select.attr('id', newId);
+                });
 
                 $main.append($newBlock);
 
                 updateSkillNames();
                 toggleRemoveButtons();
 
-                // Re-init select2
-                $newBlock.find('select.select2t-none').select2({
-                    minimumResultsForSearch: Infinity,
-                    width: '100%'
-                });
-                $firstBlock.find('select.select2t-none').select2({
-                    minimumResultsForSearch: Infinity,
-                    width: '100%'
+                // Reset the cloned .dd's visual state to the placeholder now
+                // that the underlying select's selectedIndex was reset above.
+                $newBlock.find('select.proficiency-level-select').each(function () {
+                    window.wisdomDD.sync('#' + $(this).attr('id'));
                 });
             });
 
@@ -2403,12 +2704,6 @@
                 $(this).closest('.employeeLanguageRepeater-block').remove();
                 updateSkillNames();
                 toggleRemoveButtons();
-            });
-
-            // Initialize select2
-            $('.employeeLanguageRepeater-block select.select2t-none').select2({
-                minimumResultsForSearch: Infinity,
-                width: '100%'
             });
 
             updateSkillNames();
@@ -2861,47 +3156,49 @@
                 });
             }
 
-            // Reinitialize select2
-            function reinitSelect2($context) {
-                $context.find('select.select2t-none').select2();
-            }
-
             // Add new block
+            var allowanceRowCount = 1;
             $(document).on('click', '.allowanceAdd-btn', function(e) {
                 e.preventDefault();
 
                 const $main = $('.allowanceRepeater-main');
                 const $firstBlock = $main.find('.allowanceRepeater-block').first();
 
-                // Destroy select2 on the original block before cloning
-                $firstBlock.find('select.select2t-none').each(function() {
-                    if ($(this).data('select2')) {
-                        $(this).select2('destroy');
-                    }
-                });
-
                 const $newBlock = $firstBlock.clone();
 
                 // Clear values
-                $newBlock.find('select').val('').trigger('change');
                 $newBlock.find('input[type="text"], input[type="number"]').val('');
+                $newBlock.find('select').prop('selectedIndex', 0);
 
-                // Remove any select2 DOM artifacts
-                $newBlock.find('.select2-container').remove();
-                $newBlock.find('select.select2t-none')
-                    .removeAttr('data-select2-id')
-                    .removeAttr('aria-hidden')
-                    .removeAttr('tabindex')
-                    .show();
+                // clone() copies each select's id (and its paired .dd's
+                // data-target) verbatim — every row after the first would
+                // otherwise share one id, so data-target's querySelector
+                // lookup would always resolve to the FIRST row's select.
+                // Mint a fresh id per cloned row and repoint its .dd.
+                const rowIndex = allowanceRowCount++;
+                $newBlock.find('select.allowance-type-select').each(function () {
+                    const $select = $(this);
+                    const newId = 'allowance-type-' + rowIndex;
+                    $select.next('.dd').attr('data-target', '#' + newId);
+                    $select.attr('id', newId);
+                });
+                $newBlock.find('select.allowance-currency-select').each(function () {
+                    const $select = $(this);
+                    const newId = 'allowance-currency-' + rowIndex;
+                    $select.next('.dd').attr('data-target', '#' + newId);
+                    $select.attr('id', newId);
+                });
 
                 $main.append($newBlock);
 
                 updateAllowanceButtons();
                 updateAllowanceFieldNames();
 
-                // Re-initialize select2 on both original and new blocks
-                reinitSelect2($firstBlock);
-                reinitSelect2($newBlock);
+                // Reset the cloned .dd's visual state to the placeholder now
+                // that the underlying selects' selectedIndex was reset above.
+                $newBlock.find('select.allowance-type-select, select.allowance-currency-select').each(function () {
+                    window.wisdomDD.sync('#' + $(this).attr('id'));
+                });
 
                 // Re-bind allowance input event for new block
                 $newBlock.find('.allowance-amount-input, .allowance-currency-select').on('input change',
@@ -2920,7 +3217,6 @@
             // Initialize on load
             updateAllowanceButtons();
             updateAllowanceFieldNames();
-            reinitSelect2($(document));
         });
 
 
@@ -2952,10 +3248,7 @@
                 });
             }
 
-            function reinitSelect2($context) {
-                $context.find('select.select2t-none').select2();
-            }
-
+            var bankRowCount = 1;
             $(document).on('click', '.bankAdd-btn', function(e) {
                 e.preventDefault();
 
@@ -2964,18 +3257,31 @@
 
                 // Reset inputs
                 $new.find('input[type="text"]').val('');
-                $new.find('select').val('').trigger('change');
+                $new.find('select').prop('selectedIndex', 0);
 
-                // Remove select2 artifacts
-                $new.find('.select2-container').remove();
-                $new.find('select.select2t-none').removeAttr('data-select2-id').removeAttr('aria-hidden')
-                    .show();
+                // clone() copies the select's id (and its paired .dd's
+                // data-target) verbatim — every row after the first would
+                // otherwise share one id, so data-target's querySelector
+                // lookup would always resolve to the FIRST row's select.
+                // Mint a fresh id per cloned row and repoint its .dd.
+                const rowIndex = bankRowCount++;
+                $new.find('select.currency').each(function () {
+                    const $select = $(this);
+                    const newId = 'bank-currency-' + rowIndex;
+                    $select.next('.dd').attr('data-target', '#' + newId);
+                    $select.attr('id', newId);
+                });
 
                 $('.bankRepeater-main').append($new);
 
                 updateBankNames();
                 updateBankButtons();
-                reinitSelect2($new);
+
+                // Reset the cloned .dd's visual state to the placeholder now
+                // that the underlying select's selectedIndex was reset above.
+                $new.find('select.currency').each(function () {
+                    window.wisdomDD.sync('#' + $(this).attr('id'));
+                });
             });
 
             $(document).on('click', '.bankRemove-btn', function(e) {
@@ -2988,7 +3294,6 @@
             // Init
             updateBankNames();
             updateBankButtons();
-            reinitSelect2($(document));
         });
     </script>
 
@@ -3000,18 +3305,22 @@
             // wiped the locked Position dropdown — leaving "Position required".
             function wipeIfNotLocked($field) {
                 if ($field.hasClass('vacancy-locked')) return false;
-                $field.html('<option></option>').trigger('change');
+                // Placeholder text comes from the field's own data-placeholder
+                // (e.g. "Department") so the .dd's rebuilt blank option shows
+                // real text instead of going blank — .dd-item labels come
+                // from the <option>'s own text, unlike select2's placeholder attr.
+                $field.html('<option value="">' + ($field.data('placeholder') || '') + '</option>').val('').trigger('change');
+                if ($field.attr('id')) window.wisdomDD.rebuild('#' + $field.attr('id'));
                 return true;
             }
 
-            // Toggle disabled on a select2-backed field. Pure attr() doesn't
-            // grey the Select2 widget — Select2 needs its own .select2({ disabled }).
+            // Toggle disabled on the field + its paired .dd-trigger.
             // Never enable a vacancy-locked field — the vacancy lock owns it.
             function setFieldDisabled($field, isDisabled) {
                 if (!isDisabled && $field.hasClass('vacancy-locked')) return;
                 $field.prop('disabled', !!isDisabled);
-                if ($field.data('select2')) {
-                    try { $field.select2({ disabled: !!isDisabled }); } catch (e) {}
+                if ($field.attr('id')) {
+                    $('.dd[data-target="#' + $field.attr('id') + '"] .dd-trigger').prop('disabled', !!isDisabled);
                 }
             }
 
@@ -3034,12 +3343,13 @@
                         division_id: divisionId
                     },
                     success: function(res) {
-                        let html = '<option></option>';
+                        let html = '<option value="">' + ($('#department').data('placeholder') || '') + '</option>';
                         $.each(res.departments, function(_, department) {
                             html +=
                                 `<option value="${department.id}">${department.name}</option>`;
                         });
                         $('#department').html(html).trigger('change');
+                        window.wisdomDD.rebuild('#department');
                     }
                 });
             });
@@ -3061,21 +3371,23 @@
                         department_id: departmentId
                     },
                     success: function(res) {
-                        let html = '<option></option>';
+                        let html = '<option value="">' + ($('#section').data('placeholder') || '') + '</option>';
                         if (res.sections.length > 0) {
                             $.each(res.sections, function(_, section) {
                                 html +=
                                     `<option value="${section.id}">${section.name}</option>`;
                             });
-                            $('#section').html(html).trigger('change');
+                            $('#section').html(html);
+                            window.wisdomDD.rebuild('#section');
                             setFieldDisabled($('#section'), false);
-                        } else {
-                            // No sections under this dept — leave Section
-                            // disabled and load positions directly off dept.
-                            loadPositions({
-                                department_id: departmentId
-                            });
                         }
+                        // No section chosen yet — show the department's
+                        // section-less positions (e.g. Commis) until the
+                        // user picks a section, same fallback the Section
+                        // change handler below uses when cleared.
+                        loadPositions({
+                            department_id: departmentId
+                        });
                     }
                 });
             });
@@ -3087,8 +3399,14 @@
                 // picking Section after applying a vacancy left Position
                 // empty + "Position required".
                 if ($('#position').hasClass('vacancy-locked')) return;
-                $('#position').html('<option></option>').trigger('change');
-                if (!sectionId) return;
+                $('#position').html('<option value="">' + ($('#position').data('placeholder') || '') + '</option>').val('').trigger('change');
+                window.wisdomDD.rebuild('#position');
+                if (!sectionId) {
+                    // Section cleared — fall back to the department's own positions.
+                    let departmentId = $('#department').val();
+                    if (departmentId) loadPositions({ department_id: departmentId });
+                    return;
+                }
                 loadPositions({
                     section_id: sectionId
                 });
@@ -3100,12 +3418,13 @@
                     type: 'GET',
                     data: params,
                     success: function(res) {
-                        let html = '<option></option>';
+                        let html = '<option value="">' + ($('#position').data('placeholder') || '') + '</option>';
                         $.each(res.positions, function(_, position) {
                             html +=
                                 `<option value="${position.id}">${position.position_title}</option>`;
                         });
                         $('#position').html(html).trigger('change');
+                        window.wisdomDD.rebuild('#position');
                     }
                 });
             }
@@ -3119,7 +3438,7 @@
                         rank: rank || ''
                     },
                     success: function(res) {
-                        let html = '<option></option>';
+                        let html = '<option value="">' + ($('#reporting_person').data('placeholder') || '') + '</option>';
                         $.each(res.data, function(_, person) {
 
                             let displayName = '';
@@ -3133,6 +3452,7 @@
                             html += `<option value="${person.id}">${displayName}</option>`;
                         });
                         $('#reporting_person').html(html).trigger('change');
+                        window.wisdomDD.rebuild('#reporting_person');
                     }
                 });
             };
@@ -3210,7 +3530,8 @@
             $('#position').on('change', function() {
 
                 let positionId = $(this).val();
-                $('#benefit_grid_level').html('<option></option>').trigger('change');
+                $('#benefit_grid_level').html('<option value="">' + ($('#benefit_grid_level').data('placeholder') || '') + '</option>').val('').trigger('change');
+                window.wisdomDD.rebuild('#benefit_grid_level');
                 if (!positionId) return;
                 $.ajax({
                     url: '{{ route('people.getBenefitGridByPosition') }}',
@@ -3241,6 +3562,7 @@
                         }
 
                         $('#benefit_grid_level').html(html).trigger('change');
+                        window.wisdomDD.rebuild('#benefit_grid_level');
                     }
                 });
             });
@@ -3408,4 +3730,5 @@
             });
         });
     </script>
+@include('resorts._dropdown_script')
 @endsection

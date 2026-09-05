@@ -47,13 +47,27 @@
                     <div class="row align-items-center g-md-3 g-2">
                         <div class="col-xl-2 col-md-4 col-sm-5 col-auto">
                             <div class="form-group">
-                            <select class="form-select" aria-label="Default select example" name="associated_teams" id="teamFilter">
+                            <select class="form-select dd-native-select" aria-label="Default select example" name="associated_teams" id="teamFilter">
                                 <option value="">All Teams</option>
                                 @foreach($getAllTeams as $team)
                                     <option value="{{ $team->team->id }}">{{ $team->team->name }}</option>
                                 @endforeach
                             </select>
-                                
+                            <div class="dd" data-target="#teamFilter">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">All Teams</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Team">
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value=""><span class="dd-nm">All Teams</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @foreach($getAllTeams as $team)
+                                            <div class="dd-item" role="option" data-value="{{ $team->team->id }}"><span class="dd-nm">{{ $team->team->name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        @endforeach
+                                    </div>
+                                </div>
+                            </div>
+
                             </div>
                         </div>
                         <div class="col-auto">
@@ -122,6 +136,8 @@
 
         </div>
     </div>
+@include('resorts._dropdown_styles')
+@include('resorts._dropdown_script')
 @endsection
 
 @section('import-css')

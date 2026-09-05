@@ -10,11 +10,15 @@
 @endif
 
 @section('content')
-
-
+<style>
+    #accommodation-master-hero { padding-bottom: 40px; }
+    @media (max-width: 575.98px) {
+        #accommodation-master-hero { padding-bottom: 0; }
+    }
+</style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding">
+        <div class="page-hedding" id="accommodation-master-hero">
             <div class="row justify-content-between g-3">
                 <div class="col-auto">
                     <div class="page-title">
@@ -33,11 +37,24 @@
                             <input type="text" class="form-control datepicker" placeholder="Select Duration">
                         </div> --}}
                         <div class="col-xl-3 col-lg-4 col-md-5  col-sm-6">
-                            <select class="form-select  beds">
+                            <select class="form-select dd-native-select beds" id="bedsFilter">
                                 <option selected value="all">Available  beds</option>
                                 <option value="Male">Male</option>
                                 <option value="Female">Female</option>
                             </select>
+                            <div class="dd" data-target="#bedsFilter">
+                                <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                    <span class="dd-lbl">Available beds</span>
+                                    <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                </button>
+                                <div class="dd-panel" role="listbox" aria-label="Beds">
+                                    <div class="dd-scroll">
+                                        <div class="dd-item active" role="option" data-value="all"><span class="dd-nm">Available beds</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="Male"><span class="dd-nm">Male</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                        <div class="dd-item" role="option" data-value="Female"><span class="dd-nm">Female</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -92,6 +109,7 @@
 @endsection
 
 @section('import-css')
+@include('resorts._dropdown_styles')
 @endsection
 
 @section('import-scripts')
@@ -158,4 +176,5 @@
     }
 
 </script>
+@include('resorts._dropdown_script')
 @endsection

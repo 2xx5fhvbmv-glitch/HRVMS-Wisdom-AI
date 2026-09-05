@@ -8,9 +8,15 @@
 @endif
 
 @section('content')
+    <style>
+        #final-settlement-hero { padding-bottom: 40px; }
+        @media (max-width: 575.98px) {
+            #final-settlement-hero { padding-bottom: 0; }
+        }
+    </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
-            <div class="page-hedding">
+            <div class="page-hedding" id="final-settlement-hero">
                 <div class="row justify-content-between g-3">
                     <div class="col-auto">
                         <div class="page-title">
@@ -27,7 +33,7 @@
                         <div class="row g-md-4 g-3 mb-md-4 mb-3">
                             <div class="col-xl-4 col-md-6">
                                 <label for="select_emp" class="form-label">SELECT EMPLOYEE OR EMPLOYEE ID<span class="red-mark">*</span></label>
-                                <select class="form-select select2t-none" name="select_emp" id="select_emp" onchange="getEmpDetails(this.value)"
+                                <select class="form-select dd-native-select" name="select_emp" id="select_emp" onchange="getEmpDetails(this.value)"
                                     data-parsley-required="true" data-parsley-error-message="Please select an employee" data-parsley-errors-container="#select_emp_error">
                                     <option value="">Select Employees</option>
                                     @if($employees)
@@ -44,6 +50,24 @@
                                         @endforeach
                                     @endif
                                 </select>
+                                @php $selectedEmp = !empty($preselectedEmployeeId) ? collect($employees)->first(function($e) use ($preselectedEmployeeId){ return (int)$e->employee->id === (int)$preselectedEmployeeId; }) : null; @endphp
+                                <div class="dd" data-target="#select_emp">
+                                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                        <span class="dd-lbl">{{ $selectedEmp ? ($selectedEmp->employee->Emp_id . ' - ' . $selectedEmp->employee->resortAdmin->full_name) : 'Select Employees' }}</span>
+                                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                    </button>
+                                    <div class="dd-panel" role="listbox" aria-label="Employee">
+                                        <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find an employee…"></div>
+                                        <div class="dd-scroll">
+                                            <div class="dd-item{{ !$selectedEmp ? ' active' : '' }}" role="option" data-value=""><span class="dd-nm">Select Employees</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                            @if($employees)
+                                                @foreach($employees as $emp)
+                                                <div class="dd-item{{ !empty($preselectedEmployeeId) && (int) $preselectedEmployeeId === (int) $emp->employee->id ? ' active' : '' }}" role="option" data-value="{{ $emp->employee->id }}"><span class="dd-nm">{{ $emp->employee->Emp_id }} - {{ $emp->employee->resortAdmin->full_name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                @endforeach
+                                            @endif
+                                        </div>
+                                    </div>
+                                </div>
                                 <div id="select_emp_error"></div>
                             </div>
                             <div class="col-xl-4 col-md-6">
@@ -273,12 +297,27 @@
                                 <div class="row g-md-4 g-3 deduction-row">
                                     <!-- Initial deduction row -->
                                     <div class="col-xl-3 col-sm">
-                                        <select class="form-select select2t-none deduction-select" data-parsley-required-if="#deduction-amount-first" data-parsley-trigger="change">
+                                        <select class="form-select dd-native-select deduction-select" id="deductionSelect_0" data-parsley-required-if="#deduction-amount-first" data-parsley-trigger="change">
                                             <option value="">Select Deduction</option>
                                             @foreach($deductions as $deduction)
                                                 <option value="{{ $deduction->id }}" data-unit="{{ $deduction->currency }}">{{ $deduction->deduction_name }}</option>
                                             @endforeach
                                         </select>
+                                        <div class="dd" data-target="#deductionSelect_0">
+                                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                                <span class="dd-lbl">Select Deduction</span>
+                                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                                            </button>
+                                            <div class="dd-panel" role="listbox" aria-label="Deduction">
+                                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a deduction…"></div>
+                                                <div class="dd-scroll">
+                                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Deduction</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @foreach($deductions as $deduction)
+                                                    <div class="dd-item" role="option" data-value="{{ $deduction->id }}"><span class="dd-nm">{{ $deduction->deduction_name }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                                    @endforeach
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div class="col-xl-3 col-sm">
                                         <input type="number" id="deduction-amount-first" class="form-control deduction-amount" placeholder="Enter Amount" data-parsley-type="number" data-parsley-min="0" data-parsley-trigger="change">
@@ -404,6 +443,7 @@
 
 @section('import-css')
 @include('resorts.payroll._payroll_buttons_v2_styles')
+@include('resorts._dropdown_styles')
 <style>
     select.parsley-error + .select2 .select2-selection {
     border-color: #dc3545 !important; /* red border */
@@ -423,35 +463,28 @@
             errorClass: 'is-invalid'
         });
 
-        // Initialize Select2
-        $('.select2t-none').select2({
-            allowClear: true,
-            closeOnSelect: false
-        });
-
-        // Manually trigger Parsley validation when Select2 changes
-        $(".select2t-none").on('change', function () {
+        // Manually trigger Parsley validation when a dropdown changes
+        $(".dd-native-select").on('change', function () {
             var parsleyField = $(this).parsley();
             parsleyField.validate();
 
-            // Add/remove the error class to the Select2 container based on validation
+            // Add/remove the error class on the .dd-trigger based on validation
             if (parsleyField.isValid()) {
-                $(this).next('.select2-container').find('.select2-selection').removeClass('is-invalid');
+                $(this).siblings('.dd').find('.dd-trigger').removeClass('is-invalid');
             } else {
-                $(this).next('.select2-container').find('.select2-selection').addClass('is-invalid');
+                $(this).siblings('.dd').find('.dd-trigger').addClass('is-invalid');
             }
         });
 
         // Parsley field validation handler
         window.Parsley.on('field:validated', function (fieldInstance) {
             var $element = fieldInstance.$element;
-            if ($element.hasClass('select2t-none')) {
-                // Update the Select2 container's appearance
-                var $select2Container = $element.next('.select2-container').find('.select2-selection');
+            if ($element.hasClass('dd-native-select')) {
+                var $trigger = $element.siblings('.dd').find('.dd-trigger');
                 if (fieldInstance.isValid()) {
-                    $select2Container.removeClass('is-invalid');
+                    $trigger.removeClass('is-invalid');
                 } else {
-                    $select2Container.addClass('is-invalid');
+                    $trigger.addClass('is-invalid');
                 }
             }
         });
@@ -511,6 +544,7 @@
         // ────────────────────────────────────────────────────────────
         @if(!empty($preselectedEmployeeId))
             $('#select_emp').val('{{ $preselectedEmployeeId }}').trigger('change.select2');
+            window.wisdomDD.sync('#select_emp');
             togglePensionByNationality();
             getEmpDetails('{{ $preselectedEmployeeId }}');
         @endif
@@ -913,6 +947,7 @@
         recalcPayableLeaves();
     });
 
+    var payableLeaveTypeUidCounter = 0; // always-incrementing, never reused — safe as a .dd data-target id even after rows are removed/re-added out of order
     $(document).on('click', '#add-payable-leave-row', function () {
         var dailyRate = parseFloat($('#payable-leaves').data('daily-rate') || 0);
         // Build the leave-type dropdown options. Source: the employee's
@@ -923,15 +958,26 @@
         if (!Array.isArray(types)) types = [];
         var typeCell;
         if (types.length) {
+            var typeUid = 'payableLeaveType_' + (++payableLeaveTypeUidCounter);
             var opts = '<option value="" disabled selected>Select leave type…</option>';
+            var ddItems = '<div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select leave type…</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>';
             types.forEach(function (t) {
                 var safe = $('<i>').text(t).html();
                 opts += '<option value="' + safe + '">' + safe + '</option>';
+                ddItems += '<div class="dd-item" role="option" data-value="' + safe + '"><span class="dd-nm">' + safe + '</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>';
             });
             // Keep an "Other" path so HR can still record one-off items
             // that aren't in the leave grid (eg. a pre-existing comp day).
             opts += '<option value="__other__">Other…</option>';
-            typeCell = '<select class="form-select form-select-sm payable-leave-type">' + opts + '</select>';
+            ddItems += '<div class="dd-item" role="option" data-value="__other__"><span class="dd-nm">Other…</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>';
+            typeCell = '<select class="form-select form-select-sm dd-native-select payable-leave-type" id="' + typeUid + '">' + opts + '</select>' +
+                '<div class="dd" data-target="#' + typeUid + '">' +
+                    '<button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">' +
+                        '<span class="dd-lbl">Select leave type…</span>' +
+                        '<svg class="dd-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>' +
+                    '</button>' +
+                    '<div class="dd-panel" role="listbox" aria-label="Leave type"><div class="dd-scroll">' + ddItems + '</div></div>' +
+                '</div>';
         } else {
             typeCell = '<input type="text" class="form-control form-control-sm payable-leave-type"' +
                 ' value="" placeholder="Leave / credit name">';
@@ -964,6 +1010,7 @@
         }
         var $input = $('<input type="text" class="form-control form-control-sm payable-leave-type"' +
             ' value="" placeholder="Leave / credit name">');
+        $(this).siblings('.dd').remove();
         $(this).replaceWith($input);
         $input.trigger('focus');
         recalcPayableLeaves();
@@ -1421,18 +1468,35 @@
         }
     }
 
+    var deductionSelectUidCounter = 0; // always-incrementing, never reused — safe as a .dd data-target id even after rows are removed/re-added out of order
     $(".add-deduction").click(function(e) {
         e.preventDefault();
+        var deductionUid = 'deductionSelect_' + (++deductionSelectUidCounter);
         $(".deductions-container").append(`
             <div class="fullFinal-block">
                 <div class="row g-md-4 g-3 deduction-row">
                     <div class="col-xl-3 col-sm">
-                        <select class="form-select select2t-none deduction-select" name="deductionFor[]">
+                        <select class="form-select dd-native-select deduction-select" id="${deductionUid}" name="deductionFor[]">
                             <option value="">Select Deduction</option>
                             @foreach($deductions as $deduction)
                                 <option value="{{$deduction->id}}" data-unit="{{$deduction->currency}}">{{$deduction->deduction_name}}</option>
                             @endforeach
                         </select>
+                        <div class="dd" data-target="#${deductionUid}">
+                            <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                                <span class="dd-lbl">Select Deduction</span>
+                                <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                            </button>
+                            <div class="dd-panel" role="listbox" aria-label="Deduction">
+                                <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a deduction…"></div>
+                                <div class="dd-scroll">
+                                    <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Deduction</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    @foreach($deductions as $deduction)
+                                    <div class="dd-item" role="option" data-value="{{$deduction->id}}"><span class="dd-nm">{{$deduction->deduction_name}}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        </div>
                     </div>
                     <div class="col-xl-3 col-sm">
                         <input type="number" class="form-control deduction-amount" placeholder="Enter Amount" name="deduction_amount[]"
@@ -1447,7 +1511,6 @@
                 </div>
             </div>
         `);
-        $('.select2t-none').select2();
     });
 
     // Remove Deduction
@@ -1516,13 +1579,12 @@
 
                 window.Parsley.on('field:validated', function (fieldInstance) {
                     var $element = fieldInstance.$element;
-                    if ($element.hasClass('select2t-none')) {
-                        // Update the Select2 container's appearance
-                        var $select2Container = $element.next('.select2-container').find('.select2-selection');
+                    if ($element.hasClass('dd-native-select')) {
+                        var $trigger = $element.siblings('.dd').find('.dd-trigger');
                         if (fieldInstance.isValid()) {
-                            $select2Container.removeClass('is-invalid');
+                            $trigger.removeClass('is-invalid');
                         } else {
-                            $select2Container.addClass('is-invalid');
+                            $trigger.addClass('is-invalid');
                         }
                     }
                 });
@@ -1644,4 +1706,5 @@
         $(document).ready(initializeFormValidation);
     });
 </script>
+@include('resorts._dropdown_script')
 @endsection
