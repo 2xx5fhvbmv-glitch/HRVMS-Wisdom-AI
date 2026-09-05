@@ -102,7 +102,13 @@ class IncidentController extends Controller
                 $query->where('incident_date', $request->date);
             }
 
-            $incidents = $query->get();
+            // The client's DataTable requests order by the hidden created_at
+            // column (order:[[10,'desc']]) but that request never actually
+            // reached the query — rows came back in whatever order the DB
+            // happened to return them, unsorted. Most-recently-reported-first
+            // as the query's own default fixes it regardless of what the
+            // client sends.
+            $incidents = $query->orderBy('created_at', 'desc')->get();
 
             $edit_class  = '';
             $delete_class  = '';
@@ -218,7 +224,9 @@ class IncidentController extends Controller
             }
     
             // ✅ Fetch data only after filtering
-            $incidents = $query->get();
+            // Same missing-order bug as list() above — most-recently-reported
+            // first as the query's own default.
+            $incidents = $query->orderBy('created_at', 'desc')->get();
                
             $delete_class  = '';
             if(Common::checkRouteWisePermission('incident.index',config('settings.resort_permissions.delete')) == false){
