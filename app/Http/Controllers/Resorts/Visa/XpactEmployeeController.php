@@ -947,11 +947,13 @@ class XpactEmployeeController extends Controller
         if($aws['status'] == true)
         {
             $file_child_id  = $aws['Chil_file_id'];
-            $url = config('services.ai_extract.url').$flag;
+            // /extract_work_details takes doc_type as a query param, not a
+            // path segment or form field (see main.py's route signature) —
+            // appending $flag straight onto the URL path 404s every call.
+            $url = config('services.ai_extract.url').'?doc_type='.$flag;
                 $curl = curl_init();
                 $postFields = [
                     'file' => new \CURLFile($file->getRealPath(), $file->getMimeType(), $file->getClientOriginalName()),
-                    'doc_type' => $flag,
                 ];
                 curl_setopt_array($curl, [
                     CURLOPT_URL => $url,
