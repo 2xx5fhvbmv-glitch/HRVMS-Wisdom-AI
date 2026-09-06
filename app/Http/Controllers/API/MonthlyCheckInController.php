@@ -87,6 +87,7 @@ class MonthlyCheckInController extends Controller
 
             $upComingMeeting                                =   MonthlyCheckingModel::join('employees as t1', 't1.id', '=', 'monthly_checking_models.emp_id')
                                                                     ->join('resort_admins as t2', 't2.id', '=', 't1.Admin_Parent_id')
+                                                                    ->where('monthly_checking_models.resort_id', $this->resort_id)
                                                                     ->where('date_discussion', '>', Carbon::now()->toDateString())
                                                                     ->select([
                                                                         'monthly_checking_models.id',
@@ -94,12 +95,21 @@ class MonthlyCheckInController extends Controller
                                                                         'monthly_checking_models.end_time',
                                                                         'monthly_checking_models.date_discussion',
                                                                         'monthly_checking_models.Area_of_Discussion',
-                                                                        't1.Admin_Parent_id', 
-                                                                        't2.first_name', 
-                                                                        't2.last_name', 
-                                                                        't2.profile_picture', 
+                                                                        't1.Admin_Parent_id',
+                                                                        't2.first_name',
+                                                                        't2.last_name',
+                                                                        't2.profile_picture',
                                                                     ])
-                                                                    ->where('monthly_checking_models.status', 'Confirm')
+                                                                    // Two schedule flows share this table: the legacy one moves
+                                                                    // status to 'Confirm', the newer approval-request flow
+                                                                    // (Performance\MonthlyCheckingController@scheduleRequest)
+                                                                    // leaves status NULL forever and only sets approval_status
+                                                                    // to 'approved' — this bucket only matched the first flow,
+                                                                    // so an employee-approved meeting never showed up here.
+                                                                    ->where(function ($q) {
+                                                                        $q->where('monthly_checking_models.status', 'Confirm')
+                                                                          ->orWhere('monthly_checking_models.approval_status', 'approved');
+                                                                    })
                                                                     ->get()->map(function($item){
                                                                         $item->profile_picture =  Common::getResortUserPicture($item->Admin_Parent_id);
                                                                         return $item;
