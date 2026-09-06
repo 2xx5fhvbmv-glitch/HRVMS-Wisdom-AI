@@ -372,10 +372,16 @@ class GrievanceController extends Controller
                 'name'       => trim(optional($subject->resortAdmin)->first_name . ' ' . optional($subject->resortAdmin)->last_name),
                 'department' => optional($subject->department)->name,
                 'position'   => optional($subject->position)->position_title,
+                // Witnesses already got this fix ("Was never returned at
+                // all" above) — the subject/supervisor had the identical
+                // gap, just never noticed since witnesses render as a list
+                // and these two don't.
+                'photo'      => $subject->resortAdmin ? Common::getResortUserPicture($subject->resortAdmin->id) : null,
             ],
             'supervisor' => $supervisor ? [
-                'id'   => $supervisor->id,
-                'name' => trim(optional($supervisor->resortAdmin)->first_name . ' ' . optional($supervisor->resortAdmin)->last_name),
+                'id'    => $supervisor->id,
+                'name'  => trim(optional($supervisor->resortAdmin)->first_name . ' ' . optional($supervisor->resortAdmin)->last_name),
+                'photo' => $supervisor->resortAdmin ? Common::getResortUserPicture($supervisor->resortAdmin->id) : null,
             ] : null,
         ];
     }
