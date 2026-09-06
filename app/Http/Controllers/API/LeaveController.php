@@ -2685,6 +2685,7 @@ class LeaveController extends Controller
                                                                     'el.reason',
                                                                     'ra.first_name',
                                                                     'ra.last_name',
+                                                                    'e.Admin_Parent_id as admin_parent_id',
                                                                     'lc.leave_type as leave_category',
                                                                     'rp.position_title as position',
                                                                     'els.id as emp_l_s_id',
@@ -2709,6 +2710,20 @@ class LeaveController extends Controller
                                                             ->where('el.status', 'Pending')
                                                             ->where('el.resort_id', $resort_id)
                                                             ->where('e.reporting_to', $emp_id)
+                                                            // Unlike the HR/GM branch above, this had no
+                                                            // els.approver_rank/els.status filter at all — the
+                                                            // employees_leaves_status join is one-to-many (one
+                                                            // row per approval stage), so el.status='Pending'
+                                                            // could pick up ANY stage row, not necessarily the
+                                                            // one currently awaiting this HOD. That's why a
+                                                            // request whose overall status is still "Pending"
+                                                            // could display approve_status="Approved" (a stale,
+                                                            // already-passed stage) at the top level — the real
+                                                            // cause behind Approve/Reject appearing to vanish if
+                                                            // the app reads that field instead of can_approve/
+                                                            // can_reject below.
+                                                            ->where('els.approver_rank', $emp_rank)
+                                                            ->where('els.status', 'Pending')
                                                             ->select(
                                                                 'el.id',
                                                                 'el.emp_id',
@@ -2718,6 +2733,11 @@ class LeaveController extends Controller
                                                                 'el.reason',
                                                                 'ra.first_name',
                                                                 'ra.last_name',
+                                                                // Was never selected — the leave_request list
+                                                                // had no photo field at all (island_pass on the
+                                                                // same dashboard does, via Admin_Parent_id +
+                                                                // getResortUserPicture(); this had neither).
+                                                                'e.Admin_Parent_id as admin_parent_id',
                                                                 'lc.leave_type as leave_category',
                                                                 'rp.position_title as position',
                                                                 'els.id as emp_l_s_id',
@@ -2758,6 +2778,10 @@ class LeaveController extends Controller
 
             // Clear duplicate fields in the base record
             unset($base->approver_rank, $base->approver_id);
+
+            if (isset($base->admin_parent_id)) {
+                $base->employee_profile_picture         =   Common::getResortUserPicture($base->admin_parent_id);
+            }
 
             foreach (Common::buildLeaveApprovalFlow($base->id, $emp_id) as $key => $value) {
                 $base->{$key} = $value;
