@@ -471,11 +471,15 @@
     position: relative; background: var(--neutral-bg);
 }
 #uc-panel .uc-conv-avatar img, #uc-panel .uc-picker-avatar img, #uc-panel #uc-thread-avatar img, #uc-panel .wai-mini-avatar.uc-msg-avatar img {
-    position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
+    position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1;
 }
+/* Both the img and this fallback are inserted together whenever a photo
+   URL exists (onerror only removes the img on a 404) — without a lower
+   z-index than the img above, this always painted on top of a
+   successfully-loaded photo instead of only showing when it fails. */
 #uc-panel .uc-av-fallback {
     position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-    color: #fff; font-weight: 600; font-size: inherit;
+    color: #fff; font-weight: 600; font-size: inherit; z-index: 0;
 }
 
 /* List rows */
