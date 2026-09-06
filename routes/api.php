@@ -225,6 +225,15 @@ use Illuminate\Support\Facades\Route;
 			Route::post('accommodation/hr-maintenance-req-action', [App\Http\Controllers\API\AccommodationController::class, 'handleMaintananceAction']);
 			Route::post('accommodation/hr-maintenance-req-sendto-staff-emp', [App\Http\Controllers\API\AccommodationController::class, 'completeTaskHRSendToStaffAccEmp']);
 
+			// Housekeeping Requests (Trello Card 4) — predefined services
+			// catalog per Benefit Grid grade, distinct from the housekeeping-*
+			// cleaning-schedule routes above.
+			Route::get('accommodation/housekeeping-requests/services-by-grade/{emp_id}', [App\Http\Controllers\API\HousekeepingRequestController::class, 'servicesByGrade']);
+			Route::post('accommodation/housekeeping-requests/create', [App\Http\Controllers\API\HousekeepingRequestController::class, 'createRequest']);
+			Route::get('accommodation/housekeeping-requests/list', [App\Http\Controllers\API\HousekeepingRequestController::class, 'requestList']);
+			Route::get('accommodation/housekeeping-requests/view/{id}', [App\Http\Controllers\API\HousekeepingRequestController::class, 'requestView']);
+			Route::post('accommodation/housekeeping-requests/update-status', [App\Http\Controllers\API\HousekeepingRequestController::class, 'updateStatus']);
+
 			//Employee Managament
 			Route::post('employee-management/hr-employee-overview', [App\Http\Controllers\API\EmployeeManagementController::class, 'hrEmployeeOverview']);
 			Route::get('employee-management/hr-organization-overview', [App\Http\Controllers\API\EmployeeManagementController::class, 'hrOrganizationOverview']);
