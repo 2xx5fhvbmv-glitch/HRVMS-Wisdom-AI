@@ -207,11 +207,26 @@ class LeaveController extends Controller
             }
 
             // Process each leave category and create leave records
+            //
+            // combine_with_other == 1 on a category only means it's ALLOWED
+            // to be paired with another category — it says nothing about
+            // whether THIS submission actually is a pairing. Annual Leave
+            // (and any other combinable category) submitted alone, as the
+            // overwhelming majority of leave requests are, was still
+            // getting flag set below purely because the category itself
+            // permits combining — and a non-null flag makes the row
+            // invisible in the web portal's leave-requests grid
+            // (filterLeaveGridRequests()'s whereNull('el.flag')). That's
+            // why a plain single-category Annual Leave extension (and the
+            // original leave, if it was ever submitted the same way)
+            // vanished from the web portal even though nothing was ever
+            // actually combined with anything.
+            $isCombinedSubmission                       =   count($leaveCategoryIds) == 2;
             foreach ($request->leave_category_id as $key => $categoryId) {
                 $leaveDetails                           =   LeaveCategory::where('id', $categoryId)->where('resort_id',$user->resort_id)->first();
 
                 $currentFlag                            =   null;
-                if ($leaveDetails->combine_with_other == 1) {
+                if ($isCombinedSubmission && $leaveDetails->combine_with_other == 1) {
                     $currentFlag                        =   $leaveDetails->leave_category;
                 }
 
