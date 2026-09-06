@@ -467,10 +467,10 @@
 /* Photo-first avatars with initials fallback (list rows, picker, thread
    header, member rows, and thread sender avatars all funnel through the
    same ucAvatarInner() JS helper into this markup). */
-#uc-panel .uc-conv-avatar, #uc-panel .uc-picker-avatar, #uc-panel #uc-thread-avatar {
+#uc-panel .uc-conv-avatar, #uc-panel .uc-picker-avatar, #uc-panel #uc-thread-avatar, #uc-panel .wai-mini-avatar.uc-msg-avatar {
     position: relative; background: var(--neutral-bg);
 }
-#uc-panel .uc-conv-avatar img, #uc-panel .uc-picker-avatar img, #uc-panel #uc-thread-avatar img {
+#uc-panel .uc-conv-avatar img, #uc-panel .uc-picker-avatar img, #uc-panel #uc-thread-avatar img, #uc-panel .wai-mini-avatar.uc-msg-avatar img {
     position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover;
 }
 #uc-panel .uc-av-fallback {
