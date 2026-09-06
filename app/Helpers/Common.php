@@ -4881,6 +4881,181 @@ class Common
     }
 
     /**
+     * Mirrors isLDDepartment/isSecurityDepartment's alias-matching approach.
+     * Real resort data has this under several names ("Engineering",
+     * "Engineering Maintenance", "ENGINEERING") and codes ("Eng", "EM") —
+     * matched here for the mobile module_access.engineering_hod_xcom/
+     * engineering_employee payload fields.
+     */
+    public static function isEngineeringDepartment($deptId)
+    {
+        if (!$deptId) return false;
+
+        $dept = \App\Models\ResortDepartment::find($deptId);
+        if (!$dept) return false;
+
+        $name  = strtolower(trim($dept->name ?? ''));
+        $short = strtolower(trim($dept->short_name ?? ''));
+        $code  = strtolower(trim($dept->code ?? ''));
+
+        $aliases = ['engineering', 'eng', 'em'];
+        $matches = function ($val) use ($aliases) {
+            if ($val === '') return false;
+            if (in_array($val, $aliases, true)) return true;
+            if (strpos($val, 'engineering') !== false) return true;
+            return false;
+        };
+        return $matches($name) || $matches($short) || $matches($code);
+    }
+
+    /**
+     * Mirrors isLDDepartment/isSecurityDepartment's alias-matching approach.
+     * Used for the mobile module_access.housekeeping_hod_xcom/
+     * housekeeping_employee payload fields.
+     */
+    public static function isHousekeepingDepartment($deptId)
+    {
+        if (!$deptId) return false;
+
+        $dept = \App\Models\ResortDepartment::find($deptId);
+        if (!$dept) return false;
+
+        $name  = strtolower(trim($dept->name ?? ''));
+        $short = strtolower(trim($dept->short_name ?? ''));
+        $code  = strtolower(trim($dept->code ?? ''));
+
+        $aliases = ['housekeeping', 'hk'];
+        $matches = function ($val) use ($aliases) {
+            if ($val === '') return false;
+            if (in_array($val, $aliases, true)) return true;
+            if (strpos($val, 'housekeeping') !== false) return true;
+            return false;
+        };
+        return $matches($name) || $matches($short) || $matches($code);
+    }
+
+    /**
+     * True if this resort admin (Employee::Admin_Parent_id, NOT
+     * employees.id — see Employee::sosTeams()'s own comment on this exact
+     * gotcha) is an active member of any SOS response team for this
+     * resort. Used for module_access.sos_response_team — operational SOS
+     * access is assignment-based, not derivable from rank/department.
+     */
+    public static function isSOSResponseTeamMember($resortId, $resortAdminId)
+    {
+        if (!$resortAdminId) return false;
+
+        return \App\Models\SOSTeamMemeberModel::where('resort_id', $resortId)
+            ->where('emp_id', $resortAdminId)
+            ->exists();
+    }
+
+    /**
+     * Builds the mobile module_access payload (Wisdom AI mobile access
+     * architecture: rank + department alone can't be guessed correctly for
+     * HR-assigned roles like Clinic Manager, SOS response team, L&D
+     * Manager, or Security Officer/Manager — those need an explicit,
+     * server-computed signal). Returns the exact shape requested for
+     * ProfileController::getProfile()'s employee object:
+     *   ['department' => [...], 'access_groups' => [...],
+     *    'module_access' => [...], 'flat' => ['is_clinic_manager' => ..., ...]]
+     *
+     * $employee must have its 'position' and 'department' relations
+     * already loaded (or loadable) — no new eager loads triggered here for
+     * ones already available on the caller's model.
+     */
+    public static function buildModuleAccessPayload($resortAdmin, $employee)
+    {
+        $isMasterAdmin = (int) ($resortAdmin->is_master_admin ?? 0) === 1;
+        $rank          = (int) ($employee->rank ?? 0);
+        $deptId        = $employee->Dept_id ?? null;
+        $positionTitle = optional(optional($employee)->position)->position_title;
+
+        $isHodOrExcom = in_array($rank, [1, 2], true);
+
+        // rank 12 = CLINIC_STAFF (config('settings.Position_Rank')) — same
+        // check as EnsureClinicManagerAccess middleware.
+        $isClinicManager = $isMasterAdmin || $rank === 12;
+
+        $isSosResponseTeam = $isMasterAdmin
+            || self::isSOSResponseTeamMember($employee->resort_id ?? null, $resortAdmin->id ?? null);
+
+        // Same position-title check as EnsureLDManagerAccess middleware.
+        $ldManagerTitles = ['Training Director', 'L&D Manager', 'Learning & Development Head'];
+        $isLdManager = $isMasterAdmin
+            || in_array($positionTitle, $ldManagerTitles, true)
+            || self::isLDDepartment($deptId);
+
+        // Same position-title check as EnsureSOSSecurityManagerAccess middleware.
+        $isSecurityManager = $isMasterAdmin || $positionTitle === 'Security Manager';
+        // Broader — any Security department employee (matches
+        // EnsureSOSSecurityStaffAccess's existing gate).
+        $isSecurityOfficer = $isMasterAdmin || self::isSecurityDepartment($deptId);
+
+        $isEngineeringDept = self::isEngineeringDepartment($deptId);
+        // rank 11 = EDHOD (Engineering Department Head) — a distinct rank
+        // code that exists specifically for this role regardless of
+        // whether Dept_id also resolves as Engineering.
+        $isEngineeringHodXcom = ($isEngineeringDept && $isHodOrExcom) || $rank === 11;
+        $isEngineeringEmployee = $isEngineeringDept && !$isEngineeringHodXcom;
+
+        $isHousekeepingDept = self::isHousekeepingDepartment($deptId);
+        $isHousekeepingHodXcom = $isHousekeepingDept && $isHodOrExcom;
+        $isHousekeepingEmployee = $isHousekeepingDept && !$isHousekeepingHodXcom;
+
+        $moduleAccess = [
+            'clinic_manager'        => $isClinicManager,
+            'sos_response_team'     => $isSosResponseTeam,
+            'ld_manager'            => $isLdManager,
+            'security_manager'      => $isSecurityManager,
+            'security_officer'      => $isSecurityOfficer,
+            'engineering_hod_xcom'  => $isEngineeringHodXcom,
+            'engineering_employee'  => $isEngineeringEmployee,
+            'housekeeping_hod_xcom' => $isHousekeepingHodXcom,
+            'housekeeping_employee' => $isHousekeepingEmployee,
+        ];
+
+        $accessGroups = ['everyone'];
+        if ($isHodOrExcom) {
+            $accessGroups[] = 'department_hod_xcom';
+        }
+        foreach ($moduleAccess as $group => $granted) {
+            if ($granted) {
+                $accessGroups[] = $group;
+            }
+        }
+
+        $department = null;
+        $dept = $employee->department ?? null;
+        if ($dept) {
+            $department = [
+                'id'   => $dept->id,
+                'name' => $dept->name,
+                'code' => $dept->code,
+                'slug' => $dept->slug,
+            ];
+        }
+
+        return [
+            'department'     => $department,
+            'access_groups'  => $accessGroups,
+            'module_access'  => $moduleAccess,
+            'flat'           => [
+                'is_clinic_manager'         => $isClinicManager,
+                'is_sos_response_team'      => $isSosResponseTeam,
+                'sos_team_member'           => $isSosResponseTeam,
+                'is_ld_manager'             => $isLdManager,
+                'is_security_manager'       => $isSecurityManager,
+                'is_security_officer'       => $isSecurityOfficer,
+                'is_engineering_hod'        => $isEngineeringHodXcom,
+                'is_engineering_employee'   => $isEngineeringEmployee,
+                'is_housekeeping_hod'       => $isHousekeepingHodXcom,
+                'is_housekeeping_employee'  => $isHousekeepingEmployee,
+            ],
+        ];
+    }
+
+    /**
      * True if the logged-in resort user has unrestricted access to all departments
      * (Super admin, master admin, GM, or anyone in the HR department).
      */

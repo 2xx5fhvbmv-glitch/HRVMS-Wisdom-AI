@@ -104,6 +104,20 @@ class ProfileController extends Controller
           // Assign rank_type to the get_employee array
           $profileArray['get_employee']['rank_type'] = $rankType;
 
+          // Wisdom AI mobile access architecture: rank + department alone
+          // can't be guessed correctly for HR-assigned roles (Clinic
+          // Manager, SOS response team, L&D Manager, Security Officer/
+          // Manager, Engineering/Housekeeping HOD vs employee) — mobile
+          // menus/screens are gated client-side off this payload, not by
+          // any new API 403 here.
+          $moduleAccessPayload = Common::buildModuleAccessPayload($profile, $profile->GetEmployee);
+          $profileArray['get_employee']['department']      = $moduleAccessPayload['department'];
+          $profileArray['get_employee']['access_groups']    = $moduleAccessPayload['access_groups'];
+          $profileArray['get_employee']['module_access']    = $moduleAccessPayload['module_access'];
+          foreach ($moduleAccessPayload['flat'] as $flatKey => $flatValue) {
+              $profileArray['get_employee'][$flatKey] = $flatValue;
+          }
+
           // religion is stored as "0"/"1" (see the web Employee create form's
           // <select id="religion">) — mobile only gets the raw code, so add
           // a human-readable companion field the same way rank_type is added
