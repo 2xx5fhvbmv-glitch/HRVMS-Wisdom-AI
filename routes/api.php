@@ -356,6 +356,13 @@ use Illuminate\Support\Facades\Route;
 		Route::get('learning/evaluation-from-list', [App\Http\Controllers\API\LearningController::class, 'evaluationformListing']);
 		Route::post('learning/evaluation-data-store', [App\Http\Controllers\API\LearningController::class, 'evaluationStore']);
 
+		// Employee "View Feedback/Evaluation Form" (own submitted response only)
+		// — the EXCOM/ld-manager res-view routes above 403 any employee without
+		// that rank, which is what an employee viewing their own Training
+		// Details form hits. These are owner-scoped inside the controller.
+		Route::get('learning/employee-feedback-from-res-view/{form_res_id}', [App\Http\Controllers\API\LearningController::class, 'employeeFeedbackFormResView']);
+		Route::get('learning/employee-evaluation-from-res-view/{form_res_id}', [App\Http\Controllers\API\LearningController::class, 'employeeEvaluationFormResView']);
+
 		//L&D Manager module + HR onboarding dashboard (position/department gated, not rank)
 		Route::middleware(['ld.manager'])->group(function () {
 			Route::get('ld-manager/dashboard', [App\Http\Controllers\API\LearningController::class, 'ldManagerDashboard']);

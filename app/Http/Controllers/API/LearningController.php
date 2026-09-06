@@ -1044,6 +1044,96 @@ class LearningController extends Controller
         }
     }
 
+    /**
+     * Employee-facing counterpart to feedbackFormResView()/evaluationFormResView()
+     * — those two sit behind check.rank:EXCOM / ld.manager (built for the L&D
+     * Manager's review screen) and take no owner, by design, since a manager
+     * must be able to open any participant's response. An employee opening
+     * their OWN submitted form from Training Details has neither rank, so it
+     * 403'd with "Forbidden: Insufficient rank" (reported on evaluation-from-
+     * res-view; feedback-from-res-view has the identical gap). Scoped to
+     * participant_id = the caller's own employee id so this can sit on an
+     * unrestricted route without letting an employee view someone else's
+     * submitted form by guessing the id.
+     */
+    public function employeeFeedbackFormResView($formResId)
+    {
+        if (!$this->user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $employeeId = optional($this->user->GetEmployee)->id;
+        if (!$employeeId) {
+            return response()->json(['success' => false, 'message' => 'Forbidden: No employee record linked'], 403);
+        }
+
+        try {
+            $trainingFeedbackResponse                   =   TrainingFeedbackResponse::join('training_feedback_form as tff','tff.id','training_feedback_responses.form_id')
+                                                                ->where('training_feedback_responses.id', $formResId)
+                                                                ->where('training_feedback_responses.participant_id', $employeeId)
+                                                                ->select(
+                                                                   'training_feedback_responses.*',
+                                                                   'tff.form_name',
+                                                                   'tff.form_structure',
+                                                                )->first();
+
+            if (!$trainingFeedbackResponse) {
+                return response()->json(['success' => false, 'message' => 'Feedback form not found'], 404);
+            }
+
+            return response()->json([
+                'success'                           =>  true,
+                'message'                           =>  'Feedback data retrieved successfully',
+                'feedback_form_res_view'            =>  $trainingFeedbackResponse
+            ], 200);
+
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    public function employeeEvaluationFormResView($formResId)
+    {
+        if (!$this->user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $employeeId = optional($this->user->GetEmployee)->id;
+        if (!$employeeId) {
+            return response()->json(['success' => false, 'message' => 'Forbidden: No employee record linked'], 403);
+        }
+
+        try {
+            $evaluationResponse                         =   EvaluationFormResponse::join('evaluation_form as ef','ef.id','evaluation_form_responses.form_id')
+                                                                ->where('evaluation_form_responses.id', $formResId)
+                                                                ->where('evaluation_form_responses.participant_id', $employeeId)
+                                                                ->select(
+                                                                    'evaluation_form_responses.*',
+                                                                   'ef.form_name',
+                                                                   'ef.form_structure',
+                                                                )->first();
+
+            if (!$evaluationResponse) {
+                return response()->json(['success' => false, 'message' => 'Evaluation form not found'], 404);
+            }
+
+            return response()->json([
+                'success'                           =>  true,
+                'message'                           =>  'Evaluation data retrieved successfully',
+                'evaluation_form_res_view'          =>  $evaluationResponse
+            ], 200);
+
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
     public function evaluationFormResView($formResId)
     {
         if (!$this->user) {
