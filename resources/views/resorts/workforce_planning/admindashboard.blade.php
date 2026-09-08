@@ -334,7 +334,7 @@
                                                 aria-controls="collapse{{$key}}">
                                                 <div class="d-flex align-items-center justify-content-between w-100 pe-sm-4 pe-1">
                                                     <span class="name"> {{$value->name}}</span>
-                                                    <span class="lable-budget">Budget: <img class="currency-budget-icon" src="{{ $currency }}"> 00.00</span>
+                                                    <span class="lable-budget"><img class="currency-budget-icon" src="{{ $currency }}"> 00.00</span>
                                                 </div>
                                             </button>
                                         </h2>
@@ -363,7 +363,7 @@
                                                             </a>
                                                             <button type="submit" class="submitBtn" style="display: none;">Submit</button>
                                                         </form>
-                                                        <span class="fw-normal">Budget: <img class="currency-budget-icon" src="{{ $currency }}"> 00.00</span>
+                                                        <span class="fw-normal"><img class="currency-budget-icon" src="{{ $currency }}"> 00.00</span>
                                                     </div>
                                                 @endforeach
 
@@ -393,35 +393,16 @@
                         </div>
                         <p class="mt-4 mb-2 fw-600 PendingResponsesCount" >Pending Responses - {{ $HODpendingResponse }}</p>
                         <div class="send-reminder-box bg-grey">
-                            <nav aria-label="breadcrumb">
-                                <ol class="breadcrumb">
-                                    @if(isset($PendingDepartmentResoponse) && !empty($PendingDepartmentResoponse) )
-
-
+                            @if(isset($PendingDepartmentResoponse) && !empty($PendingDepartmentResoponse) )
+                                <div class="pd-chips">
                                     @foreach ( $PendingDepartmentResoponse as $key=> $response)
-
-                                    <li class="breadcrumb-item"><a href="#">{{ $response[0] }}</a></li>
-
+                                        <span class="pd-chip">{{ $response[0] }}</span>
                                     @endforeach
-
-                                            <li class="breadcrumb-item">
-                                                <a href="#Pending-Department"  data-bs-toggle="modal"  class="Pending-Department text-theme fw-600 text-underline">View All </a>
-
-                                            </li>
-
-
-                                    @else
-
-                                    <li class="breadcrumb-item">
-                                        <a href="#"
-                                                class="text-theme fw-600 text-underline">No Pending Request Found </a>
-                                            </li>
-
-                                    @endif
-
-                                </ol>
-
-                            </nav>
+                                </div>
+                                <a href="#" class="lnk Pending-Department pd-viewall" data-details="Pending-Department">View All</a>
+                            @else
+                                <a href="#" class="text-theme fw-600 text-underline">No Pending Request Found </a>
+                            @endif
                             <div class="d-flex justify-content-center mt-3">
                                 @if(isset($PendingDepartmentResoponse) && !empty($PendingDepartmentResoponse) )
 
@@ -654,43 +635,54 @@
 {{-- End --}}
 
 
-<div class="modal fade" id="Pending-Department" tabindex="-1" aria-labelledby="exampleModalLabel"
-        aria-hidden="true">
-	<div class="modal-dialog modal-dialog-centered modal-small">
-		<div class="modal-content">
-			<div class="modal-header">
-				<h5 class="modal-title" id="staticBackdropLabel">Pending Departments</h5>
-				<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+{{-- Liquid Glass trial (data-list mode: no WAI kicker, count folded into
+     the caption bar). Uses the shared .wai-backdrop scrim (translucent
+     dark + blur) so the glass card has real colour to reflect — see
+     .lg-modal in partials/_wai_insight_modals.blade.php. Trigger keeps
+     its original .Pending-Department class (the document-delegated AJAX
+     handler in layouts/js.blade.php that populates .PendingDepartmentlist
+     on click — unrelated to and unaffected by the open/close mechanism
+     swap) alongside the new .lnk/data-details pair that the shared
+     click-delegation needs to open this backdrop. --}}
+<div class="wai-backdrop" id="Pending-Department">
+	<div class="lg-modal" role="dialog" aria-modal="true">
+		<button class="m-x" aria-label="Close">&times;</button>
+		<div class="mt">Pending Departments</div>
+		<div class="m-sub">Yet to submit next year's manning requisition</div>
+		<div class="m-tablewrap">
+			<div class="m-tcap">{{ $HODpendingResponse }} department{{ (int) $HODpendingResponse === 1 ? '' : 's' }} &middot; awaiting response</div>
+			<div class="m-tscroll">
+				<table class="m-table">
+					<thead>
+						<tr>
+							<th class="sr">Sr No</th>
+							<th>Department Name</th>
+						</tr>
+					</thead>
+					<tbody Class="PendingDepartmentlist">
+
+					</tbody>
+				</table>
 			</div>
-
-                <div class="modal-body">
-
-                        <div class="row">
-                            <table class="table">
-                                <thead>
-                                        <tr>
-                                            <th>Sr No</th>
-                                            <th>Department Name</th>
-                                        </tr>
-                                </thead>
-                                <tbody Class="PendingDepartmentlist">
-
-                                </tbody>
-
-                            </table>
-                        </div>
-                </div>
-
-
 		</div>
 	</div>
 </div>
+
+@include('partials._wai_insight_modals')
 
 @endsection
 
 @section('import-css')
 @include('resorts.workforce_planning._wfp_buttons_v2_styles')
 <style>
+    /* Pending Departments list — pipe-separated breadcrumb replaced with
+       wrapping chips. Reuses the existing .send-reminder-box/.bg-grey
+       wrapper's own background/padding/radius as the "light rounded box"
+       — no separate box needed here. */
+    .pd-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+    .pd-chip { font-size: 12px; font-weight: 500; color: var(--ink); background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 5px 10px; white-space: nowrap; }
+    .pd-viewall { display: block; text-align: center; margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--line); font-size: 12px; font-weight: 600; color: var(--teal); text-decoration: none; }
+    .pd-viewall:hover { text-decoration: underline; }
 @media print {
     #downloadManningBudget,
     .submitBtn,

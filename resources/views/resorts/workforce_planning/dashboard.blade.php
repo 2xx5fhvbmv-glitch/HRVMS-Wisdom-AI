@@ -299,8 +299,8 @@
                                         Employees under minimum wage
                                     </p>
                                     @if(($employeeMinWageList ?? collect())->isNotEmpty())
-                                        <a href="#minWageEmployeesModal" data-bs-toggle="modal"
-                                           class="wct-pill wct-pill-bad"
+                                        <a href="#" class="lnk wct-pill wct-pill-bad"
+                                           data-details="minWageEmployeesModal"
                                            title="Click to view full list with salaries">
                                             <i class="fa-solid fa-triangle-exclamation"></i>
                                             {{ $employee_under_min_wage }}
@@ -336,7 +336,7 @@
                                             </div>
                                         @endforeach
                                     </div>
-                                    <a href="#minWageEmployeesModal" data-bs-toggle="modal" class="wct-view-all">
+                                    <a href="#" class="lnk wct-view-all" data-details="minWageEmployeesModal">
                                         View all {{ $employee_under_min_wage }} employee{{ (int) $employee_under_min_wage === 1 ? '' : 's' }} <i class="fa-solid fa-chevron-right"></i>
                                     </a>
                                 @endif
@@ -484,7 +484,7 @@
                                                     aria-controls="collapse{{$key}}">
                                                     <div class="d-flex align-items-center justify-content-between w-100 pe-sm-4 pe-1">
                                                         <span class="name"> {{$value->name}}</span>
-                                                        <span class="lable-budget">Budget: <img class="currency-budget-icon" src="{{ $currency }}"> 00.00</span>
+                                                        <span class="lable-budget"><img class="currency-budget-icon" src="{{ $currency }}"> 00.00</span>
                                                     </div>
                                                 </button>
                                             </h2>
@@ -513,7 +513,7 @@
                                                                 </a>
                                                                 <button type="submit" class="submitBtn" style="display: none;">Submit</button>
                                                             </form>
-                                                            <span class="fw-normal">Budget: <img class="currency-budget-icon" src="{{ $currency }}"> 00.00</span>
+                                                            <span class="fw-normal"><img class="currency-budget-icon" src="{{ $currency }}"> 00.00</span>
                                                         </div>
                                                     @endforeach
 
@@ -559,31 +559,16 @@
                         </div>
                         <p class="mt-4 mb-2 fw-600 PendingResponsesCount" >Pending Responses - {{ $HODpendingResponse }}</p>
                         <div class="send-reminder-box bg-grey">
-                            <nav aria-label="breadcrumb">
-                                <ol class="breadcrumb">
-                                    @if(isset($PendingDepartmentResoponse) && !empty($PendingDepartmentResoponse) )
-
-
+                            @if(isset($PendingDepartmentResoponse) && !empty($PendingDepartmentResoponse) )
+                                <div class="pd-chips">
                                     @foreach ( $PendingDepartmentResoponse as $key=> $response)
-
-                                    <li class="breadcrumb-item"><a href="#">{{ $response[0] }}</a></li>
-
+                                        <span class="pd-chip">{{ $response[0] }}</span>
                                     @endforeach
-                                        <li class="breadcrumb-item">
-                                            <a href="#Pending-Department"  data-bs-toggle="modal"  class="Pending-Department text-theme fw-600 text-underline">View All </a>
-                                        </li>
-                                    @else
-
-                                    <li class="breadcrumb-item">
-                                        <a href="#"
-                                                class="text-theme fw-600 text-underline">No Pending Request Found </a>
-                                            </li>
-
-                                    @endif
-
-                                </ol>
-
-                            </nav>
+                                </div>
+                                <a href="#" class="lnk Pending-Department pd-viewall" data-details="Pending-Department">View All</a>
+                            @else
+                                <a href="#" class="text-theme fw-600 text-underline">No Pending Request Found </a>
+                            @endif
                             <div class="d-flex justify-content-center mt-3">
                                 @if(isset($PendingDepartmentResoponse) && !empty($PendingDepartmentResoponse) )
 
@@ -670,65 +655,73 @@
 @endphp
 {{-- Modal: list of employees flagged as under minimum wage. Triggered
      from the Compliance Tracking panel (both the pill and "View all"
-     link). The list is computed in the controller using the same
-     predicate as the count so the two cannot drift. Plain Bootstrap
-     data-bs-toggle/dismiss modal — X button, backdrop click, and
-     Escape all close it via Bootstrap's own modal JS, no extra code
-     needed here. --}}
-<div class="modal fade wct-modal" id="minWageEmployeesModal" tabindex="-1" aria-labelledby="minWageEmployeesModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
-        <div class="modal-content">
-            <div class="modal-header">
-                <div>
-                    <h5 class="modal-title" id="minWageEmployeesModalLabel">
-                        Employees Under Minimum Wage
-                    </h5>
-                    <p class="wct-modal-subtitle">USD &lt; 520 · MVR &lt; 8,021 · missing currency</p>
+     link, both now `.lnk[data-details]` per the shared WAI View-details
+     click-delegation in partials/_wai_insight_modals.blade.php — X
+     button, backdrop click, and Escape all close it via that same
+     shared JS, no extra code needed here). The list is computed in the
+     controller using the same predicate as the count so the two cannot
+     drift. --}}
+<div class="wai-backdrop" id="minWageEmployeesModal">
+    <div class="wai-modal wide" role="dialog" aria-modal="true">
+        <button class="m-x" aria-label="Close">&times;</button>
+        <div class="m-kicker"><span class="dot"></span>WAI Insight</div>
+        <div class="mt">Employees Under Minimum Wage</div>
+        @if(($employeeMinWageList ?? collect())->isEmpty())
+            <p class="m-empty">No employees currently flagged.</p>
+        @else
+            <div class="m-tablewrap">
+                <div class="m-tcap">{{ $employee_under_min_wage }} employee{{ (int) $employee_under_min_wage === 1 ? '' : 's' }} below threshold &middot; USD &lt; 520 &middot; MVR &lt; 8,021 &middot; missing currency</div>
+                <div class="m-tscroll">
+                    <table class="m-table">
+                        <thead><tr><th>Employee</th><th>Current wage</th></tr></thead>
+                        <tbody>
+                            @foreach($employeeMinWageList as $row)
+                                @php
+                                    $isDefaultPic = $row['picture'] === url(config('settings.default_picture'));
+                                    $hasRealPhoto = !$isDefaultPic && $row['picture'];
+                                    $initials = collect(explode(' ', trim($row['name'])))
+                                        ->filter()
+                                        ->map(fn($part) => mb_strtoupper(mb_substr($part, 0, 1)))
+                                        ->take(2)
+                                        ->implode('');
+                                @endphp
+                                <tr>
+                                    <td>
+                                        <div class="emp">
+                                            <div class="av">
+                                                {{ $initials ?: '?' }}
+                                                @if($hasRealPhoto)
+                                                    {{-- photo-first, initials underneath as the fallback: if the
+                                                         photo URL 404s/fails, onerror removes just the <img> and
+                                                         the initials already sitting behind it show through —
+                                                         never a broken-image icon. --}}
+                                                    <img src="{{ $row['picture'] }}" alt="" onerror="this.remove()">
+                                                @endif
+                                            </div>
+                                            <div class="who">
+                                                <div class="nm">{{ $row['name'] }}</div>
+                                                <div class="id">{{ $row['code'] }}</div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td class="wage">
+                                        @if($row['salary'] === '—')
+                                            <span class="wage-missing">No wage set</span>
+                                        @else
+                                            <span class="amt">{{ $row['salary'] }}</span><span class="cur">{{ $row['currency'] }}</span>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
                 </div>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body p-0">
-                @if(($employeeMinWageList ?? collect())->isEmpty())
-                    <p class="text-muted text-center py-4 m-0">No employees currently flagged.</p>
-                @else
-                    <div class="wct-modal-list">
-                        @foreach($employeeMinWageList as $row)
-                            @php
-                                $isDefaultPic = $row['picture'] === url(config('settings.default_picture'));
-                                $initials = collect(explode(' ', trim($row['name'])))
-                                    ->filter()
-                                    ->map(fn($part) => mb_strtoupper(mb_substr($part, 0, 1)))
-                                    ->take(2)
-                                    ->implode('');
-                            @endphp
-                            <div class="wct-modal-row">
-                                <div class="wct-modal-row-left">
-                                    @if($isDefaultPic || !$row['picture'])
-                                        <span class="wct-avatar-photo wct-avatar-initials wct-modal-avatar">{{ $initials ?: '?' }}</span>
-                                    @else
-                                        <img class="wct-avatar-photo wct-modal-avatar" src="{{ $row['picture'] }}" alt="{{ $row['name'] }}">
-                                    @endif
-                                    <div>
-                                        <p class="wct-modal-name">{{ $row['name'] }}</p>
-                                        <p class="wct-modal-code">{{ $row['code'] }}</p>
-                                    </div>
-                                </div>
-                                <div class="wct-modal-row-right">
-                                    @if($row['salary'] === '—')
-                                        <span class="wct-modal-salary-missing">&mdash;</span>
-                                    @else
-                                        <span class="wct-modal-salary">{{ $row['salary'] }}</span>
-                                        <span class="wct-modal-currency">{{ $row['currency'] }}</span>
-                                    @endif
-                                </div>
-                            </div>
-                        @endforeach
-                    </div>
-                @endif
-            </div>
-        </div>
+        @endif
     </div>
 </div>
+
+@include('partials._wai_insight_modals')
 
 <div class="modal fade" id="add-occupancymodal" tabindex="-1" aria-labelledby="exampleModalLabel"
         aria-hidden="true">
@@ -893,34 +886,35 @@
 {{-- End --}}
 
 
-<div class="modal fade" id="Pending-Department" tabindex="-1" aria-labelledby="exampleModalLabel"
-        aria-hidden="true">
-	<div class="modal-dialog modal-dialog-centered modal-small">
-		<div class="modal-content">
-			<div class="modal-header">
-				<h5 class="modal-title" id="staticBackdropLabel">Pending Departments</h5>
-				<button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+{{-- Liquid Glass trial (data-list mode: no WAI kicker, count folded into
+     the caption bar). Uses the shared .wai-backdrop scrim (translucent
+     dark + blur) so the glass card has real colour to reflect — see
+     .lg-modal in partials/_wai_insight_modals.blade.php. Trigger keeps
+     its original .Pending-Department class (the document-delegated AJAX
+     handler in layouts/js.blade.php that populates .PendingDepartmentlist
+     on click — unrelated to and unaffected by the open/close mechanism
+     swap) alongside the new .lnk/data-details pair that the shared
+     click-delegation needs to open this backdrop. --}}
+<div class="wai-backdrop" id="Pending-Department">
+	<div class="lg-modal" role="dialog" aria-modal="true">
+		<button class="m-x" aria-label="Close">&times;</button>
+		<div class="mt">Pending Departments</div>
+		<div class="m-sub">Yet to submit next year's manning requisition</div>
+		<div class="m-tablewrap">
+			<div class="m-tcap">{{ $HODpendingResponse }} department{{ (int) $HODpendingResponse === 1 ? '' : 's' }} &middot; awaiting response</div>
+			<div class="m-tscroll">
+				<table class="m-table">
+					<thead>
+						<tr>
+							<th class="sr">Sr No</th>
+							<th>Department Name</th>
+						</tr>
+					</thead>
+					<tbody Class="PendingDepartmentlist">
+
+					</tbody>
+				</table>
 			</div>
-
-                <div class="modal-body">
-
-                        <div class="row">
-                            <table class="table">
-                                <thead>
-                                        <tr>
-                                            <th>Sr No</th>
-                                            <th>Department Name</th>
-                                        </tr>
-                                </thead>
-                                <tbody Class="PendingDepartmentlist">
-
-                                </tbody>
-
-                            </table>
-                        </div>
-                </div>
-
-
 		</div>
 	</div>
 </div>
@@ -1156,37 +1150,20 @@
     .wct-view-all:hover { color: var(--teal-2); text-decoration: underline; }
     .wct-view-all i { font-size: 10px; }
 
-    /* ---- Under Minimum Wage modal ---- */
-    .wct-modal .modal-content { border: none; border-radius: 14px; }
-    .wct-modal .modal-header { align-items: flex-start; border-bottom: 1px solid var(--line-2); }
-    .wct-modal .modal-title { font-size: 16px; font-weight: 700; color: var(--ink); }
-    .wct-modal-subtitle { font-size: 12px; color: var(--faint); margin: 4px 0 0; }
-    .wct-modal-list { padding: 4px 0; }
-    .wct-modal-row {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        padding: 10px 20px;
-        border-bottom: 1px solid var(--line-2);
-    }
-    .wct-modal-row:last-child { border-bottom: none; }
-    .wct-modal-row-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
-    .wct-modal-avatar { width: 38px; height: 38px; flex-shrink: 0; font-size: 12px; }
-    .wct-modal-name {
-        margin: 0;
-        font-size: 13px;
-        font-weight: 600;
-        color: var(--ink);
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    .wct-modal-code { margin: 0; font-size: 11px; color: var(--faint); }
-    .wct-modal-row-right { text-align: right; flex-shrink: 0; }
-    .wct-modal-salary { font-size: 13px; font-weight: 700; color: var(--ink); }
-    .wct-modal-currency { font-size: 11px; color: var(--muted); margin-left: 4px; }
-    .wct-modal-salary-missing { font-size: 14px; font-weight: 700; color: var(--error); }
+    /* .lnk (shared WAI trigger class, needed so the click-delegation in
+       partials/_wai_insight_modals.blade.php fires) carries its own
+       font-size/weight/color — these two-class rules simply out-specificity
+       it so the pill keeps its own badge look regardless of include order. */
+    .wct-pill.lnk { font-size: 12.5px; font-weight: 700; }
+    .wct-pill-bad.lnk, .wct-pill-bad.lnk:hover { color: var(--error); }
+    /* Pending Departments list — pipe-separated breadcrumb replaced with
+       wrapping chips. Reuses the existing .send-reminder-box/.bg-grey
+       wrapper's own background/padding/radius as the "light rounded box"
+       — no separate box needed here. */
+    .pd-chips { display: flex; flex-wrap: wrap; gap: 7px; }
+    .pd-chip { font-size: 12px; font-weight: 500; color: var(--ink); background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 5px 10px; white-space: nowrap; }
+    .pd-viewall { display: block; text-align: center; margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--line); font-size: 12px; font-weight: 600; color: var(--teal); text-decoration: none; }
+    .pd-viewall:hover { text-decoration: underline; }
 </style>
 @endsection
 @section('import-scripts')

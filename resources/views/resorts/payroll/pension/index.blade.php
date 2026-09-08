@@ -82,7 +82,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="col-xl-1 col-md-2 col-sm-3 col-6">
+                        <div class="col-xl-2 col-md-3 col-sm-4 col-6 pension-filter-month">
                             <select id="monthFilter" class="form-select dd-native-select">
                                 <option value="">All Months</option>
                                 @for($i = 1; $i <= 12; $i++)
@@ -172,6 +172,18 @@
     }
     .danger-tr td {
         background-color: #ffe0e0 !important;
+    }
+    /* Employee avatar — bumped from the shared 21px (.tableUser-block
+       .img-circle in default.css, used app-wide) up to 32px, same target
+       size as the Payslip list. Scoped to this table only. */
+    #table-pension .tableUser-block .img-circle { width: 32px; height: 32px; min-width: 32px; }
+
+    /* Month filter — col-xl-2 (matching Department/Position) fit "September"
+       but stretched too wide on large screens since it's a % of the row,
+       not the filter's actual content. Pinned to a fixed width instead, sized
+       for the longest month name ("September") at the .dd-trigger's own font. */
+    @media (min-width: 1200px) {
+        .pension-filter-month { flex: 0 0 150px; max-width: 150px; }
     }
 </style>
 @endsection

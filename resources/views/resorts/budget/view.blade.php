@@ -34,274 +34,247 @@
         </div>
 
         <div>
-            <div class="card">
-                    <div class="card-title">
-                        <div class="row g-3">
-                            <div class="col-sm-6">
-                                <div class="d-flex justify-content-start align-items-center">
-                                    <h3>{{$department->name}}</h3>
-                                    <input type="hidden" class="grand_total" value="0" >
+            <div class="dwb-card">
+                <div class="dwb-hd">
+                    <div class="dwb-dept">{{$department->name}}</div>
+                    <input type="hidden" class="grand_total" value="0">
+                    <input type="hidden" id="hdn_grand_total" value="0">
+                    <input type="hidden" id="hdn_budget_id" value="{{ $Budget_id }}">
+                    <input type="hidden" id="hdn_department_id" value="{{ $dept_id }}">
+                    <span class="dwb-badge">
+                        <span class="k">Budget</span>
+                        <b id="grand_total">00.00</b>
+                    </span>
+                    <span class="dwb-sp"></span>
+                    {{-- "WSB : $11,985" was a hardcoded mockup leftover that confused
+                         every resort into thinking it was their actual Wisdom Suggested
+                         Budget. Removed until the dynamic value is wired through
+                         (the real WSB lives on /resort/budget/compare-budget/{dept}/{budget}). --}}
+                    {{-- Bulk Increment button commented out per request — the bulk-incrementView-modal
+                         still exists below but is unreachable from the UI until this is restored. --}}
+                    {{-- <a href="#bulk-incrementView-modal" data-bs-toggle="modal" class="btn btn-xs btn-themeBlue mx-2">Bulk Increment</a> --}}
+                    <a href="{{ route('resort.budget.comparebudget', ['id' => $department->id,'budgetid'=>$Budget_id]) }}" class="btn btn-xs dwb-btn-compare" @if(App\Helpers\Common::checkRouteWisePermission('resort.budget.comparebudget',config('settings.resort_permissions.view')) == false) d-none @endif>
+                        Compare
+                    </a>
+                </div>
+                @php
+                    // Get the current year and increment it to get the next year
+                    $nextYear = date('Y', strtotime('+1 year'));
+                @endphp
+                <div class="dwb-wrap">
+                    <table id="dwb-positions-table" class="dwb-table">
+                        <thead>
+                            <tr>
+                                <th class="col-act"></th>
+                                <th class="col-pos">Position</th>
+                                <th>No.</th>
+                                <th>Employee</th>
+                                <th>Rank</th>
+                                <th>Nation</th>
+                                <th class="num">Current Basic</th>
+                                <th class="num">Proposed Basic {{$nextYear}}</th>
+                                @for ($i = 1; $i <= 12; $i++)
+                                    @php
+                                        // Get the current year and increment it to get the next year
+                                        $nextYear = date('Y', strtotime('+1 year'));
 
-                                    <span class="badge badge-dark ms-3" id="grand_total">
-                                        Budget: 00.00
-                                    </span>
-                                </div>
-                            </div>
-
-                            <div class="col-sm-6">
-                                <div class="d-flex justify-content-sm-end align-items-center">
-                                    {{-- "WSB : $11,985" was a hardcoded mockup leftover that confused
-                                         every resort into thinking it was their actual Wisdom Suggested
-                                         Budget. Removed until the dynamic value is wired through
-                                         (the real WSB lives on /resort/budget/compare-budget/{dept}/{budget}). --}}
-                                    {{-- Bulk Increment button commented out per request — the bulk-incrementView-modal
-                                         still exists below but is unreachable from the UI until this is restored. --}}
-                                    {{-- <a href="#bulk-incrementView-modal" data-bs-toggle="modal" class="btn btn-xs btn-themeBlue mx-2">Bulk Increment</a> --}}
-                                     <a href="{{ route('resort.budget.comparebudget', ['id' => $department->id,'budgetid'=>$Budget_id]) }}" class="btn btn-xs btn-coolblue order-sm-last me-sm-0 me-3" @if(App\Helpers\Common::checkRouteWisePermission('resort.budget.comparebudget',config('settings.resort_permissions.view')) == false) d-none @endif>
-                                        Compare
-                                    </a> 
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    @php
-                        // Get the current year and increment it to get the next year
-                        $nextYear = date('Y', strtotime('+1 year'));
-
-                    @endphp
-                    <div class="table-responsive">
-                        <table id="filled-positions-table" class="table  w-100">
-
-                            <thead>
-                                <tr>
-                                    <th></th>
-                                    <th class="text-nowrap">Positions</th>
-                                    <th class="text-nowrap">No. Of Positions</th>
-                                    <th class="text-nowrap">Employee Name</th>
-                                    <th class="text-nowrap w-120">Rank</th>
-                                    <th class="text-nowrap">Nation</th>
-                                    {{-- Both salary headers overflowed the Jan-{year} column
-                                         because they had no width. The earlier "w-160" attempt
-                                         did nothing — that class isn't defined in this CSS.
-                                         Inline min-width is the only reliable fix here since the
-                                         table layout is auto and the column wouldn't otherwise
-                                         claim enough horizontal space for the full label.
-                                         text-nowrap forced these onto one line, and the rendered
-                                         text (~230-240px) was still wider than the min-width, so
-                                         it visually spilled into the adjacent Jan-{year} column —
-                                         which is hard-locked to 120px (w-120: width/min-width/
-                                         max-width all 120px, so it can't grow to absorb the
-                                         overflow). Letting the label wrap onto 2 lines within its
-                                         own cell instead of forcing 1 line fixes the overlap. --}}
-                                    <th style="min-width:170px; white-space:normal;">Current Basic salary</th>
-                                    <th style="min-width:170px; white-space:normal;">Proposed Basic Salary {{$nextYear}}</th>
-                                    @for ($i = 1; $i <= 12; $i++)
-                                        @php
-                                            // Get the current year and increment it to get the next year
-                                            $nextYear = date('Y', strtotime('+1 year'));
-
-                                            // Format the month and year (e.g., 01-2025)
-                                            $yearMonthValue = date("m-Y", mktime(0, 0, 0, $i, 1, $nextYear));
-
-                                            // Format as abbreviated month and year (e.g., Jan-2025)
-                                            $yearMonth = date("M-Y", mktime(0, 0, 0, $i, 1, $nextYear));
-                                        @endphp
-                                        <th class="text-nowrap w-120">{{ $yearMonth }}</th>
-                                    @endfor
-                                </tr>
-                            </thead>
-                            <tbody>
-
-                                    @foreach($getPositions as $pos)
-
-
-                                        <tr>
+                                        // Format as abbreviated month and year (e.g., Jan-2025)
+                                        $yearMonth = date("M-Y", mktime(0, 0, 0, $i, 1, $nextYear));
+                                    @endphp
+                                    <th class="num mstart">{{ $yearMonth }}</th>
+                                @endfor
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($getPositions as $pos)
+                                @php $dwbGroupHead = false; @endphp
+                                @if(isset($pos->employees) && !empty($pos->employees) && count($pos->employees) > 0)
+                                    @foreach($pos->employees as $employee)
+                                        <tr class="dwb-row-emp {{ !$dwbGroupHead ? 'dwb-gf' : '' }}" data-employee-id="{{$employee->Empid}}" data-child-id="{{ $employee->vacantData->smrp_child_id ?? '' }}">
+                                            <td class="col-act">
+                                                <span class="dwb-act-view">
+                                                    <button type="button" class="dwb-iconbtn ed dwb-edit-btn" title="Edit">
+                                                        <img src="{{ URL::asset('resorts_assets/images/edit.svg')}}" alt="" width="14" height="14">
+                                                    </button>
+                                                    <button type="button" class="dwb-iconbtn x dwb-del-btn" title="Delete">
+                                                        <img src="{{ URL::asset('resorts_assets/images/trash-red.svg')}}" alt="" width="14" height="14">
+                                                    </button>
+                                                </span>
+                                                <span class="dwb-act-edit">
+                                                    <button type="button" class="dwb-iconbtn ok dwb-save-btn" title="Save">
+                                                        <img src="{{ URL::asset('resorts_assets/images/check-circle-green.svg')}}" alt="" width="14" height="14">
+                                                    </button>
+                                                    <button type="button" class="dwb-iconbtn x dwb-cancel-btn" title="Cancel">
+                                                        <img src="{{ URL::asset('resorts_assets/images/cancel.svg')}}" alt="" width="14" height="14">
+                                                    </button>
+                                                </span>
+                                            </td>
+                                            <td class="col-pos">
+                                                @if(!$dwbGroupHead)
+                                                    <div class="dwb-pos-t">{{ $pos->position_title }}</div>
+                                                @endif
+                                            </td>
                                             <td>
-                                                <div class="d-flex align-items-center">
-                                                    <a href="#" class="btn-lg-icon icon-bg-green me-1 editBudget-icon"
-                                                        data-smrp-child-id="{{$pos->Position_id}}">
-
-                                                        <img src="{{ URL::asset('resorts_assets/images/edit.svg')}}" alt="" class="img-fluid" />
-                                                    </a>
-                                                    <a href="#" class="btn-lg-icon icon-bg-red" data-smrp-child-id="{{$pos->Position_id}}">
-                                                        <img src="{{ URL::asset('resorts_assets/images/trash-red.svg')}}" alt="" class="img-fluid" />
-                                                    </a>
-                                                </div>
-                                                <a href="#" class="btn btn-theme update-row-btn" data-smrp-child-id="{{$pos->Position_id}}">Submit</a>
+                                                @if(!$dwbGroupHead)
+                                                    <span class="dwb-no-pos">{{ $pos->headcount ?? '00' }}</span>
+                                                @endif
                                             </td>
-                                            <input type="hidden" id="hdn_grand_total" class="form-control">
-                                            <input type="hidden" id="hdn_budget_id" value="{{ $Budget_id }}">
-                                            <input type="hidden" id="hdn_department_id" value="{{ $dept_id }}">
-                                            <td>{{ $pos->position_title }}</td>
-                                            <td>{{ $pos->headcount ?? '00' }}</td>
-                                            <td colspan="15" class="p-0">
-                                                <table class="table m-0">
-    
-
-                                                    @if(isset($pos->employees) && !empty($pos->employees) && count($pos->employees) > 0)
-                                                        @foreach($pos->employees as $employee)
-                                                            <tr data-employee-id="{{$employee->Empid}}">
-                                                                <!-- Employee Name, Rank, Nationality -->
-                                                                <td>{{ $employee->first_name }} {{ $employee->last_name }}</td>
-                                                                <td class="w-120">
-                                                                    @php
-                                                                        $Rank = config('settings.Position_Rank');
-                                                                        $AvailableRank = array_key_exists($employee->rank, $Rank) ? $Rank[$employee->rank] : '';
-                                                                    @endphp
-                                                                    {{$AvailableRank}}
-                                                                </td>
-                                                                <td>{{ $employee->nationality }}</td>
-                                                                <td class="current-basic-salary">
-                                                                    <div class="inputValue">{{ number_format($employee->basic_salary, 2) }}</div>
-                                                                    <input type="number" class="form-control" name="BasicSalary[{{ $pos->Position_id}}][{{ $employee->vacantData->smrp_child_id}}][]"  value="{{ number_format($employee->basic_salary, 2) }}" min="0" step="0.01" max="9999999999.99">
-                                                                </td>
-                                                                <td class="proposed-basic-salary">
-                                                                    <div class="inputValue">{{ number_format($employee->Proposed_Basic_salary, 2) }}</div>
-                                                                    <input type="number" class="form-control" name="ProposedBasicsalary[{{ $pos->Position_id}}][{{ $employee->vacantData->smrp_child_id}}][]" value="{{ $employee->Proposed_Basic_salary }}" min="0" step="0.01" max="9999999999.99">
-                                                                </td>
-
-                                                                <!-- Monthly Budget Data for Employee -->
-                                                                @php
-                                                                    $lastIncrementMonth = (new DateTime($employee->incremented_date))->format('m');
-                                                                    $basicSalary = $employee->basic_salary;
-                                                                    $proposedSalary = $employee->Proposed_Basic_salary > 0 ? $employee->Proposed_Basic_salary : $basicSalary;
-                                                                            if(isset($employee->vacantData->Months))
-                                                                            {
-                                                                                $monthdataCollection =  json_decode($employee->vacantData->Months);
-                                                                            }
-                                                                            else 
-                                                                            {
-                                                                                $monthdataCollection=array();
-                                                                            }
-                                                                            $ak=0;
-                                                                @endphp
-
-                                                                @for ($i = 1; $i <= 12; $i++)
-                                                                    @php
-                                                                        $monthlyData = DB::table('position_monthly_data')
-                                                                                        ->where('position_id', $employee->Position_id)
-                                                                                        ->where('month', $i)
-                                                                                        ->where('manning_response_id', $pos->Budget_id)
-                                                                                        ->first();
-
-                                                                        $headcount = $monthlyData->headcount ?? 0;
-                                                                        $vacantcount = $monthlyData->vacantcount ?? 0;
-                                                                        $filledcount = $monthlyData->filledcount ?? 0;
-                                                                        $monthlySalary = ($i < $lastIncrementMonth) ? $basicSalary : $proposedSalary;
-                                                                            if(!empty($monthdataCollection) && $monthdataCollection[$ak]->month == $i)
-                                                                            {
-                                                                                $totalMothwisecost = (float)$monthdataCollection[$ak]->salary;
-                                                                            
-                                                                            }
-                                                                            else
-                                                                            {
-                                                                                // No base salary → budget $0, not fabricated overhead.
-                                                                                // (Operational/expat costs on a $0 salary were rendering
-                                                                                // as a dummy $180.) Filling the role is recommended via
-                                                                                // the AI "justified reason" on compare-budget, not a
-                                                                                // made-up salary here.
-                                                                                $totalMothwisecost = ((float) $monthlySalary <= 0)
-                                                                                    ? 0
-                                                                                    : (float) Common::CheckemployeeBudgetCost($employee->nationality, $employee->resort_id, $monthlySalary);
-                                                                            }
-                                                                            $ak++;
-                                                                    @endphp
-
-                                                                    <td class="w-120 month-{{$i}}">
-                                                                        <div class="inputValue">
-                                                                            {{number_format($totalMothwisecost,2)}}
-                                                                            {{-- Salary Increment Details flow disabled per request. The trigger icon is hidden here; the modal markup further below is also wrapped in a Blade comment so it does not render. Re-enable by uncommenting both. --}}
-                                                                            {{-- <a href="#incrementView-modal" data-bs-toggle="modal" class="btn-tableIcon btnIcon-skyblue">
-                                                                                <img src="{{ URL::asset('resorts_assets/images/increment.svg') }}"/>
-                                                                            </a> --}}
-                                                                        </div>
-                                                                        <input type="number" name= "manning_child[{{ $pos->Position_id}}][{{ $employee->vacantData->smrp_child_id }}][]"class="form-control" value="{{ $totalMothwisecost }}" min="0" step="0.01" max="9999999999.99">
-                                                                    </td>
-                                                                @endfor
-                                                            </tr>
-                                                        @endforeach
-                                                    @endif
-                                                    <!-- Separate Row for Vacant Position Costs in Specific Months -->
-                                                    @if($pos->vacantcount)
-                                                        @php
-                                                            $maxVacantCount = 0;
-                                                        @endphp
-
-                                                        <tr>
-                                                            <td colspan="5">Vacant Positions</td>
-                                                            @for($i = 1; $i <= 12; $i++)
-                                                                @php
-                                                                    if(isset($employee))
-                                                                    {
-                                                                        $monthlyData = DB::table('position_monthly_data')
-                                                                         ->where('position_id', $employee->Position_id)
-                                                                            ->where('month', $i)
-                                                                            ->where('manning_response_id', $pos->Budget_id)
-                                                                            ->first();
-                                                                            
-                                                                        $vacantcount = $monthlyData->vacantcount ?? 0;
-                                                                    }
-                                                                    else {
-                                                                        $vacantcount = 0; // Default to 0 if no employee data
-                                                                    }
-                                                                   
-                                                                    if ($vacantcount > $maxVacantCount)
-                                                                    {
-                                                                        // Calculate the difference from the max count
-                                                                        $vacantDifference = $vacantcount - $maxVacantCount;
-                                                                        $vacantCostArray = Common::CheckVacantBudgetCost($vacantDifference);
-                                                                        $vacantCost = $vacantCostArray['total_cost'] ?? 0;
-                                                                        // Was rendering the raw cost with no currency symbol
-                                                                        // or label ("Vacant (2) - 360"), which read like a
-                                                                        // negative/broken number instead of an estimated cost.
-                                                                        echo "<td class='w-120 month-{$i}'>
-                                                                            <input type='hidden' class='vacant' name='vacant[]' value='" . number_format($vacantCost, 2) . "'>
-                                                                            <span class='badge badge-success'>Vacant ({$vacantcount}) - Est. Cost " . Common::GetResortCurrencySymbol() . number_format($vacantCost, 2) . "</span>
-                                                                        </td>";
-
-                                                                        $maxVacantCount = $vacantcount;
-                                                                    }
-                                                                    else
-                                                                    {
-                                                                        echo "<td class='w-120 month-{$i}'></td>";
-                                                                    }
-                                                                @endphp
-                                                            @endfor
-                                                        </tr>
-
-                                                    @endif
-                                                </table>
+                                            <td class="dwb-emp">{{ $employee->first_name }} {{ $employee->last_name }}</td>
+                                            <td>
+                                                @php
+                                                    $Rank = config('settings.Position_Rank');
+                                                    $AvailableRank = array_key_exists($employee->rank, $Rank) ? $Rank[$employee->rank] : '';
+                                                @endphp
+                                                <span class="dwb-rank">{{$AvailableRank}}</span>
                                             </td>
+                                            <td class="dwb-nat">{{ $employee->nationality }}</td>
+                                            <td class="num dwb-cur-cell">
+                                                <span class="dwb-money soft dwb-view {{ $employee->basic_salary == 0 ? 'zero' : '' }}">{{ number_format($employee->basic_salary, 2) }}</span>
+                                                <input type="number" class="dwb-cin num dwb-edit dwb-in-current" value="{{ $employee->basic_salary }}" min="0" step="0.01" max="9999999999.99">
+                                            </td>
+                                            <td class="num dwb-prop-cell">
+                                                <span class="dwb-money soft dwb-view {{ $employee->Proposed_Basic_salary == 0 ? 'zero' : '' }}">{{ number_format($employee->Proposed_Basic_salary, 2) }}</span>
+                                                <input type="number" class="dwb-cin num dwb-edit dwb-in-proposed" value="{{ $employee->Proposed_Basic_salary }}" min="0" step="0.01" max="9999999999.99">
+                                            </td>
+
+                                            {{-- Monthly Budget Data for Employee --}}
+                                            @php
+                                                $lastIncrementMonth = (new DateTime($employee->incremented_date))->format('m');
+                                                $basicSalary = $employee->basic_salary;
+                                                $proposedSalary = $employee->Proposed_Basic_salary > 0 ? $employee->Proposed_Basic_salary : $basicSalary;
+                                                        if(isset($employee->vacantData->Months))
+                                                        {
+                                                            $monthdataCollection =  json_decode($employee->vacantData->Months);
+                                                        }
+                                                        else
+                                                        {
+                                                            $monthdataCollection=array();
+                                                        }
+                                                        $ak=0;
+                                            @endphp
+
+                                            @for ($i = 1; $i <= 12; $i++)
+                                                @php
+                                                    $monthlyData = DB::table('position_monthly_data')
+                                                                    ->where('position_id', $employee->Position_id)
+                                                                    ->where('month', $i)
+                                                                    ->where('manning_response_id', $pos->Budget_id)
+                                                                    ->first();
+
+                                                    $headcount = $monthlyData->headcount ?? 0;
+                                                    $vacantcount = $monthlyData->vacantcount ?? 0;
+                                                    $filledcount = $monthlyData->filledcount ?? 0;
+                                                    $monthlySalary = ($i < $lastIncrementMonth) ? $basicSalary : $proposedSalary;
+                                                        if(!empty($monthdataCollection) && $monthdataCollection[$ak]->month == $i)
+                                                        {
+                                                            $totalMothwisecost = (float)$monthdataCollection[$ak]->salary;
+
+                                                        }
+                                                        else
+                                                        {
+                                                            // No base salary → budget $0, not fabricated overhead.
+                                                            // (Operational/expat costs on a $0 salary were rendering
+                                                            // as a dummy $180.) Filling the role is recommended via
+                                                            // the AI "justified reason" on compare-budget, not a
+                                                            // made-up salary here.
+                                                            $totalMothwisecost = ((float) $monthlySalary <= 0)
+                                                                ? 0
+                                                                : (float) Common::CheckemployeeBudgetCost($employee->nationality, $employee->resort_id, $monthlySalary);
+                                                        }
+                                                        $ak++;
+                                                @endphp
+
+                                                <td class="num mstart dwb-month-cell">
+                                                    {{-- Salary Increment Details flow disabled per request. The trigger icon is hidden here; the modal markup further below is also wrapped in a Blade comment so it does not render. Re-enable by uncommenting both. --}}
+                                                    {{-- <a href="#incrementView-modal" data-bs-toggle="modal" class="btn-tableIcon btnIcon-skyblue month-{{$i}}">
+                                                        <img src="{{ URL::asset('resorts_assets/images/increment.svg') }}"/>
+                                                    </a> --}}
+                                                    <span class="dwb-money soft dwb-view {{ $totalMothwisecost == 0 ? 'zero' : '' }}">{{ number_format($totalMothwisecost,2) }}</span>
+                                                    <input type="number" class="dwb-cin num dwb-edit dwb-in-month" value="{{ $totalMothwisecost }}" min="0" step="0.01" max="9999999999.99">
+                                                </td>
+                                            @endfor
                                         </tr>
+                                        @php $dwbGroupHead = true; @endphp
                                     @endforeach
+                                @endif
+                                {{-- Aggregated (read-only) vacant-slot summary row for this position --}}
+                                @if($pos->vacantcount)
+                                    @php
+                                        $maxVacantCount = 0;
+                                    @endphp
+                                    <tr class="dwb-row-vac {{ !$dwbGroupHead ? 'dwb-gf' : '' }}">
+                                        <td class="col-act"></td>
+                                        <td class="col-pos">
+                                            @if(!$dwbGroupHead)
+                                                <div class="dwb-pos-t">{{ $pos->position_title }}</div>
+                                            @endif
+                                        </td>
+                                        <td>
+                                            @if(!$dwbGroupHead)
+                                                <span class="dwb-no-pos">{{ $pos->headcount ?? '00' }}</span>
+                                            @endif
+                                        </td>
+                                        <td colspan="3"><span class="dwb-vac"><span class="d"></span>Vacant position</span></td>
+                                        <td class="num"></td>
+                                        <td class="num"></td>
+                                        @for($i = 1; $i <= 12; $i++)
+                                            @php
+                                                if(isset($employee))
+                                                {
+                                                    $monthlyData = DB::table('position_monthly_data')
+                                                     ->where('position_id', $employee->Position_id)
+                                                        ->where('month', $i)
+                                                        ->where('manning_response_id', $pos->Budget_id)
+                                                        ->first();
 
-                            </tbody>
-                            <tfoot>
-                                <tr>
-                                    <th></th>
-                                    <th>Total:</th>
-                                    <th id="total-positions">0</th>
-                                    <th></th>
-                                    <th></th>
-                                    <th></th>
-                                    <th id="total-current-basic-salary">{{ Common::GetResortCurrencySymbol() }} 0</th>
-                                    <th id="total-proposed-basic-salary">{{ Common::GetResortCurrencySymbol() }} 0</th>
-                                    <th id="total-jan-2024">{{ Common::GetResortCurrencySymbol() }} 0</th>
-                                    <th id="total-feb-2024">{{ Common::GetResortCurrencySymbol() }} 0</th>
-                                    <th id="total-mar-2024">{{ Common::GetResortCurrencySymbol() }} 0</th>
-                                    <th id="total-apr-2024">{{ Common::GetResortCurrencySymbol() }} 0</th>
-                                    <th id="total-may-2024">{{ Common::GetResortCurrencySymbol() }} 0</th>
-                                    <th id="total-jun-2024">{{ Common::GetResortCurrencySymbol() }} 0</th>
-                                    <th id="total-jul-2024">{{ Common::GetResortCurrencySymbol() }} 0</th>
-                                    <th id="total-aug-2024">{{ Common::GetResortCurrencySymbol() }} 0</th>
-                                    <th id="total-sep-2024">{{ Common::GetResortCurrencySymbol() }} 0</th>
-                                    <th id="total-oct-2024">{{ Common::GetResortCurrencySymbol() }} 0</th>
-                                    <th id="total-nov-2024">{{ Common::GetResortCurrencySymbol() }} 0</th>
-                                    <th id="total-dec-2024">{{ Common::GetResortCurrencySymbol() }} 0</th>
-                                </tr>
-                            </tfoot>
-                        </table>
-                    </div>
+                                                    $vacantcount = $monthlyData->vacantcount ?? 0;
+                                                }
+                                                else {
+                                                    $vacantcount = 0; // Default to 0 if no employee data
+                                                }
+
+                                                if ($vacantcount > $maxVacantCount)
+                                                {
+                                                    // Calculate the difference from the max count
+                                                    $vacantDifference = $vacantcount - $maxVacantCount;
+                                                    $vacantCostArray = Common::CheckVacantBudgetCost($vacantDifference);
+                                                    $vacantCost = $vacantCostArray['total_cost'] ?? 0;
+                                                    $maxVacantCount = $vacantcount;
+                                                }
+                                                else
+                                                {
+                                                    $vacantCost = null;
+                                                }
+                                            @endphp
+                                            <td class="num mstart dwb-month-cell">
+                                                @if($vacantCost !== null)
+                                                    <input type="hidden" class="vacant" value="{{ number_format($vacantCost, 2) }}">
+                                                    <span class="dwb-est">{{ Common::GetResortCurrencySymbol() }}{{ number_format($vacantCost, 2) }}</span>
+                                                @endif
+                                            </td>
+                                        @endfor
+                                    </tr>
+                                    @php $dwbGroupHead = true; @endphp
+                                @endif
+                            @endforeach
+                        </tbody>
+                        <tfoot>
+                            <tr>
+                                <th class="col-act"></th>
+                                <th class="col-pos lbl">Total</th>
+                                <th id="dwb-total-positions">0</th>
+                                <th></th>
+                                <th></th>
+                                <th></th>
+                                <th class="num" id="dwb-total-current">{{ Common::GetResortCurrencySymbol() }}0.00</th>
+                                <th class="num" id="dwb-total-proposed">{{ Common::GetResortCurrencySymbol() }}0.00</th>
+                                @for ($i = 1; $i <= 12; $i++)
+                                    <th class="num mstart dwb-total-month">{{ Common::GetResortCurrencySymbol() }}0.00</th>
+                                @endfor
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
 
 
             </div>
@@ -444,82 +417,50 @@
 @endsection
 
 @section('import-css')
+@include('resorts.budget._department_wise_budget_styles')
 @endsection
 
 @section('import-scripts')
 <script>
     $(document).ready(function () {
-        function parseCurrency(value) {
-            return parseFloat(value.replace(/,/g, '')); // Remove commas and convert to float
-        }
-
         function calculateTotals() {
             let totalPositions = 0;
-            let totalCurrentBasicSalary = 0;
-            let totalProposedBasicSalary = 0;
-            let monthlyTotals = Array(12).fill(0); // Array to hold total costs per month
-            let grandTotal = 0;
+            let totalCurrent = 0;
+            let totalProposed = 0;
+            let monthlyTotals = Array(12).fill(0);
 
-            // Loop through each main position row
-            $('#filled-positions-table tbody > tr').each(function () {
-                const positionCount = parseInt($(this).find('td:eq(2)').text()) || 0;
-                totalPositions += positionCount;
+            $('#dwb-positions-table tbody tr.dwb-gf .dwb-no-pos').each(function () {
+                totalPositions += parseInt($(this).text()) || 0;
+            });
 
-                $(this).find('table tr').each(function () {
-                    const badgeExists = $(this).find('.badge-success').length;
-
-                    if (badgeExists) {
-                        for (let i = 1; i <= 12; i++) {
-                            const monthCell = $(this).find(`.month-${i}`).find('.vacant');
-                            if (monthCell.length) {
-                                const vacantCost = parseCurrency(monthCell.val()) || 0;
-                                monthlyTotals[i - 1] += Math.round(vacantCost);
-                            }
-                        }
-                    } else {
-                        const currentBasicSalary = parseCurrency($(this).find('.current-basic-salary .inputValue').text()) || 0;
-                        const proposedBasicSalary = parseCurrency($(this).find('.proposed-basic-salary .inputValue').text()) || 0;
-
-                        totalCurrentBasicSalary += currentBasicSalary;
-                        totalProposedBasicSalary += proposedBasicSalary;
-
-                        for (let i = 1; i <= 12; i++) {
-                            const monthCell = $(this).find(`.month-${i} .inputValue`);
-                            if (monthCell.length) {
-                                const employeeCost = parseCurrency(monthCell.text()) || 0;
-                                monthlyTotals[i - 1] += Math.round(employeeCost);
-                            }
-                        }
-                    }
+            $('#dwb-positions-table tbody tr.dwb-row-emp').each(function () {
+                const row = $(this);
+                totalCurrent += parseFloat(row.find('.dwb-in-current').val()) || 0;
+                totalProposed += parseFloat(row.find('.dwb-in-proposed').val()) || 0;
+                row.find('.dwb-month-cell').each(function (i) {
+                    monthlyTotals[i] += Math.round(parseFloat($(this).find('.dwb-in-month').val())) || 0;
                 });
             });
 
-            // Calculate grand total as the sum of all monthly totals
-            grandTotal = monthlyTotals.reduce((sum, current) => sum + current, 0);
+            $('#dwb-positions-table tbody tr.dwb-row-vac').each(function () {
+                $(this).find('.dwb-month-cell').each(function (i) {
+                    const v = $(this).find('input.vacant').val();
+                    if (v) monthlyTotals[i] += Math.round(parseFloat(v)) || 0;
+                });
+            });
 
-            // Update footer totals
-            $('#total-positions').text(totalPositions);
-            totalCurrentBasicSalary = Math.round(totalCurrentBasicSalary);
-            totalProposedBasicSalary = Math.round(totalProposedBasicSalary);
-            // formatAmount() already returns a fully formatted string with
-            // currency + 2 decimal places (see layouts/js.blade.php). The
-            // orphaned `minimumFractionDigits` option blocks here are
-            // leftovers from a half-finished refactor away from
-            // `toLocaleString()` — they made the whole function throw a
-            // SyntaxError, so calculateTotals() silently never ran and
-            // the badge stayed at the placeholder "Budget: 00.00".
-            $('#total-current-basic-salary').text(formatAmount(totalCurrentBasicSalary, 'USD'));
-            $('#total-proposed-basic-salary').text(formatAmount(totalProposedBasicSalary, 'USD'));
+            const grandTotal = monthlyTotals.reduce((sum, current) => sum + current, 0);
 
-            // Update monthly totals in the footer
-            const months = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
-            months.forEach((month, index) => {
-                $(`#total-${month}-2024`).text(formatAmount(monthlyTotals[index], 'USD'));
+            $('#dwb-total-positions').text(totalPositions);
+            $('#dwb-total-current').text(formatAmount(Math.round(totalCurrent), 'USD'));
+            $('#dwb-total-proposed').text(formatAmount(Math.round(totalProposed), 'USD'));
+            $('.dwb-total-month').each(function (i) {
+                $(this).text(formatAmount(monthlyTotals[i], 'USD'));
             });
 
             $('.grand_total').val(grandTotal);
-            $('#grand_total').text('Budget: ' + formatAmount(grandTotal, 'USD'));
             $('#hdn_grand_total').val(grandTotal);
+            $('#grand_total').text(formatAmount(grandTotal, 'USD'));
 
             // Update the parent table with the grand total
             updateParentTotal(grandTotal);
@@ -527,11 +468,11 @@
 
         function updateParentTotal(grandTotal) {
             $.ajax({
-                url: "{{ route('resort.budget.updateParentTotal') }}", // You'll need to create this route
+                url: "{{ route('resort.budget.updateParentTotal') }}",
                 method: 'PUT',
                 data: {
-                    Budget_id: $('#hdn_budget_id').val(), // Add this hidden input to your HTML
-                    Department_id: $('#hdn_department_id').val(), // Add this hidden input to your HTML
+                    Budget_id: $('#hdn_budget_id').val(),
+                    Department_id: $('#hdn_department_id').val(),
                     Total_Department_budget: grandTotal
                 },
                 success: function(response) {
@@ -543,105 +484,108 @@
             });
         }
 
+        function dwbFormatDecimal(v) {
+            return (Math.round(v * 100) / 100).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function dwbCloseEditing() {
+            $('#dwb-positions-table tr.dwb-editing').removeClass('dwb-editing');
+        }
+
+        function dwbSaveRow(row) {
+            const childId = row.data('child-id');
+            if (!childId) {
+                toastr.error('This row cannot be saved — missing reference id.', 'Error', { positionClass: 'toast-bottom-right' });
+                return;
+            }
+
+            const current = parseFloat(row.find('.dwb-in-current').val()) || 0;
+            const proposed = parseFloat(row.find('.dwb-in-proposed').val()) || 0;
+            const monthData = [];
+            row.find('.dwb-month-cell').each(function (i) {
+                monthData.push({ month: i + 1, salary: Math.round(parseFloat($(this).find('.dwb-in-month').val()) || 0) });
+            });
+
+            const url = "{{ route('resort.budget.update', ['id' => '__ID__']) }}".replace('__ID__', childId);
+
+            $.ajax({
+                url: url,
+                method: 'PUT',
+                data: {
+                    basic_salary: current,
+                    proposed_basic_salary: proposed,
+                    month_data: monthData,
+                    "_token": "{{ csrf_token() }}"
+                },
+                success: function (response) {
+                    row.find('.dwb-cur-cell .dwb-view').text(dwbFormatDecimal(current)).toggleClass('zero', current === 0);
+                    row.find('.dwb-prop-cell .dwb-view').text(dwbFormatDecimal(proposed)).toggleClass('zero', proposed === 0);
+                    row.find('.dwb-month-cell').each(function (i) {
+                        const v = monthData[i].salary;
+                        $(this).find('.dwb-view').text(dwbFormatDecimal(v)).toggleClass('zero', v === 0);
+                    });
+                    row.removeClass('dwb-editing');
+                    calculateTotals();
+                    toastr.success(response.message, "Success", {
+                        positionClass: 'toast-bottom-right'
+                    });
+                },
+                error: function (xhr, status, error) {
+                    console.error('AJAX Error:', status, error);
+                    let errorMessage = 'Failed to save data.';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMessage = xhr.responseJSON.message;
+                    }
+                    toastr.error(errorMessage, "Error", {
+                        positionClass: 'toast-bottom-right'
+                    });
+                }
+            });
+        }
+
         // Initial calculation
         calculateTotals();
 
-        // Recalculate on input change
-        $('#filled-positions-table').on('input', 'input', function() {
-            calculateTotals();
+        $('#dwb-positions-table').on('click', '.dwb-edit-btn', function () {
+            dwbCloseEditing();
+            const row = $(this).closest('tr');
+            row.find('.dwb-edit').each(function () {
+                $(this).data('orig', $(this).val());
+            });
+            row.addClass('dwb-editing');
+            row.find('.dwb-in-current').trigger('focus');
         });
 
-        $(".editBudget-icon").click(function () {
-            $(this).parents("tr").addClass("inputShow");
+        $('#dwb-positions-table').on('click', '.dwb-cancel-btn', function () {
+            const row = $(this).closest('tr');
+            row.find('.dwb-edit').each(function () {
+                $(this).val($(this).data('orig'));
+            });
+            row.removeClass('dwb-editing');
         });
 
-        $(".update-row-btn").click(function () {
+        $('#dwb-positions-table').on('click', '.dwb-save-btn', function () {
+            dwbSaveRow($(this).closest('tr'));
+        });
 
-            let grand_total = $(".grand_total").val();
-            let position_of_row = $(this).data('smrp-child-id');
-
-            let basic_salary = [];
-            let ProposedBasicsalary = [];
-            let month_data = {};
-            let i = 1;
-
-            $(`input[name^="BasicSalary[${position_of_row}]"]`).each(function() {
-                let smrpChildId = $(this).attr('name').match(/\[([0-9]+)\]\[\]/)[1];
-                let value = Math.round($(this).val());
-                basic_salary.push({ smrpChildId: smrpChildId, value: value });
-            });
-
-            $(`input[name^="ProposedBasicsalary[${position_of_row}]"]`).each(function() {
-                let smrpChildId = $(this).attr('name').match(/\[([0-9]+)\]\[\]/)[1];
-                let value = Math.round($(this).val());
-                ProposedBasicsalary.push({ smrpChildId: smrpChildId, value: value });
-            });
-
-            $(`input[name^="manning_child[${position_of_row}]"]`).each(function() {
-                let smrpChildId = $(this).attr('name').match(/\[([0-9]+)\]\[\]/)[1];
-                let value = Math.round($(this).val());
-
-                if (!month_data[smrpChildId]) {
-                    month_data[smrpChildId] = [];
-                    i = 1;
-                }
-
-                month_data[smrpChildId].push({
-                    month: i,
-                    salary: Math.round(value)
+        $('#dwb-positions-table').on('keydown', '.dwb-edit', function (e) {
+            const row = $(this).closest('tr');
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                dwbSaveRow(row);
+            } else if (e.key === 'Escape') {
+                e.preventDefault();
+                row.find('.dwb-edit').each(function () {
+                    $(this).val($(this).data('orig'));
                 });
+                row.removeClass('dwb-editing');
+            }
+        });
 
-                i++;
+        $('#dwb-positions-table').on('click', '.dwb-del-btn', function () {
+            toastr.info('Removing a budget line item isn\'t available yet — please contact support.', 'Not available', {
+                positionClass: 'toast-bottom-right'
             });
-
-                $.ajax({
-                    url: "{{ route('resort.UpdateResortPositionWise') }}",
-                    method: 'post',
-                    data: {
-                        basic_salary: basic_salary,
-                        ProposedBasicsalary: ProposedBasicsalary,
-                        month_data: month_data,
-                        grand_total:grand_total,
-                        "_token": "{{ csrf_token() }}"
-                    },
-                    success: function (response) {
-
-                        // // Update the values in the row for current and proposed basic salary
-                        // row.find('.current-basic-salary').text(basic_salary);
-                        // row.find('.proposed-basic-salary').text(proposed_basic_salary);
-                        // row.find('#hdn_grand_total').val(grand_total);
-
-                        // Loop through the month data and update the relevant columns
-                        // month_data.forEach(function(monthData, index) {
-                        //     row.find('.month-' + (index + 1)).text(monthData.salary);  // Assuming each month has a column with class 'month-1', 'month-2', etc.
-                        // });
-
-                        toastr.success(response.message, "Success", {
-                            positionClass: 'toast-bottom-right'
-                        });
-
-                        window.setTimeout(function() {
-                            window.location.reload();  // This reloads the current page
-                        }, 2000);
-
-                    },
-                    error: function (xhr, status, error) {
-                        // Log detailed error for debugging
-                        console.error('AJAX Error:', status, error);
-                        
-                        // Extract error message from response if available
-                        let errorMessage = 'Failed to save data.';
-                        if (xhr.responseJSON && xhr.responseJSON.message) {
-                            errorMessage = xhr.responseJSON.message;
-                        }
-                        
-                        // Display user-friendly error notification
-                        toastr.error(errorMessage, "Error", {
-                            positionClass: 'toast-bottom-right'
-                        });
-                    }
-                });
-            // }
         });
 
         let currentEmployeeId = 0;

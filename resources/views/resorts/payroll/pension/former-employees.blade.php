@@ -13,6 +13,17 @@
         @media (max-width: 575.98px) {
             #pension-former-hero { padding-bottom: 0; }
         }
+        /* Employee avatar — same 32px bump as the active Pension list and
+           Payslip screens. Scoped to this table only. */
+        #table-pension .tableUser-block .img-circle { width: 32px; height: 32px; min-width: 32px; }
+
+        /* Month filter — same fix as the active Pension list: col-xl-2
+           (matching Department/Position) fixes the "September" truncation
+           but stretches too wide on large screens as a % of the row. Pinned
+           to a fixed width sized for the longest month name instead. */
+        @media (min-width: 1200px) {
+            .pension-filter-month { flex: 0 0 150px; max-width: 150px; }
+        }
     </style>
     <div class="body-wrapper pb-5">
         <div class="container-fluid">
@@ -82,7 +93,7 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="col-xl-1 col-md-2 col-sm-3 col-6">
+                        <div class="col-xl-2 col-md-3 col-sm-4 col-6 pension-filter-month">
                             <select id="monthFilter" class="form-select dd-native-select">
                                 <option value="">All Months</option>
                                 @for($i = 1; $i <= 12; $i++)

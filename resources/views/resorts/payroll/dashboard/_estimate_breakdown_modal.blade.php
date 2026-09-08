@@ -5,7 +5,7 @@
     jQuery in dashboard.blade.php's import-scripts section. Row content is
     rendered client-side from JSON, not server-rendered here.
 
-    Frosted "details" design, matching payroll_popover_reference.html
+    Liquid Glass "details" design, matching payroll_popover_v2_reference.html
     verbatim. Still a genuine Bootstrap modal (.modal.fade, data-bs-toggle,
     show.bs.modal) — only .modal-content is restyled (as .pay-pop), so
     Bootstrap's own backdrop/centering/z-index keeps working unchanged.
@@ -48,14 +48,14 @@
                 <div id="pebBreakdownError" class="err d-none"></div>
                 <div id="pebBreakdownContent" class="d-none">
                     <div class="frame">
-                        <div class="fcap e"><span class="gd"></span>Earnings<span class="fr pos" id="pebEarnTotalHead"></span></div>
+                        <div class="fcap e"><span class="gd"></span><span class="lbl">Earnings</span></div>
                         <div id="pebEarningsList"></div>
-                        <div class="tot"><span>Total earnings</span><span class="amt pos" id="pebEarnTotalFoot"></span></div>
+                        <div class="tot"><span class="nm">Total</span><span class="emp"></span><span class="amt" id="pebEarnTotalFoot"></span><span class="cv"></span></div>
                     </div>
                     <div class="frame">
-                        <div class="fcap d"><span class="gd"></span>Deductions<span class="fr neg" id="pebDedTotalHead"></span></div>
+                        <div class="fcap d"><span class="gd"></span><span class="lbl">Deductions</span></div>
                         <div id="pebDeductionsList"></div>
-                        <div class="tot"><span>Total deductions</span><span class="amt neg" id="pebDedTotalFoot"></span></div>
+                        <div class="tot"><span class="nm">Total</span><span class="emp"></span><span class="amt" id="pebDedTotalFoot"></span><span class="cv"></span></div>
                     </div>
                     <div class="net"><div class="nl">Net estimated payout<em>Earnings &minus; Deductions</em></div><div class="nv money" id="pebNet"></div></div>
                 </div>

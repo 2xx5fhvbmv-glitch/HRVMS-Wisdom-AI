@@ -8,7 +8,7 @@ $(function () {
 $(document).ready(function () {
   $(".select2").select2();
 
-  $(".select2t-none").select2({
+  $(".select2t-none:not(.select2-hidden-accessible)").select2({
     minimumResultsForSearch: -1,
 
     allowClear: true, // Option to clear selection

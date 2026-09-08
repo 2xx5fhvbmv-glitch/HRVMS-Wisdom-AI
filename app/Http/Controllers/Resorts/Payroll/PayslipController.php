@@ -1119,7 +1119,7 @@ class PayslipController extends Controller
                 return '<span class="badge ' . $statusClass . '">' . ucfirst($settlement->status) . '</span>';
             })
             ->addColumn('action', function ($settlement) {
-                return '<a href="' . route('final.settlement.review', $settlement->id) . '" class="btn btn-sm payroll-btn-secondary">Review</a>';
+                return '<a href="' . route('final.settlement.review', $settlement->id) . '" class="btn btn-sm payroll-btn-primary">Review</a>';
             })
             ->rawColumns(['status', 'action'])
             ->make(true);
