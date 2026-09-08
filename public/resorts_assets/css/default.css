@@ -1568,7 +1568,9 @@ strong {
 }
 
 .notification-title {
-    padding: 22px 22px 4px;
+    padding: 22px 22px 14px;
+    background: var(--teal-soft);
+    border-bottom: 1px solid var(--line);
 }
 
 .ntf-kicker {
@@ -1836,6 +1838,14 @@ strong {
 @media (prefers-reduced-motion: reduce) {
     .ntf-sun, .ntf-w1, .ntf-w2 {
         animation: none;
+    }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+    .notification-wrapper {
+        background: var(--teal-soft);
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
     }
 }
 
@@ -4264,13 +4274,18 @@ border-color: #ddd; */
 
 .progress-container .img-obj {
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    width: 100%;
-    height: 100%;
-    padding: 5px;
+    /* inset (not width/height:100%) so the box itself shrinks proportionally
+       at every .progress-container size (120/89/80px) — padding wouldn't
+       shrink it, since border-radius/overflow clip at the box's own edge,
+       not the padded content area. Border-radius+overflow make it a circle
+       instead of the square .img-obj default (was reading as a diamond at
+       the corners); shrinking it 12% on each side keeps the circular photo
+       inside the progress ring's inner edge (~86% of the radius) instead of
+       overlapping it, which is what turned the ring into disconnected arc
+       stubs at the photo's corners. */
+    inset: 12%;
+    border-radius: 50%;
+    overflow: hidden;
 }
 
 

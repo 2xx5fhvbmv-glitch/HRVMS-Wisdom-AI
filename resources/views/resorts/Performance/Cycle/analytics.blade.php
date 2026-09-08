@@ -16,7 +16,6 @@
                     <div class="page-title">
                         <span>Performance</span>
                         <h1>Cycles</h1>
-                        <p class="text-muted mb-0 small">{{ $cycle->Cycle_Name }} · {{ $total }} {{ $total == 1 ? 'Employee' : 'Employees' }}</p>
                     </div>
                 </div>
                 <div class="col-auto">

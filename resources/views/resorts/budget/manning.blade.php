@@ -71,147 +71,83 @@
 
     <div>
 
-    <div class="card">
-        <div class="row g-3 justify-content-end mb-4">
-            <div class="col-auto">
-                <div class="d-flex align-items-center justify-content-sm-end">
-                    {{-- Year Filter --}}
-                        <div class="form-group me-2">
-                        <form method="GET" action="{{ route('resort.budget.manning') }}" id="yearFilterForm">
-                            <select class="form-select ManningBudgetYearWise" id="yearFilter" name="year" 
-                            onchange="document.getElementById('yearFilterForm').submit();">
-                    
-                        @php
-                            $currentYear = date('Y');
-                            $startYear = $currentYear - 10;
-                            $endYear = $currentYear + 1;
-                    
-                            // If no year in request, use current year
-                            $selectedYear = request()->get('year', $currentYear);
-                        @endphp
-                    
-                        @for ($loopyear = $startYear; $loopyear <= $endYear; $loopyear++)
-                            <option value="{{ $loopyear }}" 
-                                {{ (int)$loopyear === (int)$selectedYear ? 'selected' : '' }}>
-                                {{ $loopyear }}
-                            </option>
-                        @endfor
-                    </select>
-                        </form>
-                    </div>
-                </div>
-            </div>
-            <!-- <div class="col-auto">
-                <a href="#" class="btn btn-themeBlue btn-sm btn-allShow">All Department Show </a>
-            </div>
-            <div class="col-auto">
-                <a href="#" class="btn  btn-themeBlue btn-sm btn-allHIde">All Department Hide </a>
-            </div> -->
-            <!-- <div class="col-auto">
-                <div class="d-flex align-items-center">
-                    <label for="flexSwitchCheckDefault" class="form-label mb-0 me-3">All Department
-                        Show</label>
-                    <div class="form-check form-switch form-switchTheme department-switch">
-                        <input class="form-check-input" type="checkbox" role="switch"
-                            id="flexSwitchCheckDefault">
-                        <label class="form-check-label" for=""></label>
-                    </div>
-                </div>
-            </div> -->
-        </div>
+    <div class="card vm-card">
+        @php
+            // Reshape $departmentsData into the exact object shape the
+            // client-side render function expects — the reference's own
+            // DEPTS[] shape ({name, open, positions:[{title, count, seats}]}),
+            // so the ported avatar()/seatCell()/posRows()/deptBlock()
+            // functions need no logic changes, just real field names.
+            $Rank = config('settings.Position_Rank');
+            $DEPTS = $departmentsData->values()->map(function ($deptData, $key) use ($Rank) {
+                $positions = $deptData['positions']->map(function ($pos) use ($Rank) {
+                    $seats = $pos->employees->map(function ($employee) use ($Rank) {
+                        return [
+                            'name' => trim(($employee->first_name ?? '') . ' ' . ($employee->last_name ?? '')),
+                            'rank' => $Rank[$employee->rank] ?? '',
+                            'nation' => $employee->nationality,
+                            // No photo column is selected by this query — every
+                            // seat renders via the initials fallback below, per
+                            // the "never fabricate a photo" rule. Wiring a real
+                            // photo would mean adding a column to the
+                            // employeesByPosition select in ViewManning(), a
+                            // backend change outside this task's scope.
+                            'photo' => null,
+                            'outOfBudget' => (bool) ($employee->out_of_budget ?? false),
+                        ];
+                    })->values()->all();
+                    for ($i = 0; $i < (int) $pos->vacantcount; $i++) {
+                        $seats[] = ['vacant' => true];
+                    }
+                    return [
+                        'title' => $pos->position_title,
+                        'count' => (int) ($pos->headcount ?? 0),
+                        'seats' => $seats,
+                    ];
+                })->values();
 
+                return [
+                    'name' => $deptData['department']->name,
+                    'open' => $key === 0,
+                    'budgetId' => $deptData['Budget_id'],
+                    'deptId' => $deptData['department']->id,
+                    'positions' => $positions,
+                ];
+            })->values();
+        @endphp
 
-        <div class="viewBudget-accordion" id="accordionViewBudget">
-            @if($departmentsData)
-                @foreach($departmentsData as $key => $deptData)
-                    <div class="accordion-item">
-                        <div class="row g-3 align-items-center">
-                            <div class="col-9">
-                                <h2 class="accordion-header" id="heading{{$key}}">
-                                    <button class="accordion-button {{ $key == 0 ? '' : 'collapsed' }}" type="button" data-bs-toggle="collapse"
-                                        data-bs-target="#collapse{{$key}}" aria-expanded="{{ $key == 0 ? 'true' : 'false' }}" aria-controls="collapse{{$key}}">
-                                        <h3>{{$deptData['department']->name}}</h3>
-                                    </button>
-                                </h2>
-                            </div>
-                            <div class="col-3 justify-content-end d-flex" >
-                                @if($employeeRankPosition['position'] == 'HR' || $employeeRankPosition['position'] == 'Finance')
-                                    <a href="#revise-budgetmodal" 
-                                        class="open-revise-modal btn btn-white ms-3"
-                                        style="background: var(--teal-soft);"
-                                        data-budget_id="{{ $deptData['Budget_id'] }}"
-                                        data-dept_id="{{ $deptData['department']->id }}"
-                                        data-bs-toggle="modal">
-                                            <span class="badge badge-danger">
-                                                <i class="fa-solid fa-clock-rotate-left"></i> Revise Budget
-                                            </span>
-                                    </a>
-                                @endif
-                            </div>
-                        </div>
-                        
-                        
-                        <div id="collapse{{$key}}" class="accordion-collapse collapse {{ $key == 0 ? 'show' : '' }}" aria-labelledby="heading{{$key}}"
-                            data-bs-parent="#accordionViewBudget">
-                            <div class="table-responsive">
-                                <table class="table table-viewMannAccording  w-100">
-                                    <thead>
-                                        <tr>
-                                            <th class="text-nowrap">Positions</th>
-                                            <th class="text-nowrap">No. Of Positions</th>
-                                            <th class="text-nowrap">Employee Name</th>
-                                            <th class="text-nowrap w-120">Rank</th>
-                                            <th class="text-nowrap w-120">Nation</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        @if($deptData['positions']->isNotEmpty())
-                                            @foreach($deptData['positions'] as $pos)
-                                                <tr>
-                                                    <td>{{ $pos->position_title }}</td>
-                                                    <td>{{ $pos->headcount ?? '00' }}</td>
-                                                    <td colspan="3" class="p-0">
-                                                        <table class="table m-0">
-                                                            @if($pos->employees && count($pos->employees) > 0)
-                                                                @foreach($pos->employees as $employee)
-                                                                    <tr>
-                                                                        <td>
-                                                                            {{ $employee->first_name }} {{ $employee->last_name }}
-                                                                            @if(!empty($employee->out_of_budget))
-                                                                                <span class="badge badge-danger" title="More employees are assigned to this position than the budgeted headcount allows">Out of Budget</span>
-                                                                            @endif
-                                                                        </td>
-                                                                        <td class="w-120">
-                                                                            @php $Rank = config( 'settings.Position_Rank');
-                                                                                $AvilableRank = array_key_exists($employee->rank, $Rank) ? $Rank[$employee->rank] : '';
-                                                                            @endphp
-                                                                            {{$AvilableRank}}
-                                                                        </td>
-                                                                        <td class="w-120">{{ $employee->nationality }}</td>
-                                                                    </tr>
-                                                                @endforeach
-                                                            @endif
-                                                            @if($pos->vacantcount)
-                                                                @for($i=0; $i<$pos->vacantcount; $i++)
-                                                                    <tr>
-                                                                        <td colspan="5"><span class="badge badge-success">Vacant
-                                                                        </span></td>
-                                                                    </tr>
-                                                                @endfor
-                                                            @endif
-                                                        </table>
-                                                    </td>
-                                                </tr>
-                                            @endforeach
-                                        @endif
-                                    </tbody>
-                                </table>
-                            </div>
+        <div class="vm-tools">
+            <form method="GET" action="{{ route('resort.budget.manning') }}" id="yearFilterForm">
+                <select class="form-select dd-native-select" id="yearFilter" name="year"
+                    onchange="document.getElementById('yearFilterForm').submit();">
+                    @php
+                        $currentYear = date('Y');
+                        $startYear = $currentYear - 10;
+                        $endYear = $currentYear + 1;
+                        // If no year in request, use current year
+                        $selectedYear = request()->get('year', $currentYear);
+                    @endphp
+                    @for ($loopyear = $startYear; $loopyear <= $endYear; $loopyear++)
+                        <option value="{{ $loopyear }}" {{ (int) $loopyear === (int) $selectedYear ? 'selected' : '' }}>{{ $loopyear }}</option>
+                    @endfor
+                </select>
+                <div class="dd" data-target="#yearFilter">
+                    <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
+                        <span class="dd-lbl">{{ $selectedYear }}</span>
+                        <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                    </button>
+                    <div class="dd-panel" role="listbox" aria-label="Year">
+                        <div class="dd-scroll">
+                            @for ($loopyear = $startYear; $loopyear <= $endYear; $loopyear++)
+                                <div class="dd-item{{ (int) $loopyear === (int) $selectedYear ? ' active' : '' }}" role="option" data-value="{{ $loopyear }}"><span class="dd-nm">{{ $loopyear }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                            @endfor
                         </div>
                     </div>
-                @endforeach
-            @endif
+                </div>
+            </form>
         </div>
+
+        <div id="vm-list"></div>
     </div>
         </div>
     </div>
@@ -246,16 +182,120 @@
 @endsection
 
 @section('import-css')
+@include('resorts._dropdown_styles')
+@include('resorts.budget._view_manning_styles')
 @endsection
 
 @section('import-scripts')
+@include('resorts._dropdown_script')
+@php
+    $vmCanRevise = in_array($employeeRankPosition['position'] ?? '', ['HR', 'Finance'], true);
+@endphp
 <script>
-      $(document).on('click', '.open-revise-modal', function () {
-            let budgetId = $(this).data("budget_id");
-            let deptId = $(this).data("dept_id");
+(function () {
+    var VM_CAN_REVISE = @json($vmCanRevise);
+    var DEPTS = @json($DEPTS);
 
-            $("#budget_id").val(budgetId);
-            $("#department_id").val(deptId);
+    function vmEsc(s) { return $('<div>').text(s == null ? '' : String(s)).html(); }
+    function vmInitials(n) {
+        return String(n).split(/\s+/).filter(Boolean).slice(0, 2).map(function (w) { return w[0]; }).join('').toUpperCase();
+    }
+    var vmRevIcon = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6M1 20v-6h6M20.5 9A9 9 0 006 5.3L1 10M23 14l-5 4.7A9 9 0 013.5 15"/></svg>';
+    var vmChevIcon = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>';
+
+    // Employee avatar: photo-first, initials fallback. s.photo is always
+    // null today (see the @php block above) — every seat renders via
+    // initials, matching "never fabricate a photo" — but the img/onerror
+    // path is real and takes over the moment a real photo field exists.
+    function vmAvatar(s) {
+        if (s.photo) {
+            return '<span class="vm-av"><img src="' + vmEsc(s.photo) + '" alt="' + vmEsc(s.name) + '" onerror="this.parentNode.textContent=\'' + vmInitials(s.name) + '\'"></span>';
+        }
+        return '<span class="vm-av">' + vmEsc(vmInitials(s.name)) + '</span>';
+    }
+    function vmSeatCell(s) {
+        if (s.vacant) return '<div class="vm-emp"><span class="vm-vacant"><span class="vm-vd"></span>Vacant</span></div>';
+        var oob = s.outOfBudget ? '<span class="vm-oob" title="More employees are assigned to this position than the budgeted headcount allows">Out of Budget</span>' : '';
+        return '<div class="vm-emp">' + vmAvatar(s) + '<span class="vm-ename" title="' + vmEsc(s.name) + '">' + vmEsc(s.name) + '</span>' + oob + '</div>';
+    }
+    function vmRankCell(s) { return s.vacant ? '<span class="vm-dash">—</span>' : '<span class="vm-rank">' + vmEsc(s.rank) + '</span>'; }
+    function vmNatCell(s) { return s.vacant ? '<span class="vm-dash">—</span>' : '<span class="vm-nat">' + vmEsc(s.nation) + '</span>'; }
+
+    function vmPosRows(p) {
+        var seats = p.seats || [];
+        var count = (p.count != null) ? p.count : seats.length;
+        if (seats.length === 0) {
+            return '<tr class="vm-pstart">' +
+                '<td class="vm-pos-c"><span class="vm-pos">' + vmEsc(p.title) + '</span></td>' +
+                '<td class="vm-c-no vm-no vm-zero">' + String(count).padStart(2, '0') + '</td>' +
+                '<td colspan="3"><span class="vm-dash">—</span></td>' +
+                '</tr>';
+        }
+        return seats.map(function (s, i) {
+            var lead = i === 0
+                ? '<td class="vm-pos-c" rowspan="' + seats.length + '"><span class="vm-pos">' + vmEsc(p.title) + '</span></td>' +
+                  '<td class="vm-c-no vm-no" rowspan="' + seats.length + '">' + String(count).padStart(2, '0') + '</td>'
+                : '';
+            return '<tr class="' + (i === 0 ? 'vm-pstart' : '') + '">' + lead +
+                '<td class="vm-c-emp">' + vmSeatCell(s) + '</td>' +
+                '<td class="vm-c-rank">' + vmRankCell(s) + '</td>' +
+                '<td class="vm-c-nat">' + vmNatCell(s) + '</td>' +
+                '</tr>';
+        }).join('');
+    }
+
+    function vmDeptBlock(d, idx) {
+        var filled = 0, vac = 0, pos = d.positions.length;
+        d.positions.forEach(function (p) { (p.seats || []).forEach(function (s) { s.vacant ? vac++ : filled++; }); });
+        var meta = pos + ' position' + (pos !== 1 ? 's' : '') + ' · ' + filled + ' filled' +
+            (vac ? ' · <span class="vm-vac">' + vac + ' vacant</span>' : '');
+        var revise = VM_CAN_REVISE
+            ? '<a href="#revise-budgetmodal" class="open-revise-modal vm-revise" data-bs-toggle="modal" data-budget_id="' + vmEsc(d.budgetId) + '" data-dept_id="' + vmEsc(d.deptId) + '">' + vmRevIcon + 'Revise Budget</a>'
+            : '';
+        return '<div class="vm-dept' + (d.open ? ' open' : '') + '" data-i="' + idx + '">' +
+            '<div class="vm-dhd">' +
+                '<span class="vm-chev">' + vmChevIcon + '</span>' +
+                '<div><div class="vm-dname">' + vmEsc(d.name) + '</div><div class="vm-dmeta">' + meta + '</div></div>' +
+                '<div class="vm-sp"></div>' +
+                revise +
+            '</div>' +
+            '<div class="vm-dbody">' +
+                '<table>' +
+                    '<thead><tr>' +
+                        '<th class="vm-c-pos">Positions</th>' +
+                        '<th class="vm-c-no">No. of Positions</th>' +
+                        '<th class="vm-c-emp">Employee Name</th>' +
+                        '<th class="vm-c-rank">Rank</th>' +
+                        '<th class="vm-c-nat">Nation</th>' +
+                    '</tr></thead>' +
+                    '<tbody>' + d.positions.map(vmPosRows).join('') + '</tbody>' +
+                '</table>' +
+            '</div>' +
+        '</div>';
+    }
+
+    var $list = document.getElementById('vm-list');
+    if ($list) $list.innerHTML = DEPTS.map(vmDeptBlock).join('');
+
+    document.querySelectorAll('.vm-dept').forEach(function (el) {
+        var hd = el.querySelector('.vm-dhd');
+        if (hd) hd.addEventListener('click', function (e) {
+            // Let a click on Revise Budget open its modal without also
+            // toggling the accordion — the existing .open-revise-modal
+            // handler below is document-delegated, so it still needs this
+            // click to bubble; we just skip OUR OWN toggle for it.
+            if (e.target.closest('.vm-revise')) return;
+            el.classList.toggle('open');
         });
+    });
+})();
+
+$(document).on('click', '.open-revise-modal', function () {
+    let budgetId = $(this).data("budget_id");
+    let deptId = $(this).data("dept_id");
+
+    $("#budget_id").val(budgetId);
+    $("#department_id").val(deptId);
+});
 </script>
 @endsection

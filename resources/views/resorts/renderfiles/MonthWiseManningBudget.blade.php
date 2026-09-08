@@ -4,7 +4,7 @@
     @endphp
 
     <div class="total-b-box text-center mb-2">
-        <p class="fs-18 fw-500">Total Budget: <span class="text-theme TotalBudget ">{!! Common::formatCurrency($total, 'USD') !!}</span></p>
+        <p class="fs-18 fw-500">Total Budget: <span class="text-theme TotalBudget ">{!! str_replace(' ', '', Common::formatCurrency($total, 'USD')) !!}</span></p>
     </div>
     <div class="accordion budget-accordion" id="accordionExample">
         @foreach($resort_divisions as $key => $value)
@@ -24,7 +24,7 @@
                             $departmentTotal =  array_key_exists($value->id, $departmenet_total) ? $departmenet_total[$value->id] : 0.00;
                             $total += $departmentTotal;
                         @endphp
-                        <span class="lable-budget">Budget:{!! Common::formatCurrency($departmentTotal, 'USD') !!}</span>
+                        <span class="lable-budget">{!! str_replace(' ', '', Common::formatCurrency($departmentTotal, 'USD')) !!}</span>
 
                     </div>
                 </button>
@@ -73,7 +73,7 @@
                                     <span class="badge ms-sm-3 badge-warning">{{ $department->BudgetStatus }}</span>
                                 </p>
                             @endif
-                            <span class="fw-normal">Budget: {!! Common::formatCurrency($department->OldEmployeesBudgetValue ?? 0, 'USD') !!}</span>
+                            <span class="fw-normal">{!! str_replace(' ', '', Common::formatCurrency($department->OldEmployeesBudgetValue ?? 0, 'USD')) !!}</span>
                         </div>
                     @endforeach
 
@@ -87,5 +87,5 @@
     </div>
 
     <script>
-        document.querySelector('.TotalBudget').innerHTML = ' {!! Common::formatCurrency($total, 'USD') !!}';
+        document.querySelector('.TotalBudget').innerHTML = '{!! str_replace(' ', '', Common::formatCurrency($total, 'USD')) !!}';
     </script>

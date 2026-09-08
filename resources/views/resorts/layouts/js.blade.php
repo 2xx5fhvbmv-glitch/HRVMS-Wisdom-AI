@@ -521,6 +521,37 @@
                         }
                     });
 
+                    // Dynamic Island (header.blade.php) — hover morphs the idle bell
+                    // pill into the 3-item menu. Notifications reuses the
+                    // .notification-btn handler above unchanged (it's one of the
+                    // .wai-island-opt buttons). Messages / Ask WAI dispatch into
+                    // wisdom-chat.blade.php's existing panel-opening JS, same
+                    // hand-off pattern the old edge-notch launcher used.
+                    const $waiIsland = $('#waiIsland');
+                    if ($waiIsland.length) {
+                        $waiIsland.on('mouseenter', function () {
+                            this.dataset.state = 'open';
+                            var live = this.querySelector('.wai-cnt');
+                            var mirror = this.querySelector('[data-wai-mirror]');
+                            if (live && mirror) mirror.textContent = live.textContent;
+                        }).on('mouseleave', function () {
+                            this.dataset.state = 'idle';
+                        });
+                        $waiIsland.find('[data-wai-open="notif"]').on('click', function () {
+                            $waiIsland[0].dataset.state = 'idle';
+                        });
+                        $waiIsland.find('[data-wai-open="messages"]').on('click', function (e) {
+                            e.stopPropagation();
+                            $waiIsland[0].dataset.state = 'idle';
+                            document.dispatchEvent(new CustomEvent('wai:open-users'));
+                        });
+                        $waiIsland.find('[data-wai-open="waibot"]').on('click', function (e) {
+                            e.stopPropagation();
+                            $waiIsland[0].dataset.state = 'idle';
+                            document.dispatchEvent(new CustomEvent('wai:open-ai'));
+                        });
+                    }
+
     }
 
     // Real-time delivery (notifications + chat) runs entirely on Pusher/Echo
@@ -1194,7 +1225,7 @@
                             // Prepend so newest is on top of the bell dropdown.
                             $('.notification-body').prepend(htmlview);
                             // Bump the small unread counter next to the bell.
-                            var $badge = $('.notification-nav > span').first();
+                            var $badge = $('.notification-nav .wai-cnt').first();
                             if ($badge.length) {
                                 var n = parseInt($badge.text(), 10);
                                 if (isNaN(n)) n = 0;
@@ -1202,6 +1233,22 @@
                             }
                             if (typeof toastr !== 'undefined') {
                                 toastr.info('You have a new notification', '', { positionClass: 'toast-bottom-right' });
+                            }
+                            // Nothing open (WAI / Messages panel) — also surface the
+                            // live-activity pop-up (wisdom-chat.blade.php), dismiss-only
+                            // for notifications. htmlview is the same server-rendered
+                            // .notification-box row the bell dropdown just got, so pull
+                            // its title/message out rather than refetching anything.
+                            if (!$('#wai-panel').hasClass('wai-open') && !$('#uc-panel').hasClass('wai-open')) {
+                                var $ntf = $('<div>').html(htmlview);
+                                document.dispatchEvent(new CustomEvent('wai:activity', {
+                                    detail: {
+                                        mode: 'notif',
+                                        name: $ntf.find('h5').first().text().trim() || 'Notification',
+                                        avatarHtml: '<i class="fa-solid fa-bell"></i>',
+                                        text: $ntf.find('p').first().text().trim() || ''
+                                    }
+                                }));
                             }
                         }
                     }
@@ -1498,7 +1545,7 @@
         // the moment a user read/cleared notifications without a page
         // reload. Shared by both mark-read paths below.
         function decrementNotificationBadge() {
-            var $badge = $('.notification-nav > span').first();
+            var $badge = $('.notification-nav .wai-cnt').first();
             var n = parseInt($badge.text(), 10) - 1;
             $badge.text(n > 0 ? n : '');
         }
