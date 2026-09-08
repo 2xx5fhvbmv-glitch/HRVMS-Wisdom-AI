@@ -45,8 +45,12 @@ class FileManageController extends Controller
             $id          = isset($request->id) ?  base64_decode($request->id) : 0; 
             $resortId    = $this->resort->resort_id;
 
-            
-            if(!isset($id))
+            // $id is always assigned above (defaults to 0), so isset($id) was
+            // always true and this branch — meant for a genuinely new folder,
+            // where Folder_Name shouldn't ignore any existing row — never ran.
+            // Harmless in practice (Rule::unique()->ignore(0) below doesn't
+            // exclude a real row either), but the intent was $id == 0.
+            if($id == 0)
             {
                 $validator = Validator::make($request->all(), [
                                         'Folder_Name' => [
@@ -135,7 +139,13 @@ class FileManageController extends Controller
             try{
                     $uniqueString = substr(md5(uniqid($request->Folder_Name, true)), 0, 10);
 
-                    DB::beginTransaction();
+                    // Was a second, nested DB::beginTransaction() here with only
+                    // one DB::commit() below — Laravel's transaction depth counter
+                    // started at 2 and that single commit only ever brought it to
+                    // 1, so the outer transaction (and the row/file written inside
+                    // it) was silently rolled back when the request finished, even
+                    // though this method already returned success:true. One
+                    // transaction level is all this method ever needed.
                     try
                     {
                         $filesystem =    FilemangementSystem::updateOrCreate(["id"=>$id],[
@@ -208,6 +218,12 @@ class FileManageController extends Controller
                         
                   return response()->json(['success' => true, 'message' => $msg,'data'=>$string], 200);
               } catch (\Exception $e) {
+                // The inner catches above return before reaching here, so this
+                // only fires for something outside that block (e.g. building
+                // $FolderList/$string) — the outer transaction from
+                // DB::beginTransaction() above is still open at that point and
+                // needs to be resolved too, not just logged past.
+                DB::rollBack();
                 \Log::emergency("File: ".$e->getFile());
                 \Log::emergency("Line: ".$e->getLine());
                 \Log::emergency("Message: ".$e->getMessage());
@@ -1599,7 +1615,8 @@ class FileManageController extends Controller
             $Folder_Name = $request->Folder_Name;
             $id          = isset($request->id) ?  base64_decode($request->id) : 0; 
             $resortId = $this->resort->resort_id;
-            if(!isset($id))
+            // Same always-true isset($id) condition fixed in CreateFolder() above.
+            if($id == 0)
             {
                 $validator = Validator::make($request->all(), [
                                         'Folder_Name' => [
