@@ -473,7 +473,7 @@ class PerformanceMeetingController extends Controller
             Common::sendMobileNotification(
                 $this->resort->resort_id, 2, null, null,
                 'Performance Meeting Scheduled',
-                'You have been invited to "' . $request->title . '" on ' . Carbon::parse($request->date)->format('d M Y') . ' at ' . $request->start_time . '.',
+                'You have been invited to "' . $request->title . '" on ' . Common::formatDate($request->date) . ' at ' . Common::formatDisplayTime($request->start_time) . '.',
                 'Performance',
                 [$employee->id],
                 $meeting->id,

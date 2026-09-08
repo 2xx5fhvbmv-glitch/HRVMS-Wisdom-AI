@@ -382,8 +382,7 @@ $(document).ready(function() {
                     var option  ="";
 
                     $(response.data).each(function(i,a){
-                        console.log(a);
-                        option  =`<option value="${a.id}" >${a.Sub_Category_Name}</option>`;
+                        option  +=`<option value="${a.id}" >${a.Sub_Category_Name}</option>`;
                     });
                     $("#Grivance_Sub_cat").html(option);
                     wisdomDD.rebuild('#Grivance_Sub_cat');
