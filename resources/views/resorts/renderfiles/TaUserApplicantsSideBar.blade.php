@@ -2,45 +2,17 @@
     <div class="d-flex">
 
         @php
-            $progress = 0;
-            $roundKeys = array_keys($InterViewRound);
-            $totalRounds = count($InterViewRound);
-            // Steps: AI Shortlisted(1) + HR Shortlisted(1) + per round: Round+Complete (2*N) + Selected(1)
-            $totalSteps = 2 + ($totalRounds * 2) + 1;
-            $currentStep = 0;
-
-            if(in_array($Applicant_form_data->ApplicantStatus, ['Rejected', 'Rejected By Wisdom AI'])) {
-                if($Applicant_form_data->As_ApprovedBy == 0) {
-                    $currentStep = 1;
-                } elseif(isset($InterViewRound) && array_key_exists($Applicant_form_data->As_ApprovedBy, $InterViewRound)) {
-                    $roundIndex = array_search($Applicant_form_data->As_ApprovedBy, $roundKeys);
-                    $currentStep = 2 + ($roundIndex * 2) + 1;
-                } else {
-                    $currentStep = 2;
-                }
-            } elseif($Applicant_form_data->ApplicantStatus == 'Selected' || in_array($Applicant_form_data->ApplicantStatus, ['Offer Letter Sent', 'Offer Letter Accepted', 'Offer Letter Rejected', 'Contract Sent', 'Contract Accepted', 'Contract Rejected'])) {
-                $currentStep = $totalSteps;
-            } elseif($Applicant_form_data->As_ApprovedBy == 0) {
-                $currentStep = 1; // AI Shortlisted
-            } else {
-                $currentStep = 2; // HR Shortlisted at minimum
-                foreach ($roundKeys as $index => $rankCode) {
-                    $rankCode = (int) $rankCode;
-                    if ($Applicant_form_data->As_ApprovedBy == $rankCode && $Applicant_form_data->ApplicantStatus == 'Round') {
-                        $currentStep = 2 + ($index * 2) + 1;
-                        break;
-                    } elseif ($Applicant_form_data->As_ApprovedBy == $rankCode && $Applicant_form_data->ApplicantStatus == 'Complete') {
-                        $currentStep = 2 + ($index * 2) + 2;
-                        break;
-                    } elseif ($Applicant_form_data->As_ApprovedBy == $rankCode && $Applicant_form_data->ApplicantStatus == 'Sortlisted') {
-                        $currentStep = 2;
-                        break;
-                    }
-                }
-            }
-            $progress = round(($currentStep / $totalSteps) * 100, 2);
+            $applicantProgress = \App\Helpers\Common::applicantProgress(
+                $Applicant_form_data->ApplicantStatus,
+                $Applicant_form_data->As_ApprovedBy,
+                $Applicant_form_data->vacancy_rank ?? null
+            );
+            $progress = $applicantProgress['percent'];
+            $ringClass = $applicantProgress['state'] === 'rejected'
+                ? 'danger'
+                : ($applicantProgress['state'] === 'success' ? 'success' : 'skyblue');
         @endphp
-        <div class="progress-container {{ in_array($Applicant_form_data->ApplicantStatus, ['Rejected', 'Rejected By Wisdom AI']) ? 'danger' : 'skyblue' }}" data-progress="{{ $progress }}">
+        <div class="progress-container {{ $ringClass }}" data-progress="{{ $progress }}">
             <svg class="progress-circle" viewBox="0 0 120 120">
                 <circle class="progress-background" cx="60" cy="60" r="54"></circle>
                 <circle class="progress" cx="60" cy="60" r="54"></circle>

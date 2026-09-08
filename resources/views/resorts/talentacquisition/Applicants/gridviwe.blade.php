@@ -18,37 +18,18 @@
                 </div>
                 @endif
                 @php
-                $progress = 0;
-                $gridRounds = \App\Helpers\Common::getInterviewRoundsForPosition($a->vacancy_rank ?? null);
-                $gridRoundKeys = array_keys($gridRounds);
-                $gridTotalRounds = count($gridRounds);
-                $gridTotalSteps = 2 + ($gridTotalRounds * 2) + 1;
-                $gridCurrentStep = 0;
-
-                if($a->ApplicantStatus == 'Selected') {
-                    $gridCurrentStep = $gridTotalSteps;
-                } elseif($a->As_ApprovedBy == 0) {
-                    $gridCurrentStep = 1;
-                } else {
-                    $gridCurrentStep = 2;
-                    foreach ($gridRoundKeys as $index => $rankCode) {
-                        $rankCode = (int) $rankCode;
-                        if ($a->As_ApprovedBy == $rankCode && $a->ApplicantStatus == 'Round') {
-                            $gridCurrentStep = 2 + ($index * 2) + 1;
-                            break;
-                        } elseif ($a->As_ApprovedBy == $rankCode && $a->ApplicantStatus == 'Complete') {
-                            $gridCurrentStep = 2 + ($index * 2) + 2;
-                            break;
-                        } elseif ($a->As_ApprovedBy == $rankCode && $a->ApplicantStatus == 'Sortlisted') {
-                            $gridCurrentStep = 2;
-                            break;
-                        }
-                    }
-                }
-                $progress = round(($gridCurrentStep / $gridTotalSteps) * 100, 2);
+                $gridApplicantProgress = \App\Helpers\Common::applicantProgress(
+                    $a->ApplicantStatus,
+                    $a->As_ApprovedBy,
+                    $a->vacancy_rank ?? null
+                );
+                $progress = $gridApplicantProgress['percent'];
+                $gridRingClass = $gridApplicantProgress['state'] === 'rejected'
+                    ? 'danger'
+                    : ($gridApplicantProgress['state'] === 'success' ? 'success' : 'skyblue');
             @endphp
                 <!-- <a href="#" class="dotsV-link"><i class="fa-solid fa-ellipsis-vertical"></i></a> -->
-                <div class="progress-container skyblue" data-progress="{{ $progress  }}">
+                <div class="progress-container {{ $gridRingClass }}" data-progress="{{ $progress  }}">
                     <svg class="progress-circle" viewBox="0 0 120 120">
                         <circle class="progress-background" cx="60" cy="60" r="54"></circle>
                         <circle class="progress" cx="60" cy="60" r="54"></circle>
