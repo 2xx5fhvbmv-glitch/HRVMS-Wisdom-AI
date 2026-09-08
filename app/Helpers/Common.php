@@ -4134,6 +4134,21 @@ class Common
     {
         $user = \Auth::guard('resort-admin')->user();
         if (!$user) return $query->whereRaw('0=1');
+
+        // incidents_investigation_meetings has no resort_id column of its
+        // own — it's tenant-scoped only via its parent incident. Was
+        // missing entirely: hasFullDataAccess() (true for a resort's own
+        // HR/GM, not just super/master admin) returned $query unmodified,
+        // so any resort's HR/GM could view/reschedule/delete another
+        // resort's investigation meeting by id.
+        $resortId = $user->resort_id;
+        $query->whereExists(function ($sub) use ($resortId, $alias) {
+            $sub->selectRaw('1')
+                ->from('incidents')
+                ->whereColumn('incidents.id', $alias . '.incident_id')
+                ->where('incidents.resort_id', $resortId);
+        });
+
         if (self::hasFullDataAccess()) return $query;
 
         $emp = $user->GetEmployee ?? null;

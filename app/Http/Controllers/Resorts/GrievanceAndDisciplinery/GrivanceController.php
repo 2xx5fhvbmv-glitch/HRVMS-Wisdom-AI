@@ -1034,19 +1034,25 @@ class GrivanceController extends Controller
        
             $id = base64_decode($id);
 
+            $grievance = GrivanceSubmissionModel::where('id', $id)->where('resort_id', $this->resort->resort_id)->first();
+            if (!$grievance) {
+                abort(404);
+            }
+            $id = $grievance->id;
+
             DB::beginTransaction();
             try
             {
-               
-            
+
+
                     $investigations = GrivanceInvestigationModel::where("Grievance_s_id", $id)->get();
-                    foreach ($investigations as $investigation) 
+                    foreach ($investigations as $investigation)
                     {
                         GrivanceInvestigationChildModel::where("investigation_p_id", $investigation->id)->delete();
                     }
                     GrivanceInvestigationModel::where("Grievance_s_id", $id)->delete();
                     GrivanceSubmissionWitness::where("G_S_Parent_id", $id)->delete();
-                    GrivanceSubmissionModel::find($id)->delete();
+                    $grievance->delete();
                 DB::commit();
                 return response()->json([
                     'success' => true,

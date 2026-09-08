@@ -1934,7 +1934,7 @@ class AccommodationController extends Controller
             $user                                           =   Auth::guard('api')->user();
             $employee                                       =   $user->GetEmployee;
             $currentApproverId                              =   $employee->id;
-            $maintanance                                    =   MaintanaceRequest::find($requestId);
+            $maintanance                                    =   MaintanaceRequest::where('id', $requestId)->where('resort_id', $this->resort_id)->first();
 
             if (!$maintanance) {
                 return response()->json([
@@ -2226,7 +2226,7 @@ class AccommodationController extends Controller
             $employee                                       =   $this->user->GetEmployee;
             $requestId                                      =   $request->input('request_id');
             $assingEmployeeId                               =   $request->input('assing_employee_id');
-            $maintanance                                    =   MaintanaceRequest::find($requestId);
+            $maintanance                                    =   MaintanaceRequest::where('id', $requestId)->where('resort_id', $this->resort_id)->first();
 
             if (!$maintanance) {
                 return response()->json(['success' => false, 'message' => 'Maintenance request not found'], 200);

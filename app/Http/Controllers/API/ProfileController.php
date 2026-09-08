@@ -234,11 +234,23 @@ class ProfileController extends Controller
 
 
     try {
+      // Only carry the fields this "Personal Information" flow is meant to
+      // change into info_payload — never $request->all(). statusChange()
+      // in InfoUpdateController blindly writes every payload key onto
+      // Employee/ResortAdmin via getFillable(), so an unfiltered payload
+      // let a mobile client smuggle in employment/compensation/security
+      // fields (rank, Dept_id, basic_salary, status, ...) disguised as a
+      // personal-info edit. This allow-list matches exactly the fields the
+      // approval side (resortAdminFields + the dob date-normalize branch)
+      // and show_details.blade.php already special-case for this request
+      // type.
+      $personalInfoFields = ['first_name', 'middle_name', 'last_name', 'personal_phone', 'dob', 'address_line_1', 'address_line_2'];
+
       EmployeeInfoUpdateRequest::create([
         'resort_id'                                   => $this->resort_id,
         'title'                                       => 'Personal Information',
         'employee_id'                                 =>  $this->user->GetEmployee->id,
-        'info_payload'                                => $request->all()
+        'info_payload'                                => $request->only($personalInfoFields)
       ]);
 
       // Was fully commented out — HR never found out a mobile user had

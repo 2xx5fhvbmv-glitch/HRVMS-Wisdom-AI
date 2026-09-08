@@ -209,7 +209,11 @@ class ShopController extends Controller
 
         try {
 
-            $pendingConsentview                             =   Payment::find($consentRequestId);
+            $employeeId                                     =   $this->user->GetEmployee->id;
+
+            $pendingConsentview                             =   Payment::where('emp_id', $employeeId)
+                                                                    ->where('id', $consentRequestId)
+                                                                    ->first();
             if (!$pendingConsentview) {
                 return response()->json([
                     'success'                               =>  false,

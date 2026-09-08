@@ -569,8 +569,8 @@ class StaffAccommodationController extends Controller
             $employee                                       =   $this->user->GetEmployee;
             $requestId                                      =   $request->input('request_id');
            
-            $maintanaceRequest = MaintanaceRequest::where('id',$requestId)->where('Status','Resolvedawaiting')->first();
-            
+            $maintanaceRequest = MaintanaceRequest::where('id',$requestId)->where('resort_id', $this->resort_id)->where('Status','Resolvedawaiting')->first();
+
                 if (!$maintanaceRequest) {
                     return response()->json(['success' => false, 'message' => 'Already complete the task'], 200);
                 }
@@ -580,7 +580,7 @@ class StaffAccommodationController extends Controller
                 // with the update()'s int return value.
                 $assignedEngineerId                         =   $maintanaceRequest->Assigned_To;
 
-                $maintanaceRequest                          =   MaintanaceRequest::where('id',$requestId)->where('Status','Resolvedawaiting')->update([
+                $maintanaceRequest                          =   MaintanaceRequest::where('id',$requestId)->where('resort_id', $this->resort_id)->where('Status','Resolvedawaiting')->update([
                                                                     'Status'     => "Closed",
                                                                 ]);
                 ChildMaintananceRequest::create([
@@ -643,7 +643,7 @@ class StaffAccommodationController extends Controller
         $validator = Validator::make($request->all(), [
             'request_id'                                =>  'required',
             'item_id'                                   =>  'required',
-            'building_id'                               =>  'required',
+            'building_id'                               =>  'required|exists:building_models,id,resort_id,' . $this->resort_id,
             'FloorNo'                                   =>  'required',
             'RoomNo'                                    =>  'required',
             'descriptionIssues'                         =>  'required',
@@ -665,13 +665,12 @@ class StaffAccommodationController extends Controller
             $date                                       =   $parsedDate ? $parsedDate->format('Y-m-d') : date('Y-m-d');
             $path_path                                  =   config('settings.MaintanceRequest') . '/' . Auth::guard('api')->user()->resort->resort_id;
             
-            $maintanaceRequestEdit                      =   MaintanaceRequest::find($request->request_id);
-            
+            $maintanaceRequestEdit                      =   MaintanaceRequest::where('id', $request->request_id)->where('resort_id', $this->resort_id)->first();
+
             if (!$maintanaceRequestEdit) {
                 return response()->json(['success' => false, 'message' => 'Maintenance Request not found'], 200);
             }
 
-            $maintanaceRequestEdit->resort_id           =  $this->resort_id;
             $maintanaceRequestEdit->item_id             =  $request->item_id;
             $maintanaceRequestEdit->building_id         =  $request->building_id;
             $maintanaceRequestEdit->FloorNo             =  $request->FloorNo;

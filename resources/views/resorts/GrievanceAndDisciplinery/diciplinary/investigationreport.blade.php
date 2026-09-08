@@ -54,12 +54,12 @@
                 foreach (explode(",", $Disciplinary_parent->Attachements) as $dviFile) {
                     $dviFile = trim($dviFile);
                     if ($dviFile !== '') {
-                        $dviAttachments[] = ['name' => $dviFile, 'url' => URL::asset($Path . '/' . $dviFile)];
+                        $dviAttachments[] = ['name' => $dviFile, 'url' => \App\Helpers\StorageHelper::temporaryUrl($Path . '/' . $dviFile)];
                     }
                 }
             }
             $dviSignedDoc = !empty($Disciplinary_parent->upload_signed_document)
-                ? ['name' => $Disciplinary_parent->upload_signed_document, 'url' => URL::asset($Path . '/' . $Disciplinary_parent->upload_signed_document)]
+                ? ['name' => $Disciplinary_parent->upload_signed_document, 'url' => \App\Helpers\StorageHelper::temporaryUrl($Path . '/' . $Disciplinary_parent->upload_signed_document)]
                 : null;
         @endphp
 
@@ -170,7 +170,7 @@
                                         @endphp
                                         @if(count($dviHistFiles))
                                             @foreach($dviHistFiles as $dviHf)
-                                                <a class="filefact" href="{{ URL::asset($Path . '/' . $dviHf) }}" target="_blank" title="{{ $dviHf }}"><span class="fn">{{ $dviHf }}</span></a><br>
+                                                <a class="filefact" href="{{ \App\Helpers\StorageHelper::temporaryUrl($Path . '/' . $dviHf) }}" target="_blank" title="{{ $dviHf }}"><span class="fn">{{ $dviHf }}</span></a><br>
                                             @endforeach
                                         @else
                                             <span class="filenone">None</span>

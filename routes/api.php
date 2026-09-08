@@ -250,10 +250,11 @@ use Illuminate\Support\Facades\Route;
 			Route::post('boarding/so-pass-assign', [App\Http\Controllers\API\BoardingPassController::class, 'SOPassAssign']);
 		});
 
-		// Route::middleware(['auth:api', 'check.rank:SO'])->group(function () {
-			Route::post('boarding/so-dashboard', [App\Http\Controllers\API\BoardingPassController::class, 'SODashboard']);
+		Route::post('boarding/so-dashboard', [App\Http\Controllers\API\BoardingPassController::class, 'SODashboard']);
+
+		Route::middleware(['auth:api', 'check.rank:SO'])->group(function () {
 			Route::post('boarding/so-confirm-arrival-dept', [App\Http\Controllers\API\BoardingPassController::class, 'SOConfirmArrivalDept']);
-		// });
+		});
 
 		// Mobile-audit P2: alias (GET, filter as query param) + new detail endpoint
 		Route::get('boarding/security-officer-dashboard', [App\Http\Controllers\API\BoardingPassController::class, 'SODashboard']);
@@ -306,14 +307,14 @@ use Illuminate\Support\Facades\Route;
 		Route::post('accommodation/edit-maintenance-requests', [App\Http\Controllers\API\StaffAccommodationController::class, 'editMaintenanceRequests']);
 
 		//Engineering Department HOD
-		// Route::middleware(['auth:api', 'check.rank:EDHOD'])->group(function () {
+		Route::middleware(['auth:api', 'check.rank:EDHOD'])->group(function () {
 			Route::get('accommodation/engi-department-hod-main-req-dashboard', [App\Http\Controllers\API\AccommodationController::class, 'engDepartmentHODMaintenanceReqDashboard']);
 			Route::get('accommodation/engi-department-hod-main-req-list', [App\Http\Controllers\API\AccommodationController::class, 'engDepartmentHODMaintenanceReqList']);
 			Route::get('accommodation/engi-department-hod-under-emp', [App\Http\Controllers\API\AccommodationController::class, 'getEmployeesUnderEngHOD']);
 			Route::post('accommodation/engi-department-hod-assign-emp', [App\Http\Controllers\API\AccommodationController::class, 'engHODAssignEmployees']);
 			Route::get('accommodation/engi-department-hod-assign-req-list', [App\Http\Controllers\API\AccommodationController::class, 'engDepartmentHODMaintenanceReqAssignList']);
 			Route::post('accommodation/engi-department-hod-complete-sendto-hr', [App\Http\Controllers\API\AccommodationController::class, 'engHODCompleteSendToHR']);
-		// });
+		});
 
 		//Engineering Department Staff
 		Route::get('accommodation/engi-department-staff-main-req-dashboard', [App\Http\Controllers\API\AccommodationController::class, 'engDepartmentStaffMaintenanceReqDashboard']);

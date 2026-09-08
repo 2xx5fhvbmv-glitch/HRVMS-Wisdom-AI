@@ -406,14 +406,11 @@ class ResignationController extends Controller
         DB::beginTransaction();
         try {
 
-            $resignation                                =   ExitClearanceFormResponse::create([
-                'assignment_id'                         =>  $request->input('assignment_id'),
-                'response_data'                         =>  json_encode($request->input('response_data')),
-                'submitted_by'                          =>  $this->user->GetEmployee->id,
-                'submitted_date'                        =>  now(),
-            ]);
-
-            $ExitClearanceFormAssignment                =   ExitClearanceFormAssignment::find($request->input('assignment_id'));
+            $ExitClearanceFormAssignment                =   ExitClearanceFormAssignment::where('id', $request->input('assignment_id'))
+                                                                ->where('resort_id', $this->resort_id)
+                                                                ->where('assigned_to_type', 'employee')
+                                                                ->where('assigned_to_id', $this->user->GetEmployee->id)
+                                                                ->first();
 
             if (!$ExitClearanceFormAssignment) {
                 return response()->json([
@@ -421,6 +418,13 @@ class ResignationController extends Controller
                     'message'                           =>  'Form assignment not found'
                 ],200);
             }
+
+            $resignation                                =   ExitClearanceFormResponse::create([
+                'assignment_id'                         =>  $request->input('assignment_id'),
+                'response_data'                         =>  json_encode($request->input('response_data')),
+                'submitted_by'                          =>  $this->user->GetEmployee->id,
+                'submitted_date'                        =>  now(),
+            ]);
 
             $ExitClearanceFormAssignment->status        =   'Completed';
             // Tag the channel that closed the form so HR can tell at a
@@ -504,7 +508,10 @@ class ResignationController extends Controller
 
         DB::beginTransaction();
         try {
-            $EmployeeResignation                =   EmployeeResignation::find($request->input('resignation_id'));
+            $EmployeeResignation                =   EmployeeResignation::where('id', $request->input('resignation_id'))
+                                                            ->where('resort_id', $this->resort_id)
+                                                            ->where('employee_id', $this->user->GetEmployee->id)
+                                                            ->first();
             if (!$EmployeeResignation) {
                 return response()->json(['success' => false, 'message' => 'Resignation not found'], 200);
             }
