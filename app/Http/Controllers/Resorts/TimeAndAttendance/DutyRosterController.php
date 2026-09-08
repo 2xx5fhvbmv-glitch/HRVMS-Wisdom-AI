@@ -636,7 +636,7 @@ class DutyRosterController extends Controller
                             null,
                             null,
                             'New Duty Roster Assigned',
-                            'A new duty roster has been assigned to you starting ' . $startingDate->format('d M Y') . '.',
+                            'A new duty roster has been assigned to you starting ' . Common::formatDate($startingDate) . '.',
                             'DutyRoster',
                             [$Employee],
                             $DutyRoster->id,

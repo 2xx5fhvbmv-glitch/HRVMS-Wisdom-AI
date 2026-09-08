@@ -364,7 +364,7 @@ class MonthlyCheckInController extends Controller
                 "status"                                    =>  'Rescheduled',
             ]);
 
-            $msg                                =   'Meeting Rescheduled by HR for Monthly Check-In Date '.$request->date_discussion;
+            $msg                                =   'Meeting Rescheduled by HR for Monthly Check-In Date '.Common::formatDate($request->date_discussion);
             $title                              =   'Monthly check-in Meeting Rescheduled';
             $ModuleName                         =   'Performance';
             // Was missing the $type argument entirely (compare the sibling
@@ -795,7 +795,7 @@ class MonthlyCheckInController extends Controller
             $checkin->save();
 
             $title      = 'Monthly Check-In Approved';
-            $msg        = $this->user->first_name . ' ' . $this->user->last_name . ' has approved the monthly check-in scheduled on ' . date('d M Y', strtotime($checkin->date_discussion)) . '.';
+            $msg        = $this->user->first_name . ' ' . $this->user->last_name . ' has approved the monthly check-in scheduled on ' . Common::formatDate($checkin->date_discussion) . '.';
             $ModuleName = 'Performance';
 
             // created_by is a resort_admins.id (set in MonthlyCheckingModel::boot()),

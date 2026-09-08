@@ -141,7 +141,7 @@ class CheckVisaExpiryReminders extends Command
     {
         $employee->loadMissing('resortAdmin');
         $empName = trim(optional($employee->resortAdmin)->first_name . ' ' . optional($employee->resortAdmin)->last_name);
-        $expiryFormatted = Carbon::parse($expiryDate)->format('d M Y');
+        $expiryFormatted = Common::formatDate($expiryDate);
 
         $title = "{$label} Expiry Reminder";
         $employeeMsg = "Your {$label} expires on {$expiryFormatted} ({$days} days remaining). Please action it.";

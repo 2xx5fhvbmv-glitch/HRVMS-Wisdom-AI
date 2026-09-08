@@ -167,9 +167,7 @@ class SalaryIncrementController extends Controller
         }
 
         $employeeName  = optional($subject->resortAdmin)->full_name ?: '';
-        $effectiveFmt  = !empty($increment->effective_date)
-            ? Carbon::parse($increment->effective_date)->format('d M Y')
-            : '-';
+        $effectiveFmt  = Common::formatDate($increment->effective_date, '-');
         $reasonLine    = trim((string) $remarks) !== ''
             ? "\n💬 Reason: " . trim((string) $remarks)
             : '';
@@ -522,9 +520,7 @@ class SalaryIncrementController extends Controller
                 if ($subject) {
                     $employeeName  = optional($subject->resortAdmin)->full_name ?: '';
                     $positionTitle = optional($subject->position)->position_title ?? '';
-                    $effectiveFmt  = !empty($peopleSalaryIncrement->effective_date)
-                        ? Carbon::parse($peopleSalaryIncrement->effective_date)->format('d M Y')
-                        : '-';
+                    $effectiveFmt  = Common::formatDate($peopleSalaryIncrement->effective_date, '-');
                     $msg = "📢 Salary Increment Re-Submitted by HR"
                          . "\n👤 Employee: " . $employeeName
                          . "\n💼 Position: " . $positionTitle
@@ -895,9 +891,7 @@ class SalaryIncrementController extends Controller
                 $employeeBeingIncrementedId = (int) $increment->employee_id;
                 $employeeName = optional(optional($employee)->resortAdmin)->full_name ?? '';
                 $positionTitle = optional($employee->position)->position_title ?? '';
-                $effectiveFmt = !empty($inc['effective_date'])
-                    ? Carbon::parse($inc['effective_date'])->format('d M Y')
-                    : '-';
+                $effectiveFmt = Common::formatDate($inc['effective_date'] ?? null, '-');
                 $msg = "📢 New Salary Increment Submitted"
                      . "\n👤 Employee: " . $employeeName
                      . "\n💼 Position: " . $positionTitle
@@ -976,7 +970,7 @@ class SalaryIncrementController extends Controller
                 $msg = "📢 Salary Increment Updated by HR"
                      . "\n👤 Employee: " . $employeeName
                      . "\n💰 New Salary: " . number_format((float) $peopleSalaryIncrement->new_salary, 2)
-                     . "\n📅 Effective Date: " . Carbon::parse($effectiveDate)->format('d M Y');
+                     . "\n📅 Effective Date: " . Common::formatDate($effectiveDate);
                 $recipientIds = $financePool->pluck('id')->reject(fn($mid) => (int) $mid === (int) $subject->id)->values()->all();
                 try {
                     Common::notifyEmployees($resortId, $recipientIds, 'Salary Increment Updated', $msg, 'People Management', $peopleSalaryIncrement->id);

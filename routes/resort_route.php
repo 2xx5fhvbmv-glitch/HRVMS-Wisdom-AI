@@ -118,8 +118,6 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
          Route::get('performance/admin-dashboard', 'Performance\PerformanceDashboardController@Admin_dashboard')->name('Performance.admindashboard');
 
 
-            Route::get('grievance-and-disciplinary/admin-dashboard', 'GrievanceAndDisciplinery\DashboardController@Admin_Dashobard')->name('GrievanceAndDisciplinery.Admindashboard');
-
          //Learning Module
          Route::get('learning/hr-dashboard', 'Learning\DashboardController@HR_Dashobard')->name('learning.hr.dashboard');
          Route::get('learning/hod-dashboard', 'Learning\DashboardController@hod_dashboard')->name('learning.hod.dashboard');
@@ -132,7 +130,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
         //  GrievanceAndDisciplinery
 
          Route::get('grievance-and-disciplinary/hr-dashboard', 'GrievanceAndDisciplinery\DashboardController@HR_Dashobard')->name('GrievanceAndDisciplinery.Hrdashboard');
-         Route::get('grievance-and-disciplinary/admin-dashboard', 'GrievanceAndDisciplinery\DashboardController@Admin_Dashobard')->name('GrievanceAndDisciplinery.Admindashboard');
+         Route::get('grievance-and-disciplinary/admin-dashboard', 'GrievanceAndDisciplinery\DashboardController@Admin_dashboard')->name('GrievanceAndDisciplinery.Admindashboard');
 
         //  Survey
          Route::get('survey/hr-dashboard', 'Survey\DashboardController@HR_Dashobard')->name('Survey.hr.dashboard');

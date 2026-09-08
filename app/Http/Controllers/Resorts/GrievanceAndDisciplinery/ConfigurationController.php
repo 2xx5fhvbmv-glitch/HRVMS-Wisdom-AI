@@ -2678,7 +2678,7 @@ class ConfigurationController extends Controller
                 ->make(true);
         }
         $GrievanceCategory = GrievanceCategory::where("resort_id",$this->resort->resort_id)->get();
-        return view('resorts.GrievanceAndDisciplinery.configurationGIndexGrievanceDelegationRule',compact('GrievanceCategory','page_title'));
+        return view('resorts.GrievanceAndDisciplinery.configuration.Grievance.IndexGrievanceDelegationRule',compact('GrievanceCategory','page_title'));
     }
     public function GrievanceDelegeationRuleinlineUpdate(Request $request)
     {

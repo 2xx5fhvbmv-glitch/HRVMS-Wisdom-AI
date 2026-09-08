@@ -1314,7 +1314,7 @@ class PayrollController extends Controller
         $payroll = Payroll::where('id', $payrollId)
             ->where('resort_id', $this->resort->resort_id)
             ->firstOrFail();
-        $period = \Carbon\Carbon::parse($payroll->start_date)->format('d M Y') . ' - ' . \Carbon\Carbon::parse($payroll->end_date)->format('d M Y');
+        $period = Common::formatDate($payroll->start_date) . ' - ' . Common::formatDate($payroll->end_date);
         $approverName = $currentUser->first_name . ' ' . $currentUser->last_name;
 
         if ($request->action === 'reject') {
@@ -1456,7 +1456,7 @@ class PayrollController extends Controller
             ->where('resort_id', $resortId)
             ->first();
         if (!$payroll) return;
-        $period = \Carbon\Carbon::parse($payroll->start_date)->format('d M Y') . ' - ' . \Carbon\Carbon::parse($payroll->end_date)->format('d M Y');
+        $period = Common::formatDate($payroll->start_date) . ' - ' . Common::formatDate($payroll->end_date);
 
         $stepTitles = [1 => 'Finance EXCOM', 2 => 'HR EXCOM', 3 => 'GM'];
         $roleTitle = $stepTitles[$stepOrder] ?? '';
@@ -2024,7 +2024,7 @@ class PayrollController extends Controller
             $payroll = DB::table('payroll')->where('id', $request->payrollId)->where('resort_id', $resortId)->first(['start_date', 'end_date']);
             $dateRange = '';
             if ($payroll) {
-                $dateRange = \Carbon\Carbon::parse($payroll->start_date)->format('d M Y') . ' - ' . \Carbon\Carbon::parse($payroll->end_date)->format('d M Y');
+                $dateRange = Common::formatDate($payroll->start_date) . ' - ' . Common::formatDate($payroll->end_date);
             }
             return response()->json([
                 'success' => !empty($empIds),
@@ -3587,7 +3587,7 @@ class PayrollController extends Controller
                 ->first();
             $timeline->push([
                 'action' => 'Payroll Created',
-                'description' => 'Payroll period: ' . \Carbon\Carbon::parse($payroll->start_date)->format('d M Y') . ' - ' . \Carbon\Carbon::parse($payroll->end_date)->format('d M Y'),
+                'description' => 'Payroll period: ' . Common::formatDate($payroll->start_date) . ' - ' . Common::formatDate($payroll->end_date),
                 'user' => 'System',
                 'date' => $payroll->created_at,
                 'status' => 'completed',

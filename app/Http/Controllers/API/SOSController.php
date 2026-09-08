@@ -152,8 +152,8 @@ class SOSController extends Controller
                 $title                                      =   "SOS Alert";
                 $body                                       =   "SOS Alert!\n"
                                                                 . "Name: " . $this->user->first_name . ' ' . $this->user->last_name . "\n"
-                                                                . "Date: " . Carbon::now()->format('d M Y') . "\n"
-                                                                . "Time: " . Carbon::now()->format('h:i A') . "\n"
+                                                                . "Date: " . Common::formatDate(Carbon::now()) . "\n"
+                                                                . "Time: " . Common::formatDisplayTime(Carbon::now()) . "\n"
                                                                 . "Location: " . $request->location . "\n"
                                                                 . "Please respond immediately!";
 

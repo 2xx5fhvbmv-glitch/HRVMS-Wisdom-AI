@@ -182,8 +182,8 @@ class LearningController extends Controller
         try {
             $title = 'New Learning Request';
             $datesText = $request->filled('end_date')
-                ? "Dates: {$request->start_date} to {$request->end_date}."
-                : "Expected start: {$request->start_date}.";
+                ? "Dates: " . Common::formatDate($request->start_date) . " to " . Common::formatDate($request->end_date) . "."
+                : "Expected start: " . Common::formatDate($request->start_date) . ".";
             $message = "A new learning request for '{$learningProgramName}' has been submitted for review. "
                 . $datesText
                 . " Employees: " . count($employeeIds) . " participants.";
@@ -438,15 +438,19 @@ class LearningController extends Controller
 
             // ✅ Notify Request Creator (Sender)
             $notificationTitle = 'Learning Request Update';
+            // Plain text — ResortNotification() echoes the stored string raw with
+            // no markdown/HTML rendering contract, and the same string is served
+            // verbatim to the mobile app's in-app list and the FCM push body,
+            // where <strong> tags showed up literally instead of rendering bold.
             $notificationMessage = match ($request->status) {
-                'Approved' => "<strong>Good news!</strong> Your learning request for <strong>'{$trainingName}'</strong> has been <strong>approved</strong>. "
-                    . "<strong>Training Dates:</strong> {$learningRequest->start_date} - {$learningRequest->end_date}. "
+                'Approved' => "Good news! Your learning request for '{$trainingName}' has been approved. "
+                    . "Training Dates: " . Common::formatDate($learningRequest->start_date) . " - " . Common::formatDate($learningRequest->end_date) . ". "
                     . "Check your schedule for details.",
-                'Denied' => "Your learning request for <strong>'{$trainingName}'</strong> has been <strong>denied</strong>. "
-                    . "<strong>Reason:</strong> {$request->reason}",
-                'On Hold' => "Your learning request for <strong>'{$trainingName}'</strong> is <strong>on hold</strong>. "
-                    . "<strong>Reason:</strong> {$request->reason}",
-                default => "Your learning request for <strong>'{$trainingName}'</strong> has been updated."
+                'Denied' => "Your learning request for '{$trainingName}' has been denied. "
+                    . "Reason: {$request->reason}",
+                'On Hold' => "Your learning request for '{$trainingName}' is on hold. "
+                    . "Reason: {$request->reason}",
+                default => "Your learning request for '{$trainingName}' has been updated."
             };
 
             $moduleName = "Learning";
@@ -475,10 +479,10 @@ class LearningController extends Controller
                     ->get();
 
                 $notificationTitle = 'New Learning Assignment';
-                $notificationMessage = "<strong>Congratulations!</strong> "
-                    . "You are selected for <strong>'{$trainingName}'</strong>. "
-                    . "<strong>Training Dates:</strong> {$learningRequest->start_date} - {$learningRequest->end_date}. "
-                    . "<strong>Check your schedule and be prepared.</strong>";
+                $notificationMessage = "Congratulations! "
+                    . "You are selected for '{$trainingName}'. "
+                    . "Training Dates: " . Common::formatDate($learningRequest->start_date) . " - " . Common::formatDate($learningRequest->end_date) . ". "
+                    . "Check your schedule and be prepared.";
 
                 try {
                     Common::notifyEmployees(

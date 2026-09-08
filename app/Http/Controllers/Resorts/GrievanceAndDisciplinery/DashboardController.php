@@ -35,7 +35,14 @@ class DashboardController extends Controller
 
     public function Admin_dashboard(Request $request)
     {
-
+        // Was an empty stub — the route (grievance-and-disciplinary/admin-dashboard)
+        // pointed at a misspelled method name that didn't exist at all
+        // (fatal error), and even fixed, this returned nothing. Admin is the
+        // broadest-access tier here, same as HR_Dashobard()'s unscoped
+        // resort-wide view — not department-scoped like Hod_dashboard() —
+        // so delegate to it exactly like excom_dashboard() already does to
+        // Hod_dashboard() below.
+        return $this->HR_Dashobard($request);
     }
     public function HR_Dashobard(Request $request)
     {

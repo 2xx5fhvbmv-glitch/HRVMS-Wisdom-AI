@@ -574,7 +574,7 @@ class MonthlyCheckingController extends Controller
         try {
             $title      = 'Monthly Check-In Approval Required';
             $formatted = $this->parseDate($request->date_discussion);
-            $msg        = 'A monthly check-in meeting has been scheduled with you on '.($formatted ? date('d M Y', strtotime($formatted)) : $request->date_discussion).' at '.$request->start_time.'. Please approve or reject.';
+            $msg        = 'A monthly check-in meeting has been scheduled with you on '.Common::formatDate($formatted ?: $request->date_discussion).' at '.Common::formatDisplayTime($request->start_time).'. Please approve or reject.';
             $ModuleName = 'Performance';
 
             event(new ResortNotificationEvent(
@@ -663,7 +663,7 @@ class MonthlyCheckingController extends Controller
         $checkin->save();
 
         $title      = 'Monthly Check-In Approved';
-        $msg        = ($this->resort->full_name ?? 'Employee').' has approved the monthly check-in scheduled on '.date('d M Y', strtotime($checkin->date_discussion)).'.';
+        $msg        = ($this->resort->full_name ?? 'Employee').' has approved the monthly check-in scheduled on '.Common::formatDate($checkin->date_discussion).'.';
         $ModuleName = 'Performance';
 
         // created_by is a resort_admins.id, not an employees.id — resolve
@@ -802,7 +802,7 @@ class MonthlyCheckingController extends Controller
             }
 
             $title      = 'Monthly Check-In Submitted';
-            $msg        = 'Your monthly check-in for '.date('d M Y', strtotime($checkin->date_discussion)).' has been recorded.';
+            $msg        = 'Your monthly check-in for '.Common::formatDate($checkin->date_discussion).' has been recorded.';
             $ModuleName = 'Performance';
             event(new ResortNotificationEvent(
                 Common::nofitication($this->resort->resort_id, 10, $title, $msg, $checkin->id, $checkin->emp_id, $ModuleName)

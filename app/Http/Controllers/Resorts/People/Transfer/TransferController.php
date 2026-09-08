@@ -270,7 +270,7 @@ class TransferController extends Controller
             $msg = "📢 New Transfer Request Submitted\n👤 Employee: " . optional($transfer->employee->resortAdmin)->full_name .
             "\n🏢 From: " . optional($transfer->currentDepartment)->name .
             "\n➡️ To: " . optional($transfer->targetDepartment)->name .
-            "\n📅 Effective Date: " . Carbon::parse($transfer->effective_date)->format('d M Y') .
+            "\n📅 Effective Date: " . Common::formatDate($transfer->effective_date) .
             "\n📝 Status: Pending Approval";
 
             $pool = $approver['pool'] ?? collect([$approver['approver']]);
@@ -1306,9 +1306,7 @@ class TransferController extends Controller
         $employeeName = optional($employee->resortAdmin)->full_name ?? 'Employee';
         $fromDept = optional($transfer->currentDepartment)->name ?? 'previous department';
         $toDept   = optional($transfer->targetDepartment)->name ?? 'new department';
-        $effective = $transfer->effective_date
-            ? Carbon::parse($transfer->effective_date)->format('d M Y')
-            : 'TBD';
+        $effective = \App\Helpers\Common::formatDate($transfer->effective_date, 'TBD');
 
         // Skip notifying the employee themselves if they happen to be a
         // dept lead in either dept.
@@ -1371,14 +1369,12 @@ class TransferController extends Controller
         // Transfer effective date — shown to every recipient so the receiving
         // HOD, current HOD, HR and the employee all know when the move
         // actually takes effect. Falls back to a placeholder when unset.
-        $effectiveDate = $transfer->effective_date
-            ? Carbon::parse($transfer->effective_date)->format('d M Y')
-            : 'TBD';
+        $effectiveDate = \App\Helpers\Common::formatDate($transfer->effective_date, 'TBD');
         $temporaryNote = '';
         if ($transfer->transfer_status === 'Temporary' && $transfer->temporary_from && $transfer->temporary_to) {
             $temporaryNote = ' (Temporary: '
-                . Carbon::parse($transfer->temporary_from)->format('d M Y')
-                . ' → ' . Carbon::parse($transfer->temporary_to)->format('d M Y') . ')';
+                . \App\Helpers\Common::formatDate($transfer->temporary_from)
+                . ' → ' . \App\Helpers\Common::formatDate($transfer->temporary_to) . ')';
         }
 
         // (d) Transferred employee
@@ -1624,9 +1620,7 @@ class TransferController extends Controller
         $employeeName = optional($employee->resortAdmin)->full_name ?? 'Employee';
         $originalDept = optional($transfer->currentDepartment)->name ?? 'their original department';
         $tempDept     = optional($transfer->targetDepartment)->name ?? 'the temporary department';
-        $tempToDate   = $transfer->temporary_to
-            ? \Carbon\Carbon::parse($transfer->temporary_to)->format('d M Y')
-            : 'today';
+        $tempToDate   = \App\Helpers\Common::formatDate($transfer->temporary_to, 'today');
 
         $resortId = $transfer->resort_id;
         $push = function ($recipientId, string $title, string $message) use ($resortId, $transfer) {
@@ -1729,15 +1723,13 @@ class TransferController extends Controller
         $employeeName = optional($employee->resortAdmin)->full_name ?? 'Employee';
         $fromDept = optional($transfer->currentDepartment)->name ?? 'previous department';
         $toDept   = optional($transfer->targetDepartment)->name ?? 'new department';
-        $effectiveDate = $transfer->effective_date
-            ? Carbon::parse($transfer->effective_date)->format('d M Y')
-            : 'today';
+        $effectiveDate = \App\Helpers\Common::formatDate($transfer->effective_date, 'today');
 
         $temporaryNote = '';
         if ($transfer->transfer_status === 'Temporary' && $transfer->temporary_from && $transfer->temporary_to) {
             $temporaryNote = ' (Temporary: '
-                . Carbon::parse($transfer->temporary_from)->format('d M Y')
-                . ' → ' . Carbon::parse($transfer->temporary_to)->format('d M Y') . ')';
+                . \App\Helpers\Common::formatDate($transfer->temporary_from)
+                . ' → ' . \App\Helpers\Common::formatDate($transfer->temporary_to) . ')';
         }
 
         $resortId = $transfer->resort_id;

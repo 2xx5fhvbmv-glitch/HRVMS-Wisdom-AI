@@ -521,14 +521,18 @@ class DashboardController extends Controller
         // visible incidents so the panel can never leak cross-resort data.
         $visibleIncidentIds = $this->scopeForCurrentViewer(Incidents::query())->pluck('id')->all();
 
+        // outcome_type/action_taken/approval/approved_by all live on
+        // `incidents` (i), not `incidents_investigation` (ii) — confirmed
+        // against the current schema, this query was still referencing
+        // where they used to live before that move.
         $pendingResolutions = DB::table('incidents_investigation as ii')
             ->join('incidents as i', 'i.id', '=', 'ii.incident_id')
-            ->leftJoin('incident_outcome_types as iot','iot.id','=','ii.outcome_type')
-            ->leftJoin('incident_actions_taken as iat','iat.id','=','ii.action_taken')
-            ->select('ii.id', 'i.incident_name', 'ii.investigation_findings', 'ii.follow_up_actions','iat.action_taken','iot.outcome_type')
+            ->leftJoin('incident_outcome_types as iot','iot.id','=','i.outcome_type')
+            ->leftJoin('incident_actions_taken as iat','iat.id','=','i.action_taken')
+            ->select('ii.id', 'i.incident_name', 'ii.investigation_findings','iat.action_taken','iot.outcome_type')
             ->whereIn('i.id', $visibleIncidentIds ?: [0])
-            ->where('ii.approval', 1)
-            ->whereNull('ii.approved_by')
+            ->where('i.approval', 1)
+            ->whereNull('i.approved_by')
             ->orderBy('ii.created_at', 'desc')
             ->limit(5)
             ->get();
@@ -577,23 +581,25 @@ class DashboardController extends Controller
             // Was missing both resort_id AND viewer scope — leaked across
             // every resort in the system.
             $visibleIncidentIds = $this->scopeForCurrentViewer(Incidents::query())->pluck('id')->all();
+            // outcome_type/action_taken/approval/approved_by all live on
+            // `incidents` (i), not `incidents_investigation` (ii) — same
+            // fix as getPendingResolutionApprovals() above.
             $query = DB::table('incidents_investigation as ii')
                 ->join('incidents as i', 'i.id', '=', 'ii.incident_id')
-                ->leftJoin('incident_outcome_types as iot', 'iot.id', '=', 'ii.outcome_type')
-                ->leftJoin('incident_actions_taken as iat', 'iat.id', '=', 'ii.action_taken')
+                ->leftJoin('incident_outcome_types as iot', 'iot.id', '=', 'i.outcome_type')
+                ->leftJoin('incident_actions_taken as iat', 'iat.id', '=', 'i.action_taken')
                 ->select(
                     'ii.id',
                     'i.incident_name',
                     'ii.investigation_findings',
-                    'ii.follow_up_actions',
                     'iat.action_taken',
                     'iot.outcome_type',
                     'ii.updated_at',
                     'ii.created_at'
                 )
                 ->whereIn('i.id', $visibleIncidentIds ?: [0])
-                ->where('ii.approval', 1)
-                ->whereNull('ii.approved_by')
+                ->where('i.approval', 1)
+                ->whereNull('i.approved_by')
                 ->orderBy('ii.created_at', 'desc');
 
             // Optional: Apply search filter
@@ -1009,13 +1015,16 @@ class DashboardController extends Controller
         $pendingResolutions = Incidents::whereHas('reporter', function ($query) use ($department_id) {
             $query->where('Dept_id', $department_id);
         })
+        // outcome_type/action_taken/approval/approved_by all live on
+        // `incidents`, not `incidents_investigation` (ii) — same fix as
+        // getPendingResolutionApprovals() above.
         ->join('incidents_investigation as ii', 'incidents.id', '=', 'ii.incident_id')
-        ->leftJoin('incident_outcome_types as iot','iot.id','=','ii.outcome_type')
-        ->leftJoin('incident_actions_taken as iat','iat.id','=','ii.action_taken')
-        ->select('ii.id', 'incidents.incident_name', 'ii.investigation_findings', 'ii.follow_up_actions','iat.action_taken','iot.outcome_type')
-        ->where('ii.approval', 1)
+        ->leftJoin('incident_outcome_types as iot','iot.id','=','incidents.outcome_type')
+        ->leftJoin('incident_actions_taken as iat','iat.id','=','incidents.action_taken')
+        ->select('ii.id', 'incidents.incident_name', 'ii.investigation_findings','iat.action_taken','iot.outcome_type')
+        ->where('incidents.approval', 1)
         ->where('incidents.resort_id',$resort_id)
-        ->whereNull('ii.approved_by')
+        ->whereNull('incidents.approved_by')
         ->orderBy('ii.created_at', 'desc')
         ->limit(5)
         ->get();

@@ -2950,18 +2950,12 @@ if (!function_exists('safeParseDate')) {
 
 
         // Add new allowance row
-        // NOTE: allowanceIndex reads `$employee->allowances` (plural) which
-        // is not a real property on Employee (only the singular `allowance`
-        // relation exists) — isset() is always false here, so this always
-        // starts at 0 regardless of how many rows were server-rendered
-        // above, and a newly-added row's `name` index can collide with an
-        // existing row's. Pre-existing bug, not fixed here (out of scope
-        // for this pass) — documented in docs/dropdown-unification-backend-
-        // findings.md. ddRowIndex below is a SEPARATE, correctly-seeded
-        // counter used only for this .dd's own element ids, so the dropdown
-        // conversion doesn't compound the bug with an id collision of its
-        // own on top of the existing name-index one.
-        let allowanceIndex = {{ isset($employee->allowances) ? count($employee->allowances) : 0 }};
+        // Was reading `$employee->allowances` (plural, not a real property —
+        // only the singular `allowance` relation exists), so isset() was
+        // always false and this always started at 0 regardless of how many
+        // rows were server-rendered above, colliding a new row's `name`
+        // index with an existing row's.
+        let allowanceIndex = {{ isset($employee->allowance) ? count($employee->allowance) : 0 }};
         let allowanceDdRowIndex = {{ isset($employee->allowance) ? count($employee->allowance) : 0 }};
 
         $('#add-allowance').on('click', function() {
