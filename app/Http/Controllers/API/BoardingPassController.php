@@ -2069,7 +2069,9 @@ class BoardingPassController extends Controller
         try {
              $passId                                =   $request->pass_id;
 
-                $employeeTravelPass                 =   EmployeeTravelPass::find($passId);
+                $employeeTravelPass                 =   EmployeeTravelPass::where('id', $passId)
+                                                            ->where('resort_id', $this->resort_id)
+                                                            ->first();
                 if (!$employeeTravelPass) {
                     return response()->json([
                         'success'                   =>  false,
@@ -2165,7 +2167,10 @@ class BoardingPassController extends Controller
             // emergency-cancelled while still fully Pending (no stage ever
             // reached Approved) had nothing here blocking it from still being
             // modified.
-            $travelPass                             =   EmployeeTravelPass::find($data['pass_id']);
+            $travelPass                             =   EmployeeTravelPass::where('id', $data['pass_id'])
+                                                            ->where('resort_id', $this->resort_id)
+                                                            ->where('employee_id', $employee->id)
+                                                            ->first();
             if (!$travelPass) {
                 DB::rollBack();
                 return response()->json(['status' => false, 'message' => 'Travel pass not found.'], 200);
@@ -2197,7 +2202,7 @@ class BoardingPassController extends Controller
                 'departure_reason'                  =>  $data['dept_reason'] ?? null,
             ];
 
-            EmployeeTravelPass::where('id', $data['pass_id'])->update($boardingData);
+            $travelPass->update($boardingData);
 
             // Approvers still holding a Pending stage on this pass were
             // never told the details they're about to act on just changed.
@@ -2248,7 +2253,10 @@ class BoardingPassController extends Controller
 
         try {
             // Check if the pass is already cancelled
-            $travelPass                             =   EmployeeTravelPass::where('id', $passId)->first();
+            $travelPass                             =   EmployeeTravelPass::where('id', $passId)
+                                                            ->where('resort_id', $this->resort_id)
+                                                            ->where('employee_id', $this->reporting_to)
+                                                            ->first();
 
             if (!$travelPass) {
                 return response()->json([

@@ -189,21 +189,21 @@ $('#submit-form').on('click', function (e) {
                          }
                     }
                     } else if (input.attr('type') === 'file' && value) {
+                        // $responses' file-field values are now already
+                        // fully-resolved, signed StorageHelper URLs
+                        // (resolved server-side in the controller) — no
+                        // client-side URL building needed or possible
+                        // against a private bucket.
                         let previews = '';
-                        function buildUrl(filePath) {
-                            return '{{ url('/') }}/' + filePath.replace(/^\/+/, '');
-                        }
-                        
+
                         if (Array.isArray(value)) {
-                            value.forEach(function (fileUrl) {
-                                if (fileUrl) { // Check for null or undefined
-                                    const fullUrl = buildUrl(fileUrl);
+                            value.forEach(function (fullUrl) {
+                                if (fullUrl) {
                                     previews += `<div class="mt-2"><a href="${fullUrl}" target="_blank"><img src="${fullUrl}" alt="Uploaded File" style="max-height: 100px;"></a></div>`;
                                 }
                             });
-                        } else if (value) { // Check for null or undefined
-                            const fullUrl = buildUrl(value);
-                            previews = `<div class="mt-2"><a href="${fullUrl}" target="_blank"><img src="${fullUrl}" alt="Uploaded File" style="max-height: 100px;"></a></div>`;
+                        } else if (value) {
+                            previews = `<div class="mt-2"><a href="${value}" target="_blank"><img src="${value}" alt="Uploaded File" style="max-height: 100px;"></a></div>`;
                         }
 
                         input.closest('.form-group, .rendered-form-group').append(previews);

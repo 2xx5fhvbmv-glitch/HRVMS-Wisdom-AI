@@ -3105,36 +3105,33 @@ class TimeAndAttendanceController extends Controller
             $markResultByEmpId                              =   [];
             foreach ($empIds as $empId) {
                 $empId                                      =   (int) $empId;
+
+                // Was falling back to re-query under the TARGET employee's
+                // own resort_id whenever it differed from the caller's —
+                // any HOD/EXCOM/GM could mark an employee from a completely
+                // different resort "Present" just by passing their emp_id.
+                // No cross-resort management concept exists anywhere else
+                // in this codebase; reject instead of crossing the tenant
+                // boundary.
+                if (!Employee::where('id', $empId)->where('resort_id', $resort_id)->exists()) {
+                    $markResultByEmpId[$empId]              =   [
+                        'emp_id'                            =>  $empId,
+                        'marked'                            =>  false,
+                        'message'                           =>  'Employee not found in this resort.',
+                    ];
+                    continue;
+                }
+
                 $parentAttendance                           =   ParentAttendace::where('resort_id', $resort_id)
                     ->where('Emp_id', $empId)
                     ->whereDate('date', $currentDate)
                     ->first();
-                if (!$parentAttendance) {
-                    $emp                                    =   Employee::find($empId);
-                    $empResortId                             =   $emp ? (int) $emp->resort_id : null;
-                    if ($empResortId && $empResortId !== (int) $resort_id) {
-                        $parentAttendance                   =   ParentAttendace::where('resort_id', $empResortId)
-                            ->where('Emp_id', $empId)
-                            ->whereDate('date', $currentDate)
-                            ->first();
-                    }
-                }
 
                 if (!$parentAttendance) {
                     $rosterEntry                            =   DutyRosterEntry::where('resort_id', $resort_id)
                         ->where('Emp_id', $empId)
                         ->whereDate('date', $currentDate)
                         ->first();
-                    if (!$rosterEntry) {
-                        $emp                                =   Employee::find($empId);
-                        $empResortId                         =   $emp ? (int) $emp->resort_id : null;
-                        if ($empResortId && $empResortId !== (int) $resort_id) {
-                            $rosterEntry                    =   DutyRosterEntry::where('resort_id', $empResortId)
-                                ->where('Emp_id', $empId)
-                                ->whereDate('date', $currentDate)
-                                ->first();
-                        }
-                    }
                     if (!$rosterEntry) {
                         $markResultByEmpId[$empId]          =   [
                             'emp_id'                        =>  $empId,

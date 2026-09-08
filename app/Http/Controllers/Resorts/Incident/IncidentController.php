@@ -813,12 +813,15 @@ class IncidentController extends Controller
 
     public function destroy(Request $request)
     {
+        if(Common::checkRouteWisePermission('incident.index',config('settings.resort_permissions.delete')) == false){
+            return abort(403, 'Unauthorized access');
+        }
         $id = base64_decode($request->id);
 
         try {
             DB::beginTransaction();
 
-            $incident = Incidents::findOrFail($id);
+            $incident = Incidents::where('resort_id', $this->resort->resort_id)->findOrFail($id);
 
             // Delete related child records
             $incident->witness()->delete();

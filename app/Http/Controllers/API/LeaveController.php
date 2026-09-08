@@ -2191,7 +2191,15 @@ class LeaveController extends Controller
             return response()->json(['success' => false, 'errors' => $validator->errors()], 400);
         }
 
-        $leaveFind                                      =   EmployeeLeave::find($request->leave_id);
+        $user                                           =   Auth::guard('api')->user();
+        $employee                                       =   $user->GetEmployee;
+        $emp_id                                         =   $employee->id;
+        $rank                                           =   $employee->rank;
+
+        $leaveFind                                      =   EmployeeLeave::where('id', $request->leave_id)
+                                                                ->where('resort_id', $user->resort_id)
+                                                                ->where('emp_id', $emp_id)
+                                                                ->first();
 
         if (!$leaveFind) {
             return response()->json([
@@ -2199,11 +2207,6 @@ class LeaveController extends Controller
                 'message'                               =>  'Invalid Leave ID .',
             ], 200);
         }
-
-        $user                                           =   Auth::guard('api')->user();
-        $employee                                       =   $user->GetEmployee;
-        $emp_id                                         =   $employee->id;
-        $rank                                           =   $employee->rank;
 
         try {
             DB::beginTransaction();
@@ -2371,7 +2374,17 @@ class LeaveController extends Controller
 
                 // Update the leave record in the database
 
-                $leaveUpdate                            =   EmployeeLeave::find($request->leave_id);
+                $leaveUpdate                            =   EmployeeLeave::where('id', $request->leave_id)
+                                                                ->where('resort_id', $user->resort_id)
+                                                                ->where('emp_id', $emp_id)
+                                                                ->first();
+
+                if (!$leaveUpdate) {
+                    return response()->json([
+                        'success'                       =>  false,
+                        'message'                       =>  'Invalid Leave ID .',
+                    ], 200);
+                }
 
                 $leaveUpdate->leave_category_id         =   $categoryId;
                 $leaveUpdate->from_date                 =   $fromDate;
