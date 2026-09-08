@@ -2601,6 +2601,141 @@ class Common
         return (int) end($keys);
     }
 
+    /**
+     * Single source of truth for the applicant progress-ring calculation —
+     * previously duplicated, drifted @php blocks in
+     * TaUserApplicantsSideBar.blade.php and gridviwe.blade.php that
+     * disagreed with each other for the same applicant (the grid card
+     * showed a fully-hired, contract-accepted candidate at ~25% while the
+     * sidebar correctly showed 100%, and had no Rejected handling at all).
+     *
+     * Total steps = 2 (application submitted + HR-shortlisted) + 2 per
+     * interview round (started + completed) + 1 (Selected) + 4 (offer
+     * sent/accepted, contract sent/accepted). Contract Accepted is the
+     * only status that closes the ring — nothing in this pipeline goes
+     * further (onboarding progress after that lives on employees.status,
+     * a separate concern).
+     *
+     * $approvedBy is applicant_wise_statuses.As_ApprovedBy — the rank code
+     * of the round currently under review (0 = pre-HR triage). Once
+     * $status is one of the Offer/Contract family, As_ApprovedBy still
+     * holds the FINAL interview round's rank (those transitions overwrite
+     * the same row rather than appending a new one) — those four step
+     * cases below deliberately never read it.
+     */
+    public static function applicantProgress($status, $approvedBy, $vacancyRank): array
+    {
+        $rounds     = self::getInterviewRoundsForPosition($vacancyRank);
+        // array_keys() on config('settings.PositionInterviewRounds')'s '3'/'2'/'8'
+        // string keys returns real ints (PHP auto-casts numeric-string array
+        // keys) — normalize to strings so array_search below with strict
+        // comparison actually matches against $approvedBy (a DB column value,
+        // frequently a string) instead of silently returning false every time.
+        $roundKeys  = array_map('strval', array_keys($rounds)); // e.g. ['3','2'] or ['3','2','8'] — HR, HOD, GM in order
+        $roundCount = count($roundKeys);
+        $totalSteps = 2 + ($roundCount * 2) + 1 + 4;
+        $selectedStep = 2 + (2 * $roundCount) + 1;
+
+        $roundIndexOf = function ($rankCode) use ($roundKeys) {
+            $idx = array_search((string) $rankCode, $roundKeys, true);
+            return $idx === false ? null : $idx;
+        };
+
+        $state = 'in_progress';
+        $step  = 0;
+
+        switch ($status) {
+            case 'Sortlisted By Wisdom AI':
+                $step = 1;
+                break;
+
+            case 'Rejected By Wisdom AI':
+                // Dead status (never written), kept for old data — treat as
+                // Rejected at the application-triage stage.
+                $step = 1;
+                $state = 'rejected';
+                break;
+
+            case 'Sortlisted':
+                // Round-relative on purpose: booking the NEXT round after one
+                // completes writes 'Sortlisted' with As_ApprovedBy already set
+                // to that next round's rank — i=0 (HR-shortlisted right after
+                // triage) is step 2, i=1 (HOD round about to start) is step 4,
+                // matching the prior round's Complete step exactly.
+                $i = $roundIndexOf($approvedBy) ?? 0;
+                $step = 2 + (2 * $i);
+                break;
+
+            case 'Round':
+                $i = $roundIndexOf($approvedBy) ?? 0;
+                $step = 3 + (2 * $i);
+                break;
+
+            case 'Complete':
+                $i = $roundIndexOf($approvedBy) ?? 0;
+                $step = 4 + (2 * $i);
+                break;
+
+            case 'Rejected':
+                // Same rank code (HR's) is written both for triage rejection
+                // and for a rejection during the actual HR interview round —
+                // the data doesn't distinguish these; treated as one step,
+                // per the known ambiguity this formula deliberately accepts.
+                $i = ((string) $approvedBy === '0') ? 0 : ($roundIndexOf($approvedBy) ?? 0);
+                $step = 2 + (2 * $i);
+                $state = 'rejected';
+                break;
+
+            case 'Selected':
+                $step = $selectedStep;
+                break;
+
+            case 'Offer Letter Sent':
+                $step = $selectedStep + 1;
+                break;
+
+            case 'Offer Letter Accepted':
+                $step = $selectedStep + 2;
+                break;
+
+            case 'Offer Letter Rejected':
+                // Reached "offer sent", then declined.
+                $step = $selectedStep + 1;
+                $state = 'rejected';
+                break;
+
+            case 'Contract Sent':
+                $step = $selectedStep + 3;
+                break;
+
+            case 'Contract Accepted':
+                // == $totalSteps — the only status that closes the ring.
+                $step = $selectedStep + 4;
+                $state = 'success';
+                break;
+
+            case 'Contract Rejected':
+                // Reached "contract sent", then declined.
+                $step = $selectedStep + 3;
+                $state = 'rejected';
+                break;
+
+            default:
+                // 'Pending' (the column's default, never actually written)
+                // or anything unrecognized — pre-triage, step 0.
+                $step = 0;
+        }
+
+        $percent = $totalSteps > 0 ? round(($step / $totalSteps) * 100, 2) : 0;
+
+        return [
+            'step'    => $step,
+            'total'   => $totalSteps,
+            'percent' => $percent,
+            'state'   => $state,
+        ];
+    }
+
     public static function GmApprovedVacancy($resort_id,$rank,$take="")
     {
 
