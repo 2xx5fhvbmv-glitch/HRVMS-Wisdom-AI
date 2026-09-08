@@ -46,6 +46,184 @@
         box-sizing: content-box;
     }
 
+    /* ================= Dynamic Island =================
+       Replaces the old plain bell <li>. Idle = charcoal pill (bell + the
+       same unread count this file always rendered). Hover morphs (spring)
+       into a 3-item menu: Notifications reuses the .notification-btn
+       click handler in js.blade.php unchanged; Messages / Ask WAI dispatch
+       CustomEvents into wisdom-chat.blade.php's existing panel JS — same
+       hand-off pattern the old edge-notch launcher used. Unscoped like the
+       badge rule above, for the same reason (shared bell concept). */
+    /* The <li> itself still carries the generic .nav-icon class (a 40x40
+       circular icon tile with its own hover-to-lime background) — that
+       treatment was sized for the old plain bell <a>, not this pill, and
+       was rendering as a second circle behind/around the Island plus a
+       lime hover flash. The Island draws 100% of its own look, so strip
+       .nav-icon's box model and hover state for this one <li> only. */
+    .notification-nav.nav-icon {
+        width: auto;
+        height: auto;
+        background-color: transparent;
+        border-radius: 0;
+        display: block;
+    }
+    .notification-nav.nav-icon:hover {
+        background-color: transparent;
+    }
+    /* Idle = a plain round icon, same 40x40 circle as the search icon next
+       to it and the avatar after it — matches the rest of the row instead
+       of standing out as a pill. The unread count stays the original
+       overlapping corner badge (.notification-nav span, styled above);
+       .wai-island being position:relative + the same 40x40 box the old
+       .nav-icon <li> used to be means that badge anchors identically. */
+    .wai-island {
+        position: relative;
+        width: 40px;
+        height: 40px;
+        background: hsla(0, 0%, 0%, 0.2); /* matches .nav-icon's own idle background (search icon) */
+        border-radius: 50%;
+        cursor: pointer;
+        flex: none;
+    }
+    .wai-island-idle {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: opacity .16s;
+    }
+    .wai-island[data-state="open"] .wai-island-idle {
+        opacity: 0;
+    }
+    .notification-nav .wai-island-bell,
+    .notification-nav.nav-icon:hover .wai-island-bell {
+        width: 18px;
+        height: 18px;
+        filter: brightness(0) invert(1);
+    }
+    .wai-island-morph {
+        position: absolute;
+        top: 0; right: 0;
+        background: #06181c;
+        border-radius: inherit;
+        overflow: hidden;
+        opacity: 0;
+        pointer-events: none;
+        width: 100%;
+        height: 100%;
+        z-index: 9;
+        box-shadow: 0 18px 44px rgba(0,0,0,.36);
+        transition: width .5s cubic-bezier(.34,1.56,.64,1), height .5s cubic-bezier(.34,1.56,.64,1),
+                    border-radius .45s cubic-bezier(.34,1.56,.64,1), opacity .18s;
+    }
+    .wai-island[data-state="open"] .wai-island-morph {
+        opacity: 1;
+        pointer-events: auto;
+        width: 300px;
+        height: 152px;
+        border-radius: 22px;
+    }
+    .wai-island-menu {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        padding: 10px;
+        gap: 2px;
+        justify-content: center;
+        opacity: 0;
+        transition: opacity .16s;
+    }
+    .wai-island[data-state="open"] .wai-island-menu {
+        opacity: 1;
+        transition-delay: .12s;
+    }
+    .wai-island-opt {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        width: 100%;
+        background: transparent;
+        border: none;
+        color: #fff;
+        font: inherit;
+        font-size: 13px;
+        font-weight: 500;
+        text-align: left;
+        padding: 10px 11px;
+        border-radius: 12px;
+        cursor: pointer;
+        white-space: nowrap;
+    }
+    .wai-island-opt:hover {
+        background: rgba(255,255,255,.09);
+    }
+    .wai-island-opt svg {
+        opacity: .85;
+        flex: none;
+    }
+    .wai-island-opt .wai-island-ai {
+        color: var(--lime, #E0FF02);
+        opacity: 1;
+    }
+    /* .notification-nav span (developer.min.css) is the small round unread
+       dot's own display:flex/justify-content:center/align-items:center —
+       correct for that badge, but .wai-island-ol/.wai-island-badge are
+       also plain <span>s under the same .notification-nav ancestor, so it
+       was silently centering their text too. Reset explicitly rather than
+       just position/size. */
+    .notification-nav .wai-island-ol {
+        display: block;
+        position: static; top: auto; right: auto; background: none; border: none;
+        width: auto; height: auto; padding: 0; border-radius: 0; box-sizing: content-box;
+        flex: 1;
+        text-align: left;
+        font-size: inherit;
+        color: inherit;
+    }
+    .notification-nav .wai-island-badge {
+        display: block;
+        position: static; top: auto; right: auto; border: none;
+        width: auto; height: auto; padding: 0; border-radius: 0; box-sizing: content-box;
+        background: none;
+        text-align: left;
+        color: var(--lime, #E0FF02);
+        font-size: 12px;
+        font-weight: 600;
+        flex: none;
+    }
+    .notification-nav .wai-island-badge:empty {
+        display: none;
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .wai-island-idle, .wai-island-morph, .wai-island-menu {
+            transition: none;
+        }
+    }
+
+    /* Menu-bar avatar — photo-first with an initials fallback. The old
+       markup stacked a photo <img> over a static persone.svg with no
+       onerror wiring, so a broken/missing photo URL just rendered as a
+       broken-image icon (the svg never actually showed — .img-box has no
+       position:relative for it to layer under, and overflow:hidden clips
+       it). */
+    .wai-avatar-box {
+        position: relative;
+        display: block;
+    }
+    .wai-avatar-fallback {
+        display: none;
+        position: absolute;
+        inset: 0;
+        align-items: center;
+        justify-content: center;
+        background: var(--teal-soft, #F5F8F8);
+        color: var(--teal, #014653);
+        font-size: 14px;
+        font-weight: 600;
+    }
+
     /* developer.min.css's base rule renders this span as a red circle
        unconditionally — it never hid itself when there was nothing unread,
        so the dot stayed visible at 0 just as much as at 5. */
@@ -302,10 +480,30 @@
                                         </li>
                                         
                                         <li class="nav-item nav-icon notification-nav">
-                                            <span>@if(Auth::guard('resort-admin')->user()->type != "super" && Auth::guard('resort-admin')->check()){{ App\Helpers\Common::getNotificationCount(Auth::guard('resort-admin')->user()->resort_id,Auth::guard('resort-admin')->user()->GetEmployee->id) }}@endif</span>
-                                            <a href="javascript:void(0);" class="notification-btn">
-                                                <img src="{{ URL::asset('resorts_assets/images/bell.svg')}}" alt="" class="img-fluid" />
-                                            </a>
+                                            <div class="wai-island" id="waiIsland" data-state="idle">
+                                                <div class="wai-island-idle">
+                                                    <img src="{{ URL::asset('resorts_assets/images/bell.svg')}}" alt="" class="wai-island-bell" />
+                                                    <span class="wai-cnt">@if(Auth::guard('resort-admin')->user()->type != "super" && Auth::guard('resort-admin')->check()){{ App\Helpers\Common::getNotificationCount(Auth::guard('resort-admin')->user()->resort_id,Auth::guard('resort-admin')->user()->GetEmployee->id) }}@endif</span>
+                                                </div>
+                                                <div class="wai-island-morph">
+                                                    <div class="wai-island-menu">
+                                                        <button type="button" class="wai-island-opt notification-btn" data-wai-open="notif">
+                                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+                                                            <span class="wai-island-ol">Notifications</span>
+                                                            <span class="wai-island-badge" data-wai-mirror></span>
+                                                        </button>
+                                                        <button type="button" class="wai-island-opt" data-wai-open="messages">
+                                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-8.5 8.5 8.5 8.5 0 0 1-3.8-.9L3 21l1.9-5.7A8.5 8.5 0 1 1 21 11.5z"/></svg>
+                                                            <span class="wai-island-ol">Messages</span>
+                                                            <span class="wai-island-badge" id="msgCount"></span>
+                                                        </button>
+                                                        <button type="button" class="wai-island-opt" data-wai-open="waibot">
+                                                            <svg class="wai-island-ai" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.8 5.3L19 9l-5.2 1.7L12 16l-1.8-5.3L5 9l5.2-1.7z"/></svg>
+                                                            <span class="wai-island-ol">Ask WAI</span>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </li>
                                         <li class="nav-item nav-icon d-lg-none">
                                             <a href="javascript:void(0);" id="toggle-icon2" class="toggle-icon">
@@ -320,9 +518,13 @@
                                         <li class="nav-item dropdown profile-dropdown">
                                             <a class="nav-link dropdown-toggle d-flex align-items-center" href="#" role="button"
                                                 data-bs-toggle="dropdown" aria-expanded="false">
-                                                <span class="img-box">
-                                                    <img src=" {{ Common::getResortUserPicture(Auth::guard('resort-admin')->user()->id) }}" alt="" class="img-fluid" />
-                                                    <img src=" {{ URL::asset('resorts_assets/images/persone.svg')}}" alt="" class="img-fluid" />
+                                                @php
+                                                    $waiHeaderUser = Auth::guard('resort-admin')->user();
+                                                    $waiHeaderInitials = strtoupper(substr($waiHeaderUser->first_name ?? '', 0, 1) . substr($waiHeaderUser->last_name ?? '', 0, 1)) ?: 'U';
+                                                @endphp
+                                                <span class="img-box wai-avatar-box">
+                                                    <img src=" {{ Common::getResortUserPicture($waiHeaderUser->id) }}" alt="" class="img-fluid" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';" />
+                                                    <span class="wai-avatar-fallback">{{ $waiHeaderInitials }}</span>
                                                 </span>
                                             </a>
                                             <div class="dropdown-menu dropdown-menu-end bg-gradient py-0">

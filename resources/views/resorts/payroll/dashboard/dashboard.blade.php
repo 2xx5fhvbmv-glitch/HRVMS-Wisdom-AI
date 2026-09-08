@@ -394,11 +394,12 @@
         align-items: center;
         justify-content: space-between;
         gap: 12px;
-        padding: 20px 20px 4px;
+        padding: 20px 20px 12px;
+        border-bottom: 1px solid var(--line);
     }
     .pc-header-title { margin: 0; font-size: 18px; font-weight: 600; color: var(--ink); }
     .pc-header .form-select { font-size: 14px; padding: 4px 24px 4px 10px; }
-    .pc-columns { padding: 8px 20px 4px; margin: 0; }
+    .pc-columns { padding: 0 20px 4px; margin: 0; }
     .pc-col {
         min-width: 0;
         text-align: center;
@@ -652,14 +653,24 @@
                             </div>
                         </div>
                     </div>
-                    <div class="row g-3 align-items-center">
-                        <div class="col-12">
-                            <canvas id="myDoughnutChart"></canvas>
-                        </div>
-                        <div class="col-12">
-                            <div class="row g-2"></div>
-                        </div>
+                    <div class="scd-rule"></div>
+                    <div class="scd-dialwrap">
+                        <svg id="scdDial" viewBox="0 0 320 320" preserveAspectRatio="xMidYMid meet">
+                            <defs>
+                                <radialGradient id="scdSpoke" gradientUnits="userSpaceOnUse" cx="160" cy="160" r="120">
+                                    <stop offset="0" stop-color="#014653"/>
+                                    <stop offset="0.55" stop-color="#014653"/>
+                                    <stop offset="0.80" stop-color="#4C9A5A"/>
+                                    <stop offset="1" stop-color="#E0FF02"/>
+                                </radialGradient>
+                            </defs>
+                        </svg>
                     </div>
+                    <div class="scd-foot">
+                        <div class="scd-stat"><div class="scd-v" id="scdFTotal">—</div><div class="scd-l">Total distributed</div></div>
+                        <div class="scd-stat"><div class="scd-v" id="scdFAvg">—</div><div class="scd-l">Monthly average</div></div>
+                    </div>
+                    <div class="scd-tip" id="scdTip"></div>
                 </div>
             </div>
             <div class="col-lg-2 @if(App\Helpers\Common::checkRouteWisePermission('payroll.run',config('settings.resort_permissions.view')) == false) d-none @endif">
@@ -672,20 +683,20 @@
                         <select class="form-select dd-native-select" id="month" aria-label="Default select example">
                             @foreach(range(1, 12) as $m)
                                 <option value="{{ $m }}" {{ now()->month == $m ? 'selected' : '' }}>
-                                    {{ \Carbon\Carbon::create()->month($m)->format('F') }}
+                                    {{ \Carbon\Carbon::create()->month($m)->format('M') }}
                                 </option>
                             @endforeach
                         </select>
                         <div class="dd" data-target="#month">
                             <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
-                                <span class="dd-lbl">{{ \Carbon\Carbon::create()->month(now()->month)->format('F') }}</span>
+                                <span class="dd-lbl">{{ \Carbon\Carbon::create()->month(now()->month)->format('M') }}</span>
                                 <svg class="dd-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
                             </button>
                             <div class="dd-panel" role="listbox" aria-label="Month">
                                 <div class="dd-search"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.3-4.3"/></svg><input type="text" placeholder="Find a month…"></div>
                                 <div class="dd-scroll">
                                     @foreach(range(1, 12) as $m)
-                                    <div class="dd-item{{ now()->month == $m ? ' active' : '' }}" role="option" data-value="{{ $m }}"><span class="dd-nm">{{ \Carbon\Carbon::create()->month($m)->format('F') }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    <div class="dd-item{{ now()->month == $m ? ' active' : '' }}" role="option" data-value="{{ $m }}"><span class="dd-nm">{{ \Carbon\Carbon::create()->month($m)->format('M') }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
                                     @endforeach
                                 </div>
                             </div>
@@ -1010,9 +1021,9 @@
             </div> -->
 
 
-            
 
-          
+
+
 
             <div class="row g-3 g-xxl-4 dept-comparison-row">
                 <div class="dept-comparison-col-dist col-lg-12">
@@ -1257,6 +1268,7 @@
 @include('resorts.payroll._payroll_buttons_v2_styles')
 @include('resorts._dropdown_styles')
 @include('resorts.payroll.dashboard._estimate_breakdown_styles')
+@include('resorts.payroll.dashboard._service_charge_dial_styles')
 @endsection
 
 @section('import-scripts')
@@ -1272,6 +1284,18 @@
         var activityOffset = 0;
         var activityLimit = 25;
         var activityLoading = false;
+
+        // Pointer-tracking specular highlight — the Liquid Glass shell's
+        // signature detail (see .pay-pop::before). Skipped under
+        // prefers-reduced-motion, same as the reference.
+        var payPopEl = document.querySelector('#payrollBreakdownModal .pay-pop');
+        if (payPopEl && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            payPopEl.addEventListener('pointermove', function (e) {
+                var r = payPopEl.getBoundingClientRect();
+                payPopEl.style.setProperty('--mx', ((e.clientX - r.left) / r.width * 100) + '%');
+                payPopEl.style.setProperty('--my', ((e.clientY - r.top) / r.height * 100) + '%');
+            });
+        }
 
         function money(n) {
             var v = Number(n) || 0;
@@ -1401,17 +1425,10 @@
                     $('#pebDelta').text('');
                 }
 
-                $('#pebEarnTotalHead, #pebEarnTotalFoot').text(money(data.gross));
-                $('#pebDedTotalHead, #pebDedTotalFoot').text('−' + money(data.deductions_total));
+                $('#pebEarnTotalFoot').text(money(data.gross));
+                $('#pebDedTotalFoot').text('−' + money(data.deductions_total));
                 renderCategoryList($('#pebEarningsList'), data.earnings, '+');
                 renderCategoryList($('#pebDeductionsList'), data.deductions, '-');
-
-                // Single largest deduction gets the thin red left-edge flag.
-                var maxIdx = -1, maxAbs = 0;
-                data.deductions.forEach(function (d, i) {
-                    if (Math.abs(d.amount) > maxAbs) { maxAbs = Math.abs(d.amount); maxIdx = i; }
-                });
-                if (maxIdx >= 0) $('#pebDeductionsList').children('.cat').eq(maxIdx).addClass('attn');
 
                 $('#pebBreakdownContent').removeClass('d-none');
                 breakdownLoaded = true;
@@ -1658,67 +1675,74 @@
         window.pcDonutCurrent = buildDonut('pcDonutCurrent', data.current);
         window.pcDonutPrevious = buildDonut('pcDonutPrevious', data.previous);
     }
-    // Global variable to store the chart instance
-    let myDoughnutChart = null;
-    let serviceChargeAvg = 0;
-    //Service Charges Chart
-    const ctz = document.getElementById('myDoughnutChart').getContext('2d');
-    const doughnutLabelsInsideN = {
-        id: 'doughnutLabelsInsideN',
-        afterDraw: function (chart) {
-            var ctx = chart.ctx;
-            chart.data.datasets.forEach(function (dataset, i) {
-                var meta = chart.getDatasetMeta(i);
-                if (!meta.hidden) {
-                    meta.data.forEach(function (element, index) {
-                        var dataValue = dataset.data[index];
-                        var total = dataset.data.reduce(function (acc, val) {
-                            return acc + val;
-                        }, 0);
-                        var percentage = ((dataValue / total) * 100).toFixed(0) + '%';
-                        var position = element.tooltipPosition();
-                        ctx.fillStyle = '#fff';
-                        ctx.font = 'normal 18px Poppins';
-                        ctx.textAlign = 'center';
-                        ctx.textBaseline = 'middle';
-                        ctx.fillText(percentage, position.x, position.y);
-                    });
-                }
-            });
-        }
-    };
+    // Service Charges — radial year-dial. 12 spokes (Jan top, clockwise),
+    // length keyed to amount, one shared radius-keyed gradient (see
+    // _service_charge_dial_styles). Geometry matches the finalized
+    // reference exactly: cx/cy=160, R0=58, Rmax=120, SW=14, GAP=16.
+    const scdMonthFull = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const scdMonthLetter = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
+    // No-decimal counterpart to the shared formatAmount() (2-decimal) —
+    // reuses the same global currencySymbol/convertAmount so the footer's
+    // "Total distributed"/"Monthly average" stay in the resort's configured
+    // display currency, just rounded to whole units.
+    function scdUsdWhole(amount) {
+        return currencySymbol + ' ' + convertAmount(amount, 'USD').toLocaleString(undefined, { maximumFractionDigits: 0 });
+    }
 
-    const centerText = {
-        id: 'centerText',
-        afterDraw: function (chart) {
-            const width = chart.width;
-            const height = chart.height;
-            const ctx = chart.ctx;
+    const scdTip = document.getElementById('scdTip');
+    function scdShowTip(e, monthIndex, value) {
+        scdTip.innerHTML = '<b>' + scdMonthFull[monthIndex] + '</b> &middot; <span class="scd-tv">' + formatAmount(value, 'USD') + '</span>';
+        scdTip.style.left = e.clientX + 'px';
+        scdTip.style.top = e.clientY + 'px';
+        scdTip.style.opacity = '1';
+    }
+    function scdMoveTip(e) {
+        scdTip.style.left = e.clientX + 'px';
+        scdTip.style.top = e.clientY + 'px';
+    }
+    function scdHideTip() {
+        scdTip.style.opacity = '0';
+    }
 
-            ctx.restore();
+    function scdDrawDial(monthValues) {
+        const NS = 'http://www.w3.org/2000/svg';
+        const svg = document.getElementById('scdDial');
+        // Clear previously drawn spokes/labels, keep <defs> (the gradient).
+        Array.from(svg.querySelectorAll('.scd-bar, .scd-mlabel')).forEach(function (el) { el.remove(); });
 
-            // Use the real average service charge (not sum of percentages)
-            const formattedTotal = formatAmount(serviceChargeAvg, 'USD');
+        const cx = 160, cy = 160, R0 = 58, Rmax = 120, SW = 14, GAP = 16;
+        const max = Math.max.apply(null, monthValues);
+        const pt = function (r, a) { return [cx + r * Math.cos(a), cy + r * Math.sin(a)]; };
 
-            // Text configuration
-            ctx.textBaseline = 'middle';
-            ctx.textAlign = 'center';
+        monthValues.forEach(function (v, i) {
+            const a = (-90 + i * 30) * Math.PI / 180;
+            const len = max > 0 ? R0 + (v / max) * (Rmax - R0) : R0;
+            const p1 = pt(R0, a), p2 = pt(len, a);
 
-            // Total number
-            var _p = window.WaiChart ? window.WaiChart.palette() : { darkblack: '#222222' };
-            ctx.font = '500 22px Poppins';
-            ctx.fillStyle = _p.darkblack;
-            // ctx.fillText('$' + total, width / 2, height / 2 - 15);
-            ctx.fillText(formattedTotal, width / 2, height / 2 - 15);
+            const ln = document.createElementNS(NS, 'line');
+            ln.setAttribute('x1', p1[0]); ln.setAttribute('y1', p1[1]);
+            ln.setAttribute('x2', p2[0]); ln.setAttribute('y2', p2[1]);
+            ln.setAttribute('stroke', 'url(#scdSpoke)');
+            ln.setAttribute('stroke-width', SW);
+            ln.setAttribute('stroke-linecap', 'round');
+            ln.setAttribute('class', 'scd-bar');
+            ln.addEventListener('mouseenter', function (e) { scdShowTip(e, i, v); });
+            ln.addEventListener('mousemove', scdMoveTip);
+            ln.addEventListener('mouseleave', scdHideTip);
+            svg.appendChild(ln);
 
-            // "Total" label
-            ctx.font = '500 13px Poppins';
-            ctx.fillStyle = _p.darkblack;
-            ctx.fillText('Avg', width / 2, height / 2 + 15);
-
-            ctx.save();
-        }
-    };
+            // Letter sits a constant GAP beyond THIS bar's rounded tip —
+            // even spacing for every month regardless of its length.
+            const lp = pt(len + SW / 2 + GAP, a);
+            const t = document.createElementNS(NS, 'text');
+            t.setAttribute('x', lp[0]); t.setAttribute('y', lp[1]);
+            t.setAttribute('text-anchor', 'middle');
+            t.setAttribute('dominant-baseline', 'central');
+            t.setAttribute('class', 'scd-mlabel');
+            t.textContent = scdMonthLetter[i];
+            svg.appendChild(t);
+        });
+    }
 
     // Function to fetch and update the chart
     function GetServiceChargeChart() {
@@ -1730,68 +1754,24 @@
                 "YearWiseServichCharges": $(".YearWiseServichCharges").val()
             },
             success: function (response) {
-                console.log(response);
-                const data = response.data;
-                const total = response.total;
-                const labels = data.map(item => item.label);
-                const serviceCharges = data.map(item => item.service_charge);
-                const serviceChargespercentage = data.map(item => item.percentage);
-                // Set average for center text (total / number of months)
-                serviceChargeAvg = data.length > 0 ? parseFloat(total.replace(/,/g, '')) / data.length : 0;
-                const colors = ['#014653', '#53CAFF', '#EFB408', '#50B9BF', '#333333', '#8DC9C9'];
+                const data = response.data || [];
+                const total = parseFloat(String(response.total).replace(/,/g, '')) || 0;
 
-                 // Check if the chart exists and destroy it
-                if (myDoughnutChart !== null && typeof myDoughnutChart.destroy === 'function') {
-                    myDoughnutChart.destroy();
-                }
-                // Update the chart
-                myDoughnutChart = new Chart(document.getElementById('myDoughnutChart'), {
-                    type: 'doughnut',
-                    data: {
-                        labels: labels,
-                        datasets: [{
-                            data: serviceChargespercentage,
-                            backgroundColor: colors,
-                            borderWidth: 0
-                        }]
-                    },
-                    options: {
-                        responsive: true,
-                        plugins: {
-                            legend: {
-                                display: false
-                            }
-                        },
-                        layout: {
-                            padding: {
-                                top: 10,
-                                bottom: 10,
-                                left: 0,
-                                right: 0
-                            }
-                        }
-                    },
-                    plugins: [doughnutLabelsInsideN, centerText] // Attach the plugin to this chart only
+                // The endpoint only returns months that actually have a row
+                // (missing months are absent, not zero) — expand to a fixed
+                // Jan..Dec 12-slot array so every spoke has a position.
+                const monthValues = new Array(12).fill(0);
+                data.forEach(function (item) {
+                    const idx = scdMonthFull.indexOf(item.label);
+                    if (idx !== -1) {
+                        monthValues[idx] = parseFloat(item.service_charge) || 0;
+                    }
                 });
-                // Update the side labels
-                const labelContainer = document.querySelector('.row.g-2');
-                let labelsHTML = '';
-                data.forEach((item, index) => {
-                    labelsHTML += `
-                        <div class="col-6">
-                            <div class="doughnut-label">
-                                <span style="background-color: ${colors[index]}"></span>${item.label} <br>${formatAmount(item.service_charge, 'USD')}
-                            </div>
-                        </div>
-                    `;
-                });
-                // Add total row
-                labelsHTML += `
-                    <div class="fw-500">Total: ${formatAmount(parseFloat(String(total).replace(/,/g, '')), 'USD')}</div>
-                `;
 
-                // Insert into the DOM
-                labelContainer.innerHTML = labelsHTML;
+                scdDrawDial(monthValues);
+
+                document.getElementById('scdFTotal').textContent = scdUsdWhole(total);
+                document.getElementById('scdFAvg').textContent = scdUsdWhole(total / 12);
             },
             error: function (xhr) {
                 console.error("Failed to fetch chart data", xhr);

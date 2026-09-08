@@ -819,7 +819,7 @@
             $(this).parsley().validate();
         });
 
-        $(".select2t-none").select2();
+        $(".select2t-none:not(.select2-hidden-accessible)").select2();
 
         // Manually trigger Parsley validation when Select2 changes
         $(".select2t-none").on('change', function () {
@@ -987,7 +987,7 @@
     function initSelect2AndValidation() {
         if ($.fn.select2 && $.fn.parsley) {
             // Initialize Select2
-            $(".select2t-none").select2();
+            $(".select2t-none:not(.select2-hidden-accessible)").select2();
 
             // Add Parsley validation specifically for Select2
             $(".select2t-none").on('change', function() {
@@ -1754,7 +1754,7 @@
         function initSelect2AndValidation() {
             if ($.fn.select2 && $.fn.parsley) {
                 // Initialize Select2
-                $(".select2t-none").select2();
+                $(".select2t-none:not(.select2-hidden-accessible)").select2();
 
                 // Add Parsley validation specifically for Select2
                 $(".select2t-none").on('change', function() {

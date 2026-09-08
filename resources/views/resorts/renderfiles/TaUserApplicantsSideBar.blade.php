@@ -11,6 +11,9 @@
             $ringClass = $applicantProgress['state'] === 'rejected'
                 ? 'danger'
                 : ($applicantProgress['state'] === 'success' ? 'success' : 'skyblue');
+            // Display-only spelling fix; ApplicantStatus itself is left untouched
+            // since it's an enum value compared elsewhere ('Sortlisted', etc).
+            $displayApplicantStatus = str_replace('Sortlisted', 'Shortlisted', $Applicant_form_data->ApplicantStatus);
         @endphp
         <div class="progress-container {{ $ringClass }}" data-progress="{{ $progress }}">
             <svg class="progress-circle" viewBox="0 0 120 120">
@@ -25,27 +28,27 @@
                 {{ ucfirst($Applicant_form_data->first_name) }} {{ ucfirst($Applicant_form_data->last_name) }}
 
                 @if($Applicant_form_data->As_ApprovedBy == 0)
-                    <span class="badge badge-themeSkyblue">{{ $Applicant_form_data->ApplicantStatus }}</span>
+                    <span class="badge badge-themeSkyblue">{{ $displayApplicantStatus }}</span>
                 @elseif($Applicant_form_data->As_ApprovedBy != 0 &&  $Applicant_form_data->ApplicantStatus  == 'Sortlisted')
-                    <span class="badge badge-themeBlue">HR {{ $Applicant_form_data->ApplicantStatus }}</span>
+                    <span class="badge badge-themeBlue">HR {{ $displayApplicantStatus }}</span>
                 @elseif(in_array($Applicant_form_data->ApplicantStatus, ['Round', 'Complete']))
                     @php
                         $badgeClass = 'badge-themeBlue';
                         if ($Applicant_form_data->As_ApprovedBy == 2) $badgeClass = 'badge-themePurple';
                         elseif ($Applicant_form_data->As_ApprovedBy == 8) $badgeClass = 'badge-themePink';
                     @endphp
-                    <span class="badge {{ $badgeClass }}">{{  $Applicant_form_data->rank_name }}  {{ $Applicant_form_data->ApplicantStatus }}</span>
+                    <span class="badge {{ $badgeClass }}">{{  $Applicant_form_data->rank_name }}  {{ $displayApplicantStatus }}</span>
                 @elseif($Applicant_form_data->ApplicantStatus  == 'Selected')
-                    <span class="badge badge-themeSuccess">{{ $Applicant_form_data->ApplicantStatus }}</span>
+                    <span class="badge badge-themeSuccess">{{ $displayApplicantStatus }}</span>
                 @elseif(in_array($Applicant_form_data->ApplicantStatus, ['Offer Letter Sent', 'Offer Letter Accepted', 'Offer Letter Rejected', 'Contract Sent', 'Contract Accepted', 'Contract Rejected']))
                     @php
                         $badgeStyle = 'badge-themeSuccess';
                         if(str_contains($Applicant_form_data->ApplicantStatus, 'Rejected')) $badgeStyle = 'badge-themeDanger';
                         elseif(str_contains($Applicant_form_data->ApplicantStatus, 'Sent')) $badgeStyle = 'badge-themeBlue';
                     @endphp
-                    <span class="badge {{ $badgeStyle }}">{{ $Applicant_form_data->ApplicantStatus }}</span>
+                    <span class="badge {{ $badgeStyle }}">{{ $displayApplicantStatus }}</span>
                 @elseif( $Applicant_form_data->ApplicantStatus  == 'Rejected')
-                    <span class="badge badge-themeDanger">{{  $Applicant_form_data->rank_name }}  {{ $Applicant_form_data->ApplicantStatus }}</span>
+                    <span class="badge badge-themeDanger">{{  $Applicant_form_data->rank_name }}  {{ $displayApplicantStatus }}</span>
                 @endif
             </h4>
 

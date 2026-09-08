@@ -78,6 +78,81 @@
     .wai-modal .m-table tr.attn td:first-child { box-shadow: inset 2px 0 0 var(--error, #E5573F); }
     .wai-modal .m-empty { font-size: 13px; color: var(--muted, #6B7378); margin: 20px 0 0; }
 
+    /* People-row variant: swaps the first .m-table column for a photo-first
+       avatar + name/ID identity cell, for any module's "view details" list
+       whose rows are employees rather than metrics. Nest inside a normal
+       .m-table — <td class="emp"><div class="emp">...</div></td> — first
+       column stays left-aligned via the existing .m-table td:first-child
+       rule above. */
+    .wai-modal .m-table .emp { display: flex; align-items: center; gap: 11px; }
+    .wai-modal .m-table .av { width: 34px; height: 34px; border-radius: 50%; flex: none; position: relative;
+        display: grid; place-items: center; font-size: 11.5px; font-weight: 600;
+        color: var(--teal, #014653); background: var(--teal-3, #E6F0F1); overflow: hidden; }
+    .wai-modal .m-table .av img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+    .wai-modal .m-table .who { min-width: 0; }
+    .wai-modal .m-table .who .nm { font-size: 13px; font-weight: 500; color: var(--ink, #14232A);
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .wai-modal .m-table .who .id { font-size: 11px; color: var(--faint, #99A1A5); margin-top: 1px; }
+    .wai-modal .m-table .wage .amt { font-weight: 600; color: var(--ink, #14232A); }
+    .wai-modal .m-table .wage .cur { color: var(--faint, #99A1A5); margin-left: 3px; font-size: 11px; font-weight: 600; }
+    .wai-modal .m-table .wage-missing { color: var(--error, #E5573F); font-weight: 600; }
+
+    /* ---- Liquid Glass modal variant (Apple material) — data-list mode:
+       no kicker, count folded into the caption bar, pointer-tracking
+       specular highlight. An alternative to .wai-modal's plain frosted
+       look — opt in per-modal by using .lg-modal instead of .wai-modal
+       on the same .wai-backdrop scrim. That scrim's translucent-dark +
+       blur is the reason this reads with real colour instead of
+       collapsing to flat grey — Liquid Glass needs a dark+blurred scrim
+       behind it, not an opaque one, to have anything to reflect. */
+    .lg-modal { position: relative; width: min(452px,100%); border-radius: 22px; padding: 32px 32px 28px; overflow: hidden;
+        background: rgba(255,255,255,.55);
+        backdrop-filter: blur(22px) saturate(220%) brightness(1.06); -webkit-backdrop-filter: blur(22px) saturate(220%) brightness(1.06);
+        border: 1px solid rgba(255,255,255,.45);
+        box-shadow:
+            inset 0 1px 1px rgba(255,255,255,.75),
+            inset 0 -1px 2px rgba(255,255,255,.3),
+            inset 0 0 44px rgba(255,255,255,.07),
+            0 26px 74px rgba(0,0,0,.34);
+        transform: translateY(14px) scale(.985); opacity: .6;
+        transition: transform .3s cubic-bezier(.16,1,.3,1), opacity .3s ease, box-shadow .35s, backdrop-filter .35s;
+        font-family: 'Poppins', sans-serif; }
+    .wai-backdrop.open .lg-modal { transform: none; opacity: 1; }
+    /* pointer-tracking specular highlight, driven by --mx/--my (set in
+       the script block below) */
+    .lg-modal::before { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; z-index: 0;
+        background: radial-gradient(280px 220px at var(--mx,80%) var(--my,-5%), rgba(255,255,255,.4), transparent 60%); transition: opacity .3s; }
+    /* thin top sheen line */
+    .lg-modal::after { content: ""; position: absolute; left: 14%; right: 14%; top: 0; height: 1px; pointer-events: none; z-index: 0;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,.85), transparent); }
+    .lg-modal:hover { backdrop-filter: blur(24px) saturate(240%) brightness(1.11); -webkit-backdrop-filter: blur(24px) saturate(240%) brightness(1.11);
+        box-shadow: inset 0 1px 1px rgba(255,255,255,.85), inset 0 -1px 2px rgba(255,255,255,.35), inset 0 0 52px rgba(255,255,255,.1), 0 30px 82px rgba(0,0,0,.38); }
+    .lg-modal .m-x, .lg-modal .mt, .lg-modal .m-sub, .lg-modal .m-tablewrap { position: relative; z-index: 1; }
+    .lg-modal .m-x { position: absolute; top: 20px; right: 20px; width: 30px; height: 30px; border-radius: 50%;
+        background: transparent; border: none; color: var(--faint, #99A1A5); cursor: pointer; font-size: 15px;
+        display: grid; place-items: center; transition: background .15s, color .15s; }
+    .lg-modal .m-x:hover { background: rgba(255,255,255,.5); color: var(--ink, #14232A); }
+    .lg-modal .mt { font-size: 19px; font-weight: 600; letter-spacing: -.3px; color: var(--ink, #14232A); line-height: 1.25; padding-right: 28px; }
+    .lg-modal .m-sub { font-size: 12.5px; color: var(--muted, #6B7378); margin-top: 5px; line-height: 1.45; }
+    .lg-modal .m-tablewrap { margin-top: 22px; border: 1px solid rgba(255,255,255,.5); border-radius: 14px; overflow: hidden; background: rgba(255,255,255,.4); }
+    .lg-modal .m-tcap { font-size: 10.5px; font-weight: 600; text-transform: uppercase; letter-spacing: .7px; color: var(--muted, #6B7378); padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,.5); }
+    .lg-modal .m-tscroll { max-height: 360px; overflow-y: auto; }
+    .lg-modal .m-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .lg-modal .m-table th { position: sticky; top: 0; background: rgba(255,255,255,.5); text-align: left; font-size: 10px; font-weight: 600;
+        text-transform: uppercase; letter-spacing: .5px; color: var(--faint, #99A1A5); padding: 9px 16px; border-bottom: 1px solid rgba(255,255,255,.5); }
+    .lg-modal .m-table th.sr, .lg-modal .m-table th:first-child { width: 74px; }
+    .lg-modal .m-table td { padding: 11px 16px; color: var(--ink, #14232A); border-bottom: 1px solid rgba(255,255,255,.45); }
+    .lg-modal .m-table tr:last-child td { border-bottom: none; }
+    .lg-modal .m-table tr:hover td { background: rgba(255,255,255,.35); }
+    /* positional fallback (td:first-child/nth-child(2)) alongside the
+       .sr/.nm classes — some callers' row HTML is built server-side
+       without column classes, so this works either way. */
+    .lg-modal .m-table td.sr, .lg-modal .m-table td:first-child { color: var(--faint, #99A1A5); font-variant-numeric: tabular-nums; }
+    .lg-modal .m-table td.nm, .lg-modal .m-table td:nth-child(2) { font-weight: 500; color: var(--ink, #14232A); }
+    @media (prefers-reduced-motion: reduce) {
+        .lg-modal, .lg-modal::before, .lg-modal:hover { transition: none; }
+    }
+
     .lnkrow { display: flex; align-items: center; gap: 14px; margin-top: 12px; flex-wrap: wrap; }
     .lnkrow .lnk { font-size: 12px; font-weight: 600; color: var(--teal, #014653); text-decoration: none; }
     .lnkrow .lnk:hover { text-decoration: underline; }
@@ -147,5 +222,36 @@
         if (e.key !== 'Escape') return;
         document.querySelectorAll('.wai-backdrop.open').forEach(waiClose);
     });
+
+    // Liquid Glass — pointer-tracking specular highlight. Listeners live
+    // directly on each .lg-modal element (not a document-wide delegated
+    // listener) so pointermove only ever fires while the cursor is over
+    // an actual glass modal; .wai-backdrop's pointer-events:none while
+    // closed means these are inert until the modal is open anyway.
+    // Deferred to DOMContentLoaded (not run inline here): this partial can
+    // be included anywhere on a page, including above a module's own
+    // .lg-modal markup further down the same template — querying for
+    // .lg-modal before the parser has reached it would silently find
+    // nothing and attach no listeners at all.
+    function attachLiquidGlassTracking() {
+        document.querySelectorAll('.lg-modal').forEach(function (lg) {
+            if (lg.dataset.lgTrackingBound) return;
+            lg.dataset.lgTrackingBound = '1';
+            lg.addEventListener('pointermove', function (e) {
+                var r = lg.getBoundingClientRect();
+                lg.style.setProperty('--mx', ((e.clientX - r.left) / r.width * 100) + '%');
+                lg.style.setProperty('--my', ((e.clientY - r.top) / r.height * 100) + '%');
+            });
+            lg.addEventListener('pointerleave', function () {
+                lg.style.setProperty('--mx', '80%');
+                lg.style.setProperty('--my', '-5%');
+            });
+        });
+    }
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', attachLiquidGlassTracking);
+    } else {
+        attachLiquidGlassTracking();
+    }
 })();
 </script>

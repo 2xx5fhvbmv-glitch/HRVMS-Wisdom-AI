@@ -13,6 +13,59 @@
     @media (max-width: 575.98px) {
         #payslip-hero { padding-bottom: 0; }
     }
+
+    /* Payslip list — employee avatar, bumped from the shared 21px
+       (.tableUser-block .img-circle in default.css, used app-wide) up to
+       32px. Scoped to this table only — a global bump is a separate,
+       later task across every listing screen. */
+    #employee-table .tableUser-block .img-circle { width: 32px; height: 32px; min-width: 32px; }
+    .pyslip-avatar { position: relative; background: var(--neutral-bg, #DEDEDE); }
+    .pyslip-avatar img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .pyslip-avatar-fallback {
+        position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+        background: var(--teal-soft, #F5F8F8); color: var(--teal, #014653); font-size: 12px; font-weight: 600;
+    }
+
+    /* Payslip list — Share / View Payslip row action buttons only. */
+    .pyslip-actions { display: flex; align-items: center; justify-content: flex-start; gap: 8px; }
+    .pyslip-btn {
+        /* 14px matches this app's standard row-action button size (Bootstrap's
+           .btn-sm, used for the equivalent row buttons on the Payroll drafts/
+           approved-payrolls tables) — the reference's 12.5px read smaller than
+           every other button in the app, not just a different style. */
+        display: inline-flex; align-items: center; font-family: 'Poppins', sans-serif; font-size: 14px;
+        font-weight: 500; border-radius: 10px; cursor: pointer; border: 1px solid transparent;
+        white-space: nowrap; line-height: 1; text-decoration: none;
+        /* Same hover/press motion as .payroll-btn-primary/.payroll-btn-secondary
+           in _payroll_buttons_v2_styles.blade.php (already included below on
+           this page for the modal's own Cancel/Submit buttons) — every button
+           in this module lifts + gains a soft shadow on hover and presses down
+           on click; this restyle had skipped that entirely. */
+        transition: transform .16s cubic-bezier(.2,.8,.2,1), box-shadow .16s ease, background .16s ease, border-color .16s ease, color .16s ease;
+    }
+    .pyslip-btn:focus-visible { outline: 2px solid var(--teal, #014653); outline-offset: 2px; }
+    .pyslip-btn-primary { background: var(--teal, #014653); color: #fff; padding: 8px 16px; }
+    .pyslip-btn-primary:hover {
+        background: var(--teal-2, #035b6c); color: #fff;
+        transform: translateY(-2px);
+        box-shadow: 0 8px 18px -8px rgba(20,35,42,.35);
+    }
+    .pyslip-btn-ghost { background: transparent; color: #3A4145; border-color: #EEF2F2; padding: 8px 14px; }
+    .pyslip-btn-ghost:hover {
+        /* the "cream" hover — var(--paper), same token .payroll-btn-secondary
+           uses for its own light-tint hover elsewhere in this module. */
+        background: var(--paper, #F9F8F1); border-color: var(--teal, #014653); color: var(--teal, #014653);
+        transform: translateY(-2px);
+        box-shadow: 0 8px 18px -8px rgba(20,35,42,.18);
+    }
+    /* Press feedback, declared after both :hover rules so it wins the
+       simultaneous hover+active tie (same ordering/reasoning as the shared
+       payroll button partial). */
+    .pyslip-btn-primary:active, .pyslip-btn-ghost:active {
+        transition-duration: .07s;
+        transform: translateY(0) scale(.94);
+        box-shadow: 0 1px 1px rgba(0,0,0,.04);
+    }
 </style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
@@ -140,7 +193,7 @@
                         </div>
                     </div>
                 </div>
-                <div>
+                <div class="mb-3">
                     <label for="month" class="form-label">MONTH</label>
                     <select class="form-select dd-native-select month" id="month" aria-label="Default select example"></select>
                     <div class="dd" data-target="#month">
@@ -206,7 +259,7 @@
                         </div>
                     </div>
                 </div>
-                <div>
+                <div class="mb-3">
                     <label for="month1" class="form-label">MONTH</label>
                     <select class="form-select dd-native-select month" id="month1" aria-label="Default select example"></select>
                     <div class="dd" data-target="#month1">
@@ -235,7 +288,7 @@
             </div>
             <div class="modal-footer">
                 <a href="#" data-bs-dismiss="modal" class="btn payroll-btn-secondary ms-auto">Cancel</a>
-                <a href="#" class="btn payroll-btn-secondary" id="viewPayslipBtn">Submit</a>
+                <a href="#" class="btn payroll-btn-primary" id="viewPayslipBtn">Submit</a>
 
             </div>
         </div>
@@ -394,19 +447,21 @@
                 { 
                     data: 'employee', 
                     render: function(data, type, row) {
-                        return `<div class="tableUser-block"><div class="img-circle"><img src="${data.profile_picture}"></div><span> ${data.first_name} ${data.last_name}</span></div>`;
+                        var initials = ((data.first_name || '').charAt(0) + (data.last_name || '').charAt(0)).toUpperCase() || '?';
+                        var photoTag = data.profile_picture ? `<img src="${data.profile_picture}" alt="" onerror="this.remove()">` : '';
+                        return `<div class="tableUser-block"><div class="img-circle pyslip-avatar">${photoTag}<span class="pyslip-avatar-fallback">${initials}</span></div><span> ${data.first_name} ${data.last_name}</span></div>`;
                     }
                 },
-                { 
-                    data: 'position', 
+                {
+                    data: 'department',
+                    render: function(data, type, row) {
+                        return ` ${data.department_name}`;
+                    }
+                },
+                {
+                    data: 'position',
                     render: function(data, type, row) {
                         return ` ${data.postion_title}`;
-                    }
-                },
-                { 
-                    data: 'department', 
-                    render: function(data, type, row) {
-                        return ` ${data.department_name} <span class="badge badge-themeLight">${data.department_code}</span>`;
                     }
                 },
                 { 
@@ -418,8 +473,10 @@
                 {
                     data: 'action',
                     render: function(data, type, row) {
-                        return `<a href="#share-modal" data-bs-toggle="modal" data-id='${row.id}' class="btn payroll-btn-secondary btn-small mb-2">Share</a>
-                        <a href="#view-modal" data-bs-toggle="modal" data-id='${row.id}' class="btn payroll-btn-secondary btn-small">View Payslip</a>`;
+                        return `<div class="pyslip-actions">
+                            <a href="#share-modal" data-bs-toggle="modal" data-id='${row.id}' class="pyslip-btn pyslip-btn-ghost">Share</a>
+                            <a href="#view-modal" data-bs-toggle="modal" data-id='${row.id}' class="pyslip-btn pyslip-btn-primary">View Payslip</a>
+                        </div>`;
                     }
                 },
                 { data: 'created_at', visible: false, searchable: false }
