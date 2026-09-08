@@ -13,6 +13,10 @@
     @media (max-width: 575.98px) {
         #budgetcost-hero { padding-bottom: 0; }
     }
+    /* Add Cost modal has ~10 fields — taller than the viewport on smaller
+       screens. Same max-height + overflow-y:auto pattern already used for
+       the Budget Cost Assignment modal (renderfiles/budget_cost_modal.blade.php). */
+    #add-costmodal .modal-body { max-height: 70vh; overflow-y: auto; overflow-x: hidden; }
 </style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">

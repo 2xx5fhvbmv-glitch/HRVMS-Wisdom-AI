@@ -183,6 +183,35 @@
     .ewt-tooltip .ewt-value {
         font-weight: 600;
     }
+
+    /* Employee avatar — same 32px bump as the Payslip/Pension lists. */
+    #ewtTaxTable .tableUser-block .img-circle { width: 32px; height: 32px; min-width: 32px; }
+
+    /* Freeze ID/Employee/Department/Position/Annual Total while the Jan-Dec
+       columns scroll horizontally underneath. DataTables' FixedColumns
+       extension isn't part of this app's bundle. plain position:sticky
+       works for the body cells (.dt-scroll-body is a real overflow:auto
+       element) but NOT the header — DataTables 2 clones the header into
+       its own <table> inside .dt-scroll-head with no id (only the body
+       keeps #ewtTaxTable), and that clone's scrollLeft is synced
+       programmatically rather than by the user actually scrolling it, so
+       sticky's offset there just renders as a flat shift instead of
+       freezing. The header is frozen with a JS scroll-position
+       compensating transform instead (bound below, near ewtTable's init) —
+       selectors below use .ewt-fz directly (not #ewtTaxTable-scoped) so
+       they reach both the id-less header clone and the real body table. */
+    .dataTable td.ewt-fz {
+        position: sticky; z-index: 2; background: #fff;
+    }
+    .dataTable th.ewt-fz {
+        /* The Jan-Dec headers render with no visible background of their
+           own (thead.bg-light isn't actually painting — it's transparent
+           in this table), so matching them means white, not --bs-light,
+           despite still needing to stay opaque to occlude scrolled-under
+           month headers. */
+        position: relative; z-index: 3; background: #fff;
+    }
+    .ewt-fz-4 { box-shadow: 2px 0 4px rgba(0,0,0,.06); }
 </style>
 @endsection
 
@@ -196,11 +225,13 @@
                 data: 'id',
                 title: 'ID',
                 width: '80px',
-                className: 'text-center'
+                className: 'text-center ewt-fz ewt-fz-0'
             },
             {
                 data: 'name',
                 title: 'Employee',
+                width: '200px',
+                className: 'ewt-fz ewt-fz-1',
                 render: function(data, type, row) {
                     let resignedHtml = '';
                     if (row.resigned) {
@@ -237,35 +268,17 @@
                 data: 'department',
                 title: 'Department',
                 width: '150px',
+                className: 'ewt-fz ewt-fz-2',
                 render: function(data, type, row) {
-                    // Always show both name and code when available
-                    if (data && row.departmentCode) {
-                        return `
-                            <div>
-                                <div>${data}</div>
-                                <span class="badge badge-themeLight mt-1">${row.departmentCode}</span>
-                            </div>
-                        `;
-                    }
-                    
-                    // Show just department name if available
-                    if (data) {
-                        return data;
-                    }
-                    
-                    // Show just department code if available
-                    if (row.departmentCode) {
-                        return `<span class="badge badge-themeLight">${row.departmentCode}</span>`;
-                    }
-                    
-                    // Fallback
-                    return '<span class="text-muted">-</span>';
+                    // Department code badge removed — name only.
+                    return data ? data : '<span class="text-muted">-</span>';
                 }
             },
             {
                 data: 'position',
                 title: 'Position',
-                width: '150px'
+                width: '220px',
+                className: 'ewt-fz ewt-fz-3 text-nowrap'
             },
             {
                 data: 'total_ewt',
@@ -282,7 +295,7 @@
                     `;
                 },
                 width: '120px',
-                className: 'text-end'
+                className: 'text-end ewt-fz ewt-fz-4'
             }
         ];
 
@@ -364,6 +377,47 @@
                             $(this.node()).find('.ewt-cell').addClass('ewt-tooltip-bottom');
                         }
                     });
+                    // Frozen-column offsets, computed from actual rendered widths
+                    // rather than the declared column `width`s — DataTables' own
+                    // layout (sort-icon padding, content like "Human Resources
+                    // Coordinator" forcing extra width) doesn't always match what
+                    // was asked for, so a hardcoded offset drifts and the frozen
+                    // columns overlap the first scrolling month column.
+                    setTimeout(function() {
+                        // .dt-scroll-sizing clones exist purely for DataTables' own
+                        // width measurement (zero-height, never visible) — the first
+                        // real row inside .dt-scroll-body is the reliable source
+                        // (each cell's right edge exactly meets the next one's left).
+                        var firstRow = document.querySelector('.dt-scroll-body tbody tr') || document.querySelector('#ewtTaxTable tbody tr');
+                        if (!firstRow) return;
+                        var offsets = [], offset = 0;
+                        for (var i = 0; i < 5; i++) {
+                            var refCell = firstRow.querySelector('.ewt-fz-' + i);
+                            offsets.push(offset);
+                            if (refCell) offset += refCell.getBoundingClientRect().width;
+                        }
+                        // Body cells: .dt-scroll-body is genuinely overflow:auto, so
+                        // plain position:sticky (CSS above) freezes them correctly.
+                        for (var j = 0; j < 5; j++) {
+                            document.querySelectorAll('.dt-scroll-body .ewt-fz-' + j).forEach(function(el) { el.style.left = offsets[j] + 'px'; });
+                        }
+                        // Header cells: .dt-scroll-head is a separate overflow:hidden
+                        // clone whose scrollLeft DataTables syncs programmatically —
+                        // sticky doesn't freeze against that, so cancel its shift with
+                        // a matching transform instead, kept in sync on every scroll.
+                        var scrollBody = document.querySelector('.dt-scroll-body');
+                        function freezeHeader() {
+                            var sl = scrollBody ? scrollBody.scrollLeft : 0;
+                            document.querySelectorAll('.dt-scroll-headInner .ewt-fz').forEach(function(el) {
+                                el.style.transform = 'translateX(' + sl + 'px)';
+                            });
+                        }
+                        freezeHeader();
+                        if (scrollBody && !scrollBody.dataset.ewtFreezeBound) {
+                            scrollBody.dataset.ewtFreezeBound = '1';
+                            scrollBody.addEventListener('scroll', freezeHeader);
+                        }
+                    }, 0);
                 }
             });
         }

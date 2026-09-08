@@ -27,6 +27,9 @@
                 $gridRingClass = $gridApplicantProgress['state'] === 'rejected'
                     ? 'danger'
                     : ($gridApplicantProgress['state'] === 'success' ? 'success' : 'skyblue');
+                // Display-only spelling fix; ApplicantStatus itself is left untouched
+                // since it's an enum value compared elsewhere ('Sortlisted', etc).
+                $displayApplicantStatus = str_replace('Sortlisted', 'Shortlisted', $a->ApplicantStatus);
             @endphp
                 <!-- <a href="#" class="dotsV-link"><i class="fa-solid fa-ellipsis-vertical"></i></a> -->
                 <div class="progress-container {{ $gridRingClass }}" data-progress="{{ $progress  }}">
@@ -41,20 +44,20 @@
                 {{-- HR SortListed --}}
                 {{-- Status --}}
                     @if($a->As_ApprovedBy == 0)
-                    <span class="badge badge-themeSkyblue">{{ $a->ApplicantStatus }}</span>
+                    <span class="badge badge-themeSkyblue">{{ $displayApplicantStatus }}</span>
                     @elseif($a->As_ApprovedBy != 0 &&  $a->ApplicantStatus  == 'Sortlisted')
-                        <span class="badge badge-themeBlue">{{  $a->rank_name }} {{ $a->ApplicantStatus }}</span>
+                        <span class="badge badge-themeBlue">{{  $a->rank_name }} {{ $displayApplicantStatus }}</span>
                     @elseif(in_array($a->ApplicantStatus, ['Round', 'Complete']))
                         @php
                             $gridBadgeClass = 'badge-themeBlue';
                             if ($a->As_ApprovedBy == 2) $gridBadgeClass = 'badge-themePurple';
                             elseif ($a->As_ApprovedBy == 8) $gridBadgeClass = 'badge-themePink';
                         @endphp
-                        <span class="badge {{ $gridBadgeClass }}">{{  $a->rank_name }}  {{ $a->ApplicantStatus }}</span>
+                        <span class="badge {{ $gridBadgeClass }}">{{  $a->rank_name }}  {{ $displayApplicantStatus }}</span>
                     @elseif($a->ApplicantStatus  == 'Selected')
-                        <span class="badge badge-themeSuccess">{{ $a->ApplicantStatus }}</span>
+                        <span class="badge badge-themeSuccess">{{ $displayApplicantStatus }}</span>
                     @elseif( $a->ApplicantStatus  == 'Rejected')
-                        <span class="badge badge-themeDanger">{{  $a->rank_name }}  {{ $a->ApplicantStatus }}</span>
+                        <span class="badge badge-themeDanger">{{  $a->rank_name }}  {{ $displayApplicantStatus }}</span>
                     @endif
                 <div class="bg">
                     <p><i class="fa-regular fa-envelope"></i>{{ $a->email }}</p>

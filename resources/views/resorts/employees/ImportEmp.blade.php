@@ -31,71 +31,68 @@
                 </div>
             </div>
         </div>
-        <div>
-            <div class="row g-4">
-                <div class="col-xxl-7 col-xl-8 col-lg-9">
-                    <div class="card">
-                        {{-- <div class="row">
-                            <div class="col-lg-6"> --}}
-                                @php
-                                    $BudgetConfig= Common::GetBudgetConfigLinks(Auth::guard('resort-admin')->user()->resort_id);
-                                @endphp
-                                <form id="BudgetConfigFiles">
-                                    @csrf
-                                    <div class="row g-md-4 g-3 mb-md-5 mb-4">
-                                        <div class="col-md-6">
-                                            <label class="form-label d-block" for="position">Export Department and Position File</label>
-                                            <a href="{{ route('resort.export.Employee')}}"  class="btn wfp-btn-secondary btn-small Employeefile mt-2">Download Template</a>
-                                            <!-- <a href=""  class="btn btn-theme btn-small Employeefile mt-2">Download</a> -->
-                                        </div>
-                                        <!-- <div class="col-md-6">
-                                            <label class="form-label d-block" for="position">How To Import Employees Using Excel File</label>
-                                            <a href="{{ URL::asset('resorts_assets/demofiles/Employee.xlsx') }}" target="_blank" class="btn btn-theme btn-small Employeefile mt-2">Download </a>
-                                        </div> -->
-                                    </div>
-                                    <div class="row g-md-4 g-3 mb-md-4 mb-3">
-                                        <div class="col-md-12">
-                                            
-                                            <div class="uploadFile-block">
-                                                <div class="uploadFile-btn">
-                                                    <a href="javascript:void(0);" target="_blank" class="btn wfp-btn-primary btn-sm">Upload File</a>
-                                                    <input type="file" name="Employeefile" id="Employeefile" style="display: none;">
-                                                </div>
-                                                <span id="file-name-display" class="text-muted d-block mt-2"></span>
-                                            </div>
-                                            <span id="file-extension-error" class="text-danger d-block mt-2" style="display:none;"></span>
-                                        </div>
-                                    </div>
-
-                                    <div class="card-footer text-end ">
-                                        <button type="submit" class="btn wfp-btn-primary">Submit</button>
-                                    </div>
-                                </form>
-
-                                {{-- Error Table (shown after failed import) --}}
-                                <div id="import-error-section" class="mt-4" style="display:none;">
-                                    <div class="d-flex justify-content-between align-items-center mb-2">
-                                        <h6 class="text-danger mb-0">Import Errors</h6>
-                                        <span id="import-error-count" class="badge bg-danger"></span>
-                                    </div>
-                                    <div class="table-responsive">
-                                        <table class="table table-bordered table-sm" id="import-error-table">
-                                            <thead class="table-light">
-                                                <tr>
-                                                    <th>Row</th>
-                                                    <th>Name</th>
-                                                    <th>Email</th>
-                                                    <th>Department</th>
-                                                    <th>Position</th>
-                                                    <th>Error</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody></tbody>
-                                        </table>
-                                    </div>
+        <div class="ie-scope">
+            <div class="ie-card">
+                <form id="BudgetConfigFiles">
+                    @csrf
+                    <div class="ie-steps">
+                        <div class="ie-step">
+                            <div class="ie-badge">1</div>
+                            <div class="ie-body">
+                                <div class="ie-t">Export Department &amp; Position File</div>
+                                <div class="ie-d">Download the template, then fill in your employees against each department and position.</div>
+                                <div class="ie-controls">
+                                    <a href="{{ route('resort.export.Employee')}}" class="ie-btn ie-ghost">
+                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                                        Download Template
+                                    </a>
                                 </div>
-                            {{-- </div>
-                        </div> --}}
+                            </div>
+                        </div>
+
+                        <div class="ie-step">
+                            <div class="ie-badge">2</div>
+                            <div class="ie-body">
+                                <div class="ie-t">Upload Completed File</div>
+                                <div class="ie-d">Upload the completed Excel file exported from the template.</div>
+                                <div class="ie-controls ie-filepick uploadFile-block">
+                                    <label class="ie-choose">
+                                        <input type="file" name="Employeefile" id="Employeefile" hidden accept=".xls,.xlsx">
+                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M13 2v7h7"/></svg>
+                                        <span id="chooseTxt">Choose File</span>
+                                    </label>
+                                    <span class="ie-fname" id="file-name-display">No file selected</span>
+                                </div>
+                                <span id="file-extension-error" class="text-danger d-block mt-2" style="display:none;"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="ie-foot">
+                        <button type="submit" class="ie-btn ie-primary">Submit</button>
+                    </div>
+                </form>
+
+                {{-- Error Table (shown after failed import) --}}
+                <div id="import-error-section" class="mt-4" style="display:none;">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <h6 class="text-danger mb-0">Import Errors</h6>
+                        <span id="import-error-count" class="badge bg-danger"></span>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-sm" id="import-error-table">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Row</th>
+                                    <th>Name</th>
+                                    <th>Email</th>
+                                    <th>Department</th>
+                                    <th>Position</th>
+                                    <th>Error</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
                     </div>
                 </div>
             </div>
@@ -106,7 +103,12 @@
 @endsection
 
 @section('import-css')
+{{-- _wfp_buttons_v2_styles is still needed here for the "Back to
+     Configuration" button in the page header above (wfp-btn-neutral) —
+     dropping it makes that button lose its background and disappear
+     against the teal header band. --}}
 @include('resorts.workforce_planning._wfp_buttons_v2_styles')
+@include('resorts.employees._import_employee_styles')
 @endsection
 
 @section('import-scripts')
@@ -139,7 +141,8 @@ $(document).ready(function () {
                     if (res && res.status === 'completed' && (!res.error_report || !res.error_report.length)) {
                         toastr.success(res.created_count + ' employee(s) created, ' + res.updated_count + ' updated.', 'Success', { positionClass: 'toast-bottom-right' });
                         $('#BudgetConfigFiles')[0].reset();
-                        $('#file-name-display').text('');
+                        $('#file-name-display').text('No file selected').removeClass('ie-set');
+                        $('#chooseTxt').text('Choose File');
                         $('#import-error-section').hide();
                         $('#import-error-table tbody').empty();
                         return;
@@ -180,15 +183,18 @@ $(document).ready(function () {
         }, 3000);
     }
 
-    // Trigger hidden file input when styled button is clicked
-    $('.uploadFile-btn a').on('click', function () {
-        $('#Employeefile').click();
-    });
-
-    // Show selected file name
+    // Show selected file name + size, and switch the picker label to
+    // "Replace File" — the hidden input is wrapped in a real <label> now,
+    // so no click-forwarding JS is needed to open the native file picker.
     $('#Employeefile').on('change', function () {
-        const fileName = this.files[0] ? this.files[0].name : '';
-        $('#file-name-display').text(fileName);
+        const file = this.files[0];
+        if (file) {
+            $('#file-name-display').text(file.name + ' · ' + (file.size / 1024).toFixed(0) + ' KB').addClass('ie-set');
+            $('#chooseTxt').text('Replace File');
+        } else {
+            $('#file-name-display').text('No file selected').removeClass('ie-set');
+            $('#chooseTxt').text('Choose File');
+        }
         $('#file-extension-error').hide();
     });
 
