@@ -110,6 +110,13 @@
                     </div>
                 </form>
 
+                <div class="sosEmpSafetyStatus-form bg-themeGrayLight mb-md-4 mb-3">
+                    <div class="card-title">
+                        <h3>Instruction History</h3>
+                    </div>
+                    <div id="massInstructionHistorySection"></div>
+                </div>
+
                 <div id="employeStatusSection">
                     @include('resorts.renderfiles.SosEmployeesStatusList', ['employeesStatusList' => $employeesStatusList])
                 </div>
