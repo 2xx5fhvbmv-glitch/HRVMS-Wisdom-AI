@@ -532,6 +532,10 @@ class DashboardController extends Controller
                 'status' => $status->status,
                 'image' => Common::getResortUserPicture($status->employee->admin_parent_id ?? null),
                 'role' => $availableRank,
+                // Wanted on the info window so a manager can contact
+                // someone directly during a live incident, not just see
+                // their dot on the map.
+                'phone' => optional($status->employee->resortAdmin)->personal_phone,
             ];
         })->filter()->values();;
 
