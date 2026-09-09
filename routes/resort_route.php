@@ -1973,6 +1973,7 @@ Route::post('grievance-and-disciplinary/grievance-committee-store', 'GrievanceAn
     Route::get('sos/view-employee-safety-status/{id}', 'SOS\DashboardController@viewEmployeeSafetyDetails')->name('sos.viewEmployeeSafetyDetails');
     Route::post('sos/filter-employee-status/{id}', 'SOS\DashboardController@filterEmployeeSafetyDetails')->name('sos.filterEmployeeSafetyDetails');
     Route::post('sos/update-mass-instruction', 'SOS\DashboardController@updateMassInstruction')->name('sos.updateMassInstruction');
+    Route::get('sos/mass-instruction-history/{id}', 'SOS\DashboardController@massInstructionHistory')->name('sos.massInstructionHistory');
     // Employee live location
     Route::get('sos/employees-live-location/{id}', 'SOS\DashboardController@showMap')->name('sos.showMap');
     Route::post('sos/filter-map-employee-list/{id}', 'SOS\DashboardController@filterMapEmployeeList')->name('sos.filterMapEmployeeList');

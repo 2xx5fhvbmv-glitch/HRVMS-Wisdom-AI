@@ -737,6 +737,11 @@ $(document).ready(function()
                             });
                             // Close modal after success
                             $('#jobDesEdit-modal').modal('hide');
+                            // Land on the Job Description list so the new
+                            // entry (and its compliance result) is visible
+                            // immediately, instead of staying on this
+                            // config page with no sign anything happened.
+                            window.location.href = "{{ route('resort.ta.jobdescription.index') }}";
                         }
                     },
                     error: function(xhr, status, error) {

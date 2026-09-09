@@ -413,21 +413,54 @@ class DashboardController extends Controller
             'mass_instruction' => 'required|string|max:255',
         ]);
 
-        $update = SOSHistoryModel::where('id', $request->sos_history_id)
-            ->where('resort_id', $this->resort->resort_id)
-            ->update(['mass_instructions' => $request->mass_instruction]);
+        // Was overwriting sos_history.mass_instructions (a single string
+        // column) — every send wiped out the previous message with no way
+        // to see what was sent before. Insert a new history row instead;
+        // the old column is left alone (untouched) rather than migrated,
+        // per the decision to stop writing to it going forward.
+        \App\Models\SosMassInstruction::create([
+            'resort_id' => $this->resort->resort_id,
+            'sos_history_id' => $request->sos_history_id,
+            'message' => $request->mass_instruction,
+            'created_by' => $this->resort->id,
+        ]);
 
-        if ($update) {
-            $allEmpDeviceId                         =   Employee::where('resort_id',$this->resort->resort_id)
-                                                            ->where('status', 'Active')                 
-                                                            ->where('device_token', '!=', null)
-                                                            ->where('device_token', '!=', '')
-                                                            ->pluck('device_token');
-            $title                                  =   "SOS Mass Instruction";
-            $moduleName                             =   'SOS';
-            $allEmpPushNotification             =   Common::sendPushNotificationForMobile($allEmpDeviceId->toArray(), $title, $request->mass_instruction, $moduleName, NULL, NULL,NULL,'mass');
-        }
+        $allEmpDeviceId                         =   Employee::where('resort_id',$this->resort->resort_id)
+                                                        ->where('status', 'Active')
+                                                        ->where('device_token', '!=', null)
+                                                        ->where('device_token', '!=', '')
+                                                        ->pluck('device_token');
+        $title                                  =   "SOS Mass Instruction";
+        $moduleName                             =   'SOS';
+        $allEmpPushNotification             =   Common::sendPushNotificationForMobile($allEmpDeviceId->toArray(), $title, $request->mass_instruction, $moduleName, NULL, NULL,NULL,'mass');
+
         return response()->json(['success' => true, 'message' => 'Mass instruction updated successfully.']);
+    }
+
+    /**
+     * History panel for ViewEmployeeSafetyStatus.blade.php, newest first —
+     * the corresponding mobile GET is sos/mass-instructions/{sos_id} in
+     * API\SOSController.
+     */
+    public function massInstructionHistory($id)
+    {
+        if(Common::checkRouteWisePermission('sos.dashboard.index',config('settings.resort_permissions.view')) == false){
+            return abort(403, 'Unauthorized action.');
+        }
+        $id = base64_decode($id);
+        $sosExists = SOSHistoryModel::where('id', $id)->where('resort_id', $this->resort->resort_id)->exists();
+        if (!$sosExists) {
+            return response()->json(['success' => false, 'message' => 'SOS record not found.'], 404);
+        }
+
+        $history = \App\Models\SosMassInstruction::with('sender')
+            ->where('sos_history_id', $id)
+            ->orderByDesc('created_at')
+            ->get();
+
+        $html = view('resorts.renderfiles.SosMassInstructionHistory', compact('history'))->render();
+
+        return response()->json(['success' => true, 'html' => $html]);
     }
 
     public function showMap($id)
