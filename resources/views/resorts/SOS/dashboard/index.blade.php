@@ -54,10 +54,9 @@
                     <div class="col-xl-2 col-md-3 col-sm-4 col-6">
                         <select class="form-select dd-native-select" id="statusFilter">
                             <option value="" selected>Select Status</option>
-                            <option value="Completed">Completed</option>
-                            <option value="Pending">Pending</option>
-                            <option value="Drilled">Drilled</option>
-                            <option value="Rejected">Rejected</option>
+                            @foreach($sosStatusList as $sosStatusOpt)
+                                <option value="{{ $sosStatusOpt }}">{{ $sosStatusOpt }}</option>
+                            @endforeach
                         </select>
                         <div class="dd" data-target="#statusFilter">
                             <button type="button" class="dd-trigger" aria-haspopup="listbox" aria-expanded="false">
@@ -67,10 +66,9 @@
                             <div class="dd-panel" role="listbox" aria-label="Status">
                                 <div class="dd-scroll">
                                     <div class="dd-item active" role="option" data-value=""><span class="dd-nm">Select Status</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
-                                    <div class="dd-item" role="option" data-value="Completed"><span class="dd-nm">Completed</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
-                                    <div class="dd-item" role="option" data-value="Pending"><span class="dd-nm">Pending</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
-                                    <div class="dd-item" role="option" data-value="Drilled"><span class="dd-nm">Drilled</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
-                                    <div class="dd-item" role="option" data-value="Rejected"><span class="dd-nm">Rejected</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    @foreach($sosStatusList as $sosStatusOpt)
+                                        <div class="dd-item" role="option" data-value="{{ $sosStatusOpt }}"><span class="dd-nm">{{ $sosStatusOpt }}</span><svg class="dd-tick" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M20 6L9 17l-5-5"/></svg></div>
+                                    @endforeach
                                 </div>
                             </div>
                         </div>

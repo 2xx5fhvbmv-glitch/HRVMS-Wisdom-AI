@@ -584,7 +584,7 @@ class SOSController extends Controller
                                                                 // position for exactly the emergencies where it matters
                                                                 // most, returning a misleading "No employee location
                                                                 // found" instead.
-                                                                ->whereIn('sos_history.status',['Active','Drill-Active','Real-Active','In-Progress'])
+                                                                ->whereIn('sos_history.status', Common::sosOpenStatuses())
                                                                 ->first();
 
 
@@ -683,7 +683,7 @@ class SOSController extends Controller
                                                                 // position for exactly the emergencies where it matters
                                                                 // most, returning a misleading "No employee location
                                                                 // found" instead.
-                                                                ->whereIn('sos_history.status',['Active','Drill-Active','Real-Active','In-Progress'])
+                                                                ->whereIn('sos_history.status', Common::sosOpenStatuses())
                                                                 ->select('sos_history.*','stma.status as team_member_status', 'stma.address as team_member_address', 'stma.latitude as team_member_latitude', 'stma.longitude as team_member_longitude','stma.id as team_member_id','stma.emp_id as team_member_emp_id','set.name as emergency_name')
                                                                 ->first();
             if (!$sosData) {
@@ -1249,7 +1249,7 @@ class SOSController extends Controller
                                                                 // same class of bug fixed for employee-team-location/
                                                                 // SOSDetails: a live SOS could never be marked Completed
                                                                 // by the security manager, only a drill could.
-                                                                ->whereIn('status',['Active', 'Drill-Active', 'Real-Active', 'In-Progress'])
+                                                                ->whereIn('status', Common::sosOpenStatuses())
                                                                 ->first();
             if (!$sosHistory) {
                 return response()->json(['success' => false, 'message' => 'SOS Not Found'], 200);
