@@ -761,6 +761,17 @@ class SOSController extends Controller
             $sosData->initiator_emp_id                  =   $initiator->Emp_id ?? null;
             $sosData->initiator_photo                   =   $initiator ? Common::getResortUserPicture($initiator->admin_id) : null;
 
+            // Configured on the web Configuration page (Emergency Types'
+            // default team) but never reached the manager's dispatch/detail
+            // screen before — the manager had no server-suggested default
+            // and had to already know/remember what was configured. Same
+            // sos_child_emergency_types lookup getAnySOSEmergency() already
+            // uses for the initiator's own status check.
+            $sosData->default_teams                     =   SOSChildEmergencyType::join('sos_teams as st', 'st.id', '=', 'sos_child_emergency_types.team_id')
+                                                                ->where('sos_child_emergency_types.emergency_id', $sosData->emergency_id)
+                                                                ->select('st.id as team_id', 'st.name as team_name')
+                                                                ->get();
+
             $teamMemberStats                            =   SosTeamMemberActivity::where('sos_history_id', $sosId)
                                                                 ->selectRaw("
                                                                     COUNT(*) as total,
