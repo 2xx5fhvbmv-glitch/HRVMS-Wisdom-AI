@@ -20,7 +20,6 @@ use App\Models\SOSTeamMemeberModel;
 use App\Models\SOSEmergencyTypesModel;
 use App\Models\SOSChildEmergencyType;
 use App\Models\ResortSiteSettings;
-use Google\Service\CloudControlsPartnerService\Console;
 use Illuminate\Support\Facades\Validator;
 
 class ConfigurationController extends Controller
@@ -92,7 +91,12 @@ class ConfigurationController extends Controller
             'sos.*.role_name' => ['required', 'string', 'max:255'],
             'sos.*.role_name.*' => ['required', 'distinct'],
 
-            'sos.*.assign_permission.*' => 'required|array|min:1',
+            // Was both keyed 'sos.*.assign_permission.*' — a PHP array
+            // literal can't hold the same key twice, so the second
+            // (per-element 'string') silently overwrote the first
+            // (array-level required|array|min:1), which never actually
+            // validated. The array-level rule needs no trailing '.*'.
+            'sos.*.assign_permission' => 'required|array|min:1',
             'sos.*.assign_permission.*' => 'string'
 
             // Custom Rule to ensure uniqueness for each role and permission
@@ -511,7 +515,6 @@ class ConfigurationController extends Controller
                                 data-name ="'.$row->name.'"  
                                 data-id="' . e($id) . '"
                                 data-description="'.$row->description.'"
-                                data-teamMembers="'.$row->members.'"
                                 >
                                     <i class="fa-solid fa-pen-to-square"></i>
                                 </a>
