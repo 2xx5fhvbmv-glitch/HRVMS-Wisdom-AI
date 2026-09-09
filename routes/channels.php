@@ -36,6 +36,12 @@ Broadcast::channel('resort-online.{resort_id}', function ($user, $resort_id) {
         : false;
 });
 
+// SOS dashboard real-time alert — any resort-admin/employee of this resort
+// can listen, matching resort-online.{resort_id}'s same resort_id check.
+Broadcast::channel('resort.{resort_id}.sos', function ($user, $resort_id) {
+    return (int) $user->resort_id === (int) $resort_id;
+});
+
 Broadcast::channel('App.Models.User.{id}', function ($user, $id) {
     \Log::info('Broadcasting channel for user: ' . $id);
     return (int) $user->id === (int) $id;
