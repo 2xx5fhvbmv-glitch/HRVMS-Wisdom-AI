@@ -5085,6 +5085,27 @@ class Common
     }
 
     /**
+     * sos_history.status drifted across 3 migrations (Drill-active renamed
+     * Drill-Active; Under-Control/Drill-Under-Control added then dropped
+     * again) and several call sites were written against an earlier version
+     * of this list and never updated. Single source of truth going forward
+     * — don't hardcode a status list at a new call site, use these.
+     *
+     * Drill and Real are deliberately grouped together here per product:
+     * "Drill and Real SOS are meant to behave identically everywhere except
+     * reporting" — only SosReportController should ever split them apart.
+     */
+    public static function sosOpenStatuses(): array
+    {
+        return ['Active', 'Drill-Active', 'Real-Active', 'In-Progress'];
+    }
+
+    public static function sosClosedStatuses(): array
+    {
+        return ['Completed', 'Rejected', 'Drill-Completed', 'Drill-Rejected'];
+    }
+
+    /**
      * True if this resort admin (Employee::Admin_Parent_id, NOT
      * employees.id — see Employee::sosTeams()'s own comment on this exact
      * gotcha) is an active member of any SOS response team for this

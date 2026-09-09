@@ -112,15 +112,24 @@ class DashboardController extends Controller
                 return '<div class="user-ovImg">' . $employeesImage . '</div>';
             })
             ->addColumn('status', function ($row) {
+                // sos_history.status drifted across migrations (Drill-active
+                // renamed Drill-Active; Real-Active/In-Progress/Drill-Rejected/
+                // Drill-Completed added later) and this switch was never
+                // updated past the earliest version of that list — every
+                // status added since fell through to "Pending", which is
+                // wrong for an already-resolved or already-dispatched incident.
                 switch($row->status) {
                     case 'Completed':
-                        return '<span class="badge badge-themeSuccess">Completed</span>';
-                    case 'Drill-active':
-                        return '<span class="badge badge-infoBorder">Drill-active</span>';
+                    case 'Drill-Completed':
+                        return '<span class="badge badge-themeSuccess">'.$row->status.'</span>';
                     case 'Active':
-                        return '<span class="badge badge-infoBorder">Active</span>';
+                    case 'Drill-Active':
+                    case 'Real-Active':
+                    case 'In-Progress':
+                        return '<span class="badge badge-infoBorder">'.$row->status.'</span>';
                     case 'Rejected':
-                        return '<span class="badge badge-themeDangerNew">Rejected</span>';
+                    case 'Drill-Rejected':
+                        return '<span class="badge badge-themeDangerNew">'.$row->status.'</span>';
                     default:
                         return '<span class="badge badge-themeDanger">Pending</span>';
                 }
@@ -153,9 +162,17 @@ class DashboardController extends Controller
             ->make(true);
         }
 
-        $hasPendingSOS = SOSHistoryModel::where('status', 'Pending')->exists();
+        // Was missing resort_id — a Pending SOS in ANY resort made this true
+        // for every resort's dashboard, a live cross-tenant leak.
+        $hasPendingSOS = SOSHistoryModel::where('status', 'Pending')->where('resort_id', $this->resort->resort_id)->exists();
 
-        return view('resorts.SOS.dashboard.index', compact('page_title', 'SOSHistory','hasPendingSOS'));
+        // Rendered server-side from the same status list used everywhere
+        // else so the filter dropdown can't drift out of sync with the real
+        // enum again — it previously offered a fictional "Drilled" value
+        // that matched zero rows and was missing 5 of the 9 real statuses.
+        $sosStatusList = array_merge(['Pending'], Common::sosOpenStatuses(), Common::sosClosedStatuses());
+
+        return view('resorts.SOS.dashboard.index', compact('page_title', 'SOSHistory','hasPendingSOS','sosStatusList'));
         
     }
 
