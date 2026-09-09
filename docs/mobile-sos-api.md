@@ -191,3 +191,145 @@ that distinction).
 - **No persisted GPS trail.** `sos_history_employee_status`/`sos_team_member_activity` hold current position only — no "replay the last 10 minutes of movement" capability. Flag if the app needs that; it's a new table + a small change to `location-update`, not built now.
 - **`sos-history-listing`/`sos-history-details` are resort-wide, not scoped to the caller.** Any employee can see any past incident's history for their resort. Intentional per existing code (not something introduced here) — flag if that needs narrowing.
 - Video reference in the ticket comment wasn't accessible from here — if the flow it shows differs from what's documented above (e.g. a different role model, additional screens), point out the specific gap and it'll get built/adjusted rather than guessed at.
+
+## 2026-09-09 — Figma review against the real backend, web dashboard fixes
+
+Compared the mobile Figma screens (Trigger SOS / Pending Approval / Receive
+SOS / Employee Locations, Security Manager's Emergency Alerts + Select Team
++ SOS Confirmed, SOS History + Chat Logs, and the 3 web dashboard screens —
+Team Activity, Employee Safety Status, Live Locations) against what's
+actually built. Net result: **the mobile API surface Figma needs already
+exists almost entirely** (documented above); the 3 web pages reported as
+"not working" have one real code bug (fixed) and one data-completeness
+issue that isn't a code bug at all.
+
+### Mobile screens vs existing API — mapped, nothing new needed
+
+| Figma screen | Backend endpoint |
+|---|---|
+| Trigger SOS (Fire/Medical/Security type picker) | `GET sos/emergency-types` + `POST sos/sos-store` |
+| Pending-approval state (yellow ring, play icon) | `GET sos/get-any-sos-emergency` — poll this for the employee's own incident's current status |
+| Receive SOS / "Hold to call" | `GET sos/get-any-sos-emergency` (own role/permissions on it) — the Call button is a plain `tel:` action, no API |
+| Employees Location (map + roster) | `GET sos/employee-team-location/{sos_id}` |
+| Security Manager: Emergency Alerts (Confirm & Notify / Reject) | `POST sos/handle-sos-action-with-team` (`action: Active|Drill-Active|Rejected|Drill-Rejected`) |
+| Security Manager: Select Team + Pertinent Information + Submit | Same call — `team_id[]` + `team_message` are exactly "Select Team" + "Pertinent Information" |
+| SOS Confirmed (Fire Activated, Under Control / Disable, View Employees Status) | `POST sos/complete-sos-update-status` (Disable→Completed); "Under Control" has no dedicated status today — see gap below |
+| SOS History listing + detail (acknowledged count, incident timeline) | `GET sos/sos-history-listing`, `GET sos/sos-history-details/{sos_id}` |
+| Chat Logs | `GET sos/chat-logs/{sos_id}`, `POST sos/send-chat-message` |
+| Team Activity (web) — total/acknowledged/pending, per-member row | `GET sos/get-team-acknowledged/{sos_id}` mobile-side; web page below reads the same tables directly |
+
+**One real gap**: the Figma "SOS Confirmed" screen has an **"Under Control"**
+button distinct from "Disable" — today there's only `complete-sos-update-status`
+(→ `Completed`, matches "Disable"). Nothing marks an incident "handled but
+still open" separately from fully closing it. If that distinction matters
+to the workflow (vs. just a UI label), it needs a new status value or a
+boolean flag on `sos_history` — not built, flagging rather than guessing
+at what "Under Control" should actually change.
+
+### Web dashboard: what was actually broken
+
+**`sos/employees-live-location/{id}` — fixed.** `employeeLiveLocation.blade.php`
+hardcoded a literal Google Maps API key directly in the script tag instead
+of reading `env('GOOGLE_MAPS_API_KEY')` — the pattern every other map page in
+this app already uses correctly (`geofence-zones.blade.php`,
+`timeandattendance/Configration/index.blade.php`). That stray key is almost
+certainly invalid/restricted/over-quota, which is exactly the generic
+"Sorry! Something went wrong. This page didn't load Google Maps correctly"
+error Google's JS SDK shows for any bad key — not a data or logic problem.
+Fixed to use the real configured key.
+
+**`sos/view-team-activity/{id}` and `sos/view-employee-safety-status/{id}` —
+not a code bug, a data-completeness issue for this specific test incident.**
+Checked incident 457 (the id in both reported URLs) directly against the
+database: it's a real row (`resort_id: 26`, `status: Drill-Active`), but
+`sos_team_member_activity`, `sos_history_employee_status`, and
+`child_sos_history` all have **zero rows** for it. Both controller
+methods' queries are correct and simple (`where('sos_history_id', $id)` —
+nothing wrong with the read side).
+
+Root cause: those 3 tables are only ever populated inside
+`handleSOSActionWithTeam()` (`sos/handle-sos-action-with-team`), and only
+on the `Active`/`Drill-Active` branch (bulk-inserts one
+`sos_history_employee_status` row per active employee, plus one
+`child_sos_history` + `sos_team_member_activity` row per dispatched team
+member). But `drillRealSOS()` (`sos/drill-real-sos`) — a **separate,
+earlier** endpoint that classifies a Pending incident as
+`Real-Active`/`Drill-Active` before team dispatch, by its own explicit
+comment ("no team is assigned yet at this point") — sets that exact same
+status value on its own, with no team-dispatch side effect at all.
+
+So an incident can reach `Drill-Active` status two ways: (1) through
+`drill-real-sos` alone (classification only, no team/employee rows), or
+(2) through `handle-sos-action-with-team` (full dispatch, all 3 tables
+populated). Incident 457 went through path (1) only — classified but never
+actually dispatched to a team — which is why every web dashboard page that
+reads those 3 tables shows empty. This is expected behavior for an
+incident in that state, not a bug in the pages themselves. Two ways to
+close this out, depending on what's true operationally:
+- If every real incident is expected to always get dispatched (path 2)
+  shortly after classification, this is just incomplete test data — no
+  code change needed, re-test against an incident that went through the
+  real Security Manager dispatch flow.
+- If an incident can legitimately sit "classified but not yet dispatched"
+  for a while in real usage, the web pages should say so explicitly
+  ("No team dispatched yet" / "No employee status recorded yet") instead
+  of silently rendering an empty table — a small, contained view-level
+  fix, not built here since it's a product decision (show a real empty
+  state, or treat "classified but undispatched" as not reachable in
+  practice).
+
+Confirmed via web search of the actual controllers that the web portal has
+**no path of its own** that sets `sos_history.status` — every status
+transition is mobile/API-only (`drillRealSOS`, `handleSOSActionWithTeam`,
+`completeSOSUpdateStatus`). The web dashboard is read-only monitoring by
+design, which matches the Figma web screens shown (Team Activity /
+Employee Safety Status / Live Locations are all display + filter + "Send
+Mass Instructions", no dispatch action anywhere in them) — consistent,
+not a gap.
+
+### Module status summary
+
+**Done:**
+- Full SOS trigger → classify → dispatch → acknowledge → resolve API
+  surface (mobile), matching every mobile Figma screen shown.
+- Web configuration (teams, roles, emergency types) — already comprehensive
+  per your own note.
+- Web monitoring dashboards (Team Activity, Employee Safety Status, Live
+  Locations) — correct read-side queries, filters (`All Teams`/`All
+  Department` dropdowns, `Unacknowledged Only`/`Unknown Status Only`
+  toggles), and `Send Mass Instructions` (`updateMassInstruction()`) all
+  already built and wired to real endpoints.
+- Google Maps live-location page — fixed this pass.
+
+**Pending / needs a decision, not yet built:**
+- "Under Control" as a distinct SOS Confirmed-screen state (see gap above)
+  — needs a product decision on what it should actually change before
+  it's built.
+- Empty-state messaging on the 2 monitoring pages for a classified-but-
+  undispatched incident (see above) — small, only worth doing if that
+  state is actually reachable in real usage rather than test-only.
+- No persisted GPS trail / resort-wide (not caller-scoped) SOS history —
+  both already flagged above, unchanged by this pass.
+
+### For app dev: confirm dialog (add before shipping)
+
+Every irreversible SOS action should get a native confirm dialog before
+the API call fires — none of this needs a new endpoint, it's purely a
+client-side gate in front of calls that already exist:
+
+- **Triggering an SOS** (`sos/sos-store`) — "Are you sure you want to
+  trigger an SOS? This will alert Security and cannot be undone." /
+  Confirm / Cancel. This is the single highest-value confirm to add: a
+  misclick here pages real people.
+- **Security Manager: Confirm & Notify / Reject** (`handle-sos-action-with-team`)
+  — confirm before dispatching a real team, and separately before
+  rejecting (in case of misclick on a real emergency).
+- **Disable / mark Completed** (`complete-sos-update-status`) — confirm
+  before closing out an incident that might still be active on the
+  ground.
+
+Recommend the confirm copy restates the consequence in plain language
+(not just "Are you sure?") — e.g. "This will notify the Fire Team and all
+employees at this resort" — since the cost of a false-negative cancel is
+low but the cost of an accidental real dispatch or an accidental close-out
+is high.
