@@ -21,7 +21,6 @@ use App\Models\SosHistoryEmployeeStatus;
 use App\Models\ResortDepartment;
 use App\Models\SOSRolesAndPermission;
 use App\Models\ResortGeoLocation;
-use Google\Service\CloudControlsPartnerService\Console;
 use Illuminate\Support\Facades\Validator;
 
 class DashboardController extends Controller

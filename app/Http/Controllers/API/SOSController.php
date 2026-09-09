@@ -966,6 +966,16 @@ class SOSController extends Controller
 
 
             $displayedStatuses                          = ['data' => []];
+            // Was checking in_array($m->sos_status, $displayedStatuses) —
+            // $displayedStatuses is ['data' => [...]], an associative array
+            // whose only "value" is that inner array, so the status string
+            // could never actually be found in it and this never
+            // deduplicated anything. Track seen statuses in a flat list
+            // instead. Real impact: an incident with 2+ acknowledging team
+            // members duplicated the "acknowledgements received" timeline
+            // step once per member (ChildSOSHistoryStatus gets a new row
+            // per acknowledgement, no dedupe on the write side either).
+            $seenStatuses                                = [];
 
             foreach($sosHistory as $m)
             {
@@ -973,8 +983,9 @@ class SOSController extends Controller
                 $date                                   =   $dateTime->format('Y-m-d');
                 $time                                   =   $dateTime->format('H:i:s');
 
-                if(!in_array($m->sos_status, $displayedStatuses))
+                if(!in_array($m->sos_status, $seenStatuses, true))
                 {
+                    $seenStatuses[]                     =   $m->sos_status;
                     $displayedStatuses['data'][]        =   [
                         'sos_status'                    =>  $m->sos_status,
                         'date'                          =>  $date,
