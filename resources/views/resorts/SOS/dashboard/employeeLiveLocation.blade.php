@@ -176,13 +176,45 @@
         setInterval(loadLiveData, 10000); // Auto-refresh every 10s
     }
 
+    // 3-way status color (Safe/Unsafe/Unknown) — was only ever 2-way
+    // (Unsafe treated the same as Unknown), which made "hasn't responded
+    // yet" visually indistinguishable from "in danger". Single source for
+    // both the marker icon and the info-window text color so they can't
+    // drift apart from each other again.
+    function statusMarkerIcon(status) {
+        if (status === 'Safe') return 'http://maps.google.com/mapfiles/ms/icons/green-dot.png';
+        if (status === 'Unsafe') return 'http://maps.google.com/mapfiles/ms/icons/red-dot.png';
+        return 'http://maps.google.com/mapfiles/ms/icons/yellow-dot.png'; // Unknown
+    }
+    function statusTextColor(status) {
+        if (status === 'Safe') return '#198754';
+        if (status === 'Unsafe') return '#dc3545';
+        return '#b8860b'; // Unknown — amber, distinct from both Safe/Unsafe
+    }
+    function buildInfoWindowContent(user) {
+        return `
+            <div style="display: flex; align-items: center; padding: 5px;">
+                <img src="${user.image}" alt="${user.name}" style="width:40px; height:40px; border-radius:50%; object-fit:cover; margin-right:10px;">
+                <div>
+                    <div style="font-weight:500; font-size:14px; margin-bottom: 5px">${user.name}</div>
+                    <div style="font-size:12px; color:##666666; margin-bottom: 5px">${user.department}</div>
+                    <div style="font-size:12px; color:##666666; margin-bottom: 5px">${user.role}</div>
+                    ${user.phone ? `<div style="font-size:12px; color:##666666; margin-bottom: 5px"><a href="tel:${user.phone}">${user.phone}</a></div>` : ''}
+                    <div style="color: ${statusTextColor(user.status)}; font-size:12px;">${user.status}</div>
+                </div>
+            </div>`;
+    }
+
+    let infoWindows = {};
+
     function updateMapMarkers(locations) {
-        
+
         // Clear markers not in new data
         Object.keys(markers).forEach(id => {
             if (!locations.find(loc => loc.id == id)) {
                 markers[id].setMap(null);
                 delete markers[id];
+                delete infoWindows[id];
             }
         });
 
@@ -191,25 +223,25 @@
             const pos = { lat: user.lat, lng: user.lng };
             if (markers[user.id]) {
                 markers[user.id].setPosition(pos);
+                // Was missing entirely — a marker created once never had its
+                // color updated again, so a status change (e.g. Unknown ->
+                // Safe) while the map stayed open kept showing the stale color
+                // even though the dot kept moving on every 10s poll.
+                markers[user.id].setIcon(statusMarkerIcon(user.status));
+                markers[user.id].setTitle(`${user.name} (${user.status})`);
+                if (infoWindows[user.id]) {
+                    infoWindows[user.id].setContent(buildInfoWindowContent(user));
+                }
             } else {
                 const marker = new google.maps.Marker({
                     position: pos,
                     map: map,
                     title: `${user.name} (${user.status})`,
-                    icon: (user.status === 'Unsafe' || user.status === 'Unknown') ? 'http://maps.google.com/mapfiles/ms/icons/red-dot.png' : 'http://maps.google.com/mapfiles/ms/icons/green-dot.png',
+                    icon: statusMarkerIcon(user.status),
                 });
 
                 const infoWindow = new google.maps.InfoWindow({
-                    content: `
-                        <div style="display: flex; align-items: center; padding: 5px;">
-                            <img src="${user.image}" alt="${user.name}" style="width:40px; height:40px; border-radius:50%; object-fit:cover; margin-right:10px;">
-                            <div>
-                                <div style="font-weight:500; font-size:14px; margin-bottom: 5px">${user.name}</div>
-                                <div style="font-size:12px; color:##666666; margin-bottom: 5px">${user.department}</div>
-                                <div style="font-size:12px; color:##666666; margin-bottom: 5px">${user.role}</div>
-                                <div style="color: ${(user.status === 'Unsafe' || user.status === 'Unknown') ? '#dc3545' : '#198754'}; font-size:12px;">${user.status}</div>
-                            </div>
-                        </div>`,
+                    content: buildInfoWindowContent(user),
                     pixelOffset: new google.maps.Size(0, -5),
                     disableAutoPan: false
                 });
@@ -230,6 +262,7 @@
                 });
 
                 markers[user.id] = marker;
+                infoWindows[user.id] = infoWindow;
 
             }
         });
@@ -257,6 +290,11 @@
             success: function(response) {
                 if (response.success) {
                     updateMapMarkers(response.locations);
+                    // Was only updating the map — the response already
+                    // carries the rendered list HTML (used on filter submit/
+                    // reset), just never applied on the 10s auto-poll, so the
+                    // dots moved live but the adjacent list sat stale.
+                    $("#employeStatusSection").html(response.html);
                 }
             },
             error: function(error) {
