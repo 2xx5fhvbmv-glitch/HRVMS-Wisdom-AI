@@ -136,6 +136,24 @@ class SOSController extends Controller
                 'emergency_description'                 =>  $request->emergency_description,
             ]);
 
+            // Web dashboard had no way to know a new SOS came in except
+            // manually refreshing — see routes/channels.php's
+            // resort.{resort_id}.sos authorizer.
+            try {
+                $emergencyName = SOSEmergencyTypesModel::where('id', $request->emergency_id)->value('name');
+                event(new \App\Events\SosTriggered(
+                    $this->resort_id,
+                    $SOSHistoryAdd->id,
+                    $SOSHistoryAdd->status,
+                    $emergencyName,
+                    $SOSHistoryAdd->location,
+                    trim($this->user->first_name . ' ' . $this->user->last_name),
+                    Common::getResortUserPicture($this->user->id)
+                ));
+            } catch (\Throwable $e) {
+                \Log::warning('SosTriggered broadcast failed on SOSStore: ' . $e->getMessage());
+            }
+
             // rank==4 (MGR) used to be required here too, but no Security
             // Manager record in the DB actually carries rank 4 — the real
             // seeded example is rank 2/HOD — so that condition never
@@ -244,7 +262,26 @@ class SOSController extends Controller
             $sosHistory->team_message                   =   $request->team_message ?? null;
             $sosHistory->rejected_message               =   $request->rejected_message ?? null;
             $sosHistory->save();
-            
+
+            // Web dashboard real-time alert — same event as SOSStore(), now
+            // reflecting the Approved/Rejected/Dispatched transition.
+            try {
+                $sosInitiatorName = Employee::join('resort_admins as ra', 'ra.id', '=', 'employees.Admin_Parent_id')
+                    ->where('employees.id', $sosHistory->emp_initiated_by)
+                    ->select('ra.first_name', 'ra.last_name')
+                    ->first();
+                event(new \App\Events\SosTriggered(
+                    $this->resort_id,
+                    $sosHistory->id,
+                    $sosHistory->status,
+                    SOSEmergencyTypesModel::where('id', $sosHistory->emergency_id)->value('name'),
+                    $sosHistory->location,
+                    $sosInitiatorName ? trim($sosInitiatorName->first_name . ' ' . $sosInitiatorName->last_name) : null
+                ));
+            } catch (\Throwable $e) {
+                \Log::warning('SosTriggered broadcast failed on handleSOSActionWithTeam: ' . $e->getMessage());
+            }
+
             // Get initiator details
             $empInitiatedDeviceToken                    =   Employee::where('resort_id', $this->resort_id)
                                                                 ->where('status', 'Active')

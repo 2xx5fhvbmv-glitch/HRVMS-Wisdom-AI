@@ -29,7 +29,7 @@
 </style>
 <div class="body-wrapper pb-5">
     <div class="container-fluid">
-        <div class="page-hedding" id="sos-hero">
+        <div class="page-hedding" id="sos-hero" data-resort-id="{{ auth('resort-admin')->user()->resort_id }}">
             <div class="row justify-content-between g-3">
                 <div class="col-auto">
                     <div class="page-title">
@@ -38,6 +38,14 @@
                     </div>
                 </div>
             </div>
+        </div>
+        {{-- Persistent, not a dismissible-and-forgotten toastr — an active SOS
+             should stay visible until the manager dismisses it, not fade after
+             a few seconds like a routine success message. Populated by the
+             resort.{resort_id}.sos Echo listener below. --}}
+        <div id="sos-live-alert" class="alert alert-danger d-none" style="position: sticky; top: 0; z-index: 1050;">
+            <strong id="sos-live-alert-text"></strong>
+            <button type="button" class="btn-close float-end" aria-label="Dismiss" onclick="document.getElementById('sos-live-alert').classList.add('d-none')"></button>
         </div>
         <div class="card card-sosHistory">
             <div class="card-header">
@@ -144,6 +152,25 @@
 
 <script type="text/javascript">
     $(document).ready(function () {
+
+        // Real-time SOS alert — no broadcast infra for SOS existed before
+        // this, so a Security Manager staring at this dashboard had no way
+        // to know a new SOS came in except manually refreshing the page.
+        (function () {
+            var resortId = $('#sos-hero').data('resort-id');
+            if (!window.Echo || !resortId) return;
+            window.Echo.private('resort.' + resortId + '.sos').listen('.SosTriggered', function (e) {
+                if ($.fn.DataTable.isDataTable('#SOSHistoryTable')) {
+                    $('#SOSHistoryTable').DataTable().ajax.reload(null, false);
+                }
+                var who = e.initiator_name ? e.initiator_name + ' — ' : '';
+                $('#sos-live-alert-text').text(
+                    'SOS ' + (e.status || '') + ': ' + who + (e.emergency_name || 'Emergency') +
+                    (e.location ? ' at ' + e.location : '')
+                );
+                $('#sos-live-alert').removeClass('d-none');
+            });
+        })();
 
         flatpickr('.datepicker', {
             dateFormat: 'd/m/Y',
