@@ -1513,6 +1513,47 @@ class SOSController extends Controller
     }
 
     /**
+     * Ordered history (newest first) of mass instructions sent for an
+     * incident — the web side writes to sos_mass_instructions (a real
+     * history table) instead of overwriting sos_history.mass_instructions
+     * as it used to. Any authenticated employee can see what was sent, not
+     * just whoever had the app open at send time, same access posture as
+     * sosChatLogs() above.
+     */
+    public function sosMassInstructions($sosId)
+    {
+        if (!Auth::guard('api')->check()) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        $sosId                                          =   base64_decode($sosId);
+        try {
+            $instructions                               =   \App\Models\SosMassInstruction::join('resort_admins as ra', 'sos_mass_instructions.created_by', '=', 'ra.id')
+                                                                ->where('sos_mass_instructions.resort_id', $this->resort_id)
+                                                                ->where('sos_mass_instructions.sos_history_id', $sosId)
+                                                                ->orderBy('sos_mass_instructions.created_at', 'desc')
+                                                                ->select(
+                                                                    'sos_mass_instructions.*',
+                                                                    'ra.first_name',
+                                                                    'ra.last_name'
+                                                                )
+                                                                ->get();
+
+            return response()->json([
+                'success'                               =>  true,
+                'message'                               =>  "Mass instructions fetched successfully.",
+                'data'                                  =>  $instructions,
+            ], 200);
+
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::error($e->getMessage());
+            return response()->json(['success' => false, 'message' => 'Server error'], 500);
+        }
+    }
+
+    /**
      * Post a chat message during an active SOS. Not explicitly in the
      * mobile spec (which only listed the GET log), but a log screen with
      * no way to populate it isn't testable — thin, isolated addition.

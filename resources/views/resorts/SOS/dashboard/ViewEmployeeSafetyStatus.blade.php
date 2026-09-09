@@ -176,6 +176,19 @@
             });
         });
 
+        function loadMassInstructionHistory() {
+            $.ajax({
+                url: "{{ route('sos.massInstructionHistory', '') }}/" + $('#sos_history_id').val(),
+                method: "GET",
+                success: function(response) {
+                    if (response.success) {
+                        $('#massInstructionHistorySection').html(response.html);
+                    }
+                }
+            });
+        }
+        loadMassInstructionHistory();
+
         $('#massInstructionForm').submit(function(e) {
             e.preventDefault();
 
@@ -186,10 +199,11 @@
                 success: function(response) {
                     if (response.success) {
                         toastr.success(response.message, "Success", {
-                            positionClass: 'toast-bottom-right' 
+                            positionClass: 'toast-bottom-right'
                         });
                         $('#massInstructionForm')[0].reset();
                         $('#massInstructionForm').parsley().reset();
+                        loadMassInstructionHistory();
                     } else {
                         toastr.error(response.message, "Error", {
                             positionClass: 'toast-bottom-right'

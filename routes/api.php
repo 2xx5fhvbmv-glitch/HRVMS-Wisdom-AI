@@ -525,6 +525,7 @@ use Illuminate\Support\Facades\Route;
 		Route::get('sos/fire-team-members', [App\Http\Controllers\API\SOSController::class, 'fireTeamMembers']);
 		Route::get('sos/chat-logs/{sos_id}', [App\Http\Controllers\API\SOSController::class, 'sosChatLogs']);
 		Route::post('sos/send-chat-message', [App\Http\Controllers\API\SOSController::class, 'sosSendChatMessage']);
+		Route::get('sos/mass-instructions/{sos_id}', [App\Http\Controllers\API\SOSController::class, 'sosMassInstructions']);
 
 		// SOS — Security Manager only (approve/reject/dispatch/complete an
 		// incident). Previously reachable by any authenticated employee.
