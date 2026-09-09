@@ -788,6 +788,19 @@ class SOSController extends Controller
                                                             ->where('status', 'Unacknowledged')
                                                             ->first();
             if (!$sosAcknowledged) {
+                // Was a silent no-op — if the app sends a stale/mismatched
+                // team_member_id (e.g. a cached row id from an earlier
+                // fetch that no longer matches the current
+                // sos_team_member_activity.id on the server), this branch
+                // returns success:false with nothing ever written, and the
+                // web dashboard's "Not Acknowledged" is accurately reporting
+                // the DB truth. Log so this is distinguishable from a
+                // genuine double-submit from server logs alone.
+                \Log::warning('SOSAcknowledge: no matching Unacknowledged row', [
+                    'sos_history_id' => $request->sos_history_id,
+                    'team_member_id' => $request->team_member_id,
+                    'emp_id' => $this->user->id,
+                ]);
                 return response()->json(['success' => false, 'message' => 'SOS Already Acknowledged'], 200);
             }
 

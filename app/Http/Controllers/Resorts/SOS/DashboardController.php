@@ -356,12 +356,20 @@ class DashboardController extends Controller
         $employeesStatusList = $employeeListQuery->paginate(10);
 
         $onlySafeEmpCount = SosHistoryEmployeeStatus::where('status','Safe')->where('sos_history_id', $id)->count();
-        $onlyUnsafeEmpCount = SosHistoryEmployeeStatus::where('status','Unknown')->where('sos_history_id', $id)->count();
+        // Was misleadingly named "onlyUnsafeEmpCount" but queried
+        // status='Unknown' — the Blade label was correctly "Unknown
+        // Status" so this was never user-facing wrong, just a wrong
+        // variable name. Real "Unsafe" count never existed anywhere on
+        // this screen — the single most operationally important number
+        // (who explicitly reported being unsafe) was invisible, folded
+        // into "everyone who isn't Safe."
+        $onlyUnknownEmpCount = SosHistoryEmployeeStatus::where('status','Unknown')->where('sos_history_id', $id)->count();
+        $onlyUnsafeEmpCount = SosHistoryEmployeeStatus::where('status','Unsafe')->where('sos_history_id', $id)->count();
         $totalEmployeesCount = SosHistoryEmployeeStatus::where('sos_history_id', $id)->count();
 
         $getAllDepartments = ResortDepartment::where('resort_id',  $resort_id)->get();
 
-        return view('resorts.SOS.dashboard.ViewEmployeeSafetyStatus',compact('page_title','sosDetails','employeesStatusList','totalEmployeesCount','onlySafeEmpCount','onlyUnsafeEmpCount','id','getAllDepartments'));
+        return view('resorts.SOS.dashboard.ViewEmployeeSafetyStatus',compact('page_title','sosDetails','employeesStatusList','totalEmployeesCount','onlySafeEmpCount','onlyUnknownEmpCount','onlyUnsafeEmpCount','id','getAllDepartments'));
         
     }
 
