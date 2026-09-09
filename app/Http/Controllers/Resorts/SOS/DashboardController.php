@@ -447,7 +447,9 @@ class DashboardController extends Controller
         if(Common::checkRouteWisePermission('sos.dashboard.index',config('settings.resort_permissions.view')) == false){
             return abort(403, 'Unauthorized action.');
         }
-        $id = base64_decode($id);
+        // Raw numeric id, not base64 — matches the sibling AJAX filter
+        // methods (filterEmployeeSafetyDetails/filterTeamActivityDetails)
+        // this is called alongside, both of which take $id as-is.
         $sosExists = SOSHistoryModel::where('id', $id)->where('resort_id', $this->resort->resort_id)->exists();
         if (!$sosExists) {
             return response()->json(['success' => false, 'message' => 'SOS record not found.'], 404);
