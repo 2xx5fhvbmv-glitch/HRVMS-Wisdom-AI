@@ -458,6 +458,7 @@ use Illuminate\Support\Facades\Route;
 		Route::get('disciplinary/disciplinary-details/{disciplinary_id}', [App\Http\Controllers\API\DisciplinaryController::class, 'disciplinaryDetails']);
 		Route::post('disciplinary/acknowledgment-submit', [App\Http\Controllers\API\DisciplinaryController::class, 'AcknowledgmentSubmit']);
 		Route::post('disciplinary/appeal-submit', [App\Http\Controllers\API\DisciplinaryController::class, 'AppealSubmit']);
+		Route::get('disciplinary/appeal-list', [App\Http\Controllers\API\DisciplinaryController::class, 'AppealList']);
 
 		//Clinic
 		Route::middleware(['auth:api', 'check.rank:CLINIC_STAFF'])->group(function () {

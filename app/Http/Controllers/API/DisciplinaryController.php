@@ -256,4 +256,43 @@ class DisciplinaryController extends Controller
             return response()->json(['error' => 'Failed to submit appeal'], 500);
         }
     }
+
+    /**
+     * GET disciplinary/appeal-list — the caller's own disciplinary cases
+     * that have an appeal on them (Appeal_description IS NOT NULL,
+     * written by AppealSubmit() above). Appeal is a single free-text field
+     * per case (mirrors Acknowledgment_description's shape — see the
+     * Sep-2026 migration comment), not a separate history table, so "list"
+     * here means "which of my cases have one," same
+     * resort/employee-scoping as disciplinaryDashboard().
+     */
+    public function AppealList()
+    {
+        if (!$this->user) {
+            return response()->json(['success' => false, 'message' => 'Unauthorized'], 401);
+        }
+
+        try {
+            $employee_id = $this->user->GetEmployee->id;
+
+            $appeals = disciplinarySubmit::with(['offence'])
+                ->where('resort_id', $this->resort_id)
+                ->where('Employee_id', $employee_id)
+                ->whereNotNull('Appeal_description')
+                ->orderByDesc('id')
+                ->get();
+
+            return response()->json([
+                'status'  => true,
+                'message' => 'Appeal list retrieved successfully',
+                'data'    => $appeals,
+            ]);
+
+        } catch (\Exception $e) {
+            \Log::emergency("File: " . $e->getFile());
+            \Log::emergency("Line: " . $e->getLine());
+            \Log::emergency("Message: " . $e->getMessage());
+            return response()->json(['error' => 'Failed to fetch appeal list'], 500);
+        }
+    }
 }
