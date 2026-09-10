@@ -792,8 +792,17 @@ class BoardingPassController extends Controller
                                                             'ArrivalResortTransportation:id,resort_id,transportation_option',
                                                             ])
                                                             ->where('status', 'Pending')
+                                                            // Was approver_rank only — HOD, HR's own rep, and Security
+                                                            // Manager can all be assigned as rank 2 (approver_rank
+                                                            // reflects the real rank of whoever holds each role, not a
+                                                            // fixed per-stage code), so this matched ANY pending
+                                                            // rank-2 stage, not specifically the stage routed to THIS
+                                                            // HR employee. Same fix as boardingHODDashboard() above
+                                                            // (already correct) and boardingSecurityManagerDashboard()
+                                                            // below.
                                                             ->whereHas('employeeTravelPassStatusData', function($q) use ($currentRank) {
-                                                                    $q->where('approver_rank', $currentRank)
+                                                                    $q->where('approver_id', $this->user->GetEmployee->id)
+                                                                    ->where('approver_rank', $currentRank)
                                                                     ->where('status', 'Pending');
                                                                 })
                                                             ->where('resort_id', $this->resort_id)
@@ -923,8 +932,16 @@ class BoardingPassController extends Controller
                                                             ])
                                                             ->where('status', 'Pending')
                                                             ->where('resort_id', $this->resort_id)
+                                                            // Was approver_rank only — the Security Manager's own real
+                                                            // rank (HOD, per this resort's data) is shared with the
+                                                            // actual HOD/HR approvers on the same pass, so this matched
+                                                            // ANY pending rank-2 stage — the reported bug ("Show only
+                                                            // requests that are actually pending Security Manager
+                                                            // approval. Do not display requests pending HOD/HR
+                                                            // approval"). Same fix as boardingHRDashboard() above.
                                                             ->whereHas('employeeTravelPassStatusData', function($q) use ($currentRank) {
-                                                                    $q->where('approver_rank', $currentRank)
+                                                                    $q->where('approver_id', $this->user->GetEmployee->id)
+                                                                    ->where('approver_rank', $currentRank)
                                                                     ->where('status', 'Pending');
                                                                 })
                                                             ->orderBy('created_at', 'desc')
