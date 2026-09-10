@@ -23,6 +23,13 @@ class Shopkeeper extends Authenticatable
         'name','email','password','contact_no','profile_photo'
     ];
 
+    // No $hidden existed at all — the list screen's ->get() with no
+    // ->select() serializes every column including the hashed password
+    // into the JSON response, on every page load of the Shopkeepers list.
+    // Hidden here (not just scoped out of that one query) so every future
+    // place this model gets serialized is protected too.
+    protected $hidden = ['password'];
+
     public static function boot(){
         parent::boot();
     }

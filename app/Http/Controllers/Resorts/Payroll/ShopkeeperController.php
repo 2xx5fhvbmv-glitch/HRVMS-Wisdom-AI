@@ -145,8 +145,11 @@ class ShopkeeperController extends Controller
         $generatedPassword = Str::random(10); // Generate a 10-character random string
         // Hash the password before saving it to the database
         $hashedPassword = Hash::make($generatedPassword);
+        // Compare against the same normalized form now being stored below —
+        // otherwise a differently-cased duplicate ("John@Example.com" vs a
+        // stored "john@example.com") would slip past this check.
         $check = Shopkeeper::where('resort_id', $resort_id)
-            ->where('email', $request->email)
+            ->where('email', strtolower(trim($request->email)))
             ->first();
         if($check) {
             return response()->json(['success' => false, 'msg' => 'Shopkeeper with this email already exists.']);
@@ -155,7 +158,11 @@ class ShopkeeperController extends Controller
         $shopkeeper = Shopkeeper::create([
             'resort_id' => $resort_id,
             'name' => $request->name,
-            'email' => $request->email,
+            // Normalized the same way inlineUpdate() below now does —
+            // previously this saved the raw value while inlineUpdate() ran
+            // ucwords() on it, so a shopkeeper's stored email depended on
+            // whether it was set at creation or edited afterward.
+            'email' => strtolower(trim($request->email)),
             'password'=> $hashedPassword,
             'contact_no' => $request->contact_no,
         ]);
@@ -191,7 +198,11 @@ class ShopkeeperController extends Controller
         try {
             // Update the division's attributes
             $shopkeeper->name = $request->input('name');
-            $shopkeeper->email = ucwords($request->input('email'));
+            // Was ucwords() — for a typical no-space email that just
+            // capitalizes the first character (john@example.com ->
+            // John@example.com). Normalized to lowercase instead, matching
+            // store() above.
+            $shopkeeper->email = strtolower(trim($request->input('email')));
             $shopkeeper->contact_no = $request->input('contact_no');
             
             // Save the changes
