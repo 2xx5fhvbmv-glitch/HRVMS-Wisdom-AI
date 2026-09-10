@@ -442,6 +442,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::get('/talent-acquisition/job-advertisement/list', ['App\Http\Controllers\Resorts\TalentAcquisition\JobAdvertisementController','getList'])->name('resort.ta.jobadvertisment.getList');
     Route::post('/talent-acquisition/job-advertisement/upload', ['App\Http\Controllers\Resorts\TalentAcquisition\JobAdvertisementController','StoreJobAvd'])->name('resort.ta.jobadvertisment.upload');
     Route::delete('/talent-acquisition/job-advertisement/destroy/{id}', ['App\Http\Controllers\Resorts\TalentAcquisition\JobAdvertisementController','destroy'])->name('resort.ta.jobadvertisment.destroy');
+    Route::get('/talent-acquisition/job-advertisement/download/{vacancyId}', ['App\Http\Controllers\Resorts\TalentAcquisition\JobAdvertisementController','downloadComposedAd'])->name('resort.ta.jobadvertisment.download');
 
     Route::Post('/talent-acquisition/hold-vcancies', ['App\Http\Controllers\Resorts\TalentAcquisition\ConfigController','TaHoldVcanciesNotification'])->name('resort.ta.HiringNotification');
 
@@ -472,6 +473,7 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::post('/revert-back', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','RevertBack'])->name('resort.ta.RevertBack');
     Route::post('/talent-acquisition/applicant-file-download', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','GetAwsFiles'])->name('resort.ta.DownloadFile');
     Route::post('/talent-acquisition/applicant-file-download-all', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','GetAllAwsFiles'])->name('resort.ta.DownloadAllFiles');
+    Route::get('/talent-acquisition/applicant-file-download-all-zip/{id}', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','DownloadAllFilesZip'])->name('resort.ta.DownloadAllFilesZip');
 
 
     Route::post('/talent-acquisition/get-applicant-wise-grid-wise', ['App\Http\Controllers\Resorts\TalentAcquisition\ApplicantsController','getApplicantWiseGridWise'])->name('resort.ta.getApplicantWiseGridWise');
