@@ -69,7 +69,7 @@
                             <div class="card-title">
                                 <div class="row justify-content-between align-items-center g-">
                                     <div class="col">
-                                        <h3>Drafts <span class="badge bg-secondary">{{ $drafts->count() }}</span></h3>
+                                        <h3>Drafts &amp; Inactive <span class="badge bg-secondary">{{ $drafts->count() }}</span></h3>
                                     </div>
                                 </div>
                             </div>
@@ -81,6 +81,7 @@
                                             <th>Department</th>
                                             <th>Employee Type</th>
                                             <th>No. of Vacancy</th>
+                                            <th>Status</th>
                                             <th>Date</th>
                                             <th>Action</th>
                                         </tr>
@@ -92,6 +93,7 @@
                                                 <td>{{ $draft->Getdepartment->name ?? 'N/A' }}</td>
                                                 <td>{{ $draft->employee_type ?? 'N/A' }}</td>
                                                 <td>{{ $draft->Total_position_required }}</td>
+                                                <td>{{ $draft->status }}</td>
                                                 <td>{{ $draft->created_at ? \Carbon\Carbon::flexible($draft->created_at)->format('d M Y') : 'N/A' }}</td>
                                                 <td>
                                                     <a href="{{ route('resort.vacancies.edit', $draft->id) }}" class="btn btn-sm ta-btn-secondary">Edit</a>

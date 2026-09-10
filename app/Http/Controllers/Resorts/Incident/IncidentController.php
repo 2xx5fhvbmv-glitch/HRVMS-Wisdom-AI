@@ -878,7 +878,7 @@ class IncidentController extends Controller
             // Mail::send() takes), hence the small IncidentNotificationMail
             // class instead of a one-line send->queue rename.
             Mail::to($admin->email, $recipientName)->queue(
-                new \App\Mail\IncidentNotificationMail($recipientName, $subject, $body, $details, $ctaUrl, $ctaLabel)
+                new \App\Mail\IncidentNotificationMail($recipientName, $subject, $body, $details, $ctaUrl, $ctaLabel, $this->resort->resort_id)
             );
         } catch (\Throwable $e) {
             \Log::warning('Incident email failed for employee ' . $employeeId . ': ' . $e->getMessage());

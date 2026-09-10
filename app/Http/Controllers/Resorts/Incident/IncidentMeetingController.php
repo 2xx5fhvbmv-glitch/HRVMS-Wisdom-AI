@@ -329,7 +329,8 @@ class IncidentMeetingController extends Controller
                                         'Location' => $request->location ?? '—',
                                     ],
                                     route('incident.meeting'),
-                                    'View meetings'
+                                    'View meetings',
+                                    $this->resort->resort_id
                                 )
                             );
                         }

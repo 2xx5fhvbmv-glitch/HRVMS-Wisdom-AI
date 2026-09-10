@@ -18,15 +18,15 @@ class ResortRegistrationEmail extends ResetPasswordNotification
   public $data;
   public $resort_admin;
   public $password;
+  public $useResortBranding;
 
-  public function __construct($data, $resort_admin, $password)
+  public function __construct($data, $resort_admin, $password, $useResortBranding = false)
   {
     $this->data = $data;
-    
+
     $this->resort_admin = $resort_admin;
     $this->password = $password;
-
-    
+    $this->useResortBranding = $useResortBranding;
   }
 
   public function via($notifiable)
@@ -98,6 +98,15 @@ class ResortRegistrationEmail extends ResetPasswordNotification
     $data['mainbody'] = str_replace( $healthy, $yummy, $data['body'] );
 
     $data['settings'] = $settings;
+
+    if ($this->useResortBranding) {
+        // Resort-admin-initiated (bulk import / manual add) — may run in a
+        // queue worker with no Auth session, so pass the resort's own
+        // branding explicitly rather than relying on header/footer's
+        // auth('resort-admin')->user() fallback.
+        $data['resortLogo'] = Common::GetResortLogo($this->data->id);
+        $data['resortName'] = $resort_name;
+    }
 
     // dd($data);
 

@@ -31,9 +31,17 @@ class PerformanceDashboardController extends Controller
             $this->underEmp_id = Common::getSubordinates($reporting_to);
         }
     }
-    public function Admin_dashboard()
+    public function Admin_dashboard(Request $request)
     {
-
+        // Was an empty stub — route (performance/admin-dashboard) resolved
+        // to a real method but it returned nothing (blank page). HR_Dashobard()
+        // already scopes its data via Common::getPerformanceScopedEmpIds(),
+        // which reads the CURRENT authenticated user's own rank/department —
+        // GM/HR-tier gets full visibility, everyone else gets scoped down
+        // automatically — so delegating here (same pattern excom_dashboard()
+        // already uses for Hod_dashboard() below) gives Admin the correctly
+        // scoped view for free, no separate query logic needed.
+        return $this->HR_Dashobard($request);
     }
     public function HR_Dashobard(Request $request)
     {
@@ -385,8 +393,20 @@ class PerformanceDashboardController extends Controller
 
     public function Hod_dashboard(Request $request)
     {
-        $dashboardLabel = request('dashboard_label', 'HOD');
-        $page_header = '<span class="arca-font">'.$dashboardLabel.'</span> Dashboard';
+        // Was an empty stub, same as Admin_dashboard() above — the two
+        // Blade files that looked like they should back this route
+        // (Performance/dashboard/hoddashboard.blade.php + admindashboard.blade.php)
+        // turned out to be leftover copies of the Time & Attendance
+        // dashboard (their own variables are $totalPresentEmployee,
+        // $attendanceDataTodoList, etc. — Attendance data, not Performance),
+        // never actually adapted, so wiring this stub up to render them
+        // would show the wrong module's data. HR_Dashobard() is the real,
+        // already-correct Performance dashboard and already scopes itself
+        // per-viewer via Common::getPerformanceScopedEmpIds() (HOD/EXCOM
+        // get scoped down automatically, same helper HR/GM/Admin go
+        // through) — delegating here is the same fix as excom_dashboard()
+        // already applies to this exact method.
+        return $this->HR_Dashobard($request);
     }
 
     public function excom_dashboard()

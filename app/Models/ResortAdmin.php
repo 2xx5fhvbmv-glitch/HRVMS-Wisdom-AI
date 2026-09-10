@@ -153,7 +153,9 @@ class ResortAdmin extends Authenticatable
 
     public function sendResortRegistrationEmail($resort,$admin,$password)
     {
-      $this->notify(new ResortRegistrationEmail($resort,$admin,$password));
+      // Fired from the super-admin panel creating a resort-admin account —
+      // stays Wisdom-branded (identity + logo), not the resort's own.
+      $this->notify(new ResortRegistrationEmail($resort,$admin,$password,false));
     }
 
     // Relationships
@@ -168,7 +170,10 @@ class ResortAdmin extends Authenticatable
     }
     public function sendResortemployee($resort,$admin,$password)
     {
-      $this->notify(new ResortRegistrationEmail($resort,$admin,$password));
+      // Fired by a resort-admin (bulk import / manual add) — resort's own
+      // branding, matching the "from" address the request-scoped SMTP
+      // override already applies.
+      $this->notify(new ResortRegistrationEmail($resort,$admin,$password,true));
     }
 
     public function sosTeamMemberships()

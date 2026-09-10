@@ -365,6 +365,10 @@
                                         </label>
                                     </li>
                                 </ul>
+                                <div class="form-text mt-1">
+                                    <strong>Active</strong> — this request will be sent for approval immediately.
+                                    <strong>Inactive</strong> — your entry will be saved, but nobody will be notified until you switch this to Active and submit it.
+                                </div>
                             </div>
                         </div>
 
