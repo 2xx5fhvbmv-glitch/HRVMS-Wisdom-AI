@@ -243,8 +243,13 @@ use Illuminate\Support\Facades\Route;
 			Route::get('boarding/boarding-hr-dashboard', [App\Http\Controllers\API\BoardingPassController::class, 'boardingHRDashboard']);
 		});
 
-		//MGR Middleware for SecurityManager
-		Route::middleware(['auth:api', 'check.rank:MGR'])->group(function () {
+		// Was check.rank:MGR ("MGR Middleware for SecurityManager") — no
+		// real Security Manager record in this DB has rank MGR (the real
+		// one is rank HOD, position_title "Security Manager"), same gap
+		// already found and fixed for the SOS module's equivalent gate.
+		// Reuses that exact same middleware (position-title based, not
+		// rank) instead of duplicating the check.
+		Route::middleware(['auth:api', 'security.manager'])->group(function () {
 			Route::get('boarding/boarding-sm-dashboard', [App\Http\Controllers\API\BoardingPassController::class, 'boardingSecurityManagerDashboard']);
 			Route::get('boarding/so-employee-list', [App\Http\Controllers\API\BoardingPassController::class, 'SOEmployeeList']);
 			Route::post('boarding/so-pass-assign', [App\Http\Controllers\API\BoardingPassController::class, 'SOPassAssign']);
