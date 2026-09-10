@@ -94,6 +94,11 @@ class Kernel extends HttpKernel
         'ld.manager' => \App\Http\Middleware\EnsureLDManagerAccess::class,
         'sos.manager' => \App\Http\Middleware\EnsureSOSSecurityManagerAccess::class,
         'sos.security' => \App\Http\Middleware\EnsureSOSSecurityStaffAccess::class,
+        // Same class as sos.manager (Security Manager is one real-world
+        // role used by both the SOS and Island Pass/Boarding Pass modules)
+        // — a second, module-neutral alias so a boarding-pass route doesn't
+        // read as gated by "sos.manager".
+        'security.manager' => \App\Http\Middleware\EnsureSOSSecurityManagerAccess::class,
 
 
 
