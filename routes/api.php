@@ -396,6 +396,16 @@ use Illuminate\Support\Facades\Route;
 			Route::get('ld-manager/feedback-from-res-view/{form_res_id}', [App\Http\Controllers\API\LearningController::class, 'feedbackFormResView']);
 			Route::post('ld-manager/participant-evaluation-from-list', [App\Http\Controllers\API\LearningController::class, 'participantEvaluationFromList']);
 			Route::get('ld-manager/evaluation-from-res-view/{form_res_id}', [App\Http\Controllers\API\LearningController::class, 'evaluationFormResView']);
+
+			// Same gap as the 4 routes above: learning/manager-training-calendar
+			// (POST, start_date/end_date body — the "Core Training Calendar"
+			// screen) sits above under check.rank:EXCOM only. An L&D Manager
+			// who isn't also EXCOM rank 403'd — ldManagerTrainingCalendar() is
+			// a different implementation (day/week/month view, not a date
+			// range) and not a compatible replacement for what the app
+			// already calls, so this reaches the SAME method the app expects
+			// instead of redirecting it to a different contract.
+			Route::post('ld-manager/manager-training-calendar', [App\Http\Controllers\API\LearningController::class, 'managerTrainingCalendar']);
 		});
 
 		// HR onboarding dashboard — self-gated on HR department inside the controller.
