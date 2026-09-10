@@ -3133,6 +3133,7 @@ class Common
 		$config = ResortSmtpConfig::where('resort_id', $resortId)->first();
 
 		if (!$config) {
+			Log::warning("No resort_smtp_configs row for resort_id {$resortId} — email falling back to system default (Wisdom) identity.");
 			return;
 		}
 

@@ -35,6 +35,7 @@
                 </div>
             </div>
             <p class="text-muted px-3 mb-0">Configure this resort's own SMTP account. Once saved, every module (Leave, Payroll, Talent Acquisition, Incidents, etc.) sends email through it instead of the system default.</p>
+            <p class="text-muted px-3 mb-0">Host, Username and Password must be a real, authenticated mail relay for the same domain used in "From Address" (e.g. a Gmail address needs <code>smtp.gmail.com</code> with a Gmail App Password for that exact mailbox) — otherwise strict mail providers (iCloud, Outlook) will mask or reject the sender.</p>
 
             <form method="POST" id="emailConfigForm" class="form-horizontal">
                 @csrf
@@ -50,10 +51,12 @@
                     <div class="col-sm-6">
                         <label for="username" class="form-label">SMTP Username</label>
                         <input type="text" class="form-control" name="username" id="username" value="{{ $config->username ?? '' }}">
+                        <small class="text-muted">Usually the same mailbox as "From Address" — must be able to authenticate to the Host above.</small>
                     </div>
                     <div class="col-sm-6">
                         <label for="password" class="form-label">SMTP Password</label>
                         <input type="password" class="form-control" name="password" id="password" placeholder="{{ $config ? 'Leave blank to keep the current password' : '' }}">
+                        <small class="text-muted">For Gmail/Google Workspace with 2-Step Verification on, this must be an App Password, not the normal account password.</small>
                     </div>
                     <div class="col-sm-6">
                         <label for="encryption" class="form-label">Encryption</label>
@@ -66,11 +69,13 @@
                     <div class="col-sm-6"></div>
                     <div class="col-sm-6">
                         <label for="from_address" class="form-label">From Address</label>
-                        <input type="email" class="form-control" name="from_address" id="from_address" value="{{ $config->from_address ?? '' }}">
+                        <input type="email" class="form-control" name="from_address" id="from_address" placeholder="e.g. hr@yourresort.com" value="{{ $config->from_address ?? '' }}">
+                        <small class="text-muted">The email address recipients will see and reply to.</small>
                     </div>
                     <div class="col-sm-6">
                         <label for="from_name" class="form-label">From Name</label>
-                        <input type="text" class="form-control" name="from_name" id="from_name" value="{{ $config->from_name ?? '' }}">
+                        <input type="text" class="form-control" name="from_name" id="from_name" placeholder="e.g. Your Resort HR" value="{{ $config->from_name ?? '' }}">
+                        <small class="text-muted">A display name only — not another email address.</small>
                     </div>
                 </div>
 
@@ -83,7 +88,7 @@
 
             <div class="px-3 pb-4">
                 <h5>Send Test Email</h5>
-                <p class="text-muted">Save your configuration above, then send a test email to confirm it works.</p>
+                <p class="text-muted">Save your configuration above, then send a test email to confirm it works. If your "From Address" is a Gmail/Google Workspace address, test with a non-Gmail recipient (e.g. iCloud, Outlook) — Gmail-to-Gmail delivery can hide sender-authentication problems that other providers won't.</p>
                 <div class="row g-2 align-items-end">
                     <div class="col-sm-6">
                         <label for="test_email" class="form-label">Recipient Address</label>
