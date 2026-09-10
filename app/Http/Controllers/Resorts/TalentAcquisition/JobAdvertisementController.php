@@ -215,6 +215,126 @@ class JobAdvertisementController extends Controller
 
     }
 
+    /**
+     * Composite the "Job Advertisement Link" (as a QR code + text) onto the
+     * poster image server-side, and serve the result as a download.
+     *
+     * The Vacancies "View Job Ad" modal used to do this client-side: load
+     * the poster into an <img crossOrigin="anonymous">, draw it onto a
+     * <canvas>, and read the canvas back out via toDataURL(). Poster URLs
+     * are presigned Wasabi/S3 URLs (Common::GetJobAdvertisementImage()) —
+     * without permissive CORS headers on that bucket, the canvas is
+     * "tainted" and toDataURL() throws a SecurityError, which the JS
+     * silently caught and fell back to a plain raw-file download with no
+     * QR/link at all. That's the exact symptom reported ("Link is not
+     * imprinting on the ad when downloaded"). Doing the compositing here
+     * instead removes the CORS dependency entirely — the server reads the
+     * poster directly off its own storage disk, no browser fetch involved.
+     *
+     * Deliberately takes only $vacancyId, not a poster URL or a link
+     * string, from the client — both the poster file and the job link are
+     * re-resolved here from data this resort-admin already has authority
+     * over, the same way every other poster/link lookup in this app does,
+     * rather than trusting client-supplied values for a server-side image
+     * composite.
+     */
+    public function downloadComposedAd($vacancyId)
+    {
+        if (!$this->resort) {
+            return abort(401);
+        }
+        $resortId = $this->resort->resort_id;
+
+        // Same fallback as Common::resolveVacancyPosterImage(): this
+        // vacancy's own poster, else the resort-wide default.
+        $ad = JobAdvertisement::where('Resort_id', $resortId)->where('vacancy_id', $vacancyId)->first();
+        if (!$ad) {
+            $ad = JobAdvertisement::where('Resort_id', $resortId)->whereNull('vacancy_id')->first();
+        }
+        if (!$ad || empty($ad->Jobadvimg)) {
+            return abort(404, 'No job advertisement image found.');
+        }
+
+        // Same relative path StoreJobAvd() writes to above — read through
+        // the same driver-aware disk the write side uses.
+        $relPath = config('settings.Resort_JobAdvertisement') . '/' . $resortId . '/' . $ad->Jobadvimg;
+        try {
+            $imageBytes = \App\Helpers\StorageHelper::get($relPath);
+        } catch (\Throwable $e) {
+            \Log::warning('downloadComposedAd: could not read poster file', ['path' => $relPath, 'error' => $e->getMessage()]);
+            return abort(404, 'Job advertisement image not found.');
+        }
+
+        // Same application_links chain VacancyController already joins to
+        // display "Job Advertisement Link" (MAX(t5.link) per vacancy) — one
+        // vacancy scoped down instead of the whole grid.
+        $jobLink = DB::table('vacancies')
+            ->join('t_anotification_parents as t3', 't3.V_id', '=', 'vacancies.id')
+            ->join('t_anotification_children as t4', 't4.Parent_ta_id', '=', 't3.id')
+            ->join('application_links as t5', 't5.ta_child_id', '=', 't4.id')
+            ->where('vacancies.resort_id', $resortId)
+            ->where('vacancies.id', $vacancyId)
+            ->max('t5.link');
+
+        if (empty($jobLink)) {
+            // No link to embed — same as the JS's original "no job link"
+            // path: just download the raw poster as-is.
+            $extension = pathinfo($ad->Jobadvimg, PATHINFO_EXTENSION);
+            return response($imageBytes, 200)
+                ->header('Content-Type', \App\Helpers\StorageHelper::mimeType($relPath) ?: 'application/octet-stream')
+                ->header('Content-Disposition', 'attachment; filename="job-advertisement.' . $extension . '"');
+        }
+
+        $poster = \Image::make($imageBytes);
+
+        $qrSize = 120;
+        $padding = 20;
+        $canvas = \Image::canvas($poster->width(), $poster->height() + $qrSize + $padding * 2, '#ffffff');
+        $canvas->insert($poster, 'top-left', 0, 0);
+
+        // Drawn by hand instead of via simplesoftwareio/simple-qrcode: that
+        // package's PNG output needs Imagick (see the 'svg'-only QR
+        // elsewhere in this app, config/services or ConfigurationController
+        // — this server only has GD). bacon-qr-code (the package simple-
+        // qrcode wraps) only ships SVG/EPS/Imagick renderers, none of which
+        // GD can rasterize — so the raw module matrix is walked directly
+        // and filled as GD rectangles, the standard workaround for
+        // "QR code + GD only, no Imagick".
+        $qrCode = \BaconQrCode\Encoder\Encoder::encode($jobLink, \BaconQrCode\Common\ErrorCorrectionLevel::M());
+        $matrix = $qrCode->getMatrix();
+        $moduleCount = $matrix->getWidth();
+        $moduleSize = max(1, (int) floor($qrSize / $moduleCount));
+        $qrPixelSize = $moduleSize * $moduleCount;
+        $qrX = (int) (($canvas->width() - $qrPixelSize) / 2);
+        $qrY = $poster->height() + $padding;
+
+        for ($y = 0; $y < $moduleCount; $y++) {
+            for ($x = 0; $x < $moduleCount; $x++) {
+                if ($matrix->get($x, $y) === 1) {
+                    $canvas->rectangle(
+                        $qrX + $x * $moduleSize,
+                        $qrY + $y * $moduleSize,
+                        $qrX + ($x + 1) * $moduleSize - 1,
+                        $qrY + ($y + 1) * $moduleSize - 1,
+                        function ($draw) {
+                            $draw->background('#000000');
+                        }
+                    );
+                }
+            }
+        }
+
+        $canvas->text('Apply now: ' . $jobLink, (int) ($canvas->width() / 2), $qrY + $qrPixelSize + 18, function ($font) {
+            $font->size(14);
+            $font->color('#000000');
+            $font->align('center');
+            $font->valign('top');
+        });
+
+        return $canvas->response('png')
+            ->header('Content-Disposition', 'attachment; filename="job-advertisement.png"');
+    }
+
     public function GenrateAdvLink(Request $request)
     {
 

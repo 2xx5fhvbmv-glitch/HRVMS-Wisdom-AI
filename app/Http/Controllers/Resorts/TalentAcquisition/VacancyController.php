@@ -1390,7 +1390,7 @@ class VacancyController extends Controller
 
                 if ($canSeeAction) {
                     $actions .= '<a href="javascript:void(0)" class="btn btn-sm ta-btn-attention ExtendJobLink" data-ExpiryDate="'.$row->ExpiryDate.'" data-ApplicationId="'.$row->ApplicationId.'" data-bs-toggle="tooltip" data-bs-placement="top" title="Extend The Job Ad Link"><i class="fa-solid fa-link"></i></a>
-                            <a href="javascript:void(0)" class="btn btn-sm ta-btn-secondary viewJobAd ms-1" data-position="'.$row->positionTitle.'" data-joblink="'.htmlspecialchars($row->jobAdLink ?? '', ENT_QUOTES, 'UTF-8').'" data-alljobimages=\''.htmlspecialchars($row->allJobAdImages, ENT_QUOTES, 'UTF-8').'\' data-bs-toggle="tooltip" data-bs-placement="top" title="View Job Advertisement"><i class="fa-solid fa-image"></i></a>';
+                            <a href="javascript:void(0)" class="btn btn-sm ta-btn-secondary viewJobAd ms-1" data-vacancy-id="'.e($row->vacancy_id).'" data-position="'.$row->positionTitle.'" data-joblink="'.htmlspecialchars($row->jobAdLink ?? '', ENT_QUOTES, 'UTF-8').'" data-alljobimages=\''.htmlspecialchars($row->allJobAdImages, ENT_QUOTES, 'UTF-8').'\' data-bs-toggle="tooltip" data-bs-placement="top" title="View Job Advertisement"><i class="fa-solid fa-image"></i></a>';
                 }
 
                 return $actions;
