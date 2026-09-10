@@ -2038,39 +2038,11 @@
             });
         });
 
-        // Download All Files
+        // Download All Files — a single .zip named after the candidate +
+        // position, instead of opening every document in its own tab.
         $(document).on("click", ".DownloadAllFiles", function () {
             let fileId = $(this).data("id");
-            let btn = $(this);
-            btn.prop('disabled', true).text('Downloading...');
-
-            $.ajax({
-                url: "{{ route('resort.ta.DownloadAllFiles') }}",
-                type: "POST",
-                data: { id: fileId, "_token": "{{ csrf_token() }}" },
-                success: function(response) {
-                    btn.prop('disabled', false).text('Download All');
-                    if (response.success) {
-                        response.files.forEach(function(file, index) {
-                            setTimeout(function() {
-                                let a = document.createElement('a');
-                                a.href = file.url;
-                                a.download = file.name;
-                                a.target = '_blank';
-                                document.body.appendChild(a);
-                                a.click();
-                                document.body.removeChild(a);
-                            }, index * 500);
-                        });
-                    } else {
-                        toastr.error(response.message, "Error", { positionClass: 'toast-bottom-right' });
-                    }
-                },
-                error: function() {
-                    btn.prop('disabled', false).text('Download All');
-                    toastr.error("Something went wrong!", "Error", { positionClass: 'toast-bottom-right' });
-                }
-            });
+            window.location.href = "{{ route('resort.ta.DownloadAllFilesZip', ':id') }}".replace(':id', fileId);
         });
 
         $('#shareMeetLinkForm').validate({

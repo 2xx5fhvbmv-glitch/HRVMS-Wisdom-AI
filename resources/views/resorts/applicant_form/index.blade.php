@@ -2014,10 +2014,36 @@
                         if (eventType === "drop") {
                             const droppedFiles = e.dataTransfer.files;
                             if (droppedFiles.length) {
+                                // Other Document is multi-file, same as the
+                                // click-to-browse path above — was always
+                                // doing inputElement.files = droppedFiles
+                                // (a straight overwrite) regardless of which
+                                // input this was, so dropping onto this
+                                // dropzone silently discarded whatever was
+                                // already accumulated in window._otherDocFiles,
+                                // and only ever kept the LAST drop's files.
+                                if (inputElement.name === 'other_document[]') {
+                                    if (!window._otherDocFiles) window._otherDocFiles = [];
+                                    let hasInvalid = false;
+                                    for (let i = 0; i < droppedFiles.length; i++) {
+                                        const f = droppedFiles[i];
+                                        if (f.type !== 'application/pdf') {
+                                            hasInvalid = true;
+                                            continue;
+                                        }
+                                        window._otherDocFiles.push(f);
+                                    }
+                                    if (hasInvalid) {
+                                        toastr.error('Only PDF files are allowed.');
+                                    }
+                                    renderOtherDocList(inputElement, dropZoneElement);
+                                    return;
+                                }
+
                                 inputElement.files = droppedFiles;
                                 const file = droppedFiles[0];
                                 const fileType = getFileType(inputElement);
-                                
+
                                 if (validateFile(file, fileType,inputElement)) {
                                     updateDropzoneThumbnail(dropZoneElement, file);
                                     $(inputElement).parsley().validate();
