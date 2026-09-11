@@ -316,6 +316,11 @@ Route::prefix('resort')->middleware(['auth:resort-admin','revalidate','checkReso
     Route::post('/employee/import', ['App\Http\Controllers\Resorts\EmployeeController','ImportEmployee'])->name('resort.Depat_Position_Emp_Import');
     Route::get( '/employee/export', 'EmployeeController@exportRelatedDepartment')->name('resort.export.Employee');
     Route::get('/import/status/{history}', ['App\Http\Controllers\Resorts\EmployeeController','importStatus'])->name('resort.import.status');
+
+    // Casual & Intern bulk onboarding (Phase 6 of the Casual/Intern support plan)
+    Route::get('/employee/import-casual-intern', 'EmployeeController@ImportCasualInternEmployee')->name('resort.employee.importCasualIntern');
+    Route::get('/employee/import-casual-intern/template', 'EmployeeController@downloadCasualInternTemplate')->name('resort.employee.downloadCasualInternTemplate');
+    Route::post('/employee/import-casual-intern/upload', 'EmployeeController@ImportCasualInternEmployeeUpload')->name('resort.employee.uploadCasualIntern');
     Route::get('/master-import', ['App\Http\Controllers\Resorts\MasterImportController','index'])->name('resort.masterimport.index');
     Route::get( '/attandanceHisotry/export/', ['App\Http\Controllers\Resorts\TimeAndAttendance\EmployeeController','attandanceHisotryExport']);
     /* salary */
