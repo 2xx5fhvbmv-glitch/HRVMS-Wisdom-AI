@@ -160,6 +160,17 @@ class WorkforcePlanningReportController extends Controller
                 'filters'     => ['year'],
                 'handler'     => 'executiveSummary',
             ],
+            // Casual/Intern support plan Phase 8 — a per-employee registry,
+            // distinct from employment_type_planning's headcount-distribution
+            // above. Filters by the same $employmentTypes option index()
+            // already exposes (whatever real employment_type values exist),
+            // no new filter UI needed.
+            'casual_intern_registry' => [
+                'name'        => 'Casual & Intern Registry',
+                'description' => 'Every active Casual/Intern employee — service provider, tenure, department/position, reporting manager.',
+                'filters'     => ['department', 'employment_type'],
+                'handler'     => 'casualInternRegistry',
+            ],
         ];
     }
 
@@ -1071,6 +1082,63 @@ class WorkforcePlanningReportController extends Controller
             ])->all();
 
         return ['columns' => ['Employment Type', 'Department', 'Planned Headcount'], 'rows' => $rows];
+    }
+
+    /**
+     * Casual & Intern Registry — per-employee, not a headcount distribution
+     * (see employment_type_planning above for that). Service provider is
+     * pulled from the offline_interviews record the employee was hired
+     * against (offline_interviews.created_employee_id = employees.id,
+     * set once by OfflineInterviewController::finalize()) — 'N/A' when
+     * there isn't one, e.g. Phase 6's bulk-imported existing staff, who
+     * were never hired through a vacancy/service-provider flow at all.
+     */
+    public function casualInternRegistry(array $filters): array
+    {
+        $resortId = $this->resort->resort_id;
+        $scoped   = Common::getScopedDepartmentIds();
+
+        $rows = DB::table('employees as e')
+            ->leftJoin('resort_admins as ra', 'ra.id', '=', 'e.Admin_Parent_id')
+            ->leftJoin('resort_departments as d', 'd.id', '=', 'e.Dept_id')
+            ->leftJoin('resort_positions as p', 'p.id', '=', 'e.Position_id')
+            ->leftJoin('employees as mgr', 'mgr.id', '=', 'e.reporting_to')
+            ->leftJoin('resort_admins as mgr_ra', 'mgr_ra.id', '=', 'mgr.Admin_Parent_id')
+            ->leftJoin('offline_interviews as oi', 'oi.created_employee_id', '=', 'e.id')
+            ->where('e.resort_id', $resortId)
+            ->whereIn('e.status', ['Active', 'Probationary', 'Onboarding'])
+            ->whereIn('e.employment_type', ['Casual', 'Internship'])
+            ->when($scoped !== null, fn($q) => $q->whereIn('e.Dept_id', $scoped))
+            ->when($filters['department'], fn($q) => $q->where('e.Dept_id', $filters['department']))
+            ->when($filters['employment_type'], fn($q) => $q->where('e.employment_type', $filters['employment_type']))
+            ->orderBy('ra.first_name')
+            ->select(
+                'e.id', 'e.Emp_id', 'e.employment_type', 'e.joining_date',
+                'ra.first_name', 'ra.last_name',
+                'd.name as department', 'p.position_title',
+                'mgr_ra.first_name as mgr_first_name', 'mgr_ra.last_name as mgr_last_name',
+                'oi.service_provider_name'
+            )
+            ->get()
+            ->map(function ($r) {
+                $joined = $r->joining_date ? Carbon::parse($r->joining_date) : null;
+                return [
+                    'Employee'          => trim(($r->first_name ?? '') . ' ' . ($r->last_name ?? '')) ?: $r->Emp_id,
+                    'Emp ID'            => $r->Emp_id,
+                    'Employment Type'   => $r->employment_type,
+                    'Department'        => $r->department ?? 'N/A',
+                    'Position'          => $r->position_title ?? 'N/A',
+                    'Reporting Manager' => trim(($r->mgr_first_name ?? '') . ' ' . ($r->mgr_last_name ?? '')) ?: 'N/A',
+                    'Service Provider'  => $r->service_provider_name ?: 'N/A',
+                    'Joining Date'      => $joined ? $joined->format('Y-m-d') : 'N/A',
+                    'Tenure'            => $joined ? $joined->diffForHumans(null, true) : 'N/A',
+                ];
+            })->all();
+
+        return [
+            'columns' => ['Employee', 'Emp ID', 'Employment Type', 'Department', 'Position', 'Reporting Manager', 'Service Provider', 'Joining Date', 'Tenure'],
+            'rows' => $rows,
+        ];
     }
 
     /** #19 Workforce Cost by Position. */
